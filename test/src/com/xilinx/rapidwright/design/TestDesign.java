@@ -247,4 +247,15 @@ public class TestDesign {
         Design d2 = new Design("test2", d.getPartName());
         Assertions.assertNotNull(d2.copyCell(orig, "copy"));
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "cell_with_backslash_2022.2.dcp",
+            "cell_with_backslash_2022.1.dcp",
+    })
+    public void testCellWithBackslash(String dcp) {
+        Design design = RapidWrightDCP.loadDCP(dcp);
+        Cell c = design.getCell("this.is.an\\.escaped\\.identifier");
+        Assertions.assertNotNull(c);
+        Assertions.assertNotNull(c.getEDIFHierCellInst());
+    }
 }
