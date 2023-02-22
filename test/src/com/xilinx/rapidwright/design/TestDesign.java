@@ -304,7 +304,7 @@ public class TestDesign {
             Assertions.assertNotNull(n);
             Assertions.assertEquals(ehn.getHierarchicalNetName(), n.getName());
         }
-        // 2 + {a, b, o, GLOBAL_USEDNET, GLOBAL_LOGIC0}
-        Assertions.assertEquals(design.getNets().size(), 2 + 5);
+        final int extraNets = 5; // {a, b, o, GLOBAL_USEDNET, GLOBAL_LOGIC0}
+        Assertions.assertEquals(design.getNets().size(), 2 + extraNets);
     }
 }
