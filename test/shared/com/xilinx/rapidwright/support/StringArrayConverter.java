@@ -38,6 +38,7 @@ public class StringArrayConverter extends SimpleArgumentConverter {
             String value = (String) arg0;
             return value.split("\\s*,\\s*");
         }
-        return null;
+        throw new RuntimeException("ERROR: Unrecognized parameter '"+arg0
+                                    +"', could not be converted to a String[].");
     }
 }
