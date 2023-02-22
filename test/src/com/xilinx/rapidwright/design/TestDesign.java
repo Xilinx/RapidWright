@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -252,36 +253,39 @@ public class TestDesign {
 
     @ParameterizedTest
     @CsvSource({
-            "cell_with_backslash_2022.2.dcp,false",
-            "cell_with_backslash_2022.1.dcp,false",
-            "cell_with_backslash_2021.2.dcp,false",
-            "cell_with_backslash_double_2021.2.dcp,true",
-            "cell_with_backslash_double_2022.1.dcp,true",
-            "cell_with_backslash_double_2022.2.dcp,true",
+            "design_with_backslash_2022.2.dcp",
+            "design_with_backslash_2022.1.dcp",
+            "design_with_backslash_2021.2.dcp",
     })
-    public void testCellWithBackslash(String dcp, boolean doubleBackslash, @TempDir Path tempDir) {
+    public void testDesignWithBackslash(String dcp, @TempDir Path tempDir) {
         Design design = RapidWrightDCP.loadDCP(dcp);
-        testCellWithBackslashHelper(design, doubleBackslash);
+        testDesignWithBackslashHelper(design);
 
         if (dcp.endsWith("_2021.2.dcp") || dcp.endsWith("_2022.1.dcp")) {
             final Path rapidWrightDcp = tempDir.resolve("rapidwright.dcp");
             design.writeCheckpoint(rapidWrightDcp);
             design = Design.readCheckpoint(rapidWrightDcp);
-            testCellWithBackslashHelper(design, doubleBackslash);
+            testDesignWithBackslashHelper(design);
         }
     }
 
-    private static void testCellWithBackslashHelper(Design design, boolean doubleBackslash) {
-        String cellName;
-        if (doubleBackslash) {
-            cellName = "this.is.an\\\\.escaped\\.identifier";
-        } else {
-            cellName = "this.is.an\\.escaped\\.identifier";
+    private static void testDesignWithBackslashHelper(Design design) {
+        for (String cellName : Arrays.asList("this.is.an\\.escaped\\.cell\\.identifier",
+                "this.is.another\\\\.escaped\\.cell\\.identifier")) {
+            EDIFHierCellInst ehci = design.getNetlist().getHierCellInstFromName(cellName);
+            Assertions.assertNotNull(ehci);
+            Cell c = design.getCell(cellName);
+            Assertions.assertNotNull(c);
+            Assertions.assertEquals(ehci.getFullHierarchicalInstName(), c.getName());
         }
-        EDIFHierCellInst ehci = design.getNetlist().getHierCellInstFromName(cellName);
-        Assertions.assertNotNull(ehci);
-        Cell c = design.getCell(cellName);
-        Assertions.assertNotNull(c);
-        Assertions.assertEquals(ehci.getFullHierarchicalInstName(), c.getName());
+
+        for (String netName : Arrays.asList("this.is.an\\.escaped\\.net\\.identifier",
+                "this.is.another\\\\.escaped\\.net\\.identifier")) {
+            EDIFHierNet ehn = design.getNetlist().getHierNetFromName(netName);
+            Assertions.assertNotNull(ehn);
+            Net n = design.getNet(netName);
+            Assertions.assertNotNull(n);
+            Assertions.assertEquals(ehn.getHierarchicalNetName(), n.getName());
+        }
     }
 }
