@@ -251,6 +251,22 @@ public class TestDesign {
         Assertions.assertNotNull(d2.copyCell(orig, "copy"));
     }
 
+    /**
+     * Input description: (synthesized out of context)
+     * module top(input a, b,
+     *            input \this.is.an\.escaped\.net\.identifier ,
+     *            output o);
+     *
+     * wire \this.is.another\\.escaped\$net\+&!identifier ;
+     *
+     * (* DONT_TOUCH="true" *)
+     * LUT2 \this.is.an\.escaped\.cell\.identifier (.O(\this.is.another\\.escaped\$net\+&!identifier ), .I0(\this.is.an\.escaped\.net\.identifier ), .I1(a));
+     *
+     * (* DONT_TOUCH="true" *)
+     * LUT2 \this.is.another\\.escaped\$cell\+&!identifier (.O(o), .I0(\this.is.another\\.escaped\$net\+&!identifier ), .I1(b));
+     *
+     * endmodule
+     */
     @ParameterizedTest
     @CsvSource({
             "design_with_backslash_2022.2.dcp",
