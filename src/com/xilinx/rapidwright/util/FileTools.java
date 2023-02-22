@@ -144,7 +144,7 @@ public class FileTools {
     /** Base URL for download data files */
     public static final String RAPIDWRIGHT_DATA_URL = "http://data.rapidwright.io/";
     /** Suffix added to data file names to capture md5 status */
-    public static String MD5_DATA_FILE_SUFFIX = ".md5";
+    public static final String MD5_DATA_FILE_SUFFIX = ".md5";
 
     private static boolean OVERRIDE_DATA_FILE_DOWNLOAD = false;
 
@@ -923,7 +923,7 @@ public class FileTools {
         for (String deviceName : devices) {
             Device device = Device.getDevice(deviceName);
             device.ensureDeviceCacheFileIsGenerated();
-            RouteThruHelper rtHelper = new RouteThruHelper(device);
+            new RouteThruHelper(device);
             Device.releaseDeviceReferences();
         }
     }
@@ -943,6 +943,34 @@ public class FileTools {
             devices.add(p.getDevice());
         }
         ensureDataFilesAreStaticInstallFriendly(devices.toArray(new String[devices.size()]));
+    }
+
+    /**
+     * Gets the list of all relative dependent data files given the set of devices
+     * provided.
+     * 
+     * @param devices The list of devices to be used to compile the list of needed
+     *                data files.
+     * @return The list of all necessary data files to operate RapidWright
+     *         independently from downloads or generating cache files.
+     */
+    public static List<String> getAllDependentDataFiles(String... devices) {
+        List<String> expectedFiles = new ArrayList<>();
+        for (String dataFile : new String[] { CELL_PIN_DEFAULTS_FILE_NAME, PART_DUMP_FILE_NAME, 
+                                              PART_DB_PATH, UNISIM_DATA_FILE_NAME }) {
+            expectedFiles.add(dataFile);
+            expectedFiles.add(dataFile + MD5_DATA_FILE_SUFFIX);
+        }
+
+        for (String deviceName : devices) {
+            Part part = PartNameTools.getPart(deviceName);
+            String devResName = getDeviceResourceSuffix(part);
+            expectedFiles.add(devResName + DEVICE_FILE_SUFFIX);
+            expectedFiles.add(devResName + DEVICE_FILE_SUFFIX + MD5_DATA_FILE_SUFFIX);
+            expectedFiles.add(devResName + DEVICE_CACHE_FILE_SUFFIX);
+            expectedFiles.add(getRouteThruFileName(deviceName));
+        }
+        return expectedFiles;
     }
 
     /**
@@ -1124,6 +1152,16 @@ public class FileTools {
 
     public static String getDeviceResourceCache(Part part) {
         return getDeviceResourceSuffix(part) + DEVICE_CACHE_FILE_SUFFIX;
+    }
+
+    /**
+     * Gets the relative routethru file name for the given device.
+     * 
+     * @param deviceName Name of the device
+     * @return Relative routethru data file name for the given device.
+     */
+    public static String getRouteThruFileName(String deviceName) {
+        return ROUTETHRU_FOLDER_NAME + File.separator + deviceName + ".rt";
     }
 
     /**

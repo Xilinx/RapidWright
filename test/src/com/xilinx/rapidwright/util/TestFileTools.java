@@ -25,8 +25,6 @@ package com.xilinx.rapidwright.util;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
@@ -34,34 +32,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.converter.ConvertWith;
 import org.junit.jupiter.params.provider.CsvSource;
 
-import com.xilinx.rapidwright.device.Part;
-import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.support.StringArrayConverter;
 
 public class TestFileTools {
-
-    private static final String testDevice = "xc7a15t"; 
-    
-    public List<String> getExpectedFiles(String... devices) {
-        List<String> expectedFiles = new ArrayList<>();
-        expectedFiles.add("data/cell_pin_defaults.dat");
-        expectedFiles.add("data/cell_pin_defaults.dat.md5");
-        expectedFiles.add("data/partdump.csv");
-        expectedFiles.add("data/partdump.csv.md5");
-        expectedFiles.add("data/parts.db");
-        expectedFiles.add("data/parts.db.md5");
-        expectedFiles.add("data/unisim_data.dat");
-        expectedFiles.add("data/unisim_data.dat.md5");
-
-        for (String testDevice : devices) {
-            Part part = PartNameTools.getPart(testDevice);
-            expectedFiles.add(FileTools.getPartFolderResourceName(part) + "/" + testDevice + "_db.dat");
-            expectedFiles.add(FileTools.getPartFolderResourceName(part) + "/" + testDevice + "_db_cache.dat");
-            expectedFiles.add(FileTools.getPartFolderResourceName(part) + "/" + testDevice + "_db.dat.md5");
-            expectedFiles.add("data/routeThrus/" + testDevice + ".rt");
-        }
-        return expectedFiles;
-    }
 
     @ParameterizedTest
     @CsvSource({ "'xc7a15t'", "'xc7a15t, xcau10p'" })
@@ -95,7 +68,7 @@ public class TestFileTools {
             throw new RuntimeException(e);
         }
         
-        for (String expectedFile : getExpectedFiles(devices)) {
+        for (String expectedFile : FileTools.getAllDependentDataFiles(devices)) {
             Assertions.assertTrue(tmpPath.resolve(expectedFile).toFile().exists());
         }
     }
