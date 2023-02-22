@@ -259,8 +259,19 @@ public class TestDesign {
             "cell_with_backslash_double_2022.1.dcp,true",
             "cell_with_backslash_double_2022.2.dcp,true",
     })
-    public void testCellWithBackslash(String dcp, boolean doubleBackslash) {
+    public void testCellWithBackslash(String dcp, boolean doubleBackslash, @TempDir Path tempDir) {
         Design design = RapidWrightDCP.loadDCP(dcp);
+        testCellWithBackslashHelper(design, doubleBackslash);
+
+        if (dcp.endsWith("_2021.2.dcp") || dcp.endsWith("_2022.1.dcp")) {
+            final Path rapidWrightDcp = tempDir.resolve("rapidwright.dcp");
+            design.writeCheckpoint(rapidWrightDcp);
+            design = Design.readCheckpoint(rapidWrightDcp);
+            testCellWithBackslashHelper(design, doubleBackslash);
+        }
+    }
+
+    private static void testCellWithBackslashHelper(Design design, boolean doubleBackslash) {
         String cellName;
         if (doubleBackslash) {
             cellName = "this.is.an\\\\.escaped\\.identifier";
