@@ -271,21 +271,24 @@ public class TestDesign {
 
     private static void testDesignWithBackslashHelper(Design design) {
         for (String cellName : Arrays.asList("this.is.an\\.escaped\\.cell\\.identifier",
-                "this.is.another\\\\.escaped\\.cell\\.identifier")) {
+                "this.is.another\\\\.escaped\\$cell\\+&!identifier")) {
             EDIFHierCellInst ehci = design.getNetlist().getHierCellInstFromName(cellName);
             Assertions.assertNotNull(ehci);
             Cell c = design.getCell(cellName);
             Assertions.assertNotNull(c);
             Assertions.assertEquals(ehci.getFullHierarchicalInstName(), c.getName());
         }
+        Assertions.assertEquals(design.getCells().size(), 2);
 
         for (String netName : Arrays.asList("this.is.an\\.escaped\\.net\\.identifier",
-                "this.is.another\\\\.escaped\\.net\\.identifier")) {
+                "this.is.another\\\\.escaped\\$net\\+&!identifier")) {
             EDIFHierNet ehn = design.getNetlist().getHierNetFromName(netName);
             Assertions.assertNotNull(ehn);
             Net n = design.getNet(netName);
             Assertions.assertNotNull(n);
             Assertions.assertEquals(ehn.getHierarchicalNetName(), n.getName());
         }
+        // 2 + {a, b, o, GLOBAL_USEDNET, GLOBAL_LOGIC0}
+        Assertions.assertEquals(design.getNets().size(), 2 + 5);
     }
 }
