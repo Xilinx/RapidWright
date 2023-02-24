@@ -203,10 +203,6 @@ public class EDIFHierPortInst {
     public Cell getPhysicalCell(Design design) {
         String cellName = getFullHierarchicalInstName();
         Cell cell = design.getCell(cellName);
-        if (cell == null) {
-            // Retry with backslashes escaped one more time
-            cell = design.getCell(cellName.replace("\\", "\\\\"));
-        }
         return cell;
     }
 

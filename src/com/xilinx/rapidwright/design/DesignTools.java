@@ -2584,7 +2584,7 @@ public class DesignTools {
             Net net = null;
             if (origNet.isStaticNet()) {
                 net = origNet;
-            }else {
+            } else {
                 String parentNetName = destNetlist.getParentNetName(netName);
                 if (parentNetName == null) {
                     parentNetName = netName;
@@ -2617,7 +2617,7 @@ public class DesignTools {
                             }
                         }
                     }
-                }else {
+                } else {
                     curr = curr.getSourcePin();
                     if (curr.isSitePort()) continue;
                     String belName = curr.getBELName();
