@@ -524,7 +524,7 @@ public class EDIFTools {
                         currNet = createUniqueNet(hierParentInst.getCellType(), newName);
                         currNet.addPortInst(outerPortInst);
                     }
-                }else {
+                } else {
                     // no port to the parent cell above exists, create one
                     EDIFCell cellType = hierParentInst.getCellType();
                     String newPortName = newName;
@@ -567,11 +567,10 @@ public class EDIFTools {
                     snkNet.addPortInst(finalSrc.getPortInst());
                 }
                 return;
-            }else {
+            } else {
                 snkNet.removePortInst(finalSnk.getPortInst());
             }
         }
-
         // Make final connection in the common ancestor instance
         finalSrc.getNet().addPortInst(finalSnk.getPortInst());
     }
@@ -686,7 +685,7 @@ public class EDIFTools {
             if (i == parts.length-2) {
                 EDIFNet targetNet = currInst.getCellType().getNet(parts[parts.length-1]);
                 targetNet.createPortInst(newPort);
-            }else{
+            } else {
                 EDIFNet childNet = new EDIFNet(topPortNet.getName(), currInst.getCellType());
                 childNet.createPortInst(newPort);
                 currNet = childNet;
@@ -887,7 +886,7 @@ public class EDIFTools {
                 try {
                     netlist = BinaryEDIFReader.readBinaryEDIF(bedif);
                     return netlist;
-                } catch(Exception e) {
+                } catch (Exception e) {
                     System.out.println("WARNING: Unable to read Binary EDIF: " + bedif.toString()
                             + ", falling back to reading EDIF: " + edifFileName.toString());
                 }
