@@ -31,6 +31,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -149,5 +150,62 @@ public class TestEDIFTools {
         }
 
         Assertions.assertFalse(EDIFTools.uniqueifyNetlist(design));
+    }
+
+    @Test
+    public void testCreateUniqueNet() {
+        Design design = new Design("test", Device.AWS_F1);
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = netlist.getTopCell();
+
+        String netName = "foo";
+        Assertions.assertEquals(netName, EDIFTools.createUniqueNet(top, netName).getName());
+
+        String newNet1 = EDIFTools.createUniqueNet(top, netName).getName();
+        Assertions.assertNotEquals(newNet1, netName);
+        Assertions.assertTrue(newNet1.matches(netName + "_rw_created\\d+"));
+        String newNet2 = EDIFTools.createUniqueNet(top, netName).getName();
+        Assertions.assertNotEquals(newNet2, netName);
+        Assertions.assertNotEquals(newNet2, newNet1);
+        Assertions.assertTrue(newNet2.matches(netName + "_rw_created\\d+"));
+
+        // Check that creating a net with the same name as an existing port is allowed.
+        String portName = "bar";
+        top.createPort(portName, EDIFDirection.INPUT, 1);
+        Assertions.assertEquals(portName, EDIFTools.createUniqueNet(top, portName).getName());
+
+        // Canary to check that creating a net with the same name as the root name of an existing bus net
+        // -- designating by the existence of at least one bus[\d+] -- is allowed.
+        // (Even though doing so may cause Vivado an issue.)
+        String busNetName = "baz";
+        top.createNet(busNetName + "[999]");
+        Assertions.assertEquals(busNetName, EDIFTools.createUniqueNet(top, busNetName).getName());
+    }
+
+    @Test
+    public void testCreateUniquePort() {
+        Design design = new Design("test", Device.AWS_F1);
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = netlist.getTopCell();
+
+        // Single-bit port
+        String portName = "foo";
+        Assertions.assertEquals(portName, EDIFTools.createUniquePort(top, portName, EDIFDirection.INPUT, 1).getName());
+
+        // Multi-bit bus port
+        int busPortWidth = 16;
+        String busPortBaseName = "bar";
+        String busPortName = busPortBaseName + "[" + (busPortWidth-1) + ":0]";
+        Assertions.assertEquals(busPortName, EDIFTools.createUniquePort(top, busPortName, EDIFDirection.INPUT, 16).getName());
+
+        // Check that creating a new port with the same basename as a port gets uniquified
+        String slicedPortName = busPortBaseName + "[17]";
+        String newPort1 = EDIFTools.createUniquePort(top, slicedPortName, EDIFDirection.INPUT, 1).getName();
+        Assertions.assertNotEquals(newPort1, slicedPortName);
+        Assertions.assertTrue(newPort1.matches(Pattern.quote(slicedPortName) + "_rw_created\\d+"));
+        String newPort2 = EDIFTools.createUniquePort(top, slicedPortName, EDIFDirection.OUTPUT, 1).getName();
+        Assertions.assertNotEquals(newPort2, slicedPortName);
+        Assertions.assertNotEquals(newPort2, newPort1);
+        Assertions.assertTrue(newPort2.matches(Pattern.quote(slicedPortName) + "_rw_created\\d+"));
     }
 }
