@@ -46,6 +46,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -143,7 +144,7 @@ public class EDIFTools {
 
     public static final String LOAD_TCL_SUFFIX = "_load.tcl";
 
-    public static int UNIQUE_COUNT = 0;
+    public static final AtomicInteger UNIQUE_COUNT = new AtomicInteger();
 
     /**
      * Flag to set a feature where any .edf file that is attempted to be loaded will check if an
@@ -155,7 +156,7 @@ public class EDIFTools {
             System.getenv("RW_ENABLE_EDIF_BINARY_CACHING") != null;
 
     public static String getUniqueSuffix() {
-        return "_rw_created" + UNIQUE_COUNT++;
+        return "_rw_created" + UNIQUE_COUNT.getAndIncrement();
     }
 
     /**
