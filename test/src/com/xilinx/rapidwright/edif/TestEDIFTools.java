@@ -24,21 +24,19 @@
 
 package com.xilinx.rapidwright.edif;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-
-import java.nio.charset.StandardCharsets;
-import java.util.regex.Pattern;
-
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.regex.Pattern;
 
 public class TestEDIFTools {
 
@@ -50,8 +48,9 @@ public class TestEDIFTools {
     public static final String TEST_SNK = "u_ila_0/inst/PROBE_PIPE."
             + "shift_probes_reg[0][7]/D";
 
-    @Test
-    public void testConnectPortInstsThruHier() {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testConnectPortInstsThruHier(boolean netToPin) {
         Design d = Design.readCheckpoint(RapidWrightDCP.getPath("microblazeAndILA_3pblocks.dcp"), true);
         EDIFNetlist netlist = d.getNetlist();
 
@@ -61,7 +60,11 @@ public class TestEDIFTools {
         // Disconnect sink in anticipation of connecting to another net
         snkPortInst.getNet().removePortInst(snkPortInst.getPortInst());
 
-        EDIFTools.connectPortInstsThruHier(srcPortInst, snkPortInst, UNIQUE_SUFFIX);
+        if (netToPin) {
+            EDIFTools.connectPortInstsThruHier(srcPortInst.getHierarchicalNet(), snkPortInst, UNIQUE_SUFFIX);
+        } else {
+            EDIFTools.connectPortInstsThruHier(srcPortInst, snkPortInst, UNIQUE_SUFFIX);
+        }
 
         netlist.resetParentNetMap();
 
