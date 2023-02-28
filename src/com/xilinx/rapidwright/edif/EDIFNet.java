@@ -93,19 +93,15 @@ public class EDIFNet extends EDIFPropertyObject {
             parentCell.addInternalPortMapEntry(portInst.getName(), this);
         }
         portInst.setParentNet(this);
-        boolean portInstAdded;
-        if (deferSort) {
-            // portInst will have been added (even with deferred sorting) if it doesn't already exist
-            portInstAdded = isParentCellNonNull && (portInsts.get(portInst.getCellInst(), portInst.getName()) == null);
-            portInsts.deferSortAdd(portInst);
-        } else {
-            portInstAdded = portInsts.add(portInst) && isParentCellNonNull;
-        }
-
-        // Only consider tracking if it was successfully added
-        if (portInstAdded) {
+        if (isParentCellNonNull) {
             // This does not explicitly track the port instance index, in most cases the name should be sufficient.
             trackChanges(EDIFChangeType.PORT_INST_ADD, inst, portInst.getName());
+        }
+        if (deferSort) {
+            portInsts.deferSortAdd(portInst);
+        } else {
+            boolean added = portInsts.add(portInst);
+            assert(added);
         }
     }
 
