@@ -46,6 +46,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -143,7 +144,7 @@ public class EDIFTools {
 
     public static final String LOAD_TCL_SUFFIX = "_load.tcl";
 
-    public static int UNIQUE_COUNT = 0;
+    public static final AtomicInteger UNIQUE_COUNT = new AtomicInteger();
 
     /**
      * Flag to set a feature where any .edf file that is attempted to be loaded will check if an
@@ -155,7 +156,7 @@ public class EDIFTools {
             System.getenv("RW_ENABLE_EDIF_BINARY_CACHING") != null;
 
     public static String getUniqueSuffix() {
-        return "_rw_created" + UNIQUE_COUNT++;
+        return "_rw_created" + UNIQUE_COUNT.getAndIncrement();
     }
 
     /**
@@ -467,16 +468,38 @@ public class EDIFTools {
         return Math.abs(left - right) + 1;
     }
 
+    /**
+     * Create a unique net in the provided parent EDIFCell with the preferred provided
+     * name. If such a net already exists in this cell, append a unique suffix.
+     * @param parentCell EDIFCell in which new net is to be created.
+     * @param netName Preferred net name.
+     * @return Newly created EDIFNet.
+     */
     public static EDIFNet createUniqueNet(EDIFCell parentCell, String netName) {
-        if (parentCell.getNet(netName) != null
-                // Because RapidWright doesn't track net busses (only port busses)
-                // such that we can't reliably tell if the name 'foo[9]' could collide
-                // with a bus 'foo' (which is stored individually as 'foo[0-9+]') then
-                // we have to play it safe
-                || !EDIFTools.getRootBusName(netName).equals(netName)) {
+        if (parentCell.getNet(netName) != null) {
             netName += getUniqueSuffix();
         }
         return new EDIFNet(netName, parentCell);
+    }
+
+    /**
+     * Create a unique port in the provided parent EDIFCell with the preferred provided
+     * name. If such a port already exists in this cell, append a unique suffix.
+     * This method checks for the existence of the given name as well as for its root bus,
+     * e.g. for portName 'foo[9]', both this exact name and 'foo' will be checked.
+     * @param parentCell EDIFCell in which new port is to be created.
+     * @param portName Preferred port name.
+     * @param dir EDIFDirection.
+     * @param width Bit width.
+     * @return Newly created EDIFPort.
+     */
+    public static EDIFPort createUniquePort(EDIFCell parentCell, String portName, EDIFDirection dir, int width) {
+        String rootBusName = getRootBusName(portName);
+        if (parentCell.getPort(rootBusName) != null ||
+                (rootBusName != portName && parentCell.getPort(portName) != null)) {
+            portName += getUniqueSuffix();
+        }
+        return parentCell.createPort(portName, dir, width);
     }
 
     /**
@@ -524,17 +547,10 @@ public class EDIFTools {
                         currNet = createUniqueNet(hierParentInst.getCellType(), newName);
                         currNet.addPortInst(outerPortInst);
                     }
-                }else {
+                } else {
                     // no port to the parent cell above exists, create one
                     EDIFCell cellType = hierParentInst.getCellType();
-                    String newPortName = newName;
-                    String rootBusNewName;
-                    if ((cellType.getPort(newPortName) != null) ||
-                            // Check for existence of bus
-                            (!(rootBusNewName = EDIFTools.getRootBusName(newName)).equals(newName) && cellType.getPort(rootBusNewName) != null)) {
-                        newPortName += getUniqueSuffix();
-                    }
-                    EDIFPort port = cellType.createPort(newPortName,
+                    EDIFPort port = createUniquePort(cellType, newName,
                             hierPortInst == src ? EDIFDirection.OUTPUT : EDIFDirection.INPUT, 1);
 
                     currNet.createPortInst(port);
@@ -544,7 +560,7 @@ public class EDIFTools {
                         // We don't need to create another net, just connect to the src's net
                         currNet = finalSrc.getNet();
                     } else {
-                        currNet = createUniqueNet(hierParentInst.getCellType(), newName);
+                        currNet = createUniqueNet(hierParentInst.getCellType(), port.getName());
                     }
                     outerPortInst = currNet.createPortInst(port, prevInst);
                 }
@@ -567,15 +583,25 @@ public class EDIFTools {
                     snkNet.addPortInst(finalSrc.getPortInst());
                 }
                 return;
-            }else {
+            } else {
                 snkNet.removePortInst(finalSnk.getPortInst());
             }
         }
-
         // Make final connection in the common ancestor instance
         finalSrc.getNet().addPortInst(finalSnk.getPortInst());
     }
 
+    /**
+     * Connects an existing logical net and logical port inst together by creating new ports and
+     * nets on all cells instantiated between their levels of hierarchy.  This is a helper method
+     * on top of {@link #connectPortInstsThruHier(EDIFHierPortInst,EDIFHierPortInst,String)}
+     * for identifying the correct source and sink pins to be provided to this, according to
+     * whether the provided pin argument is an input or output pin (and finding the appropriate
+     * pin from the provided net).
+     * @param net The logical net
+     * @param pin The logical port inst source or sink
+     * @param newName A unique name to be used in creating the ports and nets
+     */
     public static void connectPortInstsThruHier(EDIFHierNet net, EDIFHierPortInst pin,
                                                 String newName) {
         EDIFHierPortInst src;
@@ -583,13 +609,6 @@ public class EDIFTools {
 
         EDIFHierCellInst netInst = net.getHierarchicalInst();
         EDIFCell cellType = netInst.getCellType();
-        String newPortName = newName;
-        String rootBusNewName;
-        if ((cellType.getPort(newPortName) != null) ||
-                // Check for existence of bus
-                (!(rootBusNewName = EDIFTools.getRootBusName(newName)).equals(newName) && cellType.getPort(rootBusNewName) != null)) {
-            newPortName += getUniqueSuffix();
-        }
 
         // FIXME: This method always punches a new port upwards
         //  -- what if the src/snk was in a lower part of the hierarchy?
@@ -607,12 +626,12 @@ public class EDIFTools {
             }
             if (snk == null) {
                 // Create one if one doesn't exist
-                EDIFPort port = cellType.createPort(newPortName, EDIFDirection.INPUT, 1);
+                EDIFPort port = createUniquePort(cellType, newName, EDIFDirection.INPUT, 1);
                 net.getNet().createPortInst(port);
 
                 // EDIFTools.connectPortInstsThruHier() does not support top-level portInsts;
                 // need to create a port inst in the parent cell too
-                EDIFNet upperNet = createUniqueNet(netInst.getParent().getCellType(), newName);
+                EDIFNet upperNet = createUniqueNet(netInst.getParent().getCellType(), port.getName());
                 snk = new EDIFHierPortInst(netInst.getParent(), upperNet.createPortInst(port, netInst.getInst()));
             }
         } else {
@@ -620,12 +639,12 @@ public class EDIFTools {
             if (!sources.isEmpty()) {
                 src = sources.get(0);
             } else {
-                EDIFPort port = cellType.createPort(newPortName, EDIFDirection.OUTPUT, 1);
+                EDIFPort port = createUniquePort(cellType, newName, EDIFDirection.OUTPUT, 1);
                 net.getNet().createPortInst(port);
 
                 // EDIFTools.connectPortInstsThruHier() does not support top-level portInsts;
                 // need to create a port inst in the parent cell too
-                EDIFNet upperNet = createUniqueNet(netInst.getParent().getCellType(), newName);
+                EDIFNet upperNet = createUniqueNet(netInst.getParent().getCellType(), port.getName());
                 src = new EDIFHierPortInst(netInst.getParent(), upperNet.createPortInst(port, netInst.getInst()));
             }
 
@@ -686,7 +705,7 @@ public class EDIFTools {
             if (i == parts.length-2) {
                 EDIFNet targetNet = currInst.getCellType().getNet(parts[parts.length-1]);
                 targetNet.createPortInst(newPort);
-            }else{
+            } else {
                 EDIFNet childNet = new EDIFNet(topPortNet.getName(), currInst.getCellType());
                 childNet.createPortInst(newPort);
                 currNet = childNet;
@@ -887,7 +906,7 @@ public class EDIFTools {
                 try {
                     netlist = BinaryEDIFReader.readBinaryEDIF(bedif);
                     return netlist;
-                } catch(Exception e) {
+                } catch (Exception e) {
                     System.out.println("WARNING: Unable to read Binary EDIF: " + bedif.toString()
                             + ", falling back to reading EDIF: " + edifFileName.toString());
                 }

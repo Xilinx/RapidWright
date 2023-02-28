@@ -2148,13 +2148,17 @@ public class DesignTools {
      * @param sitePin The site pin to query.
      * @return A list of hierarchical port instances that connect to the site pin.
      */
-    public static ArrayList<EDIFHierPortInst> getPortInstsFromSitePinInst(SitePinInst sitePin) {
+    public static List<EDIFHierPortInst> getPortInstsFromSitePinInst(SitePinInst sitePin) {
         SiteInst siteInst = sitePin.getSiteInst();
         BELPin[] belPins = siteInst.getSiteWirePins(sitePin.getName());
-        ArrayList<EDIFHierPortInst> portInsts = new ArrayList<EDIFHierPortInst>();
-        for (BELPin belPin : belPins) {
+        List<EDIFHierPortInst> portInsts = new ArrayList<>();
+        Queue<BELPin> queue = new LinkedList<>();
+        queue.addAll(Arrays.asList(belPins));
+        while (!queue.isEmpty()) {
+            BELPin belPin = queue.remove();
             if (belPin.isOutput() == sitePin.isOutPin()) {
-                if (belPin.getBEL().getBELClass() == BELClass.RBEL) {
+                BEL bel = belPin.getBEL();
+                if (bel.getBELClass() == BELClass.RBEL) {
                     // Routing BEL, lets look ahead/behind it
                     SitePIP sitePIP = siteInst.getUsedSitePIP(belPin);
                     if (sitePIP != null) {
@@ -2166,8 +2170,15 @@ public class DesignTools {
                         }
                     }
                 } else {
-                    EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, belPin);
-                    if (portInst != null) portInsts.add(portInst);
+                    Cell lut = bel.isLUT() ? siteInst.getCell(bel) : null;
+                    if (lut != null && lut.isRoutethru() && lut.getLogicalPinMapping(belPin.getName()) != null) {
+                        BELPin opin = bel.getPin("O" + bel.getName().charAt(1));
+                        belPins = siteInst.getSiteWirePins(opin.getSiteWireName());
+                        queue.addAll(Arrays.asList(belPins));
+                    } else {
+                        EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, belPin);
+                        if (portInst != null) portInsts.add(portInst);
+                    }
                 }
             }
         }
@@ -2573,7 +2584,7 @@ public class DesignTools {
             Net net = null;
             if (origNet.isStaticNet()) {
                 net = origNet;
-            }else {
+            } else {
                 String parentNetName = destNetlist.getParentNetName(netName);
                 if (parentNetName == null) {
                     parentNetName = netName;
@@ -2606,7 +2617,7 @@ public class DesignTools {
                             }
                         }
                     }
-                }else {
+                } else {
                     curr = curr.getSourcePin();
                     if (curr.isSitePort()) continue;
                     String belName = curr.getBELName();

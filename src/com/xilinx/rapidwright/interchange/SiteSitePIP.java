@@ -36,7 +36,7 @@ public class SiteSitePIP {
         this.sitePIP = sitePIP;
         this.isFixed = isFixed;
     }
-    
+
     public String toString() {
         return site.getName() + "/" + sitePIP.toString();
     }

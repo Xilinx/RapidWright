@@ -32,6 +32,8 @@ import org.junit.jupiter.api.Test;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestEDIFHierNet {
 
@@ -50,6 +52,42 @@ public class TestEDIFHierNet {
                 Assertions.assertTrue(testSet.remove(portInst));
             }
             Assertions.assertTrue(testSet.isEmpty());
+        }
+    }
+
+    @Test
+    public void testGetPortInsts() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+
+        HashSet<EDIFPortInst> portInsts = new HashSet<>();
+        for (EDIFHierNet parentNet : netlist.getParentNetMap().values()) {
+            EDIFHierCellInst parentInst = parentNet.getHierarchicalInst();
+            portInsts.addAll(parentNet.getNet().getPortInsts());
+            for (EDIFHierPortInst portInst : parentNet.getPortInsts()) {
+                Assertions.assertEquals(parentInst, portInst.getHierarchicalInst());
+                Assertions.assertTrue(portInsts.remove(portInst.getPortInst()));
+            }
+            Assertions.assertTrue(portInsts.isEmpty());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testGetSourcePortInsts(boolean includeTopLevelPorts) {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+
+        HashSet<EDIFPortInst> portInsts = new HashSet<>();
+        for (EDIFHierNet parentNet : netlist.getParentNetMap().values()) {
+            EDIFHierCellInst parentInst = parentNet.getHierarchicalInst();
+            portInsts.addAll(parentNet.getNet().getSourcePortInsts(includeTopLevelPorts));
+            for (EDIFHierPortInst portInst : parentNet.getSourcePortInsts(includeTopLevelPorts)) {
+                Assertions.assertTrue(portInst.isOutput() || parentInst.isTopLevelInst());
+                Assertions.assertEquals(parentInst, portInst.getHierarchicalInst());
+                Assertions.assertTrue(portInsts.remove(portInst.getPortInst()));
+            }
+            Assertions.assertTrue(portInsts.isEmpty());
         }
     }
 }

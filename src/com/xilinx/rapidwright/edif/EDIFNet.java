@@ -93,17 +93,15 @@ public class EDIFNet extends EDIFPropertyObject {
             parentCell.addInternalPortMapEntry(portInst.getName(), this);
         }
         portInst.setParentNet(this);
-        if (portInsts.add(portInst)) {
-            // Only consider tracking if it was successfully added
-            if (isParentCellNonNull) {
-                // This does not explicitly track the port instance index, in most cases the name should be sufficient.
-                trackChanges(EDIFChangeType.PORT_INST_ADD, inst, portInst.getName());
-            }
+        if (isParentCellNonNull) {
+            // This does not explicitly track the port instance index, in most cases the name should be sufficient.
+            trackChanges(EDIFChangeType.PORT_INST_ADD, inst, portInst.getName());
         }
         if (deferSort) {
             portInsts.deferSortAdd(portInst);
         } else {
-            portInsts.add(portInst);
+            boolean added = portInsts.add(portInst);
+            assert(added);
         }
     }
 

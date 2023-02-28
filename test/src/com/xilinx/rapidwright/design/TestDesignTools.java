@@ -23,6 +23,23 @@
 
 package com.xilinx.rapidwright.design;
 
+import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.Pair;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -33,23 +50,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
-
-import com.xilinx.rapidwright.device.BELPin;
-import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.edif.EDIFHierCellInst;
-import com.xilinx.rapidwright.edif.EDIFNetlist;
-import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.util.Pair;
 
 public class TestDesignTools {
 
@@ -826,5 +826,26 @@ public class TestDesignTools {
             Assertions.assertNotNull(net);
             Assertions.assertFalse(DesignTools.isNetDrivenByHierPort(net));
         }
+    }
+
+    @Test
+    public void testGetPortInstsFromSitePinInstLutRoutethru() {
+        Device device = Device.getDevice("xcvu3p");
+        Design design = new Design("design", device.getName());
+
+        Cell ff1 = design.createAndPlaceCell("ff1", Unisim.FDRE, "SLICE_X0Y0/AFF");
+        Cell ff2 = design.createAndPlaceCell("ff2", Unisim.FDRE, "SLICE_X0Y0/AFF2");
+        SiteInst si = ff1.getSiteInst();
+        Net net = design.createNet("net");
+        SitePinInst spi = net.createPin("A6", si);
+        new EDIFPortInst(ff1.getEDIFCellInst().getPort("D"), null, ff1.getEDIFCellInst());
+        new EDIFPortInst(ff2.getEDIFCellInst().getPort("D"), null, ff2.getEDIFCellInst());
+
+        // Routethru LUT to reach both flops
+        Assertions.assertTrue(si.routeIntraSiteNet(net, spi.getBELPin(), ff1.getBEL().getPin("D")));
+        Assertions.assertTrue(si.routeIntraSiteNet(net, spi.getBELPin(), ff2.getBEL().getPin("D")));
+
+        Assertions.assertEquals("[ff1/D, ff2/D]",
+                DesignTools.getPortInstsFromSitePinInst(spi).toString());
     }
 }

@@ -451,7 +451,7 @@ public class EDIFNetlist extends EDIFName {
         if (destLib == null) {
             if (cell.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) {
                 destLib = getHDIPrimitivesLibrary();
-            }else{
+            } else {
                 destLib = addLibrary(new EDIFLibrary(cell.getLibrary().getName()));
             }
         }
@@ -494,7 +494,7 @@ public class EDIFNetlist extends EDIFName {
         if (destLibTop == null) {
             if (cell.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) {
                 destLibTop = getHDIPrimitivesLibrary();
-            }else{
+            } else {
                 destLibTop = addLibrary(new EDIFLibrary(cell.getLibrary().getName()));
             }
         }
@@ -559,7 +559,7 @@ public class EDIFNetlist extends EDIFName {
         if (destLib == null) {
             if (cell.getLibrary().isHDIPrimitivesLibrary()) {
                 destLib = getHDIPrimitivesLibrary();
-            }else{
+            } else {
                 destLib = addLibrary(new EDIFLibrary(cell.getLibrary().getName()));
             }
         }
@@ -1000,7 +1000,7 @@ public class EDIFNetlist extends EDIFName {
                 String cellTypeName = eprList.get(0).getCellInst().getCellType().getName();
                 if (cellTypeName.equals("GND")) {
                     return d.getGndNet();
-                }else if (cellTypeName.equals("VCC")) {
+                } else if (cellTypeName.equals("VCC")) {
                     return d.getVccNet();
                 }
             }
@@ -1048,7 +1048,7 @@ public class EDIFNetlist extends EDIFName {
             EDIFHierCellInst curr = toProcess.poll();
             if (curr.getCellType().isPrimitive()) {
                 leafCells.add(curr);
-            }else{
+            } else {
                 curr.addChildren(toProcess);
             }
         }
@@ -1111,7 +1111,7 @@ public class EDIFNetlist extends EDIFName {
                         continue;
                     }
                     children.add(newCell);
-                } else{
+                } else {
                     q.add(newCell);
                     if (!leavesOnly) {
                         if (pat != null && !pat.matcher(newCell.getFullHierarchicalInstName()).matches()) {
@@ -1199,12 +1199,11 @@ public class EDIFNetlist extends EDIFName {
                     // Moving up in hierarchy
                     if (!p.getHierarchicalInst().isTopLevelInst()) {
                         final EDIFHierPortInst upPort = p.getPortInParent();
-                        // FIXME: Why would upPort.getNet() be null?
                         if (upPort != null && upPort.getNet() != null) {
                             queue.add(upPort.getHierarchicalNet());
                         }
                     }
-                } else{
+                } else {
                     // Moving down in hierarchy
                     EDIFHierNet otherNet = p.getInternalNet();
                     if (otherNet == null) {
@@ -1229,7 +1228,7 @@ public class EDIFNetlist extends EDIFName {
             physicalNetPinMap.put(parentNet, leafCellPins);
         } else if (initialNet.getNet().getPortInsts().size() == 0) {
             return aliases;
-        } else{
+        } else {
             throw new RuntimeException("ERROR: Couldn't identify parent net, no output pins (or top level output port) found.");
         }
 
@@ -1332,18 +1331,18 @@ public class EDIFNetlist extends EDIFName {
                 // Checks if cell is primitive or black box
                 if (eci.getCellType().getCellInsts().size() == 0 && eci.getCellType().getNets().size() == 0) {
                     for (EDIFPortInst portInst : eci.getPortInsts()) {
-                        if (portInst.isOutput()) {
+                        if (portInst.isOutput() && portInst.getNet() != null) {
                             queue.add(new EDIFHierPortInst(currInst, portInst));
                         }
                     }
-                }else{
+                } else {
                     instQueue.add(currInst.getChild(eci));
                 }
             }
         }
 
         for (EDIFHierPortInst pr : queue) {
-            if (pr.getNet() == null) continue;
+            assert(pr.getNet() != null);
             EDIFHierNet parentNetName = pr.getHierarchicalNet();
             for (EDIFHierNet alias : getNetAliases(parentNetName)) {
                 parentNetMap.put(alias, parentNetName);
@@ -1507,26 +1506,6 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
-     * This will be removed in the next release.
-     * Consider using {@link EDIFCell#getPortMap()} instead
-     * @deprecated
-     * @return
-     */
-    public HashMap<String,EDIFPort> generateEDIFPortMap() {
-        HashMap<String,EDIFPort> map = new HashMap<String, EDIFPort>();
-        for (EDIFPort port : getTopCellInst().getCellType().getPorts()) {
-            if (port.isBus()) {
-                for (int idx=0; idx < port.getWidth(); idx++) {
-                    map.put(port.getName() + "["+idx+"]",port);
-                }
-            }else{
-                map.put(port.getName(),port);
-            }
-        }
-        return map;
-    }
-
-    /**
      * Identify primitive cell instances in EDIF netlist
      * @return A map of hierarchical names (not including top-level name)
      *         to EdifCellInstances that use primitives in the library
@@ -1541,7 +1520,7 @@ public class EDIFNetlist extends EDIFName {
             EDIFHierCellInst curr = toProcess.poll();
             if (curr.getInst().getCellType().isPrimitive()) {
                 primitiveInstances.put(curr.getFullHierarchicalInstName(), curr.getInst());
-            }else{
+            } else {
                 curr.addChildren(toProcess);
             }
         }

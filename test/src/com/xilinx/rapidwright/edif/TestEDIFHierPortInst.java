@@ -43,8 +43,6 @@ public class TestEDIFHierPortInst {
         EDIFHierPortInst ehpi = n.getHierPortInstFromName(cellName + EDIFTools.EDIF_HIER_SEP + "Q");
         Assertions.assertEquals(c, ehpi.getPhysicalCell(d));
 
-        // It's been observed that Vivado can doubly escape the physical Cell name
-        c.updateName(cellName.replace("\\", "\\\\"));
         // Check that we can still find it in this case
         Assertions.assertEquals(c, ehpi.getPhysicalCell(d));
     }

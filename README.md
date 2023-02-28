@@ -41,7 +41,7 @@ cd RapidWright
 ```
 
 More details here:
-http://www.rapidwright.io/docs/Automatic_Install.html#automatic-install
+http://www.rapidwright.io/docs/Install.html
 
 
 ### How to Update RapidWright to the Latest Revision
@@ -52,6 +52,15 @@ git pull
 # resolve any issues
 ./gradlew updateJars
 ```
+
+### Python Setup
+
+```
+pip install rapidwright
+```
+
+More details here:
+http://www.rapidwright.io/docs/Install_RapidWright_as_a_Python_PIP_Package.html
 
 ### Development setup
 

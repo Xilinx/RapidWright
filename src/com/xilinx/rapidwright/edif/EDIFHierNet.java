@@ -157,15 +157,24 @@ public class EDIFHierNet {
         return hierarchicalInst;
     }
 
-    public List<EDIFHierPortInst> getPortInsts() {
+    /**
+     * Gets the sorted ArrayList of EDIFHierPortInsts on this net as a collection.
+     * @return The collection of EDIFPortInsts on this net.
+     */
+    public Collection<EDIFHierPortInst> getPortInsts() {
         Collection<EDIFPortInst> portInsts = net.getPortInsts();
-        List<EDIFHierPortInst> hierPortInsts = new ArrayList<>(portInsts.size());
+        Collection<EDIFHierPortInst> hierPortInsts = new ArrayList<>(portInsts.size());
         for (EDIFPortInst portInst : portInsts) {
             hierPortInsts.add(new EDIFHierPortInst(hierarchicalInst, portInst));
         }
         return hierPortInsts;
     }
 
+    /**
+     * This returns all sources on the net, either output ports of the
+     * cell instances in the cell or the top level input ports.
+     * @return A list of EDIFHierPortInst sources.
+     */
     public List<EDIFHierPortInst> getSourcePortInsts(boolean includeTopLevelPorts) {
         List<EDIFPortInst> portInsts = net.getSourcePortInsts(includeTopLevelPorts);
         List<EDIFHierPortInst> hierPortInsts = new ArrayList<>(portInsts.size());
@@ -200,7 +209,7 @@ public class EDIFHierNet {
      * @param includeSourcePins A flag to include source pins in the result.  Setting this to false
      * only returns the sinks.
      * @param visited An initial set of EDIFHierNet-s that have already been visited and will not
-     * be visited again. Initializing this set can be useful for blocking traversal.
+     * be visited again. Pre-populating this set can be useful for blocking traversal.
      * @return The list of all leaf cell port instances connected to this hierarchical net and its
      * aliases.
      */
@@ -241,7 +250,7 @@ public class EDIFHierNet {
                             queue.add(upPort.getHierarchicalNet());
                         }
                     }
-                } else{
+                } else {
                     // Moving down in hierarchy
                     EDIFHierNet otherNet = p.getInternalNet();
                     if (otherNet == null) {
