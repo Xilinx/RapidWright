@@ -24,20 +24,19 @@
 
 package com.xilinx.rapidwright.edif;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-
-import java.nio.charset.StandardCharsets;
-
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.regex.Pattern;
 
 public class TestEDIFTools {
 
@@ -49,8 +48,9 @@ public class TestEDIFTools {
     public static final String TEST_SNK = "u_ila_0/inst/PROBE_PIPE."
             + "shift_probes_reg[0][7]/D";
 
-    @Test
-    public void testConnectPortInstsThruHier() {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testConnectPortInstsThruHier(boolean netToPin) {
         Design d = Design.readCheckpoint(RapidWrightDCP.getPath("microblazeAndILA_3pblocks.dcp"), true);
         EDIFNetlist netlist = d.getNetlist();
 
@@ -60,7 +60,11 @@ public class TestEDIFTools {
         // Disconnect sink in anticipation of connecting to another net
         snkPortInst.getNet().removePortInst(snkPortInst.getPortInst());
 
-        EDIFTools.connectPortInstsThruHier(srcPortInst, snkPortInst, UNIQUE_SUFFIX);
+        if (netToPin) {
+            EDIFTools.connectPortInstsThruHier(srcPortInst.getHierarchicalNet(), snkPortInst, UNIQUE_SUFFIX);
+        } else {
+            EDIFTools.connectPortInstsThruHier(srcPortInst, snkPortInst, UNIQUE_SUFFIX);
+        }
 
         netlist.resetParentNetMap();
 
@@ -149,5 +153,62 @@ public class TestEDIFTools {
         }
 
         Assertions.assertFalse(EDIFTools.uniqueifyNetlist(design));
+    }
+
+    @Test
+    public void testCreateUniqueNet() {
+        Design design = new Design("test", Device.AWS_F1);
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = netlist.getTopCell();
+
+        String netName = "foo";
+        Assertions.assertEquals(netName, EDIFTools.createUniqueNet(top, netName).getName());
+
+        String newNet1 = EDIFTools.createUniqueNet(top, netName).getName();
+        Assertions.assertNotEquals(newNet1, netName);
+        Assertions.assertTrue(newNet1.matches(netName + "_rw_created\\d+"));
+        String newNet2 = EDIFTools.createUniqueNet(top, netName).getName();
+        Assertions.assertNotEquals(newNet2, netName);
+        Assertions.assertNotEquals(newNet2, newNet1);
+        Assertions.assertTrue(newNet2.matches(netName + "_rw_created\\d+"));
+
+        // Check that creating a net with the same name as an existing port is allowed.
+        String portName = "bar";
+        top.createPort(portName, EDIFDirection.INPUT, 1);
+        Assertions.assertEquals(portName, EDIFTools.createUniqueNet(top, portName).getName());
+
+        // Canary to check that creating a net with the same name as the root name of an existing bus net
+        // -- designating by the existence of at least one bus[\d+] -- is allowed.
+        // (Even though doing so may cause Vivado an issue.)
+        String busNetName = "baz";
+        top.createNet(busNetName + "[999]");
+        Assertions.assertEquals(busNetName, EDIFTools.createUniqueNet(top, busNetName).getName());
+    }
+
+    @Test
+    public void testCreateUniquePort() {
+        Design design = new Design("test", Device.AWS_F1);
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = netlist.getTopCell();
+
+        // Single-bit port
+        String portName = "foo";
+        Assertions.assertEquals(portName, EDIFTools.createUniquePort(top, portName, EDIFDirection.INPUT, 1).getName());
+
+        // Multi-bit bus port
+        int busPortWidth = 16;
+        String busPortBaseName = "bar";
+        String busPortName = busPortBaseName + "[" + (busPortWidth-1) + ":0]";
+        Assertions.assertEquals(busPortName, EDIFTools.createUniquePort(top, busPortName, EDIFDirection.INPUT, 16).getName());
+
+        // Check that creating a new port with the same basename as a port gets uniquified
+        String slicedPortName = busPortBaseName + "[17]";
+        String newPort1 = EDIFTools.createUniquePort(top, slicedPortName, EDIFDirection.INPUT, 1).getName();
+        Assertions.assertNotEquals(newPort1, slicedPortName);
+        Assertions.assertTrue(newPort1.matches(Pattern.quote(slicedPortName) + "_rw_created\\d+"));
+        String newPort2 = EDIFTools.createUniquePort(top, slicedPortName, EDIFDirection.OUTPUT, 1).getName();
+        Assertions.assertNotEquals(newPort2, slicedPortName);
+        Assertions.assertNotEquals(newPort2, newPort1);
+        Assertions.assertTrue(newPort2.matches(Pattern.quote(slicedPortName) + "_rw_created\\d+"));
     }
 }
