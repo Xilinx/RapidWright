@@ -104,6 +104,7 @@ public class RouteNodeInfo {
                 if (type == RouteNodeType.LAGUNA_I) {
                     assert(length == 0);
                 }
+                break;
         }
         return length;
     }
