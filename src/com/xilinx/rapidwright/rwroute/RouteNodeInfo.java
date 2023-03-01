@@ -91,6 +91,7 @@ public class RouteNodeInfo {
                 // Since only the endTile's X coordinate of LAG_LAG tiles would have been corrected
                 // by getEndTileXCoordinate(), but not the baseTile, revert this correction for the
                 // purpose of computing the node's length
+                assert(Math.abs(endTileXCoordinate - baseTile.getTileXCoordinate()) == 1);
                 length--;
                 // Fall through
             case LAGUNA_TILE:
