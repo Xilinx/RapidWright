@@ -34,7 +34,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -150,7 +149,7 @@ public class TestRWRoute {
     @Test
     @LargeTest
     @Disabled("Blocked on TimingGraph.build() being able to build partial graphs")
-    public void testTimingDrivenPartialRouting(@TempDir Path tempDir) {
+    public void testTimingDrivenPartialRouting() {
         Design design = RapidWrightDCP.loadDCP("picoblaze_partial.dcp");
         design.setTrackNetChanges(true);
 
