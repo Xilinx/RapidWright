@@ -389,8 +389,15 @@ public class PipelineGeneratorWithRouting {
             TimingModel dm1 = tm.getTimingModel();
 
             for (Net n : d.getNets()) {
-                for (SitePinInst sink : n.getSinkPins()) {
-                    SitePinInst source = n.getSource();
+                SitePinInst source = n.getSource();
+                List<SitePinInst> sinkPins = n.getSinkPins();
+                if (source == null) {
+                    if (!sinkPins.isEmpty()) {
+                        System.err.println("Couldn't route net:" + n);
+                    }
+                    continue;
+                }
+                for (SitePinInst sink : sinkPins) {
                     /* Here is where we call our example findRoute router method */
                     List<PIP> pList = findRoute(source, sink, dm1);
                     if (pList != null)
