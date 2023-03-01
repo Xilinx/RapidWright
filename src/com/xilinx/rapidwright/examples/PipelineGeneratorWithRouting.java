@@ -796,8 +796,7 @@ public class PipelineGeneratorWithRouting {
 
         double clkPeriodConstraint = Math.pow(frequencyMHz, -1)*1000;
 
-        designName = "pipeline_"+width+"w_"+depth+"d_dx"+(distanceX >= 0 ? ""+distanceX : "neg"+distanceX)+
-                "_dy"+(distanceY >= 0 ? ""+distanceY : "neg"+distanceY)+"_org"+sliceSite;
+        designName = "pipeline";
         outputDCPFileName = System.getProperty("user.dir") + File.separator + designName +".dcp";
 
         // example code for command
