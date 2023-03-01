@@ -799,8 +799,6 @@ public class PipelineGeneratorWithRouting {
         designName = "pipeline_"+width+"w_"+depth+"d_dx"+(distanceX >= 0 ? ""+distanceX : "neg"+distanceX)+
                 "_dy"+(distanceY >= 0 ? ""+distanceY : "neg"+distanceY)+"_org"+sliceSite;
         outputDCPFileName = System.getProperty("user.dir") + File.separator + designName +".dcp";
-        outputDCPFileName = System.getProperty("user.dir") + File.separator + "pipeline.dcp";
-
 
         // example code for command
         OptionParser p = new OptionParser() {{
@@ -938,7 +936,9 @@ public class PipelineGeneratorWithRouting {
 
         ///////////////////////
         t.stop();
-        d.writeCheckpoint(outputDCPFileName, t);
-        if (verbose1) System.out.println("Wrote final DCP: " + outputDCPFileName);
+        if (!outputDCPFileName.equals("/dev/null")) {
+            d.writeCheckpoint(outputDCPFileName, t);
+            if (verbose1) System.out.println("Wrote final DCP: " + outputDCPFileName);
+        }
     }
 }

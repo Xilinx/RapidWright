@@ -421,7 +421,9 @@ public class PipelineGenerator {
         d.setAutoIOBuffers(false);
 
         t.stop();
-        d.writeCheckpoint(outputDCPFileName, t);
-        if (verbose) System.out.println("Wrote final DCP: " + outputDCPFileName);
+        if (!outputDCPFileName.equals("/dev/null")) {
+            d.writeCheckpoint(outputDCPFileName, t);
+            if (verbose) System.out.println("Wrote final DCP: " + outputDCPFileName);
+        }
     }
 }
