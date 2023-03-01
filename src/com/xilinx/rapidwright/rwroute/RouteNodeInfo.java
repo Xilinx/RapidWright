@@ -126,7 +126,7 @@ public class RouteNodeInfo {
                     assert(baseTile.getTileXCoordinate() == endTileXCoordinate);
                     endTileXCoordinate++;
                 }
-            break;
+                break;
             case LAGUNA_TILE: // UltraScale only
                 // In UltraScale, Laguna tiles have the same X as the base INT tile
                 assert(baseTile.getTileXCoordinate() == endTileXCoordinate);
