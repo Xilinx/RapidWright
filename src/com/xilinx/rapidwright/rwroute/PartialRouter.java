@@ -100,8 +100,10 @@ public class PartialRouter extends RWRoute{
 
     @Override
     protected void preprocess() {
-        // Any preprocessing is expected to be performed manually and added to pinsToRoute
-        // ahead of constructing this PartialRouter class
+        // By default, preprocessing is expected to be performed manually and added to pinsToRoute
+        // ahead of constructing this PartialRouter class.
+        // Preprocessing can be invoked manually with RWRoute.preprocess(Design), as done by
+        // routeDesignWithUserDefinedArguments() which needs to infer pinsToRoute.
     }
 
     @Override
