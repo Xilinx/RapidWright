@@ -305,7 +305,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         return getNodeInfo(node).length;
     }
 
-    public void setLength(NodeInfo nodeInfo) {
+    private void setLength(NodeInfo nodeInfo) {
         length = nodeInfo.length;
 
         TileTypeEnum tileType = node.getTile().getTileTypeEnum();
