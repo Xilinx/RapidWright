@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.interchange;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 
 import com.xilinx.rapidwright.edif.EDIFEnumerable;
 
@@ -32,9 +33,9 @@ public class Enumerator<T> extends ArrayList<T> {
 
     private static final long serialVersionUID = 5235125492429382642L;
 
-    private HashMap<String, Integer> map = new HashMap<String, Integer>();
+    private Map<String, Integer> map = new HashMap<String, Integer>();
 
-    private String getKey(T obj) {
+    protected String getKey(T obj) {
         String key = null;
         if (obj instanceof EDIFEnumerable) {
             key = ((EDIFEnumerable)obj).getUniqueKey();
@@ -74,6 +75,10 @@ public class Enumerator<T> extends ArrayList<T> {
         while (size() < size) {
             add(null);
         }
+    }
+
+    public Map<String, Integer> getMap() {
+        return map;
     }
 
     @Override

@@ -24,9 +24,11 @@
 package com.xilinx.rapidwright.interchange;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.function.Consumer;
 
 import org.capnproto.MessageBuilder;
 import org.capnproto.PrimitiveList;
@@ -54,6 +56,8 @@ import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Net;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Port;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PortInstance;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.ParallelismTools;
 
 public class LogNetlistWriter {
 
@@ -61,11 +65,20 @@ public class LogNetlistWriter {
     public static final String DEVICE_PRIMITIVES_LIB = "primitives";
     public static final String DEVICE_MACROS_LIB = "macros";
 
-    LogNetlistWriter() {
-        allCells = new Enumerator<>();
-        allInsts = new Enumerator<>();
-        allPorts = new Enumerator<>();
-        allStrings = new Enumerator<>();
+    public static final int MIN_CHUNK_THRESHOLD = 1000;
+
+    public static final String CELLS_SUFFIX = ".cells";
+    public static final String STRINGS_SUFFIX = ".strings";
+    public static final String INSTS_SUFFIX = ".insts";
+    public static final String PORTS_SUFFIX = ".ports";
+    public static final String TOP_SUFFIX = ".top";
+
+
+    LogNetlistWriter(boolean parallel) {
+        allCells = parallel ? new ConcurrentEnumerator<>() : new Enumerator<>();
+        allInsts = parallel ? new ConcurrentEnumerator<>() : new Enumerator<>();
+        allPorts = parallel ? new ConcurrentEnumerator<>() : new Enumerator<>();
+        allStrings = parallel ? new ConcurrentEnumerator<>() : new Enumerator<>();
         libraryRename = Collections.emptyMap();
     }
 
@@ -167,19 +180,87 @@ public class LogNetlistWriter {
         topBuilder.setView(allStrings.getIndex(n.getTopCellInst().getViewref().getName()));
     }
 
+    private int[] starts;
+    private int[] ends;
+
+    private int calculateStartAndEndRanges() {
+        int loadCount = allCells.size();
+        int largestCell = 0;
+        for (EDIFCell cell : allCells) {
+            int cellSize = cell.getNets().size() + cell.getCellInsts().size();
+            if (largestCell < cellSize) {
+                largestCell = cellSize;
+            }
+            loadCount += cellSize;
+        }
+
+        int chunkCount = loadCount / largestCell;
+
+        int chunkLoadSize = largestCell;
+        if (chunkLoadSize < MIN_CHUNK_THRESHOLD) {
+            chunkLoadSize = MIN_CHUNK_THRESHOLD;
+        }
+
+        starts = new int[chunkCount];
+        ends = new int[chunkCount];
+
+        int cellIdx = 0;
+        int empty = 0;
+        for (int i = 0; i < chunkCount; i++) {
+            starts[i] = cellIdx;
+            int currLoad = 0;
+            while (currLoad < chunkLoadSize && cellIdx < allCells.size()) {
+                EDIFCell curr = allCells.get(cellIdx);
+                currLoad += curr.getNets().size() + curr.getCellInsts().size() + 1;
+                cellIdx++;
+            }
+            ends[i] = cellIdx;
+            if (starts[i] == ends[i]) {
+                empty++;
+            }
+        }
+        return chunkCount - empty;
+    }
+
+    private void writeNCellsToFile(int chunk, int chunkCount, String fileName) {
+        int start = starts[chunk];
+        int end = ends[chunk];
+        MessageBuilder message = new MessageBuilder();
+        Netlist.Builder netlist = message.initRoot(Netlist.factory);
+        writeAllCellsToNetlistBuilder(netlist, start, end);
+
+        try {
+            Interchange.writeInterchangeFile(fileName, message);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     /**
      * Writes master list of all cell objects to the Cap'n Proto message netlist
      * @param netlist The netlist builder.
      */
     private void writeAllCellsToNetlistBuilder(Netlist.Builder netlist) {
-        StructList.Builder<CellDeclaration.Builder> cellDeclsList = netlist.initCellDecls(allCells.size());
-        StructList.Builder<Cell.Builder> cellsList = netlist.initCellList(allCells.size());
+        writeAllCellsToNetlistBuilder(netlist, 0, allCells.size());
+    }
 
-        int i = 0;
-        for (EDIFCell cell : allCells) {
-            CellDeclaration.Builder cellDeclBuilder = cellDeclsList.get(i);
-            cellDeclBuilder.setName(allStrings.getIndex(cell.getName()));
-            Cell.Builder cellBuilder = cellsList.get(i);
+    /**
+     * Writes master list of all cell objects to the Cap'n Proto message netlist
+     * 
+     * @param netlist The netlist builder.
+     */
+    private void writeAllCellsToNetlistBuilder(Netlist.Builder netlist, int start, int end) {
+        StructList.Builder<CellDeclaration.Builder> cellDeclsList = netlist.initCellDecls(end - start);
+        StructList.Builder<Cell.Builder> cellsList = netlist.initCellList(end - start);
+
+        for (int i = start; i < end; i++) {
+            EDIFCell cell = allCells.get(i);
+            CellDeclaration.Builder cellDeclBuilder = cellDeclsList.get(i - start);
+
+            int idx = allStrings.getIndex(cell.getName());
+
+            cellDeclBuilder.setName(idx);
+            Cell.Builder cellBuilder = cellsList.get(i - start);
             cellBuilder.setIndex(i);
             populatePropertyMap(cellDeclBuilder.getPropMap(), cell);
             cellDeclBuilder.setView(allStrings.getIndex(cell.getView()));
@@ -223,9 +304,18 @@ public class LogNetlistWriter {
                 }
                 j++;
             }
-            i++;
         }
+    }
 
+    private static void writeObjectToFile(String fileName, Consumer<Netlist.Builder> c) {
+        MessageBuilder message = new MessageBuilder();
+        Netlist.Builder netlist = message.initRoot(Netlist.factory);
+        c.accept(netlist);
+        try {
+            Interchange.writeInterchangeFile(fileName, message);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private void writeAllPortsToNetlistBuilder(Netlist.Builder netlist) {
@@ -288,6 +378,8 @@ public class LogNetlistWriter {
      * @throws IOException
      */
     public static void writeLogNetlist(EDIFNetlist n, String fileName, boolean collapseMacros) throws IOException {
+        CodePerfTracker t = new CodePerfTracker("Write LogNetlist");
+        t.start("Collapse Macros");
         if (collapseMacros) {
             Device device = n.getDevice();
             if (device != null) {
@@ -297,30 +389,103 @@ public class LogNetlistWriter {
                         + " could not be identified.");
             }
         }
-
+        t.stop().start("MessageBuilder");
         MessageBuilder message = new MessageBuilder();
         Netlist.Builder netlist = message.initRoot(Netlist.factory);
-
-        LogNetlistWriter writer = new LogNetlistWriter();
+        t.stop().start("new LogNetlistWriter");
+        
+        
+        LogNetlistWriter writer = new LogNetlistWriter(false);
+        t.stop().start("writeTopNetlistStuff");
+        
         writer.writeTopNetlistStuffToNetlistBuilder(n, netlist);
+        t.stop();
         writer.populateNetlistBuilder(n, netlist);
+        t.start("writeAllStringsToNetlistBuilder");
         writer.writeAllStringsToNetlistBuilder(netlist);
-
+        t.stop().start("writeInterchangeFile");
         Interchange.writeInterchangeFile(fileName, message);
+        t.stop().printSummary();
     }
 
     /**
-     * Helper method to populate the logical netlist object with an existing builder.
-     * @param n The EDIF Netlist to serialize
+     * Writes a RapidWright netlist to a Cap'n Proto serialized file.
+     * 
+     * @param n              RapidWright netlist
+     * @param fileName       Name of the file to write
+     * @param collapseMacros If true, will attempt to collapse macros in netlist
+     *                       before writing.
+     * @throws IOException
+     */
+    public static void writeLogNetlistParallel(EDIFNetlist n, String fileName, boolean collapseMacros)
+            throws IOException {
+        LogNetlistWriter writer = new LogNetlistWriter(true);
+        CodePerfTracker t = new CodePerfTracker("WriteLogNetlistParallel");
+
+        Runnable preamble = () -> {
+            t.start("Preamble", true);
+            if (collapseMacros) {
+                Device device = n.getDevice();
+                if (device != null) {
+                    n.collapseMacroUnisims(device.getSeries());
+                } else {
+                    System.err.println("WARNING: Could not collapse macros in netlist as part target device"
+                            + " could not be identified.");
+                }
+            }
+            t.stop("Preamble");
+        };
+        
+        Runnable popEnums = () -> {
+            t.start("PopEnums", true);
+            writer.populateEnumerations(n);
+            writeObjectToFile(fileName + TOP_SUFFIX, b -> writer.writeTopNetlistStuffToNetlistBuilder(n, b));
+            t.stop("PopEnums");
+        };
+        
+        ParallelismTools.invokeAll(preamble, popEnums);
+
+        int writeCellTasks = writer.calculateStartAndEndRanges();
+        
+        Runnable[] taskArray = new Runnable[writeCellTasks + 2];
+        
+        for (int i = 0; i < writeCellTasks; i++) {
+            Integer ii = i;
+            taskArray[i] = () -> {
+                t.start("writeCells" + ii, true);
+                writer.writeNCellsToFile(ii, writeCellTasks, fileName + CELLS_SUFFIX + ii);
+                t.stop("writeCells" + ii);
+            };
+        }
+
+        taskArray[taskArray.length - 2] = () -> {
+            t.start("writePorts", true);
+            writeObjectToFile(fileName + PORTS_SUFFIX, b -> writer.writeAllPortsToNetlistBuilder(b));
+            t.stop("writePorts");
+        };
+        taskArray[taskArray.length - 1] = () -> {
+            t.start("writeInsts", true);
+            writeObjectToFile(fileName + INSTS_SUFFIX, b -> writer.writeAllInstsToNetlistBuilder(b));
+            t.stop("writeInsts");
+        };
+        ParallelismTools.invokeAll(taskArray);
+
+        t.start("writeStrings");
+        writeObjectToFile(fileName + STRINGS_SUFFIX, b -> writer.writeAllStringsToNetlistBuilder(b));
+        t.stop().printSummary();
+    }
+
+    /**
+     * Helper method to populate the logical netlist object with an existing
+     * builder.
+     * 
+     * @param n       The EDIF Netlist to serialize
      * @param netlist The current builder object to receive the EDIF Netlist
      */
     public void populateNetlistBuilder(EDIFNetlist n, Netlist.Builder netlist) {
         populateEnumerations(n);
-
         writeAllCellsToNetlistBuilder(netlist);
-
         writeAllPortsToNetlistBuilder(netlist);
-
         writeAllInstsToNetlistBuilder(netlist);
     }
 }

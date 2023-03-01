@@ -243,6 +243,47 @@ public class StringTools {
         return null;
     }
 
+    /**
+     * Extracts any unsigned integer suffix at the end of a string, e.g. test34 ->
+     * 34.
+     * 
+     * @param string The string with a numeric suffix.
+     * @return The integer of the digits found at the end of the string. If no
+     *         digits are found, it returns null.
+     */
+    public static Integer getUnsignedIntegerSuffix(String string) {
+        if (string == null || string.length() == 0)
+            return null;
+        int i = string.length() - 1;
+        while (Character.isDigit(string.charAt(i)) && i > 0) {
+            i--;
+        }
+        if (i == string.length() - 1)
+            return null;
+        return Integer.parseInt(string, i + 1, string.length(), 10);
+    }
+
+    /**
+     * Checks if a string ends with the provided suffix followed by an unsigned
+     * integer. This is essentially an optimization to avoid regex usage.
+     * 
+     * @param string The base string to examine
+     * @param suffix The suffix to check
+     * @return True if the string ends with the provided suffix followed immediately
+     *         by an unsigned integer, False otherwise.
+     */
+    public static boolean endsWithSuffixAndInteger(String string, String suffix) {
+        if (string == null || string.length() == 0)
+            return false;
+        int i = string.length() - 1;
+        while (Character.isDigit(string.charAt(i)) && i > 0) {
+            i--;
+        }
+        if (i == string.length() - 1)
+            return false;
+        return suffix.regionMatches(0, string, i - suffix.length() + 1, suffix.length());
+    }
+
     public static void main(String[] args) {
         String[] tests = new String[] {
             "ARCHITECTURE",
