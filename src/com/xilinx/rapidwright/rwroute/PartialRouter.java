@@ -29,6 +29,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
@@ -36,6 +37,7 @@ import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -517,6 +519,33 @@ public class PartialRouter extends RWRoute{
     }
 
     /**
+     * Partially routes a {@link Design} instance; specifically, all nets with no routing PIPs already present.
+     * @param design The {@link Design} instance to be routed.
+     * @param args An array of string arguments, can be null.
+     * If null, the design will be routed in the full timing-driven routing mode with default a {@link RWRouteConfig} instance.
+     * For more options of the configuration, please refer to the {@link RWRouteConfig} class.
+     * @return Routed design.
+     */
+    public static Design routeDesignWithUserDefinedArguments(Design design, String[] args) {
+        RWRoute.preprocess(design);
+
+        List<SitePinInst> pinsToRoute = new ArrayList<>();
+        for (Net net : design.getNets()) {
+            if (net.getSource() == null && !net.isStaticNet()) {
+                // Source-less nets may exist since this is an out-of-context design
+                continue;
+            }
+            if (!net.hasPIPs()) {
+                pinsToRoute.addAll(net.getSinkPins());
+            }
+        }
+
+        // Instantiates a RWRouteConfig Object and parses the arguments.
+        // Uses the default configuration if basic usage only.
+        return routeDesign(design, new RWRouteConfig(args), pinsToRoute);
+    }
+
+    /**
      * Routes a design in the partial non-timing-driven routing mode.
      * @param design The {@link Design} instance to be routed.
      * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed.
@@ -547,5 +576,30 @@ public class PartialRouter extends RWRoute{
                 "--useUTurnNodes",
                 "--verbose"}),
                 pinsToRoute);
+    }
+
+    /**
+     * The main interface of {@link PartialRouter} that reads in a {@link Design} checkpoint,
+     * and parses the arguments for the {@link RWRouteConfig} object of the router.
+     * Specifically, all nets with no routing PIPs already present will be partially routed.
+     * @param args An array of strings that are used to create a {@link RWRouteConfig} object for the router.
+     */
+    public static void main(String[] args) {
+        if (args.length < 2) {
+            System.out.println("USAGE: <input.dcp> <output.dcp>");
+            return;
+        }
+        // Reads the output directory and set the output design checkpoint file name
+        String routedDCPfileName = args[1];
+
+        CodePerfTracker t = new CodePerfTracker("PartialRouter", true);
+
+        // Reads in a design checkpoint and routes it
+        String[] rwrouteArgs = Arrays.copyOfRange(args, 2, args.length);
+        Design routed = routeDesignWithUserDefinedArguments(Design.readCheckpoint(args[0]), rwrouteArgs);
+
+        // Writes out the routed design checkpoint
+        routed.writeCheckpoint(routedDCPfileName,t);
+        System.out.println("\nINFO: Write routed design\n " + routedDCPfileName + "\n");
     }
 }

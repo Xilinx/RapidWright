@@ -159,11 +159,15 @@ public class RWRoute{
         this.config = config;
     }
 
-    protected void preprocess() {
+    protected static void preprocess(Design design) {
         // Pre-processing of the design regarding physical net names pins
         DesignTools.makePhysNetNamesConsistent(design);
         DesignTools.createPossiblePinsToStaticNets(design);
         DesignTools.createMissingSitePinInsts(design);
+    }
+
+    protected void preprocess() {
+        preprocess(design);
     }
 
     protected void initialize() {
