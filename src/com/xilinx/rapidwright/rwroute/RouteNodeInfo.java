@@ -88,6 +88,9 @@ public class RouteNodeInfo {
                 + Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate()));
         switch (baseTile.getTileTypeEnum()) {
             case LAG_LAG:
+                // Since only the endTile's X coordinate of LAG_LAG tiles would have been corrected
+                // by getEndTileXCoordinate(), but not the baseTile, revert this correction for the
+                // purpose of computing the node's length
                 length--;
                 // Fall through
             case LAGUNA_TILE:
