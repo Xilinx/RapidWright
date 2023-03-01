@@ -27,11 +27,15 @@ import org.junit.jupiter.api.Test;
 public class TestExamples {
     @Test
     public void testPipelineGenerator() {
-        PipelineGenerator.main(new String[]{});
+        PipelineGenerator.main(new String[]{
+                "-o", "/dev/null"
+        });
     }
 
     @Test
     public void testPipelineGeneratorWithRouting() {
-        PipelineGeneratorWithRouting.main(new String[]{});
+        PipelineGeneratorWithRouting.main(new String[]{
+                "-o", "/dev/null"
+        });
     }
 }
