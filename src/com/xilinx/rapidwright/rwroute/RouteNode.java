@@ -338,12 +338,14 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         if (tileType == TileTypeEnum.LAG_LAG) { // UltraScale+ only
             // Correct the X coordinate of all Laguna nodes since they are accessed by the INT
             // tile to its right, yet the LAG tile has a tile X coordinate one less than this.
-            if (tile.getTileXCoordinate() == endTileXCoordinate) {
+            // Do not apply this correction for NODE_LAGUNA_OUTPUT nodes (which the fanin and
+            // fanout nodes of the SLL are marked as) unless it is a fanin (LAGUNA_I)
+            // (i.e. do not apply it to the fanout nodes).
+            // Nor apply it to VCC_WIREs since their end tiles are INT tiles.
+            if ((node.getIntentCode() != IntentCode.NODE_LAGUNA_OUTPUT || type == RouteNodeType.LAGUNA_I) &&
+                !node.isTiedToVcc()) {
                 assert(tile.getTileXCoordinate() == endTileXCoordinate);
                 endTileXCoordinate++;
-            } else {
-                assert(type == RouteNodeType.WIRE);
-                assert(tile.getTileXCoordinate() + 1 == endTileXCoordinate);
             }
         } else if (tileType == TileTypeEnum.LAGUNA_TILE) { // UltraScale only
             // In UltraScale, Laguna tiles have the same X as the base INT tile
