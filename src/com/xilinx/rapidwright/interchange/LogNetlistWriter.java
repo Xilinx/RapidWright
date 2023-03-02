@@ -222,6 +222,28 @@ public class LogNetlistWriter {
         return chunkCount - empty;
     }
 
+    private int[] instStarts;
+    private int[] instEnds;
+    private int instChunks = 4;
+
+    private int calculateInstStartAndEndRanges() {
+        instStarts = new int[instChunks];
+        instEnds = new int[instChunks];
+
+        int total = allInsts.size();
+        int chunkSize = total / instChunks;
+
+        instStarts[0] = 0;
+        instEnds[0] = chunkSize;
+
+        for (int i = 1; i < instChunks; i++) {
+            instStarts[i] = instEnds[i - 1];
+            instEnds[i] = chunkSize + instEnds[i - 1];
+        }
+        instEnds[instChunks - 1] = allInsts.size();
+        return instChunks;
+    }
+
     private void writeNCellsToFile(int chunk, int chunkCount, String fileName) {
         int start = starts[chunk];
         int end = ends[chunk];
@@ -337,16 +359,32 @@ public class LogNetlistWriter {
         }
     }
 
+    private void writeNInstsToFile(int chunk, int chunkCount, String fileName) {
+        int start = instStarts[chunk];
+        int end = instEnds[chunk];
+        MessageBuilder message = new MessageBuilder();
+        Netlist.Builder netlist = message.initRoot(Netlist.factory);
+        writeAllInstsToNetlistBuilder(netlist, start, end);
+        try {
+            Interchange.writeInterchangeFile(fileName, message);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     private void writeAllInstsToNetlistBuilder(Netlist.Builder netlist) {
-        int i = 0;
-        StructList.Builder<CellInstance.Builder> cellInstsList = netlist.initInstList(allInsts.size());
-        for (EDIFCellInst inst : allInsts) {
+        writeAllInstsToNetlistBuilder(netlist, 0, allInsts.size());
+    }
+
+    private void writeAllInstsToNetlistBuilder(Netlist.Builder netlist, int start, int end) {
+        StructList.Builder<CellInstance.Builder> cellInstsList = netlist.initInstList(end - start);
+        for (int i = start; i < end; i++) {
+            EDIFCellInst inst = allInsts.get(i);
             CellInstance.Builder ciBuilder = cellInstsList.get(i);
             ciBuilder.setName(allStrings.getIndex(inst.getName()));
             populatePropertyMap(ciBuilder.getPropMap(), inst);
-            ciBuilder.setCell(allCells.indexOf(inst.getCellType()));
+            ciBuilder.setCell(allCells.getIndex(inst.getCellType()));
             ciBuilder.setView(allStrings.getIndex(inst.getViewref().getName()));
-            i++;
         }
     }
 
@@ -446,8 +484,9 @@ public class LogNetlistWriter {
         ParallelismTools.invokeAll(preamble, popEnums);
 
         int writeCellTasks = writer.calculateStartAndEndRanges();
+        int writeInstTasks = 1;//writer.calculateInstStartAndEndRanges();
         
-        Runnable[] taskArray = new Runnable[writeCellTasks + 2];
+        Runnable[] taskArray = new Runnable[writeCellTasks + writeInstTasks + 1];
         
         for (int i = 0; i < writeCellTasks; i++) {
             Integer ii = i;
@@ -458,15 +497,22 @@ public class LogNetlistWriter {
             };
         }
 
-        taskArray[taskArray.length - 2] = () -> {
+        for (int i = 0; i < writeInstTasks; i++) {
+            Integer ii = i;
+            taskArray[ii + writeCellTasks] = () -> {
+                String suffix = (writeInstTasks == 1 ? "" : Integer.toString(ii));
+                t.start("writeInsts" + suffix, true);
+                //writer.writeNInstsToFile(ii, writeInstTasks, fileName + INSTS_SUFFIX + ii);
+                String instFileName = fileName + INSTS_SUFFIX + suffix;
+                writeObjectToFile(instFileName, b -> writer.writeAllInstsToNetlistBuilder(b));
+                t.stop("writeInsts" + suffix);
+            };
+        }
+
+        taskArray[taskArray.length - 1] = () -> {
             t.start("writePorts", true);
             writeObjectToFile(fileName + PORTS_SUFFIX, b -> writer.writeAllPortsToNetlistBuilder(b));
             t.stop("writePorts");
-        };
-        taskArray[taskArray.length - 1] = () -> {
-            t.start("writeInsts", true);
-            writeObjectToFile(fileName + INSTS_SUFFIX, b -> writer.writeAllInstsToNetlistBuilder(b));
-            t.stop("writeInsts");
         };
         ParallelismTools.invokeAll(taskArray);
 

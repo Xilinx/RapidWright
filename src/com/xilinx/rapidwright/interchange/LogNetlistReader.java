@@ -294,7 +294,7 @@ public class LogNetlistReader {
         List<String> fileNames = new ArrayList<>();
 
         try {
-            Files.list(parentDir).filter(f -> StringTools.endsWithSuffixAndInteger(f.toString(), "netlist.cells"))
+            Files.list(parentDir).filter(f -> StringTools.endsWithSuffixAndInteger(f.toString(), rootFileName))
                     .forEach(p -> fileNames.add(p.toString()));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
