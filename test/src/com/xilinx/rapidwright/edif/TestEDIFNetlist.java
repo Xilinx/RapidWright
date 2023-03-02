@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -32,15 +32,16 @@ import java.util.Set;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IOStandard;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
+import com.xilinx.rapidwright.edif.compare.EDIFNetlistComparator;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 class TestEDIFNetlist {
 
@@ -286,5 +287,34 @@ class TestEDIFNetlist {
         } else {
             Assertions.assertEquals(dstLibrary.getCells().size(), 1);
         }
+    }
+
+    @Test
+    public void testBussedPortNamingCollision(@TempDir Path path) {
+        final EDIFNetlist origNetlist = EDIFTools.createNewNetlist("test");
+
+        EDIFCell top = origNetlist.getTopCell();
+
+        EDIFCellInst ff = top.createChildCellInst("ff", Design.getPrimitivesLibrary().getCell("FDRE"));
+        origNetlist.getHDIPrimitivesLibrary().addCell(ff.getCellType());
+
+        // Create two ports, one single-bit and another bussed with the same root name
+        EDIFPort port0 = top.createPort("unfortunate_name", EDIFDirection.INOUT, 1);
+        EDIFPort port1 = top.createPort("unfortunate_name[1:0]", EDIFDirection.INOUT, 2);
+
+        EDIFNet net0 = top.createNet("net0");
+        net0.createPortInst(port0);
+        net0.createPortInst("D", ff);
+
+        EDIFNet net1 = top.createNet("net1");
+        net1.createPortInst(port1, 1);
+        net1.createPortInst("R", ff);
+
+        Path tempFile = Path.of("test.edf");// path.resolve("test.edf");
+        origNetlist.exportEDIF(tempFile);
+
+        EDIFNetlist testNetlist = EDIFTools.readEdifFile(tempFile);
+        EDIFNetlistComparator comparer = new EDIFNetlistComparator();
+        Assertions.assertEquals(0, comparer.compareNetlists(origNetlist, testNetlist));
     }
 }
