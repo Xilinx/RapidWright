@@ -25,6 +25,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -158,11 +159,15 @@ public class RWRoute{
         this.config = config;
     }
 
-    protected void preprocess() {
+    protected static void preprocess(Design design) {
         // Pre-processing of the design regarding physical net names pins
         DesignTools.makePhysNetNamesConsistent(design);
         DesignTools.createPossiblePinsToStaticNets(design);
         DesignTools.createMissingSitePinInsts(design);
+    }
+
+    protected void preprocess() {
+        preprocess(design);
     }
 
     protected void initialize() {
@@ -1752,10 +1757,8 @@ public class RWRoute{
 
     /**
      * The main interface of {@link RWRoute} that reads in a {@link Design} checkpoint,
-     * and parses the arguments for the {@link RWRouteConfig} Object of the router.
-     * It also instantiates a {@link RWRoute} Object or a {@link PartialRouter}
-     * based on the partialRouting parameter and calls the route method to route the design.
-     * @param args An array of strings that are used to create a {@link RWRouteConfig} Object for the router.
+     * and parses the arguments for the {@link RWRouteConfig} object of the router.
+     * @param args An array of strings that are used to create a {@link RWRouteConfig} object for the router.
      */
     public static void main(String[] args) {
         if (args.length < 2) {
@@ -1768,7 +1771,8 @@ public class RWRoute{
         CodePerfTracker t = new CodePerfTracker("RWRoute", true);
 
         // Reads in a design checkpoint and routes it
-        Design routed = RWRoute.routeDesignWithUserDefinedArguments(Design.readCheckpoint(args[0]), args);
+        String[] rwrouteArgs = Arrays.copyOfRange(args, 2, args.length);
+        Design routed = routeDesignWithUserDefinedArguments(Design.readCheckpoint(args[0]), rwrouteArgs);
 
         // Writes out the routed design checkpoint
         routed.writeCheckpoint(routedDCPfileName,t);
