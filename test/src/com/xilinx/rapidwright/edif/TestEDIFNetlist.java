@@ -310,7 +310,7 @@ class TestEDIFNetlist {
         net1.createPortInst(port1, 1);
         net1.createPortInst("R", ff);
 
-        Path tempFile = Path.of("test.edf");// path.resolve("test.edf");
+        Path tempFile = path.resolve("test.edf");
         origNetlist.exportEDIF(tempFile);
 
         EDIFNetlist testNetlist = EDIFTools.readEdifFile(tempFile);
