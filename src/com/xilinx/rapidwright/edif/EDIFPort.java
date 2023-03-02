@@ -31,6 +31,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Represents a port on an {@link EDIFCell} within an EDIF netlist.
@@ -48,11 +49,16 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 
     private String busName;
 
+    private int index = -1;
+
+    public static AtomicInteger count = new AtomicInteger(0);
+
     public EDIFPort(String name, EDIFDirection direction, int width) {
         super(name);
         setDirection(direction);
         setWidth(width);
         setIsLittleEndian();
+        index = count.getAndIncrement();
     }
 
     /**
@@ -65,10 +71,11 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
         this.width = port.width;
         this.isLittleEndian = port.isLittleEndian;
         this.busName = port.busName;
+        index = count.getAndIncrement();
     }
 
     protected EDIFPort() {
-
+        index = count.getAndIncrement();
     }
 
     /**
@@ -322,6 +329,10 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
         int otherLeftBracket = otherName.lastIndexOf('[');
         if (leftBracket == -1 && otherLeftBracket == -1) return true;
         return name.regionMatches(leftBracket, otherName, otherLeftBracket, len);
+    }
+
+    public int getIndex() {
+        return index;
     }
 }
 

@@ -75,32 +75,39 @@ public class LogNetlistWriter {
 
 
     LogNetlistWriter(boolean parallel) {
-        allCells = parallel ? new ConcurrentEnumerator<>() : new Enumerator<>();
-        allInsts = parallel ? new ConcurrentEnumerator<>() : new Enumerator<>();
-        allPorts = parallel ? new ConcurrentEnumerator<>() : new Enumerator<>();
+        allCells = new EDIFCell[EDIFCell.count.get()];
+        allInsts = new EDIFCellInst[EDIFCellInst.count.get()];
+        allPorts = new EDIFPort[EDIFPort.count.get()];
+//        allCells = parallel ? new ConcurrentEnumerator<>() : new Enumerator<>();
+//        allInsts = parallel ? new ConcurrentEnumerator<>() : new Enumerator<>();
+//        allPorts = parallel ? new ConcurrentEnumerator<>() : new Enumerator<>();
         allStrings = parallel ? new ConcurrentEnumerator<>() : new Enumerator<>();
         libraryRename = Collections.emptyMap();
     }
 
     LogNetlistWriter(Enumerator<String> outsideAllStrings) {
-        allCells = new Enumerator<>();
-        allInsts = new Enumerator<>();
-        allPorts = new Enumerator<>();
+//        allCells = new Enumerator<>();
+//        allInsts = new Enumerator<>();
+//        allPorts = new Enumerator<>();
         allStrings = outsideAllStrings;
         libraryRename = Collections.emptyMap();
     }
 
     LogNetlistWriter(Enumerator<String> outsideAllStrings, Map<String, String> libraryRename) {
-        allCells = new Enumerator<>();
-        allInsts = new Enumerator<>();
-        allPorts = new Enumerator<>();
+//        allCells = new Enumerator<>();
+//        allInsts = new Enumerator<>();
+//        allPorts = new Enumerator<>();
         allStrings = outsideAllStrings;
         this.libraryRename = libraryRename;
     }
 
-    private Enumerator<EDIFCell> allCells;
-    private Enumerator<EDIFCellInst> allInsts;
-    private Enumerator<EDIFPort> allPorts;
+//    private Enumerator<EDIFCell> allCells;
+//    private Enumerator<EDIFCellInst> allInsts;
+//    private Enumerator<EDIFPort> allPorts;
+    private EDIFCell[] allCells;
+    private EDIFCellInst[] allInsts;
+    private EDIFPort[] allPorts;
+
     private Enumerator<String> allStrings;
     private Map<String, String> libraryRename;
 
@@ -111,8 +118,7 @@ public class LogNetlistWriter {
      * @param obj The EDIF object that has a property map.
      */
     private void populatePropertyMap(PropertyMap.Builder builder, EDIFPropertyObject obj) {
-        StructList.Builder<PropertyMap.Entry.Builder> entries =
-                builder.initEntries(obj.getPropertiesMap().size());
+        StructList.Builder<PropertyMap.Entry.Builder> entries = builder.initEntries(obj.getPropertiesMap().size());
         int i = 0;
         for (Entry<String, EDIFPropertyValue> e : obj.getPropertiesMap().entrySet()) {
             PropertyMap.Entry.Builder entry = entries.get(i);
@@ -150,12 +156,13 @@ public class LogNetlistWriter {
         // in netlist description
         for (EDIFLibrary lib : n.getLibrariesInExportOrder()) {
             for (EDIFCell cell : lib.getValidCellExportOrder(false)) {
-                allCells.addObject(cell);
+
+                allCells[cell.getIndex()] = cell;
                 for (EDIFPort port : cell.getPorts()) {
-                    allPorts.addObject(port);
+                    allPorts[port.getIndex()] = port;
                 }
                 for (EDIFCellInst inst : cell.getCellInsts()) {
-                    allInsts.addObject(inst);
+                    allInsts[inst.getIndex()] = inst;
                 }
             }
         }
@@ -175,7 +182,7 @@ public class LogNetlistWriter {
         // Store top cell instance
         CellInstance.Builder topBuilder = netlist.initTopInst();
         topBuilder.setName(allStrings.getIndex(n.getTopCellInst().getName()));
-        topBuilder.setCell(allCells.getIndex(n.getTopCell()));
+        topBuilder.setCell(n.getTopCell().getIndex());
         populatePropertyMap(topBuilder.getPropMap(), n.getTopCellInst());
         topBuilder.setView(allStrings.getIndex(n.getTopCellInst().getViewref().getName()));
     }
@@ -184,7 +191,7 @@ public class LogNetlistWriter {
     private int[] ends;
 
     private int calculateStartAndEndRanges() {
-        int loadCount = allCells.size();
+        int loadCount = EDIFCell.count.get();// allCells.size();
         int largestCell = 0;
         for (EDIFCell cell : allCells) {
             int cellSize = cell.getNets().size() + cell.getCellInsts().size();
@@ -209,8 +216,8 @@ public class LogNetlistWriter {
         for (int i = 0; i < chunkCount; i++) {
             starts[i] = cellIdx;
             int currLoad = 0;
-            while (currLoad < chunkLoadSize && cellIdx < allCells.size()) {
-                EDIFCell curr = allCells.get(cellIdx);
+            while (currLoad < chunkLoadSize && cellIdx < allCells.length) {
+                EDIFCell curr = allCells[cellIdx];
                 currLoad += curr.getNets().size() + curr.getCellInsts().size() + 1;
                 cellIdx++;
             }
@@ -230,7 +237,7 @@ public class LogNetlistWriter {
         instStarts = new int[instChunks];
         instEnds = new int[instChunks];
 
-        int total = allInsts.size();
+        int total = allInsts.length;
         int chunkSize = total / instChunks;
 
         instStarts[0] = 0;
@@ -240,7 +247,7 @@ public class LogNetlistWriter {
             instStarts[i] = instEnds[i - 1];
             instEnds[i] = chunkSize + instEnds[i - 1];
         }
-        instEnds[instChunks - 1] = allInsts.size();
+        instEnds[instChunks - 1] = allInsts.length;
         return instChunks;
     }
 
@@ -263,7 +270,7 @@ public class LogNetlistWriter {
      * @param netlist The netlist builder.
      */
     private void writeAllCellsToNetlistBuilder(Netlist.Builder netlist) {
-        writeAllCellsToNetlistBuilder(netlist, 0, allCells.size());
+        writeAllCellsToNetlistBuilder(netlist, 0, allCells.length);
     }
 
     /**
@@ -276,7 +283,7 @@ public class LogNetlistWriter {
         StructList.Builder<Cell.Builder> cellsList = netlist.initCellList(end - start);
 
         for (int i = start; i < end; i++) {
-            EDIFCell cell = allCells.get(i);
+            EDIFCell cell = allCells[i];
             CellDeclaration.Builder cellDeclBuilder = cellDeclsList.get(i - start);
 
             int idx = allStrings.getIndex(cell.getName());
@@ -291,14 +298,14 @@ public class LogNetlistWriter {
             PrimitiveList.Int.Builder insts = cellBuilder.initInsts(cell.getCellInsts().size());
             int j = 0;
             for (EDIFCellInst inst : cell.getCellInsts()) {
-                insts.set(j, allInsts.getIndex(inst));
+                insts.set(j, inst.getIndex());
                 j++;
             }
 
             PrimitiveList.Int.Builder ports = cellDeclBuilder.initPorts(cell.getPorts().size());
             j = 0;
             for (EDIFPort port : cell.getPorts()) {
-                ports.set(j, allPorts.getIndex(port));
+                ports.set(j, port.getIndex());
                 j++;
             }
 
@@ -313,9 +320,9 @@ public class LogNetlistWriter {
                 int k = 0;
                 for (EDIFPortInst portInst : net.getPortInsts()) {
                     PortInstance.Builder piBuilder = portInsts.get(k);
-                    piBuilder.setPort(allPorts.getIndex(portInst.getPort()));
+                    piBuilder.setPort(portInst.getPort().getIndex());
                     if (portInst.getCellInst() != null) {
-                        piBuilder.setInst(allInsts.getIndex(portInst.getCellInst()));
+                        piBuilder.setInst(portInst.getCellInst().getIndex());
                     } else {
                         piBuilder.setExtPort(Void.VOID);
                     }
@@ -342,7 +349,7 @@ public class LogNetlistWriter {
 
     private void writeAllPortsToNetlistBuilder(Netlist.Builder netlist) {
         int i = 0;
-        StructList.Builder<Port.Builder> portsList = netlist.initPortList(allPorts.size());
+        StructList.Builder<Port.Builder> portsList = netlist.initPortList(allPorts.length);
         for (EDIFPort port : allPorts) {
             Port.Builder portBuilder = portsList.get(i);
             portBuilder.setName(allStrings.getIndex(port.getBusName()));
@@ -373,17 +380,17 @@ public class LogNetlistWriter {
     }
 
     private void writeAllInstsToNetlistBuilder(Netlist.Builder netlist) {
-        writeAllInstsToNetlistBuilder(netlist, 0, allInsts.size());
+        writeAllInstsToNetlistBuilder(netlist, 0, allInsts.length);
     }
 
     private void writeAllInstsToNetlistBuilder(Netlist.Builder netlist, int start, int end) {
         StructList.Builder<CellInstance.Builder> cellInstsList = netlist.initInstList(end - start);
         for (int i = start; i < end; i++) {
-            EDIFCellInst inst = allInsts.get(i);
+            EDIFCellInst inst = allInsts[i];
             CellInstance.Builder ciBuilder = cellInstsList.get(i);
             ciBuilder.setName(allStrings.getIndex(inst.getName()));
             populatePropertyMap(ciBuilder.getPropMap(), inst);
-            ciBuilder.setCell(allCells.getIndex(inst.getCellType()));
+            ciBuilder.setCell(inst.getCellType().getIndex());
             ciBuilder.setView(allStrings.getIndex(inst.getViewref().getName()));
         }
     }

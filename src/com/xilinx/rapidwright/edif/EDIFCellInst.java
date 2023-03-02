@@ -32,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A cell instance in a logical (EDIF) netlist.  Instantiates
@@ -54,8 +55,12 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
 
     private EDIFPortInstList portInsts;
 
-    protected EDIFCellInst() {
+    private int index = -1;
 
+    public static AtomicInteger count = new AtomicInteger(0);
+
+    protected EDIFCellInst() {
+        index = count.getAndIncrement();
     }
 
     public EDIFCellInst(String name, EDIFCell cellType, EDIFCell parentCell) {
@@ -63,6 +68,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         setCellType(cellType);
         if (parentCell != null) parentCell.addCellInst(this);
         setViewref(cellType != null ? cellType.getEDIFView() : DEFAULT_VIEWREF);
+        index = count.getAndIncrement();
     }
 
     /**
@@ -74,6 +80,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         this.parentCell = parentCell;
         this.cellType = inst.cellType;
         setViewref(new EDIFName(inst.viewref));
+        index = count.getAndIncrement();
     }
 
     /**
@@ -294,5 +301,9 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
             return false;
 
         return true;
+    }
+
+    public int getIndex() {
+        return index;
     }
 }

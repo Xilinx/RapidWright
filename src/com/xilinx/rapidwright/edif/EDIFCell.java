@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Queue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Represent a logical cell in an EDIF netlist.  Can
@@ -62,9 +63,14 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 
     private EDIFName view = DEFAULT_VIEW;
 
+    private int index = -1;
+
+    public static AtomicInteger count = new AtomicInteger(0);
+
     public EDIFCell(EDIFLibrary lib, String name) {
         super(name);
         if (lib != null) lib.addCell(this);
+        index = count.getAndIncrement();
     }
 
     /**
@@ -82,6 +88,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
         ports = orig.ports;
         internalPortMap = orig.internalPortMap;
         view = orig.view;
+        index = count.getAndIncrement();
     }
 
     /**
@@ -130,10 +137,11 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
         }
         view = orig.view;
         setPropertiesMap(orig.createDuplicatePropertiesMap());
+        index = count.getAndIncrement();
     }
 
     protected EDIFCell() {
-
+        index = count.getAndIncrement();
     }
 
     public EDIFCellInst createChildCellInst(String name, EDIFCell reference) {
@@ -659,6 +667,10 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
     @Override
     public int hashCode() {
         return Objects.hash(super.hashCode(), library);
+    }
+
+    public int getIndex() {
+        return index;
     }
 }
 
