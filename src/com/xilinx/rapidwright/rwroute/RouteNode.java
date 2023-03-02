@@ -166,20 +166,25 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                 switch(ic) {
                     case NODE_OUTPUT:       // LUT route-thru
                     case NODE_CLE_OUTPUT:
+                    case NODE_LAGUNA_OUTPUT:
+                    case NODE_LAGUNA_DATA:  // US+: U-turn SLL at the boundary of the device
                         assert(length == 0);
                         break;
                     case NODE_LOCAL:
                     case INTENT_DEFAULT:
-                    case NODE_LAGUNA_OUTPUT:
                         assert(length <= 1);
                         break;
                     case NODE_SINGLE:
                         assert(length <= 2);
-                        if (length > 1) baseCost *= length;
+                        if (length == 2) baseCost *= length;
                         break;
                     case NODE_DOUBLE:
                         if (endTileXCoordinate != node.getTile().getTileXCoordinate()) {
-                            baseCost = 0.4f * length;
+                            assert(length == 1);
+                        } else {
+                            // Typically, length = 2 except for horizontal U-turns (length = 0)
+                            // or vertical U-turns (length = 1)
+                            assert(length <= 2);
                         }
                         break;
                     case NODE_HQUAD:
@@ -196,10 +201,6 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                         break;
                     case NODE_VLONG:
                         baseCost = 0.7f;
-                        break;
-                    case NODE_LAGUNA_DATA:
-                        // US+: U-turn SLL at the boundary of the device
-                        assert(length == 0);
                         break;
                     default:
                         throw new RuntimeException(ic.toString());
