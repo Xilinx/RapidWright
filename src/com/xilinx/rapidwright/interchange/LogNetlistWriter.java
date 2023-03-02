@@ -460,6 +460,7 @@ public class LogNetlistWriter {
         LogNetlistWriter writer = new LogNetlistWriter(true);
         CodePerfTracker t = new CodePerfTracker("WriteLogNetlistParallel");
 
+        t.start("writeParallel");
         Runnable preamble = () -> {
             t.start("Preamble", true);
             if (collapseMacros) {
@@ -516,7 +517,7 @@ public class LogNetlistWriter {
         };
         ParallelismTools.invokeAll(taskArray);
 
-        t.start("writeStrings");
+        t.stop().start("writeStrings");
         writeObjectToFile(fileName + STRINGS_SUFFIX, b -> writer.writeAllStringsToNetlistBuilder(b));
         t.stop().printSummary();
     }
