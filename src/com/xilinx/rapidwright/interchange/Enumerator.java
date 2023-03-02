@@ -33,7 +33,15 @@ public class Enumerator<T> extends ArrayList<T> {
 
     private static final long serialVersionUID = 5235125492429382642L;
 
-    private Map<String, Integer> map = new HashMap<String, Integer>();
+    protected final Map<String, Integer> map;
+
+    protected Enumerator(Map<String,Integer> map) {
+        this.map = map;
+    }
+
+    public Enumerator() {
+        this(new HashMap<>());
+    }
 
     protected String getKey(T obj) {
         String key = null;

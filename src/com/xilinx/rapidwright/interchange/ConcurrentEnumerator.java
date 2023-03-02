@@ -22,7 +22,7 @@
 
 package com.xilinx.rapidwright.interchange;
 
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * A thread safe version of {@link Enumerator}
@@ -33,17 +33,19 @@ public class ConcurrentEnumerator<T> extends Enumerator<T> {
 
     private static final long serialVersionUID = -7899071863571443164L;
 
+    public ConcurrentEnumerator() {
+        super(new ConcurrentHashMap<>());
+    }
+
     public Integer getIndex(T obj) {
         String key = getKey(obj);
-        Map<String, Integer> map = getMap();
-        synchronized (map) {
-            Integer idx = map.get(key);
-            if (idx == null) {
-                idx = map.size();
-                map.put(key, idx);
+        return map.computeIfAbsent(key, (k) -> {
+            int size;
+            synchronized(this) {
+                size = size();
                 add(obj);
             }
-            return idx;
-        }
+            return size;
+        });
     }
 }
