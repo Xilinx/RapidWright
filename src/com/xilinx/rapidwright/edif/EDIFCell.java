@@ -563,7 +563,7 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
     }
     @Override
     public String getUniqueKey() {
-        return getLibrary().getName() + "_" + getName();
+        return getLibrary().getName() + "-" + getName();
     }
 
     /**

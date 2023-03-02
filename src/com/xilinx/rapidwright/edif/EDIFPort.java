@@ -311,7 +311,7 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
 
     @Override
     public String getUniqueKey() {
-        return parentCell.getUniqueKey() + "_" + getName();
+        return getName() + "-" + parentCell.getUniqueKey();
     }
 
     public boolean isBusRangeEqual(EDIFPort otherPort) {

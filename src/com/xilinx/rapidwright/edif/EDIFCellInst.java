@@ -272,7 +272,7 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
 
     @Override
     public String getUniqueKey() {
-        return getCellType().getUniqueKey() + "_" + getParentCell().getUniqueKey() + "_" + getName();
+        return getCellType().getUniqueKey() + "-" + getParentCell().getUniqueKey() + "-" + getName();
     }
 
     @Override
