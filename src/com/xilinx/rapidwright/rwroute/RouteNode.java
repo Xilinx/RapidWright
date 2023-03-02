@@ -349,7 +349,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
 
     public short getBeginTileXCoordinate() {
         // For US+ Laguna tiles, use end tile coordinate as that's already been corrected
-        // (see setEndTileXYCoordinates())
+        // (see RouteNodeInfo.getEndTileXCoordinate())
         Tile tile = node.getTile();
         return (tile.getTileTypeEnum() == TileTypeEnum.LAG_LAG) ? getEndTileXCoordinate()
                 : (short) tile.getTileXCoordinate();

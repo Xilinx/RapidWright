@@ -84,16 +84,16 @@ public class RouteNodeInfo {
     }
 
     private static short getLength(Tile baseTile, RouteNodeType type, short endTileXCoordinate, short endTileYCoordinate) {
-        short length = (short) (Math.abs(endTileXCoordinate - baseTile.getTileXCoordinate())
-                + Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate()));
-        switch (baseTile.getTileTypeEnum()) {
+        TileTypeEnum tileType = baseTile.getTileTypeEnum();
+        short length = (short) Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate());
+        if (tileType == TileTypeEnum.LAG_LAG) {
+            // Nodes in LAGUNA tiles have no X distance
+            assert(baseTile.getTileXCoordinate() == endTileXCoordinate - 1);
+        } else {
+            length += Math.abs(endTileXCoordinate - baseTile.getTileXCoordinate());
+        }
+        switch (tileType) {
             case LAG_LAG:
-                // Since only the endTile's X coordinate of LAG_LAG tiles would have been corrected
-                // by getEndTileXCoordinate(), but not the baseTile, revert this correction for the
-                // purpose of computing the node's length
-                assert(Math.abs(endTileXCoordinate - baseTile.getTileXCoordinate()) == 1);
-                length--;
-                // Fall through
             case LAGUNA_TILE:
                 if (type == RouteNodeType.SUPER_LONG_LINE) {
                     assert(length == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
