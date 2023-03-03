@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -278,7 +278,7 @@ public class EDIFPortInst implements Comparable<EDIFPortInst> {
         }
         else {
             os.write(EXPORT_CONST_MEMBER);
-            os.write(cache.getLegalEDIFName(getPort().getName()));
+            os.write(cache.getLegalEDIFName(getPort().getBusName(true)));
             os.write(' ');
             os.write(Integer.toString(index).getBytes(StandardCharsets.UTF_8));
             os.write(')');
