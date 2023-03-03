@@ -460,29 +460,23 @@ public class LogNetlistWriter {
         LogNetlistWriter writer = new LogNetlistWriter(true);
         CodePerfTracker t = new CodePerfTracker("WriteLogNetlistParallel");
 
-        t.start("writeParallel");
-        Runnable preamble = () -> {
-            t.start("Preamble", true);
-            if (collapseMacros) {
-                Device device = n.getDevice();
-                if (device != null) {
-                    n.collapseMacroUnisims(device.getSeries());
-                } else {
-                    System.err.println("WARNING: Could not collapse macros in netlist as part target device"
-                            + " could not be identified.");
-                }
+        t.start("Preamble");
+        if (collapseMacros) {
+            Device device = n.getDevice();
+            if (device != null) {
+                n.collapseMacroUnisims(device.getSeries());
+            } else {
+                System.err.println("WARNING: Could not collapse macros in netlist as part target device"
+                        + " could not be identified.");
             }
-            t.stop("Preamble");
-        };
+        }
+        t.stop();
         
-        Runnable popEnums = () -> {
-            t.start("PopEnums", true);
-            writer.populateEnumerations(n);
-            writeObjectToFile(fileName + TOP_SUFFIX, b -> writer.writeTopNetlistStuffToNetlistBuilder(n, b));
-            t.stop("PopEnums");
-        };
+        t.start("PopEnums");
+        writer.populateEnumerations(n);
+        writeObjectToFile(fileName + TOP_SUFFIX, b -> writer.writeTopNetlistStuffToNetlistBuilder(n, b));
+        t.stop();
         
-        ParallelismTools.invokeAll(preamble, popEnums);
 
         int writeCellTasks = writer.calculateStartAndEndRanges();
         int writeInstTasks = 1;//writer.calculateInstStartAndEndRanges();
@@ -517,7 +511,7 @@ public class LogNetlistWriter {
         };
         ParallelismTools.invokeAll(taskArray);
 
-        t.stop().start("writeStrings");
+        t.start("writeStrings");
         writeObjectToFile(fileName + STRINGS_SUFFIX, b -> writer.writeAllStringsToNetlistBuilder(b));
         t.stop().printSummary();
     }
