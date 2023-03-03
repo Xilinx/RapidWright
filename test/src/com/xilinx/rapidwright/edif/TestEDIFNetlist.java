@@ -298,9 +298,11 @@ class TestEDIFNetlist {
         EDIFCellInst ff = top.createChildCellInst("ff", Design.getPrimitivesLibrary().getCell("FDRE"));
         origNetlist.getHDIPrimitivesLibrary().addCell(ff.getCellType());
 
+        String portName = "unfortunate_name";
+
         // Create two ports, one single-bit and another bussed with the same root name
-        EDIFPort port0 = top.createPort("unfortunate_name", EDIFDirection.INOUT, 1);
-        EDIFPort port1 = top.createPort("unfortunate_name[1:0]", EDIFDirection.INOUT, 2);
+        EDIFPort port0 = top.createPort(portName, EDIFDirection.INOUT, 1);
+        EDIFPort port1 = top.createPort(portName + "[1:0]", EDIFDirection.INOUT, 2);
 
         EDIFNet net0 = top.createNet("net0");
         net0.createPortInst(port0);
@@ -313,8 +315,16 @@ class TestEDIFNetlist {
         Path tempFile = path.resolve("test.edf");
         origNetlist.exportEDIF(tempFile);
 
+        // Check using EDIFNetlistComparator
         EDIFNetlist testNetlist = EDIFTools.readEdifFile(tempFile);
         EDIFNetlistComparator comparer = new EDIFNetlistComparator();
         Assertions.assertEquals(0, comparer.compareNetlists(origNetlist, testNetlist));
+
+        // Perform explicit check of port widths
+        EDIFCell testTopCell = testNetlist.getTopCell();
+        EDIFPort testPort0 = testTopCell.getNet(net0.getName()).getPortInst(null, portName).getPort();
+        Assertions.assertEquals(port0.getWidth(), testPort0.getWidth());
+        EDIFPort testPort1 = testTopCell.getNet(net1.getName()).getPortInst(null, portName + "[0]").getPort();
+        Assertions.assertEquals(port1.getWidth(), testPort1.getWidth());
     }
 }
