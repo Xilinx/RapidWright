@@ -381,12 +381,25 @@ public class EDIFNetlistComparator {
         }
     }
 
+    public static final String EXIT_CODE_DIFF_OPTION = "--set_exit_code_to_diff_count";
+
     public static void main(String[] args) {
-        if (args.length != 2 && args.length != 3) {
-            System.out.println(
-                    "USAGE: <golden EDIF Netlist> <test EDIFNetlist> [diff report filename]");
+        if (args.length < 2 || args.length > 4) {
+            System.out.println("USAGE: <golden EDIF Netlist> <test EDIFNetlist> [diff report filename] ["
+                    + EXIT_CODE_DIFF_OPTION + "]");
             return;
         }
+
+        boolean setExitCodeAsDiffCount = false;
+        String diffReportFileName = null;
+        for (int i = 2; i < args.length; i++) {
+            if (args[i].equals(EXIT_CODE_DIFF_OPTION)) {
+                setExitCodeAsDiffCount = true;
+            } else {
+                diffReportFileName = args[i];
+            }
+        }
+        
         CodePerfTracker t = new CodePerfTracker("Compare EDIF Netlists");
         t.start("Load Gold");
         EDIFNetlist gold = EDIFTools.readEdifFile(args[0]);
@@ -397,9 +410,9 @@ public class EDIFNetlistComparator {
         test.expandMacroUnisims(series);
         t.stop().start("Compare");
         EDIFNetlistComparator comparator = new EDIFNetlistComparator();
-        comparator.compareNetlists(gold, test);
-        if (args.length == 3) {
-            try (PrintStream ps = new PrintStream(args[2])) {
+        int diffs = comparator.compareNetlists(gold, test);
+        if (diffReportFileName != null) {
+            try (PrintStream ps = new PrintStream(diffReportFileName)) {
                 comparator.printDiffReport(ps);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
@@ -408,5 +421,9 @@ public class EDIFNetlistComparator {
             comparator.printDiffReport(System.out);
         }
         t.stop().printSummary();
+        
+        if (setExitCodeAsDiffCount) {
+            System.exit(diffs);
+        }
     }
 }
