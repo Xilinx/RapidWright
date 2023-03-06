@@ -420,13 +420,13 @@ public class RWRoute{
                         if (preservedNet != null) {
                             // If one is present, it is unavailable only if it isn't carrying
                             // the net undergoing routing
-                            return preservedNet == net ? GlobalSignalRouting.NodeStatus.INUSE
-                                    : GlobalSignalRouting.NodeStatus.UNAVAILABLE;
+                            return preservedNet == net ? NodeStatus.INUSE
+                                    : NodeStatus.UNAVAILABLE;
                         }
                         // A RouteNode will only be created if the net is necessary for
                         // a to-be-routed connection
-                        return routingGraph.getNode(node) == null ? GlobalSignalRouting.NodeStatus.AVAILABLE
-                                : GlobalSignalRouting.NodeStatus.UNAVAILABLE;
+                        return routingGraph.getNode(node) == null ? NodeStatus.AVAILABLE
+                                : NodeStatus.UNAVAILABLE;
                     },
                     design, routethruHelper);
 
