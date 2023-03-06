@@ -59,7 +59,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.DeflaterOutputStream;
@@ -82,6 +84,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
+import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.timing.TimingModel;
 
 /**
@@ -141,7 +144,7 @@ public class FileTools {
     /** Base URL for download data files */
     public static final String RAPIDWRIGHT_DATA_URL = "http://data.rapidwright.io/";
     /** Suffix added to data file names to capture md5 status */
-    public static String MD5_DATA_FILE_SUFFIX = ".md5";
+    public static final String MD5_DATA_FILE_SUFFIX = ".md5";
 
     private static boolean OVERRIDE_DATA_FILE_DOWNLOAD = false;
 
@@ -898,10 +901,85 @@ public class FileTools {
     }
 
     /**
-     * Downloads the specified data file and version according to {@link #DATA_VERSION_FILE}.  This
-     * will overwrite any existing file locally of the same name.  This also validates the download
-     * is correct by calculating the md5sum of the downloaded file and comparing it to the expected
-     * one in {@link #DATA_VERSION_FILE}.
+     * Downloads and generates all potential data files to make this RapidWright
+     * installation static friendly. After running this method, RapidWright should
+     * not download any files, create any new directories or generate any new files.
+     * This is useful when a single RapidWright installation will be used by
+     * multiple processes simultaneously and/or when RapidWright needs to reside in
+     * a read-only space.
+     * 
+     * @param devices The set of devices intended to be used for this installation
+     *                (this simply saves download and generation time).
+     */
+    public static void ensureDataFilesAreStaticInstallFriendly(String... devices) {
+        System.out.println("Download data files to " + getRapidWrightPath());
+        // Download all non-device data files
+        for (String fileName : DataVersions.dataVersionMap.keySet()) {
+            if (fileName.contains("data/devices")) continue;
+            downloadDataFile(fileName);
+        }
+        
+        // Download all requested device data files and generate associated cache files
+        for (String deviceName : devices) {
+            Device device = Device.getDevice(deviceName);
+            device.ensureDeviceCacheFileIsGenerated();
+            new RouteThruHelper(device);
+            Device.releaseDeviceReferences();
+        }
+    }
+
+    /**
+     * Downloads and generates all potential data files to make this RapidWright
+     * installation static friendly. After running this method, RapidWright should
+     * not download any files, create any new directories or generate any new files.
+     * This is useful when a single RapidWright installation will be used by
+     * multiple processes simultaneously and/or when RapidWright needs to reside in
+     * a read-only space. This method will download all devices files and generate
+     * all cache files for each device.
+     */
+    public static void ensureDataFilesAreStaticInstallFriendly() {
+        Set<String> devices = new HashSet<>();
+        for (Part p : PartNameTools.getParts()) {
+            devices.add(p.getDevice());
+        }
+        ensureDataFilesAreStaticInstallFriendly(devices.toArray(new String[devices.size()]));
+    }
+
+    /**
+     * Gets the list of all relative dependent data files given the set of devices
+     * provided.
+     * 
+     * @param devices The list of devices to be used to compile the list of needed
+     *                data files.
+     * @return The list of all necessary data files to operate RapidWright
+     *         independently from downloads or generating cache files.
+     */
+    public static List<String> getAllDependentDataFiles(String... devices) {
+        List<String> expectedFiles = new ArrayList<>();
+        for (String dataFile : new String[] { CELL_PIN_DEFAULTS_FILE_NAME, PART_DUMP_FILE_NAME, 
+                                              PART_DB_PATH, UNISIM_DATA_FILE_NAME }) {
+            expectedFiles.add(dataFile);
+            expectedFiles.add(dataFile + MD5_DATA_FILE_SUFFIX);
+        }
+
+        for (String deviceName : devices) {
+            Part part = PartNameTools.getPart(deviceName);
+            String devResName = getDeviceResourceSuffix(part);
+            expectedFiles.add(devResName + DEVICE_FILE_SUFFIX);
+            expectedFiles.add(devResName + DEVICE_FILE_SUFFIX + MD5_DATA_FILE_SUFFIX);
+            expectedFiles.add(devResName + DEVICE_CACHE_FILE_SUFFIX);
+            expectedFiles.add(getRouteThruFileName(deviceName));
+        }
+        return expectedFiles;
+    }
+
+    /**
+     * Downloads the specified data file and version according to
+     * {@link #DATA_VERSION_FILE}. This will overwrite any existing file locally of
+     * the same name. This also validates the download is correct by calculating the
+     * md5sum of the downloaded file and comparing it to the expected one in
+     * {@link #DATA_VERSION_FILE}.
+     * 
      * @param fileName Name of the data file to download
      * @return The md5 checksum of the downloaded file
      */
@@ -1074,6 +1152,16 @@ public class FileTools {
 
     public static String getDeviceResourceCache(Part part) {
         return getDeviceResourceSuffix(part) + DEVICE_CACHE_FILE_SUFFIX;
+    }
+
+    /**
+     * Gets the relative routethru file name for the given device.
+     * 
+     * @param deviceName Name of the device
+     * @return Relative routethru data file name for the given device.
+     */
+    public static String getRouteThruFileName(String deviceName) {
+        return ROUTETHRU_FOLDER_NAME + File.separator + deviceName + ".rt";
     }
 
     /**
