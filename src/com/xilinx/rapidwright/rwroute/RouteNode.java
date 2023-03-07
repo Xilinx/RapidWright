@@ -180,11 +180,15 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                         break;
                     case NODE_DOUBLE:
                         if (endTileXCoordinate != node.getTile().getTileXCoordinate()) {
-                            assert(length == 1);
+                            assert(length <= 2);
+                            // Typically, length = 1 (since tile X is not equal)
+                            // In US, have seen length = 2, e.g. VU440's INT_X171Y827/EE2_E_BEG7.
+                            if (length == 2) baseCost *= length;
                         } else {
                             // Typically, length = 2 except for horizontal U-turns (length = 0)
-                            // or vertical U-turns (length = 1)
-                            assert(length <= 2);
+                            // or vertical U-turns (length = 1).
+                            // In US, have seen length = 3, e.g. VU440's INT_X171Y827/NN2_E_BEG7.
+                            assert(length <= 3);
                         }
                         break;
                     case NODE_HQUAD:
