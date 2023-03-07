@@ -38,6 +38,8 @@ import org.capnproto.ReaderOptions;
 import org.capnproto.Serialize;
 import org.capnproto.SerializePacked;
 
+import com.github.luben.zstd.ZstdInputStream;
+import com.github.luben.zstd.ZstdOutputStream;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -48,7 +50,9 @@ public class Interchange {
     /** Flag indicating use of Packed Cap'n Proto Serialization */
     public static boolean IS_PACKED = false;
     /** Fla indicating that files are gziped on output */
-    public static boolean IS_GZIPPED = true;
+    public static boolean IS_GZIPPED = false;
+
+    public static boolean IS_ZSTD = true;
 
     /**
      * Common method to write out Interchange files
@@ -59,10 +63,12 @@ public class Interchange {
     public static void writeInterchangeFile(String fileName, MessageBuilder message) throws IOException {
         WritableByteChannel wbc = null;
 
-        if (IS_GZIPPED) {
+        if (IS_ZSTD) {
+            ZstdOutputStream zo = new ZstdOutputStream(new FileOutputStream(fileName));
+            wbc = Channels.newChannel(zo);
+        } else if (IS_GZIPPED) {
             GZIPOutputStream go = new GZIPOutputStream(new FileOutputStream(fileName));
             wbc = Channels.newChannel(go);
-
         } else {
             FileOutputStream fo = new java.io.FileOutputStream(fileName);
             wbc = fo.getChannel();
@@ -85,7 +91,10 @@ public class Interchange {
      */
     public static MessageReader readInterchangeFile(String fileName, ReaderOptions readOptions) throws IOException {
         ReadableByteChannel channel = null;
-        if (IS_GZIPPED) {
+        if (IS_ZSTD) {
+            ZstdInputStream zis = new ZstdInputStream(new FileInputStream(fileName));
+            channel = Channels.newChannel(zis);
+        } else if (IS_GZIPPED) {
             GZIPInputStream gis = new GZIPInputStream(new FileInputStream(fileName));
             channel = Channels.newChannel(gis);
         } else {
