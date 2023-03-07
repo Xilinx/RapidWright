@@ -25,7 +25,9 @@ package com.xilinx.rapidwright.interchange;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.Consumer;
@@ -146,19 +148,30 @@ public class LogNetlistWriter {
      * @param n The current netlist to be serialized
      */
     private void populateEnumerations(EDIFNetlist n) {
+        int cellCount = 0;
+        int instCount = 0;
+        int portCount = 0;
         // Enumerate all cells, ports and instances to break cyclic reference dependency
         // in netlist description
-        for (EDIFLibrary lib : n.getLibrariesInExportOrder()) {
-            for (EDIFCell cell : lib.getValidCellExportOrder(false)) {
+        for (EDIFLibrary lib : n.getLibraries()) {
+            for (EDIFCell cell : lib.getCells()) {
                 allCells.addObject(cell);
+                cellCount++;
                 for (EDIFPort port : cell.getPorts()) {
                     allPorts.addObject(port);
+                    portCount++;
                 }
                 for (EDIFCellInst inst : cell.getCellInsts()) {
                     allInsts.addObject(inst);
+                    instCount++;
                 }
             }
         }
+
+        System.out.println("total cells: " + cellCount + " " + allCells.size());
+        System.out.println("total insts: " + instCount + " " + allInsts.size());
+        System.out.println("total ports: " + portCount + " " + allPorts.size());
+
     }
 
     /**
@@ -180,51 +193,56 @@ public class LogNetlistWriter {
         topBuilder.setView(allStrings.getIndex(n.getTopCellInst().getViewref().getName()));
     }
 
-    private int[] starts;
-    private int[] ends;
+    private List<Integer> starts;
+    private List<Integer> ends;
+
+    private static int getCellLoad(EDIFCell cell) {
+        int cellSize = 1 + cell.getPorts().size() + cell.getCellInsts().size();
+        for (EDIFNet net : cell.getNets()) {
+            cellSize += net.getPortInsts().size();
+        }
+        cellSize += cell.getNets().size();
+        return cellSize;
+    }
 
     private int calculateStartAndEndRanges() {
-        int loadCount = allCells.size();
         int largestCell = 0;
-        for (EDIFCell cell : allCells) {
-            int cellSize = cell.getNets().size() + cell.getCellInsts().size();
-            if (largestCell < cellSize) {
-                largestCell = cellSize;
+        int[] cellSizes = new int[allCells.size()];
+        for (int i = 0; i < allCells.size(); i++) {
+            cellSizes[i] = getCellLoad(allCells.get(i));
+            if (largestCell < cellSizes[i]) {
+                largestCell = cellSizes[i];
             }
-            loadCount += cellSize;
         }
-
-        int chunkCount = loadCount / largestCell;
 
         int chunkLoadSize = largestCell;
         if (chunkLoadSize < MIN_CHUNK_THRESHOLD) {
             chunkLoadSize = MIN_CHUNK_THRESHOLD;
         }
 
-        starts = new int[chunkCount];
-        ends = new int[chunkCount];
+        starts = new ArrayList<>();
+        ends = new ArrayList<>();
 
-        int cellIdx = 0;
-        int empty = 0;
-        for (int i = 0; i < chunkCount; i++) {
-            starts[i] = cellIdx;
-            int currLoad = 0;
-            while (currLoad < chunkLoadSize && cellIdx < allCells.size()) {
-                EDIFCell curr = allCells.get(cellIdx);
-                currLoad += curr.getNets().size() + curr.getCellInsts().size() + 1;
-                cellIdx++;
+        int currLoad = 0;
+        for (int i = 0; i < allCells.size(); i++) {
+            if (currLoad == 0) {
+                starts.add(i);
             }
-            ends[i] = cellIdx;
-            if (starts[i] == ends[i]) {
-                empty++;
+
+            currLoad += cellSizes[i];
+
+            if ((i == allCells.size() - 1) || (currLoad + cellSizes[i + 1]) >= chunkLoadSize) {
+                ends.add(i);
+                currLoad = 0;
             }
         }
-        return chunkCount - empty;
+
+        return starts.size();
     }
 
     private int[] instStarts;
     private int[] instEnds;
-    private int instChunks = 4;
+    private int instChunks = 10;
 
     private int calculateInstStartAndEndRanges() {
         instStarts = new int[instChunks];
@@ -245,8 +263,8 @@ public class LogNetlistWriter {
     }
 
     private void writeNCellsToFile(int chunk, int chunkCount, String fileName) {
-        int start = starts[chunk];
-        int end = ends[chunk];
+        int start = starts.get(chunk);
+        int end = ends.get(chunk);
         MessageBuilder message = new MessageBuilder();
         Netlist.Builder netlist = message.initRoot(Netlist.factory);
         writeAllCellsToNetlistBuilder(netlist, start, end);
@@ -272,10 +290,10 @@ public class LogNetlistWriter {
      * @param netlist The netlist builder.
      */
     private void writeAllCellsToNetlistBuilder(Netlist.Builder netlist, int start, int end) {
-        StructList.Builder<CellDeclaration.Builder> cellDeclsList = netlist.initCellDecls(end - start);
-        StructList.Builder<Cell.Builder> cellsList = netlist.initCellList(end - start);
+        StructList.Builder<CellDeclaration.Builder> cellDeclsList = netlist.initCellDecls(end - start + 1);
+        StructList.Builder<Cell.Builder> cellsList = netlist.initCellList(end - start + 1);
 
-        for (int i = start; i < end; i++) {
+        for (int i = start; i <= end; i++) {
             EDIFCell cell = allCells.get(i);
             CellDeclaration.Builder cellDeclBuilder = cellDeclsList.get(i - start);
 

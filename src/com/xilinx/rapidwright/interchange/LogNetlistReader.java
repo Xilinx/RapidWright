@@ -361,6 +361,10 @@ public class LogNetlistReader {
 
         reader.allInsts = new EDIFCellInst[instListReader.size()];
 
+        System.out.println("readCells = " + reader.allCells.length);
+        System.out.println("readInsts = " + reader.allInsts.length);
+        System.out.println("readPorts = " + reader.allPorts.length);
+
         Runnable[] readEDIFCellTasks = new Runnable[reader.getCellNetlists().length];
         for (int i = 0; i < readEDIFCellTasks.length; i++) {
             Integer ii = i;
