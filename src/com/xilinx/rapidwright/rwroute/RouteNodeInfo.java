@@ -87,7 +87,7 @@ public class RouteNodeInfo {
         TileTypeEnum tileType = baseTile.getTileTypeEnum();
         short length = (short) Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate());
         if (tileType == TileTypeEnum.LAG_LAG) {
-            // Nodes in LAGUNA tiles have no X distance
+            // Nodes in LAGUNA tiles must have no X distance
             assert(baseTile.getTileXCoordinate() == endTileXCoordinate - 1);
         } else {
             length += Math.abs(endTileXCoordinate - baseTile.getTileXCoordinate());
