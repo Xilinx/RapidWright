@@ -443,9 +443,18 @@ public class EDIFTokenizer implements AutoCloseable {
         }
         long actual = 0;
         while (actual < i) {
-            actual += in.skip(i-actual);
+            long skipped = in.skip(i-actual);
+            if (skipped == 0) {
+                if (in.read() == -1) {
+                    // EOF reached
+                    break;
+                }
+                // One byte was successfully read
+                skipped = 1;
+            }
+            actual += skipped;
         }
-        byteOffset += i;
+        byteOffset += actual;
     }
 
     /**
