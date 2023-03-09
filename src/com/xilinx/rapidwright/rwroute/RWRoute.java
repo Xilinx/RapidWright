@@ -376,7 +376,7 @@ public class RWRoute{
      * @param staticNet The static net in question, i.e. VCC or GND.
      */
     protected void addStaticNetRoutingTargets(Net staticNet) {
-        preserveNet(staticNet, false);
+        assert(!staticNet.hasPIPs());
 
         List<SitePinInst> sinks = staticNet.getSinkPins();
         if (sinks.size() > 0) {
@@ -399,7 +399,7 @@ public class RWRoute{
 
         for (List<SitePinInst> netRouteTargetPins : staticNetAndRoutingTargets.values()) {
             for (SitePinInst sink : netRouteTargetPins) {
-                routingGraph.unpreserve(sink.getConnectedNode());
+                assert(!routingGraph.isPreserved(sink.getConnectedNode()));
             }
         }
 
@@ -418,17 +418,20 @@ public class RWRoute{
             List<SitePinInst> pins = e.getValue();
             System.out.println("INFO: Route " + pins.size() + " pins of " + net);
             GlobalSignalRouting.routeStaticNet(net,
-                    // Predicate to determine whether a node is unavailable for global routing
+                    // Lambda to determine whether a node is (a) available for use,
+                    // (b) already in used for this static net, (c) unavailable
                     (node) -> {
                         Net preservedNet = routingGraph.getPreservedNet(node);
                         if (preservedNet != null) {
                             // If one is present, it is unavailable only if it isn't carrying
                             // the net undergoing routing
-                            return preservedNet != net;
+                            return preservedNet == net ? NodeStatus.INUSE
+                                    : NodeStatus.UNAVAILABLE;
                         }
                         // A RouteNode will only be created if the net is necessary for
                         // a to-be-routed connection
-                        return routingGraph.getNode(node) != null;
+                        return routingGraph.getNode(node) == null ? NodeStatus.AVAILABLE
+                                : NodeStatus.UNAVAILABLE;
                     },
                     design, routethruHelper);
 
