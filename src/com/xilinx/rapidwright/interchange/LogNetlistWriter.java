@@ -168,10 +168,9 @@ public class LogNetlistWriter {
             }
         }
 
-        System.out.println("total cells: " + cellCount + " " + allCells.size());
-        System.out.println("total insts: " + instCount + " " + allInsts.size());
-        System.out.println("total ports: " + portCount + " " + allPorts.size());
-
+//        System.out.println("total cells: " + cellCount + " " + allCells.size());
+//        System.out.println("total insts: " + instCount + " " + allInsts.size());
+//        System.out.println("total ports: " + portCount + " " + allPorts.size());
     }
 
     /**
@@ -281,7 +280,7 @@ public class LogNetlistWriter {
      * @param netlist The netlist builder.
      */
     private void writeAllCellsToNetlistBuilder(Netlist.Builder netlist) {
-        writeAllCellsToNetlistBuilder(netlist, 0, allCells.size());
+        writeAllCellsToNetlistBuilder(netlist, 0, allCells.size() - 1);
     }
 
     /**
@@ -504,9 +503,9 @@ public class LogNetlistWriter {
         for (int i = 0; i < writeCellTasks; i++) {
             Integer ii = i;
             taskArray[i] = () -> {
-                t.start("writeCells" + ii, true);
+                // t.start("writeCells" + ii, true);
                 writer.writeNCellsToFile(ii, writeCellTasks, fileName + CELLS_SUFFIX + ii);
-                t.stop("writeCells" + ii);
+                // t.stop("writeCells" + ii);
             };
         }
 
@@ -514,20 +513,22 @@ public class LogNetlistWriter {
             Integer ii = i;
             taskArray[ii + writeCellTasks] = () -> {
                 String suffix = (writeInstTasks == 1 ? "" : Integer.toString(ii));
-                t.start("writeInsts" + suffix, true);
+                // t.start("writeInsts" + suffix, true);
                 //writer.writeNInstsToFile(ii, writeInstTasks, fileName + INSTS_SUFFIX + ii);
                 String instFileName = fileName + INSTS_SUFFIX + suffix;
                 writeObjectToFile(instFileName, b -> writer.writeAllInstsToNetlistBuilder(b));
-                t.stop("writeInsts" + suffix);
+                // t.stop("writeInsts" + suffix);
             };
         }
 
         taskArray[taskArray.length - 1] = () -> {
-            t.start("writePorts", true);
+            // t.start("writePorts", true);
             writeObjectToFile(fileName + PORTS_SUFFIX, b -> writer.writeAllPortsToNetlistBuilder(b));
-            t.stop("writePorts");
+            // t.stop("writePorts");
         };
+        t.start("cellsPortsInsts");
         ParallelismTools.invokeAll(taskArray);
+        t.stop();
 
         t.start("writeStrings");
         writeObjectToFile(fileName + STRINGS_SUFFIX, b -> writer.writeAllStringsToNetlistBuilder(b));

@@ -330,25 +330,27 @@ public class LogNetlistReader {
         for (int i = 0; i < cellFileNames.size(); i++) {
             Integer ii = i;
             tasks[i] = () -> {
-                t.start("ReadCells" + ii, true);
+                // t.start("ReadCells" + ii, true);
                 String cellFileName = cellFileNames.get(ii);
                 int cellFileNameIdx = StringTools.getUnsignedIntegerSuffix(cellFileName);
                 reader.setCellNetlist(getNetlistReaderFromFile(cellFileName), cellFileNameIdx);
-                t.stop("ReadCells" + ii);
+                // t.stop("ReadCells" + ii);
             };
         }
 
         tasks[tasks.length - 1] = () -> {
-            t.start("ReadStrings", true);
+            // t.start("ReadStrings", true);
             reader.readStrings(getNetlistReaderFromFile(fileName + LogNetlistWriter.STRINGS_SUFFIX));
-            t.stop("ReadStrings");
+            // t.stop("ReadStrings");
         };
 
+        t.start("ReadCellsStrings");
         ParallelismTools.invokeAll(tasks);
+        t.stop();
 
         t.start("ReadPorts");
         reader.readPorts(getNetlistReaderFromFile(fileName + LogNetlistWriter.PORTS_SUFFIX));
-        t.stop("ReadPorts");
+        t.stop();
 
         t.start("Create Cells");
         reader.createCells(n, reader.cellNetlists);
@@ -361,9 +363,9 @@ public class LogNetlistReader {
 
         reader.allInsts = new EDIFCellInst[instListReader.size()];
 
-        System.out.println("readCells = " + reader.allCells.length);
-        System.out.println("readInsts = " + reader.allInsts.length);
-        System.out.println("readPorts = " + reader.allPorts.length);
+//        System.out.println("readCells = " + reader.allCells.length);
+//        System.out.println("readInsts = " + reader.allInsts.length);
+//        System.out.println("readPorts = " + reader.allPorts.length);
 
         Runnable[] readEDIFCellTasks = new Runnable[reader.getCellNetlists().length];
         for (int i = 0; i < readEDIFCellTasks.length; i++) {
@@ -371,15 +373,17 @@ public class LogNetlistReader {
             Netlist.Reader netlistReader = reader.getCellNetlists()[i];
             Reader<Netlist.Cell.Reader> cellListReader = netlistReader.getCellList();
             readEDIFCellTasks[i] = () -> {
-                t.start("ReadEDIFCells" + ii, true);
+                // t.start("ReadEDIFCells" + ii, true);
                 for (int j = 0; j < cellListReader.size(); j++) {
                     reader.readEDIFCell(j, n, cellListReader, instListReader);
                 }
-                t.stop("ReadEDIFCells" + ii);
+                // t.stop("ReadEDIFCells" + ii);
             };
         }
 
+        t.start("ReadEDIFCells");
         ParallelismTools.invokeAll(readEDIFCellTasks);
+        t.stop();
 
         t.start("Populate Top");
         EDIFDesign design = new EDIFDesign(reader.allCells[topNetlist.getTopInst().getCell()].getName());
