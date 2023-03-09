@@ -54,7 +54,7 @@ public class PhysicalNetlistToDcp {
         boolean makeOutOfContext = false;
         
         if (args.length == 5 ) {
-            if(args[4].equals(MAKE_DCP_OUT_OF_CONTEXT)) {
+            if (args[4].equals(MAKE_DCP_OUT_OF_CONTEXT)) {
                 makeOutOfContext = true;
             } else {
                 System.out.println("Unrecognized option '" + args[4] + "', did you mean '"
