@@ -279,12 +279,6 @@ public class GlobalSignalRouting {
         return device.getClockRegion(center.y, center.x);
     }
 
-    public enum NodeStatus {
-        AVAILABLE,
-        UNAVAILABLE,
-        INUSE
-    }
-
     /**
      * Routes a static net (GND or VCC).
      * @param currNet The current static net to be routed.

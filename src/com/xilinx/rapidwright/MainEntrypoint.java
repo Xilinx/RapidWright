@@ -80,6 +80,7 @@ import com.xilinx.rapidwright.placer.handplacer.HandPlacer;
 import com.xilinx.rapidwright.placer.handplacer.ModuleOptimizer;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.Router;
+import com.xilinx.rapidwright.rwroute.PartialRouter;
 import com.xilinx.rapidwright.rwroute.RWRoute;
 import com.xilinx.rapidwright.tests.CheckAccuracyUsingGnlDesigns;
 import com.xilinx.rapidwright.tests.DeviceLoader;
@@ -150,6 +151,7 @@ public class MainEntrypoint {
         addFunction("MultGenerator", MultGenerator::main);
         addFunction("PartPrinter", PartPrinter::main);
         addFunction("PartTileBrowser", PartTileBrowser::main);
+        addFunction("PartialRouter", PartialRouter::main);
         addFunction("PBlockGenDebugger", PBlockGenDebugger::main);
         addFunction("PBlockGenerator", PBlockGenerator::main);
         addFunction("PBlock", PBlock::main);
