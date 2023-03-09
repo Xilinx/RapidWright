@@ -53,7 +53,7 @@ public class PhysicalNetlistToDcp {
 
         boolean makeOutOfContext = false;
         
-        if (args.length == 5 ) {
+        if (args.length == 5) {
             if (args[4].equals(MAKE_DCP_OUT_OF_CONTEXT)) {
                 makeOutOfContext = true;
             } else {
