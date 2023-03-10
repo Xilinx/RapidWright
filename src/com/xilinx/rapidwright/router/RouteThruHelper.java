@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.router;
 
 import java.io.File;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map.Entry;
@@ -53,11 +54,10 @@ public class RouteThruHelper {
 
     private Device device;
 
-    private static String getSerializedFileName(Device device) {
-        String folderName = FileTools.getRapidWrightPath() + File.separator 
-                + FileTools.ROUTETHRU_FOLDER_NAME;
-        FileTools.makeDirs(folderName);
-        return folderName + File.separator + device.getName() + ".rt";
+    public static String getSerializedFileName(String deviceName) {
+        String fileName = FileTools.getRapidWrightResourceFileName(FileTools.getRouteThruFileName(deviceName));
+        FileTools.makeDirs(Paths.get(fileName).getParent().toString());
+        return fileName;
     }
 
     public RouteThruHelper(Device device) {
@@ -66,7 +66,7 @@ public class RouteThruHelper {
     }
 
     private void writeFile() {
-        try (Output out = FileTools.getKryoOutputStream(getSerializedFileName(device))) {
+        try (Output out = FileTools.getKryoOutputStream(getSerializedFileName(device.getName()))) {
             out.writeInt(routeThrus.size());
             for (Entry<TileTypeEnum, HashSet<Integer>> e : routeThrus.entrySet()) {
                 out.writeString(e.getKey().toString());
@@ -80,7 +80,7 @@ public class RouteThruHelper {
 
     private void readFile() {
         routeThrus = new HashMap<TileTypeEnum, HashSet<Integer>>();
-        try (Input in = FileTools.getKryoInputStream(getSerializedFileName(device))) {
+        try (Input in = FileTools.getKryoInputStream(getSerializedFileName(device.getName()))) {
             int count = in.readInt();
             for (int i=0; i < count; i++) {
                 TileTypeEnum type = TileTypeEnum.valueOf(in.readString());
@@ -95,7 +95,7 @@ public class RouteThruHelper {
     }
 
     private void init() {
-        String serializedFileName = getSerializedFileName(device);
+        String serializedFileName = getSerializedFileName(device.getName());
         routeThrus = new HashMap<TileTypeEnum,HashSet<Integer>>();
         if (new File(serializedFileName).exists()) {
             readFile();
