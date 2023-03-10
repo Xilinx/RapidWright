@@ -26,13 +26,14 @@
  */
 package com.xilinx.rapidwright.edif;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collection;
+import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
+import java.util.Set;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -157,6 +158,33 @@ public class EDIFHierNet {
     }
 
     /**
+     * Gets the sorted ArrayList of EDIFHierPortInsts on this net as a collection.
+     * @return The collection of EDIFPortInsts on this net.
+     */
+    public Collection<EDIFHierPortInst> getPortInsts() {
+        Collection<EDIFPortInst> portInsts = net.getPortInsts();
+        Collection<EDIFHierPortInst> hierPortInsts = new ArrayList<>(portInsts.size());
+        for (EDIFPortInst portInst : portInsts) {
+            hierPortInsts.add(new EDIFHierPortInst(hierarchicalInst, portInst));
+        }
+        return hierPortInsts;
+    }
+
+    /**
+     * This returns all sources on the net, either output ports of the
+     * cell instances in the cell or the top level input ports.
+     * @return A list of EDIFHierPortInst sources.
+     */
+    public List<EDIFHierPortInst> getSourcePortInsts(boolean includeTopLevelPorts) {
+        List<EDIFPortInst> portInsts = net.getSourcePortInsts(includeTopLevelPorts);
+        List<EDIFHierPortInst> hierPortInsts = new ArrayList<>(portInsts.size());
+        for (EDIFPortInst portInst : portInsts) {
+            hierPortInsts.add(new EDIFHierPortInst(hierarchicalInst, portInst));
+        }
+        return hierPortInsts;
+    }
+
+    /**
      * Gets all connected leaf port instances on this hierarchical net and its aliases.
      * @return The list of all leaf cell port instances connected to this hierarchical net and its
      * aliases.
@@ -173,10 +201,22 @@ public class EDIFHierNet {
      * aliases.
      */
     public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins) {
+        return getLeafHierPortInsts(includeSourcePins, new HashSet<>());
+    }
+
+    /**
+     * Gets all connected leaf port instances on this hierarchical net and its aliases.
+     * @param includeSourcePins A flag to include source pins in the result.  Setting this to false
+     * only returns the sinks.
+     * @param visited An initial set of EDIFHierNet-s that have already been visited and will not
+     * be visited again. Pre-populating this set can be useful for blocking traversal.
+     * @return The list of all leaf cell port instances connected to this hierarchical net and its
+     * aliases.
+     */
+    public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins, Set<EDIFHierNet> visited) {
         List<EDIFHierPortInst> leafCellPins = new ArrayList<>();
         Queue<EDIFHierNet> queue = new ArrayDeque<>();
         queue.add(this);
-        HashSet<EDIFHierNet> visited = new HashSet<>();
 
         EDIFHierNet parentNet = null;
         while (!queue.isEmpty()) {

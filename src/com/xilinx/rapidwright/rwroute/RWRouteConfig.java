@@ -209,7 +209,7 @@ public class RWRouteConfig {
                 setPrintConnectionSpan(true);
                 break;
             default:
-                break;
+                throw new IllegalArgumentException("ERROR: RWRoute argument '" + arg + "' not recognized.");
             }
         }
     }

@@ -100,7 +100,8 @@ public class EDIFNet extends EDIFPropertyObject {
         if (deferSort) {
             portInsts.deferSortAdd(portInst);
         } else {
-            portInsts.add(portInst);
+            boolean added = portInsts.add(portInst);
+            assert(added);
         }
     }
 
