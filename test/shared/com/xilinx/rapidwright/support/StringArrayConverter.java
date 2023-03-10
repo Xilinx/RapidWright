@@ -26,7 +26,7 @@ import org.junit.jupiter.params.converter.ArgumentConversionException;
 import org.junit.jupiter.params.converter.SimpleArgumentConverter;
 
 /**
- * Used for converting comma separated String[] definitions in JUnity CsvSource
+ * Used for converting comma separated String[] definitions in JUnit's CsvSource
  * parameterized tests
  *
  */
