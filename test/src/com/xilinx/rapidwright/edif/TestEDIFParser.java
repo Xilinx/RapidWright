@@ -23,6 +23,24 @@
 
 package com.xilinx.rapidwright.edif;
 
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.ParallelismTools;
+import com.xilinx.rapidwright.util.Params;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.python.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
+import org.python.apache.commons.compress.compressors.gzip.GzipParameters;
+
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,19 +50,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
-
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.ValueSource;
-
-import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.Params;
+import java.util.zip.Deflater;
 
 public class TestEDIFParser {
     private static final Path input = RapidWrightDCP.getPath("edif_parsing_stress_test.edf");
@@ -126,42 +132,43 @@ public class TestEDIFParser {
     }
 
     @ParameterizedTest
-    @ValueSource(booleans = { false, true })
-    public void testGZIPEDIFParsing(boolean decompressToDisk, @TempDir Path tempDir)
+    @CsvSource({
+            "false,false",
+            "false,true",
+            "true,false",
+            "true,true"
+    })
+    public void testGZIPEDIFParsing(boolean parallel, boolean decompressToDisk, @TempDir Path tempDir)
             throws IOException {
-        if (decompressToDisk) {
-            System.setProperty(Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK_NAME, "1");
+        Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK = decompressToDisk;
+        Assumptions.assumeTrue(!parallel || ParallelismTools.getParallel());
+
+        Path dcp = RapidWrightDCP.getPath("microblazeAndILA_3pblocks.dcp");
+        Design design = Design.readCheckpoint(dcp, true);
+
+        Path compressed = tempDir.resolve(dcp.getFileName() + ".gz");
+
+        // Tell compressor to not actually do any compression (yet still create
+        // a valid Gzip stream) in order to get the largest file size possible
+        GzipParameters params = new GzipParameters();
+        params.setCompressionLevel(Deflater.NO_COMPRESSION);
+        try (GzipCompressorOutputStream gzos = new GzipCompressorOutputStream(new FileOutputStream(compressed.toFile()), params)) {
+            design.getNetlist().exportEDIF(gzos);
         }
 
-        Path src = tempDir.resolve(input.getFileName());
-        Files.copy(input, src);
-        Path compressed = FileTools.compressFileUsingGZIP(src);
         Assertions.assertTrue(compressed.toString().endsWith(".gz"));
-        Assertions.assertTrue(src.toFile().exists());
-        Files.delete(src);
-        Assertions.assertFalse(src.toFile().exists());
-        Assertions.assertNotNull(EDIFTools.loadEDIFFile(compressed));
-        Assertions.assertFalse(src.toFile().exists());
-    }
+        if (parallel) {
+            // Make sure that file size is enough to cause more than one thread to be used
+            long compressedFileSize = FileTools.getFileSize(compressed.toString());
+            Assertions.assertTrue(ParallelEDIFParser.calcThreads(compressedFileSize, Integer.MAX_VALUE, true) > 1);
 
-    @ParameterizedTest
-    @ValueSource(booleans = { false, true })
-    public void testGZIPEDIFParsingParallel(boolean decompressToDisk, @TempDir Path tempDir)
-            throws IOException {
-        if (decompressToDisk) {
-            System.setProperty(Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK_NAME, "1");
+            try (ParallelEDIFParser p = new ParallelEDIFParser(compressed)) {
+                Assertions.assertNotNull(p.parseEDIFNetlist());
+            }
+        } else {
+            try (EDIFParser p = new EDIFParser(compressed)) {
+                Assertions.assertNotNull(p.parseEDIFNetlist());
+            }
         }
-
-        Path src = tempDir.resolve(input.getFileName());
-        Files.copy(input, src);
-        Path compressed = FileTools.compressFileUsingGZIP(src);
-        Assertions.assertTrue(compressed.toString().endsWith(".gz"));
-        Assertions.assertTrue(src.toFile().exists());
-        Files.delete(src);
-        Assertions.assertFalse(src.toFile().exists());
-        try (ParallelEDIFParser p = new ParallelEDIFParser(compressed)) {
-            Assertions.assertNotNull(p.parseEDIFNetlist());
-        }
-        Assertions.assertFalse(src.toFile().exists());
     }
 }

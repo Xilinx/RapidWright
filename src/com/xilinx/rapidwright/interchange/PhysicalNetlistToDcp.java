@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Keith Rothman, Google, Inc.
@@ -29,18 +29,21 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.util.List;
 
+import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.design.ConstraintGroup;
 
 public class PhysicalNetlistToDcp {
 
+    private static final String MAKE_DCP_OUT_OF_CONTEXT = "--out_of_context";
+
     public static void main(String[] args) throws IOException {
-        if (args.length != 4) {
-            System.out.println("USAGE: <input>.netlist <input>.phys <input>.xdc <output>.dcp");
+        if (args.length != 4 && args.length != 5) {
+            System.out.println(
+                    "USAGE: <input>.netlist <input>.phys <input>.xdc <output>.dcp [" 
+                            + MAKE_DCP_OUT_OF_CONTEXT + "]");
             System.exit(1);
-            return;
         }
 
         String logNetlistFileName = args[0];
@@ -48,6 +51,19 @@ public class PhysicalNetlistToDcp {
         String xdcFileName = args[2];
         String outputDCPFileName = args[3];
 
+        boolean makeOutOfContext = false;
+        
+        if (args.length == 5) {
+            if (args[4].equals(MAKE_DCP_OUT_OF_CONTEXT)) {
+                makeOutOfContext = true;
+            } else {
+                System.out.println("Unrecognized option '" + args[4] + "', did you mean '"
+                                    + MAKE_DCP_OUT_OF_CONTEXT + "'?");
+                System.exit(1);
+            }
+        }        
+        
+        
         CodePerfTracker t = new CodePerfTracker("Interchange Format->DCP",false);
 
         t.start("Read Logical Netlist");
@@ -65,6 +81,11 @@ public class PhysicalNetlistToDcp {
         roundtrip.setXDCConstraints(lines, ConstraintGroup.NORMAL);
 
         t.stop().start("Write DCP");
+
+        if (makeOutOfContext) {
+            roundtrip.setAutoIOBuffers(false);
+            roundtrip.setDesignOutOfContext(true);
+        }
 
         // Write RapidWright netlist back to edif
         roundtrip.writeCheckpoint(outputDCPFileName, CodePerfTracker.SILENT);
