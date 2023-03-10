@@ -132,7 +132,8 @@ public class RelocationTools {
         boolean error = false;
         for (SiteInst si : siteInsts) {
             for (Cell c : si.getCells()) {
-                if (!c.isLocked() && !cells.contains(c) && !c.getType().equals(PhysNetlistWriter.PORT)) {
+                if (!c.isLocked() && !c.isRoutethru() && !cells.contains(c)
+                        && !c.getType().equals(PhysNetlistWriter.PORT)) {
                     System.out.println("ERROR: Failed to relocate SiteInst '" + si.getName()
                             + "' as it contains Cells both inside and outside of '" + instanceName + "'");
                     error = true;
