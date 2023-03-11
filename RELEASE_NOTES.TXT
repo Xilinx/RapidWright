@@ -1,3 +1,15 @@
+============= RapidWright 2022.2.2-beta released on 2023-03-10 ================
+Notes:
+  - Includes new API to ensure all downloaded/generated dependant files are present in RapidWright install (#613)
+  - Change in Cell.hashCode() and Cell.equals() behavior such that it now distinguishes routethru cells (#624), see Issue #611
+  - Fixes an issue with isFF() (#622)
+  - Resolves issue with Cells and Nets that contain backslashes not being properly loaded (#612)
+  - Fix for parsing gzipped EDIF files in parallel (#619)
+  - Fix for EDIF export bussed names that collide with bitty names (#616)
+  
+- API Additions:
+  - com.xilinx.rapidwright.device.Device "public void ensureDeviceCacheFileIsGenerated()" 
+
 ============= RapidWright 2022.2.1-beta released on 2023-01-19 ================
 Notes:
   - Preserves hwdef information in DCP (#597)
