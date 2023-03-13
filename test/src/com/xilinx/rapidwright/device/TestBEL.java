@@ -41,4 +41,22 @@ public class TestBEL {
         Assertions.assertTrue(b.canInvert());
 
     }
+
+    @ParameterizedTest
+    @CsvSource({
+        "xc7z020clg400-1,SLICE_X10Y10",
+        "xcku040-ffva1156-2-e,SLICE_X10Y10",
+        "xcau10p-ffvb676-1-i,SLICE_X10Y10",
+        "xcve1752-vsva2197-1LP-i-S,SLICE_X40Y0"
+    })
+    public void testIsFF(String deviceName, String siteName) {
+        Device d = Device.getDevice(deviceName);
+
+        Site s = d.getSite(siteName);
+        for (BEL bel : s.getBELs()) {
+            if (bel.isFF()) {
+                Assertions.assertEquals(bel.getBELClass(), BELClass.BEL);
+            }
+        }
+    }
 }

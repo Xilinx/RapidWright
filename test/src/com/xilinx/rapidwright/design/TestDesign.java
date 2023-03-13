@@ -29,11 +29,14 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
 
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.device.BEL;
@@ -246,5 +249,62 @@ public class TestDesign {
         Cell orig = d.createAndPlaceCell("orig", Unisim.DSP_PREADD58, "DSP_X0Y0/DSP_PREADD");
         Design d2 = new Design("test2", d.getPartName());
         Assertions.assertNotNull(d2.copyCell(orig, "copy"));
+    }
+
+    /**
+     * Input description: (synthesized out of context)
+     * module top(input a, b,
+     *            input \this.is.an\.escaped\.net\.identifier ,
+     *            output o);
+     *
+     * wire \this.is.another\\.escaped\$net\+&!identifier ;
+     *
+     * (* DONT_TOUCH="true" *)
+     * LUT2 \this.is.an\.escaped\.cell\.identifier (.O(\this.is.another\\.escaped\$net\+&!identifier ), .I0(\this.is.an\.escaped\.net\.identifier ), .I1(a));
+     *
+     * (* DONT_TOUCH="true" *)
+     * LUT2 \this.is.another\\.escaped\$cell\+&!identifier (.O(o), .I0(\this.is.another\\.escaped\$net\+&!identifier ), .I1(b));
+     *
+     * endmodule
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "design_with_backslash_2022.2.dcp",
+            "design_with_backslash_2022.1.dcp",
+            "design_with_backslash_2021.2.dcp",
+    })
+    public void testDesignWithBackslash(String dcp, @TempDir Path tempDir) {
+        Design design = RapidWrightDCP.loadDCP(dcp);
+        testDesignWithBackslashHelper(design);
+
+        if (dcp.endsWith("_2021.2.dcp") || dcp.endsWith("_2022.1.dcp")) {
+            final Path rapidWrightDcp = tempDir.resolve("rapidwright.dcp");
+            design.writeCheckpoint(rapidWrightDcp);
+            design = Design.readCheckpoint(rapidWrightDcp);
+            testDesignWithBackslashHelper(design);
+        }
+    }
+
+    private static void testDesignWithBackslashHelper(Design design) {
+        for (String cellName : Arrays.asList("this.is.an\\.escaped\\.cell\\.identifier",
+                "this.is.another\\\\.escaped\\$cell\\+&!identifier")) {
+            EDIFHierCellInst ehci = design.getNetlist().getHierCellInstFromName(cellName);
+            Assertions.assertNotNull(ehci);
+            Cell c = design.getCell(cellName);
+            Assertions.assertNotNull(c);
+            Assertions.assertEquals(ehci.getFullHierarchicalInstName(), c.getName());
+        }
+        Assertions.assertEquals(design.getCells().size(), 2);
+
+        for (String netName : Arrays.asList("this.is.an\\.escaped\\.net\\.identifier",
+                "this.is.another\\\\.escaped\\$net\\+&!identifier")) {
+            EDIFHierNet ehn = design.getNetlist().getHierNetFromName(netName);
+            Assertions.assertNotNull(ehn);
+            Net n = design.getNet(netName);
+            Assertions.assertNotNull(n);
+            Assertions.assertEquals(ehn.getHierarchicalNetName(), n.getName());
+        }
+        final int extraNets = 5; // {a, b, o, GLOBAL_USEDNET, GLOBAL_LOGIC0}
+        Assertions.assertEquals(design.getNets().size(), 2 + extraNets);
     }
 }
