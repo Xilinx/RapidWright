@@ -797,7 +797,8 @@ public class PhysNetlistReader {
 
         if (series == Series.UltraScalePlus || series == Series.UltraScale) {
             // To be consistent with Vivado DCPs, remove all intra-site routing for
-            // SRST* pins tied to ground on these series of devices
+            // SRST* pins tied to ground on these series of devices.
+            // (Note: this condition is necessary for {@link DesignTools#createCeSrRstPinsToVCC()})
             for (SiteInst si : design.getSiteInsts()) {
                 if (!Utils.isSLICE(si)) {
                     continue;
