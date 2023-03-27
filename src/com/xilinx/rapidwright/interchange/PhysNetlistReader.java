@@ -33,6 +33,8 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
+import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.device.SitePIP;
 import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
 import org.capnproto.ReaderOptions;
@@ -115,6 +117,8 @@ public class PhysNetlistReader {
         readRouting(physNetlist, design, allStrings);
 
         readDesignProperties(physNetlist, design, allStrings);
+
+        postProcess(design);
 
         return design;
     }
@@ -786,6 +790,33 @@ public class PhysNetlistReader {
 
             }
         }
+    }
 
+    private static void postProcess(Design design) {
+        final Series series = design.getDevice().getSeries();
+
+        if (series == Series.UltraScalePlus || series == Series.UltraScale) {
+            // To be consistent with Vivado DCPs, remove all intra-site routing for
+            // SRST* pins tied to ground on these series of devices
+            for (SiteInst si : design.getSiteInsts()) {
+                if (!Utils.isSLICE(si)) {
+                    continue;
+                }
+                for (String sw : new String[]{"RST_ABCDINV_OUT", "RST_EFGHINV_OUT"}) {
+                    Net net = si.getNetFromSiteWire(sw);
+                    if (net != null && net.getType() == NetType.GND) {
+                        BELPin belPin = si.getSiteWirePins(sw)[0];
+                        assert (belPin.isOutput());
+                        BEL bel = belPin.getBEL();
+                        assert (bel.getBELClass() == BELClass.RBEL);
+                        assert (bel.getInvertingPin() == bel.getNonInvertingPin());
+                        SitePIP sp = si.getSitePIP(belPin);
+                        Net inputNet = si.getNetFromSiteWire(sp.getInputPin().getSiteWireName());
+                        assert(inputNet == null || inputNet.isStaticNet());
+                        si.unrouteIntraSiteNet(sp.getInputPin(), sp.getOutputPin());
+                    }
+                }
+            }
+        }
     }
 }
