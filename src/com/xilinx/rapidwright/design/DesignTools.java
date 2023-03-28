@@ -2804,15 +2804,22 @@ public class DesignTools {
         }
     }
 
+    /**
+     * Create and add any missing SitePinInst-s belonging to the VCC net.
+     * This is indicated by the sitewire corresponding to CE and SR pins of SLICE FFs,
+     * or to the RST pins on RAMBs, having no associated net.
+     * @param design Design object to be modified in-place.
+     */
     public static void createCeSrRstPinsToVCC(Design design) {
+        Net vcc = design.getVccNet();
         for (Cell cell : design.getCells()) {
             if (isUnisimFlipFlopType(cell.getType())) {
+                SiteInst si = cell.getSiteInst();
                 BEL bel = cell.getBEL();
                 Pair<String, String> sitePinNames = belSitePinNameMapping.get(bel.getBELType());
                 String[] pins = new String[] {"CE", "SR"};
                 for (String pin : pins) {
                     BELPin belPin = cell.getBEL().getPin(pin);
-                    SiteInst si = cell.getSiteInst();
                     Net net = si.getNetFromSiteWire(belPin.getSiteWireName());
                     if (net == null) {
                         String sitePinName;
@@ -2821,19 +2828,22 @@ public class DesignTools {
                         } else { //SRST
                             sitePinName = sitePinNames.getSecond();
                         }
-                        net = design.getVccNet();
-                        if (!si.getSitePinInstNames().contains(sitePinName)) net.createPin(sitePinName, si);
+                        if (si.getSitePinInst(sitePinName) == null) {
+                            vcc.createPin(sitePinName, si);
+                        }
                     }
                 }
             } else if (cell.getType().equals("RAMB36E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
                 //cell.getEDIFCellInst().getProperty("DOB_REG")): integer(0)
+                SiteInst si = cell.getSiteInst();
                 String siteWire = cell.getSiteWireNameFromLogicalPin("RSTREGB");
-                Net net = cell.getSiteInst().getNetFromSiteWire(siteWire);
+                Net net = si.getNetFromSiteWire(siteWire);
                 if (net == null) {
-                    net = design.getVccNet();
-                    SiteInst si = cell.getSiteInst();
-                    if (!si.getSitePinInstNames().contains("RSTREGBU")) net.createPin("RSTREGBU", si);
-                    if (!si.getSitePinInstNames().contains("RSTREGBL")) net.createPin("RSTREGBL", si);
+                    for (String pinName : Arrays.asList("RSTREGBU", "RSTREGBL")) {
+                        if (si.getSitePinInst(pinName) == null) {
+                            vcc.createPin(pinName, si);
+                        }
+                    }
                 }
             } else if (cell.getType().equals("RAMB18E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
                 SiteInst si = cell.getSiteInst();
@@ -2848,15 +2858,14 @@ public class DesignTools {
                 String siteWire = cell.getBEL().getPin("RSTREGB").getSiteWireName();
                 Net net = si.getNetFromSiteWire(siteWire);
                 if (net == null) {
-                    net = design.getVccNet();
-                    String pinName = null;
+                    String pinName;
                     if (siteWire.endsWith("L_O")) {
                         pinName = "RSTREGBL";
                     } else {
                         pinName = "RSTREGBU";
                     }
-                    if (si.getSitePinInstNames().isEmpty() || !si.getSitePinInstNames().contains(pinName)) {
-                        net.createPin(pinName, si);
+                    if (si.getSitePinInst(pinName) == null) {
+                        vcc.createPin(pinName, si);
                     }
                 }
             }
