@@ -799,18 +799,19 @@ public class PhysNetlistReader {
             // To be consistent with Vivado DCPs, remove all intra-site routing for
             // SRST* pins tied to ground on these series of devices.
             // (Note: this condition is necessary for {@link DesignTools#createCeSrRstPinsToVCC()})
+            String[] siteWires = new String[]{"RST_ABCDINV_OUT", "RST_EFGHINV_OUT"};
             for (SiteInst si : design.getSiteInsts()) {
                 if (!Utils.isSLICE(si)) {
                     continue;
                 }
-                for (String sw : new String[]{"RST_ABCDINV_OUT", "RST_EFGHINV_OUT"}) {
+                for (String sw : siteWires) {
                     Net net = si.getNetFromSiteWire(sw);
                     if (net != null && net.getType() == NetType.GND) {
                         BELPin belPin = si.getSiteWirePins(sw)[0];
-                        assert (belPin.isOutput());
+                        assert(belPin.isOutput());
                         BEL bel = belPin.getBEL();
-                        assert (bel.getBELClass() == BELClass.RBEL);
-                        assert (bel.getInvertingPin() == bel.getNonInvertingPin());
+                        assert(bel.getBELClass() == BELClass.RBEL);
+                        assert(bel.getInvertingPin() == bel.getNonInvertingPin());
                         SitePIP sp = si.getSitePIP(belPin);
                         Net inputNet = si.getNetFromSiteWire(sp.getInputPin().getSiteWireName());
                         assert(inputNet == null || inputNet.isStaticNet());
