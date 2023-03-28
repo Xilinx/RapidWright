@@ -63,7 +63,9 @@ public class TestFileTools {
             Process p = pb.start();
             StreamGobbler sg = new StreamGobbler(p.getInputStream(), true);
             sg.start();
-            Assertions.assertEquals(p.waitFor(), 0);
+            int result = p.waitFor();
+            p.destroyForcibly();
+            Assertions.assertEquals(result, 0);
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }

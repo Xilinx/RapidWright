@@ -221,11 +221,11 @@ public class PhysNetlistReader {
                             + "leaf cells: " + cellInst.getCellType().getCellInsts() +".");
                 }
 
-                BEL bel = siteInst.getBEL(strings.get(placement.getBel()));
+                BEL bel = siteInst.getBEL(belName);
                 if (bel == null) {
                     throw new RuntimeException(
                           "ERROR: The placement specified on BEL " + site.getName() + "/"
-                          + strings.get(placement.getBel()) + " could not be found in the target "
+                          + belName + " could not be found in the target "
                           + "device.");
                 }
                 if (bel.getBELType().equals("HARD0") || bel.getBELType().equals("HARD1")) {
@@ -233,6 +233,13 @@ public class PhysNetlistReader {
                               "ERROR: The placement specified on BEL " + site.getName() + "/"
                             + bel.getName() + " is not valid. HARD0 and HARD1 BEL types do not "
                             + "require placed cells.");
+                }
+                Cell existingCell = siteInst.getCell(bel);
+                if (existingCell != null) {
+                    throw new RuntimeException(
+                            "ERROR: Cell \"" + cellName + "\" placement on BEL " + site.getName() + "/"
+                                    + belName + " conflicts with previously placed cell \"" + existingCell.getName()
+                                    + "\".");
                 }
                 Cell cell = new Cell(cellName, siteInst, bel);
                 cell.setBELFixed(placement.getIsBelFixed());

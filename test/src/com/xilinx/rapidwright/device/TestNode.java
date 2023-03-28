@@ -64,5 +64,16 @@ public class TestNode {
         PIP p = d.getPIP("BLI_LS_CORE_X90Y335/BLI_LS_CORE_R180.HSR_GRP1_A_BLI_LOGIC_OUTS0->>BLI_GRP1_A_BLI_LOGIC_OUTS0");
         Assertions.assertNull(p.getStartNode());
     }
+
+    @Test
+    public void testUphillNodeIsInvalid() {
+        // link_design -part [lindex [get_parts xcvu440*] 0]
+        // get_nodes -uphill -of [get_nodes INT_INT_INTERFACE_XIPHY_FT_X157Y688/LOGIC_OUTS_R0]
+        // WARNING: [Vivado 12-2683] No nodes matched 'get_nodes -uphill -of [get_nodes INT_INT_INTERFACE_XIPHY_FT_X157Y688/LOGIC_OUTS_R0]'
+        Device d = Device.getDevice("xcvu440");
+        Node n = d.getNode("INT_INT_INTERFACE_XIPHY_FT_X157Y688/LOGIC_OUTS_R0");
+        Assertions.assertNotNull(n);
+        Assertions.assertTrue(n.getAllUphillNodes().isEmpty());
+    }
 }
 
