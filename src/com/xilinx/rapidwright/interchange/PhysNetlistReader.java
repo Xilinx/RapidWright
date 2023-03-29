@@ -119,6 +119,35 @@ public class PhysNetlistReader {
         return design;
     }
 
+    public static Design readPhysNetlistParallel(String physNetlistFileName, EDIFNetlist netlist) throws IOException {
+        Design design = new Design();
+        design.setNetlist(netlist);
+        ReaderOptions rdOptions = new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
+                ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
+        MessageReader readMsg = Interchange.readInterchangeFile(physNetlistFileName, rdOptions);
+
+        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
+        design.setPartName(physNetlist.getPart().toString());
+
+        Enumerator<String> allStrings = readAllStrings(physNetlist);
+
+        checkConstantRoutingAndNetNaming(physNetlist, netlist, allStrings);
+
+        readSiteInsts(physNetlist, design, allStrings);
+
+        readPlacement(physNetlist, design, allStrings);
+
+        checkMacros(design);
+
+        readRouting(physNetlist, design, allStrings);
+        // TODO - To Be Implemented
+        // readRoutingParallel(physNetlist, design, allStrings);
+
+        readDesignProperties(physNetlist, design, allStrings);
+
+        return design;
+    }
+
     public static Enumerator<String> readAllStrings(PhysNetlist.Reader physNetlist) {
         Enumerator<String> allStrings = new Enumerator<>();
         TextList.Reader strListReader = physNetlist.getStrList();
@@ -710,7 +739,7 @@ public class PhysNetlistReader {
 
         // Search the EDIFNetlist for sinks from VCC or GND nets.  Find the
         // EDIFPortInst sinks on those nets, and see if a physical net
-        // corrisponds to that cell pin.
+        // corresponds to that cell pin.
         //
         // If so, verify that the physical net is marked with either VCC or
         // GND.
@@ -720,22 +749,20 @@ public class PhysNetlistReader {
         // run through a site local inverter.  Modelling these site local
         // inverters is not done here, hence why the requirement is only that
         // the net type be either VCC or GND.
-        for (EDIFCellInst leafEdifCellInst : netlist.getAllLeafCellInstances()) {
-            EDIFCell leafEdifCell = leafEdifCellInst.getCellType();
-            String leafEdifCellName = leafEdifCell.getName();
-            EDIFCell parent = leafEdifCellInst.getParentCell();
 
-            if (leafEdifCellName.equals("VCC")) {
-                EDIFPortInst portInst = leafEdifCellInst.getPortInst("P");
-                EDIFNet net = portInst.getNet();
-                checkNetTypeFromCellNet(cellPinToPhysicalNet, net, strings);
-            } else if (leafEdifCellName.equals("GND")) {
-                EDIFPortInst portInst = leafEdifCellInst.getPortInst("G");
-                EDIFNet net = portInst.getNet();
-                checkNetTypeFromCellNet(cellPinToPhysicalNet, net, strings);
-            } else {
-            }
-        }
+        // TODO - This has long runtime and memory usage
+//        for (EDIFCellInst leafEdifCellInst : netlist.getAllLeafCellInstances()) {
+//            String leafEdifCellName = leafEdifCellInst.getCellType().getName();
+//            if (leafEdifCellName.equals("VCC")) {
+//                EDIFPortInst portInst = leafEdifCellInst.getPortInst("P");
+//                EDIFNet net = portInst.getNet();
+//                checkNetTypeFromCellNet(cellPinToPhysicalNet, net, strings);
+//            } else if (leafEdifCellName.equals("GND")) {
+//                EDIFPortInst portInst = leafEdifCellInst.getPortInst("G");
+//                EDIFNet net = portInst.getNet();
+//                checkNetTypeFromCellNet(cellPinToPhysicalNet, net, strings);
+//            } 
+//        }
     }
 
     /**
