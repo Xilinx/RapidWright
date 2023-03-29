@@ -1894,7 +1894,7 @@ public class DesignTools {
                     SitePIP sitePIP = inst.getUsedSitePIP(source.getBELName());
                     if (sitePIP == null) return null;
                     queue.add(sitePIP.getInputPin());
-                } else if (source.getBELName().contains("LUT") || source.getBELName().contains("MUX")) {
+                } else if (source.getBEL().isLUT() || source.getBEL().getBELType().endsWith("MUX")) {
                     Cell possibleRouteThru = inst.getCell(source.getBEL());
                     if (possibleRouteThru != null && possibleRouteThru.isRoutethru()) {
                         String routeThru = possibleRouteThru.getPinMappingsP2L().keySet().iterator().next();

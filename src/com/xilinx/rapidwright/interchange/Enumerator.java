@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -51,10 +51,13 @@ public class Enumerator<T> extends ArrayList<T> {
 
     public Integer getIndex(T obj) {
         String key = getKey(obj);
-        return map.computeIfAbsent(key, ($) -> {
+        int size = map.size();
+        Integer index = map.putIfAbsent(key, size);
+        if (index == null) {
+            index = size;
             add(obj);
-            return map.size();
-        });
+        }
+        return index;
     }
 
     public void addObject(T obj) {

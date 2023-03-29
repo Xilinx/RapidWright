@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -26,6 +26,8 @@ package com.xilinx.rapidwright.interchange;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Site;
 
+import java.util.Objects;
+
 public class SiteBELPin {
 
     Site site;
@@ -42,13 +44,7 @@ public class SiteBELPin {
 
     @Override
     public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result
-                + ((site == null) ? 0 : site.hashCode());
-        result = prime * result
-                + ((belPin == null) ? 0 : belPin.hashCode());
-        return result;
+        return Objects.hash(site, belPin);
     }
 
     @Override
