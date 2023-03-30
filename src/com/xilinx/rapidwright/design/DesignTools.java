@@ -1309,9 +1309,14 @@ public class DesignTools {
             if (otherUser == false) {
                 // Unroute site routing back to pin and remove site pin
                 String sitePinName = getRoutedSitePinFromPhysicalPin(cell, net, pin.getName());
+                BELPin srcPin = siteInst.getSite().getBELPin(sitePinName);
+                siteInst.unrouteIntraSiteNet(srcPin, pin);
                 SitePinInst spi = siteInst.getSitePinInst(sitePinName);
-                siteInst.unrouteIntraSiteNet(spi.getBELPin(), pin);
-                handlePinRemovals(spi, deferRemovals);
+                // It's possible site wire could be set (e.g. reserved using GLOBAL_USEDNET)
+                // but no inter-site routing (thus no SPI) associated
+                if (spi != null) {
+                    handlePinRemovals(spi, deferRemovals);
+                }
             }
         }
 
@@ -1334,7 +1339,10 @@ public class DesignTools {
 
         // Remove Logical Cell
         for (EDIFPortInst portInst : cell.getEDIFCellInst().getPortInsts()) {
-            portInst.getNet().removePortInst(portInst);
+            EDIFNet en = portInst.getNet();
+            if (en != null) {
+                en.removePortInst(portInst);
+            }
         }
         cell.getParentCell().removeCellInst(cell.getEDIFCellInst());
     }
@@ -1903,11 +1911,11 @@ public class DesignTools {
                     SitePIP sitePIP = inst.getUsedSitePIP(source.getBELName());
                     if (sitePIP == null) return null;
                     queue.add(sitePIP.getInputPin());
-                } else if (source.getBELName().contains("LUT")) {
+                } else if (source.getBEL().isLUT() || source.getBEL().getBELType().endsWith("MUX")) {
                     Cell possibleRouteThru = inst.getCell(source.getBEL());
                     if (possibleRouteThru != null && possibleRouteThru.isRoutethru()) {
                         String routeThru = possibleRouteThru.getPinMappingsP2L().keySet().iterator().next();
-                        return source.getBEL().getPin(routeThru).getSourcePin().getName();
+                        queue.add(source.getBEL().getPin(routeThru));
                     }
                 } else {
                     return null;
