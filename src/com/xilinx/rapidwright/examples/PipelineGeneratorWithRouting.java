@@ -539,11 +539,17 @@ public class PipelineGeneratorWithRouting {
                 }
                 result.addAll(tmpG.getPIPs());
             }
-
-            return result;
         } else {
-            return null;
+            result = null;
         }
+
+        queue = null;
+        visited = null;
+        delayCostTable = null;
+        prevG = null;
+        currG = null;
+
+        return result;
     }
 
 
