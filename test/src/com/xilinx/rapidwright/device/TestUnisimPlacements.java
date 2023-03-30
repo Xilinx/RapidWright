@@ -24,7 +24,7 @@ package com.xilinx.rapidwright.device;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -33,10 +33,10 @@ import com.xilinx.rapidwright.edif.EDIFCell;
 public class TestUnisimPlacements {
 
     @ParameterizedTest
-    @ValueSource(strings = { "VERSALPREMIUM", "ARTIX7", "ZYNQ", "ZYNQUPLUS", "VIRTEXU" })
-    public void testUnisimPlacements(String familyType) {
+    @EnumSource(FamilyType.class)
+    public void testUnisimPlacements(FamilyType familyType) {
         for (Part part : PartNameTools.getParts()) {
-            if (!part.getFamily().toString().equals(familyType))
+            if (part.getFamily() != familyType)
                 continue;
             Design des = new Design("top", part.getName());
             EDIFCell cell = Design.getPrimitivesLibrary(des.getDevice().getName()).getCell("FDRE");
