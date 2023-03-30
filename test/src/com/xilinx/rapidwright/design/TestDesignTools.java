@@ -23,6 +23,25 @@
 
 package com.xilinx.rapidwright.design;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import com.xilinx.rapidwright.design.blocks.PBlock;
+import com.xilinx.rapidwright.design.blocks.UtilizationType;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
@@ -34,22 +53,6 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.Pair;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
 
 public class TestDesignTools {
 
@@ -847,5 +850,59 @@ public class TestDesignTools {
 
         Assertions.assertEquals("[ff1/D, ff2/D]",
                 DesignTools.getPortInstsFromSitePinInst(spi).toString());
+    }
+
+    @Test
+    public void testCalculateUtilization() {
+        Design design = RapidWrightDCP.loadDCP("bnn.dcp");
+
+        for (Entry<UtilizationType, Integer> e : DesignTools.calculateUtilization(design).entrySet()) {
+            switch (e.getKey()) {
+            case CLB_LUTS:
+                Assertions.assertEquals(3097, e.getValue());
+                break;
+            case CLB_REGS:
+                Assertions.assertEquals(2754, e.getValue());
+                break;
+            case CARRY8S:
+                Assertions.assertEquals(113, e.getValue());
+                break;
+            case LUTS_AS_LOGIC:
+                Assertions.assertEquals(3055, e.getValue());
+                break;
+            case LUTS_AS_MEMORY:
+                Assertions.assertEquals(42, e.getValue());
+                break;
+            case DSPS:
+                Assertions.assertEquals(4, e.getValue());
+                break;
+            default:
+            }
+        }
+
+        PBlock pblock = new PBlock(design.getDevice(), "SLICE_X78Y145:SLICE_X80Y149 DSP48E2_X9Y58:DSP48E2_X9Y59");
+        for (Entry<UtilizationType, Integer> e : DesignTools.calculateUtilization(design, pblock).entrySet()) {
+            switch (e.getKey()) {
+            case CLB_LUTS:
+                Assertions.assertEquals(13, e.getValue());
+                break;
+            case CLB_REGS:
+                Assertions.assertEquals(30, e.getValue());
+                break;
+            case CARRY8S:
+                Assertions.assertEquals(4, e.getValue());
+                break;
+            case LUTS_AS_LOGIC:
+                Assertions.assertEquals(13, e.getValue());
+                break;
+            case LUTS_AS_MEMORY:
+                Assertions.assertEquals(0, e.getValue());
+                break;
+            case DSPS:
+                Assertions.assertEquals(1, e.getValue());
+                break;
+            default:
+            }
+        }
     }
 }
