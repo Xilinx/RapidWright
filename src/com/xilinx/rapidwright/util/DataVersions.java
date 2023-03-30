@@ -326,6 +326,6 @@ public class DataVersions {
         dataVersionMap.put("data/devices/zynquplusrfsoc/xqzu49dr_db.dat", new Pair<>("xqzu49dr-db-dat", "df942c4f499805206466b4d89813c235"));
         dataVersionMap.put("data/partdump.csv", new Pair<>("partdump-csv", "f0417647e80cb1de13c65f0a8973df17"));
         dataVersionMap.put("data/parts.db", new Pair<>("parts-db", "b728320ae4d94f28402e03343363b6e8"));
-        dataVersionMap.put("data/unisim_data.dat", new Pair<>("unisim-data-dat", "b5a8968bd41a3b6095d5af6180a7a658"));
+        dataVersionMap.put("data/unisim_data.dat", new Pair<>("unisim-data-dat", "70faaac529fd20e64a0acaa4827a885e"));
     }
 }
