@@ -49,6 +49,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
@@ -623,14 +624,25 @@ public class DesignTools {
         return sitePin;
     }
 
-    public static HashMap<UtilizationType,Integer> calculateUtilization(Design d) {
-        HashMap<UtilizationType,Integer> map = new HashMap<UtilizationType,Integer>();
+    public static Map<UtilizationType, Integer> calculateUtilization(Design d, PBlock pblock) {
+        Set<Site> sites = pblock.getAllSites(null);
+        List<SiteInst> siteInsts = d.getSiteInsts().stream().filter(s -> sites.contains(s.getSite()))
+                .collect(Collectors.toList());
+        return calculateUtilization(siteInsts);
+    }
+
+    public static Map<UtilizationType, Integer> calculateUtilization(Design d) {
+        return calculateUtilization(d.getSiteInsts());
+    }
+
+    public static Map<UtilizationType, Integer> calculateUtilization(Collection<SiteInst> siteInsts) {
+        Map<UtilizationType, Integer> map = new HashMap<UtilizationType, Integer>();
 
         for (UtilizationType ut : UtilizationType.values()) {
             map.put(ut, 0);
         }
 
-        for (SiteInst si : d.getSiteInsts()) {
+        for (SiteInst si : siteInsts) {
             SiteTypeEnum s = si.getSite().getSiteTypeEnum();
             if (Utils.isSLICE(si)) {
                 incrementUtilType(map, UtilizationType.CLBS);
@@ -679,9 +691,14 @@ public class DesignTools {
                 }
 
             }
-            for (String letter : Arrays.asList("A", "B", "C", "D", "E", "F", "G", "H")) {
+            for (char letter : LUTTools.lutLetters) {
                 Cell c5 = si.getCell(letter +"5LUT");
                 Cell c6 = si.getCell(letter +"6LUT");
+                if (c5 != null && c5.isRoutethru()) {
+                    c5 = null;
+                } else if (c6 != null && c6.isRoutethru()) {
+                    c6 = null;
+                }
                 if (c5 != null || c6 != null) {
                     incrementUtilType(map, UtilizationType.CLB_LUTS);
 
@@ -705,7 +722,7 @@ public class DesignTools {
         return false;
     }
 
-    private static void incrementUtilType(HashMap<UtilizationType,Integer> map, UtilizationType ut) {
+    private static void incrementUtilType(Map<UtilizationType, Integer> map, UtilizationType ut) {
         Integer val = map.get(ut);
         val++;
         map.put(ut, val);
