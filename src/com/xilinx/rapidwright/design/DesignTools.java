@@ -49,6 +49,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
@@ -623,14 +624,25 @@ public class DesignTools {
         return sitePin;
     }
 
-    public static HashMap<UtilizationType,Integer> calculateUtilization(Design d) {
-        HashMap<UtilizationType,Integer> map = new HashMap<UtilizationType,Integer>();
+    public static Map<UtilizationType, Integer> calculateUtilization(Design d, PBlock pblock) {
+        Set<Site> sites = pblock.getAllSites(null);
+        List<SiteInst> siteInsts = d.getSiteInsts().stream().filter(s -> sites.contains(s.getSite()))
+                .collect(Collectors.toList());
+        return calculateUtilization(siteInsts);
+    }
+
+    public static Map<UtilizationType, Integer> calculateUtilization(Design d) {
+        return calculateUtilization(d.getSiteInsts());
+    }
+
+    public static Map<UtilizationType, Integer> calculateUtilization(Collection<SiteInst> siteInsts) {
+        Map<UtilizationType, Integer> map = new HashMap<UtilizationType, Integer>();
 
         for (UtilizationType ut : UtilizationType.values()) {
             map.put(ut, 0);
         }
 
-        for (SiteInst si : d.getSiteInsts()) {
+        for (SiteInst si : siteInsts) {
             SiteTypeEnum s = si.getSite().getSiteTypeEnum();
             if (Utils.isSLICE(si)) {
                 incrementUtilType(map, UtilizationType.CLBS);
@@ -679,9 +691,14 @@ public class DesignTools {
                 }
 
             }
-            for (String letter : Arrays.asList("A", "B", "C", "D", "E", "F", "G", "H")) {
+            for (char letter : LUTTools.lutLetters) {
                 Cell c5 = si.getCell(letter +"5LUT");
                 Cell c6 = si.getCell(letter +"6LUT");
+                if (c5 != null && c5.isRoutethru()) {
+                    c5 = null;
+                } else if (c6 != null && c6.isRoutethru()) {
+                    c6 = null;
+                }
                 if (c5 != null || c6 != null) {
                     incrementUtilType(map, UtilizationType.CLB_LUTS);
 
@@ -705,7 +722,7 @@ public class DesignTools {
         return false;
     }
 
-    private static void incrementUtilType(HashMap<UtilizationType,Integer> map, UtilizationType ut) {
+    private static void incrementUtilType(Map<UtilizationType, Integer> map, UtilizationType ut) {
         Integer val = map.get(ut);
         val++;
         map.put(ut, val);
@@ -2812,15 +2829,22 @@ public class DesignTools {
         }
     }
 
+    /**
+     * Create and add any missing SitePinInst-s belonging to the VCC net.
+     * This is indicated by the sitewire corresponding to CE and SR pins of SLICE FFs,
+     * or to the RST pins on RAMBs, having no associated net.
+     * @param design Design object to be modified in-place.
+     */
     public static void createCeSrRstPinsToVCC(Design design) {
+        Net vcc = design.getVccNet();
         for (Cell cell : design.getCells()) {
             if (isUnisimFlipFlopType(cell.getType())) {
+                SiteInst si = cell.getSiteInst();
                 BEL bel = cell.getBEL();
                 Pair<String, String> sitePinNames = belSitePinNameMapping.get(bel.getBELType());
                 String[] pins = new String[] {"CE", "SR"};
                 for (String pin : pins) {
                     BELPin belPin = cell.getBEL().getPin(pin);
-                    SiteInst si = cell.getSiteInst();
                     Net net = si.getNetFromSiteWire(belPin.getSiteWireName());
                     if (net == null) {
                         String sitePinName;
@@ -2829,19 +2853,22 @@ public class DesignTools {
                         } else { //SRST
                             sitePinName = sitePinNames.getSecond();
                         }
-                        net = design.getVccNet();
-                        if (!si.getSitePinInstNames().contains(sitePinName)) net.createPin(sitePinName, si);
+                        if (si.getSitePinInst(sitePinName) == null) {
+                            vcc.createPin(sitePinName, si);
+                        }
                     }
                 }
             } else if (cell.getType().equals("RAMB36E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
                 //cell.getEDIFCellInst().getProperty("DOB_REG")): integer(0)
+                SiteInst si = cell.getSiteInst();
                 String siteWire = cell.getSiteWireNameFromLogicalPin("RSTREGB");
-                Net net = cell.getSiteInst().getNetFromSiteWire(siteWire);
+                Net net = si.getNetFromSiteWire(siteWire);
                 if (net == null) {
-                    net = design.getVccNet();
-                    SiteInst si = cell.getSiteInst();
-                    if (!si.getSitePinInstNames().contains("RSTREGBU")) net.createPin("RSTREGBU", si);
-                    if (!si.getSitePinInstNames().contains("RSTREGBL")) net.createPin("RSTREGBL", si);
+                    for (String pinName : Arrays.asList("RSTREGBU", "RSTREGBL")) {
+                        if (si.getSitePinInst(pinName) == null) {
+                            vcc.createPin(pinName, si);
+                        }
+                    }
                 }
             } else if (cell.getType().equals("RAMB18E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
                 SiteInst si = cell.getSiteInst();
@@ -2856,15 +2883,14 @@ public class DesignTools {
                 String siteWire = cell.getBEL().getPin("RSTREGB").getSiteWireName();
                 Net net = si.getNetFromSiteWire(siteWire);
                 if (net == null) {
-                    net = design.getVccNet();
-                    String pinName = null;
+                    String pinName;
                     if (siteWire.endsWith("L_O")) {
                         pinName = "RSTREGBL";
                     } else {
                         pinName = "RSTREGBU";
                     }
-                    if (si.getSitePinInstNames().isEmpty() || !si.getSitePinInstNames().contains(pinName)) {
-                        net.createPin(pinName, si);
+                    if (si.getSitePinInst(pinName) == null) {
+                        vcc.createPin(pinName, si);
                     }
                 }
             }
