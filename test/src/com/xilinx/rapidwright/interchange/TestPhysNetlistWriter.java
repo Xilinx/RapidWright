@@ -26,7 +26,6 @@ package com.xilinx.rapidwright.interchange;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.List;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -34,9 +33,11 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist;
+import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.CellPlacement;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.NetType;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysBelPin;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysNet;
+import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PinMapping;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.RouteSegment;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
@@ -48,7 +49,7 @@ import org.capnproto.ReaderOptions;
 import org.capnproto.StructList;
 
 public class TestPhysNetlistWriter {
-    private void testAllRouteSegmentsEndInBELInputPins(Design design, RouteBranch.Reader routeBranch, List<String> strings) {
+    private void testAllRouteSegmentsEndInBELInputPins(Design design, RouteBranch.Reader routeBranch, Enumerator<String> strings) {
         StructList.Reader<RouteBranch.Reader> branches = routeBranch.getBranches();
         int branchesCount = branches.size();
         if (branchesCount == 0) {
@@ -88,7 +89,7 @@ public class TestPhysNetlistWriter {
 
         PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
 
-        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
+        Enumerator<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
 
         for (PhysNet.Reader physNet : physNetlist.getPhysNets()) {
             if (physNet.getType() == NetType.GND || physNet.getType() == NetType.VCC) {
@@ -121,13 +122,13 @@ public class TestPhysNetlistWriter {
 
         PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
 
-        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
+        Enumerator<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
 
-        for (PhysNetlist.CellPlacement.Reader placement : physNetlist.getPlacements()) {
+        for (CellPlacement.Reader placement : physNetlist.getPlacements()) {
             SiteInst siteInst = design.getSiteInstFromSiteName(allStrings.get(placement.getSite()));
             Assertions.assertNotNull(siteInst);
 
-            for (PhysNetlist.PinMapping.Reader pinMapping : placement.getPinMap()) {
+            for (PinMapping.Reader pinMapping : placement.getPinMap()) {
                 Cell belCell = siteInst.getCell(allStrings.get(pinMapping.getBel()));
                 Assertions.assertNotNull(belCell);
 
