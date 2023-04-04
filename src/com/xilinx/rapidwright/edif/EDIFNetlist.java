@@ -182,6 +182,15 @@ public class EDIFNetlist extends EDIFName {
         }
     }
 
+    /**
+     * Map that stores EDIFCellInst to EDIFPropertyValue for non-default IOStandard
+     * values propagated from other parts of the netlist.
+     * Anecdotally, it's been observed that Vivado propagates the IOStandard property
+     * from the EDIFNet feeding an output port to its driving EDIFCellInst I/O buffer.
+     */
+    private Map<EDIFCellInst,EDIFPropertyValue> cellInstPropagatedIOStandard;
+
+
     public EDIFNetlist(String name) {
         super(name);
         init();
@@ -200,7 +209,7 @@ public class EDIFNetlist extends EDIFName {
     /**
      * Adds date and username build comments such as:
      *  (comment "Built on 'Mon May  1 15:17:36 PDT 2017'")
-       *  (comment "Built by 'clavin'")
+     *  (comment "Built by 'clavin'")
      */
     public void generateBuildComments() {
         addComment("Built on '"+FileTools.getTimeString()+"'");
@@ -1602,14 +1611,7 @@ public class EDIFNetlist extends EDIFName {
                         if (!isHDILib) {
                             Pair<String, EnumSet<IOStandard>> exception = seriesMacroExpandExceptionMap.get(cellName);
                             if (exception != null) {
-                                EDIFPropertyValue value = inst.getProperty(IOSTANDARD_PROP);
-                                if (value == null) {
-                                    value = inst.getProperty(IOSTANDARD_PROP.toUpperCase());
-                                }
-                                if (value == null) {
-                                    // If the IOStandard is not set, use default
-                                    value = DEFAULT_PROP_VALUE;
-                                }
+                                EDIFPropertyValue value = getIoStandard(inst);
                                 IOStandard ioStandard = IOStandard.valueOf(value.getValue());
                                 if (exception.getSecond().contains(ioStandard)) {
                                     cellName = exception.getFirst();
@@ -1788,6 +1790,67 @@ public class EDIFNetlist extends EDIFName {
     public Map<EDIFCell, List<EDIFChange>> getModifiedCells() {
         if (modifiedCells == null) modifiedCells = new HashMap<>();
         return modifiedCells;
+    }
+
+    public EDIFPropertyValue getIoStandard(EDIFCellInst eci) {
+        EDIFPropertyValue value = EDIFTools.getIoStandard(eci);
+        if (value != DEFAULT_PROP_VALUE) {
+            return value;
+        }
+
+        if (cellInstPropagatedIOStandard == null) {
+            cellInstPropagatedIOStandard = new HashMap<>();
+
+            EDIFHierCellInst topEhci = getTopHierCellInst();
+            for (EDIFPort ep : getTopCell().getPorts()) {
+                if (ep.isInput()) {
+                    // Only handle output and inout ports
+                    continue;
+                }
+
+                for (EDIFNet en : ep.getInternalNets()) {
+                    if (en == null) {
+                        continue;
+                    }
+                    EDIFPropertyValue netEpv = EDIFTools.getIoStandard(en);
+                    if (netEpv == DEFAULT_PROP_VALUE) {
+                        // Net has no IOStandard
+                        continue;
+                    }
+                    EDIFHierNet ehn = new EDIFHierNet(topEhci, en);
+                    for (EDIFHierPortInst ehpi : ehn.getLeafHierPortInsts(true)) {
+                        if (!ehpi.isOutput()) {
+                            // Ignore other leaf sinks on this net
+                            continue;
+                        }
+
+                        EDIFCellInst driverEci = ehpi.getPortInst().getCellInst();
+                        EDIFPropertyValue driverEpv = EDIFTools.getIoStandard(driverEci);
+                        if (driverEpv != DEFAULT_PROP_VALUE) {
+                            if (driverEpv.equals(netEpv)) {
+                                // Cell and Net IOStandards match
+                                continue;
+                            }
+                            throw new RuntimeException("ERROR: EDIFCellInst '" + driverEci + "' has a conflicting IOSTANDARD" +
+                                    " with EDIFHierNet '" + ehn + "'.");
+                        }
+
+                        EDIFPropertyValue oldEpv = cellInstPropagatedIOStandard.put(driverEci, netEpv);
+                        if (oldEpv != null && !oldEpv.equals(netEpv)) {
+                            throw new RuntimeException("ERROR: EDIFCellInst '" + driverEci + "' has conflicting IOSTANDARDs" +
+                                    " from multiple EDIFHierNets.");
+                        }
+                    }
+                }
+
+            }
+        }
+        value = cellInstPropagatedIOStandard.get(eci);
+        if (value != null) {
+            return value;
+        }
+
+        return EDIFNetlist.DEFAULT_PROP_VALUE;
     }
 
     public static void main(String[] args) throws FileNotFoundException {
