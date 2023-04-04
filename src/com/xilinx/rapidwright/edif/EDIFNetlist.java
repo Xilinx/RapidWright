@@ -125,7 +125,7 @@ public class EDIFNetlist extends EDIFName {
 
     public static final String IOSTANDARD_PROP = "IOStandard";
 
-    private static final EDIFPropertyValue DEFAULT_PROP_VALUE = new EDIFPropertyValue(IOStandard.DEFAULT.name(), EDIFValueType.STRING);
+    public static final EDIFPropertyValue DEFAULT_PROP_VALUE = new EDIFPropertyValue(IOStandard.DEFAULT.name(), EDIFValueType.STRING);
 
     static {
         EnumSet<IOStandard> obufExpansion = EnumSet.of(
