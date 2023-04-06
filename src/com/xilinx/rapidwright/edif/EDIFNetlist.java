@@ -188,7 +188,7 @@ public class EDIFNetlist extends EDIFName {
      * Anecdotally, it's been observed that Vivado propagates the IOStandard property
      * from the EDIFNet feeding an output port to its driving EDIFCellInst I/O buffer.
      */
-    private Map<EDIFCellInst,EDIFPropertyValue> cellInstPropagatedIOStandard;
+    Map<EDIFCellInst,EDIFPropertyValue> cellInstIOStandardFallback;
 
 
     public EDIFNetlist(String name) {
@@ -1611,7 +1611,7 @@ public class EDIFNetlist extends EDIFName {
                         if (!isHDILib) {
                             Pair<String, EnumSet<IOStandard>> exception = seriesMacroExpandExceptionMap.get(cellName);
                             if (exception != null) {
-                                EDIFPropertyValue value = getIoStandard(inst);
+                                EDIFPropertyValue value = getIOStandard(inst);
                                 IOStandard ioStandard = IOStandard.valueOf(value.getValue());
                                 if (exception.getSecond().contains(ioStandard)) {
                                     cellName = exception.getFirst();
@@ -1792,14 +1792,14 @@ public class EDIFNetlist extends EDIFName {
         return modifiedCells;
     }
 
-    public EDIFPropertyValue getIoStandard(EDIFCellInst eci) {
-        EDIFPropertyValue value = EDIFTools.getIoStandard(eci);
+    public EDIFPropertyValue getIOStandard(EDIFCellInst eci) {
+        EDIFPropertyValue value = EDIFTools.getIOStandard(eci);
         if (value != DEFAULT_PROP_VALUE) {
             return value;
         }
 
-        if (cellInstPropagatedIOStandard == null) {
-            cellInstPropagatedIOStandard = new HashMap<>();
+        if (cellInstIOStandardFallback == null) {
+            cellInstIOStandardFallback = new HashMap<>();
 
             EDIFHierCellInst topEhci = getTopHierCellInst();
             for (EDIFPort ep : getTopCell().getPorts()) {
@@ -1812,7 +1812,7 @@ public class EDIFNetlist extends EDIFName {
                     if (en == null) {
                         continue;
                     }
-                    EDIFPropertyValue netEpv = EDIFTools.getIoStandard(en);
+                    EDIFPropertyValue netEpv = EDIFTools.getIOStandard(en);
                     if (netEpv == DEFAULT_PROP_VALUE) {
                         // Net has no IOStandard
                         continue;
@@ -1825,7 +1825,7 @@ public class EDIFNetlist extends EDIFName {
                         }
 
                         EDIFCellInst driverEci = ehpi.getPortInst().getCellInst();
-                        EDIFPropertyValue driverEpv = EDIFTools.getIoStandard(driverEci);
+                        EDIFPropertyValue driverEpv = EDIFTools.getIOStandard(driverEci);
                         if (driverEpv != DEFAULT_PROP_VALUE) {
                             if (driverEpv.equals(netEpv)) {
                                 // Cell and Net IOStandards match
@@ -1835,7 +1835,7 @@ public class EDIFNetlist extends EDIFName {
                                     " with EDIFHierNet '" + ehn + "'.");
                         }
 
-                        EDIFPropertyValue oldEpv = cellInstPropagatedIOStandard.put(driverEci, netEpv);
+                        EDIFPropertyValue oldEpv = cellInstIOStandardFallback.put(driverEci, netEpv);
                         if (oldEpv != null && !oldEpv.equals(netEpv)) {
                             throw new RuntimeException("ERROR: EDIFCellInst '" + driverEci + "' has conflicting IOSTANDARDs" +
                                     " from multiple EDIFHierNets.");
@@ -1845,7 +1845,7 @@ public class EDIFNetlist extends EDIFName {
 
             }
         }
-        value = cellInstPropagatedIOStandard.get(eci);
+        value = cellInstIOStandardFallback.get(eci);
         if (value != null) {
             return value;
         }

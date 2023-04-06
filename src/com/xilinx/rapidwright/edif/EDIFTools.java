@@ -1493,7 +1493,7 @@ public class EDIFTools {
      * @return EDIFPropertyValue containing IOStandard. Returns
      *         EDIFNetlist.DEFAULT_PROP_VALUE if no value found.
      */
-    public static EDIFPropertyValue getIoStandard(EDIFPropertyObject epo) {
+    public static EDIFPropertyValue getIOStandard(EDIFPropertyObject epo) {
         EDIFPropertyValue value = epo.getProperty(EDIFNetlist.IOSTANDARD_PROP);
         if (value != null) {
             return value;
