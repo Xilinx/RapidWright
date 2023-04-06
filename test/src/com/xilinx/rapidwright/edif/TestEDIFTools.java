@@ -1,7 +1,6 @@
-
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -210,5 +209,21 @@ public class TestEDIFTools {
         Assertions.assertNotEquals(newPort2, slicedPortName);
         Assertions.assertNotEquals(newPort2, newPort1);
         Assertions.assertTrue(newPort2.matches(Pattern.quote(slicedPortName) + "_rw_created\\d+"));
+    }
+
+    @Test
+    public void testGetIoStandard() {
+        final EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
+
+        EDIFCell top = netlist.getTopCell();
+        EDIFPort port = top.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFCellInst obufds = top.createChildCellInst("obuf", Design.getPrimitivesLibrary().getCell("OBUFDS"));
+        EDIFNet net = top.createNet("O");
+        new EDIFPortInst(port, net);
+        new EDIFPortInst(obufds.getPort("O"), net, obufds);
+        Assertions.assertEquals(EDIFNetlist.DEFAULT_PROP_VALUE, EDIFTools.getIOStandard(obufds));
+
+        obufds.addProperty(EDIFNetlist.IOSTANDARD_PROP, "LVDS");
+        Assertions.assertEquals("LVDS", EDIFTools.getIOStandard(obufds).getValue());
     }
 }
