@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -84,7 +84,7 @@ public class LogNetlistReader {
     /**
      * Extracts the property map information from a Cap'n Proto reader object and deserializes it
      * into an EDIF property map object. The reverse function is
-     * {@link #populatePropertyMap(com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap.Builder, EDIFPropertyObject)}
+     * {@link LogNetlistWriter#populatePropertyMap(PropertyMap.Builder, EDIFPropertyObject)}
      * @param reader The Cap'n Proto reader object
      * @param obj The EDIF map object
      */
