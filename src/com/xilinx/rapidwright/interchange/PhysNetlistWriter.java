@@ -75,7 +75,7 @@ public class PhysNetlistWriter {
     // By default, routing for physical nets will be written as a list of (connected)
     // trees of routing resources. Disabling this feature will save runtime but write
     // out the same set of routing resources as an unordered list of stubs instead.
-    public static final boolean BUILD_ROUTING_GRAPH_ON_EXPORT = true;
+    public static boolean BUILD_ROUTING_GRAPH_ON_EXPORT = true;
 
     private static void writeSiteInsts(PhysNetlist.Builder physNetlist, Design design,
             Enumerator<String> strings) {
