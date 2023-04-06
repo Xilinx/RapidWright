@@ -254,7 +254,7 @@ public class LogNetlistWriter {
             CellInstance.Builder ciBuilder = cellInstsList.get(i);
             ciBuilder.setName(allStrings.getIndex(inst.getName()));
             populatePropertyMap(ciBuilder.getPropMap(), inst);
-            ciBuilder.setCell(allCells.indexOf(inst.getCellType()));
+            ciBuilder.setCell(allCells.getIndex(inst.getCellType()));
             ciBuilder.setView(allStrings.getIndex(inst.getViewref().getName()));
             i++;
         }
@@ -273,7 +273,6 @@ public class LogNetlistWriter {
      * collapse macros in the netlist before writing.
      * @param n RapidWright netlist
      * @param fileName Name of the file to write
-     * @param collapseMacros If true, will attempt to collapse macros in netlist before writing.
      * @throws IOException
      */
     public static void writeLogNetlist(EDIFNetlist n, String fileName) throws IOException {

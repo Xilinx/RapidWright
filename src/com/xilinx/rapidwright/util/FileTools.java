@@ -1974,5 +1974,10 @@ public class FileTools {
         if (!fileName.endsWith(".gz")) return gzipFile;
         return Paths.get(fileName.substring(0, fileName.length() - 3));
     }
+
+    public static Path replaceDir(Path path, Path newDir) {
+        Path fn = path.getFileName();
+        return newDir.resolve(fn);
+    }
 }
 

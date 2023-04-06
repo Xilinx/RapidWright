@@ -270,4 +270,22 @@ public class EDIFPropertyValue {
     public void setOwner(String owner) {
         this.owner = owner;
     }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        EDIFPropertyValue other = (EDIFPropertyValue) obj;
+        if (!type.equals(other.type))
+            return false;
+        if (!value.equals(other.value))
+            return false;
+        if (owner != other.owner)
+            return false;
+        return true;
+    }
 }
