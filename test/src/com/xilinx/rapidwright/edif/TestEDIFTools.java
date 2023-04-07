@@ -212,7 +212,7 @@ public class TestEDIFTools {
     }
 
     @Test
-    public void testGetIoStandard() {
+    public void testGetIOStandard() {
         final EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
 
         EDIFCell top = netlist.getTopCell();
