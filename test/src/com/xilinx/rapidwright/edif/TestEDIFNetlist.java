@@ -344,7 +344,7 @@ class TestEDIFNetlist {
 
         // Previous call to netlist.getIOStandard() will have initialized this map,
         // clear it here so that it gets re-initialized
-        netlist.cellInstIOStandardFallback = null;
+        netlist.resetCellInstIOStandardFallbackMap();
 
         // Test that top-level-port's connected net property is propagated
         net.addProperty(EDIFNetlist.IOSTANDARD_PROP, "LVDS");

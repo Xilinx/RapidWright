@@ -185,8 +185,9 @@ public class EDIFNetlist extends EDIFName {
      * Anecdotally, it's been observed that Vivado propagates the IOStandard property
      * from the EDIFNet feeding a top-level output port to its driving EDIFCellInst
      * I/O buffer.
+     * @see #getIOStandard(EDIFCellInst)
      */
-    Map<EDIFCellInst,EDIFPropertyValue> cellInstIOStandardFallback;
+    private Map<EDIFCellInst,EDIFPropertyValue> cellInstIOStandardFallback;
 
 
     public EDIFNetlist(String name) {
@@ -1790,8 +1791,21 @@ public class EDIFNetlist extends EDIFName {
         return modifiedCells;
     }
 
+    /**
+     * Helper method to get the IOStandard property of an EDIFCellInst;
+     * should one not exist, fallback to the IOStandard property on
+     * the EDIFNet object connected to the top-level port that it drives.
+     * On the first time a fallback is considered, a map is initialized
+     * {@link #cellInstIOStandardFallback} to speed up future queries.
+     * This map will not be updated upon connecting a new EDIFNet nor
+     * if a new property was added to the existing EDIFNet --- for this
+     * map to be re-initialized use {@link #resetCellInstIOStandardFallbackMap}.
+     * @param eci EDIFCellInst object.
+     * @return EDIFPropertyValue describing its IOStandard. Returns
+     *         EDIFNetlist.DEFAULT_PROP_VALUE if no value found.
+     */
     public EDIFPropertyValue getIOStandard(EDIFCellInst eci) {
-        EDIFPropertyValue value = EDIFTools.getIOStandard(eci);
+        EDIFPropertyValue value = eci.getIOStandard();
         if (value != DEFAULT_PROP_VALUE) {
             return value;
         }
@@ -1810,7 +1824,7 @@ public class EDIFNetlist extends EDIFName {
                     if (en == null) {
                         continue;
                     }
-                    EDIFPropertyValue netEpv = EDIFTools.getIOStandard(en);
+                    EDIFPropertyValue netEpv = en.getIOStandard();
                     if (netEpv == DEFAULT_PROP_VALUE) {
                         // Net has no IOStandard
                         continue;
@@ -1823,7 +1837,7 @@ public class EDIFNetlist extends EDIFName {
                         }
 
                         EDIFCellInst driverEci = ehpi.getPortInst().getCellInst();
-                        EDIFPropertyValue driverEpv = EDIFTools.getIOStandard(driverEci);
+                        EDIFPropertyValue driverEpv = driverEci.getIOStandard();
                         if (driverEpv != DEFAULT_PROP_VALUE) {
                             if (driverEpv.equals(netEpv)) {
                                 // Cell and Net IOStandards match
@@ -1848,7 +1862,15 @@ public class EDIFNetlist extends EDIFName {
             return value;
         }
 
-        return EDIFNetlist.DEFAULT_PROP_VALUE;
+        return DEFAULT_PROP_VALUE;
+    }
+
+    /**
+     * Reset the fallback map used by {@link #getIOStandard} so that it may be
+     * re-initialized upon next use.
+     */
+    public void resetCellInstIOStandardFallbackMap() {
+        cellInstIOStandardFallback = null;
     }
 
     public static void main(String[] args) throws FileNotFoundException {
