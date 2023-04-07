@@ -32,14 +32,10 @@ public class TestEDIFPropertyObject {
         final EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
 
         EDIFCell top = netlist.getTopCell();
-        EDIFPort port = top.createPort("O", EDIFDirection.OUTPUT, 1);
         EDIFCellInst obufds = top.createChildCellInst("obuf", Design.getPrimitivesLibrary().getCell("OBUFDS"));
-        EDIFNet net = top.createNet("O");
-        new EDIFPortInst(port, net);
-        new EDIFPortInst(obufds.getPort("O"), net, obufds);
         Assertions.assertEquals(EDIFNetlist.DEFAULT_PROP_VALUE, obufds.getIOStandard());
 
-        obufds.addProperty(EDIFNetlist.IOSTANDARD_PROP, "LVDS");
+        obufds.addProperty("IOSTANDARD", "LVDS");
         Assertions.assertEquals("LVDS", obufds.getIOStandard().getValue());
     }
 }
