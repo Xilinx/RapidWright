@@ -124,14 +124,10 @@ public class PhysNetlistWriter {
                 String cellName = cell.getName();
                 if (cellName.equals(PhysNetlistWriter.LOCKED)) continue;
                 if (!design.getCell(cellName).getBELName().equals(cell.getBELName())) {
-                    ArrayList<Cell> cells = multiBelCells.get(cellName);
-                    if (cells == null) {
-                        cells = new ArrayList<Cell>();
-                    }
+                    multiBelCells.computeIfAbsent(cellName, (k) -> new ArrayList<>())
+                            .add(cell);
                     // Don't add multi-bel cells, store relevant info in pin placements
                     allCells.remove(allCells.size()-1);
-                    cells.add(cell);
-                    multiBelCells.put(cellName, cells);
                 }
             }
         }
@@ -244,11 +240,8 @@ public class PhysNetlistWriter {
             }
 
             for (Entry<Net,List<String>> e : siteInst.getNetToSiteWiresMap().entrySet()) {
-                List<RouteBranchNode> segments = netSiteRouting.get(e.getKey());
-                if (segments == null) {
-                    segments = new ArrayList<RouteBranchNode>();
-                    netSiteRouting.put(e.getKey(), segments);
-                }
+                List<RouteBranchNode> segments = netSiteRouting.computeIfAbsent(e.getKey(),
+                        (k) -> new ArrayList<>());
                 if (e.getValue() != null && e.getValue().size() > 0) {
                     for (String siteWire : e.getValue()) {
                         BELPin[] belPins = siteInst.getSiteWirePins(siteWire);
