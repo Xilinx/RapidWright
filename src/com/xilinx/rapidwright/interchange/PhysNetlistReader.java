@@ -739,18 +739,22 @@ public class PhysNetlistReader {
         for (EDIFCellInst leafEdifCellInst : netlist.getAllLeafCellInstances()) {
             EDIFCell leafEdifCell = leafEdifCellInst.getCellType();
             String leafEdifCellName = leafEdifCell.getName();
-            EDIFCell parent = leafEdifCellInst.getParentCell();
 
+            EDIFPortInst portInst;
             if (leafEdifCellName.equals("VCC")) {
-                EDIFPortInst portInst = leafEdifCellInst.getPortInst("P");
-                EDIFNet net = portInst.getNet();
-                checkNetTypeFromCellNet(cellPinToPhysicalNet, net, strings);
+                portInst = leafEdifCellInst.getPortInst("P");
             } else if (leafEdifCellName.equals("GND")) {
-                EDIFPortInst portInst = leafEdifCellInst.getPortInst("G");
-                EDIFNet net = portInst.getNet();
-                checkNetTypeFromCellNet(cellPinToPhysicalNet, net, strings);
+                portInst = leafEdifCellInst.getPortInst("G");
             } else {
+                continue;
             }
+
+            if (portInst == null) {
+                // Cell must be unplaced and/or unconnected
+                continue;
+            }
+            EDIFNet net = portInst.getNet();
+            checkNetTypeFromCellNet(cellPinToPhysicalNet, net, strings);
         }
     }
 
