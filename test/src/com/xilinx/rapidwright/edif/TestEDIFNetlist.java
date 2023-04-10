@@ -342,7 +342,9 @@ class TestEDIFNetlist {
         new EDIFPortInst(obufds.getPort("O"), net, obufds);
         Assertions.assertEquals(EDIFNetlist.DEFAULT_PROP_VALUE, netlist.getIOStandard(obufds));
 
-        netlist.cellInstIOStandardFallback = null;
+        // Previous call to netlist.getIOStandard() will have initialized this map,
+        // clear it here so that it gets re-initialized
+        netlist.resetCellInstIOStandardFallbackMap();
 
         // Test that top-level-port's connected net property is propagated
         net.addProperty(EDIFNetlist.IOSTANDARD_PROP, "LVDS");
