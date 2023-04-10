@@ -1794,7 +1794,7 @@ public class EDIFNetlist extends EDIFName {
     /**
      * Helper method to get the IOStandard property of an EDIFCellInst;
      * should one not exist, fallback to the IOStandard property on
-     * the EDIFNet object connected to the top-level port that it drives.
+     * the EDIFNet object connected to the top-level output port that it drives.
      * On the first time a fallback is considered, a map is initialized
      * {@link #cellInstIOStandardFallback} to speed up future queries.
      * This map will not be updated upon connecting a new EDIFNet nor
@@ -1816,7 +1816,9 @@ public class EDIFNetlist extends EDIFName {
             EDIFHierCellInst topEhci = getTopHierCellInst();
             for (EDIFPort ep : getTopCell().getPorts()) {
                 if (ep.isInput()) {
-                    // Only handle output and inout ports
+                    // Only propagate backward from output and inout ports
+                    // (propagating forwards from input/inout ports not
+                    // currently handled yet)
                     continue;
                 }
 
