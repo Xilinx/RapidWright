@@ -1485,25 +1485,4 @@ public class EDIFTools {
         }
         return collection.entrySet().stream().sorted(Entry.comparingByKey())::iterator;
     }
-
-    /**
-     * Helper method to get the IOStandard property from an EDIFPropertyObject,
-     * with consideration for upper-case.
-     * @param epo EDIFPropertyObject
-     * @return EDIFPropertyValue containing IOStandard. Returns
-     *         EDIFNetlist.DEFAULT_PROP_VALUE if no value found.
-     */
-    public static EDIFPropertyValue getIOStandard(EDIFPropertyObject epo) {
-        EDIFPropertyValue value = epo.getProperty(EDIFNetlist.IOSTANDARD_PROP);
-        if (value != null) {
-            return value;
-        }
-
-        value = epo.getProperty(EDIFNetlist.IOSTANDARD_PROP.toUpperCase());
-        if (value != null) {
-            return value;
-        }
-
-        return EDIFNetlist.DEFAULT_PROP_VALUE;
-    }
 }
