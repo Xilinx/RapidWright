@@ -1676,6 +1676,9 @@ public class EDIFNetlist extends EDIFName {
         for (EDIFCell cell : reinsert) {
             prims.removeCell(cell);
             prims.addCell(cell);
+            for (EDIFPort port : cell.getPorts()) {
+                port.setParentCell(cell);
+            }
         }
 
         for (String name : primsToRemoveOnCollapse) {

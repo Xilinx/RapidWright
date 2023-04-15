@@ -105,6 +105,35 @@ class TestEDIFNetlist {
     }
 
     @Test
+    void testMacroExpansionPortParents() {
+        final Part part = PartNameTools.getPart(Device.KCU105);
+        Design testDesign = createSamplePrimitiveDesign("OBUFDS", part);
+
+        EDIFCell cell = testDesign.getNetlist().getHDIPrimitivesLibrary().getCell("OBUFDS");
+        for (EDIFPort p : cell.getPorts()) {
+            Assertions.assertEquals(p.getParentCell(), cell);
+        }
+
+        testDesign.getNetlist().expandMacroUnisims(part.getSeries());
+
+        EDIFCell expandedCell = testDesign.getNetlist().getHDIPrimitivesLibrary().getCell("OBUFDS_DUAL_BUF");
+        Assertions.assertNotNull(expandedCell);
+        for (EDIFPort p : expandedCell.getPorts()) {
+            // Compare names because libraries are different ('p' is in UltraScale_macro_primitives library)
+            Assertions.assertNotEquals(p.getParentCell().getLibrary(), expandedCell.getLibrary());
+            Assertions.assertEquals(p.getParentCell().getName(), expandedCell.getName());
+        }
+
+        testDesign.getNetlist().collapseMacroUnisims(part.getSeries());
+
+        EDIFCell collapsedCell = testDesign.getNetlist().getHDIPrimitivesLibrary().getCell("OBUFDS");
+        Assertions.assertNotNull(collapsedCell);
+        for (EDIFPort p : collapsedCell.getPorts()) {
+            Assertions.assertEquals(p.getParentCell(), collapsedCell);
+        }
+    }
+
+    @Test
     public void testTrackChanges() {
         Design d = Design.readCheckpoint(RapidWrightDCP.getPath("microblazeAndILA_3pblocks.dcp"), true);
         EDIFNetlist netlist = d.getNetlist();
