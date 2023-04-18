@@ -1,7 +1,7 @@
 /*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
  * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -1973,6 +1973,11 @@ public class FileTools {
         String fileName = gzipFile.toString();
         if (!fileName.endsWith(".gz")) return gzipFile;
         return Paths.get(fileName.substring(0, fileName.length() - 3));
+    }
+
+    public static Path replaceDir(Path path, Path newDir) {
+        Path fn = path.getFileName();
+        return newDir.resolve(fn);
     }
 }
 
