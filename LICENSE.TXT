@@ -103,7 +103,7 @@ RapidWright (Apache 2.0)
   - jzlib 1.1.3 (BSD-style License)
   - Apache Commons IO 2.11.0 (Apache 2.0)
   - Zstd-jni 1.5.5-1 (2-clause BSD)
-      - ZStandard 1.5.5 (3-clause BSD or GPLv2)
+      - Zstandard 1.5.5 (3-clause BSD or GPLv2)
 
 
    
@@ -8718,7 +8718,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ********************************* END LICENSE *********************************
 
-********************** ZStandard 1.5.5 (BSD or GPLv2 license) *****************
+********************** Zstandard 1.5.5 (BSD or GPLv2 license) *****************
 BSD License
 
 For Zstandard software

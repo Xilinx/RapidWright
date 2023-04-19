@@ -272,10 +272,10 @@ public class FileTools {
     }
 
     /**
-     * Creates a Kryo input stream that instantiates a Zstandard compression stream
-     * to an input file.
+     * Creates a Kryo input stream from decompressing Zstandard compressed input
+     * file.
      * 
-     * @param fileName Name of the file to target.
+     * @param fileName Name of the file to read from.
      * @return The created kryo-zstd input file stream.
      */
     public static Input getKryoZstdInputStream(String fileName) {
@@ -283,9 +283,9 @@ public class FileTools {
     }
 
     /**
-     * Creates a Zstandard compression stream from an input file.
+     * Creates an input stream that decompresses a Zstandard compressed input file.
      * 
-     * @param fileName Name of the file to target.
+     * @param fileName Name of the file to read from.
      * @return The created zstd input file stream.
      */
     public static InputStream getZstdInputStream(String fileName) {
@@ -297,10 +297,9 @@ public class FileTools {
     }
 
     /**
-     * Creates a Kryo input stream that instantiates a gzip compression stream from
-     * an input file.
+     * Creates a Kryo input stream that decompresses a gzip compressed input file.
      * 
-     * @param fileName Name of the file to target.
+     * @param fileName Name of the file read from.
      * @return The created kryo-gzip input file stream.
      */
     public static Input getKryoGzipInputStream(String fileName) {
@@ -312,10 +311,9 @@ public class FileTools {
     }
 
     /**
-     * Creates a Kryo input stream that instantiates a gzip compression stream to an
-     * input stream.
+     * Creates a Kryo input stream that decompresses a gzip compressed input stream.
      * 
-     * @param fileName Name of the file to target.
+     * @param is The gzip compressed input stream to read from.
      * @return The created kryo-gzip input file stream.
      */
     public static Input getKryoGzipInputStream(InputStream is) {
