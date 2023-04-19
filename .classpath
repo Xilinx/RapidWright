@@ -54,5 +54,6 @@
 	<classpathentry kind="lib" path="jars/jeromq-0.5.2.jar"/>
 	<classpathentry kind="lib" path="jars/junit-platform-launcher-1.7.1.jar"/>
 	<classpathentry kind="lib" path="jars/junit-platform-reporting-1.7.1.jar"/>
+	<classpathentry kind="lib" path="jars/zstd-jni-1.5.5-1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
