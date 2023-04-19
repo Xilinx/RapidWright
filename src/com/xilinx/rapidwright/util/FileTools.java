@@ -178,7 +178,7 @@ public class FileTools {
     /* Get Streams                                                                       */
     //===================================================================================//
     /**
-     * Creates a Kryo output stream that instantiates a ZStandard compression stream
+     * Creates a Kryo output stream that instantiates a Zstandard compression stream
      * to an output file.
      * 
      * @param fileName Name of the file to target.
@@ -189,7 +189,7 @@ public class FileTools {
     }
 
     /**
-     * Creates a ZStandard compression stream to an output file.
+     * Creates a Zstandard compression stream to an output file.
      * 
      * @param fileName Name of the file to target.
      * @return The created zstd output file stream.
@@ -203,10 +203,10 @@ public class FileTools {
     }
 
     /**
-     * Wraps the provided output stream with a ZStandard compression stream.
+     * Wraps the provided output stream with a Zstandard compression stream.
      * 
      * @param os The existing output stream.
-     * @return The new output stream that will use ZStandard compression.
+     * @return The new output stream that will use Zstandard compression.
      */
     public static OutputStream getZstdOutputStream(OutputStream os) {
         try {
@@ -272,7 +272,7 @@ public class FileTools {
     }
 
     /**
-     * Creates a Kryo input stream that instantiates a ZStandard compression stream
+     * Creates a Kryo input stream that instantiates a Zstandard compression stream
      * to an input file.
      * 
      * @param fileName Name of the file to target.
@@ -283,7 +283,7 @@ public class FileTools {
     }
 
     /**
-     * Creates a ZStandard compression stream from an input file.
+     * Creates a Zstandard compression stream from an input file.
      * 
      * @param fileName Name of the file to target.
      * @return The created zstd input file stream.
