@@ -333,6 +333,7 @@ class TestEDIFNetlist {
     @Test
     public void testGetIOStandard() {
         final EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
+        netlist.setDevice(Device.getDevice(Device.AWS_F1));
 
         EDIFCell top = netlist.getTopCell();
         EDIFPort port = top.createPort("O", EDIFDirection.OUTPUT, 1);
@@ -362,6 +363,7 @@ class TestEDIFNetlist {
     })
     public void testExpandMacroUnisimsExceptionWithFallbackIOStandard(String standard, String cellType) {
         final EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
+        netlist.setDevice(Device.getDevice(Device.AWS_F1));
 
         EDIFCell top = netlist.getTopCell();
         EDIFPort port = top.createPort("O", EDIFDirection.OUTPUT, 1);

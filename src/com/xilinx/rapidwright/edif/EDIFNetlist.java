@@ -1813,50 +1813,61 @@ public class EDIFNetlist extends EDIFName {
         if (cellInstIOStandardFallback == null) {
             cellInstIOStandardFallback = new HashMap<>();
 
-            EDIFHierCellInst topEhci = getTopHierCellInst();
-            for (EDIFPort ep : getTopCell().getPorts()) {
-                if (ep.isInput()) {
-                    // Only propagate backward from output and inout ports
-                    // (propagating forwards from input/inout ports not
-                    // currently handled yet)
-                    continue;
-                }
+            Device device = getDevice();
+            if (device != null) {
+                EDIFLibrary macrosLibrary = Design.getMacroPrimitives(device.getSeries());
 
-                for (EDIFNet en : ep.getInternalNets()) {
-                    if (en == null) {
+                EDIFHierCellInst topEhci = getTopHierCellInst();
+                for (EDIFPort ep : getTopCell().getPorts()) {
+                    if (ep.isInput()) {
+                        // Only propagate backward from output and inout ports
+                        // (propagating forwards from input/inout ports not
+                        // currently handled yet)
                         continue;
                     }
-                    EDIFPropertyValue netEpv = en.getIOStandard();
-                    if (netEpv == DEFAULT_PROP_VALUE) {
-                        // Net has no IOStandard
-                        continue;
-                    }
-                    EDIFHierNet ehn = new EDIFHierNet(topEhci, en);
-                    for (EDIFHierPortInst ehpi : ehn.getLeafHierPortInsts(true)) {
-                        if (!ehpi.isOutput()) {
-                            // Ignore other leaf sinks on this net
+
+                    for (EDIFNet en : ep.getInternalNets()) {
+                        if (en == null) {
                             continue;
                         }
-
-                        EDIFCellInst driverEci = ehpi.getPortInst().getCellInst();
-                        EDIFPropertyValue driverEpv = driverEci.getIOStandard();
-                        if (driverEpv != DEFAULT_PROP_VALUE) {
-                            if (driverEpv.equals(netEpv)) {
-                                // Cell and Net IOStandards match
+                        EDIFPropertyValue netEpv = en.getIOStandard();
+                        if (netEpv == DEFAULT_PROP_VALUE) {
+                            // Net has no IOStandard
+                            continue;
+                        }
+                        EDIFHierNet ehn = new EDIFHierNet(topEhci, en);
+                        for (EDIFHierPortInst ehpi : ehn.getLeafHierPortInsts(true)) {
+                            if (!ehpi.isOutput()) {
+                                // Ignore other leaf sinks on this net
                                 continue;
                             }
-                            throw new RuntimeException("ERROR: EDIFCellInst '" + driverEci + "' has a conflicting IOSTANDARD" +
-                                    " with EDIFHierNet '" + ehn + "'.");
-                        }
 
-                        EDIFPropertyValue oldEpv = cellInstIOStandardFallback.put(driverEci, netEpv);
-                        if (oldEpv != null && !oldEpv.equals(netEpv)) {
-                            throw new RuntimeException("ERROR: EDIFCellInst '" + driverEci + "' has conflicting IOSTANDARDs" +
-                                    " from multiple EDIFHierNets.");
+                            EDIFCellInst driverEci = ehpi.getPortInst().getCellInst();
+                            EDIFCell driverParent = driverEci.getParentCell();
+                            if (driverParent != null && driverParent.getLibrary() == macrosLibrary) {
+                                // Driver cell instance is a primitive inside an expanded macro,
+                                // use this macro instead
+                                driverEci = ehpi.getHierarchicalInst().getInst();
+                            }
+
+                            EDIFPropertyValue driverEpv = driverEci.getIOStandard();
+                            if (driverEpv != DEFAULT_PROP_VALUE) {
+                                if (driverEpv.equals(netEpv)) {
+                                    // Cell and Net IOStandards match
+                                    continue;
+                                }
+                                throw new RuntimeException("ERROR: EDIFCellInst '" + driverEci + "' has a conflicting IOSTANDARD" +
+                                        " with EDIFHierNet '" + ehn + "'.");
+                            }
+
+                            EDIFPropertyValue oldEpv = cellInstIOStandardFallback.put(driverEci, netEpv);
+                            if (oldEpv != null && !oldEpv.equals(netEpv)) {
+                                throw new RuntimeException("ERROR: EDIFCellInst '" + driverEci + "' has conflicting IOSTANDARDs" +
+                                        " from multiple EDIFHierNets.");
+                            }
                         }
                     }
                 }
-
             }
         }
         value = cellInstIOStandardFallback.get(eci);
