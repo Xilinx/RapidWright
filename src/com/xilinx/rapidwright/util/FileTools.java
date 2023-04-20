@@ -80,6 +80,8 @@ import com.esotericsoftware.kryo.io.Output;
 import com.esotericsoftware.kryo.unsafe.UnsafeInput;
 import com.esotericsoftware.kryo.unsafe.UnsafeOutput;
 import com.esotericsoftware.kryo.util.Util;
+import com.github.luben.zstd.ZstdInputStream;
+import com.github.luben.zstd.ZstdOutputStream;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
@@ -175,40 +177,172 @@ public class FileTools {
     //===================================================================================//
     /* Get Streams                                                                       */
     //===================================================================================//
-    public static Output getKryoOutputStream(String fileName) {
-        FileOutputStream fos = null;
-        try {
-            fos = new FileOutputStream(fileName);
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
-        return getKryoOutputStream(fos);
+    /**
+     * Creates a Kryo output stream that instantiates a Zstandard compression stream
+     * to an output file.
+     * 
+     * @param fileName Name of the file to target.
+     * @return The created kryo-zstd output file stream.
+     */
+    public static Output getKryoZstdOutputStream(String fileName) {
+        return getKryoOutputStreamWithoutDeflater(getZstdOutputStream(fileName));
     }
 
-    public static Output getKryoOutputStream(OutputStream os) {
+    /**
+     * Creates a Zstandard compression stream to an output file.
+     * 
+     * @param fileName Name of the file to target.
+     * @return The created zstd output file stream.
+     */
+    public static OutputStream getZstdOutputStream(String fileName) {
+        try {
+            return getZstdOutputStream(new FileOutputStream(fileName));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * Wraps the provided output stream with a Zstandard compression stream.
+     * 
+     * @param os The existing output stream.
+     * @return The new output stream that will use Zstandard compression.
+     */
+    public static OutputStream getZstdOutputStream(OutputStream os) {
+        try {
+            return new ZstdOutputStream(os, Params.RW_ZSTD_COMPRESSION_LEVEL);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * Creates a Kryo output stream that instantiates a gzip compression stream to
+     * an output file.
+     * 
+     * @param fileName Name of the file to target.
+     * @return The created kryo-gzip output file stream.
+     */
+    public static Output getKryoGzipOutputStream(String fileName) {
+        try {
+            return getKryoGzipOutputStream(new FileOutputStream(fileName));
+        } catch (FileNotFoundException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * Creates a Kryo output stream that instantiates a gzip compression stream to
+     * an output stream.
+     * 
+     * @param fileName Name of the file to target.
+     * @return The created kryo-gzip output file stream.
+     */
+    public static Output getKryoGzipOutputStream(OutputStream os) {
         return getKryoOutputStreamWithoutDeflater(new DeflaterOutputStream(os));
     }
 
+    /**
+     * Use {@link #getKryoGzipOutputStream(String)} instead.
+     * @deprecated To be removed in 2023.2.0
+     */
+    public static Output getKryoOutputStream(String fileName) {
+        return getKryoGzipOutputStream(fileName);
+    }
+
+
+    /**
+     * Use {@link #getKryoGzipOutputStream(OutputStream)} instead.
+     * @deprecated To be removed in 2023.2.0
+     */
+    public static Output getKryoOutputStream(OutputStream os) {
+        return getKryoGzipOutputStream(os);
+    }
+
+    /**
+     * Wraps the provided output stream with a kryo stream. Will call
+     * {@link #useUnsafeStreams()} to decide on using unsafe or not.
+     * 
+     * @param os The output stream to wrap.
+     * @return The created kryo stream.
+     */
     public static Output getKryoOutputStreamWithoutDeflater(OutputStream os) {
         return useUnsafeStreams() ? new UnsafeOutput(os)
                                   : new Output(os);
     }
 
+    /**
+     * Creates a Kryo input stream from decompressing Zstandard compressed input
+     * file.
+     * 
+     * @param fileName Name of the file to read from.
+     * @return The created kryo-zstd input file stream.
+     */
+    public static Input getKryoZstdInputStream(String fileName) {
+        return getKryoInputStreamWithoutInflater(getZstdInputStream(fileName));
+    }
 
-    public static Input getKryoInputStream(String fileName) {
-        FileInputStream fis = null;
+    /**
+     * Creates an input stream that decompresses a Zstandard compressed input file.
+     * 
+     * @param fileName Name of the file to read from.
+     * @return The created zstd input file stream.
+     */
+    public static InputStream getZstdInputStream(String fileName) {
         try {
-            fis = new FileInputStream(fileName);
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            return new ZstdInputStream(new FileInputStream(fileName));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
-        return getKryoInputStream(fis);
     }
 
+    /**
+     * Creates a Kryo input stream that decompresses a gzip compressed input file.
+     * 
+     * @param fileName Name of the file read from.
+     * @return The created kryo-gzip input file stream.
+     */
+    public static Input getKryoGzipInputStream(String fileName) {
+        try {
+            return getKryoGzipInputStream((new FileInputStream(fileName)));
+        } catch (FileNotFoundException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * Creates a Kryo input stream that decompresses a gzip compressed input stream.
+     * 
+     * @param is The gzip compressed input stream to read from.
+     * @return The created kryo-gzip input file stream.
+     */
+    public static Input getKryoGzipInputStream(InputStream is) {
+        return getKryoInputStreamWithoutInflater(new InflaterInputStream(is));
+    }
+
+    /**
+     * Please use {@link #getKryoGzipInputStream(String)} instead.
+     * @deprecated - To be removed in 2023.2.0
+     */
+    public static Input getKryoInputStream(String fileName) {
+        return getKryoGzipInputStream(fileName);
+    }
+
+    /**
+     * Please use {@link #getKryoGzipInputStream(InputStream)} instead.
+     * @deprecated - To be removed in 2023.2.0
+     */
     public static Input getKryoInputStream(InputStream in) {
-        return getKryoInputStreamWithoutInflater(new InflaterInputStream(in));
+        return getKryoGzipInputStream(in);
     }
 
+    /**
+     * Wraps the provided input stream with a kryo stream. Will call
+     * {@link #useUnsafeStreams()} to decide on using unsafe or not.
+     * 
+     * @param os The input stream to wrap.
+     * @return The created kryo stream.
+     */
     public static Input getKryoInputStreamWithoutInflater(InputStream in) {
         return useUnsafeStreams() ? new UnsafeInput(in)
                                   : new Input(in);
