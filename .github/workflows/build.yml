@@ -44,7 +44,7 @@ jobs:
           pip install pytest python/
 
       - name: Compile
-        run: ./gradlew assemble
+        run: ./gradlew --info assemble
 
       - name: Test
         run: ./gradlew -PlimitToSingleProc=${{ matrix.single_threaded }} test 
