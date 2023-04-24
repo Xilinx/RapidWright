@@ -170,23 +170,23 @@ public class GlobalSignalRouting {
     public static void symmetricClkRouting(Net clk, Device device) {
         List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
         ClockRegion centroid = findCentroid(clk, device);
-        RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
-
-        RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
-
-        RouteNode vrouteUp = null;
-        RouteNode vrouteDown;
-        // Two VROUTEs going up and down
-        ClockRegion aboveCentroid = centroid.getNeighborClockRegion(1, 0);
-        if (aboveCentroid != null) {
-            vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
-        }
-        vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
 
         List<ClockRegion> upClockRegions = new ArrayList<>();
         List<ClockRegion> downClockRegions = new ArrayList<>();
         // divides clock regions into two groups
         divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
+
+        RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
+        RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
+
+        RouteNode vrouteUp = null;
+        RouteNode vrouteDown;
+        // Two VROUTEs going up and down
+        ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
+        if (aboveCentroid != null) {
+            vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
+        }
+        vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
 
         List<RouteNode> upDownDistLines = new ArrayList<>();
         if (aboveCentroid != null) {
