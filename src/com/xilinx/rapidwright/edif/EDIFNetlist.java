@@ -1624,7 +1624,7 @@ public class EDIFNetlist extends EDIFName {
                                 throw new RuntimeException("failed to find cell macro "+cellName+", we are in "+lib.getName());
                             }
                             primsToRemoveOnCollapse.add(cellName);
-                            EDIFCell copy = new EDIFCell(netlistPrims, macro);
+                            EDIFCell copy = new EDIFCell(netlistPrims, macro, cellName);
                             if (copy.getCellInsts().size() > 0) {
                                 for (EDIFCellInst copyInst : copy.getCellInsts()) {
                                     EDIFCell primCell = netlistPrims.getCell(copyInst.getCellType().getName());

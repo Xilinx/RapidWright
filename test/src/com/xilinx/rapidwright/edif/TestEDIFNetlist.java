@@ -74,7 +74,7 @@ class TestEDIFNetlist {
 
         final EDIFCell prototypePrim = Design.getPrimitivesLibrary().getCell(prim);
 
-        EDIFCell primCell = new EDIFCell(netlist.getHDIPrimitivesLibrary(), prototypePrim);
+        EDIFCell primCell = new EDIFCell(netlist.getHDIPrimitivesLibrary(), prototypePrim, prim);
 
         primCell.createCellInst("test" + prim, netlist.getTopCell());
 
@@ -102,6 +102,33 @@ class TestEDIFNetlist {
         testDesign2.getNetlist().expandMacroUnisims(part.getSeries());
         Assertions.assertTrue(testDesign2.getNetlist().getHDIPrimitivesLibrary().containsCell("OBUFDS"));
         Assertions.assertFalse(testDesign2.getNetlist().getHDIPrimitivesLibrary().containsCell("OBUFDS_DUAL_BUF"));
+    }
+
+    @Test
+    void testMacroExpansionPortParents() {
+        final Part part = PartNameTools.getPart(Device.KCU105);
+        Design testDesign = createSamplePrimitiveDesign("OBUFDS", part);
+
+        EDIFCell cell = testDesign.getNetlist().getHDIPrimitivesLibrary().getCell("OBUFDS");
+        for (EDIFPort p : cell.getPorts()) {
+            Assertions.assertSame(p.getParentCell(), cell);
+        }
+
+        testDesign.getNetlist().expandMacroUnisims(part.getSeries());
+
+        EDIFCell expandedCell = testDesign.getNetlist().getHDIPrimitivesLibrary().getCell("OBUFDS_DUAL_BUF");
+        Assertions.assertNotNull(expandedCell);
+        for (EDIFPort p : expandedCell.getPorts()) {
+            Assertions.assertSame(p.getParentCell(), expandedCell);
+        }
+
+        testDesign.getNetlist().collapseMacroUnisims(part.getSeries());
+
+        EDIFCell collapsedCell = testDesign.getNetlist().getHDIPrimitivesLibrary().getCell("OBUFDS");
+        Assertions.assertNotNull(collapsedCell);
+        for (EDIFPort p : collapsedCell.getPorts()) {
+            Assertions.assertEquals(p.getParentCell(), collapsedCell);
+        }
     }
 
     @Test
