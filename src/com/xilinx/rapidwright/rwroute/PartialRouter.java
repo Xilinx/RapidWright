@@ -570,6 +570,7 @@ public class PartialRouter extends RWRoute {
      * @param args An array of string arguments, can be null.
      * If null, the design will be routed in the full timing-driven routing mode with default a {@link RWRouteConfig} instance.
      * For more options of the configuration, please refer to the {@link RWRouteConfig} class.
+     * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
      * @return Routed design.
      */
     public static Design routeDesignWithUserDefinedArguments(Design design, String[] args, boolean softPreserve) {
@@ -595,6 +596,7 @@ public class PartialRouter extends RWRoute {
      * Routes a design in the partial non-timing-driven routing mode.
      * @param design The {@link Design} instance to be routed.
      * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed.
+     * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
      */
     public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         return routeDesign(design, new RWRouteConfig(new String[] {
@@ -612,6 +614,7 @@ public class PartialRouter extends RWRoute {
      * Routes a design in the partial timing-driven routing mode.
      * @param design The {@link Design} instance to be routed.
      * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed.
+     * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
      */
     public static Design routeDesignPartialTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         return routeDesign(design, new RWRouteConfig(new String[] {
