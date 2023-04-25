@@ -493,7 +493,7 @@ public class RWRoute{
                 Node sinkINTNode = nodes.get(0);
                 indirectConnections.add(connection);
                 Net oldNet = routingGraph.getPreservedNet(sinkINTNode);
-                if (oldNet != null) {
+                if (oldNet != null && oldNet != net) {
                     throw new RuntimeException("ERROR: Sink node " + sinkINTNode + " of net '" + net.getName() + "' is "
                             + " preserved by net '" + oldNet.getName() + "'");
                 }
