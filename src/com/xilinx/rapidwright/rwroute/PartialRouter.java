@@ -44,6 +44,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -54,7 +55,7 @@ import java.util.stream.Collectors;
  * Enabling soft preserve allows preserved routing that may be the cause of any
  * unroutable connections to be ripped up and re-routed.
  */
-public class PartialRouter extends RWRoute{
+public class PartialRouter extends RWRoute {
 
     protected final boolean softPreserve;
 
@@ -186,6 +187,49 @@ public class PartialRouter extends RWRoute{
             numCrossingSLRs += (!c.isCrossSLR() || (c.getSink().isRouted() && !c.isCongested())) ? 0 : 1;
         }
         return numCrossingSLRs;
+    }
+
+    @Override
+    protected void routeGlobalClkNets() {
+        if (clkNets.isEmpty())
+            return;
+
+        Predicate<Node> isPreservedNode = softPreserve ? (node) -> false
+                                                       : routingGraph::isPreserved;
+        routeGlobalClkNets(isPreservedNode);
+
+        if (softPreserve) {
+            List<Net> unpreserveNets = new ArrayList<>();
+            for (Net clk : clkNets) {
+                for (PIP pip : clk.getPIPs()) {
+                    for (Node node : Arrays.asList(pip.getStartNode(), pip.getEndNode())) {
+                        Net preservedNet = routingGraph.getPreservedNet(node);
+                        if (preservedNet != clk) {
+                            if (preservedNet != null) {
+                                unpreserveNet(preservedNet);
+                                unpreserveNets.add(preservedNet);
+                            }
+                            // Redo preserving clk
+                            Net oldNet = routingGraph.preserve(node, clk);
+                            assert(oldNet == null);
+
+                            // Clear preservedNode's prev pointer so that it doesn't get misinterpreted
+                            // by RouteNodeGraph.mustInclude to be part of an existing route
+                            RouteNode rnode = routingGraph.getNode(node);
+                            assert(rnode.getPrev() != null);
+                            rnode.clearPrev();
+                        }
+                    }
+                }
+            }
+
+            if (!unpreserveNets.isEmpty()) {
+                System.out.println("INFO: Unpreserving " + unpreserveNets.size() + " nets due to clock congestion");
+                for (Net net : unpreserveNets) {
+                    System.out.println("\t" + net);
+                }
+            }
+        }
     }
 
     @Override
@@ -512,12 +556,12 @@ public class PartialRouter extends RWRoute{
         return false;
     }
 
-    private static Design routeDesign(Design design, RWRouteConfig config, Collection<SitePinInst> pinsToRoute) {
+    private static Design routeDesign(Design design, RWRouteConfig config, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         if (config.isMaskNodesCrossRCLK()) {
             System.out.println("WARNING: Masking nodes across RCLK for partial routing could result in routability problems.");
         }
 
-        return routeDesign(design, new PartialRouter(design, config, pinsToRoute));
+        return routeDesign(design, new PartialRouter(design, config, pinsToRoute, softPreserve));
     }
 
     /**
@@ -528,7 +572,7 @@ public class PartialRouter extends RWRoute{
      * For more options of the configuration, please refer to the {@link RWRouteConfig} class.
      * @return Routed design.
      */
-    public static Design routeDesignWithUserDefinedArguments(Design design, String[] args) {
+    public static Design routeDesignWithUserDefinedArguments(Design design, String[] args, boolean softPreserve) {
         RWRoute.preprocess(design);
 
         List<SitePinInst> pinsToRoute = new ArrayList<>();
@@ -544,7 +588,7 @@ public class PartialRouter extends RWRoute{
 
         // Instantiates a RWRouteConfig Object and parses the arguments.
         // Uses the default configuration if basic usage only.
-        return routeDesign(design, new RWRouteConfig(args), pinsToRoute);
+        return routeDesign(design, new RWRouteConfig(args), pinsToRoute, softPreserve);
     }
 
     /**
@@ -552,7 +596,7 @@ public class PartialRouter extends RWRoute{
      * @param design The {@link Design} instance to be routed.
      * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed.
      */
-    public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute) {
+    public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         return routeDesign(design, new RWRouteConfig(new String[] {
                 "--fixBoundingBox",
                 // use U-turn nodes and no masking of nodes cross RCLK
@@ -561,7 +605,7 @@ public class PartialRouter extends RWRoute{
                 "--useUTurnNodes",
                 "--nonTimingDriven",
                 "--verbose"}),
-                pinsToRoute);
+                pinsToRoute, softPreserve);
     }
 
     /**
@@ -569,7 +613,7 @@ public class PartialRouter extends RWRoute{
      * @param design The {@link Design} instance to be routed.
      * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed.
      */
-    public static Design routeDesignPartialTimingDriven(Design design, Collection<SitePinInst> pinsToRoute) {
+    public static Design routeDesignPartialTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         return routeDesign(design, new RWRouteConfig(new String[] {
                 "--fixBoundingBox",
                 // use U-turn nodes and no masking of nodes cross RCLK
@@ -577,7 +621,7 @@ public class PartialRouter extends RWRoute{
                 // Con: might result in delay optimism and a slight increase in runtime
                 "--useUTurnNodes",
                 "--verbose"}),
-                pinsToRoute);
+                pinsToRoute, softPreserve);
     }
 
     /**
