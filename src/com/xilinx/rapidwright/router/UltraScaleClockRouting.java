@@ -46,6 +46,7 @@ import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * A collection of utility methods for routing clocks on
@@ -414,9 +415,10 @@ public class UltraScaleClockRouting {
      * @param clk
      * @param lcbMappings
      */
-    public static void routeLCBsToSinks(Net clk, Map<RouteNode, ArrayList<SitePinInst>> lcbMappings) {
+    public static void routeLCBsToSinks(Net clk, Map<RouteNode, ArrayList<SitePinInst>> lcbMappings, Predicate<Node> isPreservedNode) {
         Set<Wire> used = new HashSet<>();
-        Queue<RouteNode> q = new LinkedList<RouteNode>();
+        Set<Wire> visited = new HashSet<>();
+        Queue<RouteNode> q = new LinkedList<>();
 
         for (Entry<RouteNode,ArrayList<SitePinInst>> e : lcbMappings.entrySet()) {
             Set<PIP> currPIPs = new HashSet<>();
@@ -432,15 +434,20 @@ public class UltraScaleClockRouting {
                         List<PIP> pips = curr.getPIPsBackToSource();
                         currPIPs.addAll(pips);
                         sink.setRouted(true);
+                        visited.clear();
                         continue nextPin;
                     }
                     for (Wire w : curr.getWireConnections()) {
+                        if (!visited.add(w)) continue;
                         if (used.contains(w)) continue;
+                        if (w.isRouteThru()) continue;
+                        if (isPreservedNode.test(w.getNode())) continue;
                         q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
                     }
                 }
-                throw new RuntimeException("ERROR: Couldn't route LCB " + e.getKey() + "to Pin " + sink);
+                throw new RuntimeException("ERROR: Couldn't route LCB " + e.getKey() + " to Pin " + sink);
             }
+            visited.clear();
 
             List<PIP> clkPIPs = clk.getPIPs();
             for (PIP p : currPIPs) {

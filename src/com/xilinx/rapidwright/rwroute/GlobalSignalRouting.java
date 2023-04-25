@@ -34,6 +34,7 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -76,7 +77,10 @@ public class GlobalSignalRouting {
      * connect to sink pins of a global clock net.
      * @param device The target device needed to get routing path representation with nodes from names.
      */
-    public static void routeClkWithPartialRoutes(Net clk, Map<String, List<String>> routesToSinkINTTiles, Device device) {
+    public static void routeClkWithPartialRoutes(Net clk,
+                                                 Map<String, List<String>> routesToSinkINTTiles,
+                                                 Device device,
+                                                 Predicate<Node> isPreservedNode) {
         Map<String, List<Node>> dstINTtilePaths = getListOfNodesFromRoutes(device, routesToSinkINTTiles);
         // Not import path after HDSTR
         Set<PIP> clkPIPs = new HashSet<>();
@@ -96,7 +100,7 @@ public class GlobalSignalRouting {
         UltraScaleClockRouting.routeToLCBs(clk, getStartingPoint(horDistributionLines, device), lcbMappings.keySet());
 
         // route LCBs to sink pins
-        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);
+        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, isPreservedNode);
 
         Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
         clk.setPIPs(clkPIPsWithoutDuplication);
@@ -167,7 +171,7 @@ public class GlobalSignalRouting {
      * @param clk The clock to be routed.
      * @param device The design device.
      */
-    public static void symmetricClkRouting(Net clk, Device device) {
+    public static void symmetricClkRouting(Net clk, Device device, Predicate<Node> isPreservedNode) {
         List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
         ClockRegion centroid = findCentroid(clk, device);
 
@@ -200,7 +204,7 @@ public class GlobalSignalRouting {
         Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
         UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
 
-        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);
+        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, isPreservedNode);
 
         Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
         clk.setPIPs(clkPIPsWithoutDuplication);

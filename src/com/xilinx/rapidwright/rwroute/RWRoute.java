@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
@@ -152,7 +153,7 @@ public class RWRoute{
     private Pair<Float, TimingVertex> maxDelayAndTimingVertex;
 
     /** A map storing routes from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
-    private Map<String, List<String>> routesToSinkINTTiles;
+    protected Map<String, List<String>> routesToSinkINTTiles;
 
     public RWRoute(Design design, RWRouteConfig config) {
         this.design = design;
@@ -347,19 +348,26 @@ public class RWRoute{
      * TODO: fix the potential issue.
      */
     protected void routeGlobalClkNets() {
-         if (clkNets.size() > 0) System.out.println("INFO: Route clock nets");
-         for (Net clk : clkNets) {
-             if (routesToSinkINTTiles != null) {
-                 // routes clock nets with references of partial routes
+        if (clkNets.isEmpty())
+            return;
+        Predicate<Node> isPreservedNode = (node) -> false;
+        routeGlobalClkNets(isPreservedNode);
+    }
+
+    protected void routeGlobalClkNets(Predicate<Node> isPreservedNode) {
+        System.out.println("INFO: Route clock nets");
+        for (Net clk : clkNets) {
+            if (routesToSinkINTTiles != null) {
+                // routes clock nets with references of partial routes
                 System.out.println("INFO: Route with clock route and timing data");
-                GlobalSignalRouting.routeClkWithPartialRoutes(clk, routesToSinkINTTiles, design.getDevice());
-             } else {
-                 // routes clock nets from scratch
+                GlobalSignalRouting.routeClkWithPartialRoutes(clk, routesToSinkINTTiles, design.getDevice(), isPreservedNode);
+            } else {
+                // routes clock nets from scratch
                 System.out.println("INFO: Route with symmetric non-timing-driven clock router");
-                 GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice());
-             }
-             preserveNet(clk, false);
-         }
+                GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), isPreservedNode);
+            }
+            preserveNet(clk, false);
+        }
     }
 
     /**
