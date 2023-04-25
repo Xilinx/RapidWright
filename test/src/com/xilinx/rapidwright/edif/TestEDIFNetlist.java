@@ -74,7 +74,7 @@ class TestEDIFNetlist {
 
         final EDIFCell prototypePrim = Design.getPrimitivesLibrary().getCell(prim);
 
-        EDIFCell primCell = new EDIFCell(netlist.getHDIPrimitivesLibrary(), prototypePrim);
+        EDIFCell primCell = new EDIFCell(netlist.getHDIPrimitivesLibrary(), prototypePrim, prim);
 
         primCell.createCellInst("test" + prim, netlist.getTopCell());
 
@@ -111,7 +111,7 @@ class TestEDIFNetlist {
 
         EDIFCell cell = testDesign.getNetlist().getHDIPrimitivesLibrary().getCell("OBUFDS");
         for (EDIFPort p : cell.getPorts()) {
-            Assertions.assertEquals(p.getParentCell(), cell);
+            Assertions.assertSame(p.getParentCell(), cell);
         }
 
         testDesign.getNetlist().expandMacroUnisims(part.getSeries());
@@ -119,9 +119,7 @@ class TestEDIFNetlist {
         EDIFCell expandedCell = testDesign.getNetlist().getHDIPrimitivesLibrary().getCell("OBUFDS_DUAL_BUF");
         Assertions.assertNotNull(expandedCell);
         for (EDIFPort p : expandedCell.getPorts()) {
-            // Compare names because libraries are different ('p' is in UltraScale_macro_primitives library)
-            Assertions.assertNotEquals(p.getParentCell().getLibrary(), expandedCell.getLibrary());
-            Assertions.assertEquals(p.getParentCell().getName(), expandedCell.getName());
+            Assertions.assertSame(p.getParentCell(), expandedCell);
         }
 
         testDesign.getNetlist().collapseMacroUnisims(part.getSeries());
