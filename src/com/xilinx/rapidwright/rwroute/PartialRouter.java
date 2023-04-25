@@ -576,6 +576,19 @@ public class PartialRouter extends RWRoute {
     public static Design routeDesignWithUserDefinedArguments(Design design, String[] args, boolean softPreserve) {
         RWRoute.preprocess(design);
 
+        List<SitePinInst> pinsToRoute = getUnroutedPins(design);
+
+        // Instantiates a RWRouteConfig Object and parses the arguments.
+        // Uses the default configuration if basic usage only.
+        return routeDesign(design, new RWRouteConfig(args), pinsToRoute, softPreserve);
+    }
+
+    /**
+     * Return all SitePinInst objects belonging to fully unrouted nets (containing no routing PIPs).
+     * @param design The {@link Design} instance to be examined.
+     * @return A list of unrouted SitePinInst objects.
+     */
+    private static List<SitePinInst> getUnroutedPins(Design design) {
         List<SitePinInst> pinsToRoute = new ArrayList<>();
         for (Net net : design.getNets()) {
             if (net.getSource() == null && !net.isStaticNet()) {
@@ -586,19 +599,20 @@ public class PartialRouter extends RWRoute {
                 pinsToRoute.addAll(net.getSinkPins());
             }
         }
-
-        // Instantiates a RWRouteConfig Object and parses the arguments.
-        // Uses the default configuration if basic usage only.
-        return routeDesign(design, new RWRouteConfig(args), pinsToRoute, softPreserve);
+        return pinsToRoute;
     }
 
     /**
      * Routes a design in the partial non-timing-driven routing mode.
      * @param design The {@link Design} instance to be routed.
-     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed.
+     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all nets with no routing PIPs already present.
      * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
      */
     public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
+        if (pinsToRoute == null) {
+            pinsToRoute = getUnroutedPins(design);
+        }
+
         return routeDesign(design, new RWRouteConfig(new String[] {
                 "--fixBoundingBox",
                 // use U-turn nodes and no masking of nodes cross RCLK
@@ -613,10 +627,14 @@ public class PartialRouter extends RWRoute {
     /**
      * Routes a design in the partial timing-driven routing mode.
      * @param design The {@link Design} instance to be routed.
-     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed.
+     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all nets with no routing PIPs already present.
      * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
      */
     public static Design routeDesignPartialTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
+        if (pinsToRoute == null) {
+            pinsToRoute = getUnroutedPins(design);
+        }
+
         return routeDesign(design, new RWRouteConfig(new String[] {
                 "--fixBoundingBox",
                 // use U-turn nodes and no masking of nodes cross RCLK
