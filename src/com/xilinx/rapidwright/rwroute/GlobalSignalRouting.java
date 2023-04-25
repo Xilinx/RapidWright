@@ -76,6 +76,7 @@ public class GlobalSignalRouting {
      * @param routesToSinkINTTiles A map storing routes from CLK_OUT to different INT tiles that
      * connect to sink pins of a global clock net.
      * @param device The target device needed to get routing path representation with nodes from names.
+     * @param isPreservedNode Predicate lambda for indicating whether a Node is preserved and cannot be used.
      */
     public static void routeClkWithPartialRoutes(Net clk,
                                                  Map<String, List<String>> routesToSinkINTTiles,
@@ -170,6 +171,7 @@ public class GlobalSignalRouting {
      * Routes a clock net by dividing the target clock regions into two groups and routes to the two groups with different centroid nodes.
      * @param clk The clock to be routed.
      * @param device The design device.
+     * @param isPreservedNode Predicate lambda for indicating whether a Node is preserved and cannot be used.
      */
     public static void symmetricClkRouting(Net clk, Device device, Predicate<Node> isPreservedNode) {
         List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);

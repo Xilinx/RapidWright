@@ -194,11 +194,18 @@ public class PartialRouter extends RWRoute {
         if (clkNets.isEmpty())
             return;
 
+        // In softPreserve mode, allow the clock router to all nets -- including those already
+        // preserved by another net
         Predicate<Node> isPreservedNode = softPreserve ? (node) -> false
                                                        : routingGraph::isPreserved;
         routeGlobalClkNets(isPreservedNode);
 
         if (softPreserve) {
+            // Even though routeGlobalClkNets() has called preserveNet() for all clkNets,
+            // it will not overwrite those nodes which have already been preserved by other
+            // nets.
+            // Discover such occurrences so that the entire 'other' net can be correctly
+            // unpreserved (thus re-routed) and re-preserve clk.
             List<Net> unpreserveNets = new ArrayList<>();
             for (Net clk : clkNets) {
                 for (PIP pip : clk.getPIPs()) {
@@ -214,7 +221,7 @@ public class PartialRouter extends RWRoute {
                             assert(oldNet == null);
 
                             // Clear preservedNode's prev pointer so that it doesn't get misinterpreted
-                            // by RouteNodeGraph.mustInclude to be part of an existing route
+                            // by RouteNodeGraph.mustInclude as being part of an existing route
                             RouteNode rnode = routingGraph.getNode(node);
                             assert(rnode.getPrev() != null);
                             rnode.clearPrev();

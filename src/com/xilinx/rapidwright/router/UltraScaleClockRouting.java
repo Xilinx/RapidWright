@@ -414,6 +414,7 @@ public class UltraScaleClockRouting {
     /**
      * @param clk
      * @param lcbMappings
+     * @param isPreservedNode Predicate lambda for indicating whether a Node is preserved and cannot be used.
      */
     public static void routeLCBsToSinks(Net clk, Map<RouteNode, ArrayList<SitePinInst>> lcbMappings, Predicate<Node> isPreservedNode) {
         Set<Wire> used = new HashSet<>();
