@@ -30,43 +30,43 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.Set;
+import java.util.TreeSet;
 
 import org.capnproto.MessageBuilder;
 import org.capnproto.PrimitiveList;
+import org.capnproto.PrimitiveList.Int;
 import org.capnproto.StructList;
 import org.capnproto.Text;
 import org.capnproto.TextList;
-import org.capnproto.PrimitiveList.Int;
 import org.capnproto.Void;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.Unisim;
-import com.xilinx.rapidwright.design.VivadoPropType;
 import com.xilinx.rapidwright.design.VivadoProp;
-import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.design.VivadoPropType;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.IntentCode;
-import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.Package;
 import com.xilinx.rapidwright.device.Grade;
 import com.xilinx.rapidwright.device.IOStandard;
-import com.xilinx.rapidwright.device.PackagePin;
+import com.xilinx.rapidwright.device.IntentCode;
+import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.PIPType;
+import com.xilinx.rapidwright.device.Package;
+import com.xilinx.rapidwright.device.PackagePin;
 import com.xilinx.rapidwright.device.PseudoPIPHelper;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
@@ -78,24 +78,24 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.BEL.Builder;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELCategory;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.BELInverter;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellInversion;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellParameterDefinition;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellPinInversion;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellPinInversionParameter;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterDefinition;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterDefinitions;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterFormat;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterMapEntry;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterMapRule;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.PrimToMacroExpansion;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.PseudoCell;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SitePin;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteType;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.SiteWire;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.TileType;
-import com.xilinx.rapidwright.interchange.DeviceResources.Device.BEL.Builder;
-import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterDefinition;
-import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellParameterDefinition;
-import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterDefinitions;
-import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterFormat;
-import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterMapEntry;
-import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterMapRule;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
@@ -267,7 +267,12 @@ public class DeviceResourcesWriter {
     }
 
     public static void writeDeviceResourcesFile(String part, Device device, CodePerfTracker t,
-                                                                String fileName) throws IOException {
+            String fileName) throws IOException {
+        writeDeviceResourcesFile(part, device, t, fileName, false);
+    }
+
+    public static void writeDeviceResourcesFile(String part, Device device, CodePerfTracker t, 
+            String fileName, boolean skipRouteResources) throws IOException {
         Design design = new Design();
         design.setPartName(part);
         Series series = device.getSeries();
@@ -293,7 +298,7 @@ public class DeviceResourcesWriter {
         writeAllTilesToBuilder(device, devBuilder, tileTypeIndicies);
 
         t.stop().start("Wires&Nodes");
-        writeAllWiresAndNodesToBuilder(device, devBuilder);
+        writeAllWiresAndNodesToBuilder(device, devBuilder, skipRouteResources);
 
         t.stop().start("Prims&Macros");
         // Create an EDIFNetlist populated with just primitive and macro libraries
@@ -805,20 +810,23 @@ public class DeviceResourcesWriter {
         return key;
     }
 
-    public static void writeAllWiresAndNodesToBuilder(Device device, DeviceResources.Device.Builder devBuilder) {
+    public static void writeAllWiresAndNodesToBuilder(Device device, DeviceResources.Device.Builder devBuilder,
+            boolean skipRouteResources) {
         LongEnumerator allWires = new LongEnumerator();
-        ArrayList<Long> allNodes = new ArrayList();
+        ArrayList<Long> allNodes = new ArrayList<>();
 
-        for (Tile tile : device.getAllTiles()) {
-            for (int i=0; i < tile.getWireCount(); i++) {
-                Wire wire = new Wire(tile,i);
-                allWires.addObject(makeKey(wire.getTile(), wire.getWireIndex()));
+        if (!skipRouteResources) {
+            for (Tile tile : device.getAllTiles()) {
+                for (int i = 0; i < tile.getWireCount(); i++) {
+                    Wire wire = new Wire(tile, i);
+                    allWires.addObject(makeKey(wire.getTile(), wire.getWireIndex()));
 
-                Node node = wire.getNode();
-                if (node == null)
-                    continue;
-                if (node.getTile() == tile && node.getWire() == i)
-                    allNodes.add(makeKey(node.getTile(), node.getWire()));
+                    Node node = wire.getNode();
+                    if (node == null)
+                        continue;
+                    if (node.getTile() == tile && node.getWire() == i)
+                        allNodes.add(makeKey(node.getTile(), node.getWire()));
+                }
             }
         }
 

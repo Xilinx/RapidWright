@@ -741,34 +741,42 @@ public class EnumerateCellBelMapping {
             }
 
             for (List<String> parameters : getParametersFor(series, cell.getName())) {
+                HashSet<Map.Entry<String, String>> pinMapping = null;
+
                 for (Site site : siteMap.get(siteType)) {
-                    SiteInst siteInst = design.createSiteInst("test_site", siteType, site);
+                    if (pinMapping == null) {
+                        SiteInst siteInst = design.createSiteInst("test_site", siteType, site);
 
-                    String[] parameterArray = parameters.toArray(new String[parameters.size()]);
-                    physCell = design.createAndPlaceCell("test", Unisim.valueOf(cell.getName()), site.getName() + "/" + bel, parameterArray);
+                        String[] parameterArray = parameters.toArray(new String[parameters.size()]);
+                        physCell = design.createAndPlaceCell("test", Unisim.valueOf(cell.getName()),
+                                site.getName() + "/" + bel, parameterArray);
 
-                    // Build complete P2L map.
-                    Map<String, String> pinMap = new HashMap<String, String>();
+                        // Build complete P2L map.
+                        Map<String, String> pinMap = new HashMap<String, String>();
 
-                    for (Map.Entry<String, Set<String>> pinPair : physCell.getPinMappingsL2P().entrySet()) {
-                        for (String physPin : pinPair.getValue()) {
-                            pinMap.put(physPin, pinPair.getKey());
+                        for (Map.Entry<String, Set<String>> pinPair : physCell.getPinMappingsL2P().entrySet()) {
+                            for (String physPin : pinPair.getValue()) {
+                                pinMap.put(physPin, pinPair.getKey());
+                            }
                         }
+
+                        pinMap.putAll(physCell.getPinMappingsP2L());
+
+                        pinMapping = new HashSet<Map.Entry<String, String>>();
+                        for (Map.Entry<String, String> pinPair : pinMap.entrySet()) {
+                            pinMapping.add(
+                                    new AbstractMap.SimpleEntry<String, String>(pinPair.getValue(), pinPair.getKey()));
+                        }
+
+                        data.addInstance(siteType, site, bel, pinMapping, parameters);
+
+                        design.removeCell(physCell);
+                        design.removeSiteInst(siteInst);
+                        topLevelCell.removeCellInst("test");
+                        design.getTopEDIFCell().removeCellInst("test");
+                    } else {
+                        data.addInstance(siteType, site, bel, pinMapping, parameters);
                     }
-
-                    pinMap.putAll(physCell.getPinMappingsP2L());
-
-                    HashSet<Map.Entry<String, String>> pinMapping = new HashSet<Map.Entry<String, String>>();
-                    for (Map.Entry<String, String> pinPair : pinMap.entrySet()) {
-                        pinMapping.add(new AbstractMap.SimpleEntry<String, String>(pinPair.getValue(), pinPair.getKey()));
-                    }
-
-                    data.addInstance(siteType, site, bel, pinMapping, parameters);
-
-                    design.removeCell(physCell);
-                    design.removeSiteInst(siteInst);
-                    topLevelCell.removeCellInst("test");
-                    design.getTopEDIFCell().removeCellInst("test");
                 }
             }
         }
