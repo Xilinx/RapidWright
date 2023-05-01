@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -23,33 +23,13 @@
 
 package com.xilinx.rapidwright.interchange;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Queue;
-
-import org.capnproto.MessageBuilder;
-import org.capnproto.PrimitiveList;
-import org.capnproto.StructList;
-import org.capnproto.Text;
-import org.capnproto.TextList;
-import org.capnproto.StructList.Builder;
-
 import com.xilinx.rapidwright.design.AltPinMapping;
-import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
@@ -73,10 +53,29 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranc
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.RouteSegment;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.SiteInstance;
 import com.xilinx.rapidwright.interchange.RouteBranchNode.RouteSegmentType;
+import org.capnproto.MessageBuilder;
+import org.capnproto.PrimitiveList;
+import org.capnproto.StructList;
+import org.capnproto.StructList.Builder;
+import org.capnproto.Text;
+import org.capnproto.TextList;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Queue;
 
 public class PhysNetlistWriter {
 
-    public static final boolean BUILD_ROUTING_GRAPH_ON_EXPORT = true;
+    // By default, routing for physical nets will be written as a list of (connected)
+    // trees of routing resources. Disabling this feature will save runtime but write
+    // out the same set of routing resources as an unordered list of stubs instead.
+    public static boolean BUILD_ROUTING_GRAPH_ON_EXPORT = true;
 
     private static void writeSiteInsts(PhysNetlist.Builder physNetlist, Design design,
             Enumerator<String> strings) {
@@ -125,14 +124,10 @@ public class PhysNetlistWriter {
                 String cellName = cell.getName();
                 if (cellName.equals(PhysNetlistWriter.LOCKED)) continue;
                 if (!design.getCell(cellName).getBELName().equals(cell.getBELName())) {
-                    ArrayList<Cell> cells = multiBelCells.get(cellName);
-                    if (cells == null) {
-                        cells = new ArrayList<Cell>();
-                    }
+                    multiBelCells.computeIfAbsent(cellName, (k) -> new ArrayList<>())
+                            .add(cell);
                     // Don't add multi-bel cells, store relevant info in pin placements
                     allCells.remove(allCells.size()-1);
-                    cells.add(cell);
-                    multiBelCells.put(cellName, cells);
                 }
             }
         }
@@ -245,11 +240,8 @@ public class PhysNetlistWriter {
             }
 
             for (Entry<Net,List<String>> e : siteInst.getNetToSiteWiresMap().entrySet()) {
-                List<RouteBranchNode> segments = netSiteRouting.get(e.getKey());
-                if (segments == null) {
-                    segments = new ArrayList<RouteBranchNode>();
-                    netSiteRouting.put(e.getKey(), segments);
-                }
+                List<RouteBranchNode> segments = netSiteRouting.computeIfAbsent(e.getKey(),
+                        (k) -> new ArrayList<>());
                 if (e.getValue() != null && e.getValue().size() > 0) {
                     for (String siteWire : e.getValue()) {
                         BELPin[] belPins = siteInst.getSiteWirePins(siteWire);
@@ -300,15 +292,7 @@ public class PhysNetlistWriter {
             i++;
         }
 
-        int physNetCount = netSiteRouting.size();
-        // Check if some routes exists without site routing
-        for (Net net : design.getNets()) {
-            if (!netSiteRouting.containsKey(net)) {
-                physNetCount++;
-            }
-        }
-
-
+        int physNetCount = design.getNets().size();
         Builder<PhysNet.Builder> nets = physNetlist.initPhysNets(physNetCount);
         i=0;
         for (Net net : design.getNets()) {
@@ -354,13 +338,7 @@ public class PhysNetlistWriter {
             i++;
         }
 
-        // Clean up any nets not found in design that were stored in site routing
-        for (Entry<Net,List<RouteBranchNode>> e : netSiteRouting.entrySet()) {
-            PhysNet.Builder physNet = nets.get(i);
-            physNet.setName(strings.getIndex(e.getKey().getName()));
-            populateRouting(e.getValue(), physNet, strings);
-            i++;
-        }
+        assert(netSiteRouting.isEmpty());
     }
 
 
@@ -431,17 +409,21 @@ public class PhysNetlistWriter {
         //if (strings.get(physNet.getName()).equals("")) debugPrintRouteBranchNodes(sources, "");
 
         // Serialize...
-        Builder<RouteBranch.Builder> routeSrcs = physNet.initSources(sources.size());
-        for (int i=0; i < sources.size(); i++) {
-            RouteBranch.Builder srcBuilder = routeSrcs.get(i);
-            RouteBranchNode src = sources.get(i);
-            writeRouteBranch(srcBuilder, src, strings);
+        if (sources.size() > 0) {
+            Builder<RouteBranch.Builder> routeSrcs = physNet.initSources(sources.size());
+            for (int i=0; i < sources.size(); i++) {
+                RouteBranch.Builder srcBuilder = routeSrcs.get(i);
+                RouteBranchNode src = sources.get(i);
+                writeRouteBranch(srcBuilder, src, strings);
+            }
         }
-        Builder<RouteBranch.Builder> routeStubs = physNet.initStubs(stubs.size());
-        for (int i=0; i < stubs.size(); i++) {
-            RouteBranch.Builder stubBuilder = routeStubs.get(i);
-            RouteBranchNode src = stubs.get(i);
-            writeRouteBranch(stubBuilder, src, strings);
+        if (stubs.size() > 0) {
+            Builder<RouteBranch.Builder> routeStubs = physNet.initStubs(stubs.size());
+            for (int i=0; i < stubs.size(); i++) {
+                RouteBranch.Builder stubBuilder = routeStubs.get(i);
+                RouteBranchNode src = stubs.get(i);
+                writeRouteBranch(stubBuilder, src, strings);
+            }
         }
     }
 
@@ -490,9 +472,11 @@ public class PhysNetlistWriter {
                         src.getType());
         }
         int size = src.getBranches().size();
-        Builder<RouteBranch.Builder> branches = srcBuilder.initBranches(size);
-        for (int i=0; i < size; i++) {
-            writeRouteBranch(branches.get(i), src.getBranch(i), strings);
+        if (size > 0) {
+            Builder<RouteBranch.Builder> branches = srcBuilder.initBranches(size);
+            for (int i = 0; i < size; i++) {
+                writeRouteBranch(branches.get(i), src.getBranch(i), strings);
+            }
         }
     }
 
