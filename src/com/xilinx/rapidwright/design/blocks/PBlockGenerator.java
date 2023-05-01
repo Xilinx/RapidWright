@@ -42,9 +42,6 @@ import java.util.List;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import joptsimple.OptionParser;
-import joptsimple.OptionSet;
-
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
@@ -55,11 +52,13 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
-import com.xilinx.rapidwright.util.Utils;
 import com.xilinx.rapidwright.device.browser.PBlockGenEmitter;
 import com.xilinx.rapidwright.device.helper.TileColumnPattern;
 import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.MessageGenerator;
+import com.xilinx.rapidwright.util.Utils;
+
+import joptsimple.OptionParser;
+import joptsimple.OptionSet;
 
 /**
  * Attempts to estimate a fitting pblock for a given design.
@@ -134,8 +133,12 @@ public class PBlockGenerator {
 
     private void getResourceUsages(String reportFileName) {
         ArrayList<String> lines = FileTools.getLinesFromTextFile(reportFileName);
-
+        String prevLine = "";
         for (String line : lines) {
+            if (line.contains("13. SLR CLB Logic and Dedicated Block Utilization")
+                    && !prevLine.contains("12. SLR Connectivity Matrix")) {
+                break;
+            }
             if (line.startsWith("| Device")) {
                 String partName = line.split("\\s+")[3];
                 Part part = PartNameTools.getPart(partName);
@@ -159,6 +162,7 @@ public class PBlockGenerator {
             } else if (line.startsWith("| CARRY")) {
                 carryCount = Integer.parseInt(line.split("\\s+")[3]);
             }
+            prevLine = line;
         }
 
         if (dev.getSeries() == Series.Series7) {
