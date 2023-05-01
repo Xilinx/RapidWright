@@ -216,9 +216,10 @@ public class PhysNetlistReader {
                     } else {
                         cellInst = Design.createUnisimInst(null, cellName, unisim);
                     }
+                } else {
+                    assert(cellInst.getCellType().getName().equals(cellType));
                 }
-                if ((cellType != null && macroPrims.containsCell(cellType)) ||
-                        macroPrims.containsCell(cellInst.getCellType())) {
+                if (macroPrims.containsCell(cellType)) {
                     throw new RuntimeException("ERROR: Placement for macro primitive "
                             + cellInst.getCellType().getName() + " (instance "+cellName+") is "
                             + "invalid.  Please only provide placements for the macro's children "
@@ -337,6 +338,10 @@ public class PhysNetlistReader {
                 }
                 //for (EDIFCellInst inst : cellType.getCellInsts()) { // TODO - Fix up loop list
                 for (String childName : childrenNames) {
+                    if (childName.equals("VCC") || childName.equals("GND")) {
+                        // Ignore VCC (e.g. from FDRS_1) and GND cells
+                        continue;
+                    }
                     String childCellName = parentHierName + EDIFTools.EDIF_HIER_SEP + childName;
                     Cell child = design.getCell(childCellName);
                     if (child == null) {
@@ -609,7 +614,7 @@ public class PhysNetlistReader {
                     EDIFCell parent = portInst.getParentCell();
                     if (parent != null) {
                         EDIFNet outerNet = parent.getInternalNet(portInst);
-                        if (outerNet != null) {
+                        if (outerNet != null && outerNet != net) {
                             netsToExpand.add(outerNet);
                         }
                     }
@@ -721,31 +726,35 @@ public class PhysNetlistReader {
 
         // Search the EDIFNetlist for sinks from VCC or GND nets.  Find the
         // EDIFPortInst sinks on those nets, and see if a physical net
-        // corrisponds to that cell pin.
+        // corresponds to that cell pin.
         //
         // If so, verify that the physical net is marked with either VCC or
         // GND.
         //
         // Note: Sink port instances on the VCC net may end up in the GND
-        // physical net, or vise versa. This can occur when a constant net is
+        // physical net, or vice versa. This can occur when a constant net is
         // run through a site local inverter.  Modelling these site local
         // inverters is not done here, hence why the requirement is only that
         // the net type be either VCC or GND.
         for (EDIFCellInst leafEdifCellInst : netlist.getAllLeafCellInstances()) {
             EDIFCell leafEdifCell = leafEdifCellInst.getCellType();
             String leafEdifCellName = leafEdifCell.getName();
-            EDIFCell parent = leafEdifCellInst.getParentCell();
 
+            EDIFPortInst portInst;
             if (leafEdifCellName.equals("VCC")) {
-                EDIFPortInst portInst = leafEdifCellInst.getPortInst("P");
-                EDIFNet net = portInst.getNet();
-                checkNetTypeFromCellNet(cellPinToPhysicalNet, net, strings);
+                portInst = leafEdifCellInst.getPortInst("P");
             } else if (leafEdifCellName.equals("GND")) {
-                EDIFPortInst portInst = leafEdifCellInst.getPortInst("G");
-                EDIFNet net = portInst.getNet();
-                checkNetTypeFromCellNet(cellPinToPhysicalNet, net, strings);
+                portInst = leafEdifCellInst.getPortInst("G");
             } else {
+                continue;
             }
+
+            if (portInst == null) {
+                // Cell must be unplaced and/or unconnected
+                continue;
+            }
+            EDIFNet net = portInst.getNet();
+            checkNetTypeFromCellNet(cellPinToPhysicalNet, net, strings);
         }
     }
 

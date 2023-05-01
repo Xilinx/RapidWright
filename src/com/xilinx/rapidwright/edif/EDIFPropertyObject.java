@@ -57,6 +57,26 @@ public class EDIFPropertyObject extends EDIFName {
     }
 
     /**
+     * Helper method to get the IOStandard property, with consideration for
+     * an upper-case key name.
+     * @return EDIFPropertyValue describing its IOStandard. Returns
+     *         EDIFNetlist.DEFAULT_PROP_VALUE if no value found.
+     */
+    public EDIFPropertyValue getIOStandard() {
+        EDIFPropertyValue value = getProperty(EDIFNetlist.IOSTANDARD_PROP);
+        if (value != null) {
+            return value;
+        }
+
+        value = getProperty(EDIFNetlist.IOSTANDARD_PROP.toUpperCase());
+        if (value != null) {
+            return value;
+        }
+
+        return EDIFNetlist.DEFAULT_PROP_VALUE;
+    }
+
+    /**
      * Convenience property creator.
      * @param key Key value (to be wrapped in an EDIFName)
      * @param value The value of the property
