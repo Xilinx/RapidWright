@@ -4,7 +4,8 @@ Try RapidWright in your browser: [![Binder](https://mybinder.org/badge_logo.svg)
 
 ![Build](https://github.com/Xilinx/RapidWright/workflows/Build/badge.svg)
 
-RapidWright is an open source project from Xilinx Research Labs that
+RapidWright is an open source project from AMD Research and
+Advanced Development (formerly Xilinx Research Labs) that
 provides a new bridge to Vivado through reading and writing design
 checkpoint (DCP) files.  Its mission is to enable power users greater
 flexibility in customizing solutions to their unique implementation

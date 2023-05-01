@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -23,11 +23,7 @@
 
 package com.xilinx.rapidwright.interchange;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
@@ -36,6 +32,10 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Wire;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class RouteBranchNode {
 
@@ -50,7 +50,7 @@ public class RouteBranchNode {
 
     private RouteSegmentType type;
 
-    private List<RouteBranchNode> branches = new ArrayList<RouteBranchNode>();
+    private List<RouteBranchNode> branches;
 
     private RouteBranchNode parent = null;
 
@@ -139,6 +139,9 @@ public class RouteBranchNode {
         if (routeBranch.getParent() != null) {
             return;
         }
+        if (branches == null) {
+            branches = new ArrayList<>(1);
+        }
         branches.add(routeBranch);
         routeBranch.setParent(this);
     }
@@ -214,7 +217,7 @@ public class RouteBranchNode {
     }
 
     public List<RouteBranchNode> getBranches() {
-        return branches;
+        return branches != null ? branches : Collections.emptyList();
     }
 
     public RouteBranchNode getBranch(int idx) {

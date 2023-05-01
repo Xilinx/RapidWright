@@ -30,6 +30,10 @@ public class Params {
 
     public static String RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK_NAME = "RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK";
 
+    public static String RW_ZSTD_COMPRESSION_LEVEL_NAME = "RW_ZSTD_COMPRESSION_LEVEL";
+
+    public static int RW_ZSTD_DEFAULT_COMPRESSION_LEVEL = 3;
+
     /**
      * Flag to have RapidWright decompress gzipped EDIF files to disk prior to
      * parsing. This is a tradeoff where pre-decompression improves runtime over the
@@ -39,6 +43,14 @@ public class Params {
      */
     public static boolean RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK = isParamSet(RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK_NAME);
     
+    /**
+     * ZStandard compression effort level to use when compressing files. This can
+     * range from -7 to 22, with higher numbers producing a more compact result for
+     * more runtime.
+     */
+    public static int RW_ZSTD_COMPRESSION_LEVEL = getParamOrDefaultIntSetting(RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK_NAME,
+            RW_ZSTD_DEFAULT_COMPRESSION_LEVEL);
+
     /**
      * Checks if the named RapidWright parameter is set via an environment variable
      * or by a JVM parameter of the same name.
@@ -65,5 +77,54 @@ public class Params {
                || value.toLowerCase().equals("false")
                );         
     }
-    
+
+    /**
+     * Gets the integer value of the provided parameter name.
+     * 
+     * @param key Name of the system parameter to get.
+     * @return The set integer value of the parameter, or null if none was set. If
+     *         the property is set to a value that is not a parsable integer, a
+     *         warning message is produced and returns null.
+     */
+    public static Integer getParamIntValue(String key) {
+        String envValue = getParamValue(key);
+        if (envValue != null) {
+            try {
+                return Integer.parseInt(envValue);
+            } catch (NumberFormatException e) {
+                System.err.println("WARNING: Couldn't interpret the value '" + envValue 
+                        + "' from the parameter '" + key + "' as an integer.");
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Gets the string value of the provided parameter name.
+     * 
+     * @param key Name of the system parameter to get.
+     * @return The set string value of the parameter, or null if none was set.
+     */
+    public static String getParamValue(String key) {
+        String value = System.getenv(key);
+        if (value == null) {
+            value = System.getProperty(key);
+        }
+        return value;
+    }
+
+    /**
+     * Checks the parameter value of the provided key. If it is set, it returns the
+     * set value. Otherwise it will return the default value.
+     * 
+     * @param key          Name of the system parameter to check.
+     * @param defaultValue The default value to return if the paramter is not set.
+     * @return The system parameter value if is set, otherwise it returns
+     *         defaultValue.
+     */
+    public static int getParamOrDefaultIntSetting(String key, int defaultValue) {
+        Integer setValue = getParamIntValue(key);
+        return setValue == null ? defaultValue : setValue;
+    }
+
 }

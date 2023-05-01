@@ -29,10 +29,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.xilinx.rapidwright.device.Series;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.Design;
@@ -72,7 +74,7 @@ class TestEDIFNetlist {
 
         final EDIFCell prototypePrim = Design.getPrimitivesLibrary().getCell(prim);
 
-        EDIFCell primCell = new EDIFCell(netlist.getHDIPrimitivesLibrary(), prototypePrim);
+        EDIFCell primCell = new EDIFCell(netlist.getHDIPrimitivesLibrary(), prototypePrim, prim);
 
         primCell.createCellInst("test" + prim, netlist.getTopCell());
 
@@ -100,6 +102,33 @@ class TestEDIFNetlist {
         testDesign2.getNetlist().expandMacroUnisims(part.getSeries());
         Assertions.assertTrue(testDesign2.getNetlist().getHDIPrimitivesLibrary().containsCell("OBUFDS"));
         Assertions.assertFalse(testDesign2.getNetlist().getHDIPrimitivesLibrary().containsCell("OBUFDS_DUAL_BUF"));
+    }
+
+    @Test
+    void testMacroExpansionPortParents() {
+        final Part part = PartNameTools.getPart(Device.KCU105);
+        Design testDesign = createSamplePrimitiveDesign("OBUFDS", part);
+
+        EDIFCell cell = testDesign.getNetlist().getHDIPrimitivesLibrary().getCell("OBUFDS");
+        for (EDIFPort p : cell.getPorts()) {
+            Assertions.assertSame(p.getParentCell(), cell);
+        }
+
+        testDesign.getNetlist().expandMacroUnisims(part.getSeries());
+
+        EDIFCell expandedCell = testDesign.getNetlist().getHDIPrimitivesLibrary().getCell("OBUFDS_DUAL_BUF");
+        Assertions.assertNotNull(expandedCell);
+        for (EDIFPort p : expandedCell.getPorts()) {
+            Assertions.assertSame(p.getParentCell(), expandedCell);
+        }
+
+        testDesign.getNetlist().collapseMacroUnisims(part.getSeries());
+
+        EDIFCell collapsedCell = testDesign.getNetlist().getHDIPrimitivesLibrary().getCell("OBUFDS");
+        Assertions.assertNotNull(collapsedCell);
+        for (EDIFPort p : collapsedCell.getPorts()) {
+            Assertions.assertEquals(p.getParentCell(), collapsedCell);
+        }
     }
 
     @Test
@@ -326,5 +355,55 @@ class TestEDIFNetlist {
         Assertions.assertEquals(port0.getWidth(), testPort0.getWidth());
         EDIFPort testPort1 = testTopCell.getNet(net1.getName()).getPortInst(null, portName + "[0]").getPort();
         Assertions.assertEquals(port1.getWidth(), testPort1.getWidth());
+    }
+
+    @Test
+    public void testGetIOStandard() {
+        final EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
+        netlist.setDevice(Device.getDevice(Device.AWS_F1));
+
+        EDIFCell top = netlist.getTopCell();
+        EDIFPort port = top.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFCellInst obufds = top.createChildCellInst("obuf", Design.getPrimitivesLibrary().getCell("OBUFDS"));
+        EDIFNet net = top.createNet("O");
+        new EDIFPortInst(port, net);
+        new EDIFPortInst(obufds.getPort("O"), net, obufds);
+        Assertions.assertEquals(EDIFNetlist.DEFAULT_PROP_VALUE, netlist.getIOStandard(obufds));
+
+        // Previous call to netlist.getIOStandard() will have initialized this map,
+        // clear it here so that it gets re-initialized
+        netlist.resetCellInstIOStandardFallbackMap();
+
+        // Test that top-level-port's connected net property is propagated
+        net.addProperty(EDIFNetlist.IOSTANDARD_PROP, "LVDS");
+        Assertions.assertEquals("LVDS", netlist.getIOStandard(obufds).getValue());
+
+        // Test that cell inst takes priority
+        obufds.addProperty(EDIFNetlist.IOSTANDARD_PROP, "DIFF_SSTL12_DCI");
+        Assertions.assertEquals("DIFF_SSTL12_DCI", netlist.getIOStandard(obufds).getValue());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "LVDS,OBUFDS",
+            "BLVDS_25,OBUFDS_DUAL_BUF"
+    })
+    public void testExpandMacroUnisimsExceptionWithFallbackIOStandard(String standard, String cellType) {
+        final EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
+        netlist.setDevice(Device.getDevice(Device.AWS_F1));
+
+        EDIFCell top = netlist.getTopCell();
+        EDIFPort port = top.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFCellInst obufds = top.createChildCellInst("obuf", Design.getPrimitivesLibrary().getCell("OBUFDS"));
+        netlist.getHDIPrimitivesLibrary().addCell(obufds.getCellType());
+        EDIFNet net = top.createNet("O");
+        new EDIFPortInst(port, net);
+        new EDIFPortInst(obufds.getPort("O"), net, obufds);
+
+        // Set IOStandard only on top-level-port's connected net
+        net.addProperty(EDIFNetlist.IOSTANDARD_PROP, standard);
+
+        netlist.expandMacroUnisims(Series.UltraScalePlus);
+        Assertions.assertEquals(cellType, obufds.getCellType().getName());
     }
 }

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -23,31 +23,32 @@
 
 package com.xilinx.rapidwright.interchange;
 
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.nio.channels.Channels;
-import java.nio.channels.ReadableByteChannel;
-import java.nio.channels.WritableByteChannel;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
-
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.FileTools;
 import org.capnproto.MessageBuilder;
 import org.capnproto.MessageReader;
 import org.capnproto.ReaderOptions;
 import org.capnproto.Serialize;
 import org.capnproto.SerializePacked;
 
-import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.edif.EDIFNetlist;
-import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.util.FileTools;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 public class Interchange {
 
     /** Flag indicating use of Packed Cap'n Proto Serialization */
     public static boolean IS_PACKED = false;
-    /** Fla indicating that files are gziped on output */
+    /** Flag indicating that files are gzipped on output */
     public static boolean IS_GZIPPED = true;
 
     /**
@@ -110,19 +111,30 @@ public class Interchange {
     private static String READ_LOGICAL_NETLIST = "READ_LOGICAL_NETLIST";
     private static String READ_PHYSICAL_NETLIST = "READ_PHYSICAL_NETLIST";
 
-    private static void benchmarkDCPvsInterchange(String dcpFileName, String edifFileName) throws IOException {
-        String title = dcpFileName + " IS_PACKED=" + IS_PACKED + " IS_GZIPPED=" + IS_GZIPPED;
+    public static void benchmarkDCPvsInterchange(Path dcpPath,
+                                                 Path edifPath,
+                                                 Path workingPath) throws IOException {
+        String title = dcpPath + " IS_PACKED=" + IS_PACKED + " IS_GZIPPED=" + IS_GZIPPED;
         CodePerfTracker t = new CodePerfTracker(title);
         t.useGCToTrackMemory(true);
         t.start(READ_DCP);
-        Design design = edifFileName != null ?
-                Design.readCheckpoint(dcpFileName, edifFileName, CodePerfTracker.SILENT) :
-                Design.readCheckpoint(dcpFileName, CodePerfTracker.SILENT);
+        Design design = edifPath != null ?
+                Design.readCheckpoint(dcpPath, edifPath, CodePerfTracker.SILENT) :
+                Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
         t.stop().start(WRITE_LOGICAL_NETLIST);
-        String logNetlistFileName = dcpFileName.replace(".dcp", ".netlist");
+        Path logNetlistPath = FileTools.replaceExtension(dcpPath, ".netlist");
+        if (workingPath != null) {
+            logNetlistPath = FileTools.replaceDir(logNetlistPath, workingPath);
+        }
+        String logNetlistFileName = logNetlistPath.toString();
         LogNetlistWriter.writeLogNetlist(design.getNetlist(), logNetlistFileName);
         t.stop().start(WRITE_PHYSICAL_NETLIST);
-        String physNetlistFileName = dcpFileName.replace(".dcp", ".phys");
+
+        Path physNetlistPath = FileTools.replaceExtension(dcpPath, ".phys");
+        if (workingPath != null) {
+            physNetlistPath = FileTools.replaceDir(physNetlistPath, workingPath);
+        }
+        String physNetlistFileName = physNetlistPath.toString();
         PhysNetlistWriter.writePhysNetlist(design, physNetlistFileName);
         t.stop();
         design = null;
@@ -132,7 +144,11 @@ public class Interchange {
         t.stop().start(READ_PHYSICAL_NETLIST);
         Design designReturn = PhysNetlistReader.readPhysNetlist(physNetlistFileName, netlist);
         t.stop().start(WRITE_DCP);
-        String dcpOutputFileName = dcpFileName.replace(".dcp", "_rt.dcp");
+        Path dcpOutputPath = dcpPath;
+        if (workingPath != null) {
+            dcpOutputPath = FileTools.replaceDir(dcpOutputPath, workingPath);
+        }
+        String dcpOutputFileName = dcpOutputPath.toString().replace(".dcp", "_rt.dcp");
         designReturn.writeCheckpoint(dcpOutputFileName, CodePerfTracker.SILENT);
         t.stop().printSummary();
 
@@ -167,6 +183,8 @@ public class Interchange {
             System.out.println("USAGE: <input DCP> [input EDIF]");
             return;
         }
-        benchmarkDCPvsInterchange(args[0], args.length == 2 ? args[1] : null);
+        benchmarkDCPvsInterchange(Paths.get(args[0]),
+                args.length == 2 ? Paths.get(args[1]) : null,
+                null);
     }
 }

@@ -59,13 +59,10 @@ public class TestFileTools {
                 "from com.xilinx.rapidwright.util import FileTools;"
                 + "FileTools.ensureDataFilesAreStaticInstallFriendly("+devicesString+")");
         pb.redirectErrorStream(true);
+        pb.inheritIO();
         try {
             Process p = pb.start();
-            StreamGobbler sg = new StreamGobbler(p.getInputStream(), true);
-            sg.start();
-            int result = p.waitFor();
-            p.destroyForcibly();
-            Assertions.assertEquals(result, 0);
+            Assertions.assertEquals(0, p.waitFor());
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
