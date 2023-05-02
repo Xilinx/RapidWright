@@ -45,12 +45,10 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Part;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
-import com.xilinx.rapidwright.util.MessageGenerator;
-import com.xilinx.rapidwright.util.Pair;
-import com.xilinx.rapidwright.util.RuntimeTracker;
-import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
@@ -58,6 +56,10 @@ import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.util.MessageGenerator;
+import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.RuntimeTracker;
+import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 import com.xilinx.rapidwright.util.Utils;
 
 /**
@@ -155,12 +157,31 @@ public class RWRoute{
     /** A map storing routes from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
     protected Map<String, List<String>> routesToSinkINTTiles;
 
+    public static final Set<Series> SUPPORTED_SERIES;
+
+    static {
+        SUPPORTED_SERIES = new HashSet<>();
+        SUPPORTED_SERIES.add(Series.UltraScale);
+        SUPPORTED_SERIES.add(Series.UltraScalePlus);
+    }
+
     public RWRoute(Design design, RWRouteConfig config) {
         this.design = design;
         this.config = config;
     }
 
+    protected static String getUnsupportedSeriesMessage(Part part) {
+        return "ERROR: RWRoute does not support routing the " + part.getName() + " from the " 
+                + part.getSeries() + " series. Please re-target the design to a part from a "
+                + "supported series: " + SUPPORTED_SERIES;
+    }
+
     protected static void preprocess(Design design) {
+        Series series = design.getPart().getSeries();
+        if (!SUPPORTED_SERIES.contains(series)) {
+            throw new RuntimeException(getUnsupportedSeriesMessage(design.getPart()));
+        }
+
         // Pre-processing of the design regarding physical net names pins
         DesignTools.makePhysNetNamesConsistent(design);
         DesignTools.createPossiblePinsToStaticNets(design);
