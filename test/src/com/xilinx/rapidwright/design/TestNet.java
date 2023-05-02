@@ -176,4 +176,15 @@ public class TestNet {
             Assertions.assertNull(net.getLogicalHierNet());
         }
     }
+
+    @Test
+    public void testCreatePinInvalid() {
+        Design d = new Design("top", "xc7a200t");
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("RAMB36_X8Y14"));
+        RuntimeException ex = Assertions.assertThrows(RuntimeException.class, () ->
+                d.getGndNet().createPin("RSTRAMARSTRAML", si)
+        );
+        Assertions.assertEquals("ERROR: Couldn't find pin RSTRAMARSTRAML on site type RAMBFIFO36E1",
+                ex.getMessage());
+    }
 }
