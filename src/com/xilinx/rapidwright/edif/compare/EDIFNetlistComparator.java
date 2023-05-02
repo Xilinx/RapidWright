@@ -397,7 +397,7 @@ public class EDIFNetlistComparator {
         test.expandMacroUnisims(series);
         t.stop().start("Compare");
         EDIFNetlistComparator comparator = new EDIFNetlistComparator();
-        comparator.compareNetlists(gold, test);
+        int diffs = comparator.compareNetlists(gold, test);
         if (args.length == 3) {
             try (PrintStream ps = new PrintStream(args[2])) {
                 comparator.printDiffReport(ps);
@@ -408,5 +408,7 @@ public class EDIFNetlistComparator {
             comparator.printDiffReport(System.out);
         }
         t.stop().printSummary();
+        
+        System.exit(diffs > 0 ? 1 : 0);
     }
 }
