@@ -40,12 +40,15 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import com.xilinx.rapidwright.design.blocks.PBlock;
+import com.xilinx.rapidwright.design.blocks.UtilizationType;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -825,6 +828,81 @@ public class TestDesignTools {
             Net net = design.getNet(name);
             Assertions.assertNotNull(net);
             Assertions.assertFalse(DesignTools.isNetDrivenByHierPort(net));
+        }
+    }
+
+    @Test
+    public void testGetPortInstsFromSitePinInstLutRoutethru() {
+        Device device = Device.getDevice("xcvu3p");
+        Design design = new Design("design", device.getName());
+
+        Cell ff1 = design.createAndPlaceCell("ff1", Unisim.FDRE, "SLICE_X0Y0/AFF");
+        Cell ff2 = design.createAndPlaceCell("ff2", Unisim.FDRE, "SLICE_X0Y0/AFF2");
+        SiteInst si = ff1.getSiteInst();
+        Net net = design.createNet("net");
+        SitePinInst spi = net.createPin("A6", si);
+        new EDIFPortInst(ff1.getEDIFCellInst().getPort("D"), null, ff1.getEDIFCellInst());
+        new EDIFPortInst(ff2.getEDIFCellInst().getPort("D"), null, ff2.getEDIFCellInst());
+
+        // Routethru LUT to reach both flops
+        Assertions.assertTrue(si.routeIntraSiteNet(net, spi.getBELPin(), ff1.getBEL().getPin("D")));
+        Assertions.assertTrue(si.routeIntraSiteNet(net, spi.getBELPin(), ff2.getBEL().getPin("D")));
+
+        Assertions.assertEquals("[ff1/D, ff2/D]",
+                DesignTools.getPortInstsFromSitePinInst(spi).toString());
+    }
+
+    @Test
+    public void testCalculateUtilization() {
+        Design design = RapidWrightDCP.loadDCP("bnn.dcp");
+
+        for (Entry<UtilizationType, Integer> e : DesignTools.calculateUtilization(design).entrySet()) {
+            switch (e.getKey()) {
+            case CLB_LUTS:
+                Assertions.assertEquals(3097, e.getValue());
+                break;
+            case CLB_REGS:
+                Assertions.assertEquals(2754, e.getValue());
+                break;
+            case CARRY8S:
+                Assertions.assertEquals(113, e.getValue());
+                break;
+            case LUTS_AS_LOGIC:
+                Assertions.assertEquals(3055, e.getValue());
+                break;
+            case LUTS_AS_MEMORY:
+                Assertions.assertEquals(42, e.getValue());
+                break;
+            case DSPS:
+                Assertions.assertEquals(4, e.getValue());
+                break;
+            default:
+            }
+        }
+
+        PBlock pblock = new PBlock(design.getDevice(), "SLICE_X78Y145:SLICE_X80Y149 DSP48E2_X9Y58:DSP48E2_X9Y59");
+        for (Entry<UtilizationType, Integer> e : DesignTools.calculateUtilization(design, pblock).entrySet()) {
+            switch (e.getKey()) {
+            case CLB_LUTS:
+                Assertions.assertEquals(13, e.getValue());
+                break;
+            case CLB_REGS:
+                Assertions.assertEquals(30, e.getValue());
+                break;
+            case CARRY8S:
+                Assertions.assertEquals(4, e.getValue());
+                break;
+            case LUTS_AS_LOGIC:
+                Assertions.assertEquals(13, e.getValue());
+                break;
+            case LUTS_AS_MEMORY:
+                Assertions.assertEquals(0, e.getValue());
+                break;
+            case DSPS:
+                Assertions.assertEquals(1, e.getValue());
+                break;
+            default:
+            }
         }
     }
 }

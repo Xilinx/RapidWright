@@ -26,8 +26,8 @@ package com.xilinx.rapidwright.placer.handplacer;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.trolltech.qt.core.QPointF;
 import com.trolltech.qt.core.Qt;
@@ -36,6 +36,7 @@ import com.trolltech.qt.core.Qt.DockWidgetArea;
 import com.trolltech.qt.core.Qt.MatchFlag;
 import com.trolltech.qt.core.Qt.MatchFlags;
 import com.trolltech.qt.core.Qt.WindowModality;
+import com.trolltech.qt.gui.QAbstractItemView.SelectionMode;
 import com.trolltech.qt.gui.QAction;
 import com.trolltech.qt.gui.QApplication;
 import com.trolltech.qt.gui.QComboBox;
@@ -45,12 +46,15 @@ import com.trolltech.qt.gui.QFileDialog;
 import com.trolltech.qt.gui.QGraphicsItemInterface;
 import com.trolltech.qt.gui.QIcon;
 import com.trolltech.qt.gui.QKeySequence;
+import com.trolltech.qt.gui.QKeySequence.StandardKey;
 import com.trolltech.qt.gui.QLabel;
 import com.trolltech.qt.gui.QMainWindow;
 import com.trolltech.qt.gui.QMenu;
 import com.trolltech.qt.gui.QMessageBox;
 import com.trolltech.qt.gui.QPainter;
 import com.trolltech.qt.gui.QPrinter;
+import com.trolltech.qt.gui.QPrinter.OutputFormat;
+import com.trolltech.qt.gui.QPrinter.PageSize;
 import com.trolltech.qt.gui.QProgressDialog;
 import com.trolltech.qt.gui.QStatusBar;
 import com.trolltech.qt.gui.QTableWidget;
@@ -60,10 +64,6 @@ import com.trolltech.qt.gui.QTreeWidget;
 import com.trolltech.qt.gui.QTreeWidgetItem;
 import com.trolltech.qt.gui.QUndoStack;
 import com.trolltech.qt.gui.QWidget;
-import com.trolltech.qt.gui.QAbstractItemView.SelectionMode;
-import com.trolltech.qt.gui.QKeySequence.StandardKey;
-import com.trolltech.qt.gui.QPrinter.OutputFormat;
-import com.trolltech.qt.gui.QPrinter.PageSize;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
@@ -241,7 +241,7 @@ public class ModuleOptimizer extends QMainWindow {
     }
 
     private void updateUtilizationTable(Design d) {
-        HashMap<UtilizationType,Integer> map = DesignTools.calculateUtilization(d);
+        Map<UtilizationType, Integer> map = DesignTools.calculateUtilization(d);
 
         for (int i=0; i < UtilizationType.values.length; i++) {
             Integer count = map.get(UtilizationType.values[i]);

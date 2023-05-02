@@ -29,6 +29,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
@@ -36,12 +37,14 @@ import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -52,7 +55,7 @@ import java.util.stream.Collectors;
  * Enabling soft preserve allows preserved routing that may be the cause of any
  * unroutable connections to be ripped up and re-routed.
  */
-public class PartialRouter extends RWRoute{
+public class PartialRouter extends RWRoute {
 
     protected final boolean softPreserve;
 
@@ -98,8 +101,10 @@ public class PartialRouter extends RWRoute{
 
     @Override
     protected void preprocess() {
-        // Any preprocessing is expected to be performed manually and added to pinsToRoute
-        // ahead of constructing this PartialRouter class
+        // By default, preprocessing is expected to be performed manually and added to pinsToRoute
+        // ahead of constructing this PartialRouter class.
+        // Preprocessing can be invoked manually with RWRoute.preprocess(Design), as done by
+        // routeDesignWithUserDefinedArguments() which needs to infer pinsToRoute.
     }
 
     @Override
@@ -182,6 +187,56 @@ public class PartialRouter extends RWRoute{
             numCrossingSLRs += (!c.isCrossSLR() || (c.getSink().isRouted() && !c.isCongested())) ? 0 : 1;
         }
         return numCrossingSLRs;
+    }
+
+    @Override
+    protected void routeGlobalClkNets() {
+        if (clkNets.isEmpty())
+            return;
+
+        // In softPreserve mode, allow the clock router to all nets -- including those already
+        // preserved by another net
+        Predicate<Node> isPreservedNode = softPreserve ? (node) -> false
+                                                       : routingGraph::isPreserved;
+        routeGlobalClkNets(isPreservedNode);
+
+        if (softPreserve) {
+            // Even though routeGlobalClkNets() has called preserveNet() for all clkNets,
+            // it will not overwrite those nodes which have already been preserved by other
+            // nets.
+            // Discover such occurrences so that the entire 'other' net can be correctly
+            // unpreserved (thus re-routed) and re-preserve clk.
+            List<Net> unpreserveNets = new ArrayList<>();
+            for (Net clk : clkNets) {
+                for (PIP pip : clk.getPIPs()) {
+                    for (Node node : Arrays.asList(pip.getStartNode(), pip.getEndNode())) {
+                        Net preservedNet = routingGraph.getPreservedNet(node);
+                        if (preservedNet != clk) {
+                            if (preservedNet != null) {
+                                unpreserveNet(preservedNet);
+                                unpreserveNets.add(preservedNet);
+                            }
+                            // Redo preserving clk
+                            Net oldNet = routingGraph.preserve(node, clk);
+                            assert(oldNet == null);
+
+                            // Clear preservedNode's prev pointer so that it doesn't get misinterpreted
+                            // by RouteNodeGraph.mustInclude as being part of an existing route
+                            RouteNode rnode = routingGraph.getNode(node);
+                            assert(rnode.getPrev() != null);
+                            rnode.clearPrev();
+                        }
+                    }
+                }
+            }
+
+            if (!unpreserveNets.isEmpty()) {
+                System.out.println("INFO: Unpreserving " + unpreserveNets.size() + " nets due to clock congestion");
+                for (Net net : unpreserveNets) {
+                    System.out.println("\t" + net);
+                }
+            }
+        }
     }
 
     @Override
@@ -508,20 +563,63 @@ public class PartialRouter extends RWRoute{
         return false;
     }
 
-    private static Design routeDesign(Design design, RWRouteConfig config, Collection<SitePinInst> pinsToRoute) {
+    private static Design routeDesign(Design design, RWRouteConfig config, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         if (config.isMaskNodesCrossRCLK()) {
             System.out.println("WARNING: Masking nodes across RCLK for partial routing could result in routability problems.");
         }
 
-        return routeDesign(design, new PartialRouter(design, config, pinsToRoute));
+        return routeDesign(design, new PartialRouter(design, config, pinsToRoute, softPreserve));
+    }
+
+    /**
+     * Partially routes a {@link Design} instance; specifically, all nets with no routing PIPs already present.
+     * @param design The {@link Design} instance to be routed.
+     * @param args An array of string arguments, can be null.
+     * If null, the design will be routed in the full timing-driven routing mode with default a {@link RWRouteConfig} instance.
+     * For more options of the configuration, please refer to the {@link RWRouteConfig} class.
+     * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
+     * @return Routed design.
+     */
+    public static Design routeDesignWithUserDefinedArguments(Design design, String[] args, boolean softPreserve) {
+        RWRoute.preprocess(design);
+
+        List<SitePinInst> pinsToRoute = getUnroutedPins(design);
+
+        // Instantiates a RWRouteConfig Object and parses the arguments.
+        // Uses the default configuration if basic usage only.
+        return routeDesign(design, new RWRouteConfig(args), pinsToRoute, softPreserve);
+    }
+
+    /**
+     * Return all SitePinInst objects belonging to fully unrouted nets (containing no routing PIPs).
+     * @param design The {@link Design} instance to be examined.
+     * @return A list of unrouted SitePinInst objects.
+     */
+    private static List<SitePinInst> getUnroutedPins(Design design) {
+        List<SitePinInst> pinsToRoute = new ArrayList<>();
+        for (Net net : design.getNets()) {
+            if (net.getSource() == null && !net.isStaticNet()) {
+                // Source-less nets may exist since this is an out-of-context design
+                continue;
+            }
+            if (!net.hasPIPs()) {
+                pinsToRoute.addAll(net.getSinkPins());
+            }
+        }
+        return pinsToRoute;
     }
 
     /**
      * Routes a design in the partial non-timing-driven routing mode.
      * @param design The {@link Design} instance to be routed.
-     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed.
+     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all nets with no routing PIPs already present.
+     * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
      */
-    public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute) {
+    public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
+        if (pinsToRoute == null) {
+            pinsToRoute = getUnroutedPins(design);
+        }
+
         return routeDesign(design, new RWRouteConfig(new String[] {
                 "--fixBoundingBox",
                 // use U-turn nodes and no masking of nodes cross RCLK
@@ -530,15 +628,20 @@ public class PartialRouter extends RWRoute{
                 "--useUTurnNodes",
                 "--nonTimingDriven",
                 "--verbose"}),
-                pinsToRoute);
+                pinsToRoute, softPreserve);
     }
 
     /**
      * Routes a design in the partial timing-driven routing mode.
      * @param design The {@link Design} instance to be routed.
-     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed.
+     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all nets with no routing PIPs already present.
+     * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
      */
-    public static Design routeDesignPartialTimingDriven(Design design, Collection<SitePinInst> pinsToRoute) {
+    public static Design routeDesignPartialTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
+        if (pinsToRoute == null) {
+            pinsToRoute = getUnroutedPins(design);
+        }
+
         return routeDesign(design, new RWRouteConfig(new String[] {
                 "--fixBoundingBox",
                 // use U-turn nodes and no masking of nodes cross RCLK
@@ -546,6 +649,31 @@ public class PartialRouter extends RWRoute{
                 // Con: might result in delay optimism and a slight increase in runtime
                 "--useUTurnNodes",
                 "--verbose"}),
-                pinsToRoute);
+                pinsToRoute, softPreserve);
+    }
+
+    /**
+     * The main interface of {@link PartialRouter} that reads in a {@link Design} checkpoint,
+     * and parses the arguments for the {@link RWRouteConfig} object of the router.
+     * Specifically, all nets with no routing PIPs already present will be partially routed.
+     * @param args An array of strings that are used to create a {@link RWRouteConfig} object for the router.
+     */
+    public static void main(String[] args) {
+        if (args.length < 2) {
+            System.out.println("USAGE: <input.dcp> <output.dcp>");
+            return;
+        }
+        // Reads the output directory and set the output design checkpoint file name
+        String routedDCPfileName = args[1];
+
+        CodePerfTracker t = new CodePerfTracker("PartialRouter", true);
+
+        // Reads in a design checkpoint and routes it
+        String[] rwrouteArgs = Arrays.copyOfRange(args, 2, args.length);
+        Design routed = routeDesignWithUserDefinedArguments(Design.readCheckpoint(args[0]), rwrouteArgs);
+
+        // Writes out the routed design checkpoint
+        routed.writeCheckpoint(routedDCPfileName,t);
+        System.out.println("\nINFO: Write routed design\n " + routedDCPfileName + "\n");
     }
 }

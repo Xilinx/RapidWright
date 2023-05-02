@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -33,6 +33,8 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
+import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.device.SitePIP;
 import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
 import org.capnproto.ReaderOptions;
@@ -115,6 +117,8 @@ public class PhysNetlistReader {
         readRouting(physNetlist, design, allStrings);
 
         readDesignProperties(physNetlist, design, allStrings);
+
+        postProcess(design);
 
         return design;
     }
@@ -212,20 +216,21 @@ public class PhysNetlistReader {
                     } else {
                         cellInst = Design.createUnisimInst(null, cellName, unisim);
                     }
+                } else {
+                    assert(cellInst.getCellType().getName().equals(cellType));
                 }
-                if ((cellType != null && macroPrims.containsCell(cellType)) ||
-                        macroPrims.containsCell(cellInst.getCellType())) {
+                if (macroPrims.containsCell(cellType)) {
                     throw new RuntimeException("ERROR: Placement for macro primitive "
                             + cellInst.getCellType().getName() + " (instance "+cellName+") is "
                             + "invalid.  Please only provide placements for the macro's children "
                             + "leaf cells: " + cellInst.getCellType().getCellInsts() +".");
                 }
 
-                BEL bel = siteInst.getBEL(strings.get(placement.getBel()));
+                BEL bel = siteInst.getBEL(belName);
                 if (bel == null) {
                     throw new RuntimeException(
                           "ERROR: The placement specified on BEL " + site.getName() + "/"
-                          + strings.get(placement.getBel()) + " could not be found in the target "
+                          + belName + " could not be found in the target "
                           + "device.");
                 }
                 if (bel.getBELType().equals("HARD0") || bel.getBELType().equals("HARD1")) {
@@ -233,6 +238,13 @@ public class PhysNetlistReader {
                               "ERROR: The placement specified on BEL " + site.getName() + "/"
                             + bel.getName() + " is not valid. HARD0 and HARD1 BEL types do not "
                             + "require placed cells.");
+                }
+                Cell existingCell = siteInst.getCell(bel);
+                if (existingCell != null) {
+                    throw new RuntimeException(
+                            "ERROR: Cell \"" + cellName + "\" placement on BEL " + site.getName() + "/"
+                                    + belName + " conflicts with previously placed cell \"" + existingCell.getName()
+                                    + "\".");
                 }
                 Cell cell = new Cell(cellName, siteInst, bel);
                 cell.setBELFixed(placement.getIsBelFixed());
@@ -326,6 +338,10 @@ public class PhysNetlistReader {
                 }
                 //for (EDIFCellInst inst : cellType.getCellInsts()) { // TODO - Fix up loop list
                 for (String childName : childrenNames) {
+                    if (childName.equals("VCC") || childName.equals("GND")) {
+                        // Ignore VCC (e.g. from FDRS_1) and GND cells
+                        continue;
+                    }
                     String childCellName = parentHierName + EDIFTools.EDIF_HIER_SEP + childName;
                     Cell child = design.getCell(childCellName);
                     if (child == null) {
@@ -598,7 +614,7 @@ public class PhysNetlistReader {
                     EDIFCell parent = portInst.getParentCell();
                     if (parent != null) {
                         EDIFNet outerNet = parent.getInternalNet(portInst);
-                        if (outerNet != null) {
+                        if (outerNet != null && outerNet != net) {
                             netsToExpand.add(outerNet);
                         }
                     }
@@ -710,31 +726,35 @@ public class PhysNetlistReader {
 
         // Search the EDIFNetlist for sinks from VCC or GND nets.  Find the
         // EDIFPortInst sinks on those nets, and see if a physical net
-        // corrisponds to that cell pin.
+        // corresponds to that cell pin.
         //
         // If so, verify that the physical net is marked with either VCC or
         // GND.
         //
         // Note: Sink port instances on the VCC net may end up in the GND
-        // physical net, or vise versa. This can occur when a constant net is
+        // physical net, or vice versa. This can occur when a constant net is
         // run through a site local inverter.  Modelling these site local
         // inverters is not done here, hence why the requirement is only that
         // the net type be either VCC or GND.
         for (EDIFCellInst leafEdifCellInst : netlist.getAllLeafCellInstances()) {
             EDIFCell leafEdifCell = leafEdifCellInst.getCellType();
             String leafEdifCellName = leafEdifCell.getName();
-            EDIFCell parent = leafEdifCellInst.getParentCell();
 
+            EDIFPortInst portInst;
             if (leafEdifCellName.equals("VCC")) {
-                EDIFPortInst portInst = leafEdifCellInst.getPortInst("P");
-                EDIFNet net = portInst.getNet();
-                checkNetTypeFromCellNet(cellPinToPhysicalNet, net, strings);
+                portInst = leafEdifCellInst.getPortInst("P");
             } else if (leafEdifCellName.equals("GND")) {
-                EDIFPortInst portInst = leafEdifCellInst.getPortInst("G");
-                EDIFNet net = portInst.getNet();
-                checkNetTypeFromCellNet(cellPinToPhysicalNet, net, strings);
+                portInst = leafEdifCellInst.getPortInst("G");
             } else {
+                continue;
             }
+
+            if (portInst == null) {
+                // Cell must be unplaced and/or unconnected
+                continue;
+            }
+            EDIFNet net = portInst.getNet();
+            checkNetTypeFromCellNet(cellPinToPhysicalNet, net, strings);
         }
     }
 
@@ -779,6 +799,35 @@ public class PhysNetlistReader {
 
             }
         }
+    }
 
+    private static void postProcess(Design design) {
+        final Series series = design.getDevice().getSeries();
+
+        if (series == Series.UltraScalePlus || series == Series.UltraScale) {
+            // To be consistent with Vivado DCPs, remove all intra-site routing for
+            // SRST* pins tied to ground on these series of devices.
+            // (Note: this condition is necessary for {@link DesignTools#createCeSrRstPinsToVCC()})
+            String[] siteWires = new String[]{"RST_ABCDINV_OUT", "RST_EFGHINV_OUT"};
+            for (SiteInst si : design.getSiteInsts()) {
+                if (!Utils.isSLICE(si)) {
+                    continue;
+                }
+                for (String sw : siteWires) {
+                    Net net = si.getNetFromSiteWire(sw);
+                    if (net != null && net.getType() == NetType.GND) {
+                        BELPin belPin = si.getSiteWirePins(sw)[0];
+                        assert(belPin.isOutput());
+                        BEL bel = belPin.getBEL();
+                        assert(bel.getBELClass() == BELClass.RBEL);
+                        assert(bel.getInvertingPin() == bel.getNonInvertingPin());
+                        SitePIP sp = si.getSitePIP(belPin);
+                        Net inputNet = si.getNetFromSiteWire(sp.getInputPin().getSiteWireName());
+                        assert(inputNet == null || inputNet.isStaticNet());
+                        si.unrouteIntraSiteNet(sp.getInputPin(), sp.getOutputPin());
+                    }
+                }
+            }
+        }
     }
 }

@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -260,7 +260,12 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
         os.write(EXPORT_CONST_INDENT);
         os.write(EXPORT_CONST_PORT_BEGIN);
         if (width > 1) os.write(EXPORT_CONST_ARRAY_BEGIN);
-        exportEDIFName(os, cache);
+        if (isBus()) {
+            exportEDIFBusName(os, cache);
+        } else {
+            exportEDIFName(os, cache);
+        }
+
         if (width > 1) {
             os.write(' ');
             os.write(Integer.toString(width).getBytes(StandardCharsets.UTF_8));
@@ -276,6 +281,17 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
         }
         os.write(')');
         os.write('\n');
+    }
+
+    /**
+     * Writes out valid EDIF syntax the name and/or rename of this port to the
+     * provided output writer.
+     * 
+     * @param os The stream to export the EDIF syntax to.
+     * @throws IOException
+     */
+    public void exportEDIFBusName(OutputStream os, EDIFWriteLegalNameCache<?> cache) throws IOException {
+        exportSomeEDIFName(os, getName(), cache.getEDIFRename(busName));
     }
 
     /**

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -26,6 +26,8 @@ package com.xilinx.rapidwright.interchange;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 
+import java.util.Objects;
+
 public class SiteSitePIP {
     public Site site;
     public SitePIP sitePIP;
@@ -39,5 +41,28 @@ public class SiteSitePIP {
 
     public String toString() {
         return site.getName() + "/" + sitePIP.toString();
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(site, sitePIP, isFixed);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        SiteSitePIP other = (SiteSitePIP) obj;
+        if (!site.equals(other.site))
+            return false;
+        if (!sitePIP.equals(other.sitePIP))
+            return false;
+        if (isFixed != other.isFixed)
+            return false;
+        return true;
     }
 }

@@ -25,6 +25,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -33,6 +34,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
@@ -151,18 +153,22 @@ public class RWRoute{
     private Pair<Float, TimingVertex> maxDelayAndTimingVertex;
 
     /** A map storing routes from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
-    private Map<String, List<String>> routesToSinkINTTiles;
+    protected Map<String, List<String>> routesToSinkINTTiles;
 
     public RWRoute(Design design, RWRouteConfig config) {
         this.design = design;
         this.config = config;
     }
 
-    protected void preprocess() {
+    protected static void preprocess(Design design) {
         // Pre-processing of the design regarding physical net names pins
         DesignTools.makePhysNetNamesConsistent(design);
         DesignTools.createPossiblePinsToStaticNets(design);
         DesignTools.createMissingSitePinInsts(design);
+    }
+
+    protected void preprocess() {
+        preprocess(design);
     }
 
     protected void initialize() {
@@ -342,19 +348,26 @@ public class RWRoute{
      * TODO: fix the potential issue.
      */
     protected void routeGlobalClkNets() {
-         if (clkNets.size() > 0) System.out.println("INFO: Route clock nets");
-         for (Net clk : clkNets) {
-             if (routesToSinkINTTiles != null) {
-                 // routes clock nets with references of partial routes
+        if (clkNets.isEmpty())
+            return;
+        Predicate<Node> isPreservedNode = (node) -> false;
+        routeGlobalClkNets(isPreservedNode);
+    }
+
+    protected void routeGlobalClkNets(Predicate<Node> isPreservedNode) {
+        System.out.println("INFO: Route clock nets");
+        for (Net clk : clkNets) {
+            if (routesToSinkINTTiles != null) {
+                // routes clock nets with references of partial routes
                 System.out.println("INFO: Route with clock route and timing data");
-                GlobalSignalRouting.routeClkWithPartialRoutes(clk, routesToSinkINTTiles, design.getDevice());
-             } else {
-                 // routes clock nets from scratch
+                GlobalSignalRouting.routeClkWithPartialRoutes(clk, routesToSinkINTTiles, design.getDevice(), isPreservedNode);
+            } else {
+                // routes clock nets from scratch
                 System.out.println("INFO: Route with symmetric non-timing-driven clock router");
-                 GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice());
-             }
-             preserveNet(clk, false);
-         }
+                GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), isPreservedNode);
+            }
+            preserveNet(clk, false);
+        }
     }
 
     /**
@@ -371,7 +384,7 @@ public class RWRoute{
      * @param staticNet The static net in question, i.e. VCC or GND.
      */
     protected void addStaticNetRoutingTargets(Net staticNet) {
-        preserveNet(staticNet, false);
+        assert(!staticNet.hasPIPs());
 
         List<SitePinInst> sinks = staticNet.getSinkPins();
         if (sinks.size() > 0) {
@@ -394,7 +407,7 @@ public class RWRoute{
 
         for (List<SitePinInst> netRouteTargetPins : staticNetAndRoutingTargets.values()) {
             for (SitePinInst sink : netRouteTargetPins) {
-                routingGraph.unpreserve(sink.getConnectedNode());
+                assert(!routingGraph.isPreserved(sink.getConnectedNode()));
             }
         }
 
@@ -413,17 +426,20 @@ public class RWRoute{
             List<SitePinInst> pins = e.getValue();
             System.out.println("INFO: Route " + pins.size() + " pins of " + net);
             GlobalSignalRouting.routeStaticNet(net,
-                    // Predicate to determine whether a node is unavailable for global routing
+                    // Lambda to determine whether a node is (a) available for use,
+                    // (b) already in used for this static net, (c) unavailable
                     (node) -> {
                         Net preservedNet = routingGraph.getPreservedNet(node);
                         if (preservedNet != null) {
                             // If one is present, it is unavailable only if it isn't carrying
                             // the net undergoing routing
-                            return preservedNet != net;
+                            return preservedNet == net ? NodeStatus.INUSE
+                                    : NodeStatus.UNAVAILABLE;
                         }
                         // A RouteNode will only be created if the net is necessary for
                         // a to-be-routed connection
-                        return routingGraph.getNode(node) != null;
+                        return routingGraph.getNode(node) == null ? NodeStatus.AVAILABLE
+                                : NodeStatus.UNAVAILABLE;
                     },
                     design, routethruHelper);
 
@@ -476,6 +492,11 @@ public class RWRoute{
             } else {
                 Node sinkINTNode = nodes.get(0);
                 indirectConnections.add(connection);
+                Net oldNet = routingGraph.getPreservedNet(sinkINTNode);
+                if (oldNet != null && oldNet != net) {
+                    throw new RuntimeException("ERROR: Sink node " + sinkINTNode + " of net '" + net.getName() + "' is "
+                            + " preserved by net '" + oldNet.getName() + "'");
+                }
                 connection.setSinkRnode(getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I));
                 if (sourceINTRnode == null) {
                     Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
@@ -1752,10 +1773,8 @@ public class RWRoute{
 
     /**
      * The main interface of {@link RWRoute} that reads in a {@link Design} checkpoint,
-     * and parses the arguments for the {@link RWRouteConfig} Object of the router.
-     * It also instantiates a {@link RWRoute} Object or a {@link PartialRouter}
-     * based on the partialRouting parameter and calls the route method to route the design.
-     * @param args An array of strings that are used to create a {@link RWRouteConfig} Object for the router.
+     * and parses the arguments for the {@link RWRouteConfig} object of the router.
+     * @param args An array of strings that are used to create a {@link RWRouteConfig} object for the router.
      */
     public static void main(String[] args) {
         if (args.length < 2) {
@@ -1768,7 +1787,8 @@ public class RWRoute{
         CodePerfTracker t = new CodePerfTracker("RWRoute", true);
 
         // Reads in a design checkpoint and routes it
-        Design routed = RWRoute.routeDesignWithUserDefinedArguments(Design.readCheckpoint(args[0]), args);
+        String[] rwrouteArgs = Arrays.copyOfRange(args, 2, args.length);
+        Design routed = routeDesignWithUserDefinedArguments(Design.readCheckpoint(args[0]), rwrouteArgs);
 
         // Writes out the routed design checkpoint
         routed.writeCheckpoint(routedDCPfileName,t);

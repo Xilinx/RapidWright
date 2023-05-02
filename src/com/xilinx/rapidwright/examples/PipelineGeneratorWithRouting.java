@@ -159,15 +159,6 @@ public class PipelineGeneratorWithRouting {
                 (distanceY >= 0 ?""+distanceY : "neg"+ Math.abs(distanceY))+"_org"+
                 startingPoint+".txt";
 
-        File logFile = new File(filename);
-        PrintStream ps = null;
-        try {
-            ps = new PrintStream(logFile);
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-            return new PBlock();
-        }
-
         EDIFPort test = top.getPort("clk");
         boolean alreadyHasClk = test != null;
         if (!alreadyHasClk)
@@ -242,124 +233,129 @@ public class PipelineGeneratorWithRouting {
         Site prevSite = startingPoint;
         Site newSite = startingPoint;
 
-        // Note: the outer loop replicates flops for having multiple cycles
-        for (int j=0; j < depth; j++) {
+        try (PrintStream ps = new PrintStream(filename)) {
+            // Note: the outer loop replicates flops for having multiple cycles
+            for (int j = 0; j < depth; j++) {
 
-            int newSiteRow = newSite.getTile().getRow();
-            int newSiteCol = newSite.getTile().getColumn();
+                int newSiteRow = newSite.getTile().getRow();
+                int newSiteCol = newSite.getTile().getColumn();
 
-            int newDistanceX = distanceX;
-            int newDistanceY = distanceY;
+                int newDistanceX = distanceX;
+                int newDistanceY = distanceY;
 
-            if (j > 0) {
-                int tmpDistanceX = distanceX;
-                int tmpDistanceY = distanceY;
-                Tile testTile = null;
+                if (j > 0) {
+                    int tmpDistanceX = distanceX;
+                    int tmpDistanceY = distanceY;
+                    Tile testTile = null;
 
-                testTile = d.getDevice().getTile(newSiteRow-tmpDistanceY, newSiteCol+tmpDistanceX);
+                    testTile = d.getDevice().getTile(newSiteRow - tmpDistanceY, newSiteCol + tmpDistanceX);
 
-                boolean invalid = testTile.getSites().length == 0;
-                while (invalid) {
-                    if (distanceX >0)
-                        tmpDistanceX++;
-                    else
-                        tmpDistanceX--;
+                    boolean invalid = testTile.getSites().length == 0;
+                    while (invalid) {
+                        if (distanceX > 0)
+                            tmpDistanceX++;
+                        else
+                            tmpDistanceX--;
 
-                    testTile = d.getDevice().getTile(newSiteRow-tmpDistanceY, newSiteCol+tmpDistanceX);
+                        testTile = d.getDevice().getTile(newSiteRow - tmpDistanceY, newSiteCol + tmpDistanceX);
 
-                    // here we are checking that we are selecting a valid site type containing flops.
-                    invalid = testTile.getSites().length == 0;
-                    invalid = invalid || !(testTile.getSites()[0].isCompatibleSiteType(SiteTypeEnum.SLICEL) ||
-                                           testTile.getSites()[0].isCompatibleSiteType(SiteTypeEnum.SLICEM));
+                        // here we are checking that we are selecting a valid site type containing flops.
+                        invalid = testTile.getSites().length == 0;
+                        invalid = invalid || !(testTile.getSites()[0].isCompatibleSiteType(SiteTypeEnum.SLICEL) ||
+                                testTile.getSites()[0].isCompatibleSiteType(SiteTypeEnum.SLICEM));
 
-                    newDistanceX = tmpDistanceX;
-                    newDistanceY = tmpDistanceY;
+                        newDistanceX = tmpDistanceX;
+                        newDistanceY = tmpDistanceY;
+                    }
+                    newSite = testTile.getSites()[0];
+                    if (newDistanceX > distanceX) {
+                        ps.println("Info: please note the tile distance for row " + j +
+                                " was adjusted from " + distanceX + " to " + newDistanceX +
+                                " tiles from previous row.  This example did this to find the next "
+                                + "occurring slice.");
+                    }
+                    ps.println("Connecting prev<c" + prevSite.getTile().getColumn() +
+                            "r" + prevSite.getTile().getRow() + ">:" + prevSite.getSiteTypeEnum() +
+                            " with new<c" + newSite.getTile().getColumn() + "r" + newSite.getTile().getRow() +
+                            ">:" + newSite.getSiteTypeEnum());
                 }
-                newSite = testTile.getSites()[0];
-                if (newDistanceX > distanceX) {
-                    ps.println("Info: please note the tile distance for row "+j +
-                            " was adjusted from "+distanceX+" to "+newDistanceX+
-                            " tiles from previous row.  This example did this to find the next "
-                            + "occurring slice.");
-                }
-                ps.println("Connecting prev<c"+prevSite.getTile().getColumn()+
-                        "r"+prevSite.getTile().getRow()+">:"+prevSite.getSiteTypeEnum() +
-                        " with new<c"+newSite.getTile().getColumn()+"r"+newSite.getTile().getRow()+
-                        ">:"+newSite.getSiteTypeEnum());
-            }
-            prevSite = newSite;
+                prevSite = newSite;
 
-            // the inner for loop creates flops for one cycle, having the width of the bus
-            for (int i = width - 1; i >= 0; i--) {
-                EDIFNet inputNet = ic[j][i];
-                EDIFNet outputNet = ic[j + 1][i];
+                // the inner for loop creates flops for one cycle, having the width of the bus
+                for (int i = width - 1; i >= 0; i--) {
+                    EDIFNet inputNet = ic[j][i];
+                    EDIFNet outputNet = ic[j + 1][i];
 
-                // Note: as mentioned above, when we get the next "neighbor site", we pass it a dx
-                // and dy each time.
-                Site currSlice = prevSite.getNeighborSite(0, i / BITS_PER_CLE);
+                    // Note: as mentioned above, when we get the next "neighbor site", we pass it a dx
+                    // and dy each time.
+                    Site currSlice = prevSite.getNeighborSite(0, i / BITS_PER_CLE);
 
-                // Below is a check in case we have reached some site type that doesn't contain flops
-                int v = 0;
-                while (!currSlice.isCompatibleSiteType(SiteTypeEnum.SLICEL) &&
-                       !currSlice.isCompatibleSiteType(SiteTypeEnum.SLICEM)) {
-                    v++;
-                    int dy = (i+v) / BITS_PER_CLE;
-                    currSlice = prevSite.getNeighborSite(0, dy);
-                    if (currSlice == null) {
+                    // Below is a check in case we have reached some site type that doesn't contain flops
+                    int v = 0;
+                    while (!currSlice.isCompatibleSiteType(SiteTypeEnum.SLICEL) &&
+                            !currSlice.isCompatibleSiteType(SiteTypeEnum.SLICEM)) {
+                        v++;
+                        int dy = (i + v) / BITS_PER_CLE;
+                        currSlice = prevSite.getNeighborSite(0, dy);
+                        if (currSlice == null) {
                             ps.println("Unable to find a suitable site for placing flop "
                                     + "[" + j + "][" + i + "] " +
                                     "based on the current set of parameters with the starting "
                                     + "location: " + startingPoint.toString() + ".");
                             return new PBlock();
 
+                        }
+                    }
+                    used.add(currSlice);
+
+                    // Below picks the letter site containing pairs of flops.
+                    // The first flop is called "FF".  The second flop is called "FF2".
+                    String letter = Character.toString((char) ('A' + i % 8));
+                    BEL ff = currSlice.getBEL(letter + "FF");
+                    char[] letter_char = new char[1];
+                    letter.getChars(0, 1, letter_char, 0);
+                    boolean isFF2 = ff.getName().endsWith("2");
+                    boolean isLowerSlice = 'A' <= letter_char[0] && letter_char[0] <= 'D';
+                    String clkPinName = isLowerSlice ? "CLK1" : "CLK2";
+                    String rstPinName = isLowerSlice ? "SRST1" : "SRST2";
+                    String cePinName = "CKEN" + (isLowerSlice ? (isFF2 ? "2" : "1") : (isFF2 ? "4" : "3"));
+
+                    // note line below "places" the flop
+                    Cell ffCell = d.createAndPlaceCell(top, "d_" + j + "_" + i, Unisim.FDRE, currSlice, ff);
+                    ffs[j][i] = ffCell;
+
+                    ffCell.addProperty("INIT", "1'b0", EDIFValueType.STRING);
+                    SiteInst ff_si = ffCell.getSiteInst();
+
+                    // connect the flop I/O to the physical nets
+                    inputNet.createPortInst("D", ffCell);
+                    outputNet.createPortInst("Q", ffCell);
+
+                    if (i == 0) prevSite = currSlice;
+
+                    if (j == 0) inputNet.createPortInst(inputPort, (width - 1) - i);
+                    if (j == depth - 1) outputNet.createPortInst(outputPort, (width - 1) - i);
+
+                    clkNet.getLogicalNet().createPortInst("C", ffCell);
+                    rstNet.getLogicalNet().createPortInst("R", ffCell);
+                    ceNet.getLogicalNet().createPortInst("CE", ffCell);
+
+                    if (ff_si.getSitePinInst(clkPinName) == null) {
+                        clkNet.createPin(clkPinName, ff_si);
+                        ff_si.addSitePIP(clkPinName + "INV", "CLK");
+                    }
+                    if (ff_si.getSitePinInst(rstPinName) == null) {
+                        rstNet.createPin(rstPinName, ff_si);
+                        ff_si.addSitePIP("RST_" + (isLowerSlice ? "ABCD" : "EFGH") + "INV", "RST");
+                    }
+                    if (ff_si.getSitePinInst(cePinName) == null) {
+                        ceNet.createPin(cePinName, ff_si);
                     }
                 }
-                used.add(currSlice);
-
-                // Below picks the letter site containing pairs of flops.
-                // The first flop is called "FF".  The second flop is called "FF2".
-                String letter = Character.toString((char) ('A' + i % 8));
-                BEL ff = currSlice.getBEL(letter + "FF");
-                char[] letter_char = new char[1];
-                letter.getChars(0,1,letter_char,0);
-                boolean isFF2 = ff.getName().endsWith("2");
-                boolean isLowerSlice = 'A' <= letter_char[0] && letter_char[0] <= 'D';
-                String clkPinName = isLowerSlice ? "CLK1" : "CLK2";
-                String rstPinName = isLowerSlice ? "SRST1" : "SRST2";
-                String cePinName = "CKEN" + (isLowerSlice ? (isFF2 ? "2" : "1") : (isFF2 ? "4" : "3"));
-
-                // note line below "places" the flop
-                Cell ffCell = d.createAndPlaceCell(top, "d_" + j + "_" + i, Unisim.FDRE, currSlice, ff);
-                ffs[j][i] = ffCell;
-
-                ffCell.addProperty("INIT", "1'b0", EDIFValueType.STRING);
-                SiteInst ff_si = ffCell.getSiteInst();
-
-                // connect the flop I/O to the physical nets
-                inputNet.createPortInst("D", ffCell);
-                outputNet.createPortInst("Q", ffCell);
-
-                if (i ==0) prevSite = currSlice;
-
-                if (j==0) inputNet.createPortInst(inputPort, (width - 1) - i);
-                if (j==depth-1) outputNet.createPortInst(outputPort, (width - 1) - i);
-
-                clkNet.getLogicalNet().createPortInst("C", ffCell);
-                rstNet.getLogicalNet().createPortInst("R", ffCell);
-                ceNet.getLogicalNet().createPortInst("CE", ffCell);
-
-                if (ff_si.getSitePinInst(clkPinName) == null) {
-                    clkNet.createPin(clkPinName, ff_si);
-                    ff_si.addSitePIP(clkPinName + "INV","CLK");
-                }
-                if (ff_si.getSitePinInst(rstPinName) == null) {
-                    rstNet.createPin(rstPinName, ff_si);
-                    ff_si.addSitePIP("RST_"+(isLowerSlice ? "ABCD" : "EFGH")+"INV","RST");
-                }
-                if (ff_si.getSitePinInst(cePinName) == null) {
-                    ceNet.createPin(cePinName, ff_si);
-                }
             }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+            return new PBlock();
         }
 
         //
@@ -389,8 +385,15 @@ public class PipelineGeneratorWithRouting {
             TimingModel dm1 = tm.getTimingModel();
 
             for (Net n : d.getNets()) {
-                for (SitePinInst sink : n.getSinkPins()) {
-                    SitePinInst source = n.getSource();
+                SitePinInst source = n.getSource();
+                List<SitePinInst> sinkPins = n.getSinkPins();
+                if (source == null) {
+                    if (!sinkPins.isEmpty()) {
+                        System.err.println("Couldn't route net:" + n);
+                    }
+                    continue;
+                }
+                for (SitePinInst sink : sinkPins) {
                     /* Here is where we call our example findRoute router method */
                     List<PIP> pList = findRoute(source, sink, dm1);
                     if (pList != null)
@@ -536,11 +539,17 @@ public class PipelineGeneratorWithRouting {
                 }
                 result.addAll(tmpG.getPIPs());
             }
-
-            return result;
         } else {
-            return null;
+            result = null;
         }
+
+        queue = null;
+        visited = null;
+        delayCostTable = null;
+        prevG = null;
+        currG = null;
+
+        return result;
     }
 
 
@@ -793,11 +802,8 @@ public class PipelineGeneratorWithRouting {
 
         double clkPeriodConstraint = Math.pow(frequencyMHz, -1)*1000;
 
-        designName = "pipeline_"+width+"w_"+depth+"d_dx"+(distanceX >= 0 ? ""+distanceX : "neg"+distanceX)+
-                "_dy"+(distanceY >= 0 ? ""+distanceY : "neg"+distanceY)+"_org"+sliceSite;
+        designName = "pipeline";
         outputDCPFileName = System.getProperty("user.dir") + File.separator + designName +".dcp";
-        outputDCPFileName = System.getProperty("user.dir") + File.separator + "pipeline.dcp";
-
 
         // example code for command
         OptionParser p = new OptionParser() {{
@@ -935,7 +941,9 @@ public class PipelineGeneratorWithRouting {
 
         ///////////////////////
         t.stop();
-        d.writeCheckpoint(outputDCPFileName, t);
-        if (verbose1) System.out.println("Wrote final DCP: " + outputDCPFileName);
+        if (!outputDCPFileName.equals("/dev/null")) {
+            d.writeCheckpoint(outputDCPFileName, t);
+            if (verbose1) System.out.println("Wrote final DCP: " + outputDCPFileName);
+        }
     }
 }

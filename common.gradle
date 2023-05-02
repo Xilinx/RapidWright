@@ -30,6 +30,7 @@ ext.os = System.getProperty("os.name").toLowerCase().contains("windows") ?
                                        "win64-msvc2005x64" : "linux64-gcc"
 
 dependencies {
+  api 'com.github.luben:zstd-jni:1.5.5-1'
   api 'com.esotericsoftware:kryo:5.2.1'
   api 'org.jgrapht:jgrapht-core:1.3.0'
   api 'org.capnproto:runtime:0.1.13'
