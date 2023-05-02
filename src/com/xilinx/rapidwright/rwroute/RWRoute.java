@@ -27,6 +27,7 @@ package com.xilinx.rapidwright.rwroute;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -157,12 +158,10 @@ public class RWRoute{
     /** A map storing routes from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
     protected Map<String, List<String>> routesToSinkINTTiles;
 
-    public static final Set<Series> SUPPORTED_SERIES;
+    public static final EnumSet<Series> SUPPORTED_SERIES;
 
     static {
-        SUPPORTED_SERIES = new HashSet<>();
-        SUPPORTED_SERIES.add(Series.UltraScale);
-        SUPPORTED_SERIES.add(Series.UltraScalePlus);
+        SUPPORTED_SERIES = EnumSet.of(Series.UltraScale, Series.UltraScalePlus);
     }
 
     public RWRoute(Design design, RWRouteConfig config) {
