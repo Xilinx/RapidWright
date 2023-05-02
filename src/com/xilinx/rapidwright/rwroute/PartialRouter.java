@@ -577,6 +577,22 @@ public class PartialRouter extends RWRoute {
      * @param args An array of string arguments, can be null.
      * If null, the design will be routed in the full timing-driven routing mode with default a {@link RWRouteConfig} instance.
      * For more options of the configuration, please refer to the {@link RWRouteConfig} class.
+     * @return Routed design.
+     */
+    public static Design routeDesignWithUserDefinedArguments(Design design, String[] args) {
+        boolean softPreserve = false;
+
+        // Instantiates a RWRouteConfig Object and parses the arguments.
+        // Uses the default configuration if basic usage only.
+        return routeDesignWithUserDefinedArguments(design, args, softPreserve);
+    }
+
+    /**
+     * Partially routes a {@link Design} instance; specifically, all nets with no routing PIPs already present.
+     * @param design The {@link Design} instance to be routed.
+     * @param args An array of string arguments, can be null.
+     * If null, the design will be routed in the full timing-driven routing mode with default a {@link RWRouteConfig} instance.
+     * For more options of the configuration, please refer to the {@link RWRouteConfig} class.
      * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
      * @return Routed design.
      */
