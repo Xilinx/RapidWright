@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
@@ -347,19 +348,26 @@ public class RWRoute{
      * TODO: fix the potential issue.
      */
     protected void routeGlobalClkNets() {
-         if (clkNets.size() > 0) System.out.println("INFO: Route clock nets");
-         for (Net clk : clkNets) {
-             if (routesToSinkINTTiles != null) {
-                 // routes clock nets with references of partial routes
+        if (clkNets.isEmpty())
+            return;
+        Predicate<Node> isPreservedNode = (node) -> false;
+        routeGlobalClkNets(isPreservedNode);
+    }
+
+    protected void routeGlobalClkNets(Predicate<Node> isPreservedNode) {
+        System.out.println("INFO: Route clock nets");
+        for (Net clk : clkNets) {
+            if (routesToSinkINTTiles != null) {
+                // routes clock nets with references of partial routes
                 System.out.println("INFO: Route with clock route and timing data");
-                GlobalSignalRouting.routeClkWithPartialRoutes(clk, routesToSinkINTTiles, design.getDevice());
-             } else {
-                 // routes clock nets from scratch
+                GlobalSignalRouting.routeClkWithPartialRoutes(clk, routesToSinkINTTiles, design.getDevice(), isPreservedNode);
+            } else {
+                // routes clock nets from scratch
                 System.out.println("INFO: Route with symmetric non-timing-driven clock router");
-                 GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice());
-             }
-             preserveNet(clk, false);
-         }
+                GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), isPreservedNode);
+            }
+            preserveNet(clk, false);
+        }
     }
 
     /**
@@ -484,6 +492,11 @@ public class RWRoute{
             } else {
                 Node sinkINTNode = nodes.get(0);
                 indirectConnections.add(connection);
+                Net oldNet = routingGraph.getPreservedNet(sinkINTNode);
+                if (oldNet != null && oldNet != net) {
+                    throw new RuntimeException("ERROR: Sink node " + sinkINTNode + " of net '" + net.getName() + "' is "
+                            + " preserved by net '" + oldNet.getName() + "'");
+                }
                 connection.setSinkRnode(getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I));
                 if (sourceINTRnode == null) {
                     Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);

@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.ConstraintGroup;
@@ -390,7 +391,8 @@ public class SLRCrosserGenerator {
         UltraScaleClockRouting.routeDistributionToLCBs(clk, distLines, lcbMappings.keySet());
 
         // Route from each LCB to laguna sites
-        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);
+        Predicate<Node> isPreservedNode = (node) -> false;
+        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, isPreservedNode);
 
         // Update clocking delays to improve SLR crossing hold issues
         clk.improveSLRClockingDelay(txClkWire, rxClkWire);

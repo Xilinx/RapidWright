@@ -212,7 +212,8 @@ public class TestRWRoute {
 
         List<SitePinInst> pinsToRoute = new ArrayList<>();
         pinsToRoute.add(dstSpi);
-        PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute);
+        boolean softPreserve = false;
+        PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute, softPreserve);
 
         Assertions.assertTrue(pinsToRoute.stream().allMatch(SitePinInst::isRouted));
         Assertions.assertTrue(Long.valueOf(System.getProperty("rapidwright.rwroute.nodesPopped")) <= nodesPoppedLimit);
