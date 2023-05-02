@@ -153,7 +153,7 @@ public class RWRoute{
     private Pair<Float, TimingVertex> maxDelayAndTimingVertex;
 
     /** A map storing routes from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
-    private Map<String, List<String>> routesToSinkINTTiles;
+    protected Map<String, List<String>> routesToSinkINTTiles;
 
     public RWRoute(Design design, RWRouteConfig config) {
         this.design = design;
