@@ -183,17 +183,21 @@ public class TestNet {
         Net net = d.getVccNet();
         SiteInst si = d.createSiteInst("SLICE_X0Y0");
         SitePinInst spi = net.createPin("SRST1", si);
+        Assertions.assertEquals(net, spi.getNet());
         net.createPin("SRST2", si);
         RuntimeException ex = Assertions.assertThrows(RuntimeException.class, () -> net.createPin("SRST1", si));
         Assertions.assertEquals("ERROR: SiteInst placed at SLICE_X0Y0 already has a pin named SRST1", ex.getMessage());
 
         // Remove from net
         Assertions.assertTrue(net.removePin(spi));
+        Assertions.assertNull(spi.getNet());
         Assertions.assertEquals("ERROR: SiteInst placed at SLICE_X0Y0 already has a pin named SRST1", ex.getMessage());
 
         // Also remove from site inst
         Assertions.assertTrue(si.removePin(spi));
-        net.createPin("SRST1", si);
+        SitePinInst newSpi = net.createPin("SRST1", si);
+        Assertions.assertNotSame(newSpi, spi);
+        Assertions.assertEquals(net, newSpi.getNet());
     }
 
     @Test
