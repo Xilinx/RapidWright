@@ -34,6 +34,7 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -75,8 +76,12 @@ public class GlobalSignalRouting {
      * @param routesToSinkINTTiles A map storing routes from CLK_OUT to different INT tiles that
      * connect to sink pins of a global clock net.
      * @param device The target device needed to get routing path representation with nodes from names.
+     * @param isPreservedNode Predicate lambda for indicating whether a Node is preserved and cannot be used.
      */
-    public static void routeClkWithPartialRoutes(Net clk, Map<String, List<String>> routesToSinkINTTiles, Device device) {
+    public static void routeClkWithPartialRoutes(Net clk,
+                                                 Map<String, List<String>> routesToSinkINTTiles,
+                                                 Device device,
+                                                 Predicate<Node> isPreservedNode) {
         Map<String, List<Node>> dstINTtilePaths = getListOfNodesFromRoutes(device, routesToSinkINTTiles);
         // Not import path after HDSTR
         Set<PIP> clkPIPs = new HashSet<>();
@@ -96,7 +101,7 @@ public class GlobalSignalRouting {
         UltraScaleClockRouting.routeToLCBs(clk, getStartingPoint(horDistributionLines, device), lcbMappings.keySet());
 
         // route LCBs to sink pins
-        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);
+        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, isPreservedNode);
 
         Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
         clk.setPIPs(clkPIPsWithoutDuplication);
@@ -166,27 +171,28 @@ public class GlobalSignalRouting {
      * Routes a clock net by dividing the target clock regions into two groups and routes to the two groups with different centroid nodes.
      * @param clk The clock to be routed.
      * @param device The design device.
+     * @param isPreservedNode Predicate lambda for indicating whether a Node is preserved and cannot be used.
      */
-    public static void symmetricClkRouting(Net clk, Device device) {
+    public static void symmetricClkRouting(Net clk, Device device, Predicate<Node> isPreservedNode) {
         List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
         ClockRegion centroid = findCentroid(clk, device);
-        RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
-
-        RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
-
-        RouteNode vrouteUp = null;
-        RouteNode vrouteDown;
-        // Two VROUTEs going up and down
-        ClockRegion aboveCentroid = centroid.getNeighborClockRegion(1, 0);
-        if (aboveCentroid != null) {
-            vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
-        }
-        vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
 
         List<ClockRegion> upClockRegions = new ArrayList<>();
         List<ClockRegion> downClockRegions = new ArrayList<>();
         // divides clock regions into two groups
         divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
+
+        RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
+        RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
+
+        RouteNode vrouteUp = null;
+        RouteNode vrouteDown;
+        // Two VROUTEs going up and down
+        ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
+        if (aboveCentroid != null) {
+            vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
+        }
+        vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
 
         List<RouteNode> upDownDistLines = new ArrayList<>();
         if (aboveCentroid != null) {
@@ -200,7 +206,7 @@ public class GlobalSignalRouting {
         Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
         UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
 
-        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);
+        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, isPreservedNode);
 
         Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
         clk.setPIPs(clkPIPsWithoutDuplication);

@@ -2721,6 +2721,13 @@ public class DesignTools {
         }
     }
 
+    /**
+     * Make all of a Design's physical Net objects consistent with its logical (EDIF) netlist.
+     * Specifically, merge all sitewire and SitePinInst-s associated with physical Net-s that
+     * are not the parent/canonical logical net into the parent Net, and delete all
+     * non-parent Net-s.
+     * @param design Design object to be modified in-place.
+     */
     public static void makePhysNetNamesConsistent(Design design) {
         Map<EDIFHierNet, EDIFHierNet> netParentMap = design.getNetlist().getParentNetMap();
         EDIFNetlist netlist = design.getNetlist();
@@ -2749,7 +2756,7 @@ public class DesignTools {
                             si.routeIntraSiteNet(parentPhysNet, pins[0], pins[0]);
                         }
                     }
-                    design.removeNet(net);
+                    design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
                 } else if (!net.rename(parentHierNet.getHierarchicalNetName())) {
                     System.out.println("WARNING: Failed to adjust physical net name " + net.getName());
                 }

@@ -217,7 +217,10 @@ public class RouteNodeGraph {
         // No need to synchronize access to 'nets' since collisions are not expected
         Net[] nets = preservedMap.computeIfAbsent(tile, (t) -> new Net[t.getWireCount()]);
         Net oldNet = nets[wireIndex];
-        nets[wireIndex] = net;
+        // Do not clobber the old value
+        if (oldNet == null) {
+            nets[wireIndex] = net;
+        }
         return oldNet;
     }
 

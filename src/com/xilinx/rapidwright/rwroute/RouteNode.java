@@ -557,11 +557,18 @@ abstract public class RouteNode implements Comparable<RouteNode> {
 
     /**
      * Sets the parent RouteNode instance for routing a connection.
-     * @param prev The driving RouteNode instance to set.
+     * @param prev The driving RouteNode instance to set. Cannot be null.
      */
     public void setPrev(RouteNode prev) {
         assert(prev != null);
         this.prev = prev;
+    }
+
+    /**
+     * Clears the parent RouteNode instance.
+     */
+    public void clearPrev() {
+        this.prev = null;
     }
 
     /**
