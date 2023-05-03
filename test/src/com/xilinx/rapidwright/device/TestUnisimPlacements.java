@@ -22,9 +22,12 @@
 
 package com.xilinx.rapidwright.device;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -32,11 +35,30 @@ import com.xilinx.rapidwright.edif.EDIFCell;
 
 public class TestUnisimPlacements {
 
+    /**
+     * Set of unsupported unisim families (for now) in 2022.2.3. Hopefully will add
+     * support in 2023.1.0.
+     */
+    private static Set<FamilyType> unsupportedTypes = null;
+
+    static {
+        unsupportedTypes = new HashSet<>();
+        unsupportedTypes.add(FamilyType.ZYNQUPLUSRFSOC);
+        unsupportedTypes.add(FamilyType.QVIRTEXUPLUSHBM);
+        unsupportedTypes.add(FamilyType.QZYNQUPLUSRFSOC);
+        unsupportedTypes.add(FamilyType.VIRTEXUPLUSHBMES1);
+        unsupportedTypes.add(FamilyType.VIRTEXUPLUSHBM);
+        unsupportedTypes.add(FamilyType.VIRTEXUPLUS58G);
+    }
+
     @ParameterizedTest
-    @ValueSource(strings = { "VERSALPREMIUM", "ARTIX7", "ZYNQ", "ZYNQUPLUS", "VIRTEXU" })
-    public void testUnisimPlacements(String familyType) {
+    @EnumSource(FamilyType.class)
+    public void testUnisimPlacements(FamilyType familyType) {
+        if (unsupportedTypes.contains(familyType)) {
+            return;
+        }
         for (Part part : PartNameTools.getParts()) {
-            if (!part.getFamily().toString().equals(familyType))
+            if (part.getFamily() != familyType)
                 continue;
             Design des = new Design("top", part.getName());
             EDIFCell cell = Design.getPrimitivesLibrary(des.getDevice().getName()).getCell("FDRE");
