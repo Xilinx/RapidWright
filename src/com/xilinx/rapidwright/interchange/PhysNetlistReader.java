@@ -33,8 +33,6 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
-import com.xilinx.rapidwright.design.tools.LUTTools;
-import com.xilinx.rapidwright.device.Series;
 import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
 import org.capnproto.ReaderOptions;
