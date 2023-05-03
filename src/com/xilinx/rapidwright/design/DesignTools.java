@@ -2854,8 +2854,6 @@ public class DesignTools {
         for (Cell cell : design.getCells()) {
             if (isUnisimFlipFlopType(cell.getType())) {
                 SiteInst si = cell.getSiteInst();
-                if (si.getSiteName().equals("SLICE_X58Y149"))
-                    System.err.print("");
                 BEL bel = cell.getBEL();
                 Pair<String, String> sitePinNames = belSitePinNameMapping.get(bel.getBELType());
                 String[] pins = new String[] {"CE", "SR"};
