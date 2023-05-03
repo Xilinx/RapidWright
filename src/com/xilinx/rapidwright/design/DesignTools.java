@@ -37,6 +37,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -2844,16 +2845,24 @@ public class DesignTools {
      */
     public static void createCeSrRstPinsToVCC(Design design) {
         Net vcc = design.getVccNet();
+        Net gndInvertibleToVcc = null;
+        Series series = design.getDevice().getSeries();
+        // On these series of devices, SR can be inverted from gnd to vcc
+        if (EnumSet.of(Series.UltraScale, Series.UltraScalePlus).contains(series)) {
+            gndInvertibleToVcc = design.getGndNet();
+        }
         for (Cell cell : design.getCells()) {
             if (isUnisimFlipFlopType(cell.getType())) {
                 SiteInst si = cell.getSiteInst();
+                if (si.getSiteName().equals("SLICE_X58Y149"))
+                    System.err.print("");
                 BEL bel = cell.getBEL();
                 Pair<String, String> sitePinNames = belSitePinNameMapping.get(bel.getBELType());
                 String[] pins = new String[] {"CE", "SR"};
                 for (String pin : pins) {
                     BELPin belPin = cell.getBEL().getPin(pin);
                     Net net = si.getNetFromSiteWire(belPin.getSiteWireName());
-                    if (net == null) {
+                    if (net == null || (net == gndInvertibleToVcc && pin.equals("SR"))) {
                         String sitePinName;
                         if (pin.equals("CE")) { // CKEN
                             sitePinName = sitePinNames.getFirst();
