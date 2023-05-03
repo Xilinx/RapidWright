@@ -35,7 +35,6 @@ import java.util.Set;
 
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.Series;
-import com.xilinx.rapidwright.device.SitePIP;
 import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
 import org.capnproto.ReaderOptions;

@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import com.xilinx.rapidwright.device.Series;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -903,6 +904,48 @@ public class TestDesignTools {
                 break;
             default:
             }
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            // US+
+            Device.AWS_F1+",SLICE_X0Y0/AFF,SRST1,true",
+            Device.AWS_F1+",SLICE_X0Y0/AFF2,SRST1,false",
+            Device.AWS_F1+",SLICE_X1Y1/HFF,SRST2,true",
+            Device.AWS_F1+",SLICE_X1Y1/HFF2,SRST2,false",
+            // US
+            Device.KCU105+",SLICE_X0Y0/AFF,SRST_B1,true",
+            Device.KCU105+",SLICE_X0Y0/AFF2,SRST_B1,false",
+            Device.KCU105+",SLICE_X1Y1/HFF,SRST_B2,true",
+            Device.KCU105+",SLICE_X1Y1/HFF2,SRST_B2,false",
+            // Series7
+            Device.PYNQ_Z1+",SLICE_X0Y0/AFF,SR,true",
+            Device.PYNQ_Z1+",SLICE_X0Y0/A5FF,SR,false",
+            Device.PYNQ_Z1+",SLICE_X1Y1/DFF,SR,true",
+            Device.PYNQ_Z1+",SLICE_X1Y1/D5FF,SR,false",
+    })
+    public void testCreateCeSrRstPinsToVCC(String deviceName, String location, String sitePinName, boolean connectGnd) {
+        Design design = new Design("test", deviceName);
+        Cell c = design.createAndPlaceCell("ff", Unisim.FDRE, location);
+        BELPin sr = c.getBEL().getPin("SR");
+        SiteInst si = c.getSiteInst();
+        Assertions.assertNull(si.getNetFromSiteWire(sr.getSiteWireName()));
+        if (connectGnd) {
+            Net gnd = design.getGndNet();
+            Assertions.assertTrue(si.routeIntraSiteNet(gnd, sr, sr));
+        }
+
+        DesignTools.createCeSrRstPinsToVCC(design);
+
+        SitePinInst spi = si.getSitePinInst(sitePinName);
+        if (design.getDevice().getSeries() == Series.Series7) {
+            // Nothing done for Series7
+            Assertions.assertNull(spi);
+        } else {
+            Assertions.assertNotNull(spi);
+            Net vcc = design.getVccNet();
+            Assertions.assertEquals(vcc, spi.getNet());
         }
     }
 }
