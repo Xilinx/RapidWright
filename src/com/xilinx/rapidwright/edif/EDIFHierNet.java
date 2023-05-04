@@ -201,19 +201,29 @@ public class EDIFHierNet {
      * aliases.
      */
     public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins) {
-        return getLeafHierPortInsts(includeSourcePins, new HashSet<>());
+        return getLeafHierPortInsts(includeSourcePins, true);
+    }
+
+    public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins, boolean includeSinkPins) {
+        return getLeafHierPortInsts(includeSourcePins, includeSinkPins, new HashSet<>());
+    }
+
+    public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins, Set<EDIFHierNet> visited) {
+        return getLeafHierPortInsts(includeSourcePins, true, visited);
     }
 
     /**
      * Gets all connected leaf port instances on this hierarchical net and its aliases.
-     * @param includeSourcePins A flag to include source pins in the result.  Setting this to false
-     * only returns the sinks.
+     * @param includeSourcePins A flag to include source pins in the result.
+     * @param includeSinkPins A flag to include sink pins in the result.
      * @param visited An initial set of EDIFHierNet-s that have already been visited and will not
      * be visited again. Pre-populating this set can be useful for blocking traversal.
      * @return The list of all leaf cell port instances connected to this hierarchical net and its
      * aliases.
      */
-    public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins, Set<EDIFHierNet> visited) {
+    public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins, boolean includeSinkPins, Set<EDIFHierNet> visited) {
+        assert(includeSourcePins || includeSinkPins);
+
         List<EDIFHierPortInst> leafCellPins = new ArrayList<>();
         Queue<EDIFHierNet> queue = new ArrayDeque<>();
         queue.add(this);
@@ -229,7 +239,7 @@ public class EDIFHierNet {
 
                 boolean isCellPin = relP.getCellInst() != null && relP.getCellInst().getCellType().isLeafCellOrBlackBox();
                 if (isCellPin) {
-                    if (p.isInput() || (includeSourcePins && p.isOutput())) {
+                    if ((includeSinkPins && p.isInput()) || (includeSourcePins && p.isOutput())) {
                         leafCellPins.add(p);
                     }
                 }
