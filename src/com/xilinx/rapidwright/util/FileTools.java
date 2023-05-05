@@ -73,6 +73,7 @@ import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
 import org.apache.commons.io.input.ProxyInputStream;
+import org.python.util.PythonInterpreter;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
@@ -1135,9 +1136,25 @@ public class FileTools {
     }
 
     private static String _downloadDataFile(String url, String dstFileName) {
-        Installer.downloadFile(url, dstFileName);
+        long received = Installer.downloadFile(url, dstFileName);
+        if (received < 0) {
+            altDownloadFileMethod(url, dstFileName);
+        }
         String downloadedMD5 = Installer.calculateMD5OfFile(dstFileName);
         return downloadedMD5;
+    }
+
+    /**
+     * Attempts to download a file using Jython's interpreter and urllib
+     * 
+     * @param url         The URL to download
+     * @param dstFileName The destination file name
+     */
+    private static void altDownloadFileMethod(String url, String dstFileName) {
+        PythonInterpreter i = new PythonInterpreter();
+        i.exec("import urllib");
+        i.exec("urllib.urlretrieve('" + url + "','" + dstFileName + "')");
+        i.close();
     }
 
     /**
