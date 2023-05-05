@@ -1620,7 +1620,9 @@ public class EDIFNetlist extends EDIFName {
                                         expand = contained;
                                     } else {
                                         if (expand != contained) {
-                                            throw new RuntimeException();
+                                            throw new RuntimeException("ERROR: EDIFCellInst '" + inst + "' has conflicting IOSTANDARDs " +
+                                                    "propagated from multiple top-level nets. Consider uniquifying the EDIFNetlist to " +
+                                                    "enable correct macro expansion.");
                                         }
                                     }
                                 }
