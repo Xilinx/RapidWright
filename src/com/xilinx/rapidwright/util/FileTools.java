@@ -1127,7 +1127,7 @@ public class FileTools {
             System.err.println("WARNING: Download validation of file " + fileName + " failed.  Trying again...");
             downloadedMD5 = _downloadDataFile(url, dstFileName);
             if (!md5.equals(downloadedMD5)) {
-                throw new RuntimeException("ERROR: Failed to reliably download file: " + fileName);
+                throw new RuntimeException("ERROR: Failed to reliably download file: " + fileName + " from URL:" + url);
             }
         }
         FileTools.writeStringToTextFile(downloadedMD5, dstFileName + MD5_DATA_FILE_SUFFIX);
