@@ -181,7 +181,7 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
-     * Map that stores EDIFCellInst to a set of EDIFPropertyValue for non-default
+     * Map that stores EDIFCellInst to a set of EDIFPropertyValue-s for non-default
      * IOStandard values propagated from other parts of the netlist.
      * Anecdotally, it's been observed that Vivado propagates the IOStandard property
      * from the EDIFNet feeding a top-level output port to its driving EDIFCellInst
