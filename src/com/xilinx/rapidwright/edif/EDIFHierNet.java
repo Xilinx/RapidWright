@@ -246,7 +246,7 @@ public class EDIFHierNet {
      * aliases.
      */
     public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins, boolean includeSinkPins, Set<EDIFHierNet> visited) {
-        if (!includeSourcePins || !includeSinkPins) {
+        if (!includeSourcePins && !includeSinkPins) {
             return Collections.emptyList();
         }
 
