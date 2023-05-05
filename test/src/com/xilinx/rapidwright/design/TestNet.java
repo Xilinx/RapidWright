@@ -230,7 +230,7 @@ public class TestNet {
         SitePinInst spi3 = new SitePinInst(altPinName, si);
         Assertions.assertEquals(spi2, spi3);
 
-        Assertions.assertThrows(AssertionError.class, () -> net.setSource(spi3));
+        Assertions.assertThrows(RuntimeException.class, () -> net.setSource(spi3));
     }
 
     @Test
@@ -247,6 +247,6 @@ public class TestNet {
         net.setSource(spi1);
         Assertions.assertSame(spi1, net.getSource());
 
-        Assertions.assertThrows(AssertionError.class, () -> net.setAlternateSource(spi2));
+        Assertions.assertThrows(RuntimeException.class, () -> net.setAlternateSource(spi2));
     }
 }
