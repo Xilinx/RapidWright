@@ -203,7 +203,7 @@ public class TestNet {
         Assertions.assertEquals(!samePin, net.addPin(spi2));
 
         Assertions.assertSame(spi1, net.getSource());
-        if (altPinName.equals(pinName)) {
+        if (samePin) {
             Assertions.assertNull(net.getAlternateSource());
         } else {
             Assertions.assertSame(spi2, net.getAlternateSource());
