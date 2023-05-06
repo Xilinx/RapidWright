@@ -1851,11 +1851,8 @@ public class EDIFNetlist extends EDIFName {
                             continue;
                         }
                         EDIFHierNet ehn = new EDIFHierNet(topEhci, en);
-                        for (EDIFHierPortInst ehpi : ehn.getLeafHierPortInsts(true)) {
-                            if (!ehpi.isOutput()) {
-                                // Ignore other leaf sinks on this net
-                                continue;
-                            }
+                        for (EDIFHierPortInst ehpi : ehn.getLeafHierPortInsts(true, false)) {
+                            assert(ehpi.isOutput());
 
                             EDIFCellInst driverEci = ehpi.getPortInst().getCellInst();
                             EDIFCell driverParent = driverEci.getParentCell();
