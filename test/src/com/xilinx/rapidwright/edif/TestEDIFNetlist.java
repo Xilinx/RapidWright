@@ -368,7 +368,7 @@ class TestEDIFNetlist {
         EDIFNet net = top.createNet("O");
         new EDIFPortInst(port, net);
         new EDIFPortInst(obufds.getPort("O"), net, obufds);
-        Assertions.assertEquals(EDIFNetlist.DEFAULT_PROP_VALUE, netlist.getIOStandard(obufds));
+        Assertions.assertEquals("[string(DEFAULT)]", netlist.getIOStandards(obufds).toString());
 
         // Previous call to netlist.getIOStandard() will have initialized this map,
         // clear it here so that it gets re-initialized
@@ -376,11 +376,11 @@ class TestEDIFNetlist {
 
         // Test that top-level-port's connected net property is propagated
         net.addProperty(EDIFNetlist.IOSTANDARD_PROP, "LVDS");
-        Assertions.assertEquals("LVDS", netlist.getIOStandard(obufds).getValue());
+        Assertions.assertEquals("[string(LVDS)]", netlist.getIOStandards(obufds).toString());
 
         // Test that cell inst takes priority
         obufds.addProperty(EDIFNetlist.IOSTANDARD_PROP, "DIFF_SSTL12_DCI");
-        Assertions.assertEquals("DIFF_SSTL12_DCI", netlist.getIOStandard(obufds).getValue());
+        Assertions.assertEquals("[string(DIFF_SSTL12_DCI)]", netlist.getIOStandards(obufds).toString());
     }
 
     @ParameterizedTest
