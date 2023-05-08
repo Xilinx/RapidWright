@@ -23,18 +23,6 @@
 
 package com.xilinx.rapidwright.interchange;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-
-import org.capnproto.MessageReader;
-import org.capnproto.PrimitiveList;
-import org.capnproto.ReaderOptions;
-import org.capnproto.StructList;
-import org.capnproto.TextList;
-
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.PartNameTools;
@@ -56,46 +44,103 @@ import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Net;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Port;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PortInstance;
-import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PortInstance.BusIdx;
+import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
+import org.capnproto.MessageReader;
+import org.capnproto.PrimitiveList;
+import org.capnproto.ReaderOptions;
+import org.capnproto.StructList;
+import org.capnproto.TextList;
+
+import java.io.IOException;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.BiFunction;
+import java.util.function.Supplier;
 
 public class LogNetlistReader {
-    private Enumerator<String> allStrings;
-    private List<EDIFPort> allPorts;
-    private List<EDIFCell> allCells;
-    private List<EDIFCellInst> allInsts;
-    private Map<String, String> libraryRename;
+    private String[] allStrings;
+    private EDIFPort[] allPorts;
+    private EDIFCellInst[] allInsts;
+    protected EDIFCell[] allCells;
+    protected Map<Integer, Integer> libraryRename;
+
+    protected Map<Integer, EDIFLibrary> libraries;
+
+    protected EDIFNetlist n;
 
     public LogNetlistReader() {
-        allStrings = new Enumerator<>();
         libraryRename = Collections.emptyMap();
     }
 
     public LogNetlistReader(Enumerator<String> otherAllStrings) {
-        allStrings = otherAllStrings;
-        libraryRename = Collections.emptyMap();
+        this();
+        allStrings = new String[otherAllStrings.size()];
+        for (int i = 0; i < otherAllStrings.size(); i++) {
+            allStrings[i] = otherAllStrings.get(i);
+        }
     }
 
-    public LogNetlistReader(Enumerator<String> otherAllStrings, Map<String, String> libraryRename) {
-        allStrings = otherAllStrings;
-        this.libraryRename = libraryRename;
+    public LogNetlistReader(Enumerator<String> outsideAllStrings, Map<String, String> libraryRename) {
+        this(outsideAllStrings);
+        this.libraryRename = new HashMap<>();
+        for (Map.Entry<String, String> e : libraryRename.entrySet()) {
+            Integer keyIndex = outsideAllStrings.getIndex(e.getKey());
+            Integer valueIndex = outsideAllStrings.getIndex(e.getValue());
+            this.libraryRename.put(keyIndex, valueIndex);
+        }
+    }
+
+    protected void readAllStrings(TextList.Reader strListReader) {
+        allStrings = new String[strListReader.size()];
+        for (int i = 0; i < strListReader.size(); i++) {
+            allStrings[i] = strListReader.get(i).toString();
+        }
+    }
+
+    protected String getString(int i) {
+        return allStrings[i];
+    }
+
+    protected void readAllPorts(StructList.Reader<Port.Reader> portListReader) {
+        allPorts = new EDIFPort[portListReader.size()];
+        for (int i = 0; i < portListReader.size(); i++) {
+            allPorts[i] = readEDIFPort(portListReader.get(i));
+        }
+    }
+
+    protected EDIFPort getPort(int i) {
+        return allPorts[i];
+    }
+
+    protected void readAllInsts(StructList.Reader<Netlist.CellInstance.Reader> instListReader) {
+        allInsts = new EDIFCellInst[instListReader.size()];
+        for (int i = 0; i < instListReader.size(); i++) {
+            allInsts[i] = readEDIFCellInst(instListReader.get(i));
+        }
+    }
+
+    protected EDIFCellInst getInst(int i) {
+        return allInsts[i];
     }
 
     /**
      * Extracts the property map information from a Cap'n Proto reader object and deserializes it
      * into an EDIF property map object. The reverse function is
-     * {@link LogNetlistWriter#populatePropertyMap(PropertyMap.Builder, EDIFPropertyObject)}
+     * {@link LogNetlistWriter#populatePropertyMap(Supplier<PropertyMap.Builder>, EDIFPropertyObject)}
      * @param reader The Cap'n Proto reader object
      * @param obj The EDIF map object
      */
     private void extractPropertyMap(PropertyMap.Reader reader, EDIFPropertyObject obj) {
         StructList.Reader<PropertyMap.Entry.Reader> entries = reader.getEntries();
-        int count = entries.size();
-        for (int i=0; i < count; i++) {
+        for (int i=0; i < entries.size(); i++) {
             PropertyMap.Entry.Reader entryReader = entries.get(i);
-            String key = allStrings.get(entryReader.getKey());
+            String key = getString(entryReader.getKey());
             if (entryReader.isTextValue()) {
-                String textValue = allStrings.get(entryReader.getTextValue());
+                String textValue = getString(entryReader.getTextValue());
                 if (textValue.contains("\"")) {
                     throw new RuntimeException("ERROR: String '"+textValue+
                             "'\n\t value contains unescaped '\"' "
@@ -150,43 +195,50 @@ public class LogNetlistReader {
         }
     }
 
-    private void readEDIFCell(int cellIdx,
-                              StructList.Reader<Netlist.Cell.Reader> cellListReader,
-                              StructList.Reader<Netlist.CellInstance.Reader> instListReader) {
-        Cell.Reader cellReader = cellListReader.get(cellIdx);
+    protected void readEDIFCell(Cell.Reader cellReader) {
+        EDIFCell edifCell = allCells[cellReader.getIndex()];
+        assert(edifCell != null);
 
-        EDIFCell edifCell = allCells.get(cellReader.getIndex());
+        boolean deferSort = true;
 
         // Instances
         PrimitiveList.Int.Reader cellInstsReader = cellReader.getInsts();
         int instCount = cellInstsReader.size();
         for (int j=0; j < instCount; j++) {
-            readEDIFCellInst(cellInstsReader.get(j), edifCell, instListReader);
+            EDIFCellInst eci = getInst(cellInstsReader.get(j));
+            edifCell.addCellInst(eci);
+            eci.setParentCell(edifCell);
         }
 
         // Nets
         for (Net.Reader netReader : cellReader.getNets()) {
-            EDIFNet net = new EDIFNet(allStrings.get(netReader.getName()), edifCell);
-            extractPropertyMap(netReader.getPropMap(), net);
+            EDIFNet net = new EDIFNet(getString(netReader.getName()), edifCell);
+            if (netReader.hasPropMap()) {
+                extractPropertyMap(netReader.getPropMap(), net);
+            }
 
             for (PortInstance.Reader portInstReader : netReader.getPortInsts()) {
                 EDIFCellInst inst = null;
                 if (!portInstReader.isExtPort()) {
-                    inst = allInsts.get(portInstReader.getInst());
+                    inst = getInst(portInstReader.getInst());
                     if (inst == null) {
                         throw new RuntimeException("ERROR: EDIFCellInst should already have been read!");
                     }
                 }
 
-                EDIFPort port = allPorts.get(portInstReader.getPort());
+                EDIFPort port = getPort(portInstReader.getPort());
 
                 BusIdx.Reader portIdxReader = portInstReader.getBusIdx();
                 if (portIdxReader.isSingleBit()) {
-                    net.createPortInst(port, inst);
+                    net.createPortInst(port, inst, deferSort);
                 } else {
-                    net.createPortInst(port, portIdxReader.getIdx(), inst);
+                    net.createPortInst(port, portIdxReader.getIdx(), inst, deferSort);
                 }
             }
+        }
+
+        if (deferSort) {
+            edifCell.sortEDIFPortInstLists();
         }
 
         // Check if Unisim definitions match
@@ -212,56 +264,71 @@ public class LogNetlistReader {
         }
     }
 
-    private EDIFCellInst getInst(int instIdx) {
-        if (instIdx >= allInsts.size()) {
-            return null;
+    protected EDIFCellInst readEDIFCellInst(CellInstance.Reader instReader) {
+        String instName = getString(instReader.getName());
+
+        EDIFCell cell = allCells[instReader.getCell()];
+        assert(cell != null);
+
+        EDIFCell parent = null;
+        EDIFCellInst edifCellInst = new EDIFCellInst(instName, cell, parent);
+
+        String view = getString(instReader.getView());
+        if (!cell.getEDIFView().getName().equals(view)) {
+            edifCellInst.setViewref(new EDIFName(view));
         }
 
-        return allInsts.get(instIdx);
+        if (instReader.hasPropMap()) {
+            extractPropertyMap(instReader.getPropMap(), edifCellInst);
+        }
+
+        return edifCellInst;
     }
 
-    private void readEDIFCellInst(int instIdx, EDIFCell parent,
-                                  StructList.Reader<Netlist.CellInstance.Reader> instListReader) {
-        EDIFCellInst edifCellInst = getInst(instIdx);
-        if (edifCellInst != null) {
-            throw new RuntimeException("ERROR: Each EDIFCellInst should only be read once.");
+    private void readAllCellDecls(StructList.Reader<Netlist.CellDeclaration.Reader> cellDeclsReader) {
+        libraries = new HashMap<>();
+
+        allCells = createCells(cellDeclsReader);
+
+        for (Map.Entry<?,EDIFLibrary> e : libraries.entrySet()) {
+            n.addLibrary(e.getValue());
         }
+        libraries = null;
+    }
 
-        CellInstance.Reader instReader = instListReader.get(instIdx);
-        EDIFCell cell = allCells.get(instReader.getCell());
+    private void readAllCells(StructList.Reader<Netlist.Cell.Reader> cellsReader) {
+        for (int i = 0; i < cellsReader.size(); ++i) {
+            readEDIFCell(cellsReader.get(i));
+        }
+    }
 
-        String instName = allStrings.get(instReader.getName());
-        edifCellInst = new EDIFCellInst(instName, cell, parent);
-        edifCellInst.setViewref(new EDIFName(allStrings.get(instReader.getView())));
-
-        extractPropertyMap(instReader.getPropMap(), edifCellInst);
-
-        EDIFCellInst oldCellInst = allInsts.set(instIdx, edifCellInst);
-        assert(oldCellInst == null);
+    /**
+     * Reads Cap'n Proto serialized netlist into a RapidWright netlist in memory, with macros expanded.
+     * @param fileName Name of the serialized netlist file
+     * @return EDIFNetlist object in RapidWright framework
+     * @throws IOException
+     */
+    public static EDIFNetlist readLogNetlist(String fileName) throws IOException {
+        return readLogNetlist(fileName, true);
     }
 
     /**
      * Reads Cap'n Proto serialized netlist into a RapidWright netlist in memory
      * @param fileName Name of the serialized netlist file
-     * @return Netlist object in RapidWright framework
+     * @param expandMacros If true, expands the macros in the netlist before returning it to the caller.
+     * @return EDIFNetlist object in RapidWright framework
      * @throws IOException
      */
-    public static EDIFNetlist readLogNetlist(String fileName) throws IOException {
-        ReaderOptions readerOptions = new ReaderOptions(32L*1024L*1024L*1024L, 64);
+    public static EDIFNetlist readLogNetlist(String fileName, boolean expandMacros) throws IOException {
+        CodePerfTracker t = new CodePerfTracker("Read LogNetlist");
+
+        t.start("Read File");
+        ReaderOptions readerOptions = new ReaderOptions(32L * 1024L * 1024L * 1024L, 64);
         MessageReader readMsg = Interchange.readInterchangeFile(fileName, readerOptions);
-
         Netlist.Reader netlist = readMsg.getRoot(Netlist.factory);
-        return getLogNetlist(netlist);
-    }
+        t.stop();
 
-    private void readStrings(Netlist.Reader netlist) {
-        TextList.Reader strListReader = netlist.getStrList();
-        int strCount = strListReader.size();
-        allStrings.ensureCapacity(strCount);
-        for (int i=0; i < strCount; i++) {
-            String str = strListReader.get(i).toString();
-            allStrings.add(str);
-        }
+        return readLogNetlist(netlist, false, expandMacros, t);
     }
 
     private EDIFPort readEDIFPort(Port.Reader portReader) {
@@ -271,55 +338,56 @@ public class LogNetlistReader {
             int end = portReader.getBus().getBusEnd();
             width = Math.abs(start-end) + 1;
         }
-        String portBusName = allStrings.get(portReader.getName());
+        String portBusName = getString(portReader.getName());
         if (portReader.isBus()) {
             portBusName += "["+ portReader.getBus().getBusStart() +
                     ":" + portReader.getBus().getBusEnd() + "]";
         }
         EDIFPort edifPort = new EDIFPort(portBusName,
                                      getEDIFDirection(portReader), width);
-        extractPropertyMap(portReader.getPropMap(), edifPort);
+        if (portReader.hasPropMap()) {
+            extractPropertyMap(portReader.getPropMap(), edifPort);
+        }
         return edifPort;
     }
 
-    private void readPorts(Netlist.Reader netlist) {
-        StructList.Reader<Port.Reader> portReaderList = netlist.getPortList();
-        allPorts = new ArrayList<>(portReaderList.size());
-        for (int i = 0; i < portReaderList.size(); ++i) {
-            Port.Reader portReader = portReaderList.get(i);
-            allPorts.add(readEDIFPort(portReader));
-        }
-    }
+    protected EDIFCell[] createCells(StructList.Reader<Netlist.CellDeclaration.Reader> cellDeclsReader) {
+        EDIFCell[] cells = new EDIFCell[cellDeclsReader.size()];
 
-    private void createCells(EDIFNetlist n, Netlist.Reader netlist) {
-        StructList.Reader<Netlist.CellDeclaration.Reader> cellDeclsReader = netlist.getCellDecls();
-
-        allCells = new ArrayList<>(cellDeclsReader.size());
         for (int i = 0; i < cellDeclsReader.size(); ++i) {
             Netlist.CellDeclaration.Reader cellReader = cellDeclsReader.get(i);
-            String libraryName = allStrings.get(cellReader.getLib());
-            libraryName = libraryRename.getOrDefault(libraryName, libraryName);
-
-            EDIFLibrary library = n.getLibrary(libraryName);
-            if (library == null) {
-                library = new EDIFLibrary(libraryName);
-                n.addLibrary(library);
-            }
-
-            String cellName = allStrings.get(cellReader.getName());
-            EDIFCell cell = new EDIFCell(library, cellName);
-            extractPropertyMap(cellReader.getPropMap(), cell);
-            cell.setView(allStrings.get(cellReader.getView()));
-
-            allCells.add(cell);
-
-            PrimitiveList.Int.Reader ports = cellReader.getPorts();
-            int portCount = ports.size();
-            for (int j=0; j < portCount; j++) {
-                cell.addPort(allPorts.get(ports.get(j)));
-            }
+            cells[i] = createCell(cellReader, EDIFCell::new);
         }
-        assert(allCells.size() == cellDeclsReader.size());
+
+        return cells;
+    }
+
+    protected EDIFCell createCell(Netlist.CellDeclaration.Reader cellReader,
+                                BiFunction<EDIFLibrary,String,EDIFCell> createCell) {
+        EDIFLibrary library = getLibrary(cellReader.getLib());
+        String cellName = getString(cellReader.getName());
+
+        EDIFCell cell = createCell.apply(library, cellName);
+        if (cellReader.hasPropMap()) {
+            extractPropertyMap(cellReader.getPropMap(), cell);
+        }
+        cell.setView(getString(cellReader.getView()));
+
+        PrimitiveList.Int.Reader ports = cellReader.getPorts();
+        int portCount = ports.size();
+        for (int j=0; j < portCount; j++) {
+            cell.addPort(getPort(ports.get(j)));
+        }
+
+        return cell;
+    }
+
+    private EDIFLibrary getLibrary(Integer libraryIdx) {
+        libraryIdx = libraryRename.getOrDefault(libraryIdx, libraryIdx);
+        return libraries.computeIfAbsent(libraryIdx, (k) -> {
+            String libraryName = getString(k);
+            return new EDIFLibrary(libraryName);
+        });
     }
 
     /**
@@ -328,7 +396,7 @@ public class LogNetlistReader {
      * @param skipTopStuff If true, skips netlist design object
      * @return The logical netlist.
      */
-    public EDIFNetlist readLogNetlist(Netlist.Reader netlist, boolean skipTopStuff) {
+    public static EDIFNetlist readLogNetlist(Netlist.Reader netlist, boolean skipTopStuff) {
         return readLogNetlist(netlist, skipTopStuff, true);
     }
 
@@ -339,27 +407,50 @@ public class LogNetlistReader {
      * @param expandMacros If true, expands the macros in the netlist before returning it to the caller.
      * @return The logical netlist.
      */
-    public EDIFNetlist readLogNetlist(Netlist.Reader netlist, boolean skipTopStuff, boolean expandMacros) {
+    public static EDIFNetlist readLogNetlist(Netlist.Reader netlist, boolean skipTopStuff, boolean expandMacros) {
+        CodePerfTracker t = new CodePerfTracker("readLogNetlist");
+        return readLogNetlist(netlist, skipTopStuff, expandMacros, t);
+    }
+
+    /**
+     * Reads an Interchange netlist from Cap'n Proto reader.
+     * @param netlist The Cap'n Proto netlist reader
+     * @param skipTopStuff If true, skips netlist design object
+     * @param expandMacros If true, expands the macros in the netlist before returning it to the caller.
+     * @param t CodePerfTracker object.
+     * @return The logical netlist.
+     */
+    public static EDIFNetlist readLogNetlist(Netlist.Reader netlist, boolean skipTopStuff, boolean expandMacros, CodePerfTracker t) {
+        LogNetlistReader reader = new LogNetlistReader();
         EDIFNetlist n = new EDIFNetlist(netlist.getName().toString());
+        reader.n = n;
 
-        readPorts(netlist);
-        createCells(n, netlist);
+        t.start("Read Strings");
+        reader.readAllStrings(netlist.getStrList());
 
-        int cellCount = netlist.getCellList().size();
-        StructList.Reader<Netlist.Cell.Reader> cellListReader = netlist.getCellList();
-        StructList.Reader<Netlist.CellInstance.Reader> instListReader = netlist.getInstList();
-        allInsts = new ArrayList<>(Collections.nCopies(instListReader.size(), null));
-        for (int i=0; i < cellCount; i++) {
-            readEDIFCell(i, cellListReader, instListReader);
-        }
-        assert(allInsts.size() == instListReader.size());
+        t.stop().start("Read Ports");
+        reader.readAllPorts(netlist.getPortList());
+
+        t.stop().start("Read CellDecls");
+        reader.readAllCellDecls(netlist.getCellDecls());
+
+        t.stop().start("Read Insts");
+        reader.readAllInsts(netlist.getInstList());
+
+        t.stop().start("Read Cells");
+        reader.readAllCells(netlist.getCellList());
 
         if (!skipTopStuff) {
-            EDIFDesign design = new EDIFDesign(allCells.get(netlist.getTopInst().getCell()).getName());
-            design.setTopCell(allCells.get(netlist.getTopInst().getCell()));
+            t.stop().start("Populate Top");
+            EDIFDesign design = new EDIFDesign(reader.allCells[netlist.getTopInst().getCell()].getName());
+            design.setTopCell(reader.allCells[netlist.getTopInst().getCell()]);
             n.setDesign(design);
-            extractPropertyMap(netlist.getPropMap(), design);
+            if (netlist.hasPropMap()) {
+                reader.extractPropertyMap(netlist.getPropMap(), design);
+            }
         }
+
+        t.stop().start("Order Libraries");
 
         // Put libraries in proper export order
         List<EDIFLibrary> libs = n.getLibrariesInExportOrder();
@@ -369,24 +460,19 @@ public class LogNetlistReader {
         }
 
         if (expandMacros) {
+            t.stop().start("Expand Macros");
             String partName = EDIFTools.getPartName(n);
             if (partName != null) {
                 n.expandMacroUnisims(PartNameTools.getPart(partName).getSeries());
             } else {
                 System.err.println("WARNING: Could not determine target device from netlist.  Macro "
-                    + "unisims are not expanded.  Please add a top netlist property to indicate the "
-                    + "target part such as [part=xcvu095-ffva2104-2-e].  Macro expansion can also be"
-                    + " run manually with EDIFNetlist.expandMacroUnisims(Series)");
+                        + "unisims are not expanded.  Please add a top netlist property to indicate the "
+                        + "target part such as [part=xcvu095-ffva2104-2-e].  Macro expansion can also be"
+                        + " run manually with EDIFNetlist.expandMacroUnisims(Series)");
             }
         }
+        t.stop().printSummary();
 
         return n;
     }
-
-    public static EDIFNetlist getLogNetlist(Netlist.Reader netlist) {
-        LogNetlistReader reader = new LogNetlistReader();
-        reader.readStrings(netlist);
-        return reader.readLogNetlist(netlist, /*skipTopStuff=*/false);
-    }
-
 }

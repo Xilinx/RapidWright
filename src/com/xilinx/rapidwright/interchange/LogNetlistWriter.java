@@ -23,18 +23,6 @@
 
 package com.xilinx.rapidwright.interchange;
 
-import java.io.IOException;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Map.Entry;
-
-import org.capnproto.MessageBuilder;
-import org.capnproto.PrimitiveList;
-import org.capnproto.StructList;
-import org.capnproto.Text;
-import org.capnproto.TextList;
-import org.capnproto.Void;
-
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -54,6 +42,22 @@ import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Net;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Port;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PortInstance;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
+import org.capnproto.MessageBuilder;
+import org.capnproto.PrimitiveList;
+import org.capnproto.StructList;
+import org.capnproto.Text;
+import org.capnproto.TextList;
+import org.capnproto.Void;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public class LogNetlistWriter {
 
@@ -62,46 +66,64 @@ public class LogNetlistWriter {
     public static final String DEVICE_MACROS_LIB = "macros";
 
     LogNetlistWriter() {
-        allCells = new Enumerator<>();
-        allInsts = new Enumerator<>();
-        allPorts = new Enumerator<>();
-        allStrings = new Enumerator<>();
-        libraryRename = Collections.emptyMap();
+        this(null, null);
     }
 
     LogNetlistWriter(Enumerator<String> outsideAllStrings) {
-        allCells = new Enumerator<>();
-        allInsts = new Enumerator<>();
-        allPorts = new Enumerator<>();
-        allStrings = outsideAllStrings;
-        libraryRename = Collections.emptyMap();
+        this(outsideAllStrings, null);
     }
 
     LogNetlistWriter(Enumerator<String> outsideAllStrings, Map<String, String> libraryRename) {
         allCells = new Enumerator<>();
         allInsts = new Enumerator<>();
         allPorts = new Enumerator<>();
-        allStrings = outsideAllStrings;
-        this.libraryRename = libraryRename;
+        if (outsideAllStrings == null) {
+            allStrings = newEnumerator();
+        } else {
+            allStrings = outsideAllStrings;
+        }
+        Map<Integer, Integer> libraryIdxRename = new HashMap<>();
+        if (libraryRename != null) {
+            for (Map.Entry<String, String> e : libraryRename.entrySet()) {
+                Integer keyIndex = allStrings.getIndex(e.getValue());
+                Integer valueIndex = allStrings.getIndex(e.getValue());
+                libraryIdxRename.put(keyIndex, valueIndex);
+            }
+            this.libraryRename = Collections.unmodifiableMap(libraryIdxRename);
+        } else {
+            this.libraryRename = Collections.emptyMap();
+        }
     }
 
-    private Enumerator<EDIFCell> allCells;
-    private Enumerator<EDIFCellInst> allInsts;
-    private Enumerator<EDIFPort> allPorts;
-    private Enumerator<String> allStrings;
-    private Map<String, String> libraryRename;
+    protected Enumerator<String> newEnumerator() {
+        return new Enumerator<>();
+    }
+
+    protected final Enumerator<EDIFCell> allCells;
+    protected final Enumerator<EDIFCellInst> allInsts;
+    protected final Enumerator<EDIFPort> allPorts;
+    private final Enumerator<String> allStrings;
+    private final Map<Integer, Integer> libraryRename;
 
     /**
      * Takes an EDIF property map and serializes (writes) it using the Cap'n Proto schema.  The
      * opposite is {@link LogNetlistReader#extractPropertyMap(PropertyMap.Reader, EDIFPropertyObject)}
-     * @param builder The Cap'n Proto property map builder
+     * @param getBuilder Supplier lambda returning the Cap'n Proto property map builder.
+     *                   A lambda is used to avoid serializing an empty property map object when no
+     *                   EDIF properties exist as this still occupies space. In this case, it is
+     *                   better to not create the object to begin with.
      * @param obj The EDIF object that has a property map.
      */
-    private void populatePropertyMap(PropertyMap.Builder builder, EDIFPropertyObject obj) {
+    private void populatePropertyMap(Supplier<PropertyMap.Builder> getBuilder, EDIFPropertyObject obj) {
+        Map<String, EDIFPropertyValue> propMap = obj.getPropertiesMap();
+        if (propMap.isEmpty())
+            return;
+
+        PropertyMap.Builder builder = getBuilder.get();
         StructList.Builder<PropertyMap.Entry.Builder> entries =
-                builder.initEntries(obj.getPropertiesMap().size());
+                builder.initEntries(propMap.size());
         int i = 0;
-        for (Entry<String, EDIFPropertyValue> e : obj.getPropertiesMap().entrySet()) {
+        for (Entry<String, EDIFPropertyValue> e : propMap.entrySet()) {
             PropertyMap.Entry.Builder entry = entries.get(i);
             entry.setKey(allStrings.getIndex(e.getKey()));
             switch (e.getValue().getType()) {
@@ -123,7 +145,7 @@ public class LogNetlistWriter {
      * Gets the possibly-renamed name for a library
      * @param name The library name to map
      */
-    private String lookupLibName(String name) {
+    private int lookupLibName(int name) {
         return libraryRename.getOrDefault(name, name);
     }
 
@@ -132,11 +154,11 @@ public class LogNetlistWriter {
      * can be used for serialization.
      * @param n The current netlist to be serialized
      */
-    private void populateEnumerations(EDIFNetlist n) {
+    protected void populateEnumerations(EDIFNetlist n) {
         // Enumerate all cells, ports and instances to break cyclic reference dependency
         // in netlist description
-        for (EDIFLibrary lib : n.getLibrariesInExportOrder()) {
-            for (EDIFCell cell : lib.getValidCellExportOrder(false)) {
+        for (EDIFLibrary lib : n.getLibraries()) {
+            for (EDIFCell cell : lib.getCells()) {
                 allCells.addObject(cell);
                 for (EDIFPort port : cell.getPorts()) {
                     allPorts.addObject(port);
@@ -154,48 +176,72 @@ public class LogNetlistWriter {
      * @param n The RapidWright netlist (source)
      * @param netlist The Cap'n Proto netlist message (dest)
      */
-    private void writeTopNetlistStuffToNetlistBuilder(EDIFNetlist n, Netlist.Builder netlist) {
+    protected void writeTopNetlistStuffToNetlistBuilder(EDIFNetlist n, Netlist.Builder netlist) {
         netlist.setName(n.getName());
 
-        populatePropertyMap(netlist.getPropMap(), n.getDesign());
+        populatePropertyMap(netlist::getPropMap, n.getDesign());
 
         // Store top cell instance
         CellInstance.Builder topBuilder = netlist.initTopInst();
         topBuilder.setName(allStrings.getIndex(n.getTopCellInst().getName()));
-        topBuilder.setCell(allCells.getIndex(n.getTopCell()));
-        populatePropertyMap(topBuilder.getPropMap(), n.getTopCellInst());
+        topBuilder.setCell(allCells.maybeGetIndex(n.getTopCell()));
+        populatePropertyMap(topBuilder::getPropMap, n.getTopCellInst());
         topBuilder.setView(allStrings.getIndex(n.getTopCellInst().getViewref().getName()));
+    }
+
+    private void writeRangeCellDeclsToNetlistBuilder(Netlist.Builder netlist) {
+        writeRangeCellDeclsToNetlistBuilder(netlist, 0, allCells.size() - 1);
     }
 
     /**
      * Writes master list of all cell objects to the Cap'n Proto message netlist
      * @param netlist The netlist builder.
      */
-    private void writeAllCellsToNetlistBuilder(Netlist.Builder netlist) {
-        StructList.Builder<CellDeclaration.Builder> cellDeclsList = netlist.initCellDecls(allCells.size());
-        StructList.Builder<Cell.Builder> cellsList = netlist.initCellList(allCells.size());
+    private void writeRangeCellsToNetlistBuilder(Netlist.Builder netlist) {
+        writeRangeCellsToNetlistBuilder(netlist, 0, allCells.size() - 1);
+    }
 
-        int i = 0;
-        for (EDIFCell cell : allCells) {
-            CellDeclaration.Builder cellDeclBuilder = cellDeclsList.get(i);
-            cellDeclBuilder.setName(allStrings.getIndex(cell.getName()));
-            Cell.Builder cellBuilder = cellsList.get(i);
-            cellBuilder.setIndex(i);
-            populatePropertyMap(cellDeclBuilder.getPropMap(), cell);
+    protected void writeRangeCellDeclsToNetlistBuilder(Netlist.Builder netlist, int start, int end) {
+        StructList.Builder<CellDeclaration.Builder> cellDeclsList = netlist.initCellDecls(end - start + 1);
+
+        for (int i = start; i <= end; i++) {
+            EDIFCell cell = allCells.get(i);
+            CellDeclaration.Builder cellDeclBuilder = cellDeclsList.get(i - start);
+
+            int idx = allStrings.getIndex(cell.getName());
+
+            cellDeclBuilder.setName(idx);
+            populatePropertyMap(cellDeclBuilder::getPropMap, cell);
             cellDeclBuilder.setView(allStrings.getIndex(cell.getView()));
-            cellDeclBuilder.setLib(allStrings.getIndex(lookupLibName(cell.getLibrary().getName())));
+            int libIdx = allStrings.getIndex(cell.getLibrary().getName());
+            cellDeclBuilder.setLib(lookupLibName(libIdx));
+
+            PrimitiveList.Int.Builder ports = cellDeclBuilder.initPorts(cell.getPorts().size());
+            int j = 0;
+            for (EDIFPort port : cell.getPorts()) {
+                ports.set(j, allPorts.maybeGetIndex(port));
+                j++;
+            }
+        }
+    }
+
+    /**
+     * Writes master list of all cell objects to the Cap'n Proto message netlist
+     * @param netlist The netlist builder.
+     */
+    protected void writeRangeCellsToNetlistBuilder(Netlist.Builder netlist, int start, int end) {
+        StructList.Builder<Cell.Builder> cellsList = netlist.initCellList(end - start + 1);
+
+        for (int i = start; i <= end; i++) {
+            EDIFCell cell = allCells.get(i);
+
+            Cell.Builder cellBuilder = cellsList.get(i - start);
+            cellBuilder.setIndex(i);
 
             PrimitiveList.Int.Builder insts = cellBuilder.initInsts(cell.getCellInsts().size());
             int j = 0;
             for (EDIFCellInst inst : cell.getCellInsts()) {
-                insts.set(j, allInsts.getIndex(inst));
-                j++;
-            }
-
-            PrimitiveList.Int.Builder ports = cellDeclBuilder.initPorts(cell.getPorts().size());
-            j = 0;
-            for (EDIFPort port : cell.getPorts()) {
-                ports.set(j, allPorts.getIndex(port));
+                insts.set(j, allInsts.maybeGetIndex(inst));
                 j++;
             }
 
@@ -204,15 +250,15 @@ public class LogNetlistWriter {
             for (EDIFNet net : cell.getNets()) {
                 Net.Builder netBuilder = nets.get(j);
                 netBuilder.setName(allStrings.getIndex(net.getName()));
-                populatePropertyMap(netBuilder.getPropMap(), net);
+                populatePropertyMap(netBuilder::getPropMap, net);
                 StructList.Builder<PortInstance.Builder> portInsts = netBuilder
                         .initPortInsts(net.getPortInsts().size());
                 int k = 0;
                 for (EDIFPortInst portInst : net.getPortInsts()) {
                     PortInstance.Builder piBuilder = portInsts.get(k);
-                    piBuilder.setPort(allPorts.getIndex(portInst.getPort()));
+                    piBuilder.setPort(allPorts.maybeGetIndex(portInst.getPort()));
                     if (portInst.getCellInst() != null) {
-                        piBuilder.setInst(allInsts.getIndex(portInst.getCellInst()));
+                        piBuilder.setInst(allInsts.maybeGetIndex(portInst.getCellInst()));
                     } else {
                         piBuilder.setExtPort(Void.VOID);
                     }
@@ -223,19 +269,28 @@ public class LogNetlistWriter {
                 }
                 j++;
             }
-            i++;
         }
-
     }
 
-    private void writeAllPortsToNetlistBuilder(Netlist.Builder netlist) {
+    protected static void writeObjectToFile(String fileName, Consumer<Netlist.Builder> c) {
+        MessageBuilder message = new MessageBuilder();
+        Netlist.Builder netlist = message.initRoot(Netlist.factory);
+        c.accept(netlist);
+        try {
+            Interchange.writeInterchangeFile(fileName, message);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    protected void writeAllPortsToNetlistBuilder(Netlist.Builder netlist) {
         int i = 0;
         StructList.Builder<Port.Builder> portsList = netlist.initPortList(allPorts.size());
         for (EDIFPort port : allPorts) {
             Port.Builder portBuilder = portsList.get(i);
             portBuilder.setName(allStrings.getIndex(port.getBusName()));
             portBuilder.setDir(LogNetlistReader.getDirection(port));
-            populatePropertyMap(portBuilder.getPropMap(), port);
+            populatePropertyMap(portBuilder::getPropMap, port);
             if (port.isBus()) {
                 Bus.Builder bus = portBuilder.initBus();
                 bus.setBusStart(port.getLeft());
@@ -247,20 +302,23 @@ public class LogNetlistWriter {
         }
     }
 
-    private void writeAllInstsToNetlistBuilder(Netlist.Builder netlist) {
-        int i = 0;
-        StructList.Builder<CellInstance.Builder> cellInstsList = netlist.initInstList(allInsts.size());
-        for (EDIFCellInst inst : allInsts) {
+    protected void writeRangeInstsToNetlistBuilder(Netlist.Builder netlist) {
+        writeRangeInstsToNetlistBuilder(netlist, 0, allInsts.size());
+    }
+
+    protected void writeRangeInstsToNetlistBuilder(Netlist.Builder netlist, int start, int end) {
+        StructList.Builder<CellInstance.Builder> cellInstsList = netlist.initInstList(end - start);
+        for (int i = start; i < end; i++) {
+            EDIFCellInst inst = allInsts.get(i);
             CellInstance.Builder ciBuilder = cellInstsList.get(i);
             ciBuilder.setName(allStrings.getIndex(inst.getName()));
-            populatePropertyMap(ciBuilder.getPropMap(), inst);
-            ciBuilder.setCell(allCells.getIndex(inst.getCellType()));
+            populatePropertyMap(ciBuilder::getPropMap, inst);
+            ciBuilder.setCell(allCells.maybeGetIndex(inst.getCellType()));
             ciBuilder.setView(allStrings.getIndex(inst.getViewref().getName()));
-            i++;
         }
     }
 
-    private void writeAllStringsToNetlistBuilder(Netlist.Builder netlist) {
+    protected void writeAllStringsToNetlistBuilder(Netlist.Builder netlist) {
         int stringCount = allStrings.size();
         TextList.Builder strList = netlist.initStrList(stringCount);
         for (int i=0; i < stringCount; i++) {
@@ -287,6 +345,8 @@ public class LogNetlistWriter {
      * @throws IOException
      */
     public static void writeLogNetlist(EDIFNetlist n, String fileName, boolean collapseMacros) throws IOException {
+        CodePerfTracker t = new CodePerfTracker("Write LogNetlist");
+        t.start("Collapse Macros");
         if (collapseMacros) {
             Device device = n.getDevice();
             if (device != null) {
@@ -296,30 +356,38 @@ public class LogNetlistWriter {
                         + " could not be identified.");
             }
         }
-
+        t.stop().start("Initialize");
         MessageBuilder message = new MessageBuilder();
         Netlist.Builder netlist = message.initRoot(Netlist.factory);
-
         LogNetlistWriter writer = new LogNetlistWriter();
+        t.stop();
+        writer.populateNetlistBuilder(n, netlist, t);
+        t.start("Write Top");
         writer.writeTopNetlistStuffToNetlistBuilder(n, netlist);
-        writer.populateNetlistBuilder(n, netlist);
+        t.stop().start("Write Strings");
         writer.writeAllStringsToNetlistBuilder(netlist);
-
+        t.stop().start("Write File");
         Interchange.writeInterchangeFile(fileName, message);
+        t.stop().printSummary();
     }
 
     /**
-     * Helper method to populate the logical netlist object with an existing builder.
-     * @param n The EDIF Netlist to serialize
+     * Helper method to populate the logical netlist object with an existing
+     * builder.
+     *
+     * @param n       The EDIF Netlist to serialize
      * @param netlist The current builder object to receive the EDIF Netlist
      */
-    public void populateNetlistBuilder(EDIFNetlist n, Netlist.Builder netlist) {
+    public void populateNetlistBuilder(EDIFNetlist n, Netlist.Builder netlist, CodePerfTracker t) {
+        t.start("Populate Enums");
         populateEnumerations(n);
-
-        writeAllCellsToNetlistBuilder(netlist);
-
+        t.stop().start("Write Cells");
+        writeRangeCellDeclsToNetlistBuilder(netlist);
+        writeRangeCellsToNetlistBuilder(netlist);
+        t.stop().start("Write Ports");
         writeAllPortsToNetlistBuilder(netlist);
-
-        writeAllInstsToNetlistBuilder(netlist);
+        t.stop().start("Write Insts");
+        writeRangeInstsToNetlistBuilder(netlist);
+        t.stop();
     }
 }
