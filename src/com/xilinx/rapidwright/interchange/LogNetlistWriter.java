@@ -83,7 +83,7 @@ public class LogNetlistWriter {
         Map<Integer, Integer> libraryIdxRename = new HashMap<>();
         if (libraryRename != null) {
             for (Map.Entry<String, String> e : libraryRename.entrySet()) {
-                Integer keyIndex = allStrings.getIndex(e.getValue());
+                Integer keyIndex = allStrings.getIndex(e.getKey());
                 Integer valueIndex = allStrings.getIndex(e.getValue());
                 libraryIdxRename.put(keyIndex, valueIndex);
             }

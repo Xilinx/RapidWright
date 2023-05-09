@@ -95,6 +95,12 @@ public class LogNetlistReader {
     }
 
     protected void readAllStrings(TextList.Reader strListReader) {
+        if (strListReader.size() == 0) {
+            if (allStrings == null) {
+                System.err.println("WARNING: LogNetlistReader has no string data.");
+            }
+            return;
+        }
         allStrings = new String[strListReader.size()];
         for (int i = 0; i < strListReader.size(); i++) {
             allStrings[i] = strListReader.get(i).toString();
@@ -328,7 +334,8 @@ public class LogNetlistReader {
         Netlist.Reader netlist = readMsg.getRoot(Netlist.factory);
         t.stop();
 
-        return readLogNetlist(netlist, false, expandMacros, t);
+        LogNetlistReader reader = new LogNetlistReader();
+        return reader.readLogNetlist(netlist, false, expandMacros, t);
     }
 
     private EDIFPort readEDIFPort(Port.Reader portReader) {
@@ -396,7 +403,7 @@ public class LogNetlistReader {
      * @param skipTopStuff If true, skips netlist design object
      * @return The logical netlist.
      */
-    public static EDIFNetlist readLogNetlist(Netlist.Reader netlist, boolean skipTopStuff) {
+    public EDIFNetlist readLogNetlist(Netlist.Reader netlist, boolean skipTopStuff) {
         return readLogNetlist(netlist, skipTopStuff, true);
     }
 
@@ -407,7 +414,7 @@ public class LogNetlistReader {
      * @param expandMacros If true, expands the macros in the netlist before returning it to the caller.
      * @return The logical netlist.
      */
-    public static EDIFNetlist readLogNetlist(Netlist.Reader netlist, boolean skipTopStuff, boolean expandMacros) {
+    public EDIFNetlist readLogNetlist(Netlist.Reader netlist, boolean skipTopStuff, boolean expandMacros) {
         CodePerfTracker t = new CodePerfTracker("readLogNetlist");
         return readLogNetlist(netlist, skipTopStuff, expandMacros, t);
     }
@@ -420,33 +427,31 @@ public class LogNetlistReader {
      * @param t CodePerfTracker object.
      * @return The logical netlist.
      */
-    public static EDIFNetlist readLogNetlist(Netlist.Reader netlist, boolean skipTopStuff, boolean expandMacros, CodePerfTracker t) {
-        LogNetlistReader reader = new LogNetlistReader();
-        EDIFNetlist n = new EDIFNetlist(netlist.getName().toString());
-        reader.n = n;
+    public EDIFNetlist readLogNetlist(Netlist.Reader netlist, boolean skipTopStuff, boolean expandMacros, CodePerfTracker t) {
+        n = new EDIFNetlist(netlist.getName().toString());
 
         t.start("Read Strings");
-        reader.readAllStrings(netlist.getStrList());
+        readAllStrings(netlist.getStrList());
 
         t.stop().start("Read Ports");
-        reader.readAllPorts(netlist.getPortList());
+        readAllPorts(netlist.getPortList());
 
         t.stop().start("Read CellDecls");
-        reader.readAllCellDecls(netlist.getCellDecls());
+        readAllCellDecls(netlist.getCellDecls());
 
         t.stop().start("Read Insts");
-        reader.readAllInsts(netlist.getInstList());
+        readAllInsts(netlist.getInstList());
 
         t.stop().start("Read Cells");
-        reader.readAllCells(netlist.getCellList());
+        readAllCells(netlist.getCellList());
 
         if (!skipTopStuff) {
             t.stop().start("Populate Top");
-            EDIFDesign design = new EDIFDesign(reader.allCells[netlist.getTopInst().getCell()].getName());
-            design.setTopCell(reader.allCells[netlist.getTopInst().getCell()]);
+            EDIFDesign design = new EDIFDesign(allCells[netlist.getTopInst().getCell()].getName());
+            design.setTopCell(allCells[netlist.getTopInst().getCell()]);
             n.setDesign(design);
             if (netlist.hasPropMap()) {
-                reader.extractPropertyMap(netlist.getPropMap(), design);
+                extractPropertyMap(netlist.getPropMap(), design);
             }
         }
 
