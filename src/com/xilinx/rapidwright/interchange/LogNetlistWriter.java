@@ -51,12 +51,10 @@ import org.capnproto.TextList;
 import org.capnproto.Void;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 public class LogNetlistWriter {
@@ -150,7 +148,7 @@ public class LogNetlistWriter {
     }
 
     /**
-     * Enumerates all cells, ports and cell instances in the netlist so a integer lookup reference
+     * Enumerates all cells, ports and cell instances in the netlist so an integer lookup reference
      * can be used for serialization.
      * @param n The current netlist to be serialized
      */
@@ -189,7 +187,7 @@ public class LogNetlistWriter {
         topBuilder.setView(allStrings.getIndex(n.getTopCellInst().getViewref().getName()));
     }
 
-    private void writeRangeCellDeclsToNetlistBuilder(Netlist.Builder netlist) {
+    private void writeAllCellDeclsToNetlistBuilder(Netlist.Builder netlist) {
         writeRangeCellDeclsToNetlistBuilder(netlist, 0, allCells.size() - 1);
     }
 
@@ -197,7 +195,7 @@ public class LogNetlistWriter {
      * Writes master list of all cell objects to the Cap'n Proto message netlist
      * @param netlist The netlist builder.
      */
-    private void writeRangeCellsToNetlistBuilder(Netlist.Builder netlist) {
+    private void writeAllCellsToNetlistBuilder(Netlist.Builder netlist) {
         writeRangeCellsToNetlistBuilder(netlist, 0, allCells.size() - 1);
     }
 
@@ -272,17 +270,6 @@ public class LogNetlistWriter {
         }
     }
 
-    protected static void writeObjectToFile(String fileName, Consumer<Netlist.Builder> c) {
-        MessageBuilder message = new MessageBuilder();
-        Netlist.Builder netlist = message.initRoot(Netlist.factory);
-        c.accept(netlist);
-        try {
-            Interchange.writeInterchangeFile(fileName, message);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
     protected void writeAllPortsToNetlistBuilder(Netlist.Builder netlist) {
         int i = 0;
         StructList.Builder<Port.Builder> portsList = netlist.initPortList(allPorts.size());
@@ -302,13 +289,9 @@ public class LogNetlistWriter {
         }
     }
 
-    protected void writeRangeInstsToNetlistBuilder(Netlist.Builder netlist) {
-        writeRangeInstsToNetlistBuilder(netlist, 0, allInsts.size());
-    }
-
-    protected void writeRangeInstsToNetlistBuilder(Netlist.Builder netlist, int start, int end) {
-        StructList.Builder<CellInstance.Builder> cellInstsList = netlist.initInstList(end - start);
-        for (int i = start; i < end; i++) {
+    protected void writeAllInstsToNetlistBuilder(Netlist.Builder netlist) {
+        StructList.Builder<CellInstance.Builder> cellInstsList = netlist.initInstList(allInsts.size());
+        for (int i = 0; i < allInsts.size(); i++) {
             EDIFCellInst inst = allInsts.get(i);
             CellInstance.Builder ciBuilder = cellInstsList.get(i);
             ciBuilder.setName(allStrings.getIndex(inst.getName()));
@@ -382,12 +365,12 @@ public class LogNetlistWriter {
         t.start("Populate Enums");
         populateEnumerations(n);
         t.stop().start("Write Cells");
-        writeRangeCellDeclsToNetlistBuilder(netlist);
-        writeRangeCellsToNetlistBuilder(netlist);
+        writeAllCellDeclsToNetlistBuilder(netlist);
+        writeAllCellsToNetlistBuilder(netlist);
         t.stop().start("Write Ports");
         writeAllPortsToNetlistBuilder(netlist);
         t.stop().start("Write Insts");
-        writeRangeInstsToNetlistBuilder(netlist);
+        writeAllInstsToNetlistBuilder(netlist);
         t.stop();
     }
 }

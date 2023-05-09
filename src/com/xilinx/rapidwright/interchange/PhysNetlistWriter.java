@@ -94,6 +94,7 @@ public class PhysNetlistWriter {
     public static final String LOCKED = "<LOCKED>";
     public static final String PORT = "<PORT>";
 
+
     protected static void writeSiteInsts(PhysNetlist.Builder physNetlist, Design design,
                                          Enumerator<String> strings) {
         Builder<SiteInstance.Builder> siteInsts = physNetlist.initSiteInsts(design.getSiteInsts().size());
@@ -106,7 +107,7 @@ public class PhysNetlistWriter {
         }
     }
 
-    protected static String getUniqueLockedCellName(Cell cell, HashMap<String,PhysCellType> physCells) {
+    protected static String getUniqueLockedCellName(Cell cell, Map<String,PhysCellType> physCells) {
         String cellName = cell.getName();
         if (cellName.equals(LOCKED)) {
             cellName = cell.getSiteName() + "_" + cell.getBELName() + "_" + LOCKED;
@@ -123,10 +124,10 @@ public class PhysNetlistWriter {
     }
 
     public static void writePlacement(PhysNetlist.Builder physNetlist, Design design,
-            Enumerator<String> strings, Collection<SiteInst> siteInsts) {
-        HashMap<String,PhysCellType> physCells = new HashMap<>();
+                                      Enumerator<String> strings, Collection<SiteInst> siteInsts) {
+        Map<String,PhysCellType> physCells = new HashMap<>();
         ArrayList<Cell> allCells = new ArrayList<>();
-        HashMap<String,ArrayList<Cell>> multiBelCells = new HashMap<>();
+        Map<String,ArrayList<Cell>> multiBelCells = new HashMap<>();
         int i=0;
         for (SiteInst siteInst : siteInsts) {
             if (!siteInst.isPlaced()) continue;
@@ -509,7 +510,7 @@ public class PhysNetlistWriter {
     }
 
     public static void writeRouteBranch(RouteBranch.Builder srcBuilder, RouteBranchNode src,
-                                            Enumerator<String> strings) {
+                                        Enumerator<String> strings) {
         RouteSegment.Builder segment = srcBuilder.getRouteSegment();
         switch(src.getType()) {
             case PIP:{

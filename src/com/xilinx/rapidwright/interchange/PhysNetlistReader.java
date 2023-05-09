@@ -149,7 +149,6 @@ public class PhysNetlistReader {
         device = design.getDevice();
 
         t.stop().start("Read Strings");
-
         strings = readAllStrings(physNetlist);
 
         if (CHECK_CONSTANT_ROUTING_AND_NET_NAMING) {
@@ -481,30 +480,36 @@ public class PhysNetlistReader {
             addNetToDesign.accept(net);
 
             // Stub Nodes
-            StructList.Reader<PhysNode.Reader> stubNodes = netReader.getStubNodes();
-            int stubNodeCount = stubNodes.size();
-            for (int j=0; j < stubNodeCount; j++) {
-                PhysNode.Reader stubNodeReader = stubNodes.get(j);
-                Tile tile = getTile(stubNodeReader.getTile());
-                String wireName = strings.get(stubNodeReader.getWire());
-                Wire wire = new Wire(tile, wireName);
-                boolean added = stubWires.add(wire);
-                assert(added);
+            if (netReader.hasStubNodes()) {
+                StructList.Reader<PhysNode.Reader> stubNodes = netReader.getStubNodes();
+                int stubNodeCount = stubNodes.size();
+                for (int j = 0; j < stubNodeCount; j++) {
+                    PhysNode.Reader stubNodeReader = stubNodes.get(j);
+                    Tile tile = getTile(stubNodeReader.getTile());
+                    String wireName = strings.get(stubNodeReader.getWire());
+                    Wire wire = new Wire(tile, wireName);
+                    boolean added = stubWires.add(wire);
+                    assert (added);
+                }
             }
 
             // Sources
-            StructList.Reader<RouteBranch.Reader> routeSrcs = netReader.getSources();
-            int routeSrcsCount = routeSrcs.size();
-            for (int j=0; j < routeSrcsCount; j++) {
-                RouteBranch.Reader branchReader = routeSrcs.get(j);
-                readRouteBranch(stubWires, branchReader, net, null);
+            if (netReader.hasSources()) {
+                StructList.Reader<RouteBranch.Reader> routeSrcs = netReader.getSources();
+                int routeSrcsCount = routeSrcs.size();
+                for (int j = 0; j < routeSrcsCount; j++) {
+                    RouteBranch.Reader branchReader = routeSrcs.get(j);
+                    readRouteBranch(stubWires, branchReader, net, null);
+                }
             }
             // Stubs
-            StructList.Reader<RouteBranch.Reader> routeStubs = netReader.getStubs();
-            int routeStubsCount = routeStubs.size();
-            for (int j=0; j < routeStubsCount; j++) {
-                RouteBranch.Reader branchReader = routeStubs.get(j);
-                readRouteBranch(stubWires, branchReader, net, null);
+            if (netReader.hasStubs()) {
+                StructList.Reader<RouteBranch.Reader> routeStubs = netReader.getStubs();
+                int routeStubsCount = routeStubs.size();
+                for (int j=0; j < routeStubsCount; j++) {
+                    RouteBranch.Reader branchReader = routeStubs.get(j);
+                    readRouteBranch(stubWires, branchReader, net, null);
+                }
             }
 
             // Stub nodes that don't belong on a PIP
@@ -521,8 +526,14 @@ public class PhysNetlistReader {
                                  Net net,
                                  BELPin routeThruLutInput) {
         RouteBranch.RouteSegment.Reader segment = branchReader.getRouteSegment();
-        StructList.Reader<RouteBranch.Reader> branches = branchReader.getBranches();
-        int branchesCount = branches.size();
+        StructList.Reader<RouteBranch.Reader> branches = null;
+        int branchesCount;
+        if (branchReader.hasBranches()) {
+            branches = branchReader.getBranches();
+            branchesCount = branches.size();
+        } else {
+            branchesCount = 0;
+        }
         switch(segment.which()) {
             case PIP:{
                 PhysPIP.Reader pReader = segment.getPip();

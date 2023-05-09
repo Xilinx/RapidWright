@@ -134,7 +134,7 @@ public class LogNetlistReader {
      * @param reader The Cap'n Proto reader object
      * @param obj The EDIF map object
      */
-    private void extractPropertyMap(PropertyMap.Reader reader, EDIFPropertyObject obj) {
+    protected void extractPropertyMap(PropertyMap.Reader reader, EDIFPropertyObject obj) {
         StructList.Reader<PropertyMap.Entry.Reader> entries = reader.getEntries();
         for (int i=0; i < entries.size(); i++) {
             PropertyMap.Entry.Reader entryReader = entries.get(i);
@@ -182,7 +182,7 @@ public class LogNetlistReader {
      * @param port The Cap'n Proto Port Reader object with the direction reference of interest.
      * @return The corresponding EDIFDirection
      */
-    private static EDIFDirection getEDIFDirection(Port.Reader port) {
+    protected static EDIFDirection getEDIFDirection(Port.Reader port) {
         switch (port.getDir()) {
         case INPUT:
             return EDIFDirection.INPUT;
@@ -313,7 +313,7 @@ public class LogNetlistReader {
     }
 
     /**
-     * Reads Cap'n Proto serialized netlist into a RapidWright netlist in memory
+     * Reads Cap'n Proto serialized netlist into a RapidWright netlist in memory, with macros expanded.
      * @param fileName Name of the serialized netlist file
      * @param expandMacros If true, expands the macros in the netlist before returning it to the caller.
      * @return EDIFNetlist object in RapidWright framework
@@ -363,7 +363,7 @@ public class LogNetlistReader {
     }
 
     protected EDIFCell createCell(Netlist.CellDeclaration.Reader cellReader,
-                                BiFunction<EDIFLibrary,String,EDIFCell> createCell) {
+                                  BiFunction<EDIFLibrary,String,EDIFCell> createCell) {
         EDIFLibrary library = getLibrary(cellReader.getLib());
         String cellName = getString(cellReader.getName());
 
