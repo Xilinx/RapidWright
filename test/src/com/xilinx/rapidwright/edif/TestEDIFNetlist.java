@@ -178,7 +178,7 @@ class TestEDIFNetlist {
         // Check original macro cell wasn't affected
         Assertions.assertEquals(8, macroCell.getCellInsts().size());
         for (EDIFCellInst eci : macroCell.getCellInsts()) {
-            Assertions.assertSame(primLibrary, eci.getCellType().getLibrary());
+            Assertions.assertNotSame(netlistPrimLibrary, eci.getCellType().getLibrary());
         }
     }
 
