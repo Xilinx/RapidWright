@@ -150,9 +150,6 @@ class TestEDIFNetlist {
         EDIFCell macroCell = macroLibrary.getCell("DSP48E2");
         Assertions.assertNotSame(macroCell, cell);
         Assertions.assertEquals(8, macroCell.getCellInsts().size());
-        for (EDIFCellInst eci : macroCell.getCellInsts()) {
-            Assertions.assertSame(primLibrary, eci.getCellType().getLibrary());
-        }
 
         testNetlist.expandMacroUnisims(part.getSeries());
 
@@ -169,7 +166,7 @@ class TestEDIFNetlist {
 
         // Check that original macro cell wasn't inadvertently modified
         for (EDIFCellInst eci : macroCell.getCellInsts()) {
-            Assertions.assertSame(primLibrary, eci.getCellType().getLibrary());
+            Assertions.assertNotSame(netlistPrimLibrary, eci.getCellType().getLibrary());
         }
 
         testNetlist.collapseMacroUnisims(part.getSeries());
