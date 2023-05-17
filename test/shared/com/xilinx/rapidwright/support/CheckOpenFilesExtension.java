@@ -36,6 +36,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.extension.AfterTestExecutionCallback;
 import org.junit.jupiter.api.extension.BeforeTestExecutionCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -140,6 +141,9 @@ public class CheckOpenFilesExtension implements BeforeTestExecutionCallback, Aft
     public static class CheckOpenFilesWorkingExtension implements AfterTestExecutionCallback {
         @Override
         public void afterTestExecution(ExtensionContext context) {
+            // if "gradle" not in command line ignore this test
+            boolean gradleStart = ManagementFactory.getRuntimeMXBean().getInputArguments().stream().anyMatch(n -> n.contains("gradle"));
+            Assumptions.assumeTrue(gradleStart);
             assertExtensionInstalled(context);
         }
     }
