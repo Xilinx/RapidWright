@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -32,13 +32,17 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.extension.AfterTestExecutionCallback;
 import org.junit.jupiter.api.extension.BeforeTestExecutionCallback;
+import org.junit.jupiter.api.extension.ConditionEvaluationResult;
+import org.junit.jupiter.api.extension.ExecutionCondition;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.engine.config.JupiterConfiguration;
 
 /**
  * Check that a testcase does leak open files
@@ -137,10 +141,18 @@ public class CheckOpenFilesExtension implements BeforeTestExecutionCallback, Aft
         Assertions.assertNotNull(getBeforeList(extensionContext), "Open Files Checker Extension does not seem to be running");
     }
 
-    public static class CheckOpenFilesWorkingExtension implements AfterTestExecutionCallback {
+    public static class CheckOpenFilesWorkingExtension implements AfterTestExecutionCallback, ExecutionCondition {
         @Override
         public void afterTestExecution(ExtensionContext context) {
             assertExtensionInstalled(context);
+        }
+
+        @Override
+        public ConditionEvaluationResult evaluateExecutionCondition(ExtensionContext context) {
+            Optional<String> extensions = context.getConfigurationParameter(JupiterConfiguration.EXTENSIONS_AUTODETECTION_ENABLED_PROPERTY_NAME);
+            if ("true".equals(extensions.orElse("false")))
+                return ConditionEvaluationResult.enabled(JupiterConfiguration.EXTENSIONS_AUTODETECTION_ENABLED_PROPERTY_NAME + " == true");
+            return ConditionEvaluationResult.disabled(JupiterConfiguration.EXTENSIONS_AUTODETECTION_ENABLED_PROPERTY_NAME + " != true");
         }
     }
 }
