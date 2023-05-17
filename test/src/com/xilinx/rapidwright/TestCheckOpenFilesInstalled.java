@@ -39,6 +39,6 @@ public class TestCheckOpenFilesInstalled {
     }
 
     private boolean runningInGradle() {
-        return System.getProperties().keySet().toString().contains("gradle");
+        return System.getProperty("junit.jupiter.extensions.autodetection.enabled") != null;
     }
 }
