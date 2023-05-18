@@ -149,6 +149,9 @@ public class CheckOpenFilesExtension implements BeforeTestExecutionCallback, Aft
 
         @Override
         public ConditionEvaluationResult evaluateExecutionCondition(ExtensionContext context) {
+            // Only run this extension (used by TestCheckOpenFilesInstalled) when extensions
+            // are enabled which should be the case when invoked by through Gradle, but not
+            // necessarily through an IDE
             Optional<String> extensions = context.getConfigurationParameter(JupiterConfiguration.EXTENSIONS_AUTODETECTION_ENABLED_PROPERTY_NAME);
             if ("true".equals(extensions.orElse("false")))
                 return ConditionEvaluationResult.enabled(JupiterConfiguration.EXTENSIONS_AUTODETECTION_ENABLED_PROPERTY_NAME + " == true");
