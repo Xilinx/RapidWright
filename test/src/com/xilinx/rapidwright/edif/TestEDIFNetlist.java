@@ -134,11 +134,12 @@ class TestEDIFNetlist {
     @Test
     void testMacroExpansionInstanceTypes() {
         final Part part = PartNameTools.getPart(Device.AWS_F1);
-        Design testDesign = createSamplePrimitiveDesign("DSP48E2", part);
+        String macroName = "DSP48E2";
+        Design testDesign = createSamplePrimitiveDesign(macroName, part);
         EDIFNetlist testNetlist = testDesign.getNetlist();
         EDIFLibrary netlistPrimLibrary = testNetlist.getHDIPrimitivesLibrary();
 
-        EDIFCell cell = netlistPrimLibrary.getCell("DSP48E2");
+        EDIFCell cell = netlistPrimLibrary.getCell(macroName);
         Assertions.assertTrue(cell.getCellInsts().isEmpty());
 
         // Singleton libraries
@@ -147,7 +148,7 @@ class TestEDIFNetlist {
         // Netlist should have its own copy of the singleton library
         Assertions.assertNotSame(netlistPrimLibrary, primLibrary);
 
-        EDIFCell macroCell = macroLibrary.getCell("DSP48E2");
+        EDIFCell macroCell = macroLibrary.getCell(macroName);
         Assertions.assertNotSame(macroCell, cell);
         Assertions.assertEquals(8, macroCell.getCellInsts().size());
 
@@ -155,7 +156,7 @@ class TestEDIFNetlist {
 
         // Expanded cell must not be the same cell as before, and be a copy
         // of the macro library's cell
-        EDIFCell expandedCell = netlistPrimLibrary.getCell("DSP48E2");
+        EDIFCell expandedCell = netlistPrimLibrary.getCell(macroName);
         Assertions.assertNotSame(expandedCell, cell);
         Assertions.assertNotSame(expandedCell, macroCell);
         Assertions.assertEquals(8, expandedCell.getCellInsts().size());
@@ -171,7 +172,7 @@ class TestEDIFNetlist {
 
         testNetlist.collapseMacroUnisims(part.getSeries());
 
-        EDIFCell collapsedCell = netlistPrimLibrary.getCell("DSP48E2");
+        EDIFCell collapsedCell = netlistPrimLibrary.getCell(macroName);
         Assertions.assertNotSame(collapsedCell, cell);
         Assertions.assertTrue(collapsedCell.getCellInsts().isEmpty());
 
