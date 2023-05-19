@@ -39,7 +39,7 @@ import java.util.Objects;
  *
  * Created on: May 11, 2017
  */
-public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
+public class EDIFCellInst extends EDIFPropertyObject {
 
     private EDIFCell parentCell;
 
@@ -268,11 +268,6 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         } else {
             os.write(EXPORT_CONST_CLOSE_NO_PROPS);
         }
-    }
-
-    @Override
-    public String getUniqueKey() {
-        return getCellType().getUniqueKey() + "_" + getParentCell().getUniqueKey() + "_" + getName();
     }
 
     @Override
