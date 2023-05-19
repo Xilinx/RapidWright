@@ -259,7 +259,7 @@ public class EDIFNetlist extends EDIFName {
         if (cell == null) {
             cell = Design.getUnisimCell(unisim);
         }
-        return lib.addCell(cell);
+        return new EDIFCell(lib, cell, unisim.name());
     }
 
     public EDIFLibrary getWorkLibrary() {
