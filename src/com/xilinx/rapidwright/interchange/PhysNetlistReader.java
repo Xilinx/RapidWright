@@ -174,11 +174,6 @@ public class PhysNetlistReader {
         t.stop().start("Read Design Props");
         readDesignProperties(physNetlist);
 
-        t.stop().start("Post Process");
-        postProcess();
-
-        t.stop().printSummary();
-
         return design;
     }
 
@@ -944,36 +939,6 @@ public class PhysNetlistReader {
                     }
                 }
 
-            }
-        }
-    }
-
-    private void postProcess() {
-        final Series series = device.getSeries();
-
-        if (series == Series.UltraScalePlus || series == Series.UltraScale) {
-            // To be consistent with Vivado DCPs, remove all intra-site routing for
-            // SRST* pins tied to ground on these series of devices.
-            // (Note: this condition is necessary for {@link DesignTools#createCeSrRstPinsToVCC()})
-            String[] siteWires = new String[]{"RST_ABCDINV_OUT", "RST_EFGHINV_OUT"};
-            for (SiteInst si : design.getSiteInsts()) {
-                if (!Utils.isSLICE(si)) {
-                    continue;
-                }
-                for (String sw : siteWires) {
-                    Net net = si.getNetFromSiteWire(sw);
-                    if (net != null && net.getType() == NetType.GND) {
-                        BELPin belPin = si.getSiteWirePins(sw)[0];
-                        assert(belPin.isOutput());
-                        BEL bel = belPin.getBEL();
-                        assert(bel.getBELClass() == BELClass.RBEL);
-                        assert(bel.getInvertingPin() == bel.getNonInvertingPin());
-                        SitePIP sp = si.getSitePIP(belPin);
-                        Net inputNet = si.getNetFromSiteWire(sp.getInputPin().getSiteWireName());
-                        assert(inputNet == null || inputNet.isStaticNet());
-                        si.unrouteIntraSiteNet(sp.getInputPin(), sp.getOutputPin());
-                    }
-                }
             }
         }
     }
