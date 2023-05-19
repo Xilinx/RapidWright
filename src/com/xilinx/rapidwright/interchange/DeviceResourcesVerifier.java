@@ -93,7 +93,7 @@ import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
 import com.xilinx.rapidwright.util.Pair;
 
 public class DeviceResourcesVerifier {
-    private static Enumerator<String> allStrings;
+    private static StringEnumerator allStrings;
 
     private static boolean expect(boolean gold, boolean test) {
         if (gold != test) throw new RuntimeException("ERROR: Device mismatch: gold=" + gold
@@ -131,7 +131,7 @@ public class DeviceResourcesVerifier {
     }
 
     public static boolean verifyDeviceResources(String devResFileName, String deviceName) throws IOException {
-        allStrings = new Enumerator<String>();
+        allStrings = new StringEnumerator();
         verifiedSiteTypes = new HashSet<SiteTypeEnum>();
 
         Device device = Device.getDevice(deviceName);
@@ -833,7 +833,7 @@ public class DeviceResourcesVerifier {
         }
     }
 
-    static private void verifyParameterDefinitiosn(Enumerator<String> allStrings, DeviceResources.Device.Reader dReader, Design design) {
+    static private void verifyParameterDefinitiosn(StringEnumerator allStrings, DeviceResources.Device.Reader dReader, Design design) {
         EDIFLibrary prims = Design.getPrimitivesLibrary(design.getDevice().getName());
 
         Set<String> cellsWithParameters = new HashSet<String>();
@@ -908,7 +908,7 @@ public class DeviceResourcesVerifier {
         }
     }
 
-    static private void verifyCellBelPinMaps(Enumerator<String> allStrings, DeviceResources.Device.Reader dReader, Design design) {
+    static private void verifyCellBelPinMaps(StringEnumerator allStrings, DeviceResources.Device.Reader dReader, Design design) {
         EDIFLibrary prims = Design.getPrimitivesLibrary(design.getDevice().getName());
         EDIFLibrary library = new EDIFLibrary("work");
 
@@ -938,7 +938,7 @@ public class DeviceResourcesVerifier {
         }
     }
 
-    static private void verifyPackages(Enumerator<String> allStrings, DeviceResources.Device.Reader dReader, Device device) {
+    static private void verifyPackages(StringEnumerator allStrings, DeviceResources.Device.Reader dReader, Device device) {
         StructList.Reader<DeviceResources.Device.Package.Reader> packagesObj = dReader.getPackages();
         Set<String> packages = device.getPackages();
         expect(packages.size(), packagesObj.size());

@@ -25,32 +25,29 @@ package com.xilinx.rapidwright.interchange;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 
-import com.xilinx.rapidwright.edif.EDIFEnumerable;
-
-public class Enumerator<T> extends ArrayList<T> {
+public class StringEnumerator extends ArrayList<String> {
 
     private static final long serialVersionUID = 5235125492429382642L;
 
-    private HashMap<String, Integer> map = new HashMap<String, Integer>();
+    protected final Map<String, Integer> map;
 
-    private String getKey(T obj) {
-        String key = null;
-        if (obj instanceof EDIFEnumerable) {
-            key = ((EDIFEnumerable)obj).getUniqueKey();
-        } else {
-            key = obj.toString();
-        }
-        return key;
+    protected StringEnumerator(Map<String,Integer> map) {
+        this.map = map;
     }
 
-    public Integer maybeGetIndex(T obj) {
-        String key = getKey(obj);
+    public StringEnumerator() {
+        this(new HashMap<>());
+    }
+
+    public Integer maybeGetIndex(String obj) {
+        String key = obj;
         return map.get(key);
     }
 
-    public Integer getIndex(T obj) {
-        String key = getKey(obj);
+    public Integer getIndex(String obj) {
+        String key = obj;
         int size = map.size();
         Integer index = map.putIfAbsent(key, size);
         if (index == null) {
@@ -60,13 +57,13 @@ public class Enumerator<T> extends ArrayList<T> {
         return index;
     }
 
-    public void addObject(T obj) {
+    public void addObject(String obj) {
         getIndex(obj);
     }
 
-    public void update(T obj, int index) {
+    public void update(String obj, int index) {
         set(index, obj);
-        map.put(getKey(obj), index);
+        map.put(obj, index);
     }
 
     public void ensureSize(int size) {
@@ -76,8 +73,12 @@ public class Enumerator<T> extends ArrayList<T> {
         }
     }
 
+    public Map<String, Integer> getMap() {
+        return map;
+    }
+
     @Override
-    public T get(int index) {
+    public String get(int index) {
         if (size() -1 < index) return null;
         return super.get(index);
     }
@@ -88,3 +89,4 @@ public class Enumerator<T> extends ArrayList<T> {
         map.clear();
     }
 }
+

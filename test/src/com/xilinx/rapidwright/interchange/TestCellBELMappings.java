@@ -36,7 +36,7 @@ public class TestCellBELMappings {
 
     @Test
     public void testCellBELPinMappings() {
-        Enumerator<String> allStrings = new Enumerator<String>();
+        StringEnumerator allStrings = new StringEnumerator();
         MessageBuilder message = new MessageBuilder();
         Device device = Device.getDevice(TestDeviceResources.TEST_DEVICE);
         DeviceResources.Device.Builder devBuilder = message.initRoot(DeviceResources.Device.factory);
