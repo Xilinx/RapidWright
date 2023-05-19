@@ -487,7 +487,7 @@ class TestEDIFNetlist {
 
         EDIFCell top = netlist.getTopCell();
         EDIFPort port = top.createPort("O", EDIFDirection.OUTPUT, 1);
-        EDIFCellInst obufds = top.createChildCellInst("obuf", Design.getPrimitivesLibrary().getCell("OBUFDS"));
+        EDIFCellInst obufds = top.createChildCellInst("obuf", netlist.getHDIPrimitive(Unisim.OBUFDS));
         netlist.getHDIPrimitivesLibrary().addCell(obufds.getCellType());
         EDIFNet net = top.createNet("O");
         new EDIFPortInst(port, net);
