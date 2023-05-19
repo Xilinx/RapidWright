@@ -60,23 +60,23 @@ import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PortInstance.BusIdx;
 
 public class LogNetlistReader {
-    private Enumerator<String> allStrings;
+    private StringEnumerator allStrings;
     private List<EDIFPort> allPorts;
     private List<EDIFCell> allCells;
     private List<EDIFCellInst> allInsts;
     private Map<String, String> libraryRename;
 
     public LogNetlistReader() {
-        allStrings = new Enumerator<>();
+        allStrings = new StringEnumerator();
         libraryRename = Collections.emptyMap();
     }
 
-    public LogNetlistReader(Enumerator<String> otherAllStrings) {
+    public LogNetlistReader(StringEnumerator otherAllStrings) {
         allStrings = otherAllStrings;
         libraryRename = Collections.emptyMap();
     }
 
-    public LogNetlistReader(Enumerator<String> otherAllStrings, Map<String, String> libraryRename) {
+    public LogNetlistReader(StringEnumerator otherAllStrings, Map<String, String> libraryRename) {
         allStrings = otherAllStrings;
         this.libraryRename = libraryRename;
     }
