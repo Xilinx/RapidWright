@@ -32,11 +32,9 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
-import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
@@ -67,7 +65,6 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranc
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.RouteSegment;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.SiteInstance;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.util.Utils;
 import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
 import org.capnproto.ReaderOptions;
@@ -86,7 +83,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public class PhysNetlistReader {
@@ -119,7 +115,6 @@ public class PhysNetlistReader {
 
     protected final Design design;
     protected Device device;
-    protected final EDIFNetlist netlist;
 
     protected List<String> strings;
 
@@ -127,9 +122,11 @@ public class PhysNetlistReader {
 
     protected Map<Integer, Tile> tiles;
 
-    public PhysNetlistReader(EDIFNetlist netlist) {
-        this.netlist = netlist;
+    protected PIPCache pipCache;
 
+    protected BELPinCache belPinCache;
+
+    public PhysNetlistReader(EDIFNetlist netlist) {
         design = new Design();
         design.setNetlist(netlist);
     }
@@ -174,7 +171,13 @@ public class PhysNetlistReader {
         t.stop().start("Read Design Props");
         readDesignProperties(physNetlist);
 
+        t.stop().printSummary();
+
         return design;
+    }
+
+    public static Design readPhysNetlist(String physNetlistFileName) throws IOException {
+        return readPhysNetlist(physNetlistFileName, null);
     }
 
     public static Design readPhysNetlist(String physNetlistFileName, EDIFNetlist netlist) throws IOException {
@@ -211,12 +214,11 @@ public class PhysNetlistReader {
         int siteInstCount = siteInstsReader.size();
         if (siteInstCount == 0 && physNetlist.getPlacements().size() > 0) {
             System.out.println("WARNING: Missing SiteInst information in *.phys file.  RapidWright "
-
                     + "will attempt to infer the proper SiteInst, however, it is recommended that "
                     + "SiteInst information be specified to avoid SiteTypeEnum mismatch problems.");
         }
 
-        siteInsts = new ConcurrentHashMap<>(siteInstCount);
+        siteInsts = new HashMap<>(siteInstCount);
 
         for (int i=0; i < siteInstCount; i++) {
             SiteInstance.Reader r = siteInstsReader.get(i);
@@ -228,9 +230,9 @@ public class PhysNetlistReader {
     }
 
     protected void readPlacement(PhysNetlist.Reader physNetlist) {
-        Map<Integer, PhysCellType> physCells = new HashMap<>();
         StructList.Reader<PhysCell.Reader> physCellReaders = physNetlist.getPhysCells();
         int physCellCount = physCellReaders.size();
+        Map<Integer, PhysCellType> physCells = new HashMap<>(physCellCount);
         for (int i=0; i < physCellCount; i++) {
             PhysCell.Reader reader = physCellReaders.get(i);
             PhysCellType physType = reader.getPhysType();
@@ -242,13 +244,13 @@ public class PhysNetlistReader {
         int placementCount = placements.size();
         EDIFNetlist netlist = design.getNetlist();
         EDIFLibrary macroPrims = Design.getMacroPrimitives(device.getSeries());
+        Set<Integer> otherBELLocs = new HashSet<>();
         for (int i=0; i < placementCount; i++) {
             CellPlacement.Reader placement = placements.get(i);
             String cellName = strings.get(placement.getCellName());
             SiteInst siteInst = getSiteInst(placement.getSite());
             assert(siteInst != null);
             String belName = strings.get(placement.getBel());
-            Set<Integer> otherBELLocs = new HashSet<>();
             PhysCellType physType = physCells.get(placement.getCellName());
             if (physType == PhysCellType.LOCKED) {
                 siteInst.setSiteLocked(true);
@@ -274,6 +276,10 @@ public class PhysNetlistReader {
                 String cellType = strings.get(placement.getType());
 
                 if (CHECK_AND_CREATE_LOGICAL_CELL_IF_NOT_PRESENT) {
+                    if (netlist == null) {
+                        throw new RuntimeException("No EDIFNetlist supplied");
+                    }
+
                     EDIFCellInst cellInst = netlist.getCellInstFromHierName(cellName);
                     if (cellInst == null) {
                         Optional<Unisim> maybeUnisim = Enums.getIfPresent(Unisim.class, cellType);
@@ -455,15 +461,20 @@ public class PhysNetlistReader {
 
     private void readRouting(PhysNetlist.Reader physNetlist) {
         tiles = new HashMap<>();
+        pipCache = new PIPCache(new HashMap<>(), strings);
+        belPinCache = new BELPinCache(new HashMap<>(), strings);
+
+        StructList.Reader<PhysNetlist.PhysNet.Reader> nets = physNetlist.getPhysNets();
 
         // For single-threaded read, add net to design object immediately
-        readRouting(physNetlist, design::addNet);
+        readRouting(nets, design::addNet);
 
         tiles = null;
+        pipCache = null;
+        belPinCache = null;
     }
 
-    protected void readRouting(PhysNetlist.Reader physNetlist, Consumer<Net> addNetToDesign) {
-        StructList.Reader<PhysNet.Reader> nets = physNetlist.getPhysNets();
+    protected void readRouting(StructList.Reader<PhysNet.Reader> nets, Consumer<Net> addNetToDesign) {
         int netCount = nets.size();
         Set<Wire> stubWires = new HashSet<>();
         for (int i=0; i < netCount; i++) {
@@ -481,8 +492,8 @@ public class PhysNetlistReader {
                 for (int j = 0; j < stubNodeCount; j++) {
                     PhysNode.Reader stubNodeReader = stubNodes.get(j);
                     Tile tile = getTile(stubNodeReader.getTile());
-                    String wireName = strings.get(stubNodeReader.getWire());
-                    Wire wire = new Wire(tile, wireName);
+                    Integer wireIdx = getWireIndex(tile, stubNodeReader.getWire());
+                    Wire wire = new Wire(tile, wireIdx);
                     boolean added = stubWires.add(wire);
                     assert (added);
                 }
@@ -516,6 +527,29 @@ public class PhysNetlistReader {
         }
     }
 
+    protected void addBELPinToSiteInst(BELPin belPin, SiteInst siteInst, Net net) {
+        siteInst.routeIntraSiteNet(net, belPin, belPin);
+    }
+
+    protected void addCellToSiteInst(Cell cell) {
+        SiteInst siteInst = cell.getSiteInst();
+        siteInst.getCellMap().put(cell.getBELName(), cell);
+    }
+
+    protected void addSitePIPToSiteInst(SitePIP sitePIP, SiteInst siteInst) {
+        siteInst.addSitePIP(sitePIP);
+    }
+
+    protected SitePinInst createSitePin(int pinNameIdx, SiteInst siteInst, Net net) {
+        BELPin belPin = getBELPin(siteInst, pinNameIdx, pinNameIdx);
+        // An output BELPin is an input site pin
+        boolean outputPin = !belPin.isOutput();
+        String pinName = strings.get(pinNameIdx);
+        SitePinInst pin = new SitePinInst(outputPin, pinName, siteInst);
+        net.addPin(pin);
+        return pin;
+    }
+
     private void readRouteBranch(Set<Wire> stubWires,
                                  RouteBranch.Reader branchReader,
                                  Net net,
@@ -539,19 +573,7 @@ public class PhysNetlistReader {
                     throw new RuntimeException("ERROR: Tile " + strings.get(pReader.getTile()) + " for pip from wire " + wire0 + " to wire " + wire1 + " not found.");
                 }
 
-                Integer wire0Idx = getWireIndex(tile, pReader.getWire0());
-                if (wire0Idx == null) {
-                    String wire0 = strings.get(pReader.getWire0());
-                    throw new RuntimeException("ERROR: Wire0 " + wire0 + " in tile " + tile + " not found.");
-                }
-
-                Integer wire1Idx = getWireIndex(tile, pReader.getWire1());
-                if (wire1Idx == null) {
-                    String wire1 = strings.get(pReader.getWire1());
-                    throw new RuntimeException("ERROR: Wire1 " + wire1 + " in tile " + tile + " not found.");
-                }
-
-                PIP pip = tile.getPIP(wire0Idx, wire1Idx);
+                PIP pip = getPIP(tile, pReader.getWire0(), pReader.getWire1());
                 pip.setIsPIPFixed(pReader.getIsFixed());
                 pip.setIsReversed(!pReader.getForward());
 
@@ -565,25 +587,19 @@ public class PhysNetlistReader {
             case BEL_PIN:{
                 PhysBelPin.Reader bpReader = segment.getBelPin();
                 SiteInst siteInst = getPlacedSiteInst(bpReader.getSite());
-                String belName = strings.get(bpReader.getBel());
-                BEL bel = siteInst.getBEL(belName);
-                if (bel == null) {
-                    throw new RuntimeException(String.format("ERROR: Failed to get BEL %s", belName));
-                }
-                String belPinName = strings.get(bpReader.getPin());
-                BELPin belPin = bel.getPin(belPinName);
-                if (belPin == null) {
-                    throw new RuntimeException(String.format("ERROR: Failed to get BEL pin %s/%s", belName, belPinName));
-                }
+                BELPin belPin = getBELPin(siteInst, bpReader.getBel(), bpReader.getPin());
 
                 // Examine LUT input pins only
                 if (belPin.isInput()) {
+                    BEL bel = belPin.getBEL();
                     if (bel.isLUT()) {
                         // If this route branch terminates here ...
                         if (branchesCount == 0) {
                             // ... and it routed through a LUT along the way
                             if (routeThruLutInput != null) {
                                 // Check that a routethru cell exists
+
+                                String belPinName = belPin.getName();
 
                                 Cell belCell = siteInst.getCell(bel);
                                 Cell routeThruCell = siteInst.getCell(routeThruLutInput.getBEL());
@@ -600,10 +616,7 @@ public class PhysNetlistReader {
                                     routeThruCell.setRoutethru(true);
                                     routeThruCell.setType(belCell.getType());
                                     routeThruCell.setSiteInst(siteInst);
-                                    Map<String, Cell> cellMap = siteInst.getCellMap();
-                                    synchronized (siteInst) {
-                                        cellMap.put(routeThruLutInput.getBELName(), routeThruCell);
-                                    }
+                                    addCellToSiteInst(routeThruCell);
                                     routeThruCell.addPinMapping(routeThruLutInput.getName(), belCell.getLogicalPinMapping(belPinName));
                                 }
 
@@ -625,21 +638,16 @@ public class PhysNetlistReader {
                     assert(!belPin.isInput());
 
                     // Only output BEL pins affect intra-site routing
-                    synchronized (siteInst) {
-                        siteInst.routeIntraSiteNet(net, belPin, belPin);
-                    }
+                    addBELPinToSiteInst(belPin, siteInst, net);
                 }
                 break;
             }
             case SITE_P_I_P:{
                 PhysSitePIP.Reader spReader = segment.getSitePIP();
                 SiteInst siteInst = getPlacedSiteInst(spReader.getSite());
-                SitePIP sitePIP = siteInst.getSitePIP(strings.get(spReader.getBel()), strings.get(spReader.getPin()));
-                BELPin belPin = sitePIP.getOutputPin();
-                synchronized (siteInst) {
-                    siteInst.addSitePIP(sitePIP);
-                    siteInst.routeIntraSiteNet(net, belPin, belPin);
-                }
+                BELPin belPin = getBELPin(siteInst, spReader.getBel(), spReader.getPin());
+                SitePIP sitePIP = siteInst.getSitePIP(belPin);
+                addSitePIPToSiteInst(sitePIP, siteInst);
                 break;
             }
             case SITE_PIN: {
@@ -652,25 +660,13 @@ public class PhysNetlistReader {
                     // Create a dummy TIEOFF SiteInst
                     String name = SiteInst.STATIC_SOURCE + "_" + site.getName();
                     SiteInst si = new SiteInst(name, site.getSiteTypeEnum());
-                    synchronized(design) {
-                        si.place(site);
-                    }
+                    si.place(site);
+                    // Ensure it is not attached to the design
+                    assert(si.getDesign() == null);
                     return si;
                 });
 
-                String pinName = strings.get(spReader.getPin());
-                boolean outputPin = siteInst.isSitePinOutput(pinName);
-                SitePinInst pin = new SitePinInst(outputPin, pinName, null);
-                BELPin belPin = siteInst.getBELPin(pinName, pinName);
-                synchronized(siteInst) {
-                    pin.setSiteInst(siteInst);
-                    if (!outputPin) {
-                        // Input site pins become output BEL pins into the site
-                        siteInst.routeIntraSiteNet(net, belPin, belPin);
-                    }
-                }
-                net.addPin(pin, false);
-
+                createSitePin(spReader.getPin(), siteInst, net);
                 assert(routeThruLutInput == null);
                 break;
             }
@@ -722,6 +718,14 @@ public class PhysNetlistReader {
     private Integer getWireIndex(Tile tile, int wireStringIdx) {
         String wireName = strings.get(wireStringIdx);
         return tile.getWireIndex(wireName);
+    }
+
+    protected BELPin getBELPin(SiteInst siteInst, int belStringIdx, int pinStringIdx) {
+        return belPinCache.getBELPin(siteInst, belStringIdx, pinStringIdx);
+    }
+
+    private PIP getPIP(Tile tile, int wire0StringIdx, int wire1StringIdx) {
+        return pipCache.getPIP(tile, wire0StringIdx, wire1StringIdx);
     }
 
     private static void checkNetTypeFromCellNet(Map<String, PhysNet.Reader> cellPinToPhysicalNet, EDIFNet net, List<String> strings) {
@@ -797,6 +801,11 @@ public class PhysNetlistReader {
     }
 
     protected void checkConstantRoutingAndNetNaming(PhysNetlist.Reader physNetlist) {
+        EDIFNetlist netlist = design.getNetlist();
+        if (netlist == null) {
+            throw new RuntimeException("No EDIFNetlist supplied");
+        }
+
         // Checks that constant routing and net names are valid.
         //
         // Specifically:
@@ -907,6 +916,11 @@ public class PhysNetlistReader {
      * macro definition in the library.
      */
     protected void checkMacros() {
+        EDIFNetlist netlist = design.getNetlist();
+        if (netlist == null) {
+            throw new RuntimeException("No EDIFNetlist supplied");
+        }
+
         List<EDIFHierCellInst> leaves = netlist.getTopCell().getAllLeafDescendants();
         EDIFLibrary macros = Design.getMacroPrimitives(device.getSeries());
         for (EDIFHierCellInst leaf : leaves) {
