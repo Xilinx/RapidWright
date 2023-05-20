@@ -78,7 +78,7 @@ public class LogNetlistReader {
         libraryRename = Collections.emptyMap();
     }
 
-    public LogNetlistReader(Enumerator<String> otherAllStrings) {
+    public LogNetlistReader(StringEnumerator otherAllStrings) {
         this();
         allStrings = new String[otherAllStrings.size()];
         for (int i = 0; i < otherAllStrings.size(); i++) {
@@ -86,7 +86,7 @@ public class LogNetlistReader {
         }
     }
 
-    public LogNetlistReader(Enumerator<String> outsideAllStrings, Map<String, String> libraryRename) {
+    public LogNetlistReader(StringEnumerator outsideAllStrings, Map<String, String> libraryRename) {
         this(outsideAllStrings);
         this.libraryRename = new HashMap<>(libraryRename.size());
         for (Map.Entry<String, String> e : libraryRename.entrySet()) {

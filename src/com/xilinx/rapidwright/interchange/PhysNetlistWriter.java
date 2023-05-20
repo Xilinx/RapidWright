@@ -96,7 +96,7 @@ public class PhysNetlistWriter {
 
 
     protected static void writeSiteInsts(PhysNetlist.Builder physNetlist, Design design,
-                                         Enumerator<String> strings) {
+                                         StringEnumerator strings) {
         Builder<SiteInstance.Builder> siteInsts = physNetlist.initSiteInsts(design.getSiteInsts().size());
         int i=0;
         for (SiteInst si : design.getSiteInsts()) {
@@ -119,12 +119,12 @@ public class PhysNetlistWriter {
     }
 
     protected static void writePlacement(PhysNetlist.Builder physNetlist, Design design,
-                                         Enumerator<String> strings) {
+                                         StringEnumerator strings) {
         writePlacement(physNetlist, design, strings, design.getSiteInsts());
     }
 
     public static void writePlacement(PhysNetlist.Builder physNetlist, Design design,
-                                      Enumerator<String> strings, Collection<SiteInst> siteInsts) {
+                                      StringEnumerator strings, Collection<SiteInst> siteInsts) {
         Map<String,PhysCellType> physCells = new HashMap<>();
         ArrayList<Cell> allCells = new ArrayList<>();
         Map<String,ArrayList<Cell>> multiBelCells = new HashMap<>();
@@ -197,7 +197,7 @@ public class PhysNetlistWriter {
         }
     }
 
-    private static int addCellPinMappings(Cell cell, Enumerator<String> strings,
+    private static int addCellPinMappings(Cell cell, StringEnumerator strings,
                                             Builder<PinMapping.Builder> pinMap, Integer idx) {
         for (Entry<String,String> e : cell.getPinMappingsP2L().entrySet()) {
             PinMapping.Builder pinMapping = pinMap.get(idx);
@@ -225,7 +225,7 @@ public class PhysNetlistWriter {
     }
 
     private static void writePhysNets(PhysNetlist.Builder physNetlist, Design design,
-                                      Enumerator<String> strings) {
+                                      StringEnumerator strings) {
         writeNullNet(physNetlist, design, strings);
 
         int physNetCount = design.getNets().size();
@@ -235,7 +235,7 @@ public class PhysNetlistWriter {
     }
 
    protected static void writePhysNetsRange(Builder<PhysNet.Builder> nets, Net[] keys,
-                                            Design design, Enumerator<String> strings, int start,
+                                            Design design, StringEnumerator strings, int start,
                                             int end) {
         for (int i = start; i <= end; i++) {
             String netName = keys[i].getName();
@@ -247,7 +247,7 @@ public class PhysNetlistWriter {
     }
 
     protected static void writeNullNet(PhysNetlist.Builder physNetlist, Design design,
-                                       Enumerator<String> strings) {
+                                       StringEnumerator strings) {
         List<RouteBranchNode> nullNetStubs = new ArrayList<>();
         for (SiteInst siteInst : design.getSiteInsts()) {
             Site site = siteInst.getSite();
@@ -283,7 +283,7 @@ public class PhysNetlistWriter {
         }
     }
 
-    private static void buildNet(Net net, PhysNet.Builder physNet, Enumerator<String> strings) {
+    private static void buildNet(Net net, PhysNet.Builder physNet, StringEnumerator strings) {
         physNet.setName(strings.getIndex(net.getName()));
         switch (net.getType()) {
         case GND:
@@ -429,7 +429,7 @@ public class PhysNetlistWriter {
     }
 
     private static void populateRouting(List<RouteBranchNode> routingBranches,
-                                        PhysNet.Builder physNet, Enumerator<String> strings) {
+                                        PhysNet.Builder physNet, StringEnumerator strings) {
 
         List<RouteBranchNode> sources;
         List<RouteBranchNode> stubs;
@@ -510,7 +510,7 @@ public class PhysNetlistWriter {
     }
 
     public static void writeRouteBranch(RouteBranch.Builder srcBuilder, RouteBranchNode src,
-                                        Enumerator<String> strings) {
+                                        StringEnumerator strings) {
         RouteSegment.Builder segment = srcBuilder.getRouteSegment();
         switch(src.getType()) {
             case PIP:{
@@ -563,7 +563,7 @@ public class PhysNetlistWriter {
     }
 
     protected static void writeDesignProperties(PhysNetlist.Builder physNetlist, Design design,
-                                                Enumerator<String> strings) {
+                                                StringEnumerator strings) {
         StructList.Builder<Property.Builder> props = physNetlist.initProperties(2);
         Property.Builder autoIOs = props.get(0);
         autoIOs.setKey(strings.getIndex(PhysNetlistReader.DISABLE_AUTO_IO_BUFFERS));
@@ -574,7 +574,7 @@ public class PhysNetlistWriter {
         ooc.setValue(strings.getIndex(design.isDesignOutOfContext() ? "1" : "0"));
     }
 
-    public static void writeStrings(PhysNetlist.Builder physNetlist, Enumerator<String> strings) {
+    public static void writeStrings(PhysNetlist.Builder physNetlist, StringEnumerator strings) {
         TextList.Builder strList = physNetlist.initStrList(strings.size());
         int stringCount = strList.size();
         for (int i=0; i < stringCount; i++) {
@@ -588,7 +588,7 @@ public class PhysNetlistWriter {
         t.start("Initialize");
         MessageBuilder message = new MessageBuilder();
         PhysNetlist.Builder physNetlist = message.initRoot(PhysNetlist.factory);
-        Enumerator<String> strings = new Enumerator<>();
+        StringEnumerator strings = new StringEnumerator();
 
         physNetlist.setPart(design.getPartName());
 

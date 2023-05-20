@@ -51,6 +51,7 @@ import org.capnproto.TextList;
 import org.capnproto.Void;
 
 import java.io.IOException;
+import java.security.Identity;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -67,14 +68,14 @@ public class LogNetlistWriter {
         this(null, null);
     }
 
-    LogNetlistWriter(Enumerator<String> outsideAllStrings) {
+    LogNetlistWriter(StringEnumerator outsideAllStrings) {
         this(outsideAllStrings, null);
     }
 
-    LogNetlistWriter(Enumerator<String> outsideAllStrings, Map<String, String> libraryRename) {
-        allCells = new Enumerator<>();
-        allInsts = new Enumerator<>();
-        allPorts = new Enumerator<>();
+    LogNetlistWriter(StringEnumerator outsideAllStrings, Map<String, String> libraryRename) {
+        allCells = new IdentityEnumerator<>();
+        allInsts = new IdentityEnumerator<>();
+        allPorts = new IdentityEnumerator<>();
         if (outsideAllStrings == null) {
             allStrings = newEnumerator();
         } else {
@@ -93,14 +94,14 @@ public class LogNetlistWriter {
         }
     }
 
-    protected Enumerator<String> newEnumerator() {
-        return new Enumerator<>();
+    protected StringEnumerator newEnumerator() {
+        return new StringEnumerator();
     }
 
-    protected final Enumerator<EDIFCell> allCells;
-    protected final Enumerator<EDIFCellInst> allInsts;
-    protected final Enumerator<EDIFPort> allPorts;
-    private final Enumerator<String> allStrings;
+    protected final IdentityEnumerator<EDIFCell> allCells;
+    protected final IdentityEnumerator<EDIFCellInst> allInsts;
+    protected final IdentityEnumerator<EDIFPort> allPorts;
+    private final StringEnumerator allStrings;
     private final Map<Integer, Integer> libraryRename;
 
     /**
