@@ -257,9 +257,9 @@ public class EDIFNetlist extends EDIFName {
         EDIFLibrary lib = getHDIPrimitivesLibrary();
         EDIFCell cell = lib.getCell(unisim.name());
         if (cell == null) {
-            cell = Design.getUnisimCell(unisim);
+            cell = new EDIFCell(lib, cell, unisim.name());
         }
-        return new EDIFCell(lib, cell, unisim.name());
+        return cell;
     }
 
     public EDIFLibrary getWorkLibrary() {
