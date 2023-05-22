@@ -68,8 +68,14 @@ public class RunCode {
                 if (s.toString().contains("$")) continue;
                 if (s.getSimpleName().equals("Run")) continue;                
                 if (s.getPackageName().startsWith("com.xilinx.rapidwright.gui")) continue;
-                
-                jythonCmd.append("from " + s.getPackageName() + " import " + s.getSimpleName() + ";");
+
+                // Only import those classes being called out
+                for (int i = 0; i < args.length; i++) {
+                    if (args[i].contains(s.getSimpleName())) {
+                        jythonCmd.append("from " + s.getPackageName() + " import " + s.getSimpleName() + ";");
+                        break;
+                    }
+                }
             }
         }
         for (int i = (printResults ? 0 : 1); i < args.length; i++) {
