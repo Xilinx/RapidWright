@@ -172,7 +172,6 @@ public class MainEntrypoint {
         addFunction("ReportTimingExample", ReportTimingExample::main);
         addFunction("Router", Router::main);
         addFunction("RouteThruHelper", RouteThruHelper::main);
-        addFunction("Run", RunCode::main);
         addFunction("RunSATRouterExample", RunSATRouterExample::main);
         addFunction("RWRoute", RWRoute::main);
         addFunction("SLRCrosserGenerator", SLRCrosserGenerator::main);
