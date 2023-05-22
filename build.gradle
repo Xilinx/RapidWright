@@ -195,3 +195,9 @@ task printRapidWrightVersion() {
     }
 }
 
+task runCode(type: JavaExec) {
+    description = "Run Jython/Java code from command line (use --args=\"<code>\")"
+    dependsOn 'classes'
+    mainClass = 'com.xilinx.rapidwright.RunCode'
+    classpath = sourceSets.main.runtimeClasspath
+}
