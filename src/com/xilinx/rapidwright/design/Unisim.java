@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Advanced Micro Devices, Inc.
@@ -33,7 +33,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 
 /**
- * Generated on: Wed Oct 26 12:59:37 2022
+ * Generated on: Wed May 17 23:03:43 2023
  * by: com.xilinx.rapidwright.release.UnisimParser
  *
  * Enumerates supported Unisim primitives that map to Xilinx devices.
@@ -73,6 +73,7 @@ public enum Unisim {
     AND5B4,
     AND5B5,
     AUTOBUF,
+    BFR_MATMULX,
     BIBUF,
     BITSLICE_CONTROL,
     BSCANE2,
@@ -479,6 +480,7 @@ public enum Unisim {
     IOBUFDSE3,
     IOBUFDS_BLVDS_25,
     IOBUFDS_COMP,
+    IOBUFDS_COMP_ODDR,
     IOBUFDS_DCIEN,
     IOBUFDS_DIFF_OUT,
     IOBUFDS_DIFF_OUT_DCIEN,
@@ -795,6 +797,7 @@ public enum Unisim {
     OBUFDS,
     OBUFDS_BLVDS_25,
     OBUFDS_COMP,
+    OBUFDS_COMP_ODDR,
     OBUFDS_DPHY,
     OBUFDS_DPHY_COMP,
     OBUFDS_GTE3,
@@ -820,6 +823,7 @@ public enum Unisim {
     OBUFTDS,
     OBUFTDS_BLVDS_25,
     OBUFTDS_COMP,
+    OBUFTDS_COMP_ODDR,
     OBUFTDS_DCIEN,
     OBUFTDS_LDT_25,
     OBUFTDS_LVDSEXT_25,
@@ -1270,6 +1274,10 @@ public enum Unisim {
     RAMS64E1,
     RAMS64E5,
     RFADC,
+    RFADC_13B4W_M0,
+    RFADC_13B4W_M1,
+    RFADC_14B2W_M0,
+    RFADC_14B2W_M1,
     RFDAC,
     RIU_OR,
     ROM128X1,
@@ -1338,6 +1346,7 @@ public enum Unisim {
     XPIO_VREF,
     XPIPE_QUAD,
     XPLL,
+    XRAM,
     ZHOLD_DELAY,
 ;
 

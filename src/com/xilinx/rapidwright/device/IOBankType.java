@@ -1,9 +1,8 @@
 /*
- * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Chris Lavin, Xilinx Research Labs.
+ * Author: Chris Lavin, Advanced Micro Devices, Inc.
  *
  * This file is part of RapidWright.
  *
@@ -20,6 +19,7 @@
  * limitations under the License.
  *
  */
+
 /**
  *
  */
@@ -27,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Tue Apr 27 08:16:41 2021
+ * Generated on: Wed May 17 23:03:43 2023
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  *
  * Enumeration of IOBankType type for all valid devices within Vivado.
