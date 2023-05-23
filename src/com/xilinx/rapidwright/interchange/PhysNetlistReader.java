@@ -74,7 +74,6 @@ import org.python.google.common.base.Enums;
 import org.python.google.common.base.Optional;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -194,19 +193,6 @@ public class PhysNetlistReader {
             allStrings.add(str);
         }
         return allStrings;
-    }
-
-    public void readAllStrings(String fileName) {
-        ReaderOptions readerOptions = new ReaderOptions(32L * 1024L * 1024L * 1024L, 64);
-        MessageReader readMsg;
-        try {
-            readMsg = Interchange.readInterchangeFile(fileName, readerOptions);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-
-        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
-        strings = readAllStrings(physNetlist);
     }
 
     protected void readSiteInsts(PhysNetlist.Reader physNetlist) {

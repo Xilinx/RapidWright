@@ -51,7 +51,6 @@ import org.capnproto.TextList;
 import org.capnproto.Void;
 
 import java.io.IOException;
-import java.security.Identity;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
