@@ -1702,14 +1702,7 @@ public class FileTools {
         
     public static boolean isFileGzipped(Path path) {
         try (InputStream in = Files.newInputStream(path)) {
-            boolean isGzipped = false;
-            try {
-                isGzipped = in.read() == GZIP_START_BYTES[0] 
-                         && in.read() == GZIP_START_BYTES[1];
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-            return isGzipped;
+            return in.read() == GZIP_START_BYTES[0] && in.read() == GZIP_START_BYTES[1];
         } catch (IOException e) {
             throw new RuntimeException("ERROR: Trying to read file " + path + " and it errored.", e);
         }
