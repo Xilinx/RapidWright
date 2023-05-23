@@ -58,6 +58,17 @@ task copyJars(type: Copy) {
 }
 compileJava.dependsOn(copyJars)
 
+task mainJar(type: Jar, dependsOn: classes) {
+    baseName = project.name + '-main'
+    from sourceSets.main.output
+    include 'com/xilinx/rapidwright/Main.class'
+    manifest {
+        attributes 'Class-Path': ([destinationDirectory.get().getAsFile().toPath().relativize(sourceSets.main.java.destinationDirectory.get().getAsFile().toPath()).toString() + File.separator]
+            + configurations.implementation.collect { destinationDirectory.get().getAsFile().toPath().relativize(projectDir.toPath()).resolve('jars').resolve(it.getName()) }).join(' ')
+    }
+}
+compileJava.finalizedBy(mainJar)
+
 task deleteJars(type: Delete) {
     delete fileTree('jars')
 }
