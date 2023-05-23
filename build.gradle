@@ -59,7 +59,7 @@ task copyJars(type: Copy) {
 compileJava.dependsOn(copyJars)
 
 task mainJar(type: Jar, dependsOn: classes) {
-    baseName = project.name + '-main'
+    archiveBaseName = project.name + '-main'
     from sourceSets.main.output
     include 'com/xilinx/rapidwright/Main.class'
     manifest {
