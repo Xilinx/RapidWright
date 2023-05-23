@@ -11,7 +11,7 @@ plugins {
 
 apply from: 'common.gradle'
 
-mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
+mainClassName = "com.xilinx.rapidwright.Main"
 
 def read_rapidwright_version() {
     def sw = new StringWriter()
