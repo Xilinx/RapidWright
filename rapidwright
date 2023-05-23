@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# Check that the main jar has been built
+# NOTE: Does not check that it is up-to-date
+MAIN_JAR=${BASH_SOURCE%/*}/build/libs/main.jar
+if [[ ! -f ${MAIN_JAR} ]]; then
+    echo "RapidWright not yet compiled. Please run './gradlew compileJava' from '`readlink -f ${BASH_SOURCE%/*}`'"
+    exit 1
+fi
+
+
+# If the first argument is likely to be a class name, then
+# execute that class' `main` entry point
+if [[ "$1" == "com.xilinx.rapidwright."* ]]; then
+    java -cp ${MAIN_JAR} "$@"
+    exit
+fi
+
+
+# Otherwise use the default `MainEntrypoint` class
+java -jar ${MAIN_JAR} "$@"
