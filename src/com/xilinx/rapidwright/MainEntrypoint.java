@@ -98,7 +98,7 @@ import com.xilinx.rapidwright.util.StringTools;
 import com.xilinx.rapidwright.util.Unzip;
 import com.xilinx.rapidwright.util.performance_evaluation.PerformanceEvaluation;
 
-public class Main {
+public class MainEntrypoint {
     interface MainStyleFunction<E extends Throwable> {
         void main(String[] args) throws E;
     }
