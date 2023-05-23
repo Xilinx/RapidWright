@@ -9,6 +9,16 @@ if [[ ! -f ${MAIN_JAR} ]]; then
 fi
 
 
+if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+    echo "./rapidwright com.xilinx.rapidwright.* -- to execute main entrypoint of class"
+    echo "./rapidwright <application>            -- to execute a specific application"
+    echo "                                          (leave blank to see list)"
+    echo "./rapidwright Jython                   -- to enter interactive Jython shell"
+    echo "./rapidwright Jython -c \"...\"          -- to execute specific Jython command"
+    exit 1
+fi
+
+
 # If the first argument is likely to be a class name, then
 # execute that class' `main` entry point
 if [[ "$1" == "com.xilinx.rapidwright."* ]]; then
