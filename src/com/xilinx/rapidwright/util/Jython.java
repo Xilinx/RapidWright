@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2018-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -42,7 +42,7 @@ import com.xilinx.rapidwright.device.Device;
  * @author clavin
  *
  */
-public class RapidWright {
+public class Jython {
     /** Option to unpack ./data/ directory into current directory */
     public static final String UNPACK_OPTION_NAME = "--unpack_data";
     /** Option to create JSON Kernel file for Jupyter Notebook support */
@@ -66,7 +66,7 @@ public class RapidWright {
             bw.write(" \"argv\": [\"java\",\n");
 
             // Figure proper CLASSPATH based on if this is running from a jar or not
-            CodeSource src = RapidWright.class.getProtectionDomain().getCodeSource();
+            CodeSource src = Jython.class.getProtectionDomain().getCodeSource();
             if (src == null) {
                 MessageGenerator.briefError("Couldn't identify classpath for running RapidWright.  "
                         + "Either set the CLASSPATH correctly, or modify " + f.getAbsolutePath() + " "

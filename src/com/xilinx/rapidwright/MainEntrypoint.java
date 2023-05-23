@@ -23,11 +23,6 @@
 
 package com.xilinx.rapidwright;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import com.xilinx.rapidwright.debug.DesignInstrumentor;
 import com.xilinx.rapidwright.debug.ILAInserter;
 import com.xilinx.rapidwright.debug.ProbeRouter;
@@ -91,12 +86,17 @@ import com.xilinx.rapidwright.util.CompareRouteStatusReports;
 import com.xilinx.rapidwright.util.DesignImplementationDiff;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.JobQueue;
+import com.xilinx.rapidwright.util.Jython;
 import com.xilinx.rapidwright.util.PartPrinter;
 import com.xilinx.rapidwright.util.PerformanceExplorer;
-import com.xilinx.rapidwright.util.RapidWright;
 import com.xilinx.rapidwright.util.StringTools;
 import com.xilinx.rapidwright.util.Unzip;
 import com.xilinx.rapidwright.util.performance_evaluation.PerformanceEvaluation;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class MainEntrypoint {
     interface MainStyleFunction<E extends Throwable> {
@@ -141,6 +141,7 @@ public class MainEntrypoint {
         addFunction("IntentCode", IntentCode::main);
         addFunction("Interchange", Interchange::main);
         addFunction("IsolateLeafClkBuffer", IsolateLeafClkBuffer::main);
+        addFunction("Jython", Jython::main);
         addFunction("JobQueue", JobQueue::main);
         addFunction("Lesson1", Lesson1::main);
         addFunction("LogicalNetlistExample", LogicalNetlistExample::main);
@@ -167,7 +168,6 @@ public class MainEntrypoint {
         addFunction("PrintEDIFInstances", PrintEDIFInstances::main);
         addFunction("ProbeRouter", ProbeRouter::main);
         addFunction("PseudoPIPHelper", PseudoPIPHelper::main);
-        addFunction("RapidWright", RapidWright::main);
         addFunction("ReportDevicePerformance", ReportDevicePerformance::main);
         addFunction("ReportTimingExample", ReportTimingExample::main);
         addFunction("Router", Router::main);
