@@ -29,8 +29,9 @@ import com.xilinx.rapidwright.StandaloneEntrypoint;
 
 /**
  * Main entry point for the RapidWright executable stand-alone jar
- * @deprecated Use {@link StandaloneEntrypoint instead}.
  * @author clavin
+ * @deprecated Use {@link StandaloneEntrypoint instead}.
+ * To be removed in 2024.1.0
  *
  */
 public class RapidWright {
