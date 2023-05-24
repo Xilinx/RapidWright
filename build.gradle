@@ -12,7 +12,7 @@ plugins {
 apply from: 'common.gradle'
 
 mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
-standaloneClassName = "com.xilinx.rapidwright.StandaloneEntrypoint"
+def standaloneClassName = "com.xilinx.rapidwright.StandaloneEntrypoint"
 
 def read_rapidwright_version() {
     def sw = new StringWriter()
