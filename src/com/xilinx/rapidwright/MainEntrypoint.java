@@ -192,16 +192,16 @@ public class MainEntrypoint {
 
     public static void main(String[] args) throws Throwable {
         if (args.length == 0) {
-            System.err.println("Need one argument to determine the mode. Valid modes are (case-insensitive):");
+            System.err.println("Need one argument to determine the application. Valid applications are (case-insensitive):");
             listModes();
             System.exit(1);
         }
 
 
-        String mode = args[0];
-        MainStyleFunction<?> func = functions.get(mode.toLowerCase());
+        String application = args[0];
+        MainStyleFunction<?> func = functions.get(application.toLowerCase());
         if (func == null) {
-            System.err.println("Invalid mode '"+mode+"'. Valid modes are (case-insensitive): ");
+            System.err.println("Invalid application '"+application+"'. Valid applications are (case-insensitive): ");
             listModes();
             System.exit(1);
         }
