@@ -12,6 +12,7 @@ plugins {
 apply from: 'common.gradle'
 
 mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
+standaloneClassName = "com.xilinx.rapidwright.StandaloneEntrypoint"
 
 def read_rapidwright_version() {
     def sw = new StringWriter()
@@ -106,7 +107,7 @@ task javadocJar(type: Jar) {
 task standaloneJar (type: Jar) {
     duplicatesStrategy = DuplicatesStrategy.WARN
     manifest {
-        attributes 'Main-Class': 'com.xilinx.rapidwright.util.RapidWright'
+        attributes 'Main-Class': standaloneClassName
     }
     archiveBaseName = 'rapidwright-'+rapidwright_version+'-standalone-' + os.charAt(0) + 'in64'
     from { configurations.implementation.collect { it.isDirectory() ? it : zipTree(it) } }
