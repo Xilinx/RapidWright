@@ -714,7 +714,7 @@ public class EnumerateCellBelMapping {
     public static void populateCellBelPin(Enumerator<String> allStrings, Map<SiteTypeEnum, List<Site>> siteMap, CellBelMapping.Builder mapping, EDIFCell topLevelCell, EDIFCell cell, Design design) {
         mapping.setCell(allStrings.getIndex(cell.getName()));
         EDIFCellInst cellInst = new EDIFCellInst("test", cell, topLevelCell);
-        Cell physCell = design.createCell("test", cellInst);
+        Cell physCell = design.createCell("test", cellInst.getCellType());
 
         List<Map.Entry<SiteTypeEnum, String>> entries = new ArrayList<>();
 

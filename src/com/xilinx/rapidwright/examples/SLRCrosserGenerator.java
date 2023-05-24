@@ -175,7 +175,7 @@ public class SLRCrosserGenerator {
             String cellName = path.getHierarchicalInstName(p);
             Cell cell = d.getCell(cellName);
             if (cell == null) {
-                cell = d.createCell(cellName, p.getCellInst());
+                cell = d.createCell(cellName, p.getCellInst().getCellType());
             }
             if (p.getPort().getName().equals("Q")) txCell = cell;
             else rxCell = cell;
@@ -231,7 +231,7 @@ public class SLRCrosserGenerator {
         EDIFNetlist n = d.getNetlist();
         Cell c = d.getCell(bufName);
         if (c == null) {
-            c = d.createCell(bufName, d.getNetlist().getCellInstFromHierName(bufName));
+            c = d.createCell(bufName, d.getNetlist().getCellInstFromHierName(bufName).getCellType());
         }
         d.placeCell(c, s, s.getBEL("BUFCE"));
 

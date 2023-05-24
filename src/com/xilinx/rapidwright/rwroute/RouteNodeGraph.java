@@ -143,7 +143,7 @@ public class RouteNodeGraph {
 
         Device device = design.getDevice();
         intYToSLRIndex = new int[device.getRows()];
-        Tile[][] intTiles = device.getTilesByNameRoot("INT");
+        Tile[][] intTiles = device.getTilesByRootName("INT");
         for (int y = 0; y < intTiles.length; y++) {
             Tile[] intTilesAtY = intTiles[y];
             for (Tile tile : intTilesAtY) {
@@ -156,9 +156,9 @@ public class RouteNodeGraph {
 
         Tile[][] lagunaTiles;
         if (device.getSeries() == Series.UltraScalePlus) {
-            lagunaTiles = device.getTilesByNameRoot("LAG_LAG");
+            lagunaTiles = device.getTilesByRootName("LAG_LAG");
         } else if (device.getSeries() == Series.UltraScale) {
-            lagunaTiles = device.getTilesByNameRoot("LAGUNA_TILE");
+            lagunaTiles = device.getTilesByRootName("LAGUNA_TILE");
         } else {
             lagunaTiles = null;
         }
