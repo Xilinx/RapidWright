@@ -29,12 +29,12 @@ if [[ ! -f ${MAIN_JAR} ]]; then
 fi
 
 
-if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+if [[ $# -eq 0 || "$1" == "--help" || "$1" == "-h" || "$1" == "/?" ]]; then
     echo "./rapidwright com.xilinx.rapidwright.* -- to execute main() method of Java class"
     echo "./rapidwright <application>            -- to execute a specific application"
-    echo "                                          (leave blank to see list)"
-    echo "./rapidwright Jython                   -- to enter interactive Jython shell"
-    echo "./rapidwright Jython -c \"...\"          -- to execute specific Jython command"
+    echo "./rapidwright --list                   -- to list all available applications"
+    echo "./rapidwright jython                   -- to enter interactive Jython shell"
+    echo "./rapidwright jython -c \"...\"          -- to execute specific Jython command"
     exit 1
 fi
 
@@ -46,6 +46,11 @@ if [[ "$1" == "com.xilinx.rapidwright."* ]]; then
     exit
 fi
 
+# If the first argument is "--list" then clear all other
+# arguments for the default class that follows
+if [[ "$1" == "--list" ]]; then
+    shift $#
+fi
 
 # Otherwise use the default `MainEntrypoint` class
 java -jar ${MAIN_JAR} "$@"
