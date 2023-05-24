@@ -724,7 +724,7 @@ public class DeviceResourcesVerifier {
 
     static private void verifyCellBelPinMap(Map<SiteTypeEnum, List<Site>> siteMap, CellBelMapping cellBelMap, EDIFCell topLevelCell, EDIFCell cell, Design design) {
         EDIFCellInst cellInst = new EDIFCellInst("test", cell, topLevelCell);
-        Cell physCell = design.createCell("test", cellInst.getCellType());
+        Cell physCell = design.createCell("test", cellInst);
 
         List<Map.Entry<SiteTypeEnum, String>> entries = new ArrayList<>();
 
