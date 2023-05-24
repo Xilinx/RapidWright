@@ -30,7 +30,7 @@ fi
 
 
 if [[ "$1" == "--help" || "$1" == "-h" ]]; then
-    echo "./rapidwright com.xilinx.rapidwright.* -- to execute main entrypoint of class"
+    echo "./rapidwright com.xilinx.rapidwright.* -- to execute main() method of Java class"
     echo "./rapidwright <application>            -- to execute a specific application"
     echo "                                          (leave blank to see list)"
     echo "./rapidwright Jython                   -- to enter interactive Jython shell"
@@ -40,7 +40,7 @@ fi
 
 
 # If the first argument is likely to be a class name, then
-# execute that class' `main` entry point
+# execute that Java class' `main()` method
 if [[ "$1" == "com.xilinx.rapidwright."* ]]; then
     java -cp ${MAIN_JAR} "$@"
     exit
