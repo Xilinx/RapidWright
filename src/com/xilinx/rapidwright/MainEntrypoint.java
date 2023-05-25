@@ -184,10 +184,7 @@ public class MainEntrypoint {
     }
 
     private static void listModes() {
-        for (String name : functionNames) {
-            System.err.print('\t');
-            System.err.println(name);
-        }
+        StringTools.printListInColumns(functionNames, System.err);
     }
 
     public static void main(String[] args) throws Throwable {

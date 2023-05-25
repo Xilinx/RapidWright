@@ -117,8 +117,8 @@ public class MessageGenerator{
         String left;
         String right;
         double whiteSpace = (72 - s.length())/2.0;
-        left = MessageGenerator.makeWhiteSpace((int)(whiteSpace));
-        right = MessageGenerator.makeWhiteSpace((int)(whiteSpace+0.5));
+        left = StringTools.makeWhiteSpace((int) (whiteSpace));
+        right = StringTools.makeWhiteSpace((int) (whiteSpace + 0.5));
         System.out.println(bar);
         System.out.println("== "+ left + s + right +" ==");
         System.out.println(bar);
@@ -126,17 +126,13 @@ public class MessageGenerator{
 
     /**
      * Creates a whitespace string with length number of spaces.
+     * 
      * @param length Number of spaces in the string.
      * @return The newly created whitespace string.
+     * @deprecated to be removed in 2023.2.0
      */
     public static String makeWhiteSpace(int length) {
-        if (length < 1)
-            return "";
-        StringBuilder sb = new StringBuilder(length);
-        for (int i=0; i<length; i++) {
-            sb.append(" ");
-        }
-        return sb.toString();
+        return StringTools.makeWhiteSpace(length);
     }
 
     /**

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -26,10 +26,13 @@
 package com.xilinx.rapidwright.util;
 
 import java.io.File;
+import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
+
+import org.python.jline.TerminalFactory;
 
 /**
  * A set of String utility methods.
@@ -241,6 +244,40 @@ public class StringTools {
             if (str.startsWith(prefix)) return prefix;
         }
         return null;
+    }
+
+    /**
+     * Creates a String of spaces of the specified length
+     * 
+     * @param length The number of spaces in the desired String
+     * @return A String containing spaces of the desired length. Any length less
+     *         than 1 will return a String of length 0.
+     */
+    public static String makeWhiteSpace(int length) {
+        return length < 1 ? "" : new String(new char[length]).replace('\0', ' ');
+    }
+
+    private static final int COLUMN_SPACING = 2;
+
+    public static void printListInColumns(List<String> items, PrintStream ps) {
+        // Find the longest length of all the provided Strings
+        int maxLength = items.stream().max(Comparator.comparingInt(String::length)).get().length();
+
+        // Get the width in characters of the current terminal
+        int termWidth = TerminalFactory.get().getWidth();
+
+        int colWidth = maxLength + COLUMN_SPACING;
+        int maxColumns = (termWidth / 2) / colWidth;
+        int colHeight = (items.size() + maxColumns) / maxColumns;
+        String fmt = makeWhiteSpace(COLUMN_SPACING) + "%-" + maxLength + "s";
+        for (int i = 0; i < colHeight; i++) {
+            for (int col = 0; col < maxColumns; col++) {
+                int idx = col * colHeight + i;
+                if (idx < items.size())
+                    ps.printf(fmt, items.get(idx));
+            }
+            ps.println();
+        }
     }
 
     public static void main(String[] args) {
