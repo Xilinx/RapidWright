@@ -1,9 +1,8 @@
 /*
- * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Zak Nafziger, Xilinx Research Labs.
+ * Author: Zak Nafziger, Advanced Micro Devices, Inc.
  *
  * This file is part of RapidWright.
  *
@@ -35,7 +34,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
-public class TestRunVivado {
+public class TestVivadoTools {
     @Test
     public void testOpenDcpReadLog(@TempDir Path tempDir) throws IOException {
         Assumptions.assumeTrue(FileTools.isVivadoOnPath());
@@ -48,7 +47,7 @@ public class TestRunVivado {
         final Path dcpPath = Path.of(RapidWrightDCP.getString("picoblaze_partial.dcp"));
         final Path currentDirectory = Path.of(System.getProperty("user.dir"));
         String dcp = null;
-        if(dcpPath.startsWith(currentDirectory)) {
+        if (dcpPath.startsWith(currentDirectory)) {
             dcp = dcpPath.toString();
         }
         else {
@@ -64,23 +63,23 @@ public class TestRunVivado {
 
         // run the above script through vivado
         List<String> log = new ArrayList<>();
-        log = RunVivado.runVivadoTask(tempDir.toString(), tclScript, true);
+        log = VivadoTools.runVivadoTask(tempDir.toString(), tclScript, true);
 
         // search the log for some key phrases, and check the results:
         List<String> results = new ArrayList<>();
 
         // check to see that the expected number of nets are unrouted in the example dcp
-        results = RunVivado.searchVivadoLog(log, "# of unrouted nets");
+        results = VivadoTools.searchVivadoLog(log, "# of unrouted nets");
         Assertions.assertEquals(1, results.size());
         int parsed = Integer.parseInt(results.get(0).replaceAll("[^\\d]", ""));
         Assertions.assertEquals(12144, parsed);
 
         // check to see that a non existent key phrase doesn't break things
-        results = RunVivado.searchVivadoLog(log, "This key shouldn't be in the log!");
+        results = VivadoTools.searchVivadoLog(log, "This key shouldn't be in the log!");
         Assertions.assertEquals(0, results.size());
 
         // check to see everything works if we get multiple matches
-        results = RunVivado.searchVivadoLog(log, "# of");
+        results = VivadoTools.searchVivadoLog(log, "# of");
         Assertions.assertEquals(9, results.size());
     }
 

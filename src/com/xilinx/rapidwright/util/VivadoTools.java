@@ -1,9 +1,8 @@
 /*
- * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Zak Nafziger, Xilinx Research Labs.
+ * Author: Zak Nafziger, Advanced Micro Devices, Inc.
  *
  * This file is part of RapidWright.
  *
@@ -31,11 +30,11 @@ import java.util.List;
  * @author zakn
  *
  */
-public class RunVivado {
+public class VivadoTools {
     public static List<String> searchVivadoLog(List<String> log, String key) {
         List<String> results = new ArrayList<>();
-        for(String l : log) {
-            if(l.contains(key)) {
+        for (String l : log) {
+            if (l.contains(key)) {
                 results.add(l);
             }
         }
@@ -54,7 +53,7 @@ public class RunVivado {
 
         // run the vivado job
         while (!j.isFinished()) {
-            if(verbose) {
+            if (verbose) {
                 System.out.println("Vivado running");
             }
             try {
@@ -66,8 +65,8 @@ public class RunVivado {
         String logFile = j.getLogFilename();
         List<String> log = new ArrayList<>();
         log = FileTools.getLinesFromTextFile(logFile);
-        if(!log.isEmpty() && verbose) {
-            for(String l : log) {
+        if (!log.isEmpty() && verbose) {
+            for (String l : log) {
                 System.out.println(l);
             }
         }
