@@ -257,9 +257,31 @@ public class StringTools {
         return length < 1 ? "" : new String(new char[length]).replace('\0', ' ');
     }
 
-    private static final int COLUMN_SPACING = 2;
+    /**
+     * Number of spaces between column prints in
+     * {@link #printListInColumns(List, PrintStream)}
+     */
+    public static final int COLUMN_SPACING = 2;
 
+    /**
+     * Prints a list of Strings in columns, based upon the terminal width.
+     * 
+     * @param items      The list of Strings to print
+     * @param ps         The stream to send the printed Strings to.
+     * @param maxColumns A maximum limit to the number columns to print
+     */
     public static void printListInColumns(List<String> items, PrintStream ps) {
+        printListInColumns(items, ps, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Prints a list of Strings in columns, based upon the terminal width.
+     * 
+     * @param items      The list of Strings to print
+     * @param ps         The stream to send the printed Strings to.
+     * @param maxColumns A maximum limit to the number columns to print
+     */
+    public static void printListInColumns(List<String> items, PrintStream ps, int maxColumns) {
         // Find the longest length of all the provided Strings
         int maxLength = items.stream().max(Comparator.comparingInt(String::length)).get().length();
 
@@ -267,11 +289,11 @@ public class StringTools {
         int termWidth = TerminalFactory.get().getWidth();
 
         int colWidth = maxLength + COLUMN_SPACING;
-        int maxColumns = (termWidth / 2) / colWidth;
-        int colHeight = (items.size() + maxColumns) / maxColumns;
+        int numCols = Integer.min(termWidth / colWidth, maxColumns);
+        int colHeight = (items.size() + numCols) / numCols;
         String fmt = makeWhiteSpace(COLUMN_SPACING) + "%-" + maxLength + "s";
         for (int i = 0; i < colHeight; i++) {
-            for (int col = 0; col < maxColumns; col++) {
+            for (int col = 0; col < numCols; col++) {
                 int idx = col * colHeight + i;
                 if (idx < items.size())
                     ps.printf(fmt, items.get(idx));

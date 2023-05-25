@@ -184,7 +184,7 @@ public class MainEntrypoint {
     }
 
     private static void listModes() {
-        StringTools.printListInColumns(functionNames, System.err);
+        StringTools.printListInColumns(functionNames, System.err, 5);
     }
 
     public static void main(String[] args) throws Throwable {
