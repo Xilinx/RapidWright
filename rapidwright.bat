@@ -1,3 +1,4 @@
+@echo off
 REM  Copyright (c) 2023, Advanced Micro Devices, Inc.
 REM  All rights reserved.
 REM 
@@ -17,8 +18,6 @@ REM  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 REM  See the License for the specific language governing permissions and
 REM  limitations under the License.
 
-REM @echo off
-
 REM Check that the main jar has been built
 REM NOTE: Does not check that it is up-to-date
 SET "BAT_SOURCE=%~dp0"
@@ -29,21 +28,29 @@ EXIT /B 1
   
 :JAR_EXISTS
 SET PRINT_HELP=FALSE
+IF "%~1"=="" SET PRINT_HELP=TRUE
 IF "%~1" == "--help" SET PRINT_HELP=TRUE
 IF "%~1" == "-h" SET PRINT_HELP=TRUE
+IF "%~1" == "/?" SET PRINT_HELP=TRUE
 IF "%PRINT_HELP%"=="FALSE" GOTO RUN_STUFF
-echo.  rapidwright com.xilinx.rapidwright.* -- to execute main entrypoint of class
-echo.  rapidwright ^<application^>            -- to execute a specific application
-echo.                                            (leave blank to see list)
-echo.  rapidwright Jython                   -- to enter interactive Jython shell
-echo.  rapidwright Jython -c "..."          -- to execute specific Jython command
-EXIT /B 1
+echo.  rapidwright com.xilinx.rapidwright.^<ClassName^> -- to execute main() method of Java class
+echo.  rapidwright ^<application^>                      -- to execute a specific application
+echo.  rapidwright --list-apps                        -- to list all available applications
+echo.  rapidwright Jython                             -- to enter interactive Jython shell
+echo.  rapidwright Jython -c "..."                    -- to execute specific Jython command
+EXIT /B 0
 
 :RUN_STUFF
 SET ARG1=%~1
 IF "%ARG1:~0,23%" == "com.xilinx.rapidwright." GOTO RUN_APPS
+IF "%~1" == "--list-apps" GOTO PRINT_APP_LIST
 java -jar %MAIN_JAR% %*
+EXIT /B 0
+
+:PRINT_APP_LIST
+java -jar %MAIN_JAR%
 EXIT /B 0
 
 :RUN_APPS
 java -cp %MAIN_JAR% %*
+EXIT /B 0

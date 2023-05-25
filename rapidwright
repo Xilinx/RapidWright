@@ -30,12 +30,12 @@ fi
 
 
 if [[ $# -eq 0 || "$1" == "--help" || "$1" == "-h" || "$1" == "/?" ]]; then
-    echo "./rapidwright com.xilinx.rapidwright.* -- to execute main() method of Java class"
-    echo "./rapidwright <application>            -- to execute a specific application"
-    echo "./rapidwright --list                   -- to list all available applications"
-    echo "./rapidwright jython                   -- to enter interactive Jython shell"
-    echo "./rapidwright jython -c \"...\"          -- to execute specific Jython command"
-    exit 1
+    echo "./rapidwright com.xilinx.rapidwright.<ClassName> -- to execute main() method of Java class"
+    echo "./rapidwright <application>                      -- to execute a specific application"
+    echo "./rapidwright --list-apps                        -- to list all available applications"
+    echo "./rapidwright jython                             -- to enter interactive Jython shell"
+    echo "./rapidwright jython -c \"...\"                  -- to execute specific Jython command"
+    exit
 fi
 
 
@@ -48,7 +48,7 @@ fi
 
 # If the first argument is "--list" then clear all other
 # arguments for the default class that follows
-if [[ "$1" == "--list" ]]; then
+if [[ "$1" == "--list-apps" ]]; then
     shift $#
 fi
 
