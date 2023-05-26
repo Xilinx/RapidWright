@@ -476,6 +476,28 @@ class TestEDIFNetlist {
         Assertions.assertEquals("[string(DIFF_SSTL12_DCI)]", netlist.getIOStandards(obufds).toString());
     }
 
+    @Test
+    public void testGetIOStandardCellDefaultGetsOverriddenByNet() {
+        final EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
+        netlist.setDevice(Device.getDevice(Device.AWS_F1));
+
+        EDIFCell top = netlist.getTopCell();
+        EDIFPort port = top.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFCellInst obufds = top.createChildCellInst("obuf", Design.getPrimitivesLibrary().getCell("OBUFDS"));
+        EDIFNet net = top.createNet("O");
+        new EDIFPortInst(port, net);
+        new EDIFPortInst(obufds.getPort("O"), net, obufds);
+
+        // Explicitly attach DEFAULT property to the cell
+        obufds.addProperty(EDIFNetlist.IOSTANDARD_PROP, EDIFNetlist.DEFAULT_PROP_VALUE.getValue());
+
+        // Test that top-level-port's connected net property is propagated
+        net.addProperty(EDIFNetlist.IOSTANDARD_PROP, "LVDS");
+
+        // Test that net gets priority
+        Assertions.assertEquals("[string(LVDS)]", netlist.getIOStandards(obufds).toString());
+    }
+
     @ParameterizedTest
     @CsvSource({
             "LVDS,OBUFDS",
