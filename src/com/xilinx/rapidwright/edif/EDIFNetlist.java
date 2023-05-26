@@ -1846,7 +1846,7 @@ public class EDIFNetlist extends EDIFName {
      */
     public Collection<EDIFPropertyValue> getIOStandards(EDIFCellInst eci) {
         EDIFPropertyValue value = eci.getIOStandard();
-        if (value != DEFAULT_PROP_VALUE) {
+        if (!value.equals(DEFAULT_PROP_VALUE)) {
             return Arrays.asList(value);
         }
 
@@ -1888,7 +1888,7 @@ public class EDIFNetlist extends EDIFName {
                             }
 
                             EDIFPropertyValue driverEpv = driverEci.getIOStandard();
-                            if (driverEpv != DEFAULT_PROP_VALUE) {
+                            if (!driverEpv.equals(DEFAULT_PROP_VALUE)) {
                                 if (driverEpv.equals(netEpv)) {
                                     // Cell and Net IOStandards match
                                     continue;
