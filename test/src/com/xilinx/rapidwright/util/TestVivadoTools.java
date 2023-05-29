@@ -36,6 +36,18 @@ import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestVivadoTools {
     @Test
+    public void testRunTclCmd(@TempDir Path tempDir) {
+        Assumptions.assumeTrue(FileTools.isVivadoOnPath());
+
+        List<String> log = new ArrayList<>();
+        log = VivadoTools.runTcl(tempDir.resolve("outputLog.log"), "exit", true);
+
+        List<String> results = new ArrayList<>();
+        results = VivadoTools.searchVivadoLog(log, "INFO");
+        Assertions.assertTrue(results.get(0).contains("Exiting Vivado"));
+    }
+
+    @Test
     public void testOpenDcpReadLog(@TempDir Path tempDir) throws IOException {
         Assumptions.assumeTrue(FileTools.isVivadoOnPath());
         // XXX
@@ -54,12 +66,12 @@ public class TestVivadoTools {
             dcp = currentDirectory.resolve(dcpPath).normalize().toString();
         }
         // create a tcl script to open an example dcp
-        final String tclScript = tempDir.resolve("tclScript.tcl").toString();
+        final Path tclScript = tempDir.resolve("tclScript.tcl");
         List<String> lines = new ArrayList<>();
         lines.add("open_checkpoint " + dcp);
         lines.add("report_route_status");
         lines.add("exit");
-        FileTools.writeLinesToTextFile(lines,  tclScript);
+        FileTools.writeLinesToTextFile(lines, tclScript.toString());
 
         // run the above script through vivado
         List<String> log = new ArrayList<>();

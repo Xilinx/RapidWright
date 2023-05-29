@@ -42,9 +42,35 @@ public class VivadoTools {
         return results;
     }
 
-    public static List<String> runTcl(Path outputLog, String tclScript, boolean verbose) {
+    /**
+     * method to run a single tcl command in vivado
+     * 
+     * @param outputLog - Path to the log file that vivado will generate
+     * @param tclCmd    - tcl command to run
+     * @param verbose   - if true vivado command line and std.out/err will be
+     *                  printed to std.out
+     * @return the contenst of the log file as a list of strings
+     */
+    public static List<String> runTcl(Path outputLog, String tclCmd, boolean verbose) {
+        Path tclScript = outputLog.getParent().resolve("tclScript.tcl");
+        List<String> lines = new ArrayList<>();
+        lines.add(tclCmd);
+        FileTools.writeLinesToTextFile(lines, tclScript.toString());
+        return runTcl(outputLog, tclScript, verbose);
+    }
+
+    /**
+     * method to run a tcl script in vivado
+     * 
+     * @param outputLog - Path to the log file that vivado will generate
+     * @param tclScript - Path to the tcl script that will be run
+     * @param verbose   - if true vivado command line and std.out/err will be
+     *                  printed to std.out
+     * @return the contents of the log file as a list of strings
+     */
+    public static List<String> runTcl(Path outputLog, Path tclScript, boolean verbose) {
         final String vivadoCmd = "vivado -log " + outputLog.toString() + " -mode batch -source "
-                + tclScript;
+                + tclScript.toString();
         FileTools.runCommand(vivadoCmd, verbose);
         List<String> log = new ArrayList<>();
         log = FileTools.getLinesFromTextFile(outputLog.toString());
