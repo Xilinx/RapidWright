@@ -63,7 +63,7 @@ public class TestVivadoTools {
 
         // run the above script through vivado
         List<String> log = new ArrayList<>();
-        log = VivadoTools.runVivadoTask(tempDir.toString(), tclScript, true);
+        log = VivadoTools.runTcl(tempDir.resolve("outputLog.log"), tclScript, true);
 
         // search the log for some key phrases, and check the results:
         List<String> results = new ArrayList<>();

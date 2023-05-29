@@ -22,6 +22,7 @@
 
 package com.xilinx.rapidwright.util;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,36 +42,12 @@ public class VivadoTools {
         return results;
     }
 
-    public static List<String> runVivadoTask(String runDir, String tclScript, boolean verbose) {
-        final String vivadoCmd = "vivado -mode batch -source " + tclScript;
-        System.out.println(vivadoCmd);
-
-        // set up the vivado process
-        Job j = new LocalJob();
-        j.setCommand(vivadoCmd);
-        j.setRunDir(runDir);
-        j.launchJob();
-
-        // run the vivado job
-        while (!j.isFinished()) {
-            if (verbose) {
-                System.out.println("Vivado running");
-            }
-            try {
-                Thread.sleep(5000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-        String logFile = j.getLogFilename();
+    public static List<String> runTcl(Path outputLog, String tclScript, boolean verbose) {
+        final String vivadoCmd = "vivado -log " + outputLog.toString() + " -mode batch -source "
+                + tclScript;
+        FileTools.runCommand(vivadoCmd, verbose);
         List<String> log = new ArrayList<>();
-        log = FileTools.getLinesFromTextFile(logFile);
-        if (!log.isEmpty() && verbose) {
-            for (String l : log) {
-                System.out.println(l);
-            }
-        }
-
+        log = FileTools.getLinesFromTextFile(outputLog.toString());
         return log;
     }
 }
