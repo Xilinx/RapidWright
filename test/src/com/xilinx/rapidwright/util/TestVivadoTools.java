@@ -50,21 +50,8 @@ public class TestVivadoTools {
     @Test
     public void testOpenDcpReadLog(@TempDir Path tempDir) throws IOException {
         Assumptions.assumeTrue(FileTools.isVivadoOnPath());
-        // XXX
-        // grabbing a handle to one of the example dcps requires to some
-        // unfortunate path hacking to work in and out of gradle. inside gradle
-        // we get a relative path, and we must convert to an absolute path
-        // since vivado is run in the tempDir. outside of gradle we get an
-        // absolute path and no conversion is needed.
-        final Path dcpPath = Path.of(RapidWrightDCP.getString("picoblaze_partial.dcp"));
-        final Path currentDirectory = Path.of(System.getProperty("user.dir"));
-        String dcp = null;
-        if (dcpPath.startsWith(currentDirectory)) {
-            dcp = dcpPath.toString();
-        }
-        else {
-            dcp = currentDirectory.resolve(dcpPath).normalize().toString();
-        }
+        String dcp = RapidWrightDCP.getPath("picoblaze_partial.dcp").toString();
+
         // create a tcl script to open an example dcp
         final Path tclScript = tempDir.resolve("tclScript.tcl");
         List<String> lines = new ArrayList<>();
