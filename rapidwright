@@ -20,16 +20,33 @@
 #  limitations under the License.
 
 
+# Reproduced from from `gradlew`
+ PRG="$0" 
+ # Need this for relative symlinks. 
+ while [ -h "$PRG" ] ; do 
+     ls=`ls -ld "$PRG"` 
+     link=`expr "$ls" : '.*-> \(.*\)$'` 
+     if expr "$link" : '/.*' > /dev/null; then 
+         PRG="$link" 
+     else 
+         PRG=`dirname "$PRG"`"/$link" 
+     fi 
+ done 
+ SAVED="`pwd`" 
+ cd "`dirname \"$PRG\"`/" >/dev/null 
+ APP_HOME="`pwd -P`" 
+
+
 # Check that the main jar has been built
 # NOTE: Does not check that it is up-to-date
-MAIN_JAR=${BASH_SOURCE%/*}/build/libs/main.jar
-if [[ ! -f ${MAIN_JAR} ]]; then
-    echo "RapidWright not yet compiled. Please run './gradlew compileJava' from '`readlink -f ${BASH_SOURCE%/*}`'"
+MAIN_JAR=${APP_HOME}/build/libs/main.jar
+if [ ! -f ${MAIN_JAR} ]; then
+    echo "RapidWright not yet compiled. Please run './gradlew compileJava' from '${APP_HOME}'"
     exit 1
 fi
 
 
-if [[ $# -eq 0 || "$1" == "--help" || "$1" == "-h" || "$1" == "/?" ]]; then
+if [ $# -eq 0 -o "$1" = "--help" -o "$1" = "-h" -o "$1" = "/?" ]; then
     echo "./rapidwright com.xilinx.rapidwright.<ClassName> -- to execute main() method of Java class"
     echo "./rapidwright <application>                      -- to execute a specific application"
     echo "./rapidwright --list-apps                        -- to list all available applications"
@@ -41,15 +58,9 @@ fi
 
 # If the first argument is likely to be a class name, then
 # execute that Java class' `main()` method
-if [[ "$1" == "com.xilinx.rapidwright."* ]]; then
+if case $1 in "com.xilinx.rapidwright."*) true;; *) false;; esac; then
     java -cp ${MAIN_JAR} "$@"
     exit
-fi
-
-# If the first argument is "--list" then clear all other
-# arguments for the default class that follows
-if [[ "$1" == "--list-apps" ]]; then
-    shift $#
 fi
 
 # Otherwise use the default `MainEntrypoint` class

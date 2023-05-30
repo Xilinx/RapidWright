@@ -43,11 +43,7 @@ EXIT /B 0
 :RUN_STUFF
 SET ARG1=%~1
 IF "%ARG1:~0,23%" == "com.xilinx.rapidwright." GOTO RUN_APPS
-IF "%~1" == "--list-apps" GOTO PRINT_APP_LIST
-java -jar %MAIN_JAR% %*
-EXIT /B 0
 
-:PRINT_APP_LIST
 java -jar %MAIN_JAR%
 EXIT /B 0
 
