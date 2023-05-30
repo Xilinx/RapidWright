@@ -55,7 +55,7 @@ public class TestFileTools {
             devicesString.append("\"" + device + "\"");
         }
         
-        pb.command("java", "-cp", classpath, RapidWright.class.getCanonicalName(), "-c",
+        pb.command("java", "-cp", classpath, Jython.class.getCanonicalName(), "-c",
                 "from com.xilinx.rapidwright.util import FileTools;"
                 + "FileTools.ensureDataFilesAreStaticInstallFriendly("+devicesString+")");
         pb.redirectErrorStream(true);
