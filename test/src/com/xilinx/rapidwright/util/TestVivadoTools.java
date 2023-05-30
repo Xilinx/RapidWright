@@ -32,6 +32,7 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestVivadoTools {
@@ -48,38 +49,13 @@ public class TestVivadoTools {
     }
 
     @Test
-    public void testOpenDcpReadLog(@TempDir Path tempDir) throws IOException {
+    public void testReportRouteStatus(@TempDir Path tempDir) throws IOException {
         Assumptions.assumeTrue(FileTools.isVivadoOnPath());
         String dcp = RapidWrightDCP.getPath("picoblaze_partial.dcp").toString();
+        Design d = Design.readCheckpoint(dcp);
+        VivadoTools.ReportRouteStatusResult r = VivadoTools.reportRouteStatus(d, tempDir);
 
-        // create a tcl script to open an example dcp
-        final Path tclScript = tempDir.resolve("tclScript.tcl");
-        List<String> lines = new ArrayList<>();
-        lines.add("open_checkpoint " + dcp);
-        lines.add("report_route_status");
-        lines.add("exit");
-        FileTools.writeLinesToTextFile(lines, tclScript.toString());
-
-        // run the above script through vivado
-        List<String> log = new ArrayList<>();
-        log = VivadoTools.runTcl(tempDir.resolve("outputLog.log"), tclScript, true);
-
-        // search the log for some key phrases, and check the results:
-        List<String> results = new ArrayList<>();
-
-        // check to see that the expected number of nets are unrouted in the example dcp
-        results = VivadoTools.searchVivadoLog(log, "# of unrouted nets");
-        Assertions.assertEquals(1, results.size());
-        int parsed = Integer.parseInt(results.get(0).replaceAll("[^\\d]", ""));
-        Assertions.assertEquals(12144, parsed);
-
-        // check to see that a non existent key phrase doesn't break things
-        results = VivadoTools.searchVivadoLog(log, "This key shouldn't be in the log!");
-        Assertions.assertEquals(0, results.size());
-
-        // check to see everything works if we get multiple matches
-        results = VivadoTools.searchVivadoLog(log, "# of");
-        Assertions.assertEquals(9, results.size());
+        Assertions.assertEquals(12144, r.unroutedNets());
     }
 
 }
