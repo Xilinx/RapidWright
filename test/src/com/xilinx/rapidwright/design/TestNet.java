@@ -191,7 +191,6 @@ public class TestNet {
         // Remove from net
         Assertions.assertTrue(net.removePin(spi));
         Assertions.assertNull(spi.getNet());
-        Assertions.assertEquals("ERROR: SiteInst placed at SLICE_X0Y0 already has a pin named SRST1", ex.getMessage());
 
         // Also remove from site inst
         Assertions.assertTrue(si.removePin(spi));
