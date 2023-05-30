@@ -23,7 +23,7 @@
 # Check that the main jar has been built
 # NOTE: Does not check that it is up-to-date
 MAIN_JAR=${BASH_SOURCE%/*}/build/libs/main.jar
-if [[ ! -f ${MAIN_JAR} ]]; then
+if [ ! -f ${MAIN_JAR} ]; then
     echo "RapidWright not yet compiled. Please run './gradlew compileJava' from '`readlink -f ${BASH_SOURCE%/*}`'"
     exit 1
 fi
@@ -41,14 +41,14 @@ fi
 
 # If the first argument is likely to be a class name, then
 # execute that Java class' `main()` method
-if [[ "$1" == "com.xilinx.rapidwright."* ]]; then
+if [ "$1" == "com.xilinx.rapidwright."* ]; then
     java -cp ${MAIN_JAR} "$@"
     exit
 fi
 
 # If the first argument is "--list" then clear all other
 # arguments for the default class that follows
-if [[ "$1" == "--list-apps" ]]; then
+if [ "$1" == "--list-apps" ]; then
     shift $#
 fi
 
