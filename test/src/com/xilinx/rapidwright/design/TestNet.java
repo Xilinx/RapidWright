@@ -178,6 +178,54 @@ public class TestNet {
     }
 
     @Test
+    public void testCreatePinDuplicate() {
+        Design d = new Design("testCreatePinDuplicate", Device.AWS_F1);
+        Net net = d.getVccNet();
+        SiteInst si = d.createSiteInst("SLICE_X0Y0");
+        SitePinInst spi = net.createPin("SRST1", si);
+        Assertions.assertEquals(net, spi.getNet());
+        net.createPin("SRST2", si);
+        RuntimeException ex = Assertions.assertThrows(RuntimeException.class, () -> net.createPin("SRST1", si));
+        Assertions.assertEquals("ERROR: SiteInst placed at SLICE_X0Y0 already has a pin named SRST1", ex.getMessage());
+
+        // Remove from net
+        Assertions.assertTrue(net.removePin(spi));
+        Assertions.assertNull(spi.getNet());
+
+        // Also remove from site inst
+        Assertions.assertTrue(si.removePin(spi));
+        SitePinInst newSpi = net.createPin("SRST1", si);
+        Assertions.assertNotSame(newSpi, spi);
+        Assertions.assertEquals(net, newSpi.getNet());
+    }
+
+    @Test
+    public void testConnectPinDuplicate() {
+        Design d = new Design("testConnectPinDuplicate", Device.KCU105);
+        Cell cell = d.createAndPlaceCell("ff", Unisim.FDRE, "SLICE_X0Y0/AFF");
+        Net net = d.createNet("net");
+
+        SitePinInst spi = net.connect(cell, "CE");
+        Assertions.assertNotNull(spi);
+        Assertions.assertEquals(net, spi.getNet());
+
+        // No error if connecting same net, returns same SPI
+        Assertions.assertEquals(spi, net.connect(cell, "CE"));
+        Assertions.assertEquals(net, spi.getNet());
+
+        // Error if already connected
+        Net otherNet = d.createNet("other_net");
+        RuntimeException ex = Assertions.assertThrows(RuntimeException.class, () -> otherNet.connect(cell, "CE"));
+        Assertions.assertEquals("ERROR: SitePinInst 'IN SLICE_X0Y0.CKEN_B1' is already connected to net 'net'.  Disconnect it first from that net before calling Net.connect()", ex.getMessage());
+
+        // Remove from net
+        Assertions.assertTrue(net.removePin(spi));
+        Assertions.assertNull(spi.getNet());
+        Assertions.assertEquals(spi, otherNet.connect(cell, "CE"));
+        Assertions.assertEquals(otherNet, spi.getNet());
+    }
+  
+    @Test
     public void testCreatePinInvalid() {
         Design d = new Design("top", "xc7a200t");
         SiteInst si = d.createSiteInst(d.getDevice().getSite("RAMB36_X8Y14"));
