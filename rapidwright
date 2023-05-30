@@ -63,11 +63,5 @@ if case $1 in "com.xilinx.rapidwright."*) true;; *) false;; esac; then
     exit
 fi
 
-# If the first argument is "--list" then clear all other
-# arguments for the default class that follows
-if [ "$1" = "--list-apps" ]; then
-    shift $#
-fi
-
 # Otherwise use the default `MainEntrypoint` class
 java -jar ${MAIN_JAR} "$@"

@@ -93,6 +93,7 @@ import com.xilinx.rapidwright.util.StringTools;
 import com.xilinx.rapidwright.util.Unzip;
 import com.xilinx.rapidwright.util.performance_evaluation.PerformanceEvaluation;
 
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -183,23 +184,28 @@ public class MainEntrypoint {
         addFunction("UpdateRoutingUsingSATRouter", UpdateRoutingUsingSATRouter::main);
     }
 
-    private static void listModes() {
-        StringTools.printListInColumns(functionNames, System.err, 5);
+    private static void listModes(PrintStream ps) {
+        StringTools.printListInColumns(functionNames, ps, 5);
     }
 
     public static void main(String[] args) throws Throwable {
         if (args.length == 0) {
             System.err.println("Need one argument to determine the application. Valid applications are (case-insensitive):");
-            listModes();
+            listModes(System.err);
             System.exit(1);
         }
 
+        if (args.length >= 1 && args[0].equals("--list-apps")) {
+            System.out.println("Current list of available RapidWright applications (case-insensitive):");
+            listModes(System.out);
+            return;
+        }
 
         String application = args[0];
         MainStyleFunction<?> func = functions.get(application.toLowerCase());
         if (func == null) {
             System.err.println("Invalid application '"+application+"'. Valid applications are (case-insensitive): ");
-            listModes();
+            listModes(System.err);
             System.exit(1);
         }
 
