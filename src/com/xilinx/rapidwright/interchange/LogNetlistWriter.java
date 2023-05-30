@@ -62,33 +62,33 @@ public class LogNetlistWriter {
     public static final String DEVICE_MACROS_LIB = "macros";
 
     LogNetlistWriter() {
-        allCells = new Enumerator<>();
-        allInsts = new Enumerator<>();
-        allPorts = new Enumerator<>();
-        allStrings = new Enumerator<>();
+        allCells = new IdentityEnumerator<>();
+        allInsts = new IdentityEnumerator<>();
+        allPorts = new IdentityEnumerator<>();
+        allStrings = new StringEnumerator();
         libraryRename = Collections.emptyMap();
     }
 
-    LogNetlistWriter(Enumerator<String> outsideAllStrings) {
-        allCells = new Enumerator<>();
-        allInsts = new Enumerator<>();
-        allPorts = new Enumerator<>();
+    LogNetlistWriter(StringEnumerator outsideAllStrings) {
+        allCells = new IdentityEnumerator<>();
+        allInsts = new IdentityEnumerator<>();
+        allPorts = new IdentityEnumerator<>();
         allStrings = outsideAllStrings;
         libraryRename = Collections.emptyMap();
     }
 
-    LogNetlistWriter(Enumerator<String> outsideAllStrings, Map<String, String> libraryRename) {
-        allCells = new Enumerator<>();
-        allInsts = new Enumerator<>();
-        allPorts = new Enumerator<>();
+    LogNetlistWriter(StringEnumerator outsideAllStrings, Map<String, String> libraryRename) {
+        allCells = new IdentityEnumerator<>();
+        allInsts = new IdentityEnumerator<>();
+        allPorts = new IdentityEnumerator<>();
         allStrings = outsideAllStrings;
         this.libraryRename = libraryRename;
     }
 
-    private Enumerator<EDIFCell> allCells;
-    private Enumerator<EDIFCellInst> allInsts;
-    private Enumerator<EDIFPort> allPorts;
-    private Enumerator<String> allStrings;
+    private IdentityEnumerator<EDIFCell> allCells;
+    private IdentityEnumerator<EDIFCellInst> allInsts;
+    private IdentityEnumerator<EDIFPort> allPorts;
+    private StringEnumerator allStrings;
     private Map<String, String> libraryRename;
 
     /**

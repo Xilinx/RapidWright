@@ -42,6 +42,7 @@ import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -256,9 +257,9 @@ public class EDIFNetlist extends EDIFName {
         EDIFLibrary lib = getHDIPrimitivesLibrary();
         EDIFCell cell = lib.getCell(unisim.name());
         if (cell == null) {
-            cell = Design.getUnisimCell(unisim);
+            cell = new EDIFCell(lib, Design.getUnisimCell(unisim), unisim.name());
         }
-        return lib.addCell(cell);
+        return cell;
     }
 
     public EDIFLibrary getWorkLibrary() {
@@ -1599,7 +1600,8 @@ public class EDIFNetlist extends EDIFName {
                 toAdd = Design.getUnisimCell(Unisim.valueOf(cellName));
             }
             // Add copy to prim library to avoid destructive changes when collapsed
-            new EDIFCell(netlistPrims, toAdd);
+            // Needs to be a deep copy because it may have child instances that will get updated
+            new EDIFCell(netlistPrims, toAdd, cellName);
         }
 
         // Update all cell references to macro versions
@@ -1638,29 +1640,26 @@ public class EDIFNetlist extends EDIFName {
                                 throw new RuntimeException("failed to find cell macro "+cellName+", we are in "+lib.getName());
                             }
                             primsToRemoveOnCollapse.add(cellName);
-                            EDIFCell copy = new EDIFCell(netlistPrims, macro, cellName);
-                            if (copy.getCellInsts().size() > 0) {
-                                for (EDIFCellInst copyInst : copy.getCellInsts()) {
-                                    EDIFCell primCell = netlistPrims.getCell(copyInst.getCellType().getName());
-                                    if (primCell == null) {
-                                        primCell = new EDIFCell(netlistPrims, copyInst.getCellType());
-                                        primsToRemoveOnCollapse.add(copyInst.getCellType().getName());
-                                    }
-                                    copyInst.setCellType(primCell);
+                            newCell = new EDIFCell(netlistPrims, macro, cellName);
+                            for (EDIFCellInst childInst : newCell.getCellInsts()) {
+                                EDIFCell primCell = netlistPrims.getCell(childInst.getCellType().getName());
+                                if (primCell == null) {
+                                    primCell = new EDIFCell(netlistPrims, childInst.getCellType());
+                                    primsToRemoveOnCollapse.add(childInst.getCellType().getName());
                                 }
+                                childInst.setCellType(primCell);
                             }
-                            newCell = copy;
                         }
+                        assert(newCell == netlistPrims.getCell(cellName));
                         inst.setCellType(newCell);
-                        for (EDIFCellInst childInst : newCell.getCellInsts()) {
-                            // Check if we already have a copy
-                            EDIFCell existingCellType = netlistPrims.getCell(childInst.getCellName());
-                            if (existingCellType == null) {
-                                existingCellType = new EDIFCell(netlistPrims, childInst.getCellType());
-                                primsToRemoveOnCollapse.add(existingCellType.getName());
-                            }
-                            childInst.setCellType(existingCellType);
-                        }
+                    }
+                }
+            }
+            for (EDIFCell cell : lib.getCells()) {
+                for (EDIFNet net : cell.getNets()) {
+                    for (EDIFPortInst portInst : net.getPortInsts()) {
+                        EDIFCell parent = portInst.getPort().getParentCell();
+                        assert (parent.getLibrary().getCell(parent.getName()) == parent);
                     }
                 }
             }
@@ -1678,15 +1677,41 @@ public class EDIFNetlist extends EDIFName {
         ArrayList<EDIFCell> reinsert = new ArrayList<EDIFCell>();
         Map<String, Pair<String, EnumSet<IOStandard>>> seriesMacroCollapseExceptionMap =
                 macroCollapseExceptionMap.getOrDefault(series, Collections.emptyMap());
+        Map<EDIFCell, EDIFCell> updateCellTypes = new IdentityHashMap<>();
         for (EDIFCell cell : prims.getCells()) {
             if (macros.containsCell(cell.getName())) {
                 cell.makePrimitive();
-                if (seriesMacroCollapseExceptionMap.containsKey(cell.getName())) {
-                    cell.rename(seriesMacroCollapseExceptionMap.get(cell.getName()).getFirst());
-                    reinsert.add(cell);
+                Pair<String, EnumSet<IOStandard>> exception = seriesMacroCollapseExceptionMap.get(cell.getName());
+                if (exception != null) {
+                    EDIFCell existingCell = prims.getCell(exception.getFirst());
+                    if (existingCell != null) {
+                        // Existing cell (e.g. OBUFDS) already exists/used in primitives library
+                        // thus cannot simply rename it (e.g. from OBUFDS_DUAL_BUF)
+                        updateCellTypes.put(cell, existingCell);
+                    } else {
+                        cell.rename(exception.getFirst());
+                        reinsert.add(cell);
+                    }
                 }
             }
         }
+
+        if (!updateCellTypes.isEmpty()) {
+            // Update all cell references
+            for (EDIFLibrary lib : getLibraries()) {
+                if (lib.isHDIPrimitivesLibrary())
+                    continue;
+                for (EDIFCell cell : new ArrayList<>(lib.getCells())) {
+                    for (EDIFCellInst inst : cell.getCellInsts()) {
+                        EDIFCell newCellType = updateCellTypes.get(inst.getCellType());
+                        if (newCellType != null) {
+                            inst.setCellType(newCellType);
+                        }
+                    }
+                }
+            }
+        }
+
         for (EDIFCell cell : reinsert) {
             prims.removeCell(cell);
             prims.addCell(cell);
@@ -1821,7 +1846,7 @@ public class EDIFNetlist extends EDIFName {
      */
     public Collection<EDIFPropertyValue> getIOStandards(EDIFCellInst eci) {
         EDIFPropertyValue value = eci.getIOStandard();
-        if (value != DEFAULT_PROP_VALUE) {
+        if (!value.equals(DEFAULT_PROP_VALUE)) {
             return Arrays.asList(value);
         }
 
@@ -1863,7 +1888,7 @@ public class EDIFNetlist extends EDIFName {
                             }
 
                             EDIFPropertyValue driverEpv = driverEci.getIOStandard();
-                            if (driverEpv != DEFAULT_PROP_VALUE) {
+                            if (!driverEpv.equals(DEFAULT_PROP_VALUE)) {
                                 if (driverEpv.equals(netEpv)) {
                                     // Cell and Net IOStandards match
                                     continue;

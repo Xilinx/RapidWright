@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -46,7 +46,7 @@ import java.util.Queue;
  *
  * Created on: May 11, 2017
  */
-public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
+public class EDIFCell extends EDIFPropertyObject {
 
     public static final EDIFName DEFAULT_VIEW = new EDIFName("netlist");
 
@@ -560,10 +560,6 @@ public class EDIFCell extends EDIFPropertyObject implements EDIFEnumerable {
 
     public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache) throws IOException{
         exportEDIF(os, cache, false);
-    }
-    @Override
-    public String getUniqueKey() {
-        return getLibrary().getName() + "_" + getName();
     }
 
     /**
