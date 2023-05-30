@@ -51,7 +51,7 @@ public class DeviceTools {
         while (!q.isEmpty()) {
             RouteNode curr = q.poll();
             if (curr.getLevel() > depth) continue;
-            System.out.println(MessageGenerator.makeWhiteSpace(curr.getLevel()) + curr);
+            System.out.println(StringTools.makeWhiteSpace(curr.getLevel()) + curr);
             for (Wire w : curr.getConnections()) {
                 RouteNode next = new RouteNode(w.getTile(),w.getWireIndex(),curr,curr.getLevel()+1);
                 if (next.getConnections().isEmpty()) continue;

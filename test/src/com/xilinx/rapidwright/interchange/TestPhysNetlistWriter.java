@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -49,7 +49,7 @@ import org.capnproto.ReaderOptions;
 import org.capnproto.StructList;
 
 public class TestPhysNetlistWriter {
-    private void testAllRouteSegmentsEndInBELInputPins(Design design, RouteBranch.Reader routeBranch, Enumerator<String> strings) {
+    private void testAllRouteSegmentsEndInBELInputPins(Design design, RouteBranch.Reader routeBranch, StringEnumerator strings) {
         StructList.Reader<RouteBranch.Reader> branches = routeBranch.getBranches();
         int branchesCount = branches.size();
         if (branchesCount == 0) {
@@ -89,7 +89,7 @@ public class TestPhysNetlistWriter {
 
         PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
 
-        Enumerator<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
+        StringEnumerator allStrings = PhysNetlistReader.readAllStrings(physNetlist);
 
         for (PhysNet.Reader physNet : physNetlist.getPhysNets()) {
             if (physNet.getType() == NetType.GND || physNet.getType() == NetType.VCC) {
@@ -122,7 +122,7 @@ public class TestPhysNetlistWriter {
 
         PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
 
-        Enumerator<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
+        StringEnumerator allStrings = PhysNetlistReader.readAllStrings(physNetlist);
 
         for (CellPlacement.Reader placement : physNetlist.getPlacements()) {
             SiteInst siteInst = design.getSiteInstFromSiteName(allStrings.get(placement.getSite()));

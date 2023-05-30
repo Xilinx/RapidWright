@@ -33,8 +33,6 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
-import com.xilinx.rapidwright.device.Series;
-import com.xilinx.rapidwright.device.SitePIP;
 import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
 import org.capnproto.ReaderOptions;
@@ -104,7 +102,7 @@ public class PhysNetlistReader {
         PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
         design.setPartName(physNetlist.getPart().toString());
 
-        Enumerator<String> allStrings = readAllStrings(physNetlist);
+        StringEnumerator allStrings = readAllStrings(physNetlist);
 
         checkConstantRoutingAndNetNaming(physNetlist, netlist, allStrings);
 
@@ -118,13 +116,11 @@ public class PhysNetlistReader {
 
         readDesignProperties(physNetlist, design, allStrings);
 
-        postProcess(design);
-
         return design;
     }
 
-    public static Enumerator<String> readAllStrings(PhysNetlist.Reader physNetlist) {
-        Enumerator<String> allStrings = new Enumerator<>();
+    public static StringEnumerator readAllStrings(PhysNetlist.Reader physNetlist) {
+        StringEnumerator allStrings = new StringEnumerator();
         TextList.Reader strListReader = physNetlist.getStrList();
         int strCount = strListReader.size();
         for (int i=0; i < strCount; i++) {
@@ -135,7 +131,7 @@ public class PhysNetlistReader {
     }
 
     private static void readSiteInsts(PhysNetlist.Reader physNetlist, Design design,
-                                        Enumerator<String> strings) {
+                                        StringEnumerator strings) {
         Device device = design.getDevice();
         StructList.Reader<SiteInstance.Reader> siteInsts = physNetlist.getSiteInsts();
         int siteInstCount = siteInsts.size();
@@ -154,7 +150,7 @@ public class PhysNetlistReader {
     }
 
     private static void readPlacement(PhysNetlist.Reader physNetlist, Design design,
-                                        Enumerator<String> strings) {
+                                        StringEnumerator strings) {
         HashMap<String, PhysCellType> physCells = new HashMap<>();
         StructList.Reader<PhysCell.Reader> physCellReaders = physNetlist.getPhysCells();
         int physCellCount = physCellReaders.size();
@@ -381,7 +377,7 @@ public class PhysNetlistReader {
     }
 
     private static void readRouting(PhysNetlist.Reader physNetlist, Design design,
-                                    Enumerator<String> strings) {
+                                    StringEnumerator strings) {
         StructList.Reader<PhysNet.Reader> nets = physNetlist.getPhysNets();
         EDIFNetlist netlist = design.getNetlist();
         int netCount = nets.size();
@@ -421,7 +417,7 @@ public class PhysNetlistReader {
     }
 
     private static void readRouteBranch(RouteBranch.Reader branchReader, Net net, Design design,
-                                        Enumerator<String> strings, BELPin routeThruLutInput) {
+                                        StringEnumerator strings, BELPin routeThruLutInput) {
         RouteBranch.RouteSegment.Reader segment = branchReader.getRouteSegment();
         StructList.Reader<RouteBranch.Reader> branches = branchReader.getBranches();
         int branchesCount = branches.size();
@@ -550,7 +546,7 @@ public class PhysNetlistReader {
     }
 
     private static void readDesignProperties(PhysNetlist.Reader physNetlist, Design design,
-                                                Enumerator<String> strings) {
+                                                StringEnumerator strings) {
         StructList.Reader<Property.Reader> props = physNetlist.getProperties();
         int propCount = props.size();
         for (int i=0; i < propCount; i++) {
@@ -566,7 +562,7 @@ public class PhysNetlistReader {
         }
     }
 
-    private static SiteInst getSiteInst(int stringIdx, Design design, Enumerator<String> strings) {
+    private static SiteInst getSiteInst(int stringIdx, Design design, StringEnumerator strings) {
         String siteName = strings.get(stringIdx);
         Site site = design.getDevice().getSite(siteName);
         if (site == null) {
@@ -582,7 +578,7 @@ public class PhysNetlistReader {
         return siteInst;
     }
 
-    private static void checkNetTypeFromCellNet(Map<String, PhysNet.Reader> cellPinToPhysicalNet, EDIFNet net, Enumerator<String> strings) {
+    private static void checkNetTypeFromCellNet(Map<String, PhysNet.Reader> cellPinToPhysicalNet, EDIFNet net, StringEnumerator strings) {
         // Expand EDIFNet and make sure sink cell pins that are part of a
         // physical net are annotated as a VCC or GND net.
         //
@@ -637,7 +633,7 @@ public class PhysNetlistReader {
         }
     }
 
-    private static void mapBelPinsToPhysicalNets(Map<String, PhysNet.Reader> belPinToPhysicalNet, PhysNet.Reader netReader, RouteBranch.Reader routeBranch, Enumerator<String> strings) {
+    private static void mapBelPinsToPhysicalNets(Map<String, PhysNet.Reader> belPinToPhysicalNet, PhysNet.Reader netReader, RouteBranch.Reader routeBranch, StringEnumerator strings) {
         // Populate a map from strings formatted like "<site>/<bel>/<bel pin>"
         // to PhysNet by recursively expanding routing branches.
 
@@ -652,7 +648,7 @@ public class PhysNetlistReader {
         }
     }
 
-    private static void checkConstantRoutingAndNetNaming(PhysNetlist.Reader PhysicalNetlist, EDIFNetlist netlist, Enumerator<String> strings) {
+    private static void checkConstantRoutingAndNetNaming(PhysNetlist.Reader PhysicalNetlist, EDIFNetlist netlist, StringEnumerator strings) {
         // Checks that constant routing and net names are valid.
         //
         // Specifically:
@@ -797,36 +793,6 @@ public class PhysNetlistReader {
                     }
                 }
 
-            }
-        }
-    }
-
-    private static void postProcess(Design design) {
-        final Series series = design.getDevice().getSeries();
-
-        if (series == Series.UltraScalePlus || series == Series.UltraScale) {
-            // To be consistent with Vivado DCPs, remove all intra-site routing for
-            // SRST* pins tied to ground on these series of devices.
-            // (Note: this condition is necessary for {@link DesignTools#createCeSrRstPinsToVCC()})
-            String[] siteWires = new String[]{"RST_ABCDINV_OUT", "RST_EFGHINV_OUT"};
-            for (SiteInst si : design.getSiteInsts()) {
-                if (!Utils.isSLICE(si)) {
-                    continue;
-                }
-                for (String sw : siteWires) {
-                    Net net = si.getNetFromSiteWire(sw);
-                    if (net != null && net.getType() == NetType.GND) {
-                        BELPin belPin = si.getSiteWirePins(sw)[0];
-                        assert(belPin.isOutput());
-                        BEL bel = belPin.getBEL();
-                        assert(bel.getBELClass() == BELClass.RBEL);
-                        assert(bel.getInvertingPin() == bel.getNonInvertingPin());
-                        SitePIP sp = si.getSitePIP(belPin);
-                        Net inputNet = si.getNetFromSiteWire(sp.getInputPin().getSiteWireName());
-                        assert(inputNet == null || inputNet.isStaticNet());
-                        si.unrouteIntraSiteNet(sp.getInputPin(), sp.getOutputPin());
-                    }
-                }
             }
         }
     }

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Keith Rothman, Google, Inc.
@@ -49,7 +49,7 @@ class CellBelMapping {
         private Map<Map.Entry<SiteTypeEnum, String>, Map<String, String>> commonMaps;
         private Map<Map.Entry<SiteTypeEnum, String>, Map<String, Map<String, String>>> parameterMaps;
 
-        private Map<String, String> readPins(String cell, Enumerator<String> allStrings, StructList.Reader<CellBelPinEntry.Reader> pins) {
+        private Map<String, String> readPins(String cell, StringEnumerator allStrings, StructList.Reader<CellBelPinEntry.Reader> pins) {
             Map<String, String> pinMap = new HashMap<String, String>();
 
             for (CellBelPinEntry.Reader pin : pins) {
@@ -79,7 +79,7 @@ class CellBelMapping {
             }
         }
 
-        public CellBelPinMapping(String cell, Enumerator<String> allStrings, Device.CellBelMapping.Reader cellBelMap) {
+        public CellBelPinMapping(String cell, StringEnumerator allStrings, Device.CellBelMapping.Reader cellBelMap) {
             compatiblePlacements = new HashMap<SiteTypeEnum, Set<String>>();
             commonMaps = new HashMap<Map.Entry<SiteTypeEnum, String>, Map<String, String>>();
             parameterMaps = new HashMap<Map.Entry<SiteTypeEnum, String>, Map<String, Map<String, String>>>();
@@ -188,7 +188,7 @@ class CellBelMapping {
 
     private Map<String, CellBelPinMapping> map;
 
-    public CellBelMapping(Enumerator<String> allStrings, StructList.Reader<Device.CellBelMapping.Reader> cellBelMaps) {
+    public CellBelMapping(StringEnumerator allStrings, StructList.Reader<Device.CellBelMapping.Reader> cellBelMaps) {
         map = new HashMap<String, CellBelPinMapping>();
 
         for (Device.CellBelMapping.Reader cellBelMap : cellBelMaps) {
