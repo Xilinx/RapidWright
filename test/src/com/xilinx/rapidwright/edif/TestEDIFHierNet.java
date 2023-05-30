@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.xilinx.rapidwright.design.Unisim;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -53,6 +54,44 @@ public class TestEDIFHierNet {
             }
             Assertions.assertTrue(testSet.isEmpty());
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testGetLeafHierPortInstsInout(boolean blackbox) {
+        final EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
+
+        EDIFCell cell;
+        EDIFCell top = netlist.getTopCell();
+        String portName = "IO";
+        if (blackbox) {
+            cell = new EDIFCell(netlist.getWorkLibrary(), "blackbox");
+            cell.createPort(portName, EDIFDirection.INOUT, 1);
+        } else {
+            cell = Design.getUnisimCell(Unisim.IOBUF);
+        }
+        Assertions.assertTrue(cell.isLeafCellOrBlackBox());
+
+        EDIFCellInst inst = top.createChildCellInst("inst", cell);
+
+        EDIFNet net = top.createNet("net");
+        EDIFPort port = cell.getPort(portName);
+        // INOUT ports return false for both
+        Assertions.assertFalse(port.isInput());
+        Assertions.assertFalse(port.isOutput());
+
+        EDIFPortInst epi = net.createPortInst(port);
+        // INOUT port insts return false for both
+        Assertions.assertFalse(epi.isInput());
+        Assertions.assertFalse(epi.isOutput());
+
+        Assertions.assertEquals(1, net.getPortInsts().size());
+
+        EDIFHierNet ehn = netlist.getHierNetFromName("net");
+        List<EDIFHierPortInst> leaves = ehn.getLeafHierPortInsts(true, true);
+
+        // INOUT leaf ports insts are not currently collected
+        Assertions.assertTrue(leaves.isEmpty());
     }
 
     @Test

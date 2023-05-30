@@ -37,13 +37,13 @@ public class PathPort {
     private final SitePinInst sitePinInst;
     private final HardMacro block;
     private final Tile tile;
-    private final Tile[][] nameRootTiles;
+    private final Tile[][] rootNameTiles;
 
     public PathPort(SitePinInst sitePinInst, HardMacro block, Tile tile) {
         this.sitePinInst = sitePinInst;
         this.block = block;
         this.tile = tile;
-        this.nameRootTiles = tile.getDevice().getTilesByNameRoot(tile.getNameRoot());
+        this.rootNameTiles = tile.getDevice().getTilesByRootName(tile.getRootName());
     }
 
     private Tile cachedAnchor;
@@ -59,7 +59,7 @@ public class PathPort {
             return cachedRelocate;
         }
 
-        final Tile res = Module.getCorrespondingTile(tile, anchor, block.getModule().getAnchor().getTile(), nameRootTiles);
+        final Tile res = Module.getCorrespondingTile(tile, anchor, block.getModule().getAnchor().getTile(), rootNameTiles);
         cachedAnchor = anchor;
         cachedRelocate = res;
         return res;

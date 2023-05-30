@@ -120,7 +120,7 @@ public class RelocatableTileRectangle extends TileRectangle {
         int newTileX = newAnchor.getTileXCoordinate() + tileXOffset;
         int newTileY = newAnchor.getTileYCoordinate() + tileYOffset;
 
-        String newName = template.getNameRoot()+"_X"+newTileX+"Y"+newTileY;
+        String newName = template.getRootName() + "_X" + newTileX + "Y" + newTileY;
 
 
         return "Failed to find corresponding tile \""+newName+"\" for "+template+" when relocating from "+originalAnchor+" to "+newAnchor+". Rect: "+ this;
@@ -128,10 +128,10 @@ public class RelocatableTileRectangle extends TileRectangle {
 
     public RelocatableTileRectangle getCorresponding(Tile newAnchor, Tile originalAnchor) {
         if (minColumnArr == null) {
-            minColumnArr = newAnchor.getDevice().getTilesByNameRoot(minColumn.getNameRoot());
-            maxColumnArr = newAnchor.getDevice().getTilesByNameRoot(maxColumn.getNameRoot());
-            minRowArr = newAnchor.getDevice().getTilesByNameRoot(minRow.getNameRoot());
-            maxRowArr = newAnchor.getDevice().getTilesByNameRoot(maxRow.getNameRoot());
+            minColumnArr = newAnchor.getDevice().getTilesByRootName(minColumn.getRootName());
+            maxColumnArr = newAnchor.getDevice().getTilesByRootName(maxColumn.getRootName());
+            minRowArr = newAnchor.getDevice().getTilesByRootName(minRow.getRootName());
+            maxRowArr = newAnchor.getDevice().getTilesByRootName(maxRow.getRootName());
         }
 
         return new RelocatableTileRectangle(

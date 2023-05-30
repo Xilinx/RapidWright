@@ -188,4 +188,32 @@ public class TestModuleInst {
             Assertions.assertFalse(mi3.isPlaced());
         }
     }
+
+    @Test
+    public void testConnectMovesPins() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+
+        Design emptyDesign = new Design("emptyDesign", design.getPartName());
+
+        // Need metadata for ports
+        String metaPath = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.metadata");
+        Module module = new Module(design, metaPath, false);
+        design = null;
+
+        ModuleInst mi1 = emptyDesign.createModuleInst("inst1", module);
+        ModuleInst mi2 = emptyDesign.createModuleInst("inst2", module);
+
+        Assertions.assertTrue(mi1.placeOnOriginalAnchor());
+        boolean skipIncompatible = true; // Necessary because out-of-context clock routing cannot be relocated
+        Assertions.assertTrue(mi2.place(mi1.getPlacement().getNeighborSite(0,-5), skipIncompatible));
+
+        Net net1 = mi1.getCorrespondingNet(module.getPort("output_port_x[0]"));
+        Net net2 = mi2.getCorrespondingNet(module.getPort("input_port_a[0]"));
+        Assertions.assertEquals("[OUT SLICE_X15Y237.HQ2]", net1.getPins().toString());
+        Assertions.assertEquals("[IN SLICE_X16Y233.A2]", net2.getPins().toString());
+
+        mi1.connect("output_port_x", 0, mi2, "input_port_a", 0);
+        Assertions.assertEquals("[OUT SLICE_X15Y237.HQ2, IN SLICE_X16Y233.A2]", net1.getPins().toString());
+        Assertions.assertTrue(net2.getPins().isEmpty());
+    }
 }
