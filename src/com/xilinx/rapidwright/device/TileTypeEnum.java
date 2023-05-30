@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Advanced Micro Devices, Inc.
@@ -27,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Wed Oct 26 12:59:37 2022
+ * Generated on: Wed May 17 23:03:43 2023
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  *
  * Enumeration of TileTypeEnum type for all valid devices within Vivado.
@@ -324,8 +324,23 @@ public enum TileTypeEnum {
     CLE_M_TERM_P,
     CLE_M_TERM_T,
     CLE_W_CORE,
+    CLKE2_GT_AAO_TILE,
+    CLKE2_GT_AAO_TILE_MY,
+    CLKE2_GT_BBO_TILE,
+    CLKE2_GT_BBO_TILE_MY,
+    CLKE2_GT_CCO_TILE,
+    CLKE2_GT_CCO_TILE_MY,
     CLKE2_REBUF_HBM_CORE,
     CLKE2_REBUF_HBM_CORE_MX,
+    CLKE2_REBUF_HSR_EDGE_CORE,
+    CLKE2_REBUF_VERT_EDGE_AOO_TILE,
+    CLKE2_REBUF_VERT_GT_EDGE_AOO_TILE,
+    CLKE2_REBUF_VERT_GT_EDGE_AOO_TILE_MY,
+    CLKE2_VNOC_AAO_TILE,
+    CLKE2_VNOC_BBO_TILE,
+    CLKE2_VNOC_CCO_TILE,
+    CLKE2_VNOC_EDGE_AAO_TILE,
+    CLKE2_VNOC_PSS_CCO_TILE,
     CLK_BALI_REBUF,
     CLK_BALI_REBUF_GTZ_BOT,
     CLK_BALI_REBUF_GTZ_TOP,
@@ -1090,6 +1105,7 @@ public enum TileTypeEnum {
     L_TERM_INT,
     L_TERM_INT_BRAM,
     MISC_BFRB_DECAP_CORE,
+    MISC_CIDB_HFSR_CORE,
     MISC_GT_REBUF_TILE,
     MISC_GT_REBUF_TILE_MY,
     MISC_PSXL_DECAP_CORE,
@@ -1111,6 +1127,7 @@ public enum TileTypeEnum {
     MONITOR_TOP_PELE1,
     MRMAC_BOT_TILE,
     MRMAC_TOP_TILE,
+    NOC2_HNOC_NIDB_CORE,
     NOC2_NCRB_TILE,
     NOC2_NMU128_TOP,
     NOC2_NMU128_TOP_MY,
@@ -1128,6 +1145,7 @@ public enum TileTypeEnum {
     NOC2_NSU512_VNOC_TILE,
     NOC2_SCAN_TOP,
     NOC2_SCAN_TOP_MY,
+    NOC2_TNOC_NIDB_CORE,
     NOC2_XBR2X4_TOP,
     NOC2_XBR4X2_TOP,
     NOC2_XBR4X2_TOP_MY,
@@ -1218,6 +1236,9 @@ public enum TileTypeEnum {
     PSS_GTY_FILL_ALTO_FT,
     PSS_GTY_FILL_ALTO_TERM_B_FT,
     PSS_GTY_FILL_MX8_FT,
+    PSS_PMC_BUF_CORE,
+    PSS_PMC_GTM_BUF_CORE,
+    PSS_PMC_HNIDB_BUF_CORE,
     PSS_VCU_DA6_FILL_ALTO_RBRK_FT,
     PSXL_CORE,
     RBRK_BFRB_CORE,
@@ -1226,6 +1247,7 @@ public enum TileTypeEnum {
     RBRK_BRAM_TILE_MY,
     RBRK_CBRK_CORE,
     RBRK_CFRM_CORE,
+    RBRK_CIDB_CORE,
     RBRK_CLE_CORE,
     RBRK_CLE_LAG_CORE,
     RBRK_CPIPE_CORE,
@@ -1314,6 +1336,7 @@ public enum TileTypeEnum {
     RCLK_CBRK_M12BUF_R,
     RCLK_CBRK_R,
     RCLK_CBRK_R_CORE,
+    RCLK_CIDB_CORE,
     RCLK_CLEL_L,
     RCLK_CLEL_L_L,
     RCLK_CLEL_L_R,
@@ -1502,7 +1525,9 @@ public enum TileTypeEnum {
     SDFECA_BOT_TILE,
     SDFECA_TOP_TILE,
     SDFECB_TOP_TILE,
+    SDFECC_BOT_TILE,
     SLL,
+    SLL2,
     TERM_B_BFRB_CORE,
     TERM_B_BLI_BRAM_L_TILE,
     TERM_B_BLI_BRAM_TILE,
@@ -1514,6 +1539,7 @@ public enum TileTypeEnum {
     TERM_B_BRAM_CORE_MY,
     TERM_B_CBRK_CORE,
     TERM_B_CFRM_CORE,
+    TERM_B_CIDB_CORE,
     TERM_B_CLE_LAG_CORE,
     TERM_B_CPIPE_CORE,
     TERM_B_CPIPE_TERMR_XPIO_CORE,
@@ -1554,9 +1580,11 @@ public enum TileTypeEnum {
     TERM_P_BRAM_CORE,
     TERM_P_CBRK_CORE,
     TERM_P_CLE_CORE,
+    TERM_P_CLE_LAG_CORE,
     TERM_P_CPIPE_CORE,
     TERM_P_GTCLK_CORE,
     TERM_P_GTCLK_CORE2,
+    TERM_P_GTCLK_CORE3,
     TERM_P_GTCLK_CPM5_CORE,
     TERM_P_GTM_CORE,
     TERM_P_GTYP_CORE,
@@ -1589,6 +1617,7 @@ public enum TileTypeEnum {
     TERM_T_CBRK_CORE_MY,
     TERM_T_CBRK_LOVN_CORE,
     TERM_T_CFRM_CORE,
+    TERM_T_CIDB_CORE,
     TERM_T_CLE_CORE,
     TERM_T_CLE_LAG_CORE,
     TERM_T_CPIPE_L_CORE,

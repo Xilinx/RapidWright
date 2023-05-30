@@ -564,7 +564,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         // Get original lower left placement
         Tile origLowerLeft = getLowerLeftTile(type);
 
-        String origTilePrefix = origLowerLeft.getNameRoot();
+        String origTilePrefix = origLowerLeft.getRootName();
         String newSuffix = "_X" + (origLowerLeft.getTileXCoordinate() + dx) + "Y" + (origLowerLeft.getTileYCoordinate() + dy);
 
         Tile newTile = origLowerLeft.getDevice().getTile(origTilePrefix + newSuffix);

@@ -211,7 +211,7 @@ public class RelocationTools {
             SiteInst srcSiteInst = e.getKey();
             assert(destSite != srcSite);
             if (destTile == null || destSite == null) {
-                String destTileName = srcTile.getNameRoot() + "_X" + (srcTile.getTileXCoordinate() + tileColOffset)
+                String destTileName = srcTile.getRootName() + "_X" + (srcTile.getTileXCoordinate() + tileColOffset)
                         + "Y" + (srcTile.getTileYCoordinate() + tileRowOffset);
                 System.out.println("ERROR: Failed to move SiteInst '" + srcSiteInst.getName() + "' from Tile '" + srcTile.getName()
                         + "' to Tile '" + destTileName + "'");
@@ -285,7 +285,7 @@ public class RelocationTools {
                     if (isClockNet) {
                         System.out.println("INFO: Skipping clock net PIP '" + sp + "' (Net '" + n.getName() + "')");
                     } else {
-                        String destTileName = st.getNameRoot() + "_X" + (st.getTileXCoordinate() + tileColOffset)
+                        String destTileName = st.getRootName() + "_X" + (st.getTileXCoordinate() + tileColOffset)
                                 + "Y" + (st.getTileYCoordinate() + tileRowOffset);
                         System.out.println("ERROR: Failed to move PIP '" + sp + "' to Tile '" + destTileName +
                                 "' (Net '" + n.getName() + "')");

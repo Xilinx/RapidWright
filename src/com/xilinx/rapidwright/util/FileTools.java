@@ -189,6 +189,17 @@ public class FileTools {
     }
 
     /**
+     * Creates a Kryo output stream that instantiates a Zstandard compression stream
+     * from an output stream.
+     * 
+     * @param os The existing output stream to wrap.
+     * @return The created kryo-zstd output file stream.
+     */
+    public static Output getKryoZstdOutputStream(OutputStream os) {
+        return getKryoOutputStreamWithoutDeflater(getZstdOutputStream(os));
+    }
+
+    /**
      * Creates a Zstandard compression stream to an output file.
      * 
      * @param fileName Name of the file to target.
@@ -280,6 +291,21 @@ public class FileTools {
      */
     public static Input getKryoZstdInputStream(String fileName) {
         return getKryoInputStreamWithoutInflater(getZstdInputStream(fileName));
+    }
+
+    /**
+     * Creates a Kryo input stream from decompressing a Zstandard compressed input
+     * stream.
+     * 
+     * @param input The input stream to read from.
+     * @return The created kryo-zstd input file stream.
+     */
+    public static Input getKryoZstdInputStream(InputStream input) {
+        try {
+            return getKryoInputStreamWithoutInflater(new ZstdInputStream(input));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /**
@@ -1672,6 +1698,16 @@ public class FileTools {
         return isBinary;
     }
 
+    public static final int[] GZIP_START_BYTES = {0x78, 0x9c};
+        
+    public static boolean isFileGzipped(Path path) {
+        try (InputStream in = Files.newInputStream(path)) {
+            return in.read() == GZIP_START_BYTES[0] && in.read() == GZIP_START_BYTES[1];
+        } catch (IOException e) {
+            throw new RuntimeException("ERROR: Trying to read file " + path + " and it errored.", e);
+        }
+    }
+    
     /**
      * Runs the provided command (arguments must be separate) and gathers the
      * standard output followed by the standard error.
