@@ -12,6 +12,7 @@ plugins {
 apply from: 'common.gradle'
 
 mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
+def standaloneClassName = "com.xilinx.rapidwright.StandaloneEntrypoint"
 
 def read_rapidwright_version() {
     def sw = new StringWriter()
@@ -58,6 +59,17 @@ task copyJars(type: Copy) {
 }
 compileJava.dependsOn(copyJars)
 
+task mainJar(type: Jar, dependsOn: classes) {
+    archiveBaseName = 'main'
+    from sourceSets.main.output include mainClassName
+    manifest {
+        attributes 'Main-Class': mainClassName
+        attributes 'Class-Path': ([destinationDirectory.get().getAsFile().toPath().relativize(sourceSets.main.java.destinationDirectory.get().getAsFile().toPath()).toString() + File.separator]
+            + configurations.implementation.collect { destinationDirectory.get().getAsFile().toPath().relativize(projectDir.toPath()).resolve('jars').resolve(it.getName()) }).join(' ')
+    }
+}
+compileJava.finalizedBy(mainJar)
+
 task deleteJars(type: Delete) {
     delete fileTree('jars')
 }
@@ -95,7 +107,7 @@ task javadocJar(type: Jar) {
 task standaloneJar (type: Jar) {
     duplicatesStrategy = DuplicatesStrategy.WARN
     manifest {
-        attributes 'Main-Class': 'com.xilinx.rapidwright.util.RapidWright'
+        attributes 'Main-Class': standaloneClassName
     }
     archiveBaseName = 'rapidwright-'+rapidwright_version+'-standalone-' + os.charAt(0) + 'in64'
     from { configurations.implementation.collect { it.isDirectory() ? it : zipTree(it) } }

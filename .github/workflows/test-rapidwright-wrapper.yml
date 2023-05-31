@@ -1,0 +1,42 @@
+name: Test RapidWright Wrapper
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: gradle/wrapper-validation-action@e6e38bacfdf1a337459f332974bb2327a31aaf4b
+
+      - name: Setup JDK 1.11
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+          cache: 'gradle'
+
+      - name: Compile
+        run: ./gradlew compileJava
+
+      - name: Test RapidWright Wrapper
+        run: ./rapidwright 
+
+      - name: List RapidWright Apps
+        run: ./rapidwright --list-apps
+
+      - name: Check Class Main Execution
+        run: ./rapidwright com.xilinx.rapidwright.rwroute.RWRoute
+
+      - name: Check Jython Command Execution
+        run: ./rapidwright Jython -c "from com.xilinx.rapidwright.device import Device;print(Device.AWS_F1)"
+
+      - name: Terminate Gradle to allow caching
+        run: ./gradlew --stop
+

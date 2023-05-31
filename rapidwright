@@ -1,0 +1,67 @@
+#!/bin/sh
+
+#  Copyright (c) 2023, Advanced Micro Devices, Inc.
+#  All rights reserved.
+# 
+#  Author: Eddie Hung, Advanced Micro Devices, Inc.
+# 
+#  This file is part of RapidWright.
+# 
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+# 
+#      http://www.apache.org/licenses/LICENSE-2.0
+# 
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+
+# Reproduced from from `gradlew`
+ PRG="$0" 
+ # Need this for relative symlinks. 
+ while [ -h "$PRG" ] ; do 
+     ls=`ls -ld "$PRG"` 
+     link=`expr "$ls" : '.*-> \(.*\)$'` 
+     if expr "$link" : '/.*' > /dev/null; then 
+         PRG="$link" 
+     else 
+         PRG=`dirname "$PRG"`"/$link" 
+     fi 
+ done 
+ SAVED="`pwd`" 
+ cd "`dirname \"$PRG\"`/" >/dev/null 
+ APP_HOME="`pwd -P`" 
+
+
+# Check that the main jar has been built
+# NOTE: Does not check that it is up-to-date
+MAIN_JAR=${APP_HOME}/build/libs/main.jar
+if [ ! -f ${MAIN_JAR} ]; then
+    echo "RapidWright not yet compiled. Please run './gradlew compileJava' from '${APP_HOME}'"
+    exit 1
+fi
+
+
+if [ $# -eq 0 -o "$1" = "--help" -o "$1" = "-h" -o "$1" = "/?" ]; then
+    echo "./rapidwright com.xilinx.rapidwright.<ClassName> -- to execute main() method of Java class"
+    echo "./rapidwright <application>                      -- to execute a specific application"
+    echo "./rapidwright --list-apps                        -- to list all available applications"
+    echo "./rapidwright jython                             -- to enter interactive Jython shell"
+    echo "./rapidwright jython -c \"...\"                    -- to execute specific Jython command"
+    exit
+fi
+
+
+# If the first argument is likely to be a class name, then
+# execute that Java class' `main()` method
+if case $1 in "com.xilinx.rapidwright."*) true;; *) false;; esac; then
+    java -cp ${MAIN_JAR} "$@"
+    exit
+fi
+
+# Otherwise use the default `MainEntrypoint` class
+java -jar ${MAIN_JAR} "$@"
