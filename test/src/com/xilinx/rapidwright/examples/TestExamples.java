@@ -54,14 +54,14 @@ public class TestExamples {
 
     /*
      * This test is a reproduction of Lesson1.java. The code is not used directly so
-     * as to keep the original example simple an unencumbered.
+     * as to keep the original example simple and unencumbered.
      */
     @ParameterizedTest
     @CsvSource({ "xc7z020clg400-1", // Device.ZYNQ_Z1
             "xcku040-ffva1156-2-e", // Device.KCU105
     })
     public void testHelloWorld(String device, @TempDir Path tempDir) {
-        // Create a new empty design using the PYNQ-Z1 device part
+        // Create a new empty design using the given device part
         Design d = new Design("HelloWorld", device);
 
         String ioStd = "LVCMOS33";
