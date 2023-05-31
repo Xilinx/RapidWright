@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Advanced Micro Devices, Inc.
@@ -27,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Wed Oct 26 12:59:37 2022
+ * Generated on: Wed May 17 23:03:43 2023
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  *
  * Enumeration of SiteTypeEnum type for all valid devices within Vivado.
@@ -151,6 +151,7 @@ public enum SiteTypeEnum {
     FRAME_ECC,
     GCLK_DELAY,
     GCLK_DELAY_SSIT,
+    GCLK_DELAY_SSIT2,
     GCLK_PD,
     GCLK_TAPS_DECODE_GT,
     GCLK_TAPS_DECODE_VNOC,
@@ -253,6 +254,8 @@ public enum SiteTypeEnum {
     MRMAC,
     MTBF2,
     MTBF3,
+    NOC2_NIDBH,
+    NOC2_NIDBV,
     NOC2_NMU128,
     NOC2_NMU256,
     NOC2_NMU512,
@@ -332,6 +335,7 @@ public enum SiteTypeEnum {
     RPI_HD_APB,
     SDFEC_A,
     SDFEC_B,
+    SDFEC_C,
     SLICEL,
     SLICEM,
     STARTUP,
