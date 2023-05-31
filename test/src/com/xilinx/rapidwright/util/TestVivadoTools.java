@@ -49,13 +49,13 @@ public class TestVivadoTools {
     }
 
     @Test
-    public void testReportRouteStatus(@TempDir Path tempDir) throws IOException {
+    public void testReportRouteStatus() throws IOException {
         Assumptions.assumeTrue(FileTools.isVivadoOnPath());
         String dcp = RapidWrightDCP.getPath("picoblaze_partial.dcp").toString();
         Design d = Design.readCheckpoint(dcp);
-        VivadoTools.ReportRouteStatusResult r = VivadoTools.reportRouteStatus(d, tempDir);
+        VivadoTools.ReportRouteStatusResult r = new VivadoTools.ReportRouteStatusResult(d);
 
-        Assertions.assertEquals(12144, r.unroutedNets());
+        Assertions.assertEquals(12144, r.unroutedNets);
     }
 
 }
