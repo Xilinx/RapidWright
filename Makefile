@@ -15,8 +15,7 @@ TMP_HEADER = TMP_HEADER_TXT
 .PHONY: compile update_jars ensure_headers check_headers pre_commit enable_pre_commit_hook
 compile: $(CLASSES)
 $(CLASSES): $(SOURCES) $(JARFILES)
-	rm -rf $(BIN)
-	mkdir -p $(BIN)
+	rm -rf $(BIN)/com
 	javac -source 8 -target 8 $(SOURCES) -d $(BIN) -cp $(CLASSPATH)
 	echo "export CLASSPATH=`pwd`/bin:$(shell echo `pwd`/jars/*.jar | tr ' ' ':')" > $(BIN)/rapidwright_classpath.sh
 

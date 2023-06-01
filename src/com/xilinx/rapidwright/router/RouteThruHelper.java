@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.router;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -66,7 +67,7 @@ public class RouteThruHelper {
     }
 
     private void writeFile() {
-        try (Output out = FileTools.getKryoOutputStream(getSerializedFileName(device.getName()))) {
+        try (Output out = FileTools.getKryoZstdOutputStream(getSerializedFileName(device.getName()))) {
             out.writeInt(routeThrus.size());
             for (Entry<TileTypeEnum, HashSet<Integer>> e : routeThrus.entrySet()) {
                 out.writeString(e.getKey().toString());
@@ -80,7 +81,7 @@ public class RouteThruHelper {
 
     private void readFile() {
         routeThrus = new HashMap<TileTypeEnum, HashSet<Integer>>();
-        try (Input in = FileTools.getKryoInputStream(getSerializedFileName(device.getName()))) {
+        try (Input in = FileTools.getKryoZstdInputStream(getSerializedFileName(device.getName()))) {
             int count = in.readInt();
             for (int i=0; i < count; i++) {
                 TileTypeEnum type = TileTypeEnum.valueOf(in.readString());
@@ -97,7 +98,7 @@ public class RouteThruHelper {
     private void init() {
         String serializedFileName = getSerializedFileName(device.getName());
         routeThrus = new HashMap<TileTypeEnum,HashSet<Integer>>();
-        if (new File(serializedFileName).exists()) {
+        if (new File(serializedFileName).exists() && !FileTools.isFileGzipped(Path.of(serializedFileName))) {
             readFile();
             return;
         }
