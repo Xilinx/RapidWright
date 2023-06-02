@@ -805,7 +805,7 @@ public class RWRoute{
     /**
      * Assigns a list of nodes to each connection and fix net routes if there are cycles and / or multi-driver nodes.
      */
-    private void postRouteProcess() {
+    protected void postRouteProcess() {
         if (routeIteration <= config.getMaxIterations()) {
             assignNodesToConnections();
             // fix routes with cycles and / or multi-driver nodes
