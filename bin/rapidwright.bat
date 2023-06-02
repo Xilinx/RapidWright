@@ -1,1 +1,0 @@
-../rapidwright.bat
