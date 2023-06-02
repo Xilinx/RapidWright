@@ -62,10 +62,9 @@ task copyJars(type: Copy) {
     //Filter to remove the jar itself, getFiles() to remove the implicit dependency
     from configurations.testFixturesImplementation.filter { !tasks.getByName("jar").outputs.files.contains(it) } .getFiles()
     into 'jars'
-    dependsOn preserveScripts
-
 }
 compileJava.dependsOn(copyJars)
+compileJava.dependsOn(preserveScripts)
 
 task cleanupScripts(type: Delete) {
     delete scriptsDir
