@@ -31,9 +31,7 @@ import java.util.List;
 import com.xilinx.rapidwright.design.Design;
 
 /**
- * Utility methods to run access vivado and parse logs
- * 
- * @author zakn
+ * Utility methods to provide access to vivado and parse logs
  *
  */
 public class VivadoTools {

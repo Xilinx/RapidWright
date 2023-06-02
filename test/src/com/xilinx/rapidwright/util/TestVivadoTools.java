@@ -57,6 +57,5 @@ public class TestVivadoTools {
 
         Assertions.assertEquals(12144, r.unroutedNets);
     }
-
 }
 
