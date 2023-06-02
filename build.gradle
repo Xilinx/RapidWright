@@ -56,6 +56,8 @@ task copyJars(type: Copy) {
     //Filter to remove the jar itself, getFiles() to remove the implicit dependency
     from configurations.testFixturesImplementation.filter { !tasks.getByName("jar").outputs.files.contains(it) } .getFiles()
     into 'jars'
+
+    outputs.files("bin/rapidwright", "bin/rapidwright.bat")
 }
 compileJava.dependsOn(copyJars)
 
