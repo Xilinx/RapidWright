@@ -86,12 +86,7 @@ public class VivadoTools {
             fullyRoutedNets = parseLog(log, "# of fully routed nets");
             netsWithRoutingErrors = parseLog(log, "# of nets with routing errors");
 
-            String[] toDel = workdirHandle.list();
-            for (String s : toDel) {
-                File f = new File(workdirHandle.getPath(), s);
-                f.delete();
-            }
-            workdirHandle.delete();
+            FileTools.deleteFolder(workdirHandle.toString());
         }
     }
 
