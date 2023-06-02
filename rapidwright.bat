@@ -21,6 +21,10 @@ REM  limitations under the License.
 REM Check that the main jar has been built
 REM NOTE: Does not check that it is up-to-date
 SET "BAT_SOURCE=%~dp0"
+SET BAT_PATH=%~f0
+IF "%BAT_PATH:~-31%" == "RapidWright\bin\rapidwright.bat" (
+  SET BAT_SOURCE=%BAT_SOURCE:~0,-4%
+)
 SET "MAIN_JAR=%BAT_SOURCE%build\libs\main.jar"
 IF EXIST %MAIN_JAR% GOTO JAR_EXISTS
 echo "RapidWright not yet compiled. Please run './gradlew compileJava' from '%BAT_SOURCE%'"
