@@ -27,9 +27,11 @@ package com.xilinx.rapidwright.rwroute;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -281,11 +283,11 @@ public class RWRoute{
         numNotNeedingRoutingNets = 0;
         numUnrecognizedNets = 0;
 
-        nets = new HashMap<>();
+        nets = new IdentityHashMap<>();
         indirectConnections = new ArrayList<>();
         directConnections = new ArrayList<>();
         clkNets = new ArrayList<>();
-        staticNetAndRoutingTargets = new HashMap<>();
+        staticNetAndRoutingTargets = new IdentityHashMap<>();
 
         for (Net net : design.getNets()) {
             if (net.isClockNet()) {
@@ -1001,8 +1003,8 @@ public class RWRoute{
     private void computesNodeUsageAndTotalWirelength() {
         totalWL = 0;
         totalINTNodes = 0;
-        nodeTypeUsage = new HashMap<>();
-        nodeTypeLength = new HashMap<>();
+        nodeTypeUsage = new EnumMap<>(IntentCode.class);
+        nodeTypeLength = new EnumMap<>(IntentCode.class);
 
         Set<Node> netNodes = new HashSet<>();
         for (Entry<Net,NetWrapper> e : nets.entrySet()) {
