@@ -26,16 +26,16 @@ jobs:
         run: ./gradlew compileJava
 
       - name: Test RapidWright Wrapper
-        run: ./bin/rapidwright 
+        run: ${{ github.action_path }}/bin/rapidwright 
 
       - name: List RapidWright Apps
-        run: ./bin/rapidwright --list-apps
+        run: ${{ github.action_path }}/bin/rapidwright --list-apps
 
       - name: Check Class Main Execution
-        run: ./bin/rapidwright com.xilinx.rapidwright.rwroute.RWRoute
+        run: ${{ github.action_path }}/bin/rapidwright com.xilinx.rapidwright.rwroute.RWRoute
 
       - name: Check Jython Command Execution
-        run: ./bin/rapidwright Jython -c "from com.xilinx.rapidwright.device import Device;print(Device.AWS_F1)"
+        run: ${{ github.action_path }}/bin/rapidwright Jython -c "from com.xilinx.rapidwright.device import Device;print(Device.AWS_F1)"
 
       - name: Terminate Gradle to allow caching
         run: ./gradlew --stop
