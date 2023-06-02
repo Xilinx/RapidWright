@@ -33,7 +33,8 @@
      fi 
  done 
  SAVED="`pwd`" 
- cd "`dirname \"$PRG\"`/" >/dev/null 
+ cd "`dirname \"$PRG\"`/" >/dev/null
+ cd .. > /dev/null
  APP_HOME="`pwd -P`" 
 
 
