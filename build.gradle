@@ -13,7 +13,7 @@ apply from: 'common.gradle'
 
 mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
 def standaloneClassName = "com.xilinx.rapidwright.StandaloneEntrypoint"
-def scriptsDir = ".preserveScripts"
+def preserveDir = ".preserveBin"
 
 def read_rapidwright_version() {
     def sw = new StringWriter()
@@ -50,9 +50,9 @@ sourceSets {
   }
 }
 
-task preserveScripts(type: Copy) {
+task preserveBin(type: Copy) {
      from "bin/rapidwright", "bin/rapidwright.bat"
-     into scriptsDir
+     into preserveDir
 }
 
 task copyJars(type: Copy) {
@@ -64,14 +64,14 @@ task copyJars(type: Copy) {
     into 'jars'
 }
 compileJava.dependsOn(copyJars)
-compileJava.dependsOn(preserveScripts)
+compileJava.dependsOn(preserveBin)
 
 task cleanupScripts(type: Delete) {
-    delete scriptsDir
+    delete preserveDir
 }
 
 task restoreScripts(type: Copy) {
-    from scriptsDir
+    from preserveDir
     into 'bin'
     finalizedBy(cleanupScripts)
 }
