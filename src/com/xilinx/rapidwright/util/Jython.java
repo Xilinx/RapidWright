@@ -100,7 +100,6 @@ public class Jython {
             jythonCmd.append(origCmd);
             // Overwrite the original command with version supplemented with import statements
             args[origCmdIdx] = jythonCmd.toString();
-            System.out.println(Arrays.toString(args));
         }
         
         return args;
