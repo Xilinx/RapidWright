@@ -34,28 +34,35 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestVivadoTools {
     @Test
     public void testRunTclCmd(@TempDir Path tempDir) {
         Assumptions.assumeTrue(FileTools.isVivadoOnPath());
 
-        List<String> log = new ArrayList<>();
-        log = VivadoTools.runTcl(tempDir.resolve("outputLog.log"), "exit", true);
+        List<String> log = VivadoTools.runTcl(tempDir.resolve("outputLog.log"), "exit", true);
 
-        List<String> results = new ArrayList<>();
-        results = VivadoTools.searchVivadoLog(log, "INFO");
+        List<String> results = VivadoTools.searchVivadoLog(log, "INFO");
         Assertions.assertTrue(results.get(0).contains("Exiting Vivado"));
     }
 
-    @Test
-    public void testReportRouteStatus() throws IOException {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testReportRouteStatus(boolean fromDisk) {
         Assumptions.assumeTrue(FileTools.isVivadoOnPath());
-        String dcp = RapidWrightDCP.getPath("picoblaze_partial.dcp").toString();
-        Design d = Design.readCheckpoint(dcp);
-        ReportRouteStatusResult r = new ReportRouteStatusResult(d);
 
-        Assertions.assertEquals(12144, r.unroutedNets);
+        Path dcp = RapidWrightDCP.getPath("picoblaze_partial.dcp");
+        ReportRouteStatusResult rrs;
+        if (fromDisk) {
+            rrs = VivadoTools.reportRouteStatus(dcp);
+        } else {
+            Design d = Design.readCheckpoint(dcp);
+            rrs = VivadoTools.reportRouteStatus(d);
+        }
+
+        Assertions.assertEquals(12144, rrs.unroutedNets);
     }
 }
 
