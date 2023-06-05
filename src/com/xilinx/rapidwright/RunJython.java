@@ -89,7 +89,6 @@ public class RunJython {
         String[] jythonArgs = new String[2];
         jythonArgs[0] = "-c";
         jythonArgs[1] = jythonCmd.toString();
-        // System.out.println(jythonCmd);
         jython.main(jythonArgs);
     }
 }
