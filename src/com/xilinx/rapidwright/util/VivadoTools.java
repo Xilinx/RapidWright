@@ -24,6 +24,8 @@ package com.xilinx.rapidwright.util;
 
 import com.xilinx.rapidwright.design.Design;
 
+import java.io.File;
+import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +35,8 @@ import java.util.List;
  *
  */
 public class VivadoTools {
+
+    public static final String REPORT_ROUTE_STATUS = "report_route_status";
 
     /**
      * method to search a vivado log for a specific key phrase
@@ -92,6 +96,56 @@ public class VivadoTools {
      * @return ReportRouteStatusResult object.
      */
     public static ReportRouteStatusResult reportRouteStatus(Design design) {
-        return new ReportRouteStatusResult(design);
+        final Path workdir = FileSystems.getDefault()
+                .getPath("vivadoToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
+        File workdirHandle = new File(workdir.toString());
+        workdirHandle.mkdirs();
+        final Path dcp = workdir.resolve("checkpoint.dcp");
+        design.writeCheckpoint(dcp);
+
+        ReportRouteStatusResult rrs = reportRouteStatus(dcp, workdir);
+
+        FileTools.deleteFolder(workdir.toString());
+
+        return rrs;
+    }
+
+    /**
+     * Run Vivado's `report_route_status` command on the provided DCP path
+     * and return its result as a ReportRouteStatusResult object.
+     *
+     * @param dcp Path to DCP to report on.
+     * @return ReportRouteStatusResult object.
+     */
+    public static ReportRouteStatusResult reportRouteStatus(Path dcp) {
+        final Path workdir = FileSystems.getDefault()
+                .getPath("vivadoToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
+        File workdirHandle = new File(workdir.toString());
+        workdirHandle.mkdirs();
+
+        ReportRouteStatusResult rrs = reportRouteStatus(dcp, workdir);
+
+        FileTools.deleteFolder(workdir.toString());
+
+        return rrs;
+    }
+
+    /**
+     * Run Vivado's `report_route_status` command on the provided DCP path
+     * and return its result as a ReportRouteStatusResult object.
+     *
+     * @param dcp Path to DCP to report on.
+     * @param workdir Directory to work within.
+     * @return ReportRouteStatusResult object.
+     */
+    public static ReportRouteStatusResult reportRouteStatus(Path dcp, Path workdir) {
+        final Path outputLog = workdir.resolve("outputLog.log");
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("open_checkpoint " + dcp + "; ");
+        sb.append(REPORT_ROUTE_STATUS);
+
+        List<String> log = VivadoTools.runTcl(outputLog, sb.toString(), true);
+        return new ReportRouteStatusResult(log);
     }
 }
