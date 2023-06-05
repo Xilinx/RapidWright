@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -36,7 +36,7 @@ public class TestCellBELMappings {
 
     @Test
     public void testCellBELPinMappings() {
-        Enumerator<String> allStrings = new Enumerator<String>();
+        StringEnumerator allStrings = new StringEnumerator();
         MessageBuilder message = new MessageBuilder();
         Device device = Device.getDevice(TestDeviceResources.TEST_DEVICE);
         DeviceResources.Device.Builder devBuilder = message.initRoot(DeviceResources.Device.factory);

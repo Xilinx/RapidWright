@@ -1,3 +1,24 @@
+============= RapidWright 2023.1.0-beta released on 2023-05-31 ================
+Notes:
+  - Support for Vivado 2023.1 devices and reading 2023.1 DCPs
+  - Full adoption of Zstandard compression for all device and data
+  files - 11% faster device loads and 108% faster device cache loads with file size reductions of 32% and 52% respectively.
+  - Has a new 'rapidwright' run wrapper that avoids the need to set CLASSPATH, provides convenience to run any class file with a main() method, run the Jython interpreter and enables one-liner Jython commands.  Run `rapidwright` at the prompt for more details.
+  - Fix duplicate net source pins (won't set the alternate source if it is the same as the source)
+  - Change Net.connect() behavior to connect to existing SitePinInst if net is null
+  - DesignTools.createCeSrRstPinsToVCC() to detect gnd to invert (#664)
+  - EDIFNetlist.cellInstIOStandardFallback to collect set of IOSTANDARDs instead of throwing an error if there is a conflict (#671)
+  - [EDIF] More expanded macros to be deep copied from prim library (#672)
+  - Ignore TestCheckOpenFilesInstalled.test if outside of gradle (#674)
+  - [EDIF] EDIFNetlist.collapseMacroUnisims() to not clobber cell (#675)
+  - [EDIF] Explicit DEFAULT IOStandard on Cell to be overriden by Net (#686)
+- API Additions:
+  - (None)
+
+- API Deprecation Removals (--> Replacements) [Closed Source]:
+  - com.xilinx.rapidwright.device.Tile "public String getNameRoot() --> "public string getRootName()"
+  - com.xilinx.rapidwright.device.Device "public Tile[][] getTilesByNameRoot(String nameRoot)" --> "getTilesByRootName(String rootName)"
+
 ============= RapidWright 2022.2.3-beta released on 2023-05-03 ================
 Notes:
   - Adds preliminary support for Zstandard compression.  Uses it in device cache file generation. Next release will use it for all data files.

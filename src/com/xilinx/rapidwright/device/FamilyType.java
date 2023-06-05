@@ -1,9 +1,8 @@
 /*
- * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Chris Lavin, Xilinx Research Labs.
+ * Author: Chris Lavin, Advanced Micro Devices, Inc.
  *
  * This file is part of RapidWright.
  *
@@ -28,13 +27,14 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Wed Apr 27 13:18:34 2022
+ * Generated on: Wed May 17 22:32:37 2023
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  *
  * Set of all Supported Xilinx families in RapidWright
  */
 public enum FamilyType {
         AARTIX7,
+        AARTIXUPLUS,
         AKINTEX7,
         ARTIX7,
         ARTIX7L,
@@ -65,6 +65,7 @@ public enum FamilyType {
         VERSAL,
         VERSALAICORE,
         VERSALAIEDGE,
+        VERSALHBM,
         VERSALPREMIUM,
         VERSALPRIME,
         VIRTEX7,

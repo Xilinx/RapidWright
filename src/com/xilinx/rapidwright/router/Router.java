@@ -67,6 +67,7 @@ import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.MessageGenerator;
+import com.xilinx.rapidwright.util.StringTools;
 import com.xilinx.rapidwright.util.Utils;
 
 
@@ -449,7 +450,8 @@ public class Router extends AbstractRouter {
         if (debug) System.out.println(" SRC: " + end.getTile().getName());
         if (debug) System.out.println("SINK: " + snk.getTile().getName());
         while ((Math.abs(x) > LONG_LINE_THRESHOLD || Math.abs(y) > LONG_LINE_THRESHOLD) && watchDog > 0 && !longLineQueue.isEmpty()) {
-            if (debug) System.out.println(MessageGenerator.makeWhiteSpace(end.getLevel()) + end.toString());
+            if (debug)
+                System.out.println(StringTools.makeWhiteSpace(end.getLevel()) + end.toString());
             watchDog--;
 
             end = longLineQueue.remove();
@@ -464,7 +466,9 @@ public class Router extends AbstractRouter {
                 String wireName = wc.getWireName();
                 if (intNodeQuadLongs.contains(wireName) || allLongLines.contains(wireName)) {
                     tmp.setTileAndWire(wc);
-                    if (debug) System.out.println(MessageGenerator.makeWhiteSpace(end.getLevel()) +" -> "+ tmp.toString() +" "+ visited.contains(tmp) +" "+ usedNodes.contains(tmp));
+                    if (debug)
+                        System.out.println(StringTools.makeWhiteSpace(end.getLevel()) + " -> " + tmp.toString() + " "
+                                + visited.contains(tmp) + " " + usedNodes.contains(tmp));
                     if (visited.contains(tmp)) continue;
                     if (!canUseNode(tmp)) continue;
 
@@ -488,7 +492,9 @@ public class Router extends AbstractRouter {
                     visited.add(start);
                 }
             }
-            if (debug) System.out.println(MessageGenerator.makeWhiteSpace(end.getLevel()) + "NEXT: " + end.toString() + ": CLOSEST=" + closest.toString());
+            if (debug)
+                System.out.println(StringTools.makeWhiteSpace(end.getLevel()) + "NEXT: " + end.toString() + ": CLOSEST="
+                        + closest.toString());
             x = end.getTile().getTileXCoordinate() - snk.getTile().getTileXCoordinate();
             y = end.getTile().getTileYCoordinate() - snk.getTile().getTileYCoordinate();
         }
@@ -555,7 +561,9 @@ public class Router extends AbstractRouter {
                 return;
             }
             RouteNode currNode = queue.remove();
-            if (debug) System.out.println(MessageGenerator.makeWhiteSpace(currNode.getLevel()) + currNode.toString() + " " + currNode.getIntentCode() + " *DQ*");
+            if (debug)
+                System.out.println(StringTools.makeWhiteSpace(currNode.getLevel()) + currNode.toString() + " "
+                        + currNode.getIntentCode() + " *DQ*");
             nodesProcessed++;
             nextNode: for (Wire w : currNode.getConnections()) {
                 if (currNode.equals(currSink) || (w.getWireIndex() == this.currSink.getWire() && w.getTile().equals(currSink.getTile()))) {
@@ -683,7 +691,7 @@ public class Router extends AbstractRouter {
                             // This looks like a possible candidate for our next node, we'll add it
                             setCost(tmp, w.isRouteThru());
                             if (debug) {
-                                System.out.println(MessageGenerator.makeWhiteSpace(currNode.getLevel())
+                                System.out.println(StringTools.makeWhiteSpace(currNode.getLevel())
                                         + " -> " + tmp + " " + tmp.getIntentCode());
                             }
                             if (queue.isEmpty() || tmp.getCost() < (queue.peek().getCost() + ceilingCost)) {
@@ -1252,7 +1260,9 @@ public class Router extends AbstractRouter {
                         if (tmp.getConnections() != null && canUseNode(tmp)) {
                             setClkCostLevel(tmp);
                             visitedNodes.add(tmp);
-                            if (debug)System.out.println(MessageGenerator.makeWhiteSpace(currRouteNode.getLevel()) + " -> " + tmp + " " + tmp.getIntentCode());
+                            if (debug)
+                                System.out.println(StringTools.makeWhiteSpace(currRouteNode.getLevel()) + " -> " + tmp
+                                        + " " + tmp.getIntentCode());
                             queue.add(tmp);
                         }
                     }
@@ -1286,7 +1296,9 @@ public class Router extends AbstractRouter {
                         if (tmp.getConnections() != null && canUseNode(tmp)) {
                             setClkCostLevel(tmp);
                             visitedNodes.add(tmp);
-                            if (debug)System.out.println(MessageGenerator.makeWhiteSpace(currRouteNode.getLevel()) + " -> " + tmp + " " + tmp.getIntentCode());
+                            if (debug)
+                                System.out.println(StringTools.makeWhiteSpace(currRouteNode.getLevel()) + " -> " + tmp
+                                        + " " + tmp.getIntentCode());
                             queue.add(tmp);
                         }
                     }
@@ -1466,7 +1478,9 @@ public class Router extends AbstractRouter {
                                     }
                                 }
                         }
-                        if (debug) System.out.println(MessageGenerator.makeWhiteSpace(currNode.getLevel()) + " -> " + tmp + " " + tmp.getIntentCode());
+                        if (debug)
+                            System.out.println(StringTools.makeWhiteSpace(currNode.getLevel()) + " -> " + tmp + " "
+                                    + tmp.getIntentCode());
                         setClkCostDistance(tmp, currSink);
                         visitedNodes.add(tmp);
                         clockQueue.add(tmp);
@@ -1603,7 +1617,7 @@ public class Router extends AbstractRouter {
                     conflictNodes = new HashSet<RouteNode>();
                 }
                 while (currPathNode.getParent() != null) {
-                    if (debug) System.out.println("CL: " + MessageGenerator.makeWhiteSpace(currPathNode.getLevel()) + currPathNode.toString());
+                    if (debug) System.out.println("CL: " + StringTools.makeWhiteSpace(currPathNode.getLevel()) + currPathNode.toString());
                     if (allowWireOverlap) {
                         if (usedNodes.contains(currPathNode)) {
                             conflictNodes.add(currPathNode);

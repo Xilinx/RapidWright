@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -178,6 +178,54 @@ public class TestNet {
     }
 
     @Test
+    public void testCreatePinDuplicate() {
+        Design d = new Design("testCreatePinDuplicate", Device.AWS_F1);
+        Net net = d.getVccNet();
+        SiteInst si = d.createSiteInst("SLICE_X0Y0");
+        SitePinInst spi = net.createPin("SRST1", si);
+        Assertions.assertEquals(net, spi.getNet());
+        net.createPin("SRST2", si);
+        RuntimeException ex = Assertions.assertThrows(RuntimeException.class, () -> net.createPin("SRST1", si));
+        Assertions.assertEquals("ERROR: SiteInst placed at SLICE_X0Y0 already has a pin named SRST1", ex.getMessage());
+
+        // Remove from net
+        Assertions.assertTrue(net.removePin(spi));
+        Assertions.assertNull(spi.getNet());
+
+        // Also remove from site inst
+        Assertions.assertTrue(si.removePin(spi));
+        SitePinInst newSpi = net.createPin("SRST1", si);
+        Assertions.assertNotSame(newSpi, spi);
+        Assertions.assertEquals(net, newSpi.getNet());
+    }
+
+    @Test
+    public void testConnectPinDuplicate() {
+        Design d = new Design("testConnectPinDuplicate", Device.KCU105);
+        Cell cell = d.createAndPlaceCell("ff", Unisim.FDRE, "SLICE_X0Y0/AFF");
+        Net net = d.createNet("net");
+
+        SitePinInst spi = net.connect(cell, "CE");
+        Assertions.assertNotNull(spi);
+        Assertions.assertEquals(net, spi.getNet());
+
+        // No error if connecting same net, returns same SPI
+        Assertions.assertEquals(spi, net.connect(cell, "CE"));
+        Assertions.assertEquals(net, spi.getNet());
+
+        // Error if already connected
+        Net otherNet = d.createNet("other_net");
+        RuntimeException ex = Assertions.assertThrows(RuntimeException.class, () -> otherNet.connect(cell, "CE"));
+        Assertions.assertEquals("ERROR: SitePinInst 'IN SLICE_X0Y0.CKEN_B1' is already connected to net 'net'.  Disconnect it first from that net before calling Net.connect()", ex.getMessage());
+
+        // Remove from net
+        Assertions.assertTrue(net.removePin(spi));
+        Assertions.assertNull(spi.getNet());
+        Assertions.assertEquals(spi, otherNet.connect(cell, "CE"));
+        Assertions.assertEquals(otherNet, spi.getNet());
+    }
+  
+    @Test
     public void testCreatePinInvalid() {
         Design d = new Design("top", "xc7a200t");
         SiteInst si = d.createSiteInst(d.getDevice().getSite("RAMB36_X8Y14"));
@@ -186,5 +234,67 @@ public class TestNet {
         );
         Assertions.assertEquals("ERROR: Couldn't find pin RSTRAMARSTRAML on site type RAMBFIFO36E1",
                 ex.getMessage());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"H_O", "HMUX"})
+    public void testAddPinSource(String altPinName) {
+        Design design = new Design("top", Device.AWS_F1);
+        SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X0Y0"));
+        Net net = design.createNet("net");
+        String pinName = "H_O";
+        boolean samePin = altPinName.equals(pinName);
+        SitePinInst spi1 = new SitePinInst(pinName, si);
+        Assertions.assertTrue(net.addPin(spi1));
+        SitePinInst spi2 = new SitePinInst(altPinName, si);
+        Assertions.assertEquals(samePin, spi1.equals(spi2));
+        Assertions.assertEquals(!samePin, net.addPin(spi2));
+
+        Assertions.assertSame(spi1, net.getSource());
+        if (samePin) {
+            Assertions.assertNull(net.getAlternateSource());
+        } else {
+            Assertions.assertSame(spi2, net.getAlternateSource());
+        }
+    }
+
+    @Test
+    public void testSetSourceDuplicate() {
+        Design design = new Design("top", Device.AWS_F1);
+        SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X0Y0"));
+        Net net = design.createNet("net");
+        String pinName = "H_O";
+        SitePinInst spi1 = new SitePinInst(pinName, si);
+        Assertions.assertTrue(net.addPin(spi1));
+        String altPinName = "HMUX";
+        SitePinInst spi2 = new SitePinInst(altPinName, si);
+        Assertions.assertNotEquals(spi1, spi2);
+
+        net.setSource(spi1);
+        Assertions.assertSame(spi1, net.getSource());
+        net.setAlternateSource(spi2);
+        Assertions.assertSame(spi2, net.getAlternateSource());
+
+        SitePinInst spi3 = new SitePinInst(altPinName, si);
+        Assertions.assertEquals(spi2, spi3);
+
+        Assertions.assertThrows(RuntimeException.class, () -> net.setSource(spi3));
+    }
+
+    @Test
+    public void testSetAlternateSourceDuplicate() {
+        Design design = new Design("top", Device.AWS_F1);
+        SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X0Y0"));
+        Net net = design.createNet("net");
+        String pinName = "H_O";
+        SitePinInst spi1 = new SitePinInst(pinName, si);
+        Assertions.assertTrue(net.addPin(spi1));
+        SitePinInst spi2 = new SitePinInst(pinName, si);
+        Assertions.assertEquals(spi1, spi2);
+
+        net.setSource(spi1);
+        Assertions.assertSame(spi1, net.getSource());
+
+        Assertions.assertThrows(RuntimeException.class, () -> net.setAlternateSource(spi2));
     }
 }

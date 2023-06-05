@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -21,9 +21,6 @@
  * limitations under the License.
  *
  */
-/**
- *
- */
 package com.xilinx.rapidwright.edif;
 
 import java.io.IOException;
@@ -39,7 +36,7 @@ import java.util.Objects;
  *
  * Created on: May 11, 2017
  */
-public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
+public class EDIFCellInst extends EDIFPropertyObject {
 
     private EDIFCell parentCell;
 
@@ -268,11 +265,6 @@ public class EDIFCellInst extends EDIFPropertyObject implements EDIFEnumerable {
         } else {
             os.write(EXPORT_CONST_CLOSE_NO_PROPS);
         }
-    }
-
-    @Override
-    public String getUniqueKey() {
-        return getCellType().getUniqueKey() + "_" + getParentCell().getUniqueKey() + "_" + getName();
     }
 
     @Override

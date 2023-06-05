@@ -327,7 +327,7 @@ public class AddSubGenerator extends ArithmeticGenerator {
     private static void printHelp(OptionParser p) {
         MessageGenerator.printHeader("Adder/Subtractor Generator");
         System.out.println("This RapidWright program creates a placed and routed DCP that can be \n"
-            + "imported into UltraScale+ designs to aid in high speed SLR crossings.  See \n"
+            + "imported into UltraScale+ designs to perform addition or subtraction.  See \n"
             + "RapidWright documentation for more information.\n");
         try {
             p.accepts(OUT_DCP_OPT).withOptionalArg().defaultsTo("slr_crosser.dcp").describedAs("Output DCP File Name");

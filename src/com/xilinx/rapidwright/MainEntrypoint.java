@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -22,11 +22,6 @@
  */
 
 package com.xilinx.rapidwright;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 import com.xilinx.rapidwright.debug.DesignInstrumentor;
 import com.xilinx.rapidwright.debug.ILAInserter;
@@ -91,12 +86,18 @@ import com.xilinx.rapidwright.util.CompareRouteStatusReports;
 import com.xilinx.rapidwright.util.DesignImplementationDiff;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.JobQueue;
+import com.xilinx.rapidwright.util.Jython;
 import com.xilinx.rapidwright.util.PartPrinter;
 import com.xilinx.rapidwright.util.PerformanceExplorer;
-import com.xilinx.rapidwright.util.RapidWright;
 import com.xilinx.rapidwright.util.StringTools;
 import com.xilinx.rapidwright.util.Unzip;
 import com.xilinx.rapidwright.util.performance_evaluation.PerformanceEvaluation;
+
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class MainEntrypoint {
     interface MainStyleFunction<E extends Throwable> {
@@ -141,6 +142,7 @@ public class MainEntrypoint {
         addFunction("IntentCode", IntentCode::main);
         addFunction("Interchange", Interchange::main);
         addFunction("IsolateLeafClkBuffer", IsolateLeafClkBuffer::main);
+        addFunction("Jython", Jython::main);
         addFunction("JobQueue", JobQueue::main);
         addFunction("Lesson1", Lesson1::main);
         addFunction("LogicalNetlistExample", LogicalNetlistExample::main);
@@ -167,7 +169,6 @@ public class MainEntrypoint {
         addFunction("PrintEDIFInstances", PrintEDIFInstances::main);
         addFunction("ProbeRouter", ProbeRouter::main);
         addFunction("PseudoPIPHelper", PseudoPIPHelper::main);
-        addFunction("RapidWright", RapidWright::main);
         addFunction("ReportDevicePerformance", ReportDevicePerformance::main);
         addFunction("ReportTimingExample", ReportTimingExample::main);
         addFunction("Router", Router::main);
@@ -183,26 +184,28 @@ public class MainEntrypoint {
         addFunction("UpdateRoutingUsingSATRouter", UpdateRoutingUsingSATRouter::main);
     }
 
-    private static void listModes() {
-        for (String name : functionNames) {
-            System.err.print('\t');
-            System.err.println(name);
-        }
+    private static void listModes(PrintStream ps) {
+        StringTools.printListInColumns(functionNames, ps, 5);
     }
 
     public static void main(String[] args) throws Throwable {
         if (args.length == 0) {
-            System.err.println("Need one argument to determine the mode. Valid modes are (case-insensitive):");
-            listModes();
+            System.err.println("Need one argument to determine the application. Valid applications are (case-insensitive):");
+            listModes(System.err);
             System.exit(1);
         }
 
+        if (args.length >= 1 && args[0].equals("--list-apps")) {
+            System.out.println("Current list of available RapidWright applications (case-insensitive):");
+            listModes(System.out);
+            return;
+        }
 
-        String mode = args[0];
-        MainStyleFunction<?> func = functions.get(mode.toLowerCase());
+        String application = args[0];
+        MainStyleFunction<?> func = functions.get(application.toLowerCase());
         if (func == null) {
-            System.err.println("Invalid mode '"+mode+"'. Valid modes are (case-insensitive): ");
-            listModes();
+            System.err.println("Invalid application '"+application+"'. Valid applications are (case-insensitive): ");
+            listModes(System.err);
             System.exit(1);
         }
 
