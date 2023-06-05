@@ -282,9 +282,8 @@ public class EDIFHierNet {
                     // Moving up in hierarchy
                     if (!p.getHierarchicalInst().isTopLevelInst()) {
                         final EDIFHierPortInst upPort = p.getPortInParent();
-                        final EDIFHierNet upNet = (upPort != null) ? upPort.getHierarchicalNet() : null;
-                        if (upNet != null) {
-                            queue.add(upNet);
+                        if (upPort != null) {
+                            queue.add(upPort.getHierarchicalNet());
                         }
                     }
                 } else {
