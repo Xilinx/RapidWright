@@ -367,10 +367,7 @@ public class RouteNode{
                 for (Wire w1 : curr.tile.getWireConnections(parentWire.getWireIndex())) {
                     if (w1.getWireIndex() == curr.wire) {
                         if (w1.isEndPIPWire()) {
-                            PIP p = new PIP(curr.tile, parentWire.getWireIndex(), curr.wire, w1.getPIPType());
-                            if (p.getEndNode().toString().equals("RCLK_CLEL_L_L_X115Y1109/CLK_BUFCE_ROW_FSR_0_CLK_IN"))
-                                System.err.print("");
-                            pips.add(p);
+                            pips.add(new PIP(curr.tile, parentWire.getWireIndex(), curr.wire, w1.getPIPType()));
                             break;
                         }
                     }
