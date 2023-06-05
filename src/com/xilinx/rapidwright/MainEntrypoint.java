@@ -179,6 +179,7 @@ public class MainEntrypoint {
         addFunction("SLRCrosserGenerator", SLRCrosserGenerator::main);
         addFunction("SmallestEnclosingCircle", SmallestEnclosingCircle::main);
         addFunction("StampPlacement", StampPlacement::main);
+        addFunction("StandaloneEntrypoint", StandaloneEntrypoint::main);
         addFunction("StringTools", StringTools::main);
         addFunction("TileColumnPattern", TileColumnPattern::main);
         addFunction("Unzip", Unzip::main);
