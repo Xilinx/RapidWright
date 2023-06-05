@@ -23,6 +23,12 @@
 
 package com.xilinx.rapidwright;
 
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.xilinx.rapidwright.debug.DesignInstrumentor;
 import com.xilinx.rapidwright.debug.ILAInserter;
 import com.xilinx.rapidwright.debug.ProbeRouter;
@@ -92,12 +98,6 @@ import com.xilinx.rapidwright.util.PerformanceExplorer;
 import com.xilinx.rapidwright.util.StringTools;
 import com.xilinx.rapidwright.util.Unzip;
 import com.xilinx.rapidwright.util.performance_evaluation.PerformanceEvaluation;
-
-import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 public class MainEntrypoint {
     interface MainStyleFunction<E extends Throwable> {
@@ -178,6 +178,7 @@ public class MainEntrypoint {
         addFunction("SLRCrosserGenerator", SLRCrosserGenerator::main);
         addFunction("SmallestEnclosingCircle", SmallestEnclosingCircle::main);
         addFunction("StampPlacement", StampPlacement::main);
+        addFunction("StandaloneEntrypoint", StandaloneEntrypoint::main);
         addFunction("StringTools", StringTools::main);
         addFunction("TileColumnPattern", TileColumnPattern::main);
         addFunction("Unzip", Unzip::main);

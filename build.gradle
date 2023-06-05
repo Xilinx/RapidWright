@@ -224,4 +224,3 @@ task printRapidWrightVersion() {
         print(rapidwright_version)
     }
 }
-

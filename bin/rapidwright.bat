@@ -36,8 +36,8 @@ IF "%PRINT_HELP%"=="FALSE" GOTO RUN_STUFF
 echo.  rapidwright com.xilinx.rapidwright.^<ClassName^> -- to execute main() method of Java class
 echo.  rapidwright ^<application^>                      -- to execute a specific application
 echo.  rapidwright --list-apps                        -- to list all available applications
-echo.  rapidwright Jython                             -- to enter interactive Jython shell
-echo.  rapidwright Jython -c "..."                    -- to execute specific Jython command
+echo.  rapidwright jython                             -- to enter interactive Jython shell
+echo.  rapidwright jython -c "..."                    -- to execute specific Jython command
 EXIT /B 0
 
 :RUN_STUFF

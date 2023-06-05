@@ -25,9 +25,16 @@
 package com.xilinx.rapidwright.util;
 
 
-import com.xilinx.rapidwright.device.Device;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.Arrays;
+
 import org.python.core.PySystemState;
+import org.python.google.common.reflect.ClassPath;
+import org.python.google.common.reflect.ClassPath.ClassInfo;
 import org.python.util.jython;
+
+import com.xilinx.rapidwright.device.Device;
 
 /**
  * Main entry point for the RapidWright Jython (Python) interactive shell.
@@ -35,6 +42,70 @@ import org.python.util.jython;
  *
  */
 public class Jython {
+
+    /**
+     * When invoking the '-c' option for the Jython interpreter, this method will
+     * analyze the command for RapidWright classes that need to be imported and
+     * automatically add the import statements.
+     * 
+     * @param args Command line options.
+     * @return Augments the argument of the '-c' option with the proper import
+     *         statement for a RapidWright class. If not RapidWright class is needed
+     *         or the '-c' option is not found in the arguments, the original
+     *         arguments are returned.
+     */
+    public static String[] addImportsForCommandLineOption(String[] args) {
+        String origCmd = null;
+        int origCmdIdx = -1;
+        for (int i = 0; i < args.length; i++) {
+            if (args[i].equals("-c")) {
+                if (i + 1 >= args.length) {
+                    // No command arg, let default code handle it
+                    return args;
+                }
+                origCmd = args[i + 1];
+                origCmdIdx = i + 1;
+            }
+        }
+
+        if (origCmdIdx != -1) {
+            ClassPath cp = null;
+            try {
+                cp = ClassPath.from(Thread.currentThread().getContextClassLoader());
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            StringBuilder jythonCmd = new StringBuilder();
+            for (ClassInfo s : cp.getAllClasses()) {
+                if (s.getPackageName().startsWith("com.xilinx.rapidwright")) {
+                    // Filter out inner classes and this class to avoid run away recursion
+                    if (s.getSimpleName() == null || s.getSimpleName().isEmpty())
+                        continue;
+                    if (Character.isLowerCase(s.getSimpleName().charAt(0)))
+                        continue;
+                    if (s.toString().contains("$"))
+                        continue;
+                    if (s.getSimpleName().equals("Run"))
+                        continue;
+                    if (s.getPackageName().startsWith("com.xilinx.rapidwright.gui"))
+                        continue;
+        
+                    // Only import those classes being called out
+                    if (origCmd.contains(s.getSimpleName())) {
+                        jythonCmd.append("from " + s.getPackageName() + " import " + s.getSimpleName() + ";");
+                        break;
+                    }
+                }
+            }
+            jythonCmd.append(origCmd);
+            // Overwrite the original command with version supplemented with import statements
+            args[origCmdIdx] = jythonCmd.toString();
+            System.out.println(Arrays.toString(args));
+        }
+        
+        return args;
+    }
+
     public static void main(String[] args) {
         if (args.length == 0) {
             // If no arguments, import all major rapidwright packages for ease of use
@@ -105,6 +176,8 @@ public class Jython {
             }
             args[2] = importCmd.toString();
             System.err.println(Device.FRAMEWORK_NAME + " " + Device.RAPIDWRIGHT_VERSION + " (Jython "+PySystemState.version+")");
+        } else {
+            args = addImportsForCommandLineOption(args);
         }
 
         FileTools.blockSystemExitCalls();
