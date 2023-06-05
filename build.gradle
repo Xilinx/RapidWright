@@ -13,6 +13,7 @@ apply from: 'common.gradle'
 
 mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
 def standaloneClassName = "com.xilinx.rapidwright.StandaloneEntrypoint"
+def preserveDir = ".preserveBin"
 
 def read_rapidwright_version() {
     def sw = new StringWriter()
@@ -49,6 +50,11 @@ sourceSets {
   }
 }
 
+task preserveBin(type: Copy) {
+     from "bin/rapidwright", "bin/rapidwright.bat"
+     into preserveDir
+}
+
 task copyJars(type: Copy) {
     from configurations.api
     into 'jars'
@@ -58,6 +64,17 @@ task copyJars(type: Copy) {
     into 'jars'
 }
 compileJava.dependsOn(copyJars)
+compileJava.dependsOn(preserveBin)
+
+task cleanupScripts(type: Delete) {
+    delete preserveDir
+}
+
+task restoreScripts(type: Copy) {
+    from preserveDir
+    into 'bin'
+    finalizedBy(cleanupScripts)
+}
 
 task mainJar(type: Jar, dependsOn: classes) {
     archiveBaseName = 'main'
@@ -67,6 +84,7 @@ task mainJar(type: Jar, dependsOn: classes) {
         attributes 'Class-Path': ([destinationDirectory.get().getAsFile().toPath().relativize(sourceSets.main.java.destinationDirectory.get().getAsFile().toPath()).toString() + File.separator]
             + configurations.implementation.collect { destinationDirectory.get().getAsFile().toPath().relativize(projectDir.toPath()).resolve('jars').resolve(it.getName()) }).join(' ')
     }
+    finalizedBy(restoreScripts)
 }
 compileJava.finalizedBy(mainJar)
 

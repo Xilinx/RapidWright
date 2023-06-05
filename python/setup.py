@@ -24,7 +24,7 @@ from setuptools import setup
 
 setup(
     name='rapidwright',
-    version='2022.2.3',
+    version='2023.1.0',
     license='Apache 2.0 and Others',
     description='Xilinx RapidWright Framework Wrapped for Python.',
     long_description='',

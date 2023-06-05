@@ -8,7 +8,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -26,16 +26,16 @@ jobs:
         run: ./gradlew compileJava
 
       - name: Test RapidWright Wrapper
-        run: ./rapidwright 
+        run: bin/rapidwright
 
       - name: List RapidWright Apps
-        run: ./rapidwright --list-apps
+        run: bin/rapidwright --list-apps
 
       - name: Check Class Main Execution
-        run: ./rapidwright com.xilinx.rapidwright.rwroute.RWRoute
+        run: bin/rapidwright com.xilinx.rapidwright.rwroute.RWRoute
 
       - name: Check Jython Command Execution
-        run: ./rapidwright Jython -c "from com.xilinx.rapidwright.device import Device;print(Device.AWS_F1)"
+        run: bin/rapidwright Jython -c "from com.xilinx.rapidwright.device import Device;print(Device.AWS_F1)"
 
       - name: Terminate Gradle to allow caching
         run: ./gradlew --stop
