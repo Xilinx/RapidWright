@@ -22,73 +22,17 @@
 
 package com.xilinx.rapidwright.util;
 
-import java.io.File;
-import java.nio.file.FileSystems;
+import com.xilinx.rapidwright.design.Design;
+
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-
-import com.xilinx.rapidwright.design.Design;
 
 /**
  * Utility methods to provide access to vivado and parse logs
  *
  */
 public class VivadoTools {
-
-    public static class ReportRouteStatusResult {
-
-        public final int logicalNets;
-        public final int netsNotNeedingRouting;
-        public final int internallyRoutedNets;
-        public final int netsWithNoLoads;
-        public final int implicitlyRoutedPorts;
-        public final int routableNets;
-        public final int unroutedNets;
-        public final int fullyRoutedNets;
-        public final int netsWithRoutingErrors;
-
-        private static int parseLog(List<String> log, String key) {
-            return Integer.parseInt(
-                    VivadoTools.searchVivadoLog(log, key).get(0).replaceAll("[^\\d]", ""));
-        }
-
-        /**
-         * builds a Tcl script to open the Design d in vivado and run the command
-         * `report_route_status`
-         * 
-         * @param d the design to be analyzed
-         */
-        ReportRouteStatusResult(Design d) {
-            final Path workdir = FileSystems.getDefault()
-                    .getPath("vivadoToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
-            File workdirHandle = new File(workdir.toString());
-            workdirHandle.mkdirs();
-            final Path dcp = workdir.resolve("checkpoint.dcp");
-            final Path tclScript = workdir.resolve("tclScript.tcl");
-
-            d.writeCheckpoint(dcp);
-            List<String> lines = new ArrayList<>();
-            lines.add("open_checkpoint " + dcp);
-            lines.add("report_route_status");
-            lines.add("exit");
-            FileTools.writeLinesToTextFile(lines, tclScript.toString());
-            List<String> log = new ArrayList<>();
-            log = VivadoTools.runTcl(workdir.resolve("outputLog.log"), tclScript, true);
-
-            logicalNets = parseLog(log, "# of logical nets");
-            netsNotNeedingRouting = parseLog(log, "# of nets not needing routing");
-            internallyRoutedNets = parseLog(log, "# of internally routed nets");
-            netsWithNoLoads = parseLog(log, "# of nets with no loads");
-            implicitlyRoutedPorts = parseLog(log, "# of implicitly routed ports");
-            routableNets = parseLog(log, "# of routable nets");
-            unroutedNets = parseLog(log, "# of unrouted nets");
-            fullyRoutedNets = parseLog(log, "# of fully routed nets");
-            netsWithRoutingErrors = parseLog(log, "# of nets with routing errors");
-
-            FileTools.deleteFolder(workdirHandle.toString());
-        }
-    }
 
     /**
      * method to search a vivado log for a specific key phrase
@@ -137,8 +81,17 @@ public class VivadoTools {
         final String vivadoCmd = "vivado -log " + outputLog.toString() + " -mode batch -source "
                 + tclScript.toString();
         FileTools.runCommand(vivadoCmd, verbose);
-        List<String> log = new ArrayList<>();
-        log = FileTools.getLinesFromTextFile(outputLog.toString());
-        return log;
+        return FileTools.getLinesFromTextFile(outputLog.toString());
+    }
+
+    /**
+     * Run Vivado's `report_route_status` command on the provided Design object
+     * and return its result as a ReportRouteStatusResult object.
+     *
+     * @param design Design object to report on.
+     * @return ReportRouteStatusResult object.
+     */
+    public static ReportRouteStatusResult reportRouteStatus(Design design) {
+        return new ReportRouteStatusResult(design);
     }
 }

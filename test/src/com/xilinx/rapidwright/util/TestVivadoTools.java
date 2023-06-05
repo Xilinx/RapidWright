@@ -53,7 +53,7 @@ public class TestVivadoTools {
         Assumptions.assumeTrue(FileTools.isVivadoOnPath());
         String dcp = RapidWrightDCP.getPath("picoblaze_partial.dcp").toString();
         Design d = Design.readCheckpoint(dcp);
-        VivadoTools.ReportRouteStatusResult r = new VivadoTools.ReportRouteStatusResult(d);
+        ReportRouteStatusResult r = new ReportRouteStatusResult(d);
 
         Assertions.assertEquals(12144, r.unroutedNets);
     }
