@@ -44,7 +44,7 @@ EXIT /B 0
 SET ARG1=%~1
 IF "%ARG1:~0,23%" == "com.xilinx.rapidwright." GOTO RUN_APPS
 
-java -jar %MAIN_JAR%
+java -jar %MAIN_JAR% %*
 EXIT /B 0
 
 :RUN_APPS
