@@ -33,7 +33,7 @@ import org.python.util.jython;
  * the built-in Jython interpreter to run Jython/Java code.
  *
  */
-public class RunCode {
+public class RunJython {
 
     public static final String DONT_PRINT_OPT = "-d";
     public static final String DONT_PRINT_OPT_FULL = "--dont-print-results";
