@@ -22,20 +22,17 @@
 
 package com.xilinx.rapidwright.util;
 
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+
+import java.nio.file.Path;
+import java.util.List;
 
 public class TestVivadoTools {
     @Test
