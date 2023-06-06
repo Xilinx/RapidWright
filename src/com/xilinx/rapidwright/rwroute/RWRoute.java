@@ -443,8 +443,9 @@ public class RWRoute{
         for (Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
             Net staticNet = e.getKey();
             for (SitePinInst sink : e.getValue()) {
-                preservedStaticNode.put(sink.getConnectedNode(), staticNet);
-                assert(!routingGraph.isPreserved(sink.getConnectedNode()));
+                Node node = sink.getConnectedNode();
+                preservedStaticNode.put(node, staticNet);
+                assert(!routingGraph.isPreserved(node));
             }
         }
 
