@@ -437,7 +437,7 @@ public class RWRoute{
             }
         }
 
-        // Annotate all static pins with the net they're associated with to ensure that one
+        // Annotate all static pin nodes with the net they're associated with to ensure that one
         // net cannot unknowingly use a node needed by the other net
         Map<Node,Net> preservedStaticNodes = new HashMap<>();
         for (Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
@@ -449,7 +449,7 @@ public class RWRoute{
             }
         }
 
-        // Iterate through both static nets in a stable order (not guaranteed by IdentityHashMap())
+        // Iterate through both static nets in a stable order (not guaranteed by IdentityHashMap)
         for (Net staticNet : Arrays.asList(design.getGndNet(), design.getVccNet())) {
             List<SitePinInst> pins = staticNetAndRoutingTargets.get(staticNet);
             if (pins == null) {
