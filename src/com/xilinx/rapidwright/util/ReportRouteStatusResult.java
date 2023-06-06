@@ -46,10 +46,10 @@ public class ReportRouteStatusResult {
     }
 
     /**
-     * Analyze a Tcl script to open the Design d in vivado and run the command
-     * `report_route_status`
+     * Analyze a log file produced by Vivado's `report_route_status`
+     * command.
      *
-     * @param log the design to be analyzed
+     * @param log the List<String> of lines to be analyzed
      */
     ReportRouteStatusResult(List<String> log) {
         logicalNets = parseLog(log, "# of logical nets");
