@@ -427,12 +427,6 @@ public class RWRoute{
         if (staticNetAndRoutingTargets.isEmpty())
             return;
 
-        for (List<SitePinInst> netRouteTargetPins : staticNetAndRoutingTargets.values()) {
-            for (SitePinInst sink : netRouteTargetPins) {
-                assert(!routingGraph.isPreserved(sink.getConnectedNode()));
-            }
-        }
-
         List<SitePinInst> gndPins = staticNetAndRoutingTargets.get(design.getGndNet());
         if (gndPins != null) {
             Set<SitePinInst> newVccPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins);
@@ -443,29 +437,51 @@ public class RWRoute{
             }
         }
 
+        // Annotate all static pin nodes with the net they're associated with to ensure that one
+        // net cannot unknowingly use a node needed by the other net
+        Map<Node,Net> preservedStaticNodes = new HashMap<>();
         for (Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
-            Net net = e.getKey();
-            List<SitePinInst> pins = e.getValue();
-            System.out.println("INFO: Route " + pins.size() + " pins of " + net);
-            GlobalSignalRouting.routeStaticNet(net,
+            Net staticNet = e.getKey();
+            for (SitePinInst sink : e.getValue()) {
+                Node node = sink.getConnectedNode();
+                preservedStaticNodes.put(node, staticNet);
+                assert(!routingGraph.isPreserved(node));
+            }
+        }
+
+        // Iterate through both static nets in a stable order (not guaranteed by IdentityHashMap)
+        for (Net staticNet : Arrays.asList(design.getGndNet(), design.getVccNet())) {
+            List<SitePinInst> pins = staticNetAndRoutingTargets.get(staticNet);
+            if (pins == null) {
+                continue;
+            }
+            System.out.println("INFO: Routing " + pins.size() + " pins of " + staticNet);
+            GlobalSignalRouting.routeStaticNet(staticNet,
                     // Lambda to determine whether a node is (a) available for use,
-                    // (b) already in used for this static net, (c) unavailable
+                    // (b) already in use for this static net, (c) unavailable
                     (node) -> {
                         Net preservedNet = routingGraph.getPreservedNet(node);
                         if (preservedNet != null) {
                             // If one is present, it is unavailable only if it isn't carrying
                             // the net undergoing routing
-                            return preservedNet == net ? NodeStatus.INUSE
+                            return preservedNet == staticNet ? NodeStatus.INUSE
                                     : NodeStatus.UNAVAILABLE;
                         }
+
+                        // Check that this node is not needed by the other static net
+                        preservedNet = preservedStaticNodes.get(node);
+                        if (preservedNet != null && preservedNet != staticNet) {
+                            return NodeStatus.UNAVAILABLE;
+                        }
+
                         // A RouteNode will only be created if the net is necessary for
-                        // a to-be-routed connection
+                        // a to-be-routed (non-static) connection
                         return routingGraph.getNode(node) == null ? NodeStatus.AVAILABLE
                                 : NodeStatus.UNAVAILABLE;
                     },
                     design, routethruHelper);
 
-            preserveNet(net, false);
+            preserveNet(staticNet, false);
         }
     }
 
