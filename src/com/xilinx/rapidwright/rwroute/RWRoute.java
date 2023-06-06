@@ -455,7 +455,7 @@ public class RWRoute{
             if (pins == null) {
                 continue;
             }
-            System.out.println("INFO: Route " + pins.size() + " pins of " + staticNet);
+            System.out.println("INFO: Routing " + pins.size() + " pins of " + staticNet);
             GlobalSignalRouting.routeStaticNet(staticNet,
                     // Lambda to determine whether a node is (a) available for use,
                     // (b) already in use for this static net, (c) unavailable
