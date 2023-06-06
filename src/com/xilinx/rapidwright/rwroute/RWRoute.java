@@ -439,12 +439,12 @@ public class RWRoute{
 
         // Annotate all static pins with the net they're associated with to ensure that one
         // net cannot unknowingly use a node needed by the other net
-        Map<Node,Net> preservedStaticNode = new HashMap<>();
+        Map<Node,Net> preservedStaticNodes = new HashMap<>();
         for (Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
             Net staticNet = e.getKey();
             for (SitePinInst sink : e.getValue()) {
                 Node node = sink.getConnectedNode();
-                preservedStaticNode.put(node, staticNet);
+                preservedStaticNodes.put(node, staticNet);
                 assert(!routingGraph.isPreserved(node));
             }
         }
@@ -469,7 +469,7 @@ public class RWRoute{
                         }
 
                         // Check that this node is not needed by the other static net
-                        preservedNet = preservedStaticNode.get(node);
+                        preservedNet = preservedStaticNodes.get(node);
                         if (preservedNet != null && preservedNet != staticNet) {
                             return NodeStatus.UNAVAILABLE;
                         }
