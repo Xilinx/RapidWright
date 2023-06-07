@@ -35,7 +35,10 @@ jobs:
         run: bin/rapidwright com.xilinx.rapidwright.rwroute.RWRoute
 
       - name: Check Jython Command Execution
-        run: bin/rapidwright Jython -c "from com.xilinx.rapidwright.device import Device;print(Device.AWS_F1)"
+        run: bin/rapidwright Jython -c "print(Device.AWS_F1)"
+
+      - name: Check PWD
+        run: test $(bin/rapidwright Jython -c "import os; print(os.getcwd())") = $(pwd)
 
       - name: Terminate Gradle to allow caching
         run: ./gradlew --stop
