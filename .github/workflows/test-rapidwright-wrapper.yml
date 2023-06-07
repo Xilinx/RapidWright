@@ -38,10 +38,10 @@ jobs:
         run: bin/rapidwright Jython -c "print(Device.AWS_F1)"
 
       - name: Check PWD
-        run: | 
+        run: |
              mkdir -p sub/dir/ectory
              cd sub/dir/ectory
-             bin/rapidwright Jython -c "import sys, os; sys.exit(0 if os.getcwd() == sys.argv[1] else 1)" $(pwd)
+             ${{ github.workspace }}/bin/rapidwright Jython -c "import sys, os; sys.exit(0 if os.getcwd() == sys.argv[1] else 1)" $(pwd)
 
       - name: Terminate Gradle to allow caching
         run: ./gradlew --stop
