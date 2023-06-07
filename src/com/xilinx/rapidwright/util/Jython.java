@@ -27,7 +27,6 @@ package com.xilinx.rapidwright.util;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.Arrays;
 
 import org.python.core.PySystemState;
 import org.python.google.common.reflect.ClassPath;
@@ -174,12 +173,13 @@ public class Jython {
                 importCmd.append("from " + pkg + " import " + c.getSimpleName() + ";");
             }
             args[2] = importCmd.toString();
-            System.err.println(Device.FRAMEWORK_NAME + " " + Device.RAPIDWRIGHT_VERSION + " (Jython "+PySystemState.version+")");
+            System.out.println(Device.FRAMEWORK_NAME + " " + Device.RAPIDWRIGHT_VERSION + " (Jython "
+                    + PySystemState.version + ")");
+            FileTools.blockSystemExitCalls();
         } else {
             args = addImportsForCommandLineOption(args);
         }
 
-        FileTools.blockSystemExitCalls();
         jython.main(args);
     }
 }
