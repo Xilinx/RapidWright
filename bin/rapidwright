@@ -19,30 +19,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-
-# Reproduced from from `gradlew`
- PRG="$0" 
- # Need this for relative symlinks. 
- while [ -h "$PRG" ] ; do 
-     ls=`ls -ld "$PRG"` 
-     link=`expr "$ls" : '.*-> \(.*\)$'` 
-     if expr "$link" : '/.*' > /dev/null; then 
-         PRG="$link" 
-     else 
-         PRG=`dirname "$PRG"`"/$link" 
-     fi 
- done 
- SAVED="`pwd`" 
- cd "`dirname \"$PRG\"`/" >/dev/null
- cd .. > /dev/null
- APP_HOME="`pwd -P`" 
-
+RAPIDWRIGHT_PATH="$(dirname $(dirname $0))"
 
 # Check that the main jar has been built
 # NOTE: Does not check that it is up-to-date
-MAIN_JAR=${APP_HOME}/build/libs/main.jar
+MAIN_JAR=${RAPIDWRIGHT_PATH}/build/libs/main.jar
 if [ ! -f ${MAIN_JAR} ]; then
-    echo "RapidWright not yet compiled. Please run './gradlew compileJava' from '${APP_HOME}'"
+    echo "RapidWright not yet compiled. Please run './gradlew compileJava' from '${RAPIDWRIGHT_PATH}'"
     exit 1
 fi
 
