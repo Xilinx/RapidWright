@@ -35,9 +35,9 @@ import java.util.Map;
  */
 public class PIPCache {
     private static class Key {
-        public final TileTypeEnum tileTypeEnum;
-        public int wire0StringIdx;
-        public int wire1StringIdx;
+        private final TileTypeEnum tileTypeEnum;
+        private final int wire0StringIdx;
+        private final int wire1StringIdx;
 
         public Key(Tile tile, int wire0StringIdx, int wire1StringIdx) {
             tileTypeEnum = tile.getTileTypeEnum();

@@ -36,9 +36,9 @@ import java.util.Map;
  */
 public class BELPinCache {
     private static class Key {
-        public final SiteTypeEnum siteTypeEnum;
-        public int belStringIdx;
-        public int pinStringIdx;
+        private final SiteTypeEnum siteTypeEnum;
+        private final int belStringIdx;
+        private final int pinStringIdx;
 
         public Key(SiteInst siteInst, int belStringIdx, int pinStringIdx) {
             siteTypeEnum = siteInst.getSiteTypeEnum();
