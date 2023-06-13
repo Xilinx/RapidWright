@@ -39,6 +39,7 @@ import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.interchange.DeviceResources;
 
 /**
  * Provides a basic design merging behavior when merging designs.  If no other design merger is
@@ -86,10 +87,15 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
             // Two ports with same name but opposite direction, plan to remove both and connect
             List<EDIFNet> nets0 = p0.getInternalNets();
             List<EDIFNet> nets1 = p1.getInternalNets();
+
             ArrayList<EDIFPortInst> toRemove = new ArrayList<>();
             for (int i=0; i < nets0.size(); i++) {
                 EDIFNet net0 = nets0.get(i);
                 EDIFNet net1 = nets1.get(i);
+                //continue if either port isn't attached to net.
+                if (net0 == null || net1 == null)
+                    continue;
+
                 List<EDIFPortInst> toSwitch = new ArrayList<>();
                 for (EDIFPortInst portInst0 : net0.getPortInsts()) {
                     if (portInst0.isTopLevelPort() && portInst0.getPort() == p0) {
@@ -104,7 +110,28 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
                 }
                 for (EDIFPortInst pi : toSwitch) {
                     net0.removePortInst(pi);
-                    net1.addPortInst(pi);
+
+                    // Checks to see if the port instance already exists in the cell
+                    EDIFPortInst piDuplicate = null;
+                    for(EDIFPortInst portInst :net1.getParentCell().getPortInsts()) {
+                        if (portInst.getName().equals(pi.getName())) {
+                            piDuplicate = portInst;
+                        }
+                    }
+
+                    // If there is a matching port, and it is in an opposite direction, then merge the two nets.
+                    if (piDuplicate != null && piDuplicate.getDirection()!=pi.getDirection()) {
+                        EDIFNet mergeNet = piDuplicate.getNet();
+                        mergeNet.removePortInst(piDuplicate);
+                        for(EDIFPortInst mergePort : mergeNet.getPortInsts()) {
+                            net1.addPortInst(mergePort);
+                        }
+                        mergeNet.getParentCell().removeNet(mergeNet);
+                    }
+                    //otherwise add the port to net in the other design.
+                    else {
+                        net1.addPortInst(pi);
+                    }
                 }
                 toSwitch.clear();
 
@@ -113,26 +140,52 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
                         toRemove.add(portInst1);
                     } else if (p0IsOutput) {
                         toSwitch.add(portInst1);
+                        if (!net0.getName().equals(net1.getName())) {
+                            replacedNets.put(net0.getName(), net1.getName());
+                        }
                     }
                 }
                 for (EDIFPortInst pi : toSwitch) {
                     net1.removePortInst(pi);
-                    net0.addPortInst(pi);
+
+                    // Checks to see if the port instance already exists in the cell
+                    EDIFPortInst piDuplicate = null;
+                    for(EDIFPortInst portInst :net0.getParentCell().getPortInsts()) {
+                        if (portInst.getName().equals(pi.getName())) {
+                            piDuplicate = portInst;
+                        }
+                    }
+
+                    // If there is a matching port, and it is in an opposite direction, then merge the two nets.
+                    if (piDuplicate != null && piDuplicate.getDirection()!=pi.getDirection()) {
+                        EDIFNet mergeNet = piDuplicate.getNet();
+                        mergeNet.removePortInst(piDuplicate);
+                        for(EDIFPortInst mergePort : mergeNet.getPortInsts()) {
+                            net0.addPortInst(mergePort);
+                        }
+                        mergeNet.getParentCell().removeNet(mergeNet);
+                    }
+                    //otherwise add the port to net in the other design.
+                    else {
+                        net0.addPortInst(pi);
+                    }
                 }
                 toSwitch.clear();
             }
 
             for (EDIFPortInst remove : toRemove) {
                 EDIFNet net = remove.getNet();
-                net.removePortInst(remove);
-                if (net.getPortInsts().size() == 0) {
-                    net.getParentCell().removeNet(net);
+                if (net!=null) {
+                    net.removePortInst(remove);
+                    if (net.getPortInsts().size() == 0) {
+                        net.getParentCell().removeNet(net);
+                    }
                 }
             }
 
-
             p0.getParentCell().removePort(p0);
             p1.getParentCell().removePort(p1);
+
             return;
         }
         if (p0.isOutput() && p1.isOutput()) {
@@ -268,10 +321,11 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
             }
         }
 
-        for (Net net : new ArrayList<>(s0.getSiteWireToNetMap().values())) {
+        ArrayList<Net> nets = new ArrayList<>(s0.getSiteWireToNetMap().values());
+        for (Net net : nets) {
             String newNetName = replacedNets.get(net.getName());
             if (newNetName != null) {
-                Net newNet = s0.getDesign().getNet(newNetName);
+                Net newNet = s1.getDesign().getNet(newNetName);
                 for (String siteWire : new ArrayList<>(s0.getSiteWiresFromNet(net))) {
                     BELPin[] pins = s0.getSiteWirePins(siteWire);
                     BELPin siteWirePin = pins[0];
@@ -282,6 +336,7 @@ public class DefaultDesignMerger extends AbstractDesignMerger {
         }
 
         if (modifiedSite) {
+            s0.unrouteSite();
             s0.routeSite();
         }
     }
