@@ -258,4 +258,14 @@ public class TestRWRoute {
             break;
         }
     }
+
+    @Test
+    public void testBug701() {
+        Design design = RapidWrightDCP.loadDCP("bug701.dcp");
+
+        RWRoute.routeDesignFullNonTimingDriven(design);
+
+        assertVivadoFullyRouted(design);
+    }
+
 }
