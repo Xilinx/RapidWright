@@ -26,6 +26,9 @@ package com.xilinx.rapidwright.rwroute;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.ReportRouteStatusResult;
+import com.xilinx.rapidwright.util.VivadoTools;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Disabled;
@@ -54,6 +57,15 @@ public class TestRWRoute {
         }
     }
 
+    public static void assertVivadoFullyRouted(Design design) {
+        if (!FileTools.isVivadoOnPath()) {
+            return;
+        }
+
+        ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+        Assertions.assertTrue(rrs.isFullyRouted());
+    }
+
     private static void assertAllSinksRouted(Design design) {
         for (Net net : design.getNets()) {
             if (net.getSource() == null && !net.isStaticNet()) {
@@ -78,7 +90,10 @@ public class TestRWRoute {
         Design design = Design.readCheckpoint(dcpPath);
         RWRoute.routeDesignFullNonTimingDriven(design);
         assertAllSinksRouted(design);
+        assertVivadoFullyRouted(design);
     }
+
+
 
     /**
      * Tests the timing driven full routing, i.e., RWRoute running in timing-driven mode.
@@ -96,6 +111,7 @@ public class TestRWRoute {
         Design design = Design.readCheckpoint(dcpPath);
         RWRoute.routeDesignFullTimingDriven(design);
         assertAllSinksRouted(design);
+        assertVivadoFullyRouted(design);
     }
 
     /**
@@ -115,6 +131,7 @@ public class TestRWRoute {
         Design design = Design.readCheckpoint(dcpPath);
         RWRoute.routeDesignFullNonTimingDriven(design);
         assertAllSinksRouted(design);
+        assertVivadoFullyRouted(design);
     }
 
     /**
@@ -143,6 +160,7 @@ public class TestRWRoute {
         for (Net net : routed.getModifiedNets()) {
             assertAllSinksRouted(net.getPins());
         }
+        assertVivadoFullyRouted(design);
     }
 
     /**
@@ -167,6 +185,7 @@ public class TestRWRoute {
         for (Net net : routed.getModifiedNets()) {
             assertAllSinksRouted(net.getPins());
         }
+        assertVivadoFullyRouted(design);
     }
 
     @ParameterizedTest
@@ -221,7 +240,7 @@ public class TestRWRoute {
         PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute, softPreserve);
 
         Assertions.assertTrue(pinsToRoute.stream().allMatch(SitePinInst::isRouted));
-        Assertions.assertTrue(Long.valueOf(System.getProperty("rapidwright.rwroute.nodesPopped")) <= nodesPoppedLimit);
+        Assertions.assertTrue(Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped")) <= nodesPoppedLimit);
     }
 
     @ParameterizedTest
@@ -233,7 +252,7 @@ public class TestRWRoute {
                 RuntimeException e = Assertions.assertThrows(RuntimeException.class,
                         () -> RWRoute.routeDesignFullNonTimingDriven(design),
                         "Expected RuntimeException() but was not thrown.");
-                Assertions.assertTrue(e.getMessage().equals(RWRoute.getUnsupportedSeriesMessage(part)));
+                Assertions.assertEquals(e.getMessage(), RWRoute.getUnsupportedSeriesMessage(part));
             }
             // Only test one part per series
             break;

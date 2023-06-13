@@ -633,6 +633,7 @@ public class PartialRouter extends RWRoute {
      */
     public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         if (pinsToRoute == null) {
+            RWRoute.preprocess(design);
             pinsToRoute = getUnroutedPins(design);
         }
 
@@ -655,6 +656,7 @@ public class PartialRouter extends RWRoute {
      */
     public static Design routeDesignPartialTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         if (pinsToRoute == null) {
+            RWRoute.preprocess(design);
             pinsToRoute = getUnroutedPins(design);
         }
 

@@ -311,7 +311,7 @@ public class BinaryEDIFWriter {
 
     public static void writeBinaryEDIF(OutputStream outputStream, EDIFNetlist netlist) {
         Map<String, Integer> stringMap = createStringMap(netlist);
-        try (Output os = FileTools.getKryoOutputStream(outputStream)) {
+        try (Output os = FileTools.getKryoZstdOutputStream(outputStream)) {
             os.writeString(EDIF_BINARY_FILE_TAG);
             os.writeString(EDIF_BINARY_FILE_VERSION);
             String[] strings = new String[stringMap.size()];

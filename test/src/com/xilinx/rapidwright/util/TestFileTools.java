@@ -23,15 +23,22 @@
 package com.xilinx.rapidwright.util;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.management.ManagementFactory;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.zip.DeflaterOutputStream;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.converter.ConvertWith;
 import org.junit.jupiter.params.provider.CsvSource;
 
+import com.github.luben.zstd.ZstdOutputStream;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.support.StringArrayConverter;
 
 public class TestFileTools {
@@ -55,7 +62,7 @@ public class TestFileTools {
             devicesString.append("\"" + device + "\"");
         }
         
-        pb.command("java", "-cp", classpath, RapidWright.class.getCanonicalName(), "-c",
+        pb.command("java", "-cp", classpath, Jython.class.getCanonicalName(), "-c",
                 "from com.xilinx.rapidwright.util import FileTools;"
                 + "FileTools.ensureDataFilesAreStaticInstallFriendly("+devicesString+")");
         pb.redirectErrorStream(true);
@@ -70,5 +77,33 @@ public class TestFileTools {
         for (String expectedFile : FileTools.getAllDependentDataFiles(devices)) {
             Assertions.assertTrue(tmpPath.resolve(expectedFile).toFile().exists());
         }
+    }
+
+    @Test
+    public void testIsGzippedFile(@TempDir Path tmpPath) {
+        String testFileName = "edif_parsing_stress_test.edf";
+        Path input = RapidWrightDCP.getPath(testFileName);
+        Path gzipped = tmpPath.resolve(testFileName + ".gz");
+        Path zstdFile = tmpPath.resolve(testFileName + ".zstd");
+        List<String> lines = FileTools.getLinesFromTextFile(input.toString());
+        try (DeflaterOutputStream out = new DeflaterOutputStream(Files.newOutputStream(gzipped))) {
+            for (String line : lines) {
+                out.write(line.getBytes());
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+
+        try (ZstdOutputStream out = new ZstdOutputStream(Files.newOutputStream(zstdFile))) {
+            for (String line : lines) {
+                out.write(line.getBytes());
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+
+        Assertions.assertTrue(FileTools.isFileGzipped(gzipped));
+        Assertions.assertFalse(FileTools.isFileGzipped(input));
+        Assertions.assertFalse(FileTools.isFileGzipped(zstdFile));
     }
 }

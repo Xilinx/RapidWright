@@ -26,6 +26,8 @@
  */
 package com.xilinx.rapidwright.edif;
 
+import static com.xilinx.rapidwright.edif.BinaryEDIFWriter.EDIF_HAS_OWNER;
+
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
@@ -33,8 +35,6 @@ import java.util.Map;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.xilinx.rapidwright.util.FileTools;
-
-import static com.xilinx.rapidwright.edif.BinaryEDIFWriter.EDIF_HAS_OWNER;
 
 /**
  * A Reader for the RapidWright Binary EDIF Format
@@ -218,7 +218,7 @@ public class BinaryEDIFReader {
      * @see BinaryEDIFWriter#writeBinaryEDIF(Path, EDIFNetlist)
      */
     public static EDIFNetlist readBinaryEDIF(Path path) {
-        try (Input is = FileTools.getKryoInputStream(path.toString())) {
+        try (Input is = FileTools.getKryoZstdInputStream(path.toString())) {
             if (!is.readString().equals(BinaryEDIFWriter.EDIF_BINARY_FILE_TAG)) {
                 throw new RuntimeException("ERROR: Cannot recognize EDIF Binary format");
             }
