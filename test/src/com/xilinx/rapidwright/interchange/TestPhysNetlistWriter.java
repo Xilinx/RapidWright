@@ -26,6 +26,7 @@ package com.xilinx.rapidwright.interchange;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.List;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -49,7 +50,7 @@ import org.capnproto.ReaderOptions;
 import org.capnproto.StructList;
 
 public class TestPhysNetlistWriter {
-    private void testAllRouteSegmentsEndInBELInputPins(Design design, RouteBranch.Reader routeBranch, StringEnumerator strings) {
+    private void testAllRouteSegmentsEndInBELInputPins(Design design, RouteBranch.Reader routeBranch, List<String> strings) {
         StructList.Reader<RouteBranch.Reader> branches = routeBranch.getBranches();
         int branchesCount = branches.size();
         if (branchesCount == 0) {
@@ -89,7 +90,7 @@ public class TestPhysNetlistWriter {
 
         PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
 
-        StringEnumerator allStrings = PhysNetlistReader.readAllStrings(physNetlist);
+        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
 
         for (PhysNet.Reader physNet : physNetlist.getPhysNets()) {
             if (physNet.getType() == NetType.GND || physNet.getType() == NetType.VCC) {
@@ -122,7 +123,7 @@ public class TestPhysNetlistWriter {
 
         PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
 
-        StringEnumerator allStrings = PhysNetlistReader.readAllStrings(physNetlist);
+        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
 
         for (CellPlacement.Reader placement : physNetlist.getPlacements()) {
             SiteInst siteInst = design.getSiteInstFromSiteName(allStrings.get(placement.getSite()));

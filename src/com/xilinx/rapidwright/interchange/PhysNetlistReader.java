@@ -23,24 +23,6 @@
 
 package com.xilinx.rapidwright.interchange;
 
-import java.io.IOException;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
-
-import org.capnproto.MessageReader;
-import org.capnproto.PrimitiveList;
-import org.capnproto.ReaderOptions;
-import org.capnproto.StructList;
-import org.capnproto.TextList;
-import org.python.google.common.base.Enums;
-import org.python.google.common.base.Optional;
-
 import com.xilinx.rapidwright.design.AltPinMapping;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -50,13 +32,14 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
-import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
@@ -81,107 +64,181 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.Property;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.RouteSegment;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.SiteInstance;
-import com.xilinx.rapidwright.util.Utils;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
+import org.capnproto.MessageReader;
+import org.capnproto.PrimitiveList;
+import org.capnproto.ReaderOptions;
+import org.capnproto.StructList;
+import org.capnproto.TextList;
+import org.python.google.common.base.Enums;
+import org.python.google.common.base.Optional;
+
+import java.io.IOException;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+import java.util.function.Consumer;
 
 public class PhysNetlistReader {
 
     protected static final String DISABLE_AUTO_IO_BUFFERS = "DISABLE_AUTO_IO_BUFFERS";
     protected static final String OUT_OF_CONTEXT = "OUT_OF_CONTEXT";
 
-    private static final String STATIC_SOURCE = "STATIC_SOURCE";
-    private static int tieoffInstanceCount = 0;
+    public static boolean VALIDATE_MACROS_PLACED_FULLY = true;
 
-    public static Design readPhysNetlist(String physNetlistFileName, EDIFNetlist netlist) throws IOException {
-        Design design = new Design();
+    /**
+     *  Checks that constant routing and net names are valid.
+     *  This incurs a runtime overhead.
+     */
+    public static boolean CHECK_CONSTANT_ROUTING_AND_NET_NAMING = true;
+
+    /**
+     * Examines a design to ensure that the provided macro placement is consistent with the
+     * macro definition in the library.
+     * This incurs a runtime overhead.
+     */
+    public static boolean CHECK_MACROS_CONSISTENT = true;
+
+
+    /**
+     * When reading placement for physical netlist cells, check for the presence of and
+     * consistency with logical netlist cells.
+     * This incurs a runtime overhead.
+     */
+    public static boolean CHECK_AND_CREATE_LOGICAL_CELL_IF_NOT_PRESENT = true;
+
+    protected final Design design;
+    protected Device device;
+
+    protected List<String> strings;
+
+    protected Map<Integer, SiteInst> siteInsts;
+
+    protected Map<Integer, Tile> tiles;
+
+    protected PIPCache pipCache;
+
+    protected BELPinCache belPinCache;
+
+    public PhysNetlistReader(EDIFNetlist netlist) {
+        design = new Design();
         design.setNetlist(netlist);
+    }
+
+    protected Design read(String physNetlistFileName) throws IOException {
+        CodePerfTracker t = new CodePerfTracker("Read PhysNetlist");
+
+        t.start("Read File");
         ReaderOptions rdOptions =
                 new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
                 ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
         MessageReader readMsg = Interchange.readInterchangeFile(physNetlistFileName, rdOptions);
 
         PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
+
         design.setPartName(physNetlist.getPart().toString());
+        device = design.getDevice();
 
-        StringEnumerator allStrings = readAllStrings(physNetlist);
+        t.stop().start("Read Strings");
+        strings = readAllStrings(physNetlist);
 
-        checkConstantRoutingAndNetNaming(physNetlist, netlist, allStrings);
+        if (CHECK_CONSTANT_ROUTING_AND_NET_NAMING) {
+            t.stop().start("Check Constant Routing & Net Naming");
+            checkConstantRoutingAndNetNaming(physNetlist);
+        }
 
-        readSiteInsts(physNetlist, design, allStrings);
+        t.stop().start("Read SiteInsts");
+        readSiteInsts(physNetlist);
 
-        readPlacement(physNetlist, design, allStrings);
+        t.stop().start("Read Placement");
+        readPlacement(physNetlist);
 
-        checkMacros(design);
+        if (CHECK_MACROS_CONSISTENT) {
+            t.stop().start("Check Macros");
+            checkMacros();
+        }
 
-        readRouting(physNetlist, design, allStrings);
+        t.stop().start("Read Routing");
+        readNullNet(physNetlist);
+        readRouting(physNetlist);
 
-        readDesignProperties(physNetlist, design, allStrings);
+        t.stop().start("Read Design Props");
+        readDesignProperties(physNetlist);
+
+        t.stop().printSummary();
 
         return design;
     }
 
-    public static StringEnumerator readAllStrings(PhysNetlist.Reader physNetlist) {
-        StringEnumerator allStrings = new StringEnumerator();
+    public static Design readPhysNetlist(String physNetlistFileName) throws IOException {
+        return readPhysNetlist(physNetlistFileName, null);
+    }
+
+    public static Design readPhysNetlist(String physNetlistFileName, EDIFNetlist netlist) throws IOException {
+        PhysNetlistReader reader = new PhysNetlistReader(netlist);
+        return reader.read(physNetlistFileName);
+    }
+
+    public static List<String> readAllStrings(PhysNetlist.Reader physNetlist) {
         TextList.Reader strListReader = physNetlist.getStrList();
         int strCount = strListReader.size();
+        List<String> allStrings = new ArrayList<>(strCount);
         for (int i=0; i < strCount; i++) {
             String str = strListReader.get(i).toString();
-            allStrings.addObject(str);
+            allStrings.add(str);
         }
         return allStrings;
     }
 
-    private static void readSiteInsts(PhysNetlist.Reader physNetlist, Design design,
-                                        StringEnumerator strings) {
-        Device device = design.getDevice();
-        StructList.Reader<SiteInstance.Reader> siteInsts = physNetlist.getSiteInsts();
-        int siteInstCount = siteInsts.size();
+    protected void readSiteInsts(PhysNetlist.Reader physNetlist) {
+        StructList.Reader<SiteInstance.Reader> siteInstsReader = physNetlist.getSiteInsts();
+        int siteInstCount = siteInstsReader.size();
         if (siteInstCount == 0 && physNetlist.getPlacements().size() > 0) {
             System.out.println("WARNING: Missing SiteInst information in *.phys file.  RapidWright "
-
                     + "will attempt to infer the proper SiteInst, however, it is recommended that "
                     + "SiteInst information be specified to avoid SiteTypeEnum mismatch problems.");
         }
+
+        siteInsts = new HashMap<>(siteInstCount);
+
         for (int i=0; i < siteInstCount; i++) {
-            SiteInstance.Reader si = siteInsts.get(i);
-            String siteName = strings.get(si.getSite());
-            SiteTypeEnum type = SiteTypeEnum.valueOf(strings.get(si.getType()));
-            design.createSiteInst(siteName, type, device.getSite(siteName));
+            SiteInstance.Reader r = siteInstsReader.get(i);
+            String siteName = strings.get(r.getSite());
+            SiteTypeEnum type = SiteTypeEnum.valueOf(strings.get(r.getType()));
+            SiteInst si = design.createSiteInst(siteName, type, device.getSite(siteName));
+            siteInsts.put(r.getSite(), si);
         }
     }
 
-    private static void readPlacement(PhysNetlist.Reader physNetlist, Design design,
-                                        StringEnumerator strings) {
-        HashMap<String, PhysCellType> physCells = new HashMap<>();
+    protected void readPlacement(PhysNetlist.Reader physNetlist) {
         StructList.Reader<PhysCell.Reader> physCellReaders = physNetlist.getPhysCells();
         int physCellCount = physCellReaders.size();
+        Map<Integer, PhysCellType> physCells = new HashMap<>(physCellCount);
         for (int i=0; i < physCellCount; i++) {
             PhysCell.Reader reader = physCellReaders.get(i);
-            physCells.put(strings.get(reader.getCellName()), reader.getPhysType());
+            PhysCellType physType = reader.getPhysType();
+            assert(physType == PhysCellType.LOCKED || physType == PhysCellType.PORT);
+            physCells.put(reader.getCellName(), physType);
         }
-
 
         StructList.Reader<CellPlacement.Reader> placements = physNetlist.getPlacements();
         int placementCount = placements.size();
-        Device device = design.getDevice();
         EDIFNetlist netlist = design.getNetlist();
         EDIFLibrary macroPrims = Design.getMacroPrimitives(device.getSeries());
-        Map<String, List<String>> macroLeafChildren = new HashMap<>();
+        Set<Integer> otherBELLocs = new HashSet<>();
         for (int i=0; i < placementCount; i++) {
             CellPlacement.Reader placement = placements.get(i);
             String cellName = strings.get(placement.getCellName());
-            EDIFCellInst cellInst = null;
-            Site site = device.getSite(strings.get(placement.getSite()));
-            SiteInst siteInst = design.getSiteInstFromSite(site);
-            if (siteInst == null) {
-                siteInst = design.createSiteInst(site);
-            }
+            SiteInst siteInst = getSiteInst(placement.getSite());
+            assert(siteInst != null);
             String belName = strings.get(placement.getBel());
-            HashSet<String> otherBELLocs = null;
-            if (physCells.get(cellName) == PhysCellType.LOCKED) {
-                cellInst = new EDIFCellInst(PhysNetlistWriter.LOCKED,null,null);
-                if (siteInst == null) {
-                    siteInst = new SiteInst(site.getName(), design, site.getSiteTypeEnum(), site);
-                }
+            PhysCellType physType = physCells.get(placement.getCellName());
+            if (physType == PhysCellType.LOCKED) {
                 siteInst.setSiteLocked(true);
                 Cell c = siteInst.getCell(belName);
                 if (c == null) {
@@ -194,81 +251,78 @@ public class PhysNetlistReader {
                 c.setLocked(true);
 
                 // c Alternative Blocked Site Type // TODO
-            } else if (physCells.get(cellName) == PhysCellType.PORT) {
+            } else if (physType == PhysCellType.PORT) {
                 Cell portCell = new Cell(cellName,siteInst.getBEL(belName));
                 portCell.setType(PhysNetlistWriter.PORT);
                 siteInst.addCell(portCell);
                 portCell.setBELFixed(placement.getIsBelFixed());
                 portCell.setSiteFixed(placement.getIsSiteFixed());
             } else {
-                cellInst = netlist.getCellInstFromHierName(cellName);
+                assert(physType == null);
                 String cellType = strings.get(placement.getType());
-                if (cellInst == null) {
-                    Optional<Unisim> maybeUnisim = Enums.getIfPresent(Unisim.class, cellType);
-                    Unisim unisim = maybeUnisim.isPresent() ? maybeUnisim.get() : null;
-                    if (unisim == null) {
-                        EDIFCell cell = new EDIFCell(null,cellType);
-                        cellInst = new EDIFCellInst(cellName,cell, null);
-                    } else {
-                        cellInst = Design.createUnisimInst(null, cellName, unisim);
+
+                if (CHECK_AND_CREATE_LOGICAL_CELL_IF_NOT_PRESENT) {
+                    if (netlist == null) {
+                        throw new RuntimeException("No EDIFNetlist supplied");
                     }
-                } else {
-                    assert(cellInst.getCellType().getName().equals(cellType));
+
+                    EDIFCellInst cellInst = netlist.getCellInstFromHierName(cellName);
+                    if (cellInst == null) {
+                        Optional<Unisim> maybeUnisim = Enums.getIfPresent(Unisim.class, cellType);
+                        Unisim unisim = maybeUnisim.isPresent() ? maybeUnisim.get() : null;
+                        if (unisim == null) {
+                            EDIFCell cell = new EDIFCell(null, cellType);
+                            new EDIFCellInst(cellName, cell, null);
+                        } else {
+                            Design.createUnisimInst(null, cellName, unisim);
+                        }
+                    } else {
+                        assert (cellInst.getCellType().getName().equals(cellType));
+                    }
                 }
                 if (macroPrims.containsCell(cellType)) {
                     throw new RuntimeException("ERROR: Placement for macro primitive "
-                            + cellInst.getCellType().getName() + " (instance "+cellName+") is "
+                            + cellType + " (instance "+cellName+") is "
                             + "invalid.  Please only provide placements for the macro's children "
-                            + "leaf cells: " + cellInst.getCellType().getCellInsts() +".");
+                            + "leaf cells: " + cellType +".");
                 }
 
                 BEL bel = siteInst.getBEL(belName);
                 if (bel == null) {
+                    String siteName = strings.get(placement.getSite());
                     throw new RuntimeException(
-                          "ERROR: The placement specified on BEL " + site.getName() + "/"
+                          "ERROR: The placement specified on BEL " + siteName + "/"
                           + belName + " could not be found in the target "
                           + "device.");
                 }
                 if (bel.getBELType().equals("HARD0") || bel.getBELType().equals("HARD1")) {
+                    String siteName = strings.get(placement.getSite());
                     throw new RuntimeException(
-                              "ERROR: The placement specified on BEL " + site.getName() + "/"
+                              "ERROR: The placement specified on BEL " + siteName + "/"
                             + bel.getName() + " is not valid. HARD0 and HARD1 BEL types do not "
                             + "require placed cells.");
                 }
                 Cell existingCell = siteInst.getCell(bel);
                 if (existingCell != null) {
+                    String siteName = strings.get(placement.getSite());
                     throw new RuntimeException(
-                            "ERROR: Cell \"" + cellName + "\" placement on BEL " + site.getName() + "/"
+                            "ERROR: Cell \"" + cellName + "\" placement on BEL " + siteName + "/"
                                     + belName + " conflicts with previously placed cell \"" + existingCell.getName()
                                     + "\".");
                 }
                 Cell cell = new Cell(cellName, siteInst, bel);
                 cell.setBELFixed(placement.getIsBelFixed());
                 cell.setSiteFixed(placement.getIsSiteFixed());
-                if (cellInst != null) {
-                    cell.setType(cellInst.getCellType().getName());
-                }
+                cell.setType(cellType);
 
-                PrimitiveList.Int.Reader otherBELs = placement.getOtherBels();
-                int otherBELCount = otherBELs.size();
-                if (otherBELCount > 0) otherBELLocs = new HashSet<String>();
-                for (int j=0; j < otherBELCount; j++) {
-                    String belLoc = strings.get(otherBELs.get(j));
-                    otherBELLocs.add(belLoc);
+                if (placement.hasOtherBels()) {
+                    PrimitiveList.Int.Reader otherBELs = placement.getOtherBels();
+                    int otherBELCount = otherBELs.size();
+                    for (int j=0; j < otherBELCount; j++) {
+                        otherBELLocs.add(otherBELs.get(j));
+                    }
                 }
             }
-
-            PhysNet.Reader nullNet = physNetlist.getNullNet();
-            StructList.Reader<RouteBranch.Reader> stubs = nullNet.getStubs();
-            int stubCount = stubs.size();
-            for (int k=0; k < stubCount; k++) {
-                RouteSegment.Reader segment = stubs.get(k).getRouteSegment();
-                PhysSitePIP.Reader spReader = segment.getSitePIP();
-                SiteInst sitePIPSiteInst = getSiteInst(spReader.getSite(), design, strings);
-                sitePIPSiteInst.addSitePIP(strings.get(spReader.getBel()),
-                                           strings.get(spReader.getPin()));
-            }
-
 
             StructList.Reader<PinMapping.Reader> pinMap = placement.getPinMap();
             int pinMapCount = pinMap.size();
@@ -279,7 +333,7 @@ public class PhysNetlistReader {
                 String cellPinName = strings.get(pinMapping.getCellPin());
                 Cell c = siteInst.getCell(belName);
                 if (c == null) {
-                    if (otherBELLocs.contains(belName)) {
+                    if (otherBELLocs.remove(pinMapping.getBel())) {
                         BEL bel = siteInst.getBEL(belName);
                         if (bel == null) {
                             throw new RuntimeException("ERROR: Couldn't find BEL " + belName
@@ -317,42 +371,44 @@ public class PhysNetlistReader {
                     }
                 }
             }
+
+            assert(otherBELLocs.isEmpty());
         }
 
         // Validate macro primitives are placed fully
-        HashSet<String> checked = new HashSet<>();
-        for (Cell c : design.getCells()) {
-            EDIFCell cellType = c.getParentCell();
-            if (cellType != null && macroPrims.containsCell(cellType)) {
-                String parentHierName = c.getParentHierarchicalInstName();
-                if (checked.contains(parentHierName)) continue;
-                List<String> missingPlacements = null;
-                List<String> childrenNames = macroLeafChildren.get(cellType.getName());
-                if (childrenNames == null) {
-                    childrenNames = EDIFTools.getMacroLeafCellNames(cellType);
-                    macroLeafChildren.put(cellType.getName(), childrenNames);
-                }
-                //for (EDIFCellInst inst : cellType.getCellInsts()) { // TODO - Fix up loop list
-                for (String childName : childrenNames) {
-                    if (childName.equals("VCC") || childName.equals("GND")) {
-                        // Ignore VCC (e.g. from FDRS_1) and GND cells
-                        continue;
+        if (VALIDATE_MACROS_PLACED_FULLY) {
+            Map<String, List<String>> macroLeafChildren = new HashMap<>();
+            Set<String> checked = new HashSet<>();
+            for (Cell c : design.getCells()) {
+                EDIFCell cellType = c.getParentCell();
+                if (cellType != null && macroPrims.containsCell(cellType)) {
+                    String parentHierName = c.getParentHierarchicalInstName();
+                    if (checked.contains(parentHierName)) continue;
+                    List<String> missingPlacements = null;
+                    List<String> childrenNames = macroLeafChildren.computeIfAbsent(cellType.getName(),
+                            (k) -> EDIFTools.getMacroLeafCellNames(cellType));
+                    //for (EDIFCellInst inst : cellType.getCellInsts()) { // TODO - Fix up loop list
+                    for (String childName : childrenNames) {
+                        if (childName.equals("VCC") || childName.equals("GND")) {
+                            // Ignore VCC (e.g. from FDRS_1) and GND cells
+                            continue;
+                        }
+                        String childCellName = parentHierName + EDIFTools.EDIF_HIER_SEP + childName;
+                        Cell child = design.getCell(childCellName);
+                        if (child == null) {
+                            if (missingPlacements == null) missingPlacements = new ArrayList<>();
+                            missingPlacements.add(childName + " (" + childCellName + ")");
+                        }
                     }
-                    String childCellName = parentHierName + EDIFTools.EDIF_HIER_SEP + childName;
-                    Cell child = design.getCell(childCellName);
-                    if (child == null) {
-                        if (missingPlacements == null) missingPlacements = new ArrayList<String>();
-                        missingPlacements.add(childName + " (" + childCellName + ")");
+                    if (missingPlacements != null && !cellType.getName().equals("IOBUFDS")) {
+                        throw new RuntimeException("ERROR: Macro primitive '" + parentHierName
+                                + "' is not fully placed. Expected placements for all child cells: "
+                                + cellType.getCellInsts() + ", but missing placements "
+                                + "for cells: " + missingPlacements);
                     }
-                }
-                if (missingPlacements != null && !cellType.getName().equals("IOBUFDS")) {
-                    throw new RuntimeException("ERROR: Macro primitive '"+ parentHierName
-                            + "' is not fully placed. Expected placements for all child cells: "
-                            + cellType.getCellInsts() + ", but missing placements "
-                            + "for cells: " + missingPlacements);
-                }
 
-                checked.add(parentHierName);
+                    checked.add(parentHierName);
+                }
             }
         }
     }
@@ -376,160 +432,227 @@ public class PhysNetlistReader {
         }
     }
 
-    private static void readRouting(PhysNetlist.Reader physNetlist, Design design,
-                                    StringEnumerator strings) {
-        StructList.Reader<PhysNet.Reader> nets = physNetlist.getPhysNets();
-        EDIFNetlist netlist = design.getNetlist();
+    protected void readNullNet(PhysNetlist.Reader physNetlist) {
+        PhysNet.Reader nullNet = physNetlist.getNullNet();
+        StructList.Reader<RouteBranch.Reader> stubs = nullNet.getStubs();
+        int stubCount = stubs.size();
+        for (int k=0; k < stubCount; k++) {
+            RouteSegment.Reader segment = stubs.get(k).getRouteSegment();
+            PhysSitePIP.Reader spReader = segment.getSitePIP();
+            SiteInst sitePIPSiteInst = getSiteInst(spReader.getSite());
+            sitePIPSiteInst.addSitePIP(strings.get(spReader.getBel()),
+                    strings.get(spReader.getPin()));
+        }
+    }
+
+    private void readRouting(PhysNetlist.Reader physNetlist) {
+        tiles = new HashMap<>();
+        pipCache = new PIPCache(new HashMap<>(), strings);
+        belPinCache = new BELPinCache(new HashMap<>(), strings);
+
+        StructList.Reader<PhysNetlist.PhysNet.Reader> nets = physNetlist.getPhysNets();
+
+        // For single-threaded read, add net to design object immediately
+        readRouting(nets, design::addNet);
+
+        tiles = null;
+        pipCache = null;
+        belPinCache = null;
+    }
+
+    protected void readRouting(StructList.Reader<PhysNet.Reader> nets, Consumer<Net> addNetToDesign) {
         int netCount = nets.size();
+        Set<Wire> stubWires = new HashSet<>();
         for (int i=0; i < netCount; i++) {
             PhysNet.Reader netReader = nets.get(i);
             String netName = strings.get(netReader.getName());
             Net net = new Net(netName);
-            design.addNet(net);
+            net.setDesign(design);
             net.setType(getNetType(netReader, netName));
-
-            // Sources
-            StructList.Reader<RouteBranch.Reader> routeSrcs = netReader.getSources();
-            int routeSrcsCount = routeSrcs.size();
-            for (int j=0; j < routeSrcsCount; j++) {
-                RouteBranch.Reader branchReader = routeSrcs.get(j);
-                readRouteBranch(branchReader, net, design, strings, null);
-            }
-            // Stubs
-            StructList.Reader<RouteBranch.Reader> routeStubs = netReader.getStubs();
-            int routeStubsCount = routeStubs.size();
-            for (int j=0; j < routeStubsCount; j++) {
-                RouteBranch.Reader branchReader = routeStubs.get(j);
-                readRouteBranch(branchReader, net, design, strings, null);
-            }
+            addNetToDesign.accept(net);
 
             // Stub Nodes
-            StructList.Reader<PhysNode.Reader> stubNodes = netReader.getStubNodes();
-            int stubNodeCount = stubNodes.size();
-            Device device = design.getDevice();
-            for (int j=0; j < stubNodeCount; j++) {
-                PhysNode.Reader stubNodeReader = stubNodes.get(j);
-                Tile tile = device.getTile(strings.get(stubNodeReader.getTile()));
-                PIP pip = new PIP(tile, stubNodeReader.getWire(), PIP.NULL_END_WIRE_IDX);
+            if (netReader.hasStubNodes()) {
+                StructList.Reader<PhysNode.Reader> stubNodes = netReader.getStubNodes();
+                int stubNodeCount = stubNodes.size();
+                for (int j = 0; j < stubNodeCount; j++) {
+                    PhysNode.Reader stubNodeReader = stubNodes.get(j);
+                    Tile tile = getTile(stubNodeReader.getTile());
+                    Integer wireIdx = getWireIndex(tile, stubNodeReader.getWire());
+                    Wire wire = new Wire(tile, wireIdx);
+                    boolean added = stubWires.add(wire);
+                    assert (added);
+                }
+            }
+
+            // Sources
+            if (netReader.hasSources()) {
+                StructList.Reader<RouteBranch.Reader> routeSrcs = netReader.getSources();
+                int routeSrcsCount = routeSrcs.size();
+                for (int j = 0; j < routeSrcsCount; j++) {
+                    RouteBranch.Reader branchReader = routeSrcs.get(j);
+                    readRouteBranch(stubWires, branchReader, net, null);
+                }
+            }
+            // Stubs
+            if (netReader.hasStubs()) {
+                StructList.Reader<RouteBranch.Reader> routeStubs = netReader.getStubs();
+                int routeStubsCount = routeStubs.size();
+                for (int j=0; j < routeStubsCount; j++) {
+                    RouteBranch.Reader branchReader = routeStubs.get(j);
+                    readRouteBranch(stubWires, branchReader, net, null);
+                }
+            }
+
+            // Stub nodes that don't belong on a PIP
+            for (Wire wire : stubWires) {
+                PIP pip = new PIP(wire.getTile(), wire.getWireIndex(), PIP.NULL_END_WIRE_IDX);
                 net.addPIP(pip);
             }
+            stubWires.clear();
         }
     }
 
-    private static void readRouteBranch(RouteBranch.Reader branchReader, Net net, Design design,
-                                        StringEnumerator strings, BELPin routeThruLutInput) {
+    protected void addBELPinToSiteInst(BELPin belPin, SiteInst siteInst, Net net) {
+        siteInst.routeIntraSiteNet(net, belPin, belPin);
+    }
+
+    protected void addCellToSiteInst(Cell cell) {
+        SiteInst siteInst = cell.getSiteInst();
+        siteInst.getCellMap().put(cell.getBELName(), cell);
+    }
+
+    protected void addSitePIPToSiteInst(SitePIP sitePIP, SiteInst siteInst) {
+        siteInst.addSitePIP(sitePIP);
+    }
+
+    protected SitePinInst createSitePin(int pinNameIdx, SiteInst siteInst, Net net) {
+        BELPin belPin = getBELPin(siteInst, pinNameIdx, pinNameIdx);
+        // An output BELPin is an input site pin
+        boolean outputPin = !belPin.isOutput();
+        String pinName = strings.get(pinNameIdx);
+        SitePinInst pin = new SitePinInst(outputPin, pinName, siteInst);
+        net.addPin(pin);
+        return pin;
+    }
+
+    private void readRouteBranch(Set<Wire> stubWires,
+                                 RouteBranch.Reader branchReader,
+                                 Net net,
+                                 BELPin routeThruLutInput) {
         RouteBranch.RouteSegment.Reader segment = branchReader.getRouteSegment();
-        StructList.Reader<RouteBranch.Reader> branches = branchReader.getBranches();
-        int branchesCount = branches.size();
-        Device device = design.getDevice();
+        StructList.Reader<RouteBranch.Reader> branches = null;
+        int branchesCount;
+        if (branchReader.hasBranches()) {
+            branches = branchReader.getBranches();
+            branchesCount = branches.size();
+        } else {
+            branchesCount = 0;
+        }
         switch(segment.which()) {
             case PIP:{
                 PhysPIP.Reader pReader = segment.getPip();
-                Tile tile = device.getTile(strings.get(pReader.getTile()));
-                String wire0 = strings.get(pReader.getWire0());
-                String wire1 = strings.get(pReader.getWire1());
+                Tile tile = getTile(pReader.getTile());
                 if (tile == null) {
-                    throw new RuntimeException("ERROR: Tile " + tile + " for pip from wire " + wire0 + " to wire " + wire1 + " not found.");
+                    String wire0 = strings.get(pReader.getWire0());
+                    String wire1 = strings.get(pReader.getWire1());
+                    throw new RuntimeException("ERROR: Tile " + strings.get(pReader.getTile()) + " for pip from wire " + wire0 + " to wire " + wire1 + " not found.");
                 }
 
-                Integer wire0Idx = tile.getWireIndex(wire0);
-                if (wire0Idx == null) {
-                    throw new RuntimeException("ERROR: Wire0 " + wire0 + " in tile " + tile + " not found.");
-                }
-
-                Integer wire1Idx = tile.getWireIndex(wire1);
-                if (wire1Idx == null) {
-                    throw new RuntimeException("ERROR: Wire1 " + wire1 + " in tile " + tile + " not found.");
-                }
-
-                PIP pip = tile.getPIP(wire0Idx, wire1Idx);
-                if (pip == null) {
-                    throw new RuntimeException("ERROR: PIP for tile " + tile + " from wire " + wire0 + " to wire " + wire1 + " not found.");
-                }
-
+                PIP pip = getPIP(tile, pReader.getWire0(), pReader.getWire1());
                 pip.setIsPIPFixed(pReader.getIsFixed());
                 pip.setIsReversed(!pReader.getForward());
+
+                if (stubWires.remove(pip.getEndWire())) {
+                    pip.setIsStub(true);
+                }
+
                 net.addPIP(pip);
                 break;
             }
             case BEL_PIN:{
                 PhysBelPin.Reader bpReader = segment.getBelPin();
-                SiteInst siteInst = getSiteInst(bpReader.getSite(), design, strings);
-                String belName = strings.get(bpReader.getBel());
-                BEL bel = siteInst.getBEL(belName);
-                if (bel == null) {
-                    throw new RuntimeException(String.format("ERROR: Failed to get BEL %s", belName));
-                }
-                String belPinName = strings.get(bpReader.getPin());
-                BELPin belPin = bel.getPin(belPinName);
-                if (belPin == null) {
-                    throw new RuntimeException(String.format("ERROR: Failed to get BEL pin %s/%s", belName, belPinName));
-                }
+                SiteInst siteInst = getPlacedSiteInst(bpReader.getSite());
+                BELPin belPin = getBELPin(siteInst, bpReader.getBel(), bpReader.getPin());
 
-                // Examine BEL input pins from SLICEL/M only
-                if (Utils.isSLICE(siteInst) && bel.getBELClass() == BELClass.BEL && belPin.isInput()) {
+                // Examine LUT input pins only
+                if (belPin.isInput()) {
+                    BEL bel = belPin.getBEL();
+                    if (bel.isLUT()) {
+                        // If this route branch terminates here ...
+                        if (branchesCount == 0) {
+                            // ... and it routed through a LUT along the way
+                            if (routeThruLutInput != null) {
+                                // Check that a routethru cell exists
 
-                    // If this route branch terminates here ...
-                    if (branchesCount == 0) {
-                        // ... and it routed through a LUT along the way
-                        if (routeThruLutInput != null) {
-                            // Check that a routethru cell exists
+                                String belPinName = belPin.getName();
 
-                            Cell belCell = siteInst.getCell(bel);
-                            Cell routeThruCell = siteInst.getCell(routeThruLutInput.getBEL());
-                            if (routeThruCell == null) {
-                                // Routethru cell does not exist, create one
+                                Cell belCell = siteInst.getCell(bel);
+                                Cell routeThruCell = siteInst.getCell(routeThruLutInput.getBEL());
+                                if (routeThruCell == null) {
+                                    // Routethru cell does not exist, create one
 
-                                // Make sure nothing placed there already
-                                if (siteInst.getCell(routeThruLutInput.getBEL()) != null) {
-                                    throw new RuntimeException("Routethru inferred for " + siteInst.getSiteName() + "/" + routeThruLutInput.getBELName()
-                                        + " but it is already occupied");
+                                    // Make sure nothing placed there already
+                                    if (siteInst.getCell(routeThruLutInput.getBEL()) != null) {
+                                        throw new RuntimeException("Routethru inferred for " + siteInst.getSiteName() + "/" + routeThruLutInput.getBELName()
+                                                + " but it is already occupied");
+                                    }
+
+                                    routeThruCell = new Cell(belCell.getName(), routeThruLutInput.getBEL());
+                                    routeThruCell.setRoutethru(true);
+                                    routeThruCell.setType(belCell.getType());
+                                    routeThruCell.setSiteInst(siteInst);
+                                    addCellToSiteInst(routeThruCell);
+                                    routeThruCell.addPinMapping(routeThruLutInput.getName(), belCell.getLogicalPinMapping(belPinName));
                                 }
 
-                                routeThruCell = new Cell(belCell.getName(), routeThruLutInput.getBEL());
-                                routeThruCell.setRoutethru(true);
-                                routeThruCell.setType(belCell.getType());
-                                routeThruCell.setSiteInst(siteInst);
-                                siteInst.getCellMap().put(routeThruLutInput.getBELName(), routeThruCell);
-                                routeThruCell.addPinMapping(routeThruLutInput.getName(), belCell.getLogicalPinMapping(belPinName));
+                                String physicalPin = routeThruLutInput.getName();
+                                String logicalPin = belCell.getLogicalPinMapping(belPinName);
+                                if (routeThruCell.getSiteInst() != siteInst ||
+                                        !routeThruCell.isRoutethru() ||
+                                        !routeThruCell.getLogicalPinMapping(physicalPin).equals(logicalPin)) {
+                                    throw new RuntimeException("Invalid routethru cell: " + routeThruCell);
+                                }
                             }
-                            String physicalPin = routeThruLutInput.getName();
-                            String logicalPin = belCell.getLogicalPinMapping(belPinName);
-                            if (routeThruCell.getSiteInst() != siteInst ||
-                                !routeThruCell.isRoutethru() ||
-                                !routeThruCell.getLogicalPinMapping(physicalPin).equals(logicalPin)) {
-                                throw new RuntimeException("Invalid routethru cell: " + routeThruCell);
-                            }
+                        } else {
+                            assert (routeThruLutInput == null);
+
+                            routeThruLutInput = belPin;
                         }
-                    } else if (belName.endsWith("LUT")) {
-                        assert (routeThruLutInput == null);
-
-                        routeThruLutInput = belPin;
                     }
-                }
+                } else {
+                    assert(!belPin.isInput());
 
-                siteInst.routeIntraSiteNet(net, belPin, belPin);
+                    // Only output BEL pins affect intra-site routing
+                    addBELPinToSiteInst(belPin, siteInst, net);
+                }
                 break;
             }
             case SITE_P_I_P:{
                 PhysSitePIP.Reader spReader = segment.getSitePIP();
-                SiteInst siteInst = getSiteInst(spReader.getSite(), design, strings);
-                siteInst.addSitePIP(strings.get(spReader.getBel()),
-                                    strings.get(spReader.getPin()));
+                SiteInst siteInst = getPlacedSiteInst(spReader.getSite());
+                BELPin belPin = getBELPin(siteInst, spReader.getBel(), spReader.getPin());
+                SitePIP sitePIP = siteInst.getSitePIP(belPin);
+                addSitePIPToSiteInst(sitePIP, siteInst);
                 break;
             }
             case SITE_PIN: {
                 PhysSitePin.Reader spReader = segment.getSitePin();
-                SiteInst siteInst = getSiteInst(spReader.getSite(), design, strings);
-                String pinName = strings.get(spReader.getPin());
-                if (siteInst == null && net.isStaticNet()) {
-                    Site site = design.getDevice().getSite(strings.get(spReader.getSite()));
-                    siteInst = new SiteInst(STATIC_SOURCE + tieoffInstanceCount++, site.getSiteTypeEnum());
-                    siteInst.place(site);
-                }
+                SiteInst siteInst = siteInsts.computeIfAbsent(spReader.getSite(), (k) -> {
+                    Site site = device.getSite(strings.get(k));
+                    if (!net.isStaticNet()) {
+                        throw new RuntimeException("ERROR: SiteInst for Site " + site.getName() + " not found.");
+                    }
+                    // Create a dummy TIEOFF SiteInst
+                    String name = SiteInst.STATIC_SOURCE + "_" + site.getName();
+                    SiteInst si = new SiteInst(name, site.getSiteTypeEnum());
+                    si.place(site);
+                    // Ensure it is not attached to the design
+                    assert(si.getDesign() == null);
+                    return si;
+                });
 
-                net.addPin(new SitePinInst(pinName, siteInst), false);
-
+                createSitePin(spReader.getPin(), siteInst, net);
                 assert(routeThruLutInput == null);
                 break;
             }
@@ -540,13 +663,12 @@ public class PhysNetlistReader {
 
         for (int j=0; j < branchesCount; j++) {
             RouteBranch.Reader bReader = branches.get(j);
-            readRouteBranch(bReader, net, design, strings, routeThruLutInput);
+            readRouteBranch(stubWires, bReader, net, routeThruLutInput);
         }
 
     }
 
-    private static void readDesignProperties(PhysNetlist.Reader physNetlist, Design design,
-                                                StringEnumerator strings) {
+    protected void readDesignProperties(PhysNetlist.Reader physNetlist) {
         StructList.Reader<Property.Reader> props = physNetlist.getProperties();
         int propCount = props.size();
         for (int i=0; i < propCount; i++) {
@@ -562,23 +684,37 @@ public class PhysNetlistReader {
         }
     }
 
-    private static SiteInst getSiteInst(int stringIdx, Design design, StringEnumerator strings) {
-        String siteName = strings.get(stringIdx);
-        Site site = design.getDevice().getSite(siteName);
-        if (site == null) {
-            throw new RuntimeException("ERROR: Unknown site " + siteName +
-                    " found while parsing routing");
-        }
-        SiteInst siteInst = design.getSiteInstFromSite(site);
-        if (siteInst == null && site.getSiteTypeEnum() == SiteTypeEnum.TIEOFF) {
-            // Create a dummy TIEOFF SiteInst
-            siteInst = new SiteInst(STATIC_SOURCE + tieoffInstanceCount++, site.getSiteTypeEnum());
-            siteInst.place(site);
-        }
+    protected SiteInst getSiteInst(int stringIdx) {
+        return siteInsts.get(stringIdx);
+    }
+
+    private SiteInst getPlacedSiteInst(int stringIdx) {
+        SiteInst siteInst = getSiteInst(stringIdx);
+        assert(siteInst != null && siteInst.isPlaced());
         return siteInst;
     }
 
-    private static void checkNetTypeFromCellNet(Map<String, PhysNet.Reader> cellPinToPhysicalNet, EDIFNet net, StringEnumerator strings) {
+    private Tile getTile(int stringIdx) {
+        return tiles.computeIfAbsent(stringIdx, (i) -> {
+            String tileName = strings.get(i);
+            return device.getTile(tileName);
+        });
+    }
+
+    private Integer getWireIndex(Tile tile, int wireStringIdx) {
+        String wireName = strings.get(wireStringIdx);
+        return tile.getWireIndex(wireName);
+    }
+
+    protected BELPin getBELPin(SiteInst siteInst, int belStringIdx, int pinStringIdx) {
+        return belPinCache.getBELPin(siteInst, belStringIdx, pinStringIdx);
+    }
+
+    private PIP getPIP(Tile tile, int wire0StringIdx, int wire1StringIdx) {
+        return pipCache.getPIP(tile, wire0StringIdx, wire1StringIdx);
+    }
+
+    private static void checkNetTypeFromCellNet(Map<String, PhysNet.Reader> cellPinToPhysicalNet, EDIFNet net, List<String> strings) {
         // Expand EDIFNet and make sure sink cell pins that are part of a
         // physical net are annotated as a VCC or GND net.
         //
@@ -589,7 +725,7 @@ public class PhysNetlistReader {
         // If the full physical net is present and the inverting site pips are
         // labelled, then it would be possible to confirm if the NetType was
         // always correct.
-        Queue<EDIFNet> netsToExpand = new ArrayDeque<EDIFNet>();
+        Queue<EDIFNet> netsToExpand = new ArrayDeque<>();
         netsToExpand.add(net);
 
         while (!netsToExpand.isEmpty()) {
@@ -633,7 +769,9 @@ public class PhysNetlistReader {
         }
     }
 
-    private static void mapBelPinsToPhysicalNets(Map<String, PhysNet.Reader> belPinToPhysicalNet, PhysNet.Reader netReader, RouteBranch.Reader routeBranch, StringEnumerator strings) {
+    private void mapBelPinsToPhysicalNets(Map<String, PhysNet.Reader> belPinToPhysicalNet,
+                                          PhysNet.Reader netReader,
+                                          RouteBranch.Reader routeBranch) {
         // Populate a map from strings formatted like "<site>/<bel>/<bel pin>"
         // to PhysNet by recursively expanding routing branches.
 
@@ -644,11 +782,16 @@ public class PhysNetlistReader {
         }
 
         for (PhysNetlist.RouteBranch.Reader childBranch : routeBranch.getBranches()) {
-            mapBelPinsToPhysicalNets(belPinToPhysicalNet, netReader, childBranch, strings);
+            mapBelPinsToPhysicalNets(belPinToPhysicalNet, netReader, childBranch);
         }
     }
 
-    private static void checkConstantRoutingAndNetNaming(PhysNetlist.Reader PhysicalNetlist, EDIFNetlist netlist, StringEnumerator strings) {
+    protected void checkConstantRoutingAndNetNaming(PhysNetlist.Reader physNetlist) {
+        EDIFNetlist netlist = design.getNetlist();
+        if (netlist == null) {
+            throw new RuntimeException("No EDIFNetlist supplied");
+        }
+
         // Checks that constant routing and net names are valid.
         //
         // Specifically:
@@ -666,15 +809,15 @@ public class PhysNetlistReader {
         // and Nets.VCC_NET.
         boolean foundGndNet = false;
         boolean foundVccNet = false;
-        Map<String, PhysNet.Reader> belPinToPhysicalNet = new HashMap<String, PhysNet.Reader>();
-        Set<Integer> netNames = new HashSet<Integer>();
-        for (PhysNet.Reader physNet : PhysicalNetlist.getPhysNets()) {
+        Map<String, PhysNet.Reader> belPinToPhysicalNet = new HashMap<>();
+        Set<Integer> netNames = new HashSet<>();
+        for (PhysNet.Reader physNet : physNetlist.getPhysNets()) {
             for (PhysNetlist.RouteBranch.Reader routeBranch : physNet.getSources()) {
-                mapBelPinsToPhysicalNets(belPinToPhysicalNet, physNet, routeBranch, strings);
+                mapBelPinsToPhysicalNets(belPinToPhysicalNet, physNet, routeBranch);
             }
 
             for (PhysNetlist.RouteBranch.Reader routeBranch : physNet.getStubs()) {
-                mapBelPinsToPhysicalNets(belPinToPhysicalNet, physNet, routeBranch, strings);
+                mapBelPinsToPhysicalNets(belPinToPhysicalNet, physNet, routeBranch);
             }
 
             if (!netNames.add(physNet.getName())) {
@@ -709,8 +852,8 @@ public class PhysNetlistReader {
         }
 
         // Iterate over placements and map cell pins to physical nets.
-        Map<String, PhysNet.Reader> cellPinToPhysicalNet = new HashMap<String, PhysNet.Reader>();
-        for (CellPlacement.Reader placement : PhysicalNetlist.getPlacements()) {
+        Map<String, PhysNet.Reader> cellPinToPhysicalNet = new HashMap<>();
+        for (CellPlacement.Reader placement : physNetlist.getPlacements()) {
             for (PinMapping.Reader pinMap : placement.getPinMap()) {
                 String key = strings.get(placement.getSite()) + "/" + strings.get(pinMap.getBel()) + "/" + strings.get(pinMap.getBelPin());
                 PhysNet.Reader net = belPinToPhysicalNet.get(key);
@@ -757,12 +900,15 @@ public class PhysNetlistReader {
     /**
      * Examines a design to ensure that the provided macro placement is consistent with the
      * macro definition in the library.
-     * @param design The placed design to be checked
      */
-    private static void checkMacros(Design design) {
+    protected void checkMacros() {
         EDIFNetlist netlist = design.getNetlist();
+        if (netlist == null) {
+            throw new RuntimeException("No EDIFNetlist supplied");
+        }
+
         List<EDIFHierCellInst> leaves = netlist.getTopCell().getAllLeafDescendants();
-        EDIFLibrary macros = Design.getMacroPrimitives(design.getDevice().getSeries());
+        EDIFLibrary macros = Design.getMacroPrimitives(device.getSeries());
         for (EDIFHierCellInst leaf : leaves) {
             if (macros.containsCell(leaf.getCellType())) {
                 EDIFCell macro = macros.getCell(leaf.getCellName());
