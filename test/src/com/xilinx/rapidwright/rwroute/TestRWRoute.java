@@ -265,7 +265,9 @@ public class TestRWRoute {
 
         RWRoute.routeDesignFullNonTimingDriven(design);
 
-        assertVivadoFullyRouted(design);
+        // Testcase has a number of undriven nets, so just check for unrouted nets
+        ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+        Assertions.assertEquals(0, rrs.unroutedNets);
     }
 
 }
