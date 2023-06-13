@@ -959,7 +959,8 @@ public class TestDesignTools {
 
         DesignTools.makePhysNetNamesConsistent(design);
 
-        // Check those nets were created
+        // Check those nets were created and all sitewires
+        // were switched over correctly
         Net vcc = design.getNet(Net.VCC_NET);
         Assertions.assertNotNull(vcc);
         Assertions.assertEquals(1, vcc.getSiteInsts().size());
