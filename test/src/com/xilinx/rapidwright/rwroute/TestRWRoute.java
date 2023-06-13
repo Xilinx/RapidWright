@@ -265,9 +265,19 @@ public class TestRWRoute {
 
         RWRoute.routeDesignFullNonTimingDriven(design);
 
-        // Testcase has a number of undriven nets, so just check for unrouted nets
-        ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
-        Assertions.assertEquals(0, rrs.unroutedNets);
+        Net vcc = design.getVccNet();
+        Assertions.assertEquals(1, vcc.getPins().size());
+        Assertions.assertTrue(vcc.getPins().stream().allMatch(SitePinInst::isRouted));
+
+        Net gnd = design.getGndNet();
+        Assertions.assertEquals(31, gnd.getPins().size());
+        Assertions.assertTrue(gnd.getPins().stream().allMatch(SitePinInst::isRouted));
+
+        if (FileTools.isVivadoOnPath()) {
+            // Testcase has a number of undriven nets, so just check for unrouted nets
+            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            Assertions.assertEquals(0, rrs.unroutedNets);
+        }
     }
 
 }
