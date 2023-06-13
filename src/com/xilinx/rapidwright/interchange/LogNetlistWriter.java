@@ -99,7 +99,7 @@ public class LogNetlistWriter {
 
     protected final IdentityEnumerator<EDIFCell> allCells;
     protected final IdentityEnumerator<EDIFCellInst> allInsts;
-    protected final IdentityEnumerator<EDIFPort> allPorts;
+    private final IdentityEnumerator<EDIFPort> allPorts;
     private final StringEnumerator allStrings;
     private final Map<Integer, Integer> libraryRename;
 
