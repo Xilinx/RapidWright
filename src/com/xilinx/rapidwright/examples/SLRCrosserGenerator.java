@@ -36,7 +36,6 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.function.Predicate;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.ConstraintGroup;
@@ -388,8 +387,7 @@ public class SLRCrosserGenerator {
                     clockRegions,
                     getNodeStatus);
 
-            distLines.addAll(UltraScaleClockRouting.routeCentroidToHorizontalDistributionLines(clk,
-                    centroidDistNode,
+            distLines.addAll(UltraScaleClockRouting.routeVerticalToHorizontalDistributionLines(clk,
                     vertDistLines,
                     getNodeStatus));
         }
