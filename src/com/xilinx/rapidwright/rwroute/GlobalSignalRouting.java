@@ -337,7 +337,7 @@ public class GlobalSignalRouting {
                                       Function<Node,NodeStatus> getNodeState,
                                       Design design, RouteThruHelper routeThruHelper) {
         NetType netType = currNet.getType();
-        Set<PIP> netPIPs = new HashSet<>();
+        Set<PIP> netPIPs = new HashSet<>(currNet.getPIPs());
         Queue<LightweightRouteNode> q = new LinkedList<>();
         Set<LightweightRouteNode> visitedRoutingNodes = new HashSet<>();
         Set<LightweightRouteNode> usedRoutingNodes = new HashSet<>();
