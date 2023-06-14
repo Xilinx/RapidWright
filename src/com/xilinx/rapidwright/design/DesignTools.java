@@ -2799,7 +2799,17 @@ public class DesignTools {
                 continue;
             }
             if (!hierNet.equals(parentHierNet)) {
-                Net parentPhysNet = design.getNet(parentHierNet.getHierarchicalNetName());
+                String parentHierNetName = parentHierNet.getHierarchicalNetName();
+                Net parentPhysNet;
+                if (parentHierNetName.equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
+                    parentHierNetName = Net.VCC_NET;
+                    parentPhysNet = design.getVccNet();
+                } else if (parentHierNetName.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
+                    parentHierNetName = Net.GND_NET;
+                    parentPhysNet = design.getGndNet();
+                } else {
+                    parentPhysNet = design.getNet(parentHierNetName);
+                }
                 if (parentPhysNet != null) {
                     // Merge both physical nets together
                     for (SiteInst si : net.getSiteInsts()) {
@@ -2811,7 +2821,7 @@ public class DesignTools {
                         }
                     }
                     design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
-                } else if (!net.rename(parentHierNet.getHierarchicalNetName())) {
+                } else if (!net.rename(parentHierNetName)) {
                     System.out.println("WARNING: Failed to adjust physical net name " + net.getName());
                 }
             }
