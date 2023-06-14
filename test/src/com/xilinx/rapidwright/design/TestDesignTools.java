@@ -948,4 +948,35 @@ public class TestDesignTools {
             Assertions.assertEquals(vcc, spi.getNet());
         }
     }
+
+    @Test
+    public void testMakePhysNetNamesConsistentLogicalVccGnd() {
+        Design design = RapidWrightDCP.loadDCP("bug701.dcp");
+
+        // Design has no GLOBAL_LOGIC{0,1}
+        Assertions.assertNull(design.getNet(Net.VCC_NET));
+        Assertions.assertNull(design.getNet(Net.GND_NET));
+
+        DesignTools.makePhysNetNamesConsistent(design);
+
+        // Check those nets were created and all sitewires
+        // were switched over correctly
+        Net vcc = design.getNet(Net.VCC_NET);
+        Assertions.assertNotNull(vcc);
+        Assertions.assertEquals(1, vcc.getSiteInsts().size());
+        int numSitewires = 0;
+        for (SiteInst si : vcc.getSiteInsts()) {
+            numSitewires += si.getSiteWiresFromNet(vcc).size();
+        }
+        Assertions.assertEquals(1, numSitewires);
+
+        Net gnd = design.getNet(Net.GND_NET);
+        Assertions.assertNotNull(gnd);
+        Assertions.assertEquals(4, gnd.getSiteInsts().size());
+        numSitewires = 0;
+        for (SiteInst si : gnd.getSiteInsts()) {
+            numSitewires += si.getSiteWiresFromNet(gnd).size();
+        }
+        Assertions.assertEquals(31, numSitewires);
+    }
 }
