@@ -1,22 +1,25 @@
 package com.xilinx.rapidwright.examples;
 
-import com.xilinx.rapidwright.design.*;
+import com.xilinx.rapidwright.design.ConstraintGroup;
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.merge.MergeDesigns;
-import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.edif.*;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFPort;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.rwroute.RWRoute;
 
-import java.util.ArrayList;
-import java.util.List;
+import static com.xilinx.rapidwright.examples.ArithmeticGenerator.INPUT_A_NAME;
+import static com.xilinx.rapidwright.examples.ArithmeticGenerator.INPUT_B_NAME;
+import static com.xilinx.rapidwright.examples.ArithmeticGenerator.RESULT_NAME;
 
-import static com.xilinx.rapidwright.examples.ArithmeticGenerator.*;
-
-public class paramCounterDesignMerger {
-
+public class ParamCounterDesignMerger {
     public static void main(String[] args) {
-
         String sliceName = "SLICE_X0Y0";
         String clkName = "clk";
         double clkPeriodConstraint = 10;
