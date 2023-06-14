@@ -5,7 +5,8 @@
 /.gradle/
 .pydevproject
 /.settings/
-/bin/
+/bin/com
+/bin/rapidwright_classpath.sh
 .idea
 *.iml
 /designs/

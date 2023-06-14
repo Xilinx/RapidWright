@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -103,8 +103,8 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.Pair;
 
 public class DeviceResourcesWriter {
-    private static Enumerator<String> allStrings;
-    private static Enumerator<String> allSiteTypes;
+    private static StringEnumerator allStrings;
+    private static IdentityEnumerator<SiteTypeEnum> allSiteTypes;
 
     private static HashMap<TileTypeEnum,Tile> tileTypes;
     private static HashMap<SiteTypeEnum,Site> siteTypes;
@@ -135,8 +135,8 @@ public class DeviceResourcesWriter {
 
     public static void populateEnumerations(Design design, Device device) {
 
-        allStrings = new Enumerator<>();
-        allSiteTypes = new Enumerator<>();
+        allStrings = new StringEnumerator();
+        allSiteTypes = new IdentityEnumerator<>();
 
         HashMap<SiteTypeEnum,Site> allAltSiteTypeEnums = new HashMap<>();
 
@@ -404,7 +404,7 @@ public class DeviceResourcesWriter {
                     put(series+"_"+EDIFTools.MACRO_PRIMITIVES_LIB, LogNetlistWriter.DEVICE_MACROS_LIB);
                 }}
             );
-        writer.populateNetlistBuilder(netlist, netlistBuilder);
+        writer.populateNetlistBuilder(netlist, netlistBuilder, CodePerfTracker.SILENT);
 
         writeCellParameterDefinitions(series, netlist, devBuilder.getParameterDefs());
 
@@ -536,9 +536,9 @@ public class DeviceResourcesWriter {
             SiteInst siteInst = design.createSiteInst("site_instance", e.getKey(), site);
             Tile tile = siteInst.getTile();
             siteType.setName(allStrings.getIndex(e.getKey().name()));
-            allSiteTypes.addObject(e.getKey().name());
+            allSiteTypes.addObject(e.getKey());
 
-            Enumerator<BELPin> allBELPins = new Enumerator<BELPin>();
+            IdentityEnumerator<BELPin> allBELPins = new IdentityEnumerator<BELPin>();
 
             // BELs
             StructList.Builder<Builder> belBuilders = siteType.initBels(siteInst.getBELs().length);
@@ -647,7 +647,7 @@ public class DeviceResourcesWriter {
             PrimitiveList.Int.Builder altSiteTypesBuilder = siteType.initAltSiteTypes(altSiteTypes.length);
 
             for (int j=0; j < altSiteTypes.length; ++j) {
-                Integer siteTypeIdx = allSiteTypes.maybeGetIndex(altSiteTypes[j].name());
+                Integer siteTypeIdx = allSiteTypes.maybeGetIndex(altSiteTypes[j]);
                 if (siteTypeIdx == null) {
                     throw new RuntimeException("Site type " + altSiteTypes[j].name() + " is missing from allSiteTypes Enumerator.");
                 }
@@ -702,7 +702,7 @@ public class DeviceResourcesWriter {
             StructList.Builder<DeviceResources.Device.SiteTypeInTileType.Builder> siteTypes = tileType.initSiteTypes(sites.length);
             for (int j=0; j < sites.length; j++) {
                 DeviceResources.Device.SiteTypeInTileType.Builder siteType = siteTypes.get(j);
-                int primaryTypeIndex = allSiteTypes.getIndex(sites[j].getSiteTypeEnum().name());
+                int primaryTypeIndex = allSiteTypes.getIndex(sites[j].getSiteTypeEnum());
                 siteType.setPrimaryType(primaryTypeIndex);
 
                 int numPins = sites[j].getSitePinCount();
@@ -857,7 +857,7 @@ public class DeviceResourcesWriter {
             }
         }
     }
-    private static void populatePackages(Enumerator<String> allStrings, Device device, DeviceResources.Device.Builder devBuilder) {
+    private static void populatePackages(StringEnumerator allStrings, Device device, DeviceResources.Device.Builder devBuilder) {
         Set<String> packages = device.getPackages();
         List<String> packagesList = new ArrayList<String>();
         packagesList.addAll(packages);
@@ -906,7 +906,7 @@ public class DeviceResourcesWriter {
             }
         }
     }
-    public static void writeWireTypes(Enumerator<String> allStrings, DeviceResources.Device.Builder devBuilder) {
+    public static void writeWireTypes(StringEnumerator allStrings, DeviceResources.Device.Builder devBuilder) {
         StructList.Builder<DeviceResources.Device.WireType.Builder> wireTypesObj =
                 devBuilder.initWireTypes(IntentCode.values.length);
         for (IntentCode intent : IntentCode.values) {

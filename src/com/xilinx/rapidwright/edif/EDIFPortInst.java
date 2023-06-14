@@ -65,6 +65,7 @@ public class EDIFPortInst implements Comparable<EDIFPortInst> {
     public EDIFPortInst(EDIFPort port, EDIFNet parentNet, int index) {
         this(port,parentNet,index,null);
     }
+
     /**
      * Constructor to create a single bit port ref and associate it with its
      * net and instance.
@@ -73,7 +74,23 @@ public class EDIFPortInst implements Comparable<EDIFPortInst> {
      * @param cellInst The instance this port ref belongs to
      */
     public EDIFPortInst(EDIFPort port, EDIFNet parentNet, EDIFCellInst cellInst) {
-        this(port, parentNet, -1, cellInst);
+        this(port, parentNet, -1, cellInst, false);
+    }
+
+    /**
+     * Constructor to create a single bit port ref and associate it with its
+     * net and instance.
+     * @param port The port on the cell this port ref uses
+     * @param parentNet The net this port ref should belong to
+     * @param cellInst The instance this port ref belongs to
+     * @param deferSort The EDIFPortInstList maintains a sorted list of EDIFPortInst
+     * objects and sorts them upon insertion.  Setting this flag to true will skip a sort addition
+     * but the caller is responsible to conclude a batch of additions with a call to
+     * {@link EDIFPortInstList#reSortList()}.  This is useful when a large number of EDIFPortInsts
+     * will be added consecutively (such as parsing a netlist).
+     */
+    public EDIFPortInst(EDIFPort port, EDIFNet parentNet, EDIFCellInst cellInst, boolean deferSort) {
+        this(port, parentNet, -1, cellInst, deferSort);
     }
 
     /**

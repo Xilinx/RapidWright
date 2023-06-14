@@ -37,6 +37,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -1235,17 +1237,7 @@ public class DesignTools {
         return toRemove;
     }
 
-
-    /**
-     * This method will completely remove a placed cell (both logical and physical) from a design.
-     * In the case where the removed cell is the last user of a shared control signal (CLK, CE, SR) then that pin will also be removed and unrouted immediately if deferRemovals is null, otherwise it is added to this map.
-     * @param design The design where the cell is instantiated
-     * @param cell The cell to remove
-     * @param deferRemovals An optional map that, if passed in non-null will be populated with
-     * site pins marked for removal.  The map allows a persistent tracking if this method is called
-     * many times as the process is expensive without batching.
-     */
-    public static void fullyRemoveCell(Design design, Cell cell, Map<Net, Set<SitePinInst>> deferRemovals) {
+    private static void fullyUnplaceCellHelper(Cell cell, Map<Net, Set<SitePinInst>> deferRemovals) {
         SiteInst siteInst = cell.getSiteInst();
         BEL bel = cell.getBEL();
         // If cell was using shared control signals (CLK, CE, RST), check to see if this was
@@ -1309,19 +1301,47 @@ public class DesignTools {
             if (otherUser == false) {
                 // Unroute site routing back to pin and remove site pin
                 String sitePinName = getRoutedSitePinFromPhysicalPin(cell, net, pin.getName());
-                BELPin srcPin = siteInst.getSite().getBELPin(sitePinName);
-                siteInst.unrouteIntraSiteNet(srcPin, pin);
-                SitePinInst spi = siteInst.getSitePinInst(sitePinName);
-                // It's possible site wire could be set (e.g. reserved using GLOBAL_USEDNET)
-                // but no inter-site routing (thus no SPI) associated
-                if (spi != null) {
-                    handlePinRemovals(spi, deferRemovals);
+                if (sitePinName != null) {
+                    BELPin sitePortBelPin = siteInst.getSite().getBELPin(sitePinName);
+                    assert(sitePortBelPin.isSitePort());
+                    boolean outputSitePin = sitePortBelPin.isInput(); // Input BELPin means output SitePin
+                    if (outputSitePin) {
+                        siteInst.unrouteIntraSiteNet(pin, sitePortBelPin);
+                    } else {
+                        siteInst.unrouteIntraSiteNet(sitePortBelPin, pin);
+                    }
+                    SitePinInst spi = siteInst.getSitePinInst(sitePinName);
+                    // It's possible site wire could be set (e.g. reserved using GLOBAL_USEDNET)
+                    // but no inter-site routing (thus no SPI) associated
+                    if (spi != null) {
+                        handlePinRemovals(spi, deferRemovals);
+
+                        if (outputSitePin) {
+                            assert(spi.isOutPin());
+                            SitePinInst altSpi = net.getAlternateSource();
+                            if (altSpi != null) {
+                                if (spi == altSpi) {
+                                    altSpi = net.getSource();
+                                    assert(spi != altSpi);
+                                }
+                                siteInst.unrouteIntraSiteNet(pin, altSpi.getBELPin());
+                                handlePinRemovals(altSpi, deferRemovals);
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        // Remove Physical Cell
-        design.removeCell(cell);
+        if (bel.isLUT() && bel.getName().endsWith("5LUT")) {
+            String lut6 = bel.getName().replace('5', '6');
+            if (siteInst.getCell(lut6) == null) {
+                SitePinInst vccSpi = siteInst.getSitePinInst(lut6.substring(0,2));
+                assert(vccSpi.getNet().getType() == NetType.VCC);
+                siteInst.unrouteIntraSiteNet(vccSpi.getBELPin(), siteInst.getBELPin(lut6, "A6"));
+                handlePinRemovals(vccSpi, deferRemovals);
+            }
+        }
 
         // Check and remove routethrus that exist that point to removed cell
         List<BEL> belsToRemove = null;
@@ -1336,6 +1356,39 @@ public class DesignTools {
                 siteInst.removeCell(b);
             }
         }
+    }
+
+    /**
+     * This method will fully unplace (but not remove) a physical cell from a design.
+     * In the case where the unplaced cell is the last user of a shared control signal (CLK, CE, SR)
+     * then that pin will also be removed and unrouted immediately if deferRemovals is null, otherwise
+     * it is added to this map.
+     * @param cell The cell to unplace
+     * @param deferRemovals An optional map that, if passed in non-null will be populated with
+     * site pins marked for removal.  The map allows for persistent tracking if this method is called
+     * many times as the process is expensive without batching.
+     */
+    public static void fullyUnplaceCell(Cell cell, Map<Net, Set<SitePinInst>> deferRemovals) {
+        fullyUnplaceCellHelper(cell, deferRemovals);
+        cell.unplace();
+    }
+
+    /**
+     * This method will completely remove a placed cell (both logical and physical) from a design.
+     * In the case where the removed cell is the last user of a shared control signal (CLK, CE, SR)
+     * then that pin will also be removed and unrouted immediately if deferRemovals is null, otherwise
+     * it is added to this map.
+     * @param design The design where the cell is instantiated
+     * @param cell The cell to remove
+     * @param deferRemovals An optional map that, if passed in non-null will be populated with
+     * site pins marked for removal.  The map allows for persistent tracking if this method is called
+     * many times as the process is expensive without batching.
+     */
+    public static void fullyRemoveCell(Design design, Cell cell, Map<Net, Set<SitePinInst>> deferRemovals) {
+        fullyUnplaceCellHelper(cell, deferRemovals);
+
+        // Remove Physical Cell
+        design.removeCell(cell);
 
         // Remove Logical Cell
         for (EDIFPortInst portInst : cell.getEDIFCellInst().getPortInsts()) {
@@ -1410,6 +1463,7 @@ public class DesignTools {
                     if (pin.isOutPin() && pin.equals(srcPin)) {
                         net.setSource(null);
                     }
+                    assert(pin.getNet() == net);
                     pin.setNet(null);
                     pin.detachSiteInst();
                     continue;
@@ -2843,17 +2897,28 @@ public class DesignTools {
      * @param design Design object to be modified in-place.
      */
     public static void createCeSrRstPinsToVCC(Design design) {
+        Series series = design.getDevice().getSeries();
+        if (series == Series.Series7) {
+            // Nothing to be done for Series7 which don't have inverters
+            return;
+        }
         Net vcc = design.getVccNet();
+        Net gndInvertibleToVcc = null;
+        // On these series of devices, SR can be inverted from gnd to vcc
+        if (EnumSet.of(Series.UltraScale, Series.UltraScalePlus).contains(series)) {
+            gndInvertibleToVcc = design.getGndNet();
+        }
+        Map<String, Pair<String, String>> pinMapping = belTypeSitePinNameMapping.get(series);
         for (Cell cell : design.getCells()) {
             if (isUnisimFlipFlopType(cell.getType())) {
                 SiteInst si = cell.getSiteInst();
                 BEL bel = cell.getBEL();
-                Pair<String, String> sitePinNames = belSitePinNameMapping.get(bel.getBELType());
+                Pair<String, String> sitePinNames = pinMapping.get(bel.getBELType());
                 String[] pins = new String[] {"CE", "SR"};
                 for (String pin : pins) {
                     BELPin belPin = cell.getBEL().getPin(pin);
                     Net net = si.getNetFromSiteWire(belPin.getSiteWireName());
-                    if (net == null) {
+                    if (net == null || (net == gndInvertibleToVcc && pin.equals("SR"))) {
                         String sitePinName;
                         if (pin.equals("CE")) { // CKEN
                             sitePinName = sitePinNames.getFirst();
@@ -2955,27 +3020,63 @@ public class DesignTools {
         return unisimFlipFlopTypes.contains(cellType);
     }
 
-    static Map<String, Pair<String, String>> belSitePinNameMapping;
+    static public final Map<Series, Map<String, Pair<String, String>>> belTypeSitePinNameMapping;
     static{
-        belSitePinNameMapping = new HashMap<>();
+        belTypeSitePinNameMapping = new EnumMap(Series.class);
+        Pair<String,String> p;
 
-        belSitePinNameMapping.put("AFF", new Pair<>("CKEN1", "SRST1"));
-        belSitePinNameMapping.put("BFF", new Pair<>("CKEN1", "SRST1"));
-        belSitePinNameMapping.put("CFF", new Pair<>("CKEN1", "SRST1"));
-        belSitePinNameMapping.put("DFF", new Pair<>("CKEN1", "SRST1"));
-        belSitePinNameMapping.put("AFF2", new Pair<>("CKEN2", "SRST1"));
-        belSitePinNameMapping.put("BFF2", new Pair<>("CKEN2", "SRST1"));
-        belSitePinNameMapping.put("CFF2", new Pair<>("CKEN2", "SRST1"));
-        belSitePinNameMapping.put("DFF2", new Pair<>("CKEN2", "SRST1"));
+        {
+            Map<String, Pair<String, String>> ultraScalePlus = new HashMap<>();
+            belTypeSitePinNameMapping.put(Series.UltraScalePlus, ultraScalePlus);
 
-        belSitePinNameMapping.put("EFF", new Pair<>("CKEN3", "SRST2"));
-        belSitePinNameMapping.put("FFF", new Pair<>("CKEN3", "SRST2"));
-        belSitePinNameMapping.put("GFF", new Pair<>("CKEN3", "SRST2"));
-        belSitePinNameMapping.put("HFF", new Pair<>("CKEN3", "SRST2"));
-        belSitePinNameMapping.put("EFF2", new Pair<>("CKEN4", "SRST2"));
-        belSitePinNameMapping.put("FFF2", new Pair<>("CKEN4", "SRST2"));
-        belSitePinNameMapping.put("GFF2", new Pair<>("CKEN4", "SRST2"));
-        belSitePinNameMapping.put("HFF2", new Pair<>("CKEN4", "SRST2"));
+            p = new Pair<>("CKEN1", "SRST1");
+            ultraScalePlus.put("AFF", p);
+            ultraScalePlus.put("BFF", p);
+            ultraScalePlus.put("CFF", p);
+            ultraScalePlus.put("DFF", p);
+            p = new Pair<>("CKEN2", "SRST1");
+            ultraScalePlus.put("AFF2", p);
+            ultraScalePlus.put("BFF2", p);
+            ultraScalePlus.put("CFF2", p);
+            ultraScalePlus.put("DFF2", p);
+
+            p = new Pair<>("CKEN3", "SRST2");
+            ultraScalePlus.put("EFF", p);
+            ultraScalePlus.put("FFF", p);
+            ultraScalePlus.put("GFF", p);
+            ultraScalePlus.put("HFF", p);
+            p = new Pair<>("CKEN4", "SRST2");
+            ultraScalePlus.put("EFF2", p);
+            ultraScalePlus.put("FFF2", p);
+            ultraScalePlus.put("GFF2", p);
+            ultraScalePlus.put("HFF2", p);
+        }
+        {
+            Map<String, Pair<String, String>> ultraScale = new HashMap<>();
+            belTypeSitePinNameMapping.put(Series.UltraScale, ultraScale);
+
+            p = new Pair<>("CKEN_B1", "SRST_B1");
+            ultraScale.put("AFF", p);
+            ultraScale.put("BFF", p);
+            ultraScale.put("CFF", p);
+            ultraScale.put("DFF", p);
+            p = new Pair<>("CKEN_B2", "SRST_B1");
+            ultraScale.put("AFF2", p);
+            ultraScale.put("BFF2", p);
+            ultraScale.put("CFF2", p);
+            ultraScale.put("DFF2", p);
+
+            p = new Pair<>("CKEN_B3", "SRST_B2");
+            ultraScale.put("EFF", p);
+            ultraScale.put("FFF", p);
+            ultraScale.put("GFF", p);
+            ultraScale.put("HFF", p);
+            p = new Pair<>("CKEN_B4", "SRST_B2");
+            ultraScale.put("EFF2", p);
+            ultraScale.put("FFF2", p);
+            ultraScale.put("GFF2", p);
+            ultraScale.put("HFF2", p);
+        }
     }
 
     /**

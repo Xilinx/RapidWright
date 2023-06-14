@@ -27,8 +27,11 @@ package com.xilinx.rapidwright.rwroute;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -45,12 +48,10 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Part;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
-import com.xilinx.rapidwright.util.MessageGenerator;
-import com.xilinx.rapidwright.util.Pair;
-import com.xilinx.rapidwright.util.RuntimeTracker;
-import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
@@ -58,6 +59,10 @@ import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.util.MessageGenerator;
+import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.RuntimeTracker;
+import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 import com.xilinx.rapidwright.util.Utils;
 
 /**
@@ -155,12 +160,29 @@ public class RWRoute{
     /** A map storing routes from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
     protected Map<String, List<String>> routesToSinkINTTiles;
 
+    public static final EnumSet<Series> SUPPORTED_SERIES;
+
+    static {
+        SUPPORTED_SERIES = EnumSet.of(Series.UltraScale, Series.UltraScalePlus);
+    }
+
     public RWRoute(Design design, RWRouteConfig config) {
         this.design = design;
         this.config = config;
     }
 
+    protected static String getUnsupportedSeriesMessage(Part part) {
+        return "ERROR: RWRoute does not support routing the " + part.getName() + " from the " 
+                + part.getSeries() + " series. Please re-target the design to a part from a "
+                + "supported series: " + SUPPORTED_SERIES;
+    }
+
     protected static void preprocess(Design design) {
+        Series series = design.getPart().getSeries();
+        if (!SUPPORTED_SERIES.contains(series)) {
+            throw new RuntimeException(getUnsupportedSeriesMessage(design.getPart()));
+        }
+
         // Pre-processing of the design regarding physical net names pins
         DesignTools.makePhysNetNamesConsistent(design);
         DesignTools.createPossiblePinsToStaticNets(design);
@@ -261,11 +283,11 @@ public class RWRoute{
         numNotNeedingRoutingNets = 0;
         numUnrecognizedNets = 0;
 
-        nets = new HashMap<>();
+        nets = new IdentityHashMap<>();
         indirectConnections = new ArrayList<>();
         directConnections = new ArrayList<>();
         clkNets = new ArrayList<>();
-        staticNetAndRoutingTargets = new HashMap<>();
+        staticNetAndRoutingTargets = new IdentityHashMap<>();
 
         for (Net net : design.getNets()) {
             if (net.isClockNet()) {
@@ -405,12 +427,6 @@ public class RWRoute{
         if (staticNetAndRoutingTargets.isEmpty())
             return;
 
-        for (List<SitePinInst> netRouteTargetPins : staticNetAndRoutingTargets.values()) {
-            for (SitePinInst sink : netRouteTargetPins) {
-                assert(!routingGraph.isPreserved(sink.getConnectedNode()));
-            }
-        }
-
         List<SitePinInst> gndPins = staticNetAndRoutingTargets.get(design.getGndNet());
         if (gndPins != null) {
             Set<SitePinInst> newVccPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins);
@@ -421,29 +437,51 @@ public class RWRoute{
             }
         }
 
+        // Annotate all static pin nodes with the net they're associated with to ensure that one
+        // net cannot unknowingly use a node needed by the other net
+        Map<Node,Net> preservedStaticNodes = new HashMap<>();
         for (Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
-            Net net = e.getKey();
-            List<SitePinInst> pins = e.getValue();
-            System.out.println("INFO: Route " + pins.size() + " pins of " + net);
-            GlobalSignalRouting.routeStaticNet(net,
+            Net staticNet = e.getKey();
+            for (SitePinInst sink : e.getValue()) {
+                Node node = sink.getConnectedNode();
+                preservedStaticNodes.put(node, staticNet);
+                assert(!routingGraph.isPreserved(node));
+            }
+        }
+
+        // Iterate through both static nets in a stable order (not guaranteed by IdentityHashMap)
+        for (Net staticNet : Arrays.asList(design.getGndNet(), design.getVccNet())) {
+            List<SitePinInst> pins = staticNetAndRoutingTargets.get(staticNet);
+            if (pins == null) {
+                continue;
+            }
+            System.out.println("INFO: Routing " + pins.size() + " pins of " + staticNet);
+            GlobalSignalRouting.routeStaticNet(staticNet,
                     // Lambda to determine whether a node is (a) available for use,
-                    // (b) already in used for this static net, (c) unavailable
+                    // (b) already in use for this static net, (c) unavailable
                     (node) -> {
                         Net preservedNet = routingGraph.getPreservedNet(node);
                         if (preservedNet != null) {
                             // If one is present, it is unavailable only if it isn't carrying
                             // the net undergoing routing
-                            return preservedNet == net ? NodeStatus.INUSE
+                            return preservedNet == staticNet ? NodeStatus.INUSE
                                     : NodeStatus.UNAVAILABLE;
                         }
+
+                        // Check that this node is not needed by the other static net
+                        preservedNet = preservedStaticNodes.get(node);
+                        if (preservedNet != null && preservedNet != staticNet) {
+                            return NodeStatus.UNAVAILABLE;
+                        }
+
                         // A RouteNode will only be created if the net is necessary for
-                        // a to-be-routed connection
+                        // a to-be-routed (non-static) connection
                         return routingGraph.getNode(node) == null ? NodeStatus.AVAILABLE
                                 : NodeStatus.UNAVAILABLE;
                     },
                     design, routethruHelper);
 
-            preserveNet(net, false);
+            preserveNet(staticNet, false);
         }
     }
 
@@ -492,11 +530,7 @@ public class RWRoute{
             } else {
                 Node sinkINTNode = nodes.get(0);
                 indirectConnections.add(connection);
-                Net oldNet = routingGraph.getPreservedNet(sinkINTNode);
-                if (oldNet != null && oldNet != net) {
-                    throw new RuntimeException("ERROR: Sink node " + sinkINTNode + " of net '" + net.getName() + "' is "
-                            + " preserved by net '" + oldNet.getName() + "'");
-                }
+                checkSinkRoutability(net, sinkINTNode);
                 connection.setSinkRnode(getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I));
                 if (sourceINTRnode == null) {
                     Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
@@ -546,6 +580,14 @@ public class RWRoute{
             }
         }
         return netWrapper;
+    }
+
+    protected void checkSinkRoutability(Net net, Node sinkNode) {
+        Net oldNet = routingGraph.getPreservedNet(sinkNode);
+        if (oldNet != null && oldNet != net) {
+            throw new RuntimeException("ERROR: Sink node " + sinkNode + " of net '" + net.getName() + "' is "
+                    + " preserved by net '" + oldNet.getName() + "'");
+        }
     }
 
     /**
@@ -781,7 +823,7 @@ public class RWRoute{
     /**
      * Assigns a list of nodes to each connection and fix net routes if there are cycles and / or multi-driver nodes.
      */
-    private void postRouteProcess() {
+    protected void postRouteProcess() {
         if (routeIteration <= config.getMaxIterations()) {
             assignNodesToConnections();
             // fix routes with cycles and / or multi-driver nodes
@@ -977,8 +1019,8 @@ public class RWRoute{
     private void computesNodeUsageAndTotalWirelength() {
         totalWL = 0;
         totalINTNodes = 0;
-        nodeTypeUsage = new HashMap<>();
-        nodeTypeLength = new HashMap<>();
+        nodeTypeUsage = new EnumMap<>(IntentCode.class);
+        nodeTypeLength = new EnumMap<>(IntentCode.class);
 
         Set<Node> netNodes = new HashSet<>();
         for (Entry<Net,NetWrapper> e : nets.entrySet()) {

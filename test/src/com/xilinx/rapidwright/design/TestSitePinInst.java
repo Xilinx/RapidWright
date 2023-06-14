@@ -24,6 +24,8 @@
  package com.xilinx.rapidwright.design;
 
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.router.RouteNode;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -43,5 +45,14 @@ public class TestSitePinInst {
         spi.setSiteInst(siteInst);
 
         Assertions.assertEquals(1, net0.getPIPs().size());
+    }
+
+    @Test
+    public void testGetRouteNode() {
+        Design d = RapidWrightDCP.loadDCP("bug635.dcp");
+        SiteInst si = d.getSiteInstFromSiteName("RAMB36_X8Y14");
+        SitePinInst spi = si.getSitePinInst("RSTRAMARSTRAML");
+        RouteNode rn = spi.getRouteNode();
+        Assertions.assertNotEquals(-1, rn.getWire());
     }
 }

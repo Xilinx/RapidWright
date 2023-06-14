@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 
 /**
  * Represents the EDIF property value construct.  Currently supports:
@@ -284,5 +285,10 @@ public class EDIFPropertyValue {
         if (owner != other.owner)
             return false;
         return true;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(type, value, owner);
     }
 }

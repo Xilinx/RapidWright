@@ -34,6 +34,7 @@ import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
@@ -41,6 +42,7 @@ import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -180,14 +182,15 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
-     * Map that stores EDIFCellInst to EDIFPropertyValue for non-default IOStandard
-     * values propagated from other parts of the netlist.
+     * Map that stores EDIFCellInst to a set of EDIFPropertyValue-s for non-default
+     * IOStandard values propagated from other parts of the netlist.
      * Anecdotally, it's been observed that Vivado propagates the IOStandard property
      * from the EDIFNet feeding a top-level output port to its driving EDIFCellInst
      * I/O buffer.
-     * @see #getIOStandard(EDIFCellInst)
+     * @see #getIOStandards(EDIFCellInst)
      */
-    private Map<EDIFCellInst,EDIFPropertyValue> cellInstIOStandardFallback;
+    private Map<EDIFCellInst,Collection<EDIFPropertyValue>> cellInstIOStandardFallback;
+    private final static Collection<EDIFPropertyValue> defaultPropValueAsCollection = Arrays.asList(DEFAULT_PROP_VALUE);
 
 
     public EDIFNetlist(String name) {
@@ -254,9 +257,9 @@ public class EDIFNetlist extends EDIFName {
         EDIFLibrary lib = getHDIPrimitivesLibrary();
         EDIFCell cell = lib.getCell(unisim.name());
         if (cell == null) {
-            cell = Design.getUnisimCell(unisim);
+            cell = new EDIFCell(lib, Design.getUnisimCell(unisim), unisim.name());
         }
-        return lib.addCell(cell);
+        return cell;
     }
 
     public EDIFLibrary getWorkLibrary() {
@@ -1597,7 +1600,8 @@ public class EDIFNetlist extends EDIFName {
                 toAdd = Design.getUnisimCell(Unisim.valueOf(cellName));
             }
             // Add copy to prim library to avoid destructive changes when collapsed
-            new EDIFCell(netlistPrims, toAdd);
+            // Needs to be a deep copy because it may have child instances that will get updated
+            new EDIFCell(netlistPrims, toAdd, cellName);
         }
 
         // Update all cell references to macro versions
@@ -1610,9 +1614,21 @@ public class EDIFNetlist extends EDIFName {
                         if (!isHDILib) {
                             Pair<String, EnumSet<IOStandard>> exception = seriesMacroExpandExceptionMap.get(cellName);
                             if (exception != null) {
-                                EDIFPropertyValue value = getIOStandard(inst);
-                                IOStandard ioStandard = IOStandard.valueOf(value.getValue());
-                                if (exception.getSecond().contains(ioStandard)) {
+                                Boolean expand = null;
+                                for (EDIFPropertyValue value : getIOStandards(inst)) {
+                                    IOStandard ioStandard = IOStandard.valueOf(value.getValue());
+                                    boolean contained = exception.getSecond().contains(ioStandard);
+                                    if (expand == null) {
+                                        expand = contained;
+                                    } else {
+                                        if (expand != contained) {
+                                            throw new RuntimeException("ERROR: EDIFCellInst '" + inst + "' has conflicting IOSTANDARDs " +
+                                                    "propagated from multiple top-level nets. Consider uniquifying the EDIFNetlist to " +
+                                                    "enable correct macro expansion.");
+                                        }
+                                    }
+                                }
+                                if (expand) {
                                     cellName = exception.getFirst();
                                 }
                             }
@@ -1624,29 +1640,26 @@ public class EDIFNetlist extends EDIFName {
                                 throw new RuntimeException("failed to find cell macro "+cellName+", we are in "+lib.getName());
                             }
                             primsToRemoveOnCollapse.add(cellName);
-                            EDIFCell copy = new EDIFCell(netlistPrims, macro, cellName);
-                            if (copy.getCellInsts().size() > 0) {
-                                for (EDIFCellInst copyInst : copy.getCellInsts()) {
-                                    EDIFCell primCell = netlistPrims.getCell(copyInst.getCellType().getName());
-                                    if (primCell == null) {
-                                        primCell = new EDIFCell(netlistPrims, copyInst.getCellType());
-                                        primsToRemoveOnCollapse.add(copyInst.getCellType().getName());
-                                    }
-                                    copyInst.setCellType(primCell);
+                            newCell = new EDIFCell(netlistPrims, macro, cellName);
+                            for (EDIFCellInst childInst : newCell.getCellInsts()) {
+                                EDIFCell primCell = netlistPrims.getCell(childInst.getCellType().getName());
+                                if (primCell == null) {
+                                    primCell = new EDIFCell(netlistPrims, childInst.getCellType());
+                                    primsToRemoveOnCollapse.add(childInst.getCellType().getName());
                                 }
+                                childInst.setCellType(primCell);
                             }
-                            newCell = copy;
                         }
+                        assert(newCell == netlistPrims.getCell(cellName));
                         inst.setCellType(newCell);
-                        for (EDIFCellInst childInst : newCell.getCellInsts()) {
-                            // Check if we already have a copy
-                            EDIFCell existingCellType = netlistPrims.getCell(childInst.getCellName());
-                            if (existingCellType == null) {
-                                existingCellType = new EDIFCell(netlistPrims, childInst.getCellType());
-                                primsToRemoveOnCollapse.add(existingCellType.getName());
-                            }
-                            childInst.setCellType(existingCellType);
-                        }
+                    }
+                }
+            }
+            for (EDIFCell cell : lib.getCells()) {
+                for (EDIFNet net : cell.getNets()) {
+                    for (EDIFPortInst portInst : net.getPortInsts()) {
+                        EDIFCell parent = portInst.getPort().getParentCell();
+                        assert (parent.getLibrary().getCell(parent.getName()) == parent);
                     }
                 }
             }
@@ -1664,15 +1677,41 @@ public class EDIFNetlist extends EDIFName {
         ArrayList<EDIFCell> reinsert = new ArrayList<EDIFCell>();
         Map<String, Pair<String, EnumSet<IOStandard>>> seriesMacroCollapseExceptionMap =
                 macroCollapseExceptionMap.getOrDefault(series, Collections.emptyMap());
+        Map<EDIFCell, EDIFCell> updateCellTypes = new IdentityHashMap<>();
         for (EDIFCell cell : prims.getCells()) {
             if (macros.containsCell(cell.getName())) {
                 cell.makePrimitive();
-                if (seriesMacroCollapseExceptionMap.containsKey(cell.getName())) {
-                    cell.rename(seriesMacroCollapseExceptionMap.get(cell.getName()).getFirst());
-                    reinsert.add(cell);
+                Pair<String, EnumSet<IOStandard>> exception = seriesMacroCollapseExceptionMap.get(cell.getName());
+                if (exception != null) {
+                    EDIFCell existingCell = prims.getCell(exception.getFirst());
+                    if (existingCell != null) {
+                        // Existing cell (e.g. OBUFDS) already exists/used in primitives library
+                        // thus cannot simply rename it (e.g. from OBUFDS_DUAL_BUF)
+                        updateCellTypes.put(cell, existingCell);
+                    } else {
+                        cell.rename(exception.getFirst());
+                        reinsert.add(cell);
+                    }
                 }
             }
         }
+
+        if (!updateCellTypes.isEmpty()) {
+            // Update all cell references
+            for (EDIFLibrary lib : getLibraries()) {
+                if (lib.isHDIPrimitivesLibrary())
+                    continue;
+                for (EDIFCell cell : new ArrayList<>(lib.getCells())) {
+                    for (EDIFCellInst inst : cell.getCellInsts()) {
+                        EDIFCell newCellType = updateCellTypes.get(inst.getCellType());
+                        if (newCellType != null) {
+                            inst.setCellType(newCellType);
+                        }
+                    }
+                }
+            }
+        }
+
         for (EDIFCell cell : reinsert) {
             prims.removeCell(cell);
             prims.addCell(cell);
@@ -1792,22 +1831,23 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
-     * Helper method to get the IOStandard property of an EDIFCellInst;
+     * Helper method to get the set of IOStandard properties of an EDIFCellInst;
      * should one not exist, fallback to the IOStandard property on
-     * the EDIFNet object connected to the top-level output port that it drives.
+     * the EDIFNet object(s) connected to the top-level output port(s) that it drives.
      * On the first time a fallback is considered, a map is initialized
      * {@link #cellInstIOStandardFallback} to speed up future queries.
      * This map will not be updated upon connecting a new EDIFNet nor
      * if a new property was added to the existing EDIFNet --- for this
      * map to be re-initialized use {@link #resetCellInstIOStandardFallbackMap}.
      * @param eci EDIFCellInst object.
-     * @return EDIFPropertyValue describing its IOStandard. Returns
-     *         EDIFNetlist.DEFAULT_PROP_VALUE if no value found.
+     * @return Collection of EDIFPropertyValue describing its IOStandard.
+     *         Returns a one-element collection containing EDIFNetlist.DEFAULT_PROP_VALUE
+     *         if no value found.
      */
-    public EDIFPropertyValue getIOStandard(EDIFCellInst eci) {
+    public Collection<EDIFPropertyValue> getIOStandards(EDIFCellInst eci) {
         EDIFPropertyValue value = eci.getIOStandard();
-        if (value != DEFAULT_PROP_VALUE) {
-            return value;
+        if (!value.equals(DEFAULT_PROP_VALUE)) {
+            return Arrays.asList(value);
         }
 
         if (cellInstIOStandardFallback == null) {
@@ -1836,11 +1876,8 @@ public class EDIFNetlist extends EDIFName {
                             continue;
                         }
                         EDIFHierNet ehn = new EDIFHierNet(topEhci, en);
-                        for (EDIFHierPortInst ehpi : ehn.getLeafHierPortInsts(true)) {
-                            if (!ehpi.isOutput()) {
-                                // Ignore other leaf sinks on this net
-                                continue;
-                            }
+                        for (EDIFHierPortInst ehpi : ehn.getLeafHierPortInsts(true, false)) {
+                            assert(ehpi.isOutput());
 
                             EDIFCellInst driverEci = ehpi.getPortInst().getCellInst();
                             EDIFCell driverParent = driverEci.getParentCell();
@@ -1851,7 +1888,7 @@ public class EDIFNetlist extends EDIFName {
                             }
 
                             EDIFPropertyValue driverEpv = driverEci.getIOStandard();
-                            if (driverEpv != DEFAULT_PROP_VALUE) {
+                            if (!driverEpv.equals(DEFAULT_PROP_VALUE)) {
                                 if (driverEpv.equals(netEpv)) {
                                     // Cell and Net IOStandards match
                                     continue;
@@ -1860,26 +1897,18 @@ public class EDIFNetlist extends EDIFName {
                                         " with EDIFHierNet '" + ehn + "'.");
                             }
 
-                            EDIFPropertyValue oldEpv = cellInstIOStandardFallback.put(driverEci, netEpv);
-                            if (oldEpv != null && !oldEpv.equals(netEpv)) {
-                                throw new RuntimeException("ERROR: EDIFCellInst '" + driverEci + "' has conflicting IOSTANDARDs" +
-                                        " from multiple EDIFHierNets.");
-                            }
+                            cellInstIOStandardFallback.computeIfAbsent(driverEci, (k) -> new HashSet<>())
+                                .add(netEpv);
                         }
                     }
                 }
             }
         }
-        value = cellInstIOStandardFallback.get(eci);
-        if (value != null) {
-            return value;
-        }
-
-        return DEFAULT_PROP_VALUE;
+        return cellInstIOStandardFallback.getOrDefault(eci, defaultPropValueAsCollection);
     }
 
     /**
-     * Reset the fallback map used by {@link #getIOStandard} so that it may be
+     * Reset the fallback map used by {@link #getIOStandards} so that it may be
      * re-initialized upon next use.
      */
     public void resetCellInstIOStandardFallbackMap() {

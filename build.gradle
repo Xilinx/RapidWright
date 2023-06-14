@@ -12,6 +12,8 @@ plugins {
 apply from: 'common.gradle'
 
 mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
+def standaloneClassName = "com.xilinx.rapidwright.StandaloneEntrypoint"
+def preserveDir = ".preserveBin"
 
 def read_rapidwright_version() {
     def sw = new StringWriter()
@@ -21,6 +23,10 @@ def read_rapidwright_version() {
     return sw.toString().replace("RAPIDWRIGHT_VERSION: v", "").replace("-beta", "").trim() + ""
 }
 def rapidwright_version = project.hasProperty('override_rapidwright_version') ? override_rapidwright_version : read_rapidwright_version()
+
+// Skipping test-fixtures for publication, see https://github.com/Xilinx/RapidWright/issues/697
+components["java"].withVariantsFromConfiguration(configurations["testFixturesApiElements"]) { skip() }
+components["java"].withVariantsFromConfiguration(configurations["testFixturesRuntimeElements"]) { skip() }
 
 dependencies {
     api 'com.xilinx.rapidwright:rapidwright-api-lib:' + rapidwright_version
@@ -48,6 +54,11 @@ sourceSets {
   }
 }
 
+task preserveBin(type: Copy) {
+     from "bin/rapidwright", "bin/rapidwright.bat"
+     into preserveDir
+}
+
 task copyJars(type: Copy) {
     from configurations.api
     into 'jars'
@@ -57,6 +68,29 @@ task copyJars(type: Copy) {
     into 'jars'
 }
 compileJava.dependsOn(copyJars)
+compileJava.dependsOn(preserveBin)
+
+task cleanupScripts(type: Delete) {
+    delete preserveDir
+}
+
+task restoreScripts(type: Copy) {
+    from preserveDir
+    into 'bin'
+    finalizedBy(cleanupScripts)
+}
+
+task mainJar(type: Jar, dependsOn: classes) {
+    archiveBaseName = 'main'
+    from sourceSets.main.output include mainClassName
+    manifest {
+        attributes 'Main-Class': mainClassName
+        attributes 'Class-Path': ([destinationDirectory.get().getAsFile().toPath().relativize(sourceSets.main.java.destinationDirectory.get().getAsFile().toPath()).toString() + File.separator]
+            + configurations.implementation.collect { destinationDirectory.get().getAsFile().toPath().relativize(projectDir.toPath()).resolve('jars').resolve(it.getName()) }).join(' ')
+    }
+    finalizedBy(restoreScripts)
+}
+compileJava.finalizedBy(mainJar)
 
 task deleteJars(type: Delete) {
     delete fileTree('jars')
@@ -95,7 +129,7 @@ task javadocJar(type: Jar) {
 task standaloneJar (type: Jar) {
     duplicatesStrategy = DuplicatesStrategy.WARN
     manifest {
-        attributes 'Main-Class': 'com.xilinx.rapidwright.util.RapidWright'
+        attributes 'Main-Class': standaloneClassName
     }
     archiveBaseName = 'rapidwright-'+rapidwright_version+'-standalone-' + os.charAt(0) + 'in64'
     from { configurations.implementation.collect { it.isDirectory() ? it : zipTree(it) } }
@@ -194,4 +228,3 @@ task printRapidWrightVersion() {
         print(rapidwright_version)
     }
 }
-

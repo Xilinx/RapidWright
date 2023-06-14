@@ -111,7 +111,7 @@ public class Interchange {
     private static String READ_LOGICAL_NETLIST = "READ_LOGICAL_NETLIST";
     private static String READ_PHYSICAL_NETLIST = "READ_PHYSICAL_NETLIST";
 
-    public static void benchmarkDCPvsInterchange(Path dcpPath,
+    public static Path benchmarkDCPvsInterchange(Path dcpPath,
                                                  Path edifPath,
                                                  Path workingPath) throws IOException {
         String title = dcpPath + " IS_PACKED=" + IS_PACKED + " IS_GZIPPED=" + IS_GZIPPED;
@@ -169,6 +169,8 @@ public class Interchange {
                 + printFileSize(" LOGICAL_NETLIST", logNetlistFileName) + " "
                 + printFileSize("PHYSICAL_NETLIST", physNetlistFileName) + " "
         );
+
+        return Paths.get(dcpOutputFileName);
     }
 
 

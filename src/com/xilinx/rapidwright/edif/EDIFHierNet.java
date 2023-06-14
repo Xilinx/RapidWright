@@ -29,6 +29,7 @@ package com.xilinx.rapidwright.edif;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.ArrayDeque;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -185,7 +186,8 @@ public class EDIFHierNet {
     }
 
     /**
-     * Gets all connected leaf port instances on this hierarchical net and its aliases.
+     * Gets all connected leaf port instances (inputs and outputs, but not inouts) on this
+     * hierarchical net and its aliases.
      * @return The list of all leaf cell port instances connected to this hierarchical net and its
      * aliases.
      */
@@ -194,26 +196,60 @@ public class EDIFHierNet {
     }
 
     /**
-     * Gets all connected leaf port instances on this hierarchical net and its aliases.
+     * Gets all connected leaf port instances (inputs, and optionally outputs, but not inouts) on this
+     * hierarchical net and its aliases.
      * @param includeSourcePins A flag to include source pins in the result.  Setting this to false
      * only returns the sinks.
      * @return The list of all leaf cell port instances connected to this hierarchical net and its
      * aliases.
      */
     public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins) {
-        return getLeafHierPortInsts(includeSourcePins, new HashSet<>());
+        return getLeafHierPortInsts(includeSourcePins, true);
+    }
+
+
+    /**
+     * Gets all connected leaf port instances (inputs, and/or outputs, but not inouts) on this
+     * hierarchical net and its aliases. Setting includeSourcePins and includeSinkPins to false
+     * will return an empty list.
+     * @param includeSourcePins A flag to include source pins in the result.
+     * @param includeSinkPins A flag to include sink pins in the result.
+     * @return The list of all leaf cell port instances connected to this hierarchical net and its
+     * aliases.
+     */
+    public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins, boolean includeSinkPins) {
+        return getLeafHierPortInsts(includeSourcePins, includeSinkPins, new HashSet<>());
     }
 
     /**
-     * Gets all connected leaf port instances on this hierarchical net and its aliases.
-     * @param includeSourcePins A flag to include source pins in the result.  Setting this to false
-     * only returns the sinks.
+     * Gets all connected leaf port instances (inputs, and optionally outputs, but not inouts) on this
+     * hierarchical net and its aliases.
+     * @param includeSourcePins A flag to include source pins in the result.
      * @param visited An initial set of EDIFHierNet-s that have already been visited and will not
      * be visited again. Pre-populating this set can be useful for blocking traversal.
      * @return The list of all leaf cell port instances connected to this hierarchical net and its
      * aliases.
      */
     public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins, Set<EDIFHierNet> visited) {
+        return getLeafHierPortInsts(includeSourcePins, true, visited);
+    }
+
+    /**
+     * Gets all connected leaf port instances (inputs, and/or outputs, but not inouts) on this
+     * hierarchical net and its aliases. Setting includeSourcePins and includeSinkPins to false
+     * will return an empty list.
+     * @param includeSourcePins A flag to include source pins in the result.
+     * @param includeSinkPins A flag to include sink pins in the result.
+     * @param visited An initial set of EDIFHierNet-s that have already been visited and will not
+     * be visited again. Pre-populating this set can be useful for blocking traversal.
+     * @return The list of all leaf cell port instances connected to this hierarchical net and its
+     * aliases.
+     */
+    public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins, boolean includeSinkPins, Set<EDIFHierNet> visited) {
+        if (!includeSourcePins && !includeSinkPins) {
+            return Collections.emptyList();
+        }
+
         List<EDIFHierPortInst> leafCellPins = new ArrayList<>();
         Queue<EDIFHierNet> queue = new ArrayDeque<>();
         queue.add(this);
@@ -229,7 +265,7 @@ public class EDIFHierNet {
 
                 boolean isCellPin = relP.getCellInst() != null && relP.getCellInst().getCellType().isLeafCellOrBlackBox();
                 if (isCellPin) {
-                    if (p.isInput() || (includeSourcePins && p.isOutput())) {
+                    if ((includeSinkPins && p.isInput()) || (includeSourcePins && p.isOutput())) {
                         leafCellPins.add(p);
                     }
                 }

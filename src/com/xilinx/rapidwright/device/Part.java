@@ -1,9 +1,8 @@
 /*
- * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Chris Lavin, Xilinx Research Labs.
+ * Author: Chris Lavin, Advanced Micro Devices, Inc.
  *
  * This file is part of RapidWright.
  *
@@ -31,7 +30,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 
 /**
- * Generated on: Wed Apr 27 13:18:34 2022
+ * Generated on: Wed May 17 22:32:37 2023
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  *
  * Class used to uniquely represent a Xilinx part.
@@ -242,6 +241,7 @@ public class Part {
         };
         ultraScale = new HashSet<FamilyType>(Arrays.asList(ultraScaleTypes));
         ultraScalePlusTypes = new FamilyType[] {
+                FamilyType.AARTIXUPLUS,
                 FamilyType.ARTIXUPLUS,
                 FamilyType.AZYNQUPLUS,
                 FamilyType.KINTEXUPLUS,
@@ -265,6 +265,7 @@ public class Part {
                 FamilyType.VERSAL,
                 FamilyType.VERSALAICORE,
                 FamilyType.VERSALAIEDGE,
+                FamilyType.VERSALHBM,
                 FamilyType.VERSALPREMIUM,
                 FamilyType.VERSALPRIME,
         };

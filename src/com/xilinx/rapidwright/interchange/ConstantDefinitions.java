@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Keith Rothman, Google, Inc.
@@ -69,7 +69,7 @@ public class ConstantDefinitions {
     private Set<Map.Entry<String, String>> exceptionalVccNodes;
     private Set<Map.Entry<String, String>> exceptionalGndNodes;
 
-    public ConstantDefinitions(Enumerator<String> allStrings, Constants.Reader reader, Map<TileTypeEnum, TileType.Reader> tileTypes) {
+    public ConstantDefinitions(StringEnumerator allStrings, Constants.Reader reader, Map<TileTypeEnum, TileType.Reader> tileTypes) {
         vccBels = new HashMap<Map.Entry<SiteTypeEnum, String>, String>();
         gndBels = new HashMap<Map.Entry<SiteTypeEnum, String>, String>();
         vccWires = new HashSet<Map.Entry<TileTypeEnum, Integer>>();
@@ -237,7 +237,7 @@ public class ConstantDefinitions {
     }
 
 
-    public static void verifyConstants(Enumerator<String> allStrings, Device device, Design design, Map<SiteTypeEnum,Site> siteTypes, Constants.Reader reader, Map<TileTypeEnum, TileType.Reader> tileTypes) {
+    public static void verifyConstants(StringEnumerator allStrings, Device device, Design design, Map<SiteTypeEnum,Site> siteTypes, Constants.Reader reader, Map<TileTypeEnum, TileType.Reader> tileTypes) {
         if (reader.getDefaultBestConstant() != ConstantType.VCC) {
             throw new RuntimeException("Expected that default best constant be VCC! Got " + reader.getDefaultBestConstant().name());
         }
@@ -397,7 +397,7 @@ public class ConstantDefinitions {
         return tileTiedWires;
     }
 
-    public static void writeTiedWires(Enumerator<String> allStrings, Device device,
+    public static void writeTiedWires(StringEnumerator allStrings, Device device,
             Constants.Builder builder, Map<TileTypeEnum, TileType.Builder> tileTypes) {
 
         ArrayList<Node> allTiedNodes = getAllTiedNodes(device);
@@ -486,7 +486,7 @@ public class ConstantDefinitions {
         }
     }
 
-    private static void writeTiedBels(Enumerator<String> allStrings, Device device, Constants.Builder builder, Design design, Map<SiteTypeEnum,Site> siteTypes) {
+    private static void writeTiedBels(StringEnumerator allStrings, Device device, Constants.Builder builder, Design design, Map<SiteTypeEnum,Site> siteTypes) {
         Set<List<String>> siteVccSources = new HashSet<List<String>>();
         Set<List<String>> siteGndSources = new HashSet<List<String>>();
 
@@ -558,7 +558,7 @@ public class ConstantDefinitions {
         }
     }
 
-    private static void writeCellPinDefaults(Enumerator<String> allStrings, Device device, Constants.Builder builder) {
+    private static void writeCellPinDefaults(StringEnumerator allStrings, Device device, Constants.Builder builder) {
         Map<Unisim,Map<String,NetType>> map = CellPinStaticDefaults.getCellPinDefaultsMap().get(device.getSeries());
         Builder<DefaultCellConnections.Builder> defaultCellConnsBuilder = builder.initDefaultCellConns(map.keySet().size());
         int i=0;
@@ -577,7 +577,7 @@ public class ConstantDefinitions {
         }
     }
 
-    public static void writeConstants(Enumerator<String> allStrings, Device device, Constants.Builder builder, Design design, Map<SiteTypeEnum,Site> siteTypes, Map<TileTypeEnum, TileType.Builder> tileTypes) {
+    public static void writeConstants(StringEnumerator allStrings, Device device, Constants.Builder builder, Design design, Map<SiteTypeEnum,Site> siteTypes, Map<TileTypeEnum, TileType.Builder> tileTypes) {
         builder.setDefaultBestConstant(ConstantType.VCC);
 
         builder.setGndCellType(allStrings.getIndex("GND"));

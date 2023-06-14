@@ -23,22 +23,30 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.SiteInst;
-import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.support.LargeTest;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.ReportRouteStatusResult;
+import com.xilinx.rapidwright.util.VivadoTools;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Part;
+import com.xilinx.rapidwright.device.PartNameTools;
+import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.support.LargeTest;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestRWRoute {
     private static void assertAllSinksRouted(List<SitePinInst> pins) {
@@ -47,6 +55,15 @@ public class TestRWRoute {
                 continue;
             Assertions.assertTrue(spi.isRouted());
         }
+    }
+
+    public static void assertVivadoFullyRouted(Design design) {
+        if (!FileTools.isVivadoOnPath()) {
+            return;
+        }
+
+        ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+        Assertions.assertTrue(rrs.isFullyRouted());
     }
 
     private static void assertAllSinksRouted(Design design) {
@@ -73,7 +90,10 @@ public class TestRWRoute {
         Design design = Design.readCheckpoint(dcpPath);
         RWRoute.routeDesignFullNonTimingDriven(design);
         assertAllSinksRouted(design);
+        assertVivadoFullyRouted(design);
     }
+
+
 
     /**
      * Tests the timing driven full routing, i.e., RWRoute running in timing-driven mode.
@@ -91,6 +111,7 @@ public class TestRWRoute {
         Design design = Design.readCheckpoint(dcpPath);
         RWRoute.routeDesignFullTimingDriven(design);
         assertAllSinksRouted(design);
+        assertVivadoFullyRouted(design);
     }
 
     /**
@@ -110,6 +131,7 @@ public class TestRWRoute {
         Design design = Design.readCheckpoint(dcpPath);
         RWRoute.routeDesignFullNonTimingDriven(design);
         assertAllSinksRouted(design);
+        assertVivadoFullyRouted(design);
     }
 
     /**
@@ -138,6 +160,7 @@ public class TestRWRoute {
         for (Net net : routed.getModifiedNets()) {
             assertAllSinksRouted(net.getPins());
         }
+        assertVivadoFullyRouted(design);
     }
 
     /**
@@ -162,6 +185,7 @@ public class TestRWRoute {
         for (Net net : routed.getModifiedNets()) {
             assertAllSinksRouted(net.getPins());
         }
+        assertVivadoFullyRouted(design);
     }
 
     @ParameterizedTest
@@ -216,6 +240,22 @@ public class TestRWRoute {
         PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute, softPreserve);
 
         Assertions.assertTrue(pinsToRoute.stream().allMatch(SitePinInst::isRouted));
-        Assertions.assertTrue(Long.valueOf(System.getProperty("rapidwright.rwroute.nodesPopped")) <= nodesPoppedLimit);
+        Assertions.assertTrue(Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped")) <= nodesPoppedLimit);
+    }
+
+    @ParameterizedTest
+    @EnumSource(Series.class)
+    public void testRWRouteDeviceSupport(Series series) {
+        for (Part part : PartNameTools.getAllParts(series)) {
+            Design design = new Design("test", part.getName());
+            if (!RWRoute.SUPPORTED_SERIES.contains(series)) {
+                RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                        () -> RWRoute.routeDesignFullNonTimingDriven(design),
+                        "Expected RuntimeException() but was not thrown.");
+                Assertions.assertEquals(e.getMessage(), RWRoute.getUnsupportedSeriesMessage(part));
+            }
+            // Only test one part per series
+            break;
+        }
     }
 }

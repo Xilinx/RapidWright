@@ -32,7 +32,7 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -470,7 +470,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      */
     public void incrementUser(NetWrapper user) {
         if (usersConnectionCounts == null) {
-            usersConnectionCounts = new HashMap<>();
+            usersConnectionCounts = new IdentityHashMap<>();
         }
         usersConnectionCounts.merge(user, 1, Integer::sum);
     }
@@ -526,7 +526,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      */
     public void incrementDriver(RouteNode parent) {
         if (driversCounts == null) {
-            driversCounts = new HashMap<>();
+            driversCounts = new IdentityHashMap<>();
         }
         driversCounts.merge(parent, 1, Integer::sum);
     }

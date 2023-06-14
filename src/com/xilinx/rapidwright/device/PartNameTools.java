@@ -1,9 +1,8 @@
 /*
- * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Chris Lavin, Xilinx Research Labs.
+ * Author: Chris Lavin, Advanced Micro Devices, Inc.
  *
  * This file is part of RapidWright.
  *
@@ -37,7 +36,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
- * Generated on: Wed Apr 27 13:18:34 2022
+ * Generated on: Wed May 17 22:32:37 2023
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  *
  * Class to hold utility APIs dealing with Parts and device names.
@@ -49,8 +48,7 @@ public class PartNameTools {
     }
     static {
         partMap = new HashMap<String,Part>();
-        try (Input his = FileTools.getKryoInputStream(FileTools.getRapidWrightResourceInputStream(FileTools.PART_DB_PATH))) {
-
+        try (Input his = FileTools.getKryoZstdInputStream(FileTools.getRapidWrightResourceInputStream(FileTools.PART_DB_PATH))) {
             int version = his.readInt();
             if (version != FileTools.PART_DB_FILE_VERSION) {
                 throw new RuntimeException("ERROR: " + FileTools.PART_DB_PATH
@@ -109,7 +107,7 @@ public class PartNameTools {
             p = partMap.get("xc" + normalizedName);
         }
         if (p == null) {
-            throw new RuntimeException("\n\n\tERROR: Couldn't identify " + normalizedName + " in RapidWright part database. ");
+            throw new RuntimeException("ERROR: Couldn't identify " + normalizedName + " in RapidWright part database. ");
         }
         return p;
     }
@@ -126,8 +124,9 @@ public class PartNameTools {
      * @return The base architecture as a family type
      */
     public static FamilyType getArchitectureFromFamilyType(FamilyType type) {
-        switch(type) {
+        switch (type) {
             case AARTIX7: return FamilyType.ARTIX7;
+            case AARTIXUPLUS: return FamilyType.KINTEXUPLUS;
             case AKINTEX7: return FamilyType.KINTEX7;
             case ARTIX7: return FamilyType.ARTIX7;
             case ARTIX7L: return FamilyType.ARTIX7;
@@ -157,6 +156,7 @@ public class PartNameTools {
             case SPARTAN7: return FamilyType.SPARTAN7;
             case VERSALAICORE: return FamilyType.VERSAL;
             case VERSALAIEDGE: return FamilyType.VERSAL;
+            case VERSALHBM: return FamilyType.VERSAL;
             case VERSALPREMIUM: return FamilyType.VERSAL;
             case VERSALPRIME: return FamilyType.VERSAL;
             case VIRTEX7: return FamilyType.VIRTEX7;
@@ -177,8 +177,9 @@ public class PartNameTools {
      * @return The formal family name or null if none exists.
      */
     public static String getFullArchitectureName(FamilyType type) {
-        switch(type) {
+        switch (type) {
             case AARTIX7: return "Artix-7";
+            case AARTIXUPLUS: return "Kintex UltraScale+";
             case AKINTEX7: return "Kintex-7";
             case ARTIX7: return "Artix-7";
             case ARTIX7L: return "Artix-7";
@@ -209,6 +210,7 @@ public class PartNameTools {
             case VERSAL: return "Versal ACAP";
             case VERSALAICORE: return "Versal ACAP";
             case VERSALAIEDGE: return "Versal ACAP";
+            case VERSALHBM: return "Versal ACAP";
             case VERSALPREMIUM: return "Versal ACAP";
             case VERSALPRIME: return "Versal ACAP";
             case VIRTEX7: return "Virtex-7";
@@ -229,8 +231,9 @@ public class PartNameTools {
      * @return The series or technology generation or null if unknown.
      */
     public static Series getSeriesFromFamilyType(FamilyType type) {
-        switch(type) {
+        switch (type) {
             case AARTIX7: return Series.Series7;
+            case AARTIXUPLUS: return Series.UltraScalePlus;
             case AKINTEX7: return Series.Series7;
             case ARTIX7: return Series.Series7;
             case ARTIX7L: return Series.Series7;
@@ -261,6 +264,7 @@ public class PartNameTools {
             case VERSAL: return Series.Versal;
             case VERSALAICORE: return Series.Versal;
             case VERSALAIEDGE: return Series.Versal;
+            case VERSALHBM: return Series.Versal;
             case VERSALPREMIUM: return Series.Versal;
             case VERSALPRIME: return Series.Versal;
             case VIRTEX7: return Series.Series7;

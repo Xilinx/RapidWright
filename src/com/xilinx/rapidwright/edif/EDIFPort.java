@@ -36,7 +36,7 @@ import java.util.List;
  * Represents a port on an {@link EDIFCell} within an EDIF netlist.
  * Created on: May 11, 2017
  */
-public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
+public class EDIFPort extends EDIFPropertyObject {
 
     private EDIFCell parentCell;
 
@@ -323,11 +323,6 @@ public class EDIFPort extends EDIFPropertyObject implements EDIFEnumerable {
         if (getName().contains("["))
             return new int[] {Integer.parseInt(getName().substring(lastLeftBracket,getName().length()-1))};
         return null;
-    }
-
-    @Override
-    public String getUniqueKey() {
-        return parentCell.getUniqueKey() + "_" + getName();
     }
 
     public boolean isBusRangeEqual(EDIFPort otherPort) {
