@@ -76,12 +76,13 @@ public class GlobalSignalRouting {
      * @param routesToSinkINTTiles A map storing routes from CLK_OUT to different INT tiles that
      * connect to sink pins of a global clock net.
      * @param device The target device needed to get routing path representation with nodes from names.
-     * @param isPreservedNode Predicate lambda for indicating whether a Node is preserved and cannot be used.
+     * @param getNodeStatus Lambda for indicating the status of a Node: available, in-use (preserved
+     *                      for same net as we're routing), or unavailable (preserved for other net).
      */
     public static void routeClkWithPartialRoutes(Net clk,
                                                  Map<String, List<String>> routesToSinkINTTiles,
                                                  Device device,
-                                                 Predicate<Node> isPreservedNode) {
+                                                 Function<Node, NodeStatus> getNodeStatus) {
         Map<String, List<Node>> dstINTtilePaths = getListOfNodesFromRoutes(device, routesToSinkINTTiles);
         // Not import path after HDSTR
         Set<PIP> clkPIPs = new HashSet<>();
@@ -101,7 +102,7 @@ public class GlobalSignalRouting {
         UltraScaleClockRouting.routeToLCBs(clk, getStartingPoint(horDistributionLines, device), lcbMappings.keySet());
 
         // route LCBs to sink pins
-        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, isPreservedNode);
+        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
 
         Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
         clk.setPIPs(clkPIPsWithoutDuplication);
@@ -171,9 +172,10 @@ public class GlobalSignalRouting {
      * Routes a clock net by dividing the target clock regions into two groups and routes to the two groups with different centroid nodes.
      * @param clk The clock to be routed.
      * @param device The design device.
-     * @param isPreservedNode Predicate lambda for indicating whether a Node is preserved and cannot be used.
+     * @param getNodeStatus Lambda for indicating the status of a Node: available, in-use (preserved
+     *                      for same net as we're routing), or unavailable (preserved for other net).
      */
-    public static void symmetricClkRouting(Net clk, Device device, Predicate<Node> isPreservedNode) {
+    public static void symmetricClkRouting(Net clk, Device device, Function<Node,NodeStatus> getNodeStatus) {
         List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
         ClockRegion centroid = findCentroid(clk, device);
 
@@ -196,17 +198,17 @@ public class GlobalSignalRouting {
 
         List<RouteNode> upDownDistLines = new ArrayList<>();
         if (aboveCentroid != null) {
-            List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false);
+            List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false, getNodeStatus);
             if (upLines != null) upDownDistLines.addAll(upLines);
         }
 
-        List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true);//TODO this is where the antenna node shows up
+        List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
         if (downLines != null) upDownDistLines.addAll(downLines);
 
         Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
         UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
 
-        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, isPreservedNode);
+        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
 
         Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
         clk.setPIPs(clkPIPsWithoutDuplication);
@@ -245,25 +247,63 @@ public class GlobalSignalRouting {
      * @return A map between leaf clock buffer nodes and sink SitePinInsts.
      */
     public static Map<RouteNode, ArrayList<SitePinInst>> getLCBPinMappings(Net clk) {
+        return getLCBPinMappings(clk.getPins(), (n) -> NodeStatus.AVAILABLE);
+    }
+
+    /**
+     * Maps each sink SitePinInsts of a clock net to a leaf clock buffer node.
+     * @param clkPins List of clock pins in question.
+     * @return A map between leaf clock buffer nodes and sink SitePinInsts.
+     */
+    public static Map<RouteNode, ArrayList<SitePinInst>> getLCBPinMappings(List<SitePinInst> clkPins,
+                                                                           Function<Node,NodeStatus> getNodeStatus) {
         Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = new HashMap<>();
-        for (SitePinInst p : clk.getPins()) {
+        List<Node> lcbCandidates = new ArrayList<>();
+        Set<Node> usedLcbs = new HashSet<>();
+        for (SitePinInst p : clkPins) {
             if (p.isOutPin()) continue;
-            if (p.isRouted()) continue;
-            Node n = null;// n should be a node whose name ends with "CLK_LEAF"
-            for (Node prev : p.getConnectedNode().getAllUphillNodes()) {
-                if (prev.getTile().equals(p.getSite().getIntTile())) {
-                    for (Node prevPrev : prev.getAllUphillNodes()) {
-                        if (prevPrev.getIntentCode() == IntentCode.NODE_GLOBAL_LEAF) {
-                            n = prevPrev;
-                            break;
-                        }
+            assert(lcbCandidates.isEmpty());
+            Tile intTile = p.getSite().getIntTile();
+
+            outer: for (Node prev : p.getConnectedNode().getAllUphillNodes()) {
+                if (!prev.getTile().equals(intTile)) {
+                    continue;
+                }
+
+                NodeStatus prevNodeStatus = getNodeStatus.apply(prev);
+                if (prevNodeStatus == NodeStatus.UNAVAILABLE) {
+                    continue;
+                }
+
+                for (Node prevPrev : prev.getAllUphillNodes()) {
+                    if (prevPrev.getIntentCode() != IntentCode.NODE_GLOBAL_LEAF) {
+                        continue;
                     }
+
+                    NodeStatus prevPrevNodeStatus = getNodeStatus.apply(prevPrev);
+                    if (prevPrevNodeStatus == NodeStatus.UNAVAILABLE) {
+                        continue;
+                    }
+
+                    if (usedLcbs.contains(prevPrev) || prevPrevNodeStatus == NodeStatus.INUSE) {
+                        lcbCandidates.clear();
+                        lcbCandidates.add(prevPrev);
+                        break outer;
+                    }
+
+                    assert(prevPrevNodeStatus == NodeStatus.AVAILABLE);
+                    lcbCandidates.add(prevPrev);
                 }
             }
 
-            if (n == null) throw new RuntimeException("ERROR: No mapped LCB to SitePinInst " + p);
+            if (lcbCandidates.isEmpty()) {
+                throw new RuntimeException("ERROR: No mapped LCB to SitePinInst " + p);
+            }
+            Node n = lcbCandidates.get(0);
             RouteNode rn = new RouteNode(n.getTile(), n.getWire());
             lcbMappings.computeIfAbsent(rn, (k) -> new ArrayList<>()).add(p);
+            usedLcbs.add(n);
+            lcbCandidates.clear();
         }
 
         return lcbMappings;
@@ -379,12 +419,13 @@ public class GlobalSignalRouting {
     /**
      * Checks if a {@link LightweightRouteNode} instance that represents a {@link Node} object should be pruned.
      * @param routingNode The RoutingNode in question.
-     * @param isNodeUnavailable A Predicate lambda to check if node is unavailable for use.
+     * @param getNodeStatus Lambda for indicating the status of a Node: available, in-use (preserved
+     *                      for same net as we're routing), or unavailable (preserved for other net).
      * @param visitedRoutingNodes RoutingNode instances that have been visited.
      * @return true, if the RoutingNode instance should not be considered as an available resource.
      */
     private static boolean pruneNode(LightweightRouteNode routingNode,
-                                     Function<Node,NodeStatus> isNodeUnavailable,
+                                     Function<Node,NodeStatus> getNodeStatus,
                                      Set<LightweightRouteNode> visitedRoutingNodes,
                                      Set<LightweightRouteNode> usedRoutingNodes) {
         Node node = routingNode.getNode();
@@ -401,7 +442,7 @@ public class GlobalSignalRouting {
                 return true;
             default:
         }
-        NodeStatus status = isNodeUnavailable.apply(node);
+        NodeStatus status = getNodeStatus.apply(node);
         if (status == NodeStatus.UNAVAILABLE) {
             return true;
         }
@@ -412,7 +453,6 @@ public class GlobalSignalRouting {
         }
         return visitedRoutingNodes.contains(routingNode);
     }
-
     /**
      * Determines if the given {@link LightweightRouteNode} instance that represents a {@link Node} instance can serve as our sink.
      * @param routingNode The {@link LightweightRouteNode} instance in question.

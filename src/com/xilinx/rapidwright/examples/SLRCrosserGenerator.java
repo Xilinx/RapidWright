@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 import com.xilinx.rapidwright.design.Cell;
@@ -70,6 +71,7 @@ import com.xilinx.rapidwright.placer.blockplacer.SmallestEnclosingCircle;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.router.Router;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
+import com.xilinx.rapidwright.rwroute.NodeStatus;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.MessageGenerator;
 
@@ -378,9 +380,18 @@ public class SLRCrosserGenerator {
                 clockRegions.add(centroid);
                 clockRegions.add(centroid.getNeighborClockRegion(1, 0));
             }
-            Map<ClockRegion, RouteNode> vertDistLines = UltraScaleClockRouting.routeCentroidToVerticalDistributionLines(clk,centroidDistNode, clockRegions);
 
-            distLines.addAll(UltraScaleClockRouting.routeCentroidToHorizontalDistributionLines(clk, centroidDistNode, vertDistLines));
+            Function<Node, NodeStatus> getNodeStatus = (node) -> NodeStatus.AVAILABLE;
+
+            Map<ClockRegion, RouteNode> vertDistLines = UltraScaleClockRouting.routeCentroidToVerticalDistributionLines(clk,
+                    centroidDistNode,
+                    clockRegions,
+                    getNodeStatus);
+
+            distLines.addAll(UltraScaleClockRouting.routeCentroidToHorizontalDistributionLines(clk,
+                    centroidDistNode,
+                    vertDistLines,
+                    getNodeStatus));
         }
 
 
@@ -391,7 +402,7 @@ public class SLRCrosserGenerator {
         UltraScaleClockRouting.routeDistributionToLCBs(clk, distLines, lcbMappings.keySet());
 
         // Route from each LCB to laguna sites
-        Predicate<Node> isPreservedNode = (node) -> false;
+        Function<Node, NodeStatus> isPreservedNode = (node) -> NodeStatus.AVAILABLE;
         UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, isPreservedNode);
 
         // Update clocking delays to improve SLR crossing hold issues
