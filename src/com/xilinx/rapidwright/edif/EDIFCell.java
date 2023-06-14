@@ -643,6 +643,21 @@ public class EDIFCell extends EDIFPropertyObject {
         }
     }
 
+    /**
+     * Gets all EDIFPortInsts in the cell. Runs in O(N*P), where N is the number of nets in the cell and P is the
+     * average number of port instances per net.
+     *
+     * @return A List of EDIFPortInsts
+     */
+    public List<EDIFPortInst> getPortInsts() {
+        List<EDIFPortInst> portInsts = new ArrayList<>();
+        for (EDIFNet net : getNets()) {
+            portInsts.addAll(net.getEDIFPortInstList());
+        }
+        return portInsts;
+    }
+
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
