@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -222,6 +222,10 @@ public class EDIFNet extends EDIFPropertyObject {
 
     public EDIFPortInst createPortInst(EDIFPort port, EDIFCellInst cellInst) {
         return new EDIFPortInst(port, this, cellInst);
+    }
+
+    public EDIFPortInst createPortInst(EDIFPort port, EDIFCellInst cellInst, boolean deferSort) {
+        return new EDIFPortInst(port, this, cellInst, deferSort);
     }
 
     public EDIFPortInst createPortInst(EDIFPort port, int index, EDIFCellInst cellInst) {

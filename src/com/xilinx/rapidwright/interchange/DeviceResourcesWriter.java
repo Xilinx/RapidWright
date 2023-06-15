@@ -404,7 +404,7 @@ public class DeviceResourcesWriter {
                     put(series+"_"+EDIFTools.MACRO_PRIMITIVES_LIB, LogNetlistWriter.DEVICE_MACROS_LIB);
                 }}
             );
-        writer.populateNetlistBuilder(netlist, netlistBuilder);
+        writer.populateNetlistBuilder(netlist, netlistBuilder, CodePerfTracker.SILENT);
 
         writeCellParameterDefinitions(series, netlist, devBuilder.getParameterDefs());
 
