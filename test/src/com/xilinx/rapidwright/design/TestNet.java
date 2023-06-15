@@ -156,6 +156,28 @@ public class TestNet {
     }
 
     @Test
+    public void testRemovePinSiteInsts() {
+        Design d = new Design("testRemovePinSiteInsts", Device.AWS_F1);
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
+
+        Net net = d.createNet("net");
+        SitePinInst spi1 = net.createPin("A_O", si);
+        SitePinInst spi2 = net.createPin("AMUX", si);
+
+        Assertions.assertIterableEquals(net.getSiteInsts(), Arrays.asList(si));
+
+        // Remove first of two pins
+        net.removePin(spi1);
+
+        Assertions.assertIterableEquals(net.getSiteInsts(), Arrays.asList(si));
+
+        // Remove second of two pins
+        net.removePin(spi2);
+
+        Assertions.assertTrue(net.getSiteInsts().isEmpty());
+    }
+
+    @Test
     public void testGetLogicalHierNetDetachedNetlist() {
         String dcpPath = RapidWrightDCP.getString("bnn.dcp");
         Design design = Design.readCheckpoint(dcpPath);
