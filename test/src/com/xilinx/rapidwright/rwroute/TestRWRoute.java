@@ -258,4 +258,26 @@ public class TestRWRoute {
             break;
         }
     }
+
+    @Test
+    public void testBug701() {
+        Design design = RapidWrightDCP.loadDCP("bug701.dcp");
+
+        RWRoute.routeDesignFullNonTimingDriven(design);
+
+        Net vcc = design.getVccNet();
+        Assertions.assertEquals(1, vcc.getPins().size());
+        Assertions.assertTrue(vcc.getPins().stream().allMatch(SitePinInst::isRouted));
+
+        Net gnd = design.getGndNet();
+        Assertions.assertEquals(31, gnd.getPins().size());
+        Assertions.assertTrue(gnd.getPins().stream().allMatch(SitePinInst::isRouted));
+
+        if (FileTools.isVivadoOnPath()) {
+            // Testcase has a number of undriven nets, so just check for unrouted nets
+            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            Assertions.assertEquals(0, rrs.unroutedNets);
+        }
+    }
+
 }
