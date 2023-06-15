@@ -55,4 +55,28 @@ public class TestSitePinInst {
         RouteNode rn = spi.getRouteNode();
         Assertions.assertNotEquals(-1, rn.getWire());
     }
+
+    @Test
+    public void testDetachSiteInst() {
+        Design d = new Design("testDetachSiteInst", Device.AWS_F1);
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
+
+        Net net1 = d.createNet("net1");
+        SitePinInst spi1 = net1.createPin("A_O", si);
+        Assertions.assertEquals(net1, si.getNetFromSiteWire(spi1.getSiteWireName()));
+
+        // Forcibly detach SitePinInst from SiteInst but without removing any
+        // intra-site routing, so that new pin can be added
+        si.getSitePinInstMap().remove(spi1.getName());
+
+        Net net2 = d.createNet("net2");
+        SitePinInst spi2 = net2.createPin("A_O", si);
+        Assertions.assertEquals(net2, si.getNetFromSiteWire(spi2.getSiteWireName()));
+
+        spi1.detachSiteInst();
+
+        // Check that the sitewire is untouched
+        Assertions.assertEquals(net2, si.getNetFromSiteWire(spi2.getSiteWireName()));
+    }
+
 }
