@@ -86,7 +86,7 @@ public class VivadoTools {
                 + tclScript.toString();
         Integer exitCode = FileTools.runCommand(vivadoCmd, verbose);
         if (exitCode != 0) {
-            throw new RuntimeException("Exited with " + exitCode);
+            throw new RuntimeException("Vivado exited with code: " + exitCode);
         }
         return FileTools.getLinesFromTextFile(outputLog.toString());
     }
