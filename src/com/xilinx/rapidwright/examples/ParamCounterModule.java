@@ -52,9 +52,6 @@ import com.xilinx.rapidwright.util.MessageGenerator;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 
-import java.io.File;
-import java.util.Arrays;
-
 import static com.xilinx.rapidwright.examples.ArithmeticGenerator.INPUT_A_NAME;
 import static com.xilinx.rapidwright.examples.ArithmeticGenerator.INPUT_B_NAME;
 import static com.xilinx.rapidwright.examples.ArithmeticGenerator.RESULT_NAME;
@@ -184,7 +181,6 @@ public class ParamCounterModule {
         adderDesign.setAutoIOBuffers(false);
 
         // Create module for adder and populate ports
-        // TODO: make port population automatic when creating module?
         Module adderModule = new Module(adderDesign);
         for (Net net : adderModule.getNets()) {
             EDIFNet edifNet = net.getLogicalNet();
@@ -229,7 +225,6 @@ public class ParamCounterModule {
 
         //connect ports of adder modules
         for(int i = 0; i<width; i++) {
-            //TODO: have mi.connect() return logical net name directly?
             mi.connect(resultBusName, i, mi, aBusName, i); // Connect output of adder to one of the input ports of adder
             EDIFNet net = cntrTop.getNet(mi.getNewNetName(resultBusName, i, mi, aBusName, i));
             net.createPortInst(outPort, i); // Attach output port to newly created top-level net
