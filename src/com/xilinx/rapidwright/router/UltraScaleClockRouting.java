@@ -42,14 +42,12 @@ import com.xilinx.rapidwright.rwroute.NodeStatus;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.Function;
@@ -103,8 +101,7 @@ public class UltraScaleClockRouting {
      * @param findCentroidHroute The flag to indicate the returned RouteNode should be HROUTE in the center or VROUTE going up or down.
      */
     public static RouteNode routeToCentroid(Net clk, RouteNode startingRouteNode, ClockRegion clockRegion, boolean adjusted, boolean findCentroidHroute) {
-        Queue<RouteNode> q = new PriorityQueue<>(16, new Comparator<RouteNode>() {
-            public int compare(RouteNode i, RouteNode j) {return i.getCost() - j.getCost();}});
+        Queue<RouteNode> q = RouteNode.createPriorityQueue();
         HashSet<RouteNode> visited = new HashSet<>();
         startingRouteNode.setParent(null);
         q.add(startingRouteNode);
@@ -171,8 +168,7 @@ public class UltraScaleClockRouting {
      * @return
      */
     public static RouteNode routeToCentroidNode(Net clk, RouteNode startingRouteNode, Node centroid) {
-        Queue<RouteNode> q = new PriorityQueue<>(16, new Comparator<RouteNode>() {
-            public int compare(RouteNode i, RouteNode j) {return i.getCost() - j.getCost();}});
+        Queue<RouteNode> q = RouteNode.createPriorityQueue();
         HashSet<RouteNode> visited = new HashSet<>();
 
         startingRouteNode.setParent(null);
@@ -274,8 +270,7 @@ public class UltraScaleClockRouting {
                                                                                        Function<Node, NodeStatus> getNodeStatus) {
         Map<ClockRegion, RouteNode> crToVdist = new HashMap<>();
         centroidDistNode.setParent(null);
-        Queue<RouteNode> q = new PriorityQueue<>(16, new Comparator<RouteNode>() {
-            public int compare(RouteNode i, RouteNode j) {return i.getCost() - j.getCost();}});
+        Queue<RouteNode> q = RouteNode.createPriorityQueue();
         HashSet<RouteNode> visited = new HashSet<>();
         Set<PIP> allPIPs = new HashSet<>();
         Set<RouteNode> startingPoints = new HashSet<>();
@@ -335,7 +330,7 @@ public class UltraScaleClockRouting {
                                                                              Map<ClockRegion,RouteNode> crMap,
                                                                              Function<Node, NodeStatus> getNodeStatus) {
         List<RouteNode> distLines = new ArrayList<>();
-        Queue<RouteNode> q = new LinkedList<RouteNode>();
+        Queue<RouteNode> q = new LinkedList<>();
         Set<PIP> allPIPs = new HashSet<>();
         nextClockRegion: for (Entry<ClockRegion,RouteNode> e : crMap.entrySet()) {
             q.clear();
@@ -391,8 +386,7 @@ public class UltraScaleClockRouting {
     }
 
     public static void routeToLCBs(Net clk, Map<ClockRegion, Set<RouteNode>> startingPoints, Set<RouteNode> lcbTargets) {
-        Queue<RouteNode> q = new PriorityQueue<RouteNode>(16, new Comparator<RouteNode>() {
-            public int compare(RouteNode i, RouteNode j) {return i.getCost() - j.getCost();}});
+        Queue<RouteNode> q = RouteNode.createPriorityQueue();
         Set<PIP> allPIPs = new HashSet<>();
         HashSet<RouteNode> visited = new HashSet<>();
 
@@ -446,7 +440,7 @@ public class UltraScaleClockRouting {
      * @param getNodeStatus Lambda for indicating the status of a Node: available, in-use (preserved
      *                      for same net as we're routing), or unavailable (preserved for other net).
      */
-    public static void routeLCBsToSinks(Net clk, Map<RouteNode, ArrayList<SitePinInst>> lcbMappings,
+    public static void routeLCBsToSinks(Net clk, Map<RouteNode, List<SitePinInst>> lcbMappings,
                                         Function<Node, NodeStatus> getNodeStatus) {
         Set<Wire> used = new HashSet<>();
         Set<Wire> visited = new HashSet<>();
@@ -454,7 +448,7 @@ public class UltraScaleClockRouting {
 
         Predicate<Node> isNodeUnavailable = (node) -> getNodeStatus.apply(node) == NodeStatus.UNAVAILABLE;
 
-        for (Entry<RouteNode,ArrayList<SitePinInst>> e : lcbMappings.entrySet()) {
+        for (Entry<RouteNode,List<SitePinInst>> e : lcbMappings.entrySet()) {
             Set<PIP> currPIPs = new HashSet<>();
             RouteNode lcb = e.getKey();
             assert(lcb.getParent() == null);
@@ -642,12 +636,12 @@ public class UltraScaleClockRouting {
         RouteNode vrouteDown = currNode != null ? new RouteNode(currNode.getTile(), currNode.getWire()) : null;
 
         // Find the target leaf clock buffers (LCBs), route from horizontal dist lines to those
-        Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = GlobalSignalRouting.getLCBPinMappings(clkPins, getNodeStatus);
+        Map<RouteNode, List<SitePinInst>> lcbMappings = GlobalSignalRouting.getLCBPinMappings(clkPins, getNodeStatus);
 
         final int finalCentroidY = centroidY;
         Set<ClockRegion> newUpClockRegions = new HashSet<>();
         Set<ClockRegion> newDownClockRegions = new HashSet<>();
-        for (Map.Entry<RouteNode, ArrayList<SitePinInst>> e : lcbMappings.entrySet()) {
+        for (Map.Entry<RouteNode, List<SitePinInst>> e : lcbMappings.entrySet()) {
             RouteNode lcb = e.getKey();
             ClockRegion currCR = lcb.getTile().getClockRegion();
             startingPoints.computeIfAbsent(currCR, n -> {

@@ -39,7 +39,6 @@ import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
@@ -364,9 +363,12 @@ public class RWRoute{
         }
     }
 
-    // Determines whether a node is not preserved nor reserved and
-    // thus available for use
-    protected NodeStatus getNodeStatus(Net net, Node node) {
+    /**
+     * Returns whether a node is (a) available for use,
+     * (b) already in used by this net, (c) unavailable
+     * @return NodeStatus result.
+     */
+    protected NodeStatus getGlobalRoutingNodeStatus(Net net, Node node) {
         if (routingGraph.isPreserved(node)) {
             // Node is preserved by any net -- for base RWRoute, we don't need
             // to check which net it is because global/static nets are routed
@@ -391,7 +393,7 @@ public class RWRoute{
         if (clkNets.isEmpty())
             return;
         for (Net clk : clkNets) {
-            Function<Node, NodeStatus> gns = (node) -> getNodeStatus(clk, node);
+            Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(clk, node);
             if (routesToSinkINTTiles != null) {
                 // routes clock nets with references of partial routes
                 System.out.println("INFO: Routing " + clk.getPins().size() + " pins of clock " + clk + " (timing-driven)");
@@ -476,12 +478,12 @@ public class RWRoute{
             System.out.println("INFO: Routing " + pins.size() + " pins of " + staticNet);
 
             Function<Node, NodeStatus> gns = (node) -> {
-                // Check that this node is not needed by the other static net
+                // Check that this node is not needed by a pin on the other static net
                 Net preservedNet = preservedStaticNodes.get(node);
                 if (preservedNet != null && preservedNet != staticNet) {
                     return NodeStatus.UNAVAILABLE;
                 }
-                return getNodeStatus(staticNet, node);
+                return getGlobalRoutingNodeStatus(staticNet, node);
             };
             GlobalSignalRouting.routeStaticNet(staticNet, gns, design, routethruHelper);
 

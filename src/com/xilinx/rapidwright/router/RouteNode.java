@@ -25,7 +25,6 @@ package com.xilinx.rapidwright.router;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
 
@@ -45,7 +44,7 @@ import com.xilinx.rapidwright.device.Wire;
  * @author Chris Lavin
  *
  */
-public class RouteNode{
+public class RouteNode implements Comparable<RouteNode> {
 
     /** This is the tile where the node/wire resides */
     public Tile tile;
@@ -247,9 +246,9 @@ public class RouteNode{
     /**
      * The priority queue will use strictly the cost to evaluate priority
      */
-    //public int compareTo(RouteNode node) {
-    //    return this.cost - node.cost;
-    //}
+    public int compareTo(RouteNode node) {
+       return this.cost - node.cost;
+    }
 
     /**
      * Quick check to see if the tile/wire combination match this node.
@@ -414,8 +413,7 @@ public class RouteNode{
      * their lowest cost (see {@link RouteNode#getCost()}).
      * @return The newly created priority queue.
      */
-    public static PriorityQueue<RouteNode> getPriorityQueue() {
-        return new PriorityQueue<RouteNode>(16, new Comparator<RouteNode>() {
-            public int compare(RouteNode i, RouteNode j) {return i.getCost() - j.getCost();}});
+    public static PriorityQueue<RouteNode> createPriorityQueue() {
+        return new PriorityQueue<>(16);
     }
 }

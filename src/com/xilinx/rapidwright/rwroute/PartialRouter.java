@@ -189,12 +189,10 @@ public class PartialRouter extends RWRoute {
         return numCrossingSLRs;
     }
 
-    // Determines whether a node is (a) available for use,
-    // (b) already in used by this net, (c) unavailable
     @Override
-    protected NodeStatus getNodeStatus(Net net, Node node) {
-        // In softPreserve mode, allow the clock router to all nets -- including those already
-        // preserved by another net
+    protected NodeStatus getGlobalRoutingNodeStatus(Net net, Node node) {
+        // In softPreserve mode, allow global router to use all nodes -- including
+        // those already preserved by another net
 
         Net preservedNet = routingGraph.getPreservedNet(node);
         if (preservedNet != null) {

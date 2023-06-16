@@ -298,19 +298,15 @@ public class SLRCrosserGenerator {
      * @param rxClkWire The INT tile wire name to use for RX-based clocks
      * @return A map from LCB node to a list of all clk sinks to be driven by the LCB.
      */
-    public static Map<RouteNode,ArrayList<SitePinInst>> getLCBPinMappings(Net clk, String txClkWire, String rxClkWire) {
-        Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = new HashMap<>();
+    public static Map<RouteNode, List<SitePinInst>> getLCBPinMappings(Net clk, String txClkWire, String rxClkWire) {
+        Map<RouteNode, List<SitePinInst>> lcbMappings = new HashMap<>();
         for (SitePinInst p : clk.getPins()) {
             if (p.isOutPin()) continue;
             String wireName = p.getName().startsWith("TX") ? txClkWire : rxClkWire;
             Node n = Node.getNode(p.getSite().getIntTile(), p.getSite().getIntTile().getWireIndex(wireName));
-            RouteNode rn = new RouteNode(n.getTile(), n.getWire());
-            ArrayList<SitePinInst> sinks = lcbMappings.get(rn);
-            if (sinks == null) {
-                sinks = new ArrayList<>();
-                lcbMappings.put(rn, sinks);
-            }
-            sinks.add(p);
+            RouteNode rn = new RouteNode(n);
+            lcbMappings.computeIfAbsent(rn, (k) -> new ArrayList<>())
+                    .add(p);
         }
         return lcbMappings;
     }
@@ -366,6 +362,9 @@ public class SLRCrosserGenerator {
             }
         }
 
+        // All nodes are available for clock routing
+        Function<Node, NodeStatus> getNodeStatus = (node) -> NodeStatus.AVAILABLE;
+
         List<RouteNode> distLines = new ArrayList<>();
         for (ClockRegion centroid : centroids) {
             RouteNode centroidRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid);
@@ -380,8 +379,6 @@ public class SLRCrosserGenerator {
                 clockRegions.add(centroid.getNeighborClockRegion(1, 0));
             }
 
-            Function<Node, NodeStatus> getNodeStatus = (node) -> NodeStatus.AVAILABLE;
-
             Map<ClockRegion, RouteNode> vertDistLines = UltraScaleClockRouting.routeCentroidToVerticalDistributionLines(clk,
                     centroidDistNode,
                     clockRegions,
@@ -394,14 +391,13 @@ public class SLRCrosserGenerator {
 
 
         // Separate sinks by RX/TX LCBs
-        Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk, txClkWire, rxClkWire);
+        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk, txClkWire, rxClkWire);
 
         // Route from clock distribution to all 4 LCBs
         UltraScaleClockRouting.routeDistributionToLCBs(clk, distLines, lcbMappings.keySet());
 
         // Route from each LCB to laguna sites
-        Function<Node, NodeStatus> isPreservedNode = (node) -> NodeStatus.AVAILABLE;
-        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, isPreservedNode);
+        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
 
         // Update clocking delays to improve SLR crossing hold issues
         clk.improveSLRClockingDelay(txClkWire, rxClkWire);

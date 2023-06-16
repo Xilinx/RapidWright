@@ -96,7 +96,7 @@ public class GlobalSignalRouting {
         }
         clk.setPIPs(clkPIPs);
 
-        Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
+        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
 
         UltraScaleClockRouting.routeToLCBs(clk, getStartingPoint(horDistributionLines, device), lcbMappings.keySet());
 
@@ -204,7 +204,7 @@ public class GlobalSignalRouting {
         List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
         if (downLines != null) upDownDistLines.addAll(downLines);
 
-        Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
+        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
         UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
 
         UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
@@ -245,7 +245,7 @@ public class GlobalSignalRouting {
      * @param clk The clock net in question.
      * @return A map between leaf clock buffer nodes and sink SitePinInsts.
      */
-    public static Map<RouteNode, ArrayList<SitePinInst>> getLCBPinMappings(Net clk) {
+    public static Map<RouteNode, List<SitePinInst>> getLCBPinMappings(Net clk) {
         return getLCBPinMappings(clk.getPins(), (n) -> NodeStatus.AVAILABLE);
     }
 
@@ -254,9 +254,9 @@ public class GlobalSignalRouting {
      * @param clkPins List of clock pins in question.
      * @return A map between leaf clock buffer nodes and sink SitePinInsts.
      */
-    public static Map<RouteNode, ArrayList<SitePinInst>> getLCBPinMappings(List<SitePinInst> clkPins,
-                                                                           Function<Node,NodeStatus> getNodeStatus) {
-        Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = new HashMap<>();
+    public static Map<RouteNode, List<SitePinInst>> getLCBPinMappings(List<SitePinInst> clkPins,
+                                                                      Function<Node,NodeStatus> getNodeStatus) {
+        Map<RouteNode, List<SitePinInst>> lcbMappings = new HashMap<>();
         List<Node> lcbCandidates = new ArrayList<>();
         Set<Node> usedLcbs = new HashSet<>();
         for (SitePinInst p : clkPins) {
