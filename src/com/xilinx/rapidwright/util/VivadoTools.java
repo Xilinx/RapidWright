@@ -84,7 +84,10 @@ public class VivadoTools {
     public static List<String> runTcl(Path outputLog, Path tclScript, boolean verbose) {
         final String vivadoCmd = "vivado -log " + outputLog.toString() + " -mode batch -source "
                 + tclScript.toString();
-        FileTools.runCommand(vivadoCmd, verbose);
+        Integer exitCode = FileTools.runCommand(vivadoCmd, verbose);
+        if (exitCode != 0) {
+            throw new RuntimeException("Exited with " + exitCode);
+        }
         return FileTools.getLinesFromTextFile(outputLog.toString());
     }
 
