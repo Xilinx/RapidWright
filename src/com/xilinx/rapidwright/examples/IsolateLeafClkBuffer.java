@@ -76,7 +76,7 @@ public class IsolateLeafClkBuffer {
 
     private static List<PIP> findRoute(RouteNode src, RouteNode snk, Set<RouteNode> used) {
         Set<RouteNode> visited = new HashSet<>();
-        Queue<RouteNode> q = RouteNode.getPriorityQueue();
+        Queue<RouteNode> q = RouteNode.createPriorityQueue();
 
         RouteNode curr = null;
         q.add(src);

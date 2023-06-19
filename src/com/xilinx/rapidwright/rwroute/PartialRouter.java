@@ -190,15 +190,30 @@ public class PartialRouter extends RWRoute {
     }
 
     @Override
+    protected NodeStatus getGlobalRoutingNodeStatus(Net net, Node node) {
+        // In softPreserve mode, allow global router to use all nodes -- including
+        // those already preserved by another net
+
+        Net preservedNet = routingGraph.getPreservedNet(node);
+        if (preservedNet != null) {
+            // Unavailable only if it isn't carrying the net undergoing routing
+            return preservedNet == net ? NodeStatus.INUSE :
+                          softPreserve ? NodeStatus.AVAILABLE :
+                                         NodeStatus.UNAVAILABLE;
+        }
+
+        // A RouteNode will only be created if the net is necessary for
+        // a to-be-routed connection
+        return softPreserve || routingGraph.getNode(node) == null ? NodeStatus.AVAILABLE
+                                                                  : NodeStatus.UNAVAILABLE;
+    }
+
+    @Override
     protected void routeGlobalClkNets() {
         if (clkNets.isEmpty())
             return;
 
-        // In softPreserve mode, allow the clock router to all nets -- including those already
-        // preserved by another net
-        Predicate<Node> isPreservedNode = softPreserve ? (node) -> false
-                                                       : routingGraph::isPreserved;
-        routeGlobalClkNets(isPreservedNode);
+        super.routeGlobalClkNets();
 
         if (softPreserve) {
             // Even though routeGlobalClkNets() has called preserveNet() for all clkNets,
@@ -237,27 +252,6 @@ public class PartialRouter extends RWRoute {
                 }
             }
         }
-    }
-
-    @Override
-    protected void routeStaticNets() {
-        if (staticNetAndRoutingTargets.isEmpty())
-            return;
-
-        Net gnd = design.getGndNet();
-        Net vcc = design.getVccNet();
-
-        // Copy existing PIPs
-        List<PIP> gndPips = (staticNetAndRoutingTargets.containsKey(gnd)) ? new ArrayList<>(gnd.getPIPs()) : Collections.emptyList();
-        List<PIP> vccPips = (staticNetAndRoutingTargets.containsKey(vcc)) ? new ArrayList<>(vcc.getPIPs()) : Collections.emptyList();
-
-        // Perform static net routing (which does no rip-up)
-        super.routeStaticNets();
-
-        // Since super.routeStaticNets() clobbers the PIPs list,
-        // re-insert those existing PIPs
-        gnd.getPIPs().addAll(gndPips);
-        vcc.getPIPs().addAll(vccPips);
     }
 
     @Override
@@ -325,20 +319,29 @@ public class PartialRouter extends RWRoute {
         if (!clk.hasPIPs()) {
             super.addGlobalClkRoutingTargets(clk);
         } else {
-            preserveNet(clk, false);
+            preserveNet(clk, true);
             numPreservedClks++;
-            numPreservedRoutableNets++;
+
+            List<SitePinInst> clkPins = netToPins.get(clk);
+            if (clkPins != null && !clkPins.isEmpty()) {
+                clkNets.add(clk);
+                numPreservedRoutableNets++;
+            } else {
+                numNotNeedingRoutingNets++;
+            }
         }
     }
 
     @Override
     protected void addStaticNetRoutingTargets(Net staticNet) {
-        preserveNet(staticNet, false);
+        if (staticNet.hasPIPs()) {
+            preserveNet(staticNet, true);
+            numPreservedStaticNets++;
+        }
 
         List<SitePinInst> staticPins = netToPins.get(staticNet);
         if (staticPins == null || staticPins.isEmpty()) {
             if (staticNet.hasPIPs()) {
-                numPreservedStaticNets++;
                 numPreservedRoutableNets++;
             } else {
                 numNotNeedingRoutingNets++;
