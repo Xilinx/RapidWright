@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
 public class TestTile {
     @Test
     public void testGetWireConnections() {
-        Device dev = Device.getDevice("xcku025");
+        Device dev = Device.getDevice("xcku035");
         Tile tile = dev.getTile("RCLK_CLE_M_L_X31Y149");
         Assertions.assertDoesNotThrow(() -> tile.getWireConnections(8));
     }
