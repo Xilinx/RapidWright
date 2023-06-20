@@ -984,7 +984,7 @@ public class TestDesignTools {
     @Test
     public void testPlaceCell() {
         //test a design that already contains a Carry4 cell
-        Design d0 = Design.readCheckpoint("bug709.dcp");
+        Design d0 = RapidWrightDCP.loadDCP("bug709.dcp");
         //test a blank design
         Design d1 = new Design("blankDesign", d0.getPartName());
 
