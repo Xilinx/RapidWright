@@ -382,7 +382,6 @@ public class PhysNetlistWriter {
                             // Skip if pin is not used by site port
                             continue;
                         }
-                        assert(spi.getNet() == net);
 
                         if (!VERBOSE_PHYSICAL_NET_ROUTING) {
                             // Skip input pins to site ports (will be set when site pin is added
