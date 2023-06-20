@@ -23,13 +23,25 @@
 package com.xilinx.rapidwright.device;
 
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 public class TestTile {
-    @Test
-    public void testGetWireConnections() {
-        Device dev = Device.getDevice("xcku035");
+    @ParameterizedTest
+    @CsvSource({
+            "xcku025,true",
+            "xcku035,false"
+    })
+    public void testGetWireConnections(String partName, boolean expectThrow) {
+        Device dev = Device.getDevice(partName);
         Tile tile = dev.getTile("RCLK_CLE_M_L_X31Y149");
-        Assertions.assertDoesNotThrow(() -> tile.getWireConnections(8));
+        Executable e = () -> tile.getWireConnections(8);
+        if (expectThrow) {
+            // xcku025 is known to fail
+            Assertions.assertThrows(NullPointerException.class, e);
+        } else {
+            Assertions.assertDoesNotThrow(e);
+        }
     }
 }
