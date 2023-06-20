@@ -402,7 +402,7 @@ public class PhysNetlistWriter {
                                 continue;
                             }
                         } else {
-                            assert(bel.isStaticSource());
+                            assert(bel.isStaticSource() || net.getName().equals(Net.USED_NET));
                         }
                     } else {
                         assert(bel.getBELClass() == BELClass.PORT);
