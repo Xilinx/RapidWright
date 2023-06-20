@@ -35,6 +35,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.edif.EDIFCell;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -978,5 +979,32 @@ public class TestDesignTools {
             numSitewires += si.getSiteWiresFromNet(gnd).size();
         }
         Assertions.assertEquals(31, numSitewires);
+    }
+
+    @Test
+    public void testPlaceCell() {
+        //test a design that already contains a Carry4 cell
+        Design d0 = RapidWrightDCP.loadDCP("bug709.dcp");
+        //test a blank design
+        Design d1 = new Design("blankDesign", d0.getPartName());
+
+        Design designs[] = {d0, d1};
+
+        for(Design d : designs) {
+            // Test placing a cell created from a Unisim
+            Cell c0 = d.createCell("cell0", Unisim.CARRY4);
+            // Test placing a cell created from a EDIFCELL reference
+            EDIFCell ec = Design.getUnisimCell(Unisim.CARRY4);
+            Cell c1 = d.createCell("cell1", ec);
+
+            Cell cells[] = {c0, c1};
+
+            for(Cell c : cells) {
+                DesignTools.placeCell(c, d);
+                Assertions.assertFalse(c.getPinMappingsP2L().isEmpty());
+                Assertions.assertNotNull(c.getBEL());
+                Assertions.assertNotNull(c.getSiteInst());
+            }
+        }
     }
 }
