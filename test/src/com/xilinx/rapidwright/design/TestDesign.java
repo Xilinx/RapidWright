@@ -29,8 +29,6 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
 
-import com.xilinx.rapidwright.edif.EDIFHierCellInst;
-import com.xilinx.rapidwright.edif.EDIFHierNet;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -43,6 +41,8 @@ import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
@@ -54,6 +54,7 @@ import com.xilinx.rapidwright.util.Job;
 import com.xilinx.rapidwright.util.JobQueue;
 import com.xilinx.rapidwright.util.LocalJob;
 import com.xilinx.rapidwright.util.ParallelismTools;
+import com.xilinx.rapidwright.util.ReplaceEDIFInDCP;
 
 /**
  * Test that we can write a DCP file and read it back in. We currently don't have a way to check designs for equality,
@@ -306,5 +307,21 @@ public class TestDesign {
         }
         final int extraNets = 5; // {a, b, o, GLOBAL_USEDNET, GLOBAL_LOGIC0}
         Assertions.assertEquals(design.getNets().size(), 2 + extraNets);
+    }
+    
+    @Test
+    public void testReplaceEDIFInDCP(@TempDir Path tempDir) {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        String unreadable = "picoblaze_ooc_X10Y235_unreadable_edif";
+        Path readableEDIF = tempDir.resolve(unreadable + ".edf");
+        design.getNetlist().exportEDIF(readableEDIF.toString());
+        Path unreadableDCP = RapidWrightDCP.getPath(unreadable + ".dcp");
+        Path readableDCP = tempDir.resolve("picoblaze_ooc_X10Y235.dcp");
+
+        ReplaceEDIFInDCP.main(new String[] {unreadableDCP.toString(), readableEDIF.toString(), readableDCP.toString()});
+        Design.readCheckpoint(readableDCP);
+        
+        ReplaceEDIFInDCP.main(new String[] {unreadableDCP.toString(), readableEDIF.toString()});
+        Design.readCheckpoint(unreadableDCP);
     }
 }
