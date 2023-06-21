@@ -24,7 +24,6 @@
 package com.xilinx.rapidwright.router;
 
 import java.io.File;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -98,7 +97,7 @@ public class RouteThruHelper {
     private void init() {
         String serializedFileName = getSerializedFileName(device.getName());
         routeThrus = new HashMap<TileTypeEnum,HashSet<Integer>>();
-        if (new File(serializedFileName).exists() && !FileTools.isFileGzipped(Path.of(serializedFileName))) {
+        if (new File(serializedFileName).exists() && !FileTools.isFileGzipped(Paths.get(serializedFileName))) {
             readFile();
             return;
         }

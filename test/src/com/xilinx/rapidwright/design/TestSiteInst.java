@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -33,6 +33,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+
+import java.util.Arrays;
 
 public class TestSiteInst {
 
@@ -346,5 +348,21 @@ public class TestSiteInst {
         }
         Assertions.assertNull(si.getNetFromSiteWire("EX"));
         Assertions.assertNull(si.getSitePinInst("EX"));
+    }
+
+    @Test
+    public void testUnrouteSiteUpdatesNetSiteInsts() {
+        Design d = new Design("testUnrouteSiteUpdatesNetSiteInsts", Device.AWS_F1);
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
+
+        Net net = d.createNet("net");
+        net.createPin("A_O", si);
+        net.createPin("AMUX", si);
+
+        Assertions.assertIterableEquals(net.getSiteInsts(), Arrays.asList(si));
+
+        si.unrouteSite();
+
+        Assertions.assertTrue(net.getSiteInsts().isEmpty());
     }
 }
