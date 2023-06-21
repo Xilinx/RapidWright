@@ -3,7 +3,7 @@
  * Copyright (c) 2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Chris Lavin, Xilinx Research Labs.
+ * Author: Hayden Cook, AMD Research and Advanced Development.
  *
  * This file is part of RapidWright.
  *
