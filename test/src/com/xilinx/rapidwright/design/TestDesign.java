@@ -29,8 +29,6 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
 
-import com.xilinx.rapidwright.edif.EDIFHierCellInst;
-import com.xilinx.rapidwright.edif.EDIFHierNet;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -43,6 +41,8 @@ import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
@@ -82,6 +82,7 @@ public class TestDesign {
     @Test
     public void checkDcpRoundtrip(@TempDir Path tempDir) throws IOException {
         //Keep a reference to the device to avoid it being garbage collected during testcase execution
+        @SuppressWarnings("unused")
         Device device = Device.getDevice(DEVICE);
 
         //Use separate files for writing/reading so we can identify leaking file handles by filename
