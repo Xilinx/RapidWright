@@ -51,7 +51,7 @@ public class ReportRouteStatusResult {
      *
      * @param log the List<String> of lines to be analyzed
      */
-    ReportRouteStatusResult(List<String> log) {
+    public ReportRouteStatusResult(List<String> log) {
         logicalNets = parseLog(log, "# of logical nets");
         netsNotNeedingRouting = parseLog(log, "# of nets not needing routing");
         internallyRoutedNets = parseLog(log, "# of internally routed nets");
