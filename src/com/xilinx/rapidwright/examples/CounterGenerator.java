@@ -35,6 +35,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.Port;
 import com.xilinx.rapidwright.design.PortType;
+import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
@@ -57,13 +58,13 @@ import static com.xilinx.rapidwright.examples.ArithmeticGenerator.INPUT_B_NAME;
 import static com.xilinx.rapidwright.examples.ArithmeticGenerator.RESULT_NAME;
 
 /**
- * A class that implements a counter using the
+ * A class that implements a parameterizable counter for an UltraScale+ device using the
+ * {@link com.xilinx.rapidwright.examples.AddSubGenerator} as a submodule to increment/decrement the counter.
  */
-public class ParamCounterModule {
+public class CounterGenerator {
 
     protected static final String PART_OPT = "p";
     protected static final String DESIGN_NAME_OPT = "d";
-    protected static final String ADDER_NAME_OPT = "a";
     protected static final String OUT_DCP_OPT = "o";
     protected static final String CLK_NAME_OPT = "c";
     protected static final String CLK_CONSTRAINT_OPT = "x";
@@ -74,14 +75,113 @@ public class ParamCounterModule {
     private static final String COUNT_DOWN_OPT = "m";
     private static final String STEP_OPT = "t";
     private static final String INIT_OPT = "i";
+    private static final String ADDER_NAME = "adder";
+    private static final String SUBTRACTOR_NAME = "subtractor";
+
+    /**
+     * A method that implements a parameterizable counter for an UltraScale+ device using the
+     * {@link com.xilinx.rapidwright.examples.AddSubGenerator#createAddSub(Design, Site, int, boolean, boolean, boolean,
+     * boolean)} method to create an adder/subtractor submodule to increment/decrement the counter.
+     * @param d Parent design to contain the counter
+     * @param origin Anchor site to place the counter
+     * @param width Width of the counter
+     * @param initValue The initial value of the counter
+     * @param step How much the value of the counter changes each clock cycle
+     * @param countDown The counter will count down if true, and count up otherwise
+     * @return
+     */
+    public static PBlock createCounter(Design d, Site origin, int width, long initValue, long step, boolean countDown) {
+        String adderName = countDown ? SUBTRACTOR_NAME :ADDER_NAME;
+        Design adderDesign = new Design(adderName, d.getPartName());
+
+        adderDesign.setAutoIOBuffers(false);
+
+        boolean inputFlop = false;
+        boolean outputFlop = true;
+        boolean route = false;
+        PBlock footprint = AddSubGenerator.createAddSub(adderDesign, origin, width, countDown, inputFlop, outputFlop,
+                route);
+
+        //set init value on counter
+        String initBin = Long.toBinaryString(initValue);
+        String initFormatStr = "%0"+(width-initBin.length()) + "d%s";
+        initBin = String.format(initFormatStr,  0, initBin);
+        String invInitBin = new StringBuilder(initBin).reverse().toString();
+        for (int i = 0; i < width; i++) {
+            EDIFCellInst ff = adderDesign.getTopEDIFCell().getCellInst("sum"+i);
+            ff.addProperty("INIT", "1'b" + invInitBin.charAt(i));
+        }
+
+        // Create module for adder and populate ports
+        Module adderModule = new Module(adderDesign);
+        for (Net net : adderModule.getNets()) {
+            EDIFNet edifNet = net.getLogicalNet();
+            for(EDIFPortInst portInst : edifNet.getPortInsts()) {
+                if (portInst.isTopLevelPort()) {
+                    Port port = new Port(portInst.getName(), net.getPins());
+                    port.setType(PortType.SIGNAL);
+                    adderModule.addPort(port);
+                }
+            }
+        }
+
+        // Add adder as submodule and replace.
+        ModuleInst mi = d.createModuleInst(adderName, adderModule);
+        mi.placeOnOriginalAnchor();
+
+        EDIFCell cntrTop = d.getTopEDIFCell();
+        String bus = "["+(width-1)+":0]";
+
+        // Create port for the output of the counter.
+        EDIFPort outPort = cntrTop.createPort("cntrOut" + bus, EDIFDirection.OUTPUT, width);
+
+        // Get gnd and static nets to connect to b port of adder
+        EDIFNet gnd = EDIFTools.getStaticNet(NetType.GND, cntrTop, d.getNetlist());
+        EDIFNet vcc = EDIFTools.getStaticNet(NetType.VCC, cntrTop, d.getNetlist());
+
+        //busNames for adder ports
+        String aBusName = adderDesign.getTopEDIFCell().getPort(INPUT_A_NAME + "[").getBusName();
+        String bBusName = adderDesign.getTopEDIFCell().getPort(INPUT_B_NAME + "[").getBusName();
+        String resultBusName = adderDesign.getTopEDIFCell().getPort(RESULT_NAME + "[").getBusName();
+
+        String stepBin = Long.toBinaryString(step);
+        String stepFormatStr = "%0"+(width-stepBin.length()) + "d%s";
+        stepBin = String.format(stepFormatStr,  0, stepBin);
+        EDIFCellInst adderCell = cntrTop.getCellInst(adderName);
+
+        //connect ports of adder modules
+        for(int i = 0; i<width; i++) {
+            mi.connect(resultBusName, i, mi, aBusName, i); // Connect output of adder to one of the input ports of adder
+            EDIFNet net = cntrTop.getNet(mi.getNewNetName(resultBusName, i, mi, aBusName, i));
+            net.createPortInst(outPort, i); // Attach output port to newly created top-level net
+
+            // Connect this bit of b port on adder to either vcc or gnd depending on current bit of the step parameter
+            EDIFNet staticNet = stepBin.charAt(i) == '1' ? vcc : gnd;
+            staticNet.createPortInst(bBusName, i, adderCell);
+        }
+
+        // Create top level ports for clk, ce, and rst lines and connect to equivalent adder ports
+        EDIFPort clkPort = cntrTop.createPort("clk", EDIFDirection.INPUT, 1);
+        EDIFPort cePort = cntrTop.createPort("ce", EDIFDirection.INPUT, 1);
+        EDIFPort rstPort = cntrTop.createPort("rst", EDIFDirection.INPUT, 1);
+        mi.connect("clk",  mi, "clk");
+        mi.connect("ce",  mi, "ce");
+        mi.connect("rst",  mi, "rst");
+        // The names of the newly created, top level nets can are simply the module name + "_" + the port name.
+        cntrTop.getNet(adderName + "_clk").createPortInst(clkPort);
+        cntrTop.getNet(adderName + "_ce").createPortInst(cePort);
+        cntrTop.getNet(adderName + "_rst").createPortInst(rstPort);
+
+        // Return pblock of adder (which should be the same as the counter as no new sites were created).
+        return footprint;
+    }
 
     private static OptionParser createOptionParser() {
         // Defaults
         String partName = "xczu3eg-sbva484-1-i";
         String designName = "counter";
-        String adderName = "adder";
         String outputDCPFileName = System.getProperty("user.dir") + File.separator + designName +".dcp";
-        String clkName = "clk";
+//        String clkName = "clk";
         double clkPeriodConstraint = 1.291; // 775 MHz
         int width = 32;
         String sliceSite = "SLICE_X3Y3";
@@ -92,11 +192,9 @@ public class ParamCounterModule {
 
         OptionParser p = new OptionParser() {{
             accepts(PART_OPT).withOptionalArg().defaultsTo(partName).describedAs("UltraScale+ Part Name");
-            accepts(DESIGN_NAME_OPT).withOptionalArg().defaultsTo(designName).describedAs("Design Name");
-            accepts(DESIGN_NAME_OPT).withOptionalArg().defaultsTo(designName).describedAs("Name of counter design");
-            accepts(ADDER_NAME_OPT).withOptionalArg().defaultsTo(adderName).describedAs("Name of adder submodule");
+            accepts(DESIGN_NAME_OPT).withOptionalArg().defaultsTo(designName).describedAs("Name of the top counter design");
             accepts(OUT_DCP_OPT).withOptionalArg().defaultsTo(outputDCPFileName).describedAs("Output DCP File Name");
-            accepts(CLK_NAME_OPT).withOptionalArg().defaultsTo(clkName).describedAs("Clk net name");
+//            accepts(CLK_NAME_OPT).withOptionalArg().defaultsTo(clkName).describedAs("Clk Port name");
             accepts(CLK_CONSTRAINT_OPT).withOptionalArg().ofType(Double.class).defaultsTo(clkPeriodConstraint).describedAs("Clk period constraint (ns)");
             accepts(WIDTH_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(width).describedAs("Operand width");
             accepts(SLICE_SITES_OPT).withOptionalArg().defaultsTo(sliceSite).describedAs("Lower left slice to be used for adder/subtracter");
@@ -124,6 +222,9 @@ public class ParamCounterModule {
         }
     }
 
+    /**
+     * Implements a parameterizable counter for an UltraScale+ device and routes the counter using RWRoute.
+     */
     public static void main(String[] args) {
         // Extract program options
         OptionParser p = createOptionParser();
@@ -138,9 +239,7 @@ public class ParamCounterModule {
 
         String partName = (String) opts.valueOf(PART_OPT);
         String designName = (String) opts.valueOf(DESIGN_NAME_OPT);
-        String adderName = (String) opts.valueOf(ADDER_NAME_OPT);
         String outputDCPFileName = (String) opts.valueOf(OUT_DCP_OPT);
-        String clkName = (String) opts.valueOf(CLK_NAME_OPT);
         double clkPeriodConstraint = (double) opts.valueOf(CLK_CONSTRAINT_OPT);
         int width = (int) opts.valueOf(WIDTH_OPT);
         String sliceName = (String) opts.valueOf(SLICE_SITES_OPT);
@@ -148,103 +247,22 @@ public class ParamCounterModule {
         long step = (long) opts.valueOf(STEP_OPT);
         long initValue = (long) opts.valueOf(INIT_OPT);
 
-
         // Perform some error checking on inputs
         Part part = PartNameTools.getPart(partName);
         if (part == null || part.isSeries7()) {
             throw new RuntimeException("ERROR: Invalid/unsupport part " + partName + ".");
         }
 
-        if (verbose) t.stop().start("Create Add/Sub Module");
-
-        Design adderDesign = new Design(adderName, partName);
-
-        adderDesign.setAutoIOBuffers(false);
-        Device dev = adderDesign.getDevice();
-
-        Site slice = dev.getSite(sliceName);
-        AddSubGenerator.createAddSub(adderDesign, slice, width, countDown, false, true, false);
-
-        //set init value on counter
-        String initBin = Long.toBinaryString(initValue);
-        String initFormatStr = "%0"+(width-initBin.length()) + "d%s";
-        initBin = String.format(initFormatStr,  0, initBin);
-        String invInitBin = new StringBuilder(initBin).reverse().toString();
-        for (int i = 0; i < width; i++) {
-            EDIFCellInst ff = adderDesign.getTopEDIFCell().getCellInst("sum"+i);
-            ff.addProperty("INIT", "1'b" + invInitBin.charAt(i));
-        }
-
-        // Add a clock constraint
-        String tcl = "create_clock -name "+clkName+" -period "+clkPeriodConstraint+" [get_ports "+clkName+"]";
-        adderDesign.addXDCConstraint(ConstraintGroup.LATE,tcl);
-        adderDesign.setAutoIOBuffers(false);
-
-        // Create module for adder and populate ports
-        Module adderModule = new Module(adderDesign);
-        for (Net net : adderModule.getNets()) {
-            EDIFNet edifNet = net.getLogicalNet();
-            for(EDIFPortInst portInst : edifNet.getPortInsts()) {
-                if (portInst.isTopLevelPort()) {
-                    Port port = new Port(portInst.getName(), net.getPins());
-                    port.setType(PortType.SIGNAL);
-                    adderModule.addPort(port);
-                }
-            }
-        }
-
         if (verbose) t.stop().start("Create Counter");
 
-        // Create design for counter
         Design cntrDesign = new Design(designName, partName);
+        Site slice = cntrDesign.getDevice().getSite(sliceName);
+
+        createCounter(cntrDesign, slice, width, initValue, step, countDown);
+
+        String tcl = "create_clock -name clk -period "+clkPeriodConstraint+" [get_ports clk]";
+        cntrDesign.addXDCConstraint(ConstraintGroup.LATE,tcl);
         cntrDesign.setAutoIOBuffers(false);
-
-        // Add adder as submodule and replace.
-        ModuleInst mi = cntrDesign.createModuleInst(adderName, adderModule);
-        mi.placeOnOriginalAnchor();
-
-        EDIFCell cntrTop = cntrDesign.getTopEDIFCell();
-        String bus = "["+(width-1)+":0]";
-
-        // Create port for the output of the counter.
-        EDIFPort outPort = cntrTop.createPort("cntrOut" + bus, EDIFDirection.OUTPUT, width);
-
-        // Get gnd and static nets to connect to b port of adder
-        EDIFNet gnd = EDIFTools.getStaticNet(NetType.GND, cntrTop, cntrDesign.getNetlist());
-        EDIFNet vcc = EDIFTools.getStaticNet(NetType.VCC, cntrTop, cntrDesign.getNetlist());
-
-        //busNames for adder ports
-        String aBusName = adderDesign.getTopEDIFCell().getPort(INPUT_A_NAME + "[").getBusName();
-        String bBusName = adderDesign.getTopEDIFCell().getPort(INPUT_B_NAME + "[").getBusName();
-        String resultBusName = adderDesign.getTopEDIFCell().getPort(RESULT_NAME + "[").getBusName();
-
-        String stepBin = Long.toBinaryString(step);
-        String stepFormatStr = "%0"+(width-stepBin.length()) + "d%s";
-        stepBin = String.format(stepFormatStr,  0, stepBin);
-        EDIFCellInst adderCell = cntrTop.getCellInst(adderName);
-
-        //connect ports of adder modules
-        for(int i = 0; i<width; i++) {
-            mi.connect(resultBusName, i, mi, aBusName, i); // Connect output of adder to one of the input ports of adder
-            EDIFNet net = cntrTop.getNet(mi.getNewNetName(resultBusName, i, mi, aBusName, i));
-            net.createPortInst(outPort, i); // Attach output port to newly created top-level net
-
-            // Connect this bit of b port on adder to either vcc or gnd depending on current bit of the step parameter
-            EDIFNet staticNet = stepBin.charAt(i) == '1' ? vcc : gnd;
-            staticNet.createPortInst(bBusName, i, adderCell);
-        }
-
-        // Create top level ports for clk, ce, and rst lines and connect to equivalent adder ports
-        EDIFPort clkPort = cntrTop.createPort(clkName, EDIFDirection.INPUT, 1);
-        EDIFPort cePort = cntrTop.createPort("ce", EDIFDirection.INPUT, 1);
-        EDIFPort rstPort = cntrTop.createPort("rst", EDIFDirection.INPUT, 1);
-        mi.connect(clkName,  mi, clkName);
-        mi.connect("ce",  mi, "ce");
-        mi.connect("rst",  mi, "rst");
-        // The names of the newly created, top level nets can are simply the module name + "_" + the port name.
-        cntrTop.getNet(adderName + "_" + clkName).createPortInst(clkPort);
-        cntrTop.getNet(adderName + "_ce").createPortInst(cePort);
-        cntrTop.getNet(adderName + "_rst").createPortInst(rstPort);
 
         if (verbose) t.stop().start("Route Design");
 
