@@ -382,7 +382,6 @@ public class PhysNetlistWriter {
                             // Skip if pin is not used by site port
                             continue;
                         }
-                        assert(spi.getNet() == net);
 
                         if (!VERBOSE_PHYSICAL_NET_ROUTING) {
                             // Skip input pins to site ports (will be set when site pin is added
@@ -402,7 +401,7 @@ public class PhysNetlistWriter {
                                 continue;
                             }
                         } else {
-                            assert(bel.isStaticSource());
+                            assert(bel.isStaticSource() || net.getName().equals(Net.USED_NET));
                         }
                     } else {
                         assert(bel.getBELClass() == BELClass.PORT);
