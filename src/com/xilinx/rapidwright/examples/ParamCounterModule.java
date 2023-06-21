@@ -111,7 +111,7 @@ public class ParamCounterModule {
     }
 
     private static void printHelp(OptionParser p) {
-        MessageGenerator.printHeader("Adder/Subtractor Generator");
+        MessageGenerator.printHeader("Counter Generator");
         System.out.println("This RapidWright program creates a placed and routed DCP for UltraScale+ devices that contains \n"
                 + "imported into UltraScale+ designs to perform addition or subtraction.  See \n"
                 + "RapidWright documentation for more information.\n");
