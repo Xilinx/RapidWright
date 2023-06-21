@@ -116,7 +116,7 @@ public class ParamCounterModule {
                 + "imported into UltraScale+ designs to perform addition or subtraction.  See \n"
                 + "RapidWright documentation for more information.\n");
         try {
-            p.accepts(OUT_DCP_OPT).withOptionalArg().defaultsTo("slr_crosser.dcp").describedAs("Output DCP File Name");
+            p.accepts(OUT_DCP_OPT).withOptionalArg().defaultsTo("counter.dcp").describedAs("Output DCP File Name");
             p.printHelpOn(System.out);
 
         } catch (IOException e) {
