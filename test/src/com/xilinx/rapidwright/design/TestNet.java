@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -64,6 +65,27 @@ public class TestNet {
 
         Assertions.assertTrue(net.setPins(pins));
         Assertions.assertNull(net.getSource());
+        Assertions.assertNull(net.getAlternateSource());
+    }
+
+    @Test
+    void testSetPinsAltSourceAsPrimary() {
+        Design d = new Design("testSetPinsAltSourceAsPrimary", Device.KCU105);
+        SiteInst si = d.createSiteInst("SLICE_X32Y73");
+
+        SitePinInst spiA = new SitePinInst("A_O", si);
+        SitePinInst spiAMUX = new SitePinInst("AMUX", si);
+
+        Net net = d.createNet("net");
+        net.addPin(spiA);
+        net.addPin(spiAMUX);
+
+        // Set the alternate source as the primary source now
+        List<SitePinInst> pins = new ArrayList<>();
+        pins.add(spiAMUX);
+
+        Assertions.assertTrue(net.setPins(pins));
+        Assertions.assertEquals(spiAMUX, net.getSource());
         Assertions.assertNull(net.getAlternateSource());
     }
 
