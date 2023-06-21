@@ -1,7 +1,7 @@
 /*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
  * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -38,7 +38,9 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
-import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -686,8 +688,15 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
             physicalNet = getCorrespondingNet(p0);
             if (physicalNet == null) {
                 // This is a pass-thru situation and we'll need to create the net
-                EDIFCell top = getCellInst().getParentCell();
-                String newNetName = super.getNewNetName(portName, busIndex0, other, otherPortName, busIndex1);
+                List<String> passThruPortNames = p0.getPassThruPortNames();
+                if (passThruPortNames.isEmpty()) {
+                    throw new RuntimeException("Expecting a pass-thru situation");
+                }
+
+                // Use the net connected to the first pass-thru port
+                EDIFPortInst firstPassThruPortInst = getCellInst().getPortInst(passThruPortNames.get(0));
+                EDIFNet firstPassThruPortInstNet = firstPassThruPortInst.getInternalNet();
+                String newNetName = getName() + EDIFTools.EDIF_HIER_SEP + firstPassThruPortInstNet.getName();
                 physicalNet = design.createNet(newNetName);
             }
             inPort = p1;
