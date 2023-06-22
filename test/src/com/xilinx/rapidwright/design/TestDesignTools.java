@@ -36,6 +36,9 @@ import java.util.Set;
 
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFPort;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -259,6 +262,26 @@ public class TestDesignTools {
             Assertions.assertNotNull(spi);
             Assertions.assertTrue(netPins.contains(spi));
         }
+    }
+
+    @Test
+    public void testCreateMissingSitePinInstsNoConnectedNode() {
+        Device device = Device.getDevice("xcvu3p");
+        Design design = new Design("testDesign", device.getName());
+        Cell cell = design.createAndPlaceCell("cell", Unisim.INBUF, "IOB_X0Y116/INBUF");
+
+        EDIFCell topCell = design.getNetlist().getTopCell();
+        EDIFPort pi = topCell.createPort("pi", EDIFDirection.INPUT, 1);
+        EDIFNet edifNet = topCell.createNet("net");
+        edifNet.createPortInst(pi);
+        EDIFPortInst pad = edifNet.createPortInst("PAD", cell);
+
+        Net net = design.createNet(edifNet.getName());
+        BELPin bp = cell.getBELPin(pad);
+        cell.getSiteInst().routeIntraSiteNet(net, bp, bp);
+        DesignTools.createMissingSitePinInsts(design, net);
+
+        Assertions.assertTrue(net.getPins().isEmpty());
     }
 
     @Test
