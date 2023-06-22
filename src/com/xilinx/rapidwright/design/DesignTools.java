@@ -1908,7 +1908,13 @@ public class DesignTools {
                     if (sitePinName == null) continue;
                     SitePinInst newPin = si.getSitePinInst(sitePinName);
                     if (newPin != null) continue;
-                    newPin = net.createPin(sitePinName, c.getSiteInst());
+                    int wireIndex = si.getSite().getTileWireIndexFromPinName(sitePinName);
+                    if (Node.getNode(si.getTile(), wireIndex) == null) {
+                        // It's possible that the discovered site pin (e.g. as for some IOB tiles)
+                        // is not actually connected to the global routing fabric; skip those
+                        continue;
+                    }
+                    newPin = net.createPin(sitePinName, si);
                     if (newPin != null) newPins.add(newPin);
                 }
             }
