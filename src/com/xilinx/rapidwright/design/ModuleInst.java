@@ -687,17 +687,14 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         if (p0.isOutPort()) {
             physicalNet = getCorrespondingNet(p0);
             if (physicalNet == null) {
-                // This is a pass-thru situation and we'll need to create the net
+                // This must be a pass-thru situation
                 List<String> passThruPortNames = p0.getPassThruPortNames();
                 if (passThruPortNames.isEmpty()) {
                     throw new RuntimeException("Expecting a pass-thru situation");
                 }
-
-                // Use the net connected to the first pass-thru port
-                EDIFPortInst firstPassThruPortInst = getCellInst().getPortInst(passThruPortNames.get(0));
-                EDIFNet firstPassThruPortInstNet = firstPassThruPortInst.getInternalNet();
-                String newNetName = getName() + EDIFTools.EDIF_HIER_SEP + firstPassThruPortInstNet.getName();
-                physicalNet = design.createNet(newNetName);
+                // No updates needed for the physical netlist -- with the logical netlist
+                // already updated, the two physical nets will be interpreted as aliases
+                return;
             }
             inPort = p1;
             modInst = other;
