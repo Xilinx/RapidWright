@@ -29,8 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.xilinx.rapidwright.design.Unisim;
-import com.xilinx.rapidwright.device.Series;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -39,10 +37,12 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IOStandard;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.edif.compare.EDIFNetlistComparator;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
@@ -520,5 +520,22 @@ class TestEDIFNetlist {
 
         netlist.expandMacroUnisims(Series.UltraScalePlus);
         Assertions.assertEquals(cellType, obufds.getCellType().getName());
+    }
+
+    @Test
+    public void testMultiLevelMacroExpansion() {
+        final EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
+        netlist.setDevice(Device.getDevice(Device.AWS_F1));
+
+        EDIFCell top = netlist.getTopCell();
+
+        EDIFCellInst iobufdse3 = top.createChildCellInst("IOBUFDSE3_expandme",
+                netlist.getHDIPrimitive(Unisim.IOBUFDSE3));
+        netlist.getHDIPrimitivesLibrary().addCell(iobufdse3.getCellType());
+
+        netlist.expandMacroUnisims(Series.UltraScalePlus);
+
+        EDIFCellInst childInst = iobufdse3.getCellType().getCellInst("OBUFTDS");
+        Assertions.assertEquals(childInst.getCellType().getName(), "OBUFTDS_DCIEN_DUAL_BUF");
     }
 }
