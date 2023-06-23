@@ -42,11 +42,15 @@ public class TestReplaceEDIFInDCP {
         design.getNetlist().exportEDIF(readableEDIF.toString());
         Path unreadableDCP = RapidWrightDCP.getPath(unreadable + ".dcp");
         Path readableDCP = tempDir.resolve("picoblaze_ooc_X10Y235.dcp");
-        
+
+        // Replace for new DCP
         ReplaceEDIFInDCP.main(new String[] { unreadableDCP.toString(), readableEDIF.toString(), readableDCP.toString() });
         Design.readCheckpoint(readableDCP);
 
-        ReplaceEDIFInDCP.main(new String[] { unreadableDCP.toString(), readableEDIF.toString() });
-        Design.readCheckpoint(unreadableDCP);
+        // Replace in-place
+        Path unreadableDCPCopy = tempDir.resolve(unreadableDCP.getFileName());
+        FileTools.copyFile(unreadableDCP.toString(), unreadableDCPCopy.toString());
+        ReplaceEDIFInDCP.main(new String[] { unreadableDCPCopy.toString(), readableEDIF.toString() });
+        Design.readCheckpoint(unreadableDCPCopy);
     }
 }
