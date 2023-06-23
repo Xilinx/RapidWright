@@ -537,5 +537,6 @@ class TestEDIFNetlist {
 
         EDIFCellInst childInst = iobufdse3.getCellType().getCellInst("OBUFTDS");
         Assertions.assertEquals(childInst.getCellType().getName(), "OBUFTDS_DCIEN_DUAL_BUF");
+        Assertions.assertEquals(childInst.getCellType().getCellInsts().size(), 3);
     }
 }
