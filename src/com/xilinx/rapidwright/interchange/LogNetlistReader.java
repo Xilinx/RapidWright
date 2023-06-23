@@ -138,7 +138,7 @@ public class LogNetlistReader {
     /**
      * Extracts the property map information from a Cap'n Proto reader object and deserializes it
      * into an EDIF property map object. The reverse function is
-     * {@link LogNetlistWriter#populatePropertyMap(Supplier<PropertyMap.Builder>, EDIFPropertyObject)}
+     * {@link LogNetlistWriter#populatePropertyMap(Supplier, EDIFPropertyObject)}
      * @param reader The Cap'n Proto reader object
      * @param obj The EDIF map object
      */

@@ -268,7 +268,6 @@ public class StringTools {
      * 
      * @param items      The list of Strings to print
      * @param ps         The stream to send the printed Strings to.
-     * @param maxColumns A maximum limit to the number columns to print
      */
     public static void printListInColumns(List<String> items, PrintStream ps) {
         printListInColumns(items, ps, Integer.MAX_VALUE);

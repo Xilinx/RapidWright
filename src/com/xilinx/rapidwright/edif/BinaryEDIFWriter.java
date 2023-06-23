@@ -156,7 +156,7 @@ public class BinaryEDIFWriter {
      * @param o The object write
      * @param os The Kryo-based output stream
      * @param stringMap Map of String to enumeration integers
-     * @see #readEDIFObject(EDIFPropertyObject, Output, Map)
+     * @see BinaryEDIFReader#readEDIFObject(EDIFPropertyObject, Input, String[])
      */
     private static void writeEDIFObject(EDIFPropertyObject o, Output os, Map<String,Integer> stringMap) {
         boolean hasProperties = o.getPropertiesMap().size() > 0;
