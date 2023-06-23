@@ -181,7 +181,6 @@ public class CounterGenerator {
         String partName = "xczu3eg-sbva484-1-i";
         String designName = "counter";
         String outputDCPFileName = System.getProperty("user.dir") + File.separator + designName +".dcp";
-//        String clkName = "clk";
         double clkPeriodConstraint = 1.291; // 775 MHz
         int width = 32;
         String sliceSite = "SLICE_X3Y3";
