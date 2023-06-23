@@ -193,7 +193,6 @@ public class CounterGenerator {
             accepts(PART_OPT).withOptionalArg().defaultsTo(partName).describedAs("UltraScale+ Part Name");
             accepts(DESIGN_NAME_OPT).withOptionalArg().defaultsTo(designName).describedAs("Name of the top counter design");
             accepts(OUT_DCP_OPT).withOptionalArg().defaultsTo(outputDCPFileName).describedAs("Output DCP File Name");
-//            accepts(CLK_NAME_OPT).withOptionalArg().defaultsTo(clkName).describedAs("Clk Port name");
             accepts(CLK_CONSTRAINT_OPT).withOptionalArg().ofType(Double.class).defaultsTo(clkPeriodConstraint).describedAs("Clk period constraint (ns)");
             accepts(WIDTH_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(width).describedAs("Operand width");
             accepts(SLICE_SITES_OPT).withOptionalArg().defaultsTo(sliceSite).describedAs("Lower left slice to be used for adder/subtracter");
