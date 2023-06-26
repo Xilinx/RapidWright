@@ -249,8 +249,8 @@ public class EDIFCell extends EDIFPropertyObject {
 
     /**
      * Gets a port by bus name (see {@link EDIFPort#getBusName()}). Multi-bit ports
-     * need to have closing square bracket and range removed (for example: "bus[3:0]"
-     * -> "bus[". See {@link EDIFCell#addPort(EDIFPort)} for more information.
+     * need to have closing square bracket and range removed (for example:
+     * {@code "bus[3:0]" -> "bus["}). See {@link EDIFCell#addPort(EDIFPort)} for more information.
      *
      * @param name Bus name (ends with '[' to represent a bussed port) of the
      *                port to get. Single bit ports use their entire name.

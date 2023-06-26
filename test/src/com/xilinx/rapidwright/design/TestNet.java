@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -64,6 +65,27 @@ public class TestNet {
 
         Assertions.assertTrue(net.setPins(pins));
         Assertions.assertNull(net.getSource());
+        Assertions.assertNull(net.getAlternateSource());
+    }
+
+    @Test
+    void testSetPinsAltSourceAsPrimary() {
+        Design d = new Design("testSetPinsAltSourceAsPrimary", Device.KCU105);
+        SiteInst si = d.createSiteInst("SLICE_X32Y73");
+
+        SitePinInst spiA = new SitePinInst("A_O", si);
+        SitePinInst spiAMUX = new SitePinInst("AMUX", si);
+
+        Net net = d.createNet("net");
+        net.addPin(spiA);
+        net.addPin(spiAMUX);
+
+        // Set the alternate source as the primary source now
+        List<SitePinInst> pins = new ArrayList<>();
+        pins.add(spiAMUX);
+
+        Assertions.assertTrue(net.setPins(pins));
+        Assertions.assertEquals(spiAMUX, net.getSource());
         Assertions.assertNull(net.getAlternateSource());
     }
 
@@ -153,6 +175,28 @@ public class TestNet {
         Assertions.assertEquals(gndNet.getPIPs().size(), 4);
         gndNet.removePin(b6, true);
         Assertions.assertEquals(gndNet.getPIPs().size(), 0);
+    }
+
+    @Test
+    public void testRemovePinSiteInsts() {
+        Design d = new Design("testRemovePinSiteInsts", Device.AWS_F1);
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
+
+        Net net = d.createNet("net");
+        SitePinInst spi1 = net.createPin("A_O", si);
+        SitePinInst spi2 = net.createPin("AMUX", si);
+
+        Assertions.assertIterableEquals(net.getSiteInsts(), Arrays.asList(si));
+
+        // Remove first of two pins
+        net.removePin(spi1);
+
+        Assertions.assertIterableEquals(net.getSiteInsts(), Arrays.asList(si));
+
+        // Remove second of two pins
+        net.removePin(spi2);
+
+        Assertions.assertTrue(net.getSiteInsts().isEmpty());
     }
 
     @Test

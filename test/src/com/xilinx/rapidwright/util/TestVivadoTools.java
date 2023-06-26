@@ -45,6 +45,16 @@ public class TestVivadoTools {
         Assertions.assertTrue(results.get(0).contains("Exiting Vivado"));
     }
 
+    @Test
+    public void testRunTclCmdThrowsException(@TempDir Path tempDir) {
+        Assumptions.assumeTrue(FileTools.isVivadoOnPath());
+
+        RuntimeException ex = Assertions.assertThrows(RuntimeException.class,
+                () -> VivadoTools.runTcl(tempDir.resolve("outputLog.log"), "exit 1", true)
+        );
+        Assertions.assertEquals("Vivado exited with code: 1", ex.getMessage());
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void testReportRouteStatus(boolean fromDisk) {

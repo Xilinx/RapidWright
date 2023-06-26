@@ -27,6 +27,7 @@ package com.xilinx.rapidwright.rwroute;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -37,7 +38,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Set;
-import java.util.function.Predicate;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
@@ -363,6 +364,25 @@ public class RWRoute{
     }
 
     /**
+     * Returns whether a node is (a) available for use,
+     * (b) already in used by this net, (c) unavailable
+     * @return NodeStatus result.
+     */
+    protected NodeStatus getGlobalRoutingNodeStatus(Net net, Node node) {
+        if (routingGraph.isPreserved(node)) {
+            // Node is preserved by any net -- for base RWRoute, we don't need
+            // to check which net it is because global/static nets are routed
+            // fully in one pass
+            return NodeStatus.UNAVAILABLE;
+        }
+
+        // A RouteNode will only be created if the net is necessary for
+        // a to-be-routed connection
+        return routingGraph.getNode(node) == null ? NodeStatus.AVAILABLE
+                                                  : NodeStatus.UNAVAILABLE;
+    }
+
+    /**
      * Routes clock nets by default or in a different way when corresponding timing info supplied.
      * NOTE: For an unrouted design, its clock nets must not contain any PIPs or nodes, i.e, completely unrouted.
      * Otherwise, there could be a critical warning of clock routing results, when loading the routed design into Vivado.
@@ -372,21 +392,16 @@ public class RWRoute{
     protected void routeGlobalClkNets() {
         if (clkNets.isEmpty())
             return;
-        Predicate<Node> isPreservedNode = (node) -> false;
-        routeGlobalClkNets(isPreservedNode);
-    }
-
-    protected void routeGlobalClkNets(Predicate<Node> isPreservedNode) {
-        System.out.println("INFO: Route clock nets");
         for (Net clk : clkNets) {
+            Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(clk, node);
             if (routesToSinkINTTiles != null) {
                 // routes clock nets with references of partial routes
-                System.out.println("INFO: Route with clock route and timing data");
-                GlobalSignalRouting.routeClkWithPartialRoutes(clk, routesToSinkINTTiles, design.getDevice(), isPreservedNode);
+                System.out.println("INFO: Routing " + clk.getPins().size() + " pins of clock " + clk + " (timing-driven)");
+                GlobalSignalRouting.routeClkWithPartialRoutes(clk, routesToSinkINTTiles, design.getDevice(), gns);
             } else {
                 // routes clock nets from scratch
-                System.out.println("INFO: Route with symmetric non-timing-driven clock router");
-                GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), isPreservedNode);
+                System.out.println("INFO: Routing " + clk.getPins().size() + " pins of clock " + clk + " (non timing-driven)");
+                GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), gns);
             }
             preserveNet(clk, false);
         }
@@ -421,7 +436,7 @@ public class RWRoute{
     }
 
     /**
-     * Routes static nets with preserved resources list supplied to avoid conflicting nodes.
+     * Routes static nets.
      */
     protected void routeStaticNets() {
         if (staticNetAndRoutingTargets.isEmpty())
@@ -437,16 +452,21 @@ public class RWRoute{
             }
         }
 
-        // Annotate all static pin nodes with the net they're associated with to ensure that one
-        // net cannot unknowingly use a node needed by the other net
-        Map<Node,Net> preservedStaticNodes = new HashMap<>();
-        for (Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
-            Net staticNet = e.getKey();
-            for (SitePinInst sink : e.getValue()) {
-                Node node = sink.getConnectedNode();
-                preservedStaticNodes.put(node, staticNet);
-                assert(!routingGraph.isPreserved(node));
+        Map<Node,Net> preservedStaticNodes;
+        if (staticNetAndRoutingTargets.size() > 1) {
+            // Annotate all static pin nodes with the net they're associated with to ensure that one
+            // net cannot unknowingly use a node needed by the other net
+            preservedStaticNodes = new HashMap<>();
+            for (Map.Entry<Net, List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
+                Net staticNet = e.getKey();
+                for (SitePinInst sink : e.getValue()) {
+                    Node node = sink.getConnectedNode();
+                    preservedStaticNodes.put(node, staticNet);
+                    assert (!routingGraph.isPreserved(node));
+                }
             }
+        } else {
+            preservedStaticNodes = Collections.emptyMap();
         }
 
         // Iterate through both static nets in a stable order (not guaranteed by IdentityHashMap)
@@ -456,30 +476,16 @@ public class RWRoute{
                 continue;
             }
             System.out.println("INFO: Routing " + pins.size() + " pins of " + staticNet);
-            GlobalSignalRouting.routeStaticNet(staticNet,
-                    // Lambda to determine whether a node is (a) available for use,
-                    // (b) already in use for this static net, (c) unavailable
-                    (node) -> {
-                        Net preservedNet = routingGraph.getPreservedNet(node);
-                        if (preservedNet != null) {
-                            // If one is present, it is unavailable only if it isn't carrying
-                            // the net undergoing routing
-                            return preservedNet == staticNet ? NodeStatus.INUSE
-                                    : NodeStatus.UNAVAILABLE;
-                        }
 
-                        // Check that this node is not needed by the other static net
-                        preservedNet = preservedStaticNodes.get(node);
-                        if (preservedNet != null && preservedNet != staticNet) {
-                            return NodeStatus.UNAVAILABLE;
-                        }
-
-                        // A RouteNode will only be created if the net is necessary for
-                        // a to-be-routed (non-static) connection
-                        return routingGraph.getNode(node) == null ? NodeStatus.AVAILABLE
-                                : NodeStatus.UNAVAILABLE;
-                    },
-                    design, routethruHelper);
+            Function<Node, NodeStatus> gns = (node) -> {
+                // Check that this node is not needed by a pin on the other static net
+                Net preservedNet = preservedStaticNodes.get(node);
+                if (preservedNet != null && preservedNet != staticNet) {
+                    return NodeStatus.UNAVAILABLE;
+                }
+                return getGlobalRoutingNodeStatus(staticNet, node);
+            };
+            GlobalSignalRouting.routeStaticNet(staticNet, gns, design, routethruHelper);
 
             preserveNet(staticNet, false);
         }

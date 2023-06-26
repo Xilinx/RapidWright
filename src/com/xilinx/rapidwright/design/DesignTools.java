@@ -1616,9 +1616,13 @@ public class DesignTools {
             }
         }
 
+        Set<String> updatedNets = new HashSet<>();
         for (Entry<Net, String> e : netsToUpdate.entrySet()) {
             EDIFHierNet newSource = d.getNetlist().getHierNetFromName(e.getValue());
-            DesignTools.updateNetName(d, e.getKey(), newSource.getNet(), e.getValue());
+            Net updatedNet = DesignTools.updateNetName(d, e.getKey(), newSource.getNet(), e.getValue());
+            if (updatedNet != null) {
+                updatedNets.add(updatedNet.getName());
+            }
         }
 
         t.stop().start("cleanup siteinsts");
@@ -1626,7 +1630,8 @@ public class DesignTools {
         for (SiteInst siteInst : touched) {
             for (SitePinInst pin : siteInst.getSitePinInsts()) {
                 Net net = pin.getNet();
-                if (net == null) continue;
+                if (net == null || updatedNets.contains(net.getName()))
+                    continue;
                 pinsToRemove.computeIfAbsent(net, ($) -> new HashSet<>()).add(pin);
             }
         }
@@ -1652,14 +1657,14 @@ public class DesignTools {
     }
 
     /**
-     * Helper method for makeBlackBox().  When cutting out nets that used
-     * to be source'd from something inside a black box, the net names
-     * need to be updated.
-     * @param d The current design
-     * @param currNet Current net that requires a name change
+     * Helper method for makeBlackBox(). When cutting out nets that used to be
+     * source'd from something inside a black box, the net names need to be updated.
+     * 
+     * @param d         The current design
+     * @param currNet   Current net that requires a name change
      * @param newSource The source net (probably a pin on the black box)
-     * @param newName New name for the net
-     * @return True if the operation succeeded, false otherwise.
+     * @param newName   New name for the net
+     * @return A reference to the newly updated/renamed net.
      */
     private static Net updateNetName(Design d, Net currNet, EDIFNet newSource, String newName) {
         List<PIP> pips = currNet.getPIPs();
@@ -1908,7 +1913,13 @@ public class DesignTools {
                     if (sitePinName == null) continue;
                     SitePinInst newPin = si.getSitePinInst(sitePinName);
                     if (newPin != null) continue;
-                    newPin = net.createPin(sitePinName, c.getSiteInst());
+                    int wireIndex = si.getSite().getTileWireIndexFromPinName(sitePinName);
+                    if (Node.getNode(si.getTile(), wireIndex) == null) {
+                        // It's possible that the discovered site pin (e.g. as for some IOB tiles)
+                        // is not actually connected to the global routing fabric; skip those
+                        continue;
+                    }
+                    newPin = net.createPin(sitePinName, si);
                     if (newPin != null) newPins.add(newPin);
                 }
             }
@@ -3373,7 +3384,7 @@ public class DesignTools {
      * Determine if a Net is driven by a hierarchical port, created as part of an out-of-context
      * synthesis flow, for example.
      * @param net Net to examine.
-     * @returns True if driven by a hierport.
+     * @return True if driven by a hierport.
      */
     public static boolean isNetDrivenByHierPort(Net net) {
         if (net.getSource() != null) {
