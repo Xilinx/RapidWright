@@ -24,6 +24,17 @@ package com.xilinx.rapidwright.examples;
 
 import java.nio.file.Path;
 
+import com.xilinx.rapidwright.design.ConstraintGroup;
+import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.rwroute.RWRoute;
+import org.capnproto.PrimitiveList;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -57,52 +68,62 @@ public class TestExamples {
      * as to keep the original example simple and unencumbered.
      */
     @ParameterizedTest
-    @CsvSource({ "xc7z020clg400-1", // Device.ZYNQ_Z1
-            "xcku040-ffva1156-2-e", // Device.KCU105
-    })
-    public void testHelloWorld(String device, @TempDir Path tempDir) {
-        // Create a new empty design using the given device part
-        Design d = new Design("HelloWorld", device);
+    @CsvSource({
+            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 32, 0, 1, false",
+            "xcku040-ffva1156-2-e,  SLICE_X1Y1, 32, 0, 1, false", // Device.KCU105
+            "xczu3eg-sbva484-1-i, SLICE_X0Y0, 32, 0, 1, false",
+            "xczu3eg-sbva484-1-i, SLICE_X0Y147, 32, 0, 1, false",
+            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 1, 0, 1, false",
+            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 65, 0, 1, false",
+            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 32, 1024, 1, true",
+            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 32, 0, 1024, false",
 
-        String ioStd = "LVCMOS33";
-        String[] iobLocs = { "D19", "D20", "R14" };
-        if (device.equals(Device.KCU105)) {
-            ioStd = "LVCMOS18";
-            iobLocs = new String[] { "AE10", "AF9", "AP8" };
+    })
+    public void testCounterGenerator(String device,  String sliceName, int width, long initValue, long step,
+                                     boolean countDown,  @TempDir Path tempDir) {
+        Design d = new Design("test", device);
+        Site slice = d.getDevice().getSite(sliceName);
+        CounterGenerator.createCounter(d, slice, width, initValue, step, countDown);
+
+        String submoduleName = countDown ? "subtractor" : "adder";
+        EDIFCellInst submoduleInst = d.getTopEDIFCell().getCellInst(submoduleName);
+        EDIFCell submodule = submoduleInst.getCellType();
+        int numOfAddLuts = 0;
+        int numOfSumFFs = 0;
+        for (EDIFCellInst eci : submodule.getCellInsts()) {
+            if (eci.getName().startsWith("add")) {
+                numOfAddLuts++;
+                String initString = eci.getProperty("INIT").getValue();
+                Assertions.assertTrue(countDown ? initString.endsWith("h9") : initString.endsWith("h6"));
+            }
+            else if (eci.getName().startsWith("sum")) {
+                numOfSumFFs++;
+                int idx = Integer.parseInt(eci.getName().substring(3));
+                int bit = (int) ((initValue >> idx) & 1);
+                int init = Integer.parseInt(eci.getProperty("INIT").getValue().substring(3));
+                Assertions.assertEquals(bit, init);
+            }
         }
 
-        // Create all the design elements (LUT2, and 3 IOs)
-        Cell and2 = d.createAndPlaceCell("and2", Unisim.AND2, "SLICE_X100Y100/A6LUT");
-        Cell button0 = d.createAndPlaceIOB("button0", PinType.IN, iobLocs[0], ioStd);
-        Cell button1 = d.createAndPlaceIOB("button1", PinType.IN, iobLocs[1], ioStd);
-        Cell led0 = d.createAndPlaceIOB("led0", PinType.OUT, iobLocs[2], ioStd);
+        Assertions.assertEquals(width, numOfAddLuts);
+        Assertions.assertEquals(width, numOfSumFFs);
 
-        // Connect Button 0 to the LUT2 input I0
-        Net net0 = d.createNet("button0_IBUF");
-        net0.connect(button0, "O");
-        net0.connect(and2, "I0");
+        String stepBin = new StringBuilder(Long.toBinaryString(step)).reverse().toString();
 
-        // Connect Button 1 to the LUT2 input I1
-        Net net1 = d.createNet("button1_IBUF");
-        net1.connect(button1, "O");
-        net1.connect(and2, "I1");
+        EDIFNet gnd = EDIFTools.getStaticNet(NetType.GND, d.getTopEDIFCell(), d.getNetlist());
+        EDIFNet vcc = EDIFTools.getStaticNet(NetType.VCC, d.getTopEDIFCell(), d.getNetlist());
 
-        // Connect the LUT2 (AND2) to the LED IO
-        Net net2 = d.createNet("and2");
-        net2.connect(and2, "O");
-        net2.connect(led0, "I");
+        for(int i = 0; i < stepBin.length(); i++) {
+            char bit = stepBin.charAt(i);
+            EDIFNet constNet = bit == '0' ? gnd : vcc;
+            EDIFPortInst pi = submoduleInst.getPortInst("B["+i+"]");
+            EDIFNet net = pi.getNet();
+            Assertions.assertEquals(pi.getNet(), constNet);
+        }
 
-        // Route site internal nets
-        d.routeSites();
-
-        // Route nets between sites
-        new Router(d).routeDesign();
-
-        // Save our work in a Checkpoint
-        Path helloWorldDCP = tempDir.resolve("HelloWorld.dcp");
-        d.writeCheckpoint(helloWorldDCP);
-
-        // Confirm the DCP can be reloaded
-        Design.readCheckpoint(helloWorldDCP);
+        String countDownOpt = countDown ? "-m" : "";
+        CounterGenerator.main(new String[]{"-p", device, "-o", tempDir.toAbsolutePath().toString()+"/test.dcp", "-w",
+                Integer.toString(width), "-s", sliceName, "-t", Long.toString(step), "-i", Long.toString(initValue),
+                countDownOpt});
     }
 }

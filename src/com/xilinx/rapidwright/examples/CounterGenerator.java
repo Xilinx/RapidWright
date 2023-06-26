@@ -104,8 +104,10 @@ public class CounterGenerator {
 
         //set init value on counter
         String initBin = Long.toBinaryString(initValue);
-        String initFormatStr = "%0"+(width-initBin.length()) + "d%s";
-        initBin = String.format(initFormatStr,  0, initBin);
+        if ((width-initBin.length()) > 0) {
+            String initFormatStr = "%0" + (width - initBin.length()) + "d%s";
+            initBin = String.format(initFormatStr, 0, initBin);
+        }
         String invInitBin = new StringBuilder(initBin).reverse().toString();
         for (int i = 0; i < width; i++) {
             EDIFCellInst ff = adderDesign.getTopEDIFCell().getCellInst("sum"+i);
@@ -145,8 +147,10 @@ public class CounterGenerator {
         String resultBusName = adderDesign.getTopEDIFCell().getPort(RESULT_NAME + "[").getBusName();
 
         String stepBin = Long.toBinaryString(step);
-        String stepFormatStr = "%0"+(width-stepBin.length()) + "d%s";
-        stepBin = String.format(stepFormatStr,  0, stepBin);
+        if ((width-stepBin.length())>0) {
+            String stepFormatStr = "%0" + (width - stepBin.length()) + "d%s";
+            stepBin = String.format(stepFormatStr, 0, stepBin);
+        }
         EDIFCellInst adderCell = cntrTop.getCellInst(adderName);
 
         //connect ports of adder modules
