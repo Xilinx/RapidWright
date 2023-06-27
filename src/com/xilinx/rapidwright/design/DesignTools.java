@@ -1520,6 +1520,7 @@ public class DesignTools {
         while (!queue.isEmpty()) {
             BELPin currPin = queue.poll();
             visited.add(currPin);
+            BELPin unrouteSegment = null;
             for (BELPin pin : siteInst.getSiteWirePins(currPin.getSiteWireIndex())) {
                 if (currPin == pin || visited.contains(pin)) {
                     visited.add(pin);
@@ -1589,6 +1590,7 @@ public class DesignTools {
                             Net otherNet = siteInst.getNetFromSiteWire(otherPin.getSiteWireName());
                             if (otherNet != null && net.getName().equals(otherNet.getName())) {
                                 queue.add(otherPin);
+                                unrouteSegment = otherPin;
                             } else {
                                 // site routing terminates here or is invalid
                             }
@@ -1598,12 +1600,21 @@ public class DesignTools {
                 }
                 visited.add(pin);
             }
+            if (unrouteSegment != null && unrouteSegment.isInput() && internalSinks.size() == 0) {
+                // Unroute this branch of the sitePIP
+                Net otherNet = siteInst.getNetFromSiteWire(unrouteSegment.getSiteWireName());
+                siteInst.unrouteIntraSiteNet(unrouteSegment, belPin);
+                siteInst.routeIntraSiteNet(otherNet, unrouteSegment, unrouteSegment);
+            }
         }
 
         List<SitePinInst> sitePinsToRemove = new ArrayList<>();
 
         // This net is routed internally to the site
         for (BELPin internalTerminal : internalTerminals) {
+            if (internalTerminal.isOutput() && internalSinks.size() > 0) {
+                continue;
+            }
             if (belPin.isOutput()) {
                 siteInst.unrouteIntraSiteNet(belPin, internalTerminal);
             } else {
@@ -1620,7 +1631,7 @@ public class DesignTools {
                     } else {
                         siteInst.unrouteIntraSiteNet(belPin, pin.getBELPin());
                     }
-                } else if (sitePinName.endsWith("MUX")) {
+                } else if (sitePinName.endsWith("MUX") || sitePinName.endsWith("_O")) {
                     // Vivado leaves dual output *MUX partially routed, unroute the site for this
                     // MUX pin
                     siteInst.unrouteIntraSiteNet(belPin, siteInst.getBELPin(sitePinName, sitePinName));
@@ -1726,9 +1737,10 @@ public class DesignTools {
         t.stop().start("cleanup t-prims");
 
         // Clean up any cells from Transformed Prims
+        String keepPrefix = hierarchicalCell.getFullHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP;
         for (SiteInst si : d.getSiteInsts()) {
             for (Cell c : si.getCells()) {
-                if (c.getName().startsWith(hierarchicalCell.getFullHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP)) {
+                if (c.getName().startsWith(keepPrefix)) {
                     touched.add(si);
                 }
             }
@@ -1736,8 +1748,8 @@ public class DesignTools {
 
         t.stop().start("new net names");
 
-        Map<Net, String> netsToUpdate = new HashMap<>();
         // Update black box output nets with new net names (those with sinks inside the black box)
+        Map<Net, String> netsToUpdate = new HashMap<>();
         for (Net n : d.getNets()) {
             String newName = boundaryNets.get(n.getName());
             if (newName != null) {
@@ -1745,6 +1757,7 @@ public class DesignTools {
             }
         }
 
+        // Rename nets if source was removed
         Set<String> netsToKeep = new HashSet<>();
         for (Entry<Net, String> e : netsToUpdate.entrySet()) {
             EDIFHierNet newSource = d.getNetlist().getHierNetFromName(e.getValue());
@@ -1756,12 +1769,32 @@ public class DesignTools {
 
         t.stop().start("cleanup siteinsts");
 
-        batchRemoveSitePins(pinsToRemove, true);
-
-        // Clean up SiteInst objects
+        // Keep track of site instances to remove, but keep those supplying static sources
+        List<SiteInst> siteInstsToRemove = new ArrayList<>();
         for (SiteInst siteInst : touched) {
             if (siteInst.getCells().size() == 0) {
-                d.removeSiteInst(siteInst);
+                boolean keepSiteInst = false;
+                for (SitePinInst pin : siteInst.getSitePinInsts()) {
+                    if (pin.getNet() != null && pin.getNet().isStaticNet() && pin.isOutPin()) {
+                        keepSiteInst = true;
+                    }
+                }
+                if (!keepSiteInst) {
+                    siteInstsToRemove.add(siteInst);
+                }
+            }
+        }
+
+        batchRemoveSitePins(pinsToRemove, true);
+
+        for (SiteInst siteInst : siteInstsToRemove) {
+            d.removeSiteInst(siteInst);
+        }
+
+        // Remove any stray stubs on any remaining nets
+        for (Net net : pinsToRemove.keySet()) {
+            if (net.getFanOut() == 0 && net.hasPIPs()) {
+                net.unroute();
             }
         }
 
