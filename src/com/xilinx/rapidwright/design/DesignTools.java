@@ -1492,7 +1492,7 @@ public class DesignTools {
     }
 
     /**
-     * Unroutes the site routing connected the provided cell's logical pin.
+     * Unroutes the site routing connected to the provided cell's logical pin.
      * Preserves other parts of the net if used by other sinks in the site if an
      * input. For the unrouting to be successful, this method depends on the site
      * routing to be consistent.
@@ -1500,7 +1500,7 @@ public class DesignTools {
      * @param cell           The cell of the pin
      * @param logicalPinName The logical pin name source or sink to have routing
      *                       removed.
-     * @returns The set of site pins removed as part of the unroute.
+     * @returns A list of site pins that should be removed as part of the unroute.
      */
     public static List<SitePinInst> unrouteCellPinSiteRouting(Cell cell, String logicalPinName) {
         String physPinName = cell.getPhysicalPinMapping(logicalPinName);
