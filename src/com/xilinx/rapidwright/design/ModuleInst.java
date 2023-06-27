@@ -524,9 +524,9 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
 
 
     /**
-     * Get's the corresponding port on the module by name.
+     * Gets the corresponding port on the module by name.
      * @param name
-     * @return
+     * @return Port object.
      */
     public Port getPort(String name) {
         return module.getPort(name);

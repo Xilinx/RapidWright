@@ -1745,7 +1745,6 @@ public class DesignTools {
             }
         }
 
-
         Set<String> netsToKeep = new HashSet<>();
         for (Entry<Net, String> e : netsToUpdate.entrySet()) {
             EDIFHierNet newSource = d.getNetlist().getHierNetFromName(e.getValue());
@@ -3508,7 +3507,7 @@ public class DesignTools {
      * Determine if a Net is driven by a hierarchical port, created as part of an out-of-context
      * synthesis flow, for example.
      * @param net Net to examine.
-     * @returns True if driven by a hierport.
+     * @return True if driven by a hierport.
      */
     public static boolean isNetDrivenByHierPort(Net net) {
         if (net.getSource() != null) {

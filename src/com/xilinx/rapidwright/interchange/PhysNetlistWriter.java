@@ -84,9 +84,9 @@ public class PhysNetlistWriter {
     /**
      * The Interchange format allows for all physical routing resources to be
      * specified, e.g.
-     *   ... -> PIP -> SitePin -> BELPin(output) -> BELPin(input) -> SitePIP -> BELPin(output) -> BELPin(input)
+     *   {@code ... -> PIP -> SitePin -> BELPin(output) -> BELPin(input) -> SitePIP -> BELPin(output) -> BELPin(input)}
      * It may not be necessary to use specify all such resources, as many are implied:
-     *   ... -> PIP -> SitePin -> (implied)      -> (implied)     -> SitePIP -> (implied)      -> (implied)
+     *   {@code ... -> PIP -> SitePin -> (implied)      -> (implied)     -> SitePIP -> (implied)      -> (implied)}
      * Disabling this flag allows such implied resources to be omitted.
      */
     public static boolean VERBOSE_PHYSICAL_NET_ROUTING = true;

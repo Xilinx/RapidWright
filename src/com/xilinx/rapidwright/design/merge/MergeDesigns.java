@@ -33,7 +33,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
@@ -46,8 +45,9 @@ import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 /**
- * Merges two or more designs into a single Design.  Merge process can be customized through the
- * use of the {@link MergeOptions} class.
+ * Merges two or more designs into a single Design. Merge process can be
+ * customized through the use of the @link {@link AbstractDesignMerger}
+ * interface.
  */
 public class MergeDesigns {
 
@@ -127,8 +127,7 @@ public class MergeDesigns {
      * netlist.  Assumes that designs are compatible for merging. Assumes that if there are duplicate
      * cells in the set of designs to be merged that they are flip-flops and that they are always
      * connected to a top-level port.
-     * @param options The set of options to customize the merge process based on netlist-specific
-     * names
+     * @param merger The specific design merger instance to use to merge the designs
      * @param designs The set of designs to be merged into a single design.
      * @return The merged design that contains the superset of all logic, placement and routing of
      * the input designs.
