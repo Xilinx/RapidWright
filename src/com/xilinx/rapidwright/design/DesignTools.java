@@ -1500,7 +1500,7 @@ public class DesignTools {
      * @param cell           The cell of the pin
      * @param logicalPinName The logical pin name source or sink to have routing
      *                       removed.
-     * @returns A list of site pins that should be removed as part of the unroute.
+     * @returns A list of site pins (if any) that should also be removed from inter-site routing to complete the unroute.
      */
     public static List<SitePinInst> unrouteCellPinSiteRouting(Cell cell, String logicalPinName) {
         String physPinName = cell.getPhysicalPinMapping(logicalPinName);
