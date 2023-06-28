@@ -1,3 +1,15 @@
+============= RapidWright 2023.1.1-beta released on 2023-06-21 ================
+Notes:
+  - UltraScale Incremental Clock Router Improvements (#540)
+  - Adds VivadoTools, a Vivado wrapper/helper in RapidWright (#684)
+  - Fixes published Maven Central jar (#698)
+  - Enhancements to RWRoute (#691, #696)
+  - Interchange reader/writer improvements (#677)
+  - Fix for issue #709
+  - Improves handling of site routing and site pins when updating
+    physical netlist
+
+
 ============= RapidWright 2023.1.0-beta released on 2023-05-31 ================
 Notes:
   - Support for Vivado 2023.1 devices and reading 2023.1 DCPs

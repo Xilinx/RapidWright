@@ -66,7 +66,7 @@ public class BinaryEDIFReader {
      * @param o The object to read
      * @param is The Kryo-based input stream
      * @param strings Indexed string lookup
-     * @see BinaryEDIFWriter#writeEDIFObject(EDIFPropertyObject, Output, Map<String,Integer>)
+     * @see BinaryEDIFWriter#writeEDIFObject(EDIFPropertyObject, Output, Map)
      */
     static void readEDIFObject(EDIFPropertyObject o, Input is, String[] strings) {
         if (readEDIFName(o, is, strings)) {

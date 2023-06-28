@@ -96,6 +96,7 @@ import com.xilinx.rapidwright.util.JobQueue;
 import com.xilinx.rapidwright.util.Jython;
 import com.xilinx.rapidwright.util.PartPrinter;
 import com.xilinx.rapidwright.util.PerformanceExplorer;
+import com.xilinx.rapidwright.util.ReplaceEDIFInDCP;
 import com.xilinx.rapidwright.util.StringTools;
 import com.xilinx.rapidwright.util.Unzip;
 import com.xilinx.rapidwright.util.performance_evaluation.PerformanceEvaluation;
@@ -171,6 +172,7 @@ public class MainEntrypoint {
         addFunction("PrintEDIFInstances", PrintEDIFInstances::main);
         addFunction("ProbeRouter", ProbeRouter::main);
         addFunction("PseudoPIPHelper", PseudoPIPHelper::main);
+        addFunction("ReplaceEDIFInDCP", ReplaceEDIFInDCP::main);
         addFunction("ReportDevicePerformance", ReportDevicePerformance::main);
         addFunction("ReportTimingExample", ReportTimingExample::main);
         addFunction("Router", Router::main);

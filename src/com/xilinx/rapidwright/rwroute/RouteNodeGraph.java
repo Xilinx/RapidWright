@@ -40,6 +40,7 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -292,13 +293,14 @@ public class RouteNodeGraph {
 
     private static final Set<TileTypeEnum> allowedTileEnums;
     static {
-        allowedTileEnums = new HashSet<>();
-        allowedTileEnums.add(TileTypeEnum.INT);
+        Set<TileTypeEnum> tempAllowedTileEnums = new HashSet<>();
+        tempAllowedTileEnums.add(TileTypeEnum.INT);
         for (TileTypeEnum e : TileTypeEnum.values()) {
             if (e.toString().startsWith("LAG")) {
-                allowedTileEnums.add(e);
+                tempAllowedTileEnums.add(e);
             }
         }
+        allowedTileEnums = EnumSet.copyOf(tempAllowedTileEnums);
     }
 
     protected boolean mustInclude(Node parent, Node child) {

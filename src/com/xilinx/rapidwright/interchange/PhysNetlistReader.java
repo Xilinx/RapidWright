@@ -344,6 +344,7 @@ public class PhysNetlistReader {
                         c.setSiteInst(siteInst);
                         siteInst.getCellMap().put(belName, c);
                         c.setRoutethru(true);
+                        c.setType(strings.get(placement.getType()));
                     } else {
                         throw new RuntimeException("ERROR: Missing BEL location in other BEL list: "
                                 + belName + " on for pin mapping "

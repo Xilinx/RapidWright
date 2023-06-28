@@ -1237,17 +1237,7 @@ public class DesignTools {
         return toRemove;
     }
 
-
-    /**
-     * This method will completely remove a placed cell (both logical and physical) from a design.
-     * In the case where the removed cell is the last user of a shared control signal (CLK, CE, SR) then that pin will also be removed and unrouted immediately if deferRemovals is null, otherwise it is added to this map.
-     * @param design The design where the cell is instantiated
-     * @param cell The cell to remove
-     * @param deferRemovals An optional map that, if passed in non-null will be populated with
-     * site pins marked for removal.  The map allows a persistent tracking if this method is called
-     * many times as the process is expensive without batching.
-     */
-    public static void fullyRemoveCell(Design design, Cell cell, Map<Net, Set<SitePinInst>> deferRemovals) {
+    private static void fullyUnplaceCellHelper(Cell cell, Map<Net, Set<SitePinInst>> deferRemovals) {
         SiteInst siteInst = cell.getSiteInst();
         BEL bel = cell.getBEL();
         // If cell was using shared control signals (CLK, CE, RST), check to see if this was
@@ -1311,19 +1301,47 @@ public class DesignTools {
             if (otherUser == false) {
                 // Unroute site routing back to pin and remove site pin
                 String sitePinName = getRoutedSitePinFromPhysicalPin(cell, net, pin.getName());
-                BELPin srcPin = siteInst.getSite().getBELPin(sitePinName);
-                siteInst.unrouteIntraSiteNet(srcPin, pin);
-                SitePinInst spi = siteInst.getSitePinInst(sitePinName);
-                // It's possible site wire could be set (e.g. reserved using GLOBAL_USEDNET)
-                // but no inter-site routing (thus no SPI) associated
-                if (spi != null) {
-                    handlePinRemovals(spi, deferRemovals);
+                if (sitePinName != null) {
+                    BELPin sitePortBelPin = siteInst.getSite().getBELPin(sitePinName);
+                    assert(sitePortBelPin.isSitePort());
+                    boolean outputSitePin = sitePortBelPin.isInput(); // Input BELPin means output SitePin
+                    if (outputSitePin) {
+                        siteInst.unrouteIntraSiteNet(pin, sitePortBelPin);
+                    } else {
+                        siteInst.unrouteIntraSiteNet(sitePortBelPin, pin);
+                    }
+                    SitePinInst spi = siteInst.getSitePinInst(sitePinName);
+                    // It's possible site wire could be set (e.g. reserved using GLOBAL_USEDNET)
+                    // but no inter-site routing (thus no SPI) associated
+                    if (spi != null) {
+                        handlePinRemovals(spi, deferRemovals);
+
+                        if (outputSitePin) {
+                            assert(spi.isOutPin());
+                            SitePinInst altSpi = net.getAlternateSource();
+                            if (altSpi != null) {
+                                if (spi == altSpi) {
+                                    altSpi = net.getSource();
+                                    assert(spi != altSpi);
+                                }
+                                siteInst.unrouteIntraSiteNet(pin, altSpi.getBELPin());
+                                handlePinRemovals(altSpi, deferRemovals);
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        // Remove Physical Cell
-        design.removeCell(cell);
+        if (bel.isLUT() && bel.getName().endsWith("5LUT")) {
+            String lut6 = bel.getName().replace('5', '6');
+            if (siteInst.getCell(lut6) == null) {
+                SitePinInst vccSpi = siteInst.getSitePinInst(lut6.substring(0,2));
+                assert(vccSpi.getNet().getType() == NetType.VCC);
+                siteInst.unrouteIntraSiteNet(vccSpi.getBELPin(), siteInst.getBELPin(lut6, "A6"));
+                handlePinRemovals(vccSpi, deferRemovals);
+            }
+        }
 
         // Check and remove routethrus that exist that point to removed cell
         List<BEL> belsToRemove = null;
@@ -1338,6 +1356,39 @@ public class DesignTools {
                 siteInst.removeCell(b);
             }
         }
+    }
+
+    /**
+     * This method will fully unplace (but not remove) a physical cell from a design.
+     * In the case where the unplaced cell is the last user of a shared control signal (CLK, CE, SR)
+     * then that pin will also be removed and unrouted immediately if deferRemovals is null, otherwise
+     * it is added to this map.
+     * @param cell The cell to unplace
+     * @param deferRemovals An optional map that, if passed in non-null will be populated with
+     * site pins marked for removal.  The map allows for persistent tracking if this method is called
+     * many times as the process is expensive without batching.
+     */
+    public static void fullyUnplaceCell(Cell cell, Map<Net, Set<SitePinInst>> deferRemovals) {
+        fullyUnplaceCellHelper(cell, deferRemovals);
+        cell.unplace();
+    }
+
+    /**
+     * This method will completely remove a placed cell (both logical and physical) from a design.
+     * In the case where the removed cell is the last user of a shared control signal (CLK, CE, SR)
+     * then that pin will also be removed and unrouted immediately if deferRemovals is null, otherwise
+     * it is added to this map.
+     * @param design The design where the cell is instantiated
+     * @param cell The cell to remove
+     * @param deferRemovals An optional map that, if passed in non-null will be populated with
+     * site pins marked for removal.  The map allows for persistent tracking if this method is called
+     * many times as the process is expensive without batching.
+     */
+    public static void fullyRemoveCell(Design design, Cell cell, Map<Net, Set<SitePinInst>> deferRemovals) {
+        fullyUnplaceCellHelper(cell, deferRemovals);
+
+        // Remove Physical Cell
+        design.removeCell(cell);
 
         // Remove Logical Cell
         for (EDIFPortInst portInst : cell.getEDIFCellInst().getPortInsts()) {
@@ -1412,6 +1463,7 @@ public class DesignTools {
                     if (pin.isOutPin() && pin.equals(srcPin)) {
                         net.setSource(null);
                     }
+                    assert(pin.getNet() == net);
                     pin.setNet(null);
                     pin.detachSiteInst();
                     continue;
@@ -1564,9 +1616,13 @@ public class DesignTools {
             }
         }
 
+        Set<String> updatedNets = new HashSet<>();
         for (Entry<Net, String> e : netsToUpdate.entrySet()) {
             EDIFHierNet newSource = d.getNetlist().getHierNetFromName(e.getValue());
-            DesignTools.updateNetName(d, e.getKey(), newSource.getNet(), e.getValue());
+            Net updatedNet = DesignTools.updateNetName(d, e.getKey(), newSource.getNet(), e.getValue());
+            if (updatedNet != null) {
+                updatedNets.add(updatedNet.getName());
+            }
         }
 
         t.stop().start("cleanup siteinsts");
@@ -1574,7 +1630,8 @@ public class DesignTools {
         for (SiteInst siteInst : touched) {
             for (SitePinInst pin : siteInst.getSitePinInsts()) {
                 Net net = pin.getNet();
-                if (net == null) continue;
+                if (net == null || updatedNets.contains(net.getName()))
+                    continue;
                 pinsToRemove.computeIfAbsent(net, ($) -> new HashSet<>()).add(pin);
             }
         }
@@ -1600,14 +1657,14 @@ public class DesignTools {
     }
 
     /**
-     * Helper method for makeBlackBox().  When cutting out nets that used
-     * to be source'd from something inside a black box, the net names
-     * need to be updated.
-     * @param d The current design
-     * @param currNet Current net that requires a name change
+     * Helper method for makeBlackBox(). When cutting out nets that used to be
+     * source'd from something inside a black box, the net names need to be updated.
+     * 
+     * @param d         The current design
+     * @param currNet   Current net that requires a name change
      * @param newSource The source net (probably a pin on the black box)
-     * @param newName New name for the net
-     * @return True if the operation succeeded, false otherwise.
+     * @param newName   New name for the net
+     * @return A reference to the newly updated/renamed net.
      */
     private static Net updateNetName(Design d, Net currNet, EDIFNet newSource, String newName) {
         List<PIP> pips = currNet.getPIPs();
@@ -1856,7 +1913,13 @@ public class DesignTools {
                     if (sitePinName == null) continue;
                     SitePinInst newPin = si.getSitePinInst(sitePinName);
                     if (newPin != null) continue;
-                    newPin = net.createPin(sitePinName, c.getSiteInst());
+                    int wireIndex = si.getSite().getTileWireIndexFromPinName(sitePinName);
+                    if (Node.getNode(si.getTile(), wireIndex) == null) {
+                        // It's possible that the discovered site pin (e.g. as for some IOB tiles)
+                        // is not actually connected to the global routing fabric; skip those
+                        continue;
+                    }
+                    newPin = net.createPin(sitePinName, si);
                     if (newPin != null) newPins.add(newPin);
                 }
             }
@@ -2747,10 +2810,20 @@ public class DesignTools {
                 continue;
             }
             if (!hierNet.equals(parentHierNet)) {
-                Net parentPhysNet = design.getNet(parentHierNet.getHierarchicalNetName());
+                String parentHierNetName = parentHierNet.getHierarchicalNetName();
+                Net parentPhysNet;
+                if (parentHierNetName.equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
+                    parentHierNetName = Net.VCC_NET;
+                    parentPhysNet = design.getVccNet();
+                } else if (parentHierNetName.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
+                    parentHierNetName = Net.GND_NET;
+                    parentPhysNet = design.getGndNet();
+                } else {
+                    parentPhysNet = design.getNet(parentHierNetName);
+                }
                 if (parentPhysNet != null) {
                     // Merge both physical nets together
-                    for (SiteInst si : net.getSiteInsts()) {
+                    for (SiteInst si : new ArrayList<>(net.getSiteInsts())) {
                         List<String> siteWires = new ArrayList<>(si.getSiteWiresFromNet(net));
                         for (String siteWire : siteWires) {
                             BELPin[] pins = si.getSiteWirePins(siteWire);
@@ -2759,7 +2832,7 @@ public class DesignTools {
                         }
                     }
                     design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
-                } else if (!net.rename(parentHierNet.getHierarchicalNetName())) {
+                } else if (!net.rename(parentHierNetName)) {
                     System.out.println("WARNING: Failed to adjust physical net name " + net.getName());
                 }
             }
@@ -3311,7 +3384,7 @@ public class DesignTools {
      * Determine if a Net is driven by a hierarchical port, created as part of an out-of-context
      * synthesis flow, for example.
      * @param net Net to examine.
-     * @returns True if driven by a hierport.
+     * @return True if driven by a hierport.
      */
     public static boolean isNetDrivenByHierPort(Net net) {
         if (net.getSource() != null) {

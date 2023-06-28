@@ -246,7 +246,7 @@ public class FileTools {
      * Creates a Kryo output stream that instantiates a gzip compression stream to
      * an output stream.
      * 
-     * @param fileName Name of the file to target.
+     * @param os The output stream to wrap.
      * @return The created kryo-gzip output file stream.
      */
     public static Output getKryoGzipOutputStream(OutputStream os) {
@@ -366,7 +366,7 @@ public class FileTools {
      * Wraps the provided input stream with a kryo stream. Will call
      * {@link #useUnsafeStreams()} to decide on using unsafe or not.
      * 
-     * @param os The input stream to wrap.
+     * @param in The input stream to wrap.
      * @return The created kryo stream.
      */
     public static Input getKryoInputStreamWithoutInflater(InputStream in) {

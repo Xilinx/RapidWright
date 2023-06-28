@@ -35,6 +35,10 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFPort;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -258,6 +262,26 @@ public class TestDesignTools {
             Assertions.assertNotNull(spi);
             Assertions.assertTrue(netPins.contains(spi));
         }
+    }
+
+    @Test
+    public void testCreateMissingSitePinInstsNoConnectedNode() {
+        Device device = Device.getDevice("xcvu3p");
+        Design design = new Design("testDesign", device.getName());
+        Cell cell = design.createAndPlaceCell("cell", Unisim.INBUF, "IOB_X0Y116/INBUF");
+
+        EDIFCell topCell = design.getNetlist().getTopCell();
+        EDIFPort pi = topCell.createPort("pi", EDIFDirection.INPUT, 1);
+        EDIFNet edifNet = topCell.createNet("net");
+        edifNet.createPortInst(pi);
+        EDIFPortInst pad = edifNet.createPortInst("PAD", cell);
+
+        Net net = design.createNet(edifNet.getName());
+        BELPin bp = cell.getBELPin(pad);
+        cell.getSiteInst().routeIntraSiteNet(net, bp, bp);
+        DesignTools.createMissingSitePinInsts(design, net);
+
+        Assertions.assertTrue(net.getPins().isEmpty());
     }
 
     @Test
@@ -946,6 +970,64 @@ public class TestDesignTools {
             Assertions.assertNotNull(spi);
             Net vcc = design.getVccNet();
             Assertions.assertEquals(vcc, spi.getNet());
+        }
+    }
+
+    @Test
+    public void testMakePhysNetNamesConsistentLogicalVccGnd() {
+        Design design = RapidWrightDCP.loadDCP("bug701.dcp");
+
+        // Design has no GLOBAL_LOGIC{0,1}
+        Assertions.assertNull(design.getNet(Net.VCC_NET));
+        Assertions.assertNull(design.getNet(Net.GND_NET));
+
+        DesignTools.makePhysNetNamesConsistent(design);
+
+        // Check those nets were created and all sitewires
+        // were switched over correctly
+        Net vcc = design.getNet(Net.VCC_NET);
+        Assertions.assertNotNull(vcc);
+        Assertions.assertEquals(1, vcc.getSiteInsts().size());
+        int numSitewires = 0;
+        for (SiteInst si : vcc.getSiteInsts()) {
+            numSitewires += si.getSiteWiresFromNet(vcc).size();
+        }
+        Assertions.assertEquals(1, numSitewires);
+
+        Net gnd = design.getNet(Net.GND_NET);
+        Assertions.assertNotNull(gnd);
+        Assertions.assertEquals(4, gnd.getSiteInsts().size());
+        numSitewires = 0;
+        for (SiteInst si : gnd.getSiteInsts()) {
+            numSitewires += si.getSiteWiresFromNet(gnd).size();
+        }
+        Assertions.assertEquals(31, numSitewires);
+    }
+
+    @Test
+    public void testPlaceCell() {
+        //test a design that already contains a Carry4 cell
+        Design d0 = RapidWrightDCP.loadDCP("bug709.dcp");
+        //test a blank design
+        Design d1 = new Design("blankDesign", d0.getPartName());
+
+        Design designs[] = {d0, d1};
+
+        for(Design d : designs) {
+            // Test placing a cell created from a Unisim
+            Cell c0 = d.createCell("cell0", Unisim.CARRY4);
+            // Test placing a cell created from a EDIFCELL reference
+            EDIFCell ec = Design.getUnisimCell(Unisim.CARRY4);
+            Cell c1 = d.createCell("cell1", ec);
+
+            Cell cells[] = {c0, c1};
+
+            for(Cell c : cells) {
+                DesignTools.placeCell(c, d);
+                Assertions.assertFalse(c.getPinMappingsP2L().isEmpty());
+                Assertions.assertNotNull(c.getBEL());
+                Assertions.assertNotNull(c.getSiteInst());
+            }
         }
     }
 }
