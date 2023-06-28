@@ -43,12 +43,12 @@ public class DcpToInterchange {
         Design design = Design.readCheckpoint(args[0]);
         String baseName = Paths.get(args[0]).getFileName().toString();
         baseName = FileTools.removeFileExtension(baseName);
-        String logNlistName = baseName + ".netlist";
-        String physNlistName = baseName + ".phys";
+        String logNetlistName = baseName + ".netlist";
+        String physNetlistName = baseName + ".phys";
         String xdcName = baseName + ".xdc";
 
-        LogNetlistWriter.writeLogNetlist(design.getNetlist(), logNlistName);
-        PhysNetlistWriter.writePhysNetlist(design, physNlistName);
+        LogNetlistWriter.writeLogNetlist(design.getNetlist(), logNetlistName);
+        PhysNetlistWriter.writePhysNetlist(design, physNetlistName);
 
         List<String> constraints = design.getXDCConstraints(ConstraintGroup.NORMAL);
         try (FileOutputStream f = new FileOutputStream(xdcName)) {
