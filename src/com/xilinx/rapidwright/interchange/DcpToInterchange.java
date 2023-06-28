@@ -25,23 +25,24 @@ package com.xilinx.rapidwright.interchange;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.ipi.XDCParser;
+import com.xilinx.rapidwright.util.FileTools;
 
 public class DcpToInterchange {
     public static void main(String[] args) throws IOException {
         if (args.length != 1) {
-            System.out.println("USAGE: java " + DcpToInterchange.class.getCanonicalName() + " "
-                    + "<dcp to convert>");
+            System.out.println("USAGE: <input.dcp>");
             return;
         }
 
         Design design = Design.readCheckpoint(args[0]);
-        String baseName = Path.of(args[0]).getFileName().toString();
-        baseName = baseName.substring(0, baseName.lastIndexOf('.'));
+        String baseName = Paths.get(args[0]).getFileName().toString();
+        baseName = FileTools.removeFileExtension(baseName);
         String logNlistName = baseName + ".netlist";
         String physNlistName = baseName + ".phys";
         String xdcName = baseName + ".xdc";
@@ -50,7 +51,8 @@ public class DcpToInterchange {
         PhysNetlistWriter.writePhysNetlist(design, physNlistName);
 
         List<String> constraints = design.getXDCConstraints(ConstraintGroup.NORMAL);
-        FileOutputStream f = new FileOutputStream(xdcName);
-        XDCParser.writeXDC(constraints, f);
+        try (FileOutputStream f = new FileOutputStream(xdcName)) {
+            XDCParser.writeXDC(constraints, f);
+        }
     }
 }
