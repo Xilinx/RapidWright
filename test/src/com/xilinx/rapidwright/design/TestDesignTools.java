@@ -1039,7 +1039,7 @@ public class TestDesignTools {
         Cell lut0 = design.createAndPlaceCell("lut0", Unisim.LUT5, "SLICE_X0Y0/C6LUT");
         Cell f7mux0 = design.createAndPlaceCell("f7mux0", Unisim.MUXF7, "SLICE_X0Y0/F7MUX_CD");
         SiteInst si0 = lut0.getSiteInst();
-        Net net0 = design.createNet("lut0/O");
+        Net net0 = design.createNet("O");
         net0.connect(lut0, "O");
         net0.getLogicalNet().createPortInst("I1", f7mux0);
         si0.routeIntraSiteNet(net0, lut0.getBEL().getPin("O6"), f7mux0.getBEL().getPin("1"));
@@ -1055,7 +1055,7 @@ public class TestDesignTools {
         Cell lut1 = design.createAndPlaceCell("lut1", Unisim.LUT6, "SLICE_X0Y1/B6LUT");
         Cell ff1 = design.createAndPlaceCell("ff1", Unisim.FDRE, "SLICE_X0Y1/BFF");
         SiteInst si1 = lut1.getSiteInst();
-        Net net1 = design.createNet("lut1/O");
+        Net net1 = design.createNet("O1");
         net1.connect(lut1, "O");
         net1.connect(ff1, "D");
         si1.routeIntraSiteNet(net1, lut1.getBEL().getPin("O6"), ff1.getBEL().getPin("D"));
@@ -1117,7 +1117,7 @@ public class TestDesignTools {
         Cell lut4 = design.createAndPlaceCell("lut4", Unisim.LUT6, "SLICE_X0Y4/B6LUT");
         Cell ff4 = design.createAndPlaceCell("ff4", Unisim.FDRE, "SLICE_X0Y4/BFF");
         SiteInst si4 = lut4.getSiteInst();
-        Net net4 = design.createNet("lut4/O");
+        Net net4 = design.createNet("O4");
         net4.connect(lut4, "O");
         net4.connect(ff4, "D");
         carry4.addPinMapping("S1", "S[1]");
