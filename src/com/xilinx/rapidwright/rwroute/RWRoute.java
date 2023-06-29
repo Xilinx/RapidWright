@@ -379,8 +379,8 @@ public class RWRoute{
     protected NodeStatus getGlobalRoutingNodeStatus(Net net, Node node) {
         if (routingGraph.isPreserved(node)) {
             // Node is preserved by any net -- for base RWRoute, we don't need
-            // to check which net it is because global/static nets are routed
-            // fully in one pass
+            // to check which net it is nor whether it is already in use
+            // because global/static nets are routed from scratch
             return NodeStatus.UNAVAILABLE;
         }
 
