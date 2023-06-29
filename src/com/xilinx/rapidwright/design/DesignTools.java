@@ -2814,10 +2814,8 @@ public class DesignTools {
                 Net parentPhysNet;
                 // Assume that a net named <const1> or <const0> is always a VCC or GND net
                 if (parentNetName.equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
-                    parentNetName = Net.VCC_NET;
                     parentPhysNet = design.getVccNet();
                 } else if (parentNetName.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
-                    parentNetName = Net.GND_NET;
                     parentPhysNet = design.getGndNet();
                 } else {
                     parentPhysNet = design.getNet(parentHierNet.getHierarchicalNetName());
