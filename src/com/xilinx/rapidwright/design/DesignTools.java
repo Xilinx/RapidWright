@@ -2833,7 +2833,7 @@ public class DesignTools {
                         }
                     }
                     design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
-                } else if (!net.rename(parentNetName)) {
+                } else if (!net.rename(parentHierNet.getHierarchicalNetName())) {
                     System.out.println("WARNING: Failed to adjust physical net name " + net.getName());
                 }
             }
