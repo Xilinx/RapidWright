@@ -191,19 +191,23 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected NodeStatus getGlobalRoutingNodeStatus(Net net, Node node) {
-        // In softPreserve mode, allow global router to use all nodes -- including
-        // those already preserved by another net -- unless it is a must-have node
-        // (e.g. sink node on a hierarchical net; Vivado will complain otherwise)
-
         Net preservedNet = routingGraph.getPreservedNet(node);
+        if (preservedNet == net) {
+            return NodeStatus.INUSE;
+        }
         if (preservedNet != null) {
-            // Unavailable only if it isn't carrying the net undergoing routing
-            return (preservedNet == net) ? NodeStatus.INUSE :
-                    (softPreserve && routingGraph.getNode(node) == null) ? NodeStatus.AVAILABLE :
+            // In softPreserve mode, allow global router to use all nodes -- including
+            // those already preserved by another net, unless it's the input pin
+            RouteNode rnode = (softPreserve) ? routingGraph.getNode(node) : null;
+            if (rnode == null) {
+                return NodeStatus.AVAILABLE;
+            }
+
+            return (rnode.getType() != RouteNodeType.PINFEED_I) ? NodeStatus.AVAILABLE :
                     NodeStatus.UNAVAILABLE;
         }
 
-        // A RouteNode will only be created if the node is necessary for
+        // A RouteNode would only have been created if it is necessary for
         // a to-be-routed connection
         return softPreserve || routingGraph.getNode(node) == null ? NodeStatus.AVAILABLE
                                                                   : NodeStatus.UNAVAILABLE;
@@ -227,21 +231,22 @@ public class PartialRouter extends RWRoute {
                 for (PIP pip : clk.getPIPs()) {
                     for (Node node : Arrays.asList(pip.getStartNode(), pip.getEndNode())) {
                         Net preservedNet = routingGraph.getPreservedNet(node);
-                        if (preservedNet != clk) {
-                            if (preservedNet != null) {
-                                unpreserveNet(preservedNet);
-                                unpreserveNets.add(preservedNet);
-                            }
-                            // Redo preserving clk
-                            Net oldNet = routingGraph.preserve(node, clk);
-                            assert(oldNet == null);
-
-                            // Clear preservedNode's prev pointer so that it doesn't get misinterpreted
-                            // by RouteNodeGraph.mustInclude as being part of an existing route
-                            RouteNode rnode = routingGraph.getNode(node);
-                            assert(rnode.getPrev() != null);
-                            rnode.clearPrev();
+                        if (preservedNet == clk) {
+                            continue;
                         }
+                        assert(preservedNet != null);
+
+                        unpreserveNet(preservedNet);
+                        unpreserveNets.add(preservedNet);
+                        // Redo preserving clk
+                        Net oldNet = routingGraph.preserve(node, clk);
+                        assert(oldNet == null);
+
+                        // Clear preservedNode's prev pointer so that it doesn't get misinterpreted
+                        // by RouteNodeGraph.mustInclude as being part of an existing route
+                        RouteNode rnode = routingGraph.getNode(node);
+                        assert(rnode.getPrev() != null);
+                        rnode.clearPrev();
                     }
                 }
             }
@@ -652,7 +657,7 @@ public class PartialRouter extends RWRoute {
                 pinsToRoute, softPreserve);
     }
 
-    /**
+    /**`
      * Routes a design in the partial timing-driven routing mode.
      * @param design The {@link Design} instance to be routed.
      * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all nets with no routing PIPs already present.
