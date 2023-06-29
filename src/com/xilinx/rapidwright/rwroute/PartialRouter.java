@@ -192,17 +192,18 @@ public class PartialRouter extends RWRoute {
     @Override
     protected NodeStatus getGlobalRoutingNodeStatus(Net net, Node node) {
         // In softPreserve mode, allow global router to use all nodes -- including
-        // those already preserved by another net
+        // those already preserved by another net -- unless it is a must-have node
+        // (e.g. sink node on a hierarchical net; Vivado will complain otherwise)
 
         Net preservedNet = routingGraph.getPreservedNet(node);
         if (preservedNet != null) {
             // Unavailable only if it isn't carrying the net undergoing routing
-            return preservedNet == net ? NodeStatus.INUSE :
-                          softPreserve ? NodeStatus.AVAILABLE :
-                                         NodeStatus.UNAVAILABLE;
+            return (preservedNet == net) ? NodeStatus.INUSE :
+                    (softPreserve && routingGraph.getNode(node) == null) ? NodeStatus.AVAILABLE :
+                    NodeStatus.UNAVAILABLE;
         }
 
-        // A RouteNode will only be created if the net is necessary for
+        // A RouteNode will only be created if the node is necessary for
         // a to-be-routed connection
         return softPreserve || routingGraph.getNode(node) == null ? NodeStatus.AVAILABLE
                                                                   : NodeStatus.UNAVAILABLE;
