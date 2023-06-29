@@ -66,6 +66,7 @@ import com.xilinx.rapidwright.examples.SLRCrosserGenerator;
 import com.xilinx.rapidwright.examples.StampPlacement;
 import com.xilinx.rapidwright.examples.UpdateRoutingUsingSATRouter;
 import com.xilinx.rapidwright.examples.tilebrowser.PartTileBrowser;
+import com.xilinx.rapidwright.interchange.DcpToInterchange;
 import com.xilinx.rapidwright.interchange.DeviceResourcesExample;
 import com.xilinx.rapidwright.interchange.EdifToLogicalNetlist;
 import com.xilinx.rapidwright.interchange.EnumerateCellBelMapping;
@@ -124,6 +125,7 @@ public class MainEntrypoint {
         addFunction("CompareRouteStatusReports", CompareRouteStatusReports::main);
         addFunction("CopyMMCMCell", CopyMMCMCell::main);
         addFunction("CustomRouting", CustomRouting::main);
+        addFunction("DcpToInterchange", DcpToInterchange::main);
         addFunction("DecomposeLUT", DecomposeLUT::main);
         addFunction("DesignImplementationDiff", DesignImplementationDiff::main);
         addFunction("DesignInstrumentor", DesignInstrumentor::main);
