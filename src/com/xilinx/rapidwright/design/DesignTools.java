@@ -2820,7 +2820,7 @@ public class DesignTools {
                     parentNetName = Net.GND_NET;
                     parentPhysNet = design.getGndNet();
                 } else {
-                    parentPhysNet = design.getNet(parentNetName);
+                    parentPhysNet = design.getNet(parentHierNet.getHierarchicalNetName());
                 }
                 if (parentPhysNet != null) {
                     // Merge both physical nets together
