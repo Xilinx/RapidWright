@@ -195,22 +195,20 @@ public class PartialRouter extends RWRoute {
         if (preservedNet == net) {
             return NodeStatus.INUSE;
         }
-        if (preservedNet != null) {
-            // In softPreserve mode, allow global router to use all nodes -- including
-            // those already preserved by another net, unless it's the input pin
-            RouteNode rnode = (softPreserve) ? routingGraph.getNode(node) : null;
-            if (rnode == null) {
-                return NodeStatus.AVAILABLE;
-            }
-
-            return (rnode.getType() != RouteNodeType.PINFEED_I) ? NodeStatus.AVAILABLE :
-                    NodeStatus.UNAVAILABLE;
+        if (!softPreserve && preservedNet != null) {
+            return NodeStatus.UNAVAILABLE;
         }
 
-        // A RouteNode would only have been created if it is necessary for
-        // a to-be-routed connection
-        return softPreserve || routingGraph.getNode(node) == null ? NodeStatus.AVAILABLE
-                                                                  : NodeStatus.UNAVAILABLE;
+        RouteNode rnode = routingGraph.getNode(node);
+        if (rnode != null) {
+            // In softPreserve mode, allow global router to use all nodes -- including
+            // those already preserved by another net, unless it's an input pin
+            if (!softPreserve || rnode.getType() == RouteNodeType.PINFEED_I) {
+                return NodeStatus.UNAVAILABLE;
+            }
+        }
+
+        return NodeStatus.AVAILABLE;
     }
 
     @Override
