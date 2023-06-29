@@ -655,7 +655,7 @@ public class PartialRouter extends RWRoute {
                 pinsToRoute, softPreserve);
     }
 
-    /**`
+    /**
      * Routes a design in the partial timing-driven routing mode.
      * @param design The {@link Design} instance to be routed.
      * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all nets with no routing PIPs already present.
