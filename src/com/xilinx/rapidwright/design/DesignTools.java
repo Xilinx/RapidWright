@@ -2970,16 +2970,15 @@ public class DesignTools {
                 continue;
             }
             if (!hierNet.equals(parentHierNet)) {
-                String parentHierNetName = parentHierNet.getHierarchicalNetName();
+                String parentNetName = parentHierNet.getNet().getName();
                 Net parentPhysNet;
-                if (parentHierNetName.equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
-                    parentHierNetName = Net.VCC_NET;
+                // Assume that a net named <const1> or <const0> is always a VCC or GND net
+                if (parentNetName.equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
                     parentPhysNet = design.getVccNet();
-                } else if (parentHierNetName.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
-                    parentHierNetName = Net.GND_NET;
+                } else if (parentNetName.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
                     parentPhysNet = design.getGndNet();
                 } else {
-                    parentPhysNet = design.getNet(parentHierNetName);
+                    parentPhysNet = design.getNet(parentHierNet.getHierarchicalNetName());
                 }
                 if (parentPhysNet != null) {
                     // Merge both physical nets together
@@ -2992,7 +2991,7 @@ public class DesignTools {
                         }
                     }
                     design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
-                } else if (!net.rename(parentHierNetName)) {
+                } else if (!net.rename(parentHierNet.getHierarchicalNetName())) {
                     System.out.println("WARNING: Failed to adjust physical net name " + net.getName());
                 }
             }

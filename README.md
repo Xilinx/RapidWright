@@ -52,6 +52,7 @@ cd $RAPIDWRIGHT_PATH
 git pull
 # resolve any issues
 ./gradlew updateJars
+./gradlew compileJava
 ```
 
 ### Python Setup
