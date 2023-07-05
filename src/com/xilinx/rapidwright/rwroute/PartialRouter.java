@@ -191,21 +191,24 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected NodeStatus getGlobalRoutingNodeStatus(Net net, Node node) {
-        // In softPreserve mode, allow global router to use all nodes -- including
-        // those already preserved by another net
-
         Net preservedNet = routingGraph.getPreservedNet(node);
-        if (preservedNet != null) {
-            // Unavailable only if it isn't carrying the net undergoing routing
-            return preservedNet == net ? NodeStatus.INUSE :
-                          softPreserve ? NodeStatus.AVAILABLE :
-                                         NodeStatus.UNAVAILABLE;
+        if (preservedNet == net) {
+            return NodeStatus.INUSE;
+        }
+        if (!softPreserve && preservedNet != null) {
+            return NodeStatus.UNAVAILABLE;
         }
 
-        // A RouteNode will only be created if the net is necessary for
-        // a to-be-routed connection
-        return softPreserve || routingGraph.getNode(node) == null ? NodeStatus.AVAILABLE
-                                                                  : NodeStatus.UNAVAILABLE;
+        RouteNode rnode = routingGraph.getNode(node);
+        if (rnode != null) {
+            // In softPreserve mode, allow global router to use all nodes -- including
+            // those already preserved by another net, unless it's an input pin
+            if (!softPreserve || rnode.getType() == RouteNodeType.PINFEED_I) {
+                return NodeStatus.UNAVAILABLE;
+            }
+        }
+
+        return NodeStatus.AVAILABLE;
     }
 
     @Override
@@ -226,21 +229,22 @@ public class PartialRouter extends RWRoute {
                 for (PIP pip : clk.getPIPs()) {
                     for (Node node : Arrays.asList(pip.getStartNode(), pip.getEndNode())) {
                         Net preservedNet = routingGraph.getPreservedNet(node);
-                        if (preservedNet != clk) {
-                            if (preservedNet != null) {
-                                unpreserveNet(preservedNet);
-                                unpreserveNets.add(preservedNet);
-                            }
-                            // Redo preserving clk
-                            Net oldNet = routingGraph.preserve(node, clk);
-                            assert(oldNet == null);
-
-                            // Clear preservedNode's prev pointer so that it doesn't get misinterpreted
-                            // by RouteNodeGraph.mustInclude as being part of an existing route
-                            RouteNode rnode = routingGraph.getNode(node);
-                            assert(rnode.getPrev() != null);
-                            rnode.clearPrev();
+                        if (preservedNet == clk) {
+                            continue;
                         }
+                        assert(preservedNet != null);
+
+                        unpreserveNet(preservedNet);
+                        unpreserveNets.add(preservedNet);
+                        // Redo preserving clk
+                        Net oldNet = routingGraph.preserve(node, clk);
+                        assert(oldNet == null);
+
+                        // Clear preservedNode's prev pointer so that it doesn't get misinterpreted
+                        // by RouteNodeGraph.mustInclude as being part of an existing route
+                        RouteNode rnode = routingGraph.getNode(node);
+                        assert(rnode.getPrev() != null);
+                        rnode.clearPrev();
                     }
                 }
             }

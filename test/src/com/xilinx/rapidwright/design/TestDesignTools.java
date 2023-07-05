@@ -34,8 +34,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import com.xilinx.rapidwright.device.Series;
-import com.xilinx.rapidwright.edif.EDIFCell;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -47,9 +45,14 @@ import com.xilinx.rapidwright.design.blocks.UtilizationType;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
@@ -259,6 +262,26 @@ public class TestDesignTools {
             Assertions.assertNotNull(spi);
             Assertions.assertTrue(netPins.contains(spi));
         }
+    }
+
+    @Test
+    public void testCreateMissingSitePinInstsNoConnectedNode() {
+        Device device = Device.getDevice("xcvu3p");
+        Design design = new Design("testDesign", device.getName());
+        Cell cell = design.createAndPlaceCell("cell", Unisim.INBUF, "IOB_X0Y116/INBUF");
+
+        EDIFCell topCell = design.getNetlist().getTopCell();
+        EDIFPort pi = topCell.createPort("pi", EDIFDirection.INPUT, 1);
+        EDIFNet edifNet = topCell.createNet("net");
+        edifNet.createPortInst(pi);
+        EDIFPortInst pad = edifNet.createPortInst("PAD", cell);
+
+        Net net = design.createNet(edifNet.getName());
+        BELPin bp = cell.getBELPin(pad);
+        cell.getSiteInst().routeIntraSiteNet(net, bp, bp);
+        DesignTools.createMissingSitePinInsts(design, net);
+
+        Assertions.assertTrue(net.getPins().isEmpty());
     }
 
     @Test
@@ -1006,5 +1029,116 @@ public class TestDesignTools {
                 Assertions.assertNotNull(c.getSiteInst());
             }
         }
+    }
+
+    @Test
+    public void testUnrouteCellPinSiteRouting() {
+        Design design = new Design("test", Device.KCU105);
+
+        // Test internal routing removal - no sitepips
+        Cell lut0 = design.createAndPlaceCell("lut0", Unisim.LUT5, "SLICE_X0Y0/C6LUT");
+        Cell f7mux0 = design.createAndPlaceCell("f7mux0", Unisim.MUXF7, "SLICE_X0Y0/F7MUX_CD");
+        SiteInst si0 = lut0.getSiteInst();
+        Net net0 = design.createNet("O");
+        net0.connect(lut0, "O");
+        net0.getLogicalNet().createPortInst("I1", f7mux0);
+        si0.routeIntraSiteNet(net0, lut0.getBEL().getPin("O6"), f7mux0.getBEL().getPin("1"));
+        Assertions.assertEquals(net0, si0.getNetFromSiteWire("C_O"));
+
+        DesignTools.unrouteCellPinSiteRouting(lut0, "O");
+        Assertions.assertNull(si0.getNetFromSiteWire("C_O"));
+
+        DesignTools.unrouteCellPinSiteRouting(f7mux0, "I1");
+        Assertions.assertNull(si0.getNetFromSiteWire("C_O"));
+
+        // Test internal routing removal - with sitepips
+        Cell lut1 = design.createAndPlaceCell("lut1", Unisim.LUT6, "SLICE_X0Y1/B6LUT");
+        Cell ff1 = design.createAndPlaceCell("ff1", Unisim.FDRE, "SLICE_X0Y1/BFF");
+        SiteInst si1 = lut1.getSiteInst();
+        Net net1 = design.createNet("O1");
+        net1.connect(lut1, "O");
+        net1.connect(ff1, "D");
+        si1.routeIntraSiteNet(net1, lut1.getBEL().getPin("O6"), ff1.getBEL().getPin("D"));
+        Assertions.assertEquals(net1, si1.getNetFromSiteWire("B_O"));
+        Assertions.assertEquals(net1, si1.getNetFromSiteWire("FFMUXB1_OUT1"));
+        Assertions.assertEquals("D6", si1.getUsedSitePIP("FFMUXB1").getInputPinName());
+
+        DesignTools.unrouteCellPinSiteRouting(lut1, "O");
+        Assertions.assertNull(si1.getNetFromSiteWire("B_O"));
+        Assertions.assertNull(si1.getNetFromSiteWire("FFMUXB1_OUT1"));
+        Assertions.assertNull(si1.getUsedSitePIP("FFMUXB1"));
+
+        DesignTools.unrouteCellPinSiteRouting(f7mux0, "I1");
+        Assertions.assertNull(si1.getNetFromSiteWire("B_O"));
+        Assertions.assertNull(si1.getNetFromSiteWire("FFMUXB2_OUT2"));
+        Assertions.assertNull(si1.getUsedSitePIP("FFMUXB2"));
+
+        // Test internal routing removal - routethru
+        Cell carry2 = design.createAndPlaceCell("carry2", Unisim.CARRY8, "SLICE_X0Y2/CARRY8");
+        SiteInst si2 = carry2.getSiteInst();
+        Net net2 = design.createNet("some_source");
+        net2.getLogicalNet().createPortInst("DI[0]", carry2);
+        si2.routeIntraSiteNet(net2, si2.getBELPin("A2", "A2"), carry2.getBEL().getPin("DI0"));
+        net2.createPin("A2", si2);
+
+        Assertions.assertTrue(si2.getCell("A5LUT").isRoutethru());
+        Assertions.assertEquals(net2, si2.getNetFromSiteWire("A2"));
+        Assertions.assertEquals(net2, si2.getNetFromSiteWire("A5LUT_O5"));
+
+        DesignTools.unrouteCellPinSiteRouting(carry2, "DI[0]");
+
+        Assertions.assertNull(si2.getCell("A5LUT"));
+        Assertions.assertNull(si2.getNetFromSiteWire("A2"));
+        Assertions.assertNull(si2.getNetFromSiteWire("A5LUT_O5"));
+
+        // Test internal routing removal - routethru with fanout
+        Cell carry3 = design.createAndPlaceCell("carry3", Unisim.CARRY8, "SLICE_X0Y3/CARRY8");
+        Cell lut3 = design.createAndPlaceCell("lut3", Unisim.LUT6, "SLICE_X0Y3/A6LUT");
+        lut3.addPinMapping("A2", "I2");
+        SiteInst si3 = carry3.getSiteInst();
+        Net net3 = design.createNet("some_source2");
+        net3.getLogicalNet().createPortInst("DI[0]", carry3);
+        si3.routeIntraSiteNet(net3, si3.getBELPin("A2", "A2"), carry3.getBEL().getPin("DI0"));
+        net3.connect(lut3, "I2");
+
+        Assertions.assertEquals(net3, si3.getSitePinInst("A2").getNet());
+        Assertions.assertTrue(si3.getCell("A5LUT").isRoutethru());
+        Assertions.assertEquals(net3, si3.getNetFromSiteWire("A2"));
+        Assertions.assertEquals(net3, si3.getNetFromSiteWire("A5LUT_O5"));
+
+        DesignTools.unrouteCellPinSiteRouting(carry3, "DI[0]");
+
+        Assertions.assertNull(si3.getCell("A5LUT"));
+        Assertions.assertEquals(net3, si3.getNetFromSiteWire("A2"));
+        Assertions.assertNull(si3.getNetFromSiteWire("A5LUT_O5"));
+
+        // Test internal routing removal - fanout
+        Cell carry4 = design.createAndPlaceCell("carry4", Unisim.CARRY8, "SLICE_X0Y4/CARRY8");
+        Cell lut4 = design.createAndPlaceCell("lut4", Unisim.LUT6, "SLICE_X0Y4/B6LUT");
+        Cell ff4 = design.createAndPlaceCell("ff4", Unisim.FDRE, "SLICE_X0Y4/BFF");
+        SiteInst si4 = lut4.getSiteInst();
+        Net net4 = design.createNet("O4");
+        net4.connect(lut4, "O");
+        net4.connect(ff4, "D");
+        carry4.addPinMapping("S1", "S[1]");
+        net4.getLogicalNet().createPortInst("S[1]", carry4);
+
+        si4.routeIntraSiteNet(net4, lut4.getBEL().getPin("O6"), ff4.getBEL().getPin("D"));
+
+        Assertions.assertEquals(net4, si4.getNetFromSiteWire("B_O"));
+        Assertions.assertEquals(net4, si4.getNetFromSiteWire("FFMUXB1_OUT1"));
+        Assertions.assertEquals("D6", si4.getUsedSitePIP("FFMUXB1").getInputPinName());
+
+        DesignTools.unrouteCellPinSiteRouting(ff4, "D");
+
+        Assertions.assertNull(si4.getNetFromSiteWire("FFMUXB1_OUT1"));
+        Assertions.assertNull(si4.getUsedSitePIP("FFMUXB1"));
+        Assertions.assertEquals(net4, si4.getNetFromSiteWire("B_O"));
+
+        DesignTools.unrouteCellPinSiteRouting(carry4, "S[1]");
+
+        Assertions.assertNull(si4.getNetFromSiteWire("FFMUXB1_OUT1"));
+        Assertions.assertNull(si4.getUsedSitePIP("FFMUXB1"));
+        Assertions.assertNull(si4.getNetFromSiteWire("B_O"));
     }
 }
