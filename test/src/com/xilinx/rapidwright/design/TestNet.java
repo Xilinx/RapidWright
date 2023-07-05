@@ -348,7 +348,7 @@ public class TestNet {
         Design design = new Design("test", Device.KCU105);
         Cell lut0 = design.createAndPlaceCell("lut0", Unisim.LUT5, "SLICE_X0Y0/C6LUT");
         Cell f7mux0 = design.createAndPlaceCell("f7mux0", Unisim.MUXF7, "SLICE_X0Y0/F7MUX_CD");
-        Net net0 = design.createNet("lut0/O");
+        Net net0 = design.createNet("O");
         net0.connect(lut0, "O");
         net0.connect(f7mux0, "I1");
 
