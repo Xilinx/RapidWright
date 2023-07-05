@@ -34,6 +34,7 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -101,7 +102,19 @@ public class LUTTools {
     }
 
     /**
-     * Checks if this cell is a LUT (LUT1, LUT2, LUT3,...). A CFGLUT5 will return false.
+     * Gets the output pin from the BEL of a LUT
+     * 
+     * @param bel The physical bel site of the LUT
+     * @return O5 or O6 based on the BEL
+     */
+    public static BELPin getLUTOutputPin(BEL bel) {
+        return bel.getPin("O" + bel.getName().charAt(1));
+    }
+
+    /**
+     * Checks if this cell is a LUT (LUT1, LUT2, LUT3,...). A CFGLUT5 will return
+     * false.
+     * 
      * @param c The cell in question
      * @return True if this is a LUT[1-6], false otherwise.
      */
