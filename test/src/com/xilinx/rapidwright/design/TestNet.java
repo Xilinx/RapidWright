@@ -96,7 +96,7 @@ public class TestNet {
         Design design = new Design("test", Device.KCU105);
 
         // Net with two outputs (HMUX primary and H_O alternate) and two sinks (SRST_B2 & B2)
-        Net net = TestDesignTools.createTestNet(design, "net", new String[]{
+        Net net = TestDesignHelper.createTestNet(design, "net", new String[]{
                 // SLICE_X65Y158/HMUX-> SLICE_X64Y158/SRST_B2
                 "INT_X42Y158/INT.LOGIC_OUTS_E16->>INT_NODE_SINGLE_DOUBLE_46_INT_OUT",
                 "INT_X42Y158/INT.INT_NODE_SINGLE_DOUBLE_46_INT_OUT->>INT_INT_SINGLE_51_INT_OUT",
@@ -165,7 +165,7 @@ public class TestNet {
         Net gndNet = design.getGndNet();
         SitePinInst a6 = gndNet.createPin("A6", si);
         SitePinInst b6 = gndNet.createPin("B6", si);
-        TestDesignTools.addPIPs(gndNet, new String[]{
+        TestDesignHelper.addPIPs(gndNet, new String[]{
                 "INT_X0Y0/INT.LOGIC_OUTS_E29->>INT_NODE_SINGLE_DOUBLE_101_INT_OUT",
                 "INT_X0Y0/INT.INT_NODE_SINGLE_DOUBLE_101_INT_OUT->>SS1_E_BEG7",
                 "INT_X0Y0/INT.INT_NODE_IMUX_64_INT_OUT->>IMUX_E16",

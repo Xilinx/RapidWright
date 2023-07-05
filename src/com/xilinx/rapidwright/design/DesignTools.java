@@ -1212,15 +1212,28 @@ public class DesignTools {
                         curr = reverseConns.get(sink);
                         fanoutCount = fanout.getOrDefault(sink, 0);
                     }
-                    if (curr == null && fanout.size() == 1 && !net.isStaticNet()) {
-                        // We got all the way back to the source site. It is likely that
-                        // the net is using dual exit points from the site as is common in
-                        // SLICEs -- we should unroute the sitenet
-                        SitePin sPin = sink.getSitePin();
-                        if (net.getSource() != null) {
-                            SiteInst si = net.getSource().getSiteInst();
-                            BELPin belPin = sPin.getBELPin();
-                            si.unrouteIntraSiteNet(belPin, belPin);
+                    if (curr == null && !net.isStaticNet()) {
+                        if (fanoutCount == 1 && net.getAlternateSource() != null && net.getSource() != null) {
+                            // check if this is a dual-output net and if we just removed one of the outputs
+                            // if so, remove the logical driver flag
+                            for (PIP pip : net.getPIPs()) {
+                                if (pip.isLogicalDriver()) {
+                                    pip.setIsLogicalDriver(false);
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (fanout.size() == 1) {
+                            // We got all the way back to the source site. It is likely that
+                            // the net is using dual exit points from the site as is common in
+                            // SLICEs -- we should unroute the sitenet
+                            SitePin sPin = sink.getSitePin();
+                            if (net.getSource() != null) {
+                                SiteInst si = net.getSource().getSiteInst();
+                                BELPin belPin = sPin.getBELPin();
+                                si.unrouteIntraSiteNet(belPin, belPin);
+                            }
                         }
                     }
                 }
