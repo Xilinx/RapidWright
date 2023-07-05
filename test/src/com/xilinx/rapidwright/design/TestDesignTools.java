@@ -318,7 +318,7 @@ public class TestDesignTools {
     public void testGetTrimmablePIPsFromPins(String pinName) {
         Design design = new Design("top", "xcau10p");
         Device device = design.getDevice();
-        Net net = createTestNet(design, "net", new String[]{
+        Net net = TestDesignHelper.createTestNet(design, "net", new String[]{
                 "INT_X24Y92/INT.LOGIC_OUTS_E27->INT_NODE_SDQ_41_INT_OUT1",            // Output pin
                 "INT_X24Y92/INT.INT_NODE_SDQ_41_INT_OUT1->>SS1_E_BEG7",
                 "INT_X24Y91/INT.SS1_E_END7->>INT_NODE_IMUX_25_INT_OUT1",
@@ -358,7 +358,7 @@ public class TestDesignTools {
         Design design = new Design("test", "xcvu19p-fsva3824-1-e");
         Device device = design.getDevice();
 
-        Net net = createTestNet(design, "net", new String[]{
+        Net net = TestDesignHelper.createTestNet(design, "net", new String[]{
                 "INT_X102Y428/INT.LOGIC_OUTS_W30->>INT_NODE_IMUX_60_INT_OUT1",  // EQ output
                 "INT_X102Y428/INT.INT_NODE_IMUX_60_INT_OUT1->>BYPASS_W14",
                 "INT_X102Y428/INT.INT_NODE_IMUX_50_INT_OUT0<<->>BYPASS_W14",    // (reversed PIP)
@@ -414,7 +414,7 @@ public class TestDesignTools {
         Design design = new Design("test", "xcvu19p-fsva3824-1-e");
         Device device = design.getDevice();
 
-        Net net = createTestNet(design, "net", new String[]{
+        Net net = TestDesignHelper.createTestNet(design, "net", new String[]{
                 "INT_X126Y235/INT.LOGIC_OUTS_W27->INT_NODE_SDQ_87_INT_OUT0",    // DQ2 output
                 "INT_X126Y235/INT.INT_NODE_SDQ_87_INT_OUT0->>EE4_W_BEG6",
                 "INT_X128Y235/INT.EE4_W_END6->INT_NODE_SDQ_84_INT_OUT1",
@@ -459,7 +459,7 @@ public class TestDesignTools {
         Design design = new Design("test", "xcvu19p-fsva3824-1-e");
         Device device = design.getDevice();
 
-        Net net = createTestNet(design, "net", new String[]{
+        Net net = TestDesignHelper.createTestNet(design, "net", new String[]{
                 "INT_X115Y444/INT.LOGIC_OUTS_W30->INT_NODE_SDQ_91_INT_OUT1",                    // EQ
                 "INT_X115Y444/INT.INT_NODE_SDQ_91_INT_OUT1->>INT_INT_SDQ_7_INT_OUT0",
                 "INT_X115Y444/INT.INT_INT_SDQ_7_INT_OUT0->>INT_NODE_GLOBAL_10_INT_OUT0",
@@ -507,7 +507,7 @@ public class TestDesignTools {
         Design design = new Design("test", "xcvu19p-fsva3824-1-e");
         Device device = design.getDevice();
 
-        Net net = createTestNet(design, "net", new String[]{
+        Net net = TestDesignHelper.createTestNet(design, "net", new String[]{
                 "INT_X196Y535/INT.LOGIC_OUTS_E10->INT_NODE_SDQ_12_INT_OUT1",                    // DQ
                 "INT_X196Y535/INT.INT_NODE_SDQ_12_INT_OUT1->>INT_INT_SDQ_73_INT_OUT0",
                 "INT_X196Y535/INT.INT_INT_SDQ_73_INT_OUT0->>INT_NODE_GLOBAL_1_INT_OUT1",
@@ -553,7 +553,7 @@ public class TestDesignTools {
     public void testUnrouteSourcePinBidir() {
         Design design = new Design("test", "xcvu19p-fsva3824-1-e");
 
-        Net net = createTestNet(design, "net", new String[]{
+        Net net = TestDesignHelper.createTestNet(design, "net", new String[]{
                 "INT_X193Y606/INT.LOGIC_OUTS_W27->INT_NODE_SDQ_87_INT_OUT0",
                 "INT_X193Y606/INT.INT_NODE_SDQ_87_INT_OUT0->>NN1_W_BEG6",
                 "INT_X193Y607/INT.NN1_W_END6->INT_NODE_SDQ_83_INT_OUT0",
@@ -587,19 +587,6 @@ public class TestDesignTools {
         Assertions.assertTrue(net.getPIPs().isEmpty());
     }
 
-    public static void addPIPs(Net net, String[] pips) {
-        Device device = net.getDesign().getDevice();
-        for (String pip : pips) {
-            net.addPIP(device.getPIP(pip));
-        }
-    }
-
-    public static Net createTestNet(Design design, String netName, String[] pips) {
-        Net net = design.createNet(netName);
-        addPIPs(net, pips);
-        return net;
-    }
-
     private void removeSourcePinHelper(boolean useUnroutePins, SitePinInst spi, int expectedPIPs) {
         if (useUnroutePins) {
             DesignTools.unroutePins(spi.getNet(), Arrays.asList(spi));
@@ -614,7 +601,7 @@ public class TestDesignTools {
         Design design = new Design("test", Device.KCU105);
 
         // Net with one source (AQ2) and two sinks (A_I & FX) and a stub (INT_NODE_IMUX_71_INT_OUT)
-        Net net1 = createTestNet(design, "net1", new String[]{
+        Net net1 = TestDesignHelper.createTestNet(design, "net1", new String[]{
                 // Translocated from example in
                 // https://github.com/Xilinx/RapidWright/pull/475#issuecomment-1188337848
                 "INT_X63Y21/INT.LOGIC_OUTS_E12->>INT_NODE_SINGLE_DOUBLE_76_INT_OUT",
@@ -644,7 +631,7 @@ public class TestDesignTools {
 
 
         // Net with one output (HMUX) and one input (SRST_B2)
-        Net net2 = createTestNet(design, "net2", new String[]{
+        Net net2 = TestDesignHelper.createTestNet(design, "net2", new String[]{
             "INT_X42Y158/INT.LOGIC_OUTS_E16->>INT_NODE_SINGLE_DOUBLE_46_INT_OUT",
             "INT_X42Y158/INT.INT_NODE_SINGLE_DOUBLE_46_INT_OUT->>INT_INT_SINGLE_51_INT_OUT",
             "INT_X42Y158/INT.INT_INT_SINGLE_51_INT_OUT->>INT_NODE_GLOBAL_3_OUT1",
@@ -669,7 +656,7 @@ public class TestDesignTools {
 
 
         // Net with two outputs (HMUX primary and H_O alternate) and two sinks (SRST_B2 & B2)
-        Net net3 = createTestNet(design, "net3", new String[]{
+        Net net3 = TestDesignHelper.createTestNet(design, "net3", new String[]{
             // SLICE_X65Y158/HMUX-> SLICE_X64Y158/SRST_B2
             "INT_X42Y158/INT.LOGIC_OUTS_E16->>INT_NODE_SINGLE_DOUBLE_46_INT_OUT",
             "INT_X42Y158/INT.INT_NODE_SINGLE_DOUBLE_46_INT_OUT->>INT_INT_SINGLE_51_INT_OUT",
