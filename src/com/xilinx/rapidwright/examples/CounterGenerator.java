@@ -225,7 +225,7 @@ public class CounterGenerator {
     }
 
     /**
-     * Implements a parameterizable counter for an UltraScale+ device and routes the counter using RWRoute.
+     * Implements a parameterizable counter for an UltraScale/UltraScale+ device and routes the counter using RWRoute.
      */
     public static void main(String[] args) {
         // Extract program options
