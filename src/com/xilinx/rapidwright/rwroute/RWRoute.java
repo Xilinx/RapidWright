@@ -302,6 +302,14 @@ public class RWRoute{
                     addNetConnectionToRoutingTargets(net);
                 } else if (RouterHelper.isDriverLessOrLoadLessNet(net)) {
                     preserveNet(net, true);
+                    if (DesignTools.isNetDrivenByHierPort(net)) {
+                        // For the case of nets driven by hierarchical ports (out of context designs)
+                        // create a RouteNode for all its sink ports in order to prevent them from
+                        // being unpreserved
+                        for (SitePinInst spi : net.getSinkPins()) {
+                            getOrCreateRouteNode(spi.getConnectedNode(), RouteNodeType.PINFEED_I);
+                        }
+                    }
                     numNotNeedingRoutingNets++;
                 } else if (RouterHelper.isInternallyRoutedNet(net)) {
                     preserveNet(net, true);
@@ -371,8 +379,8 @@ public class RWRoute{
     protected NodeStatus getGlobalRoutingNodeStatus(Net net, Node node) {
         if (routingGraph.isPreserved(node)) {
             // Node is preserved by any net -- for base RWRoute, we don't need
-            // to check which net it is because global/static nets are routed
-            // fully in one pass
+            // to check which net it is nor whether it is already in use
+            // because global/static nets are routed from scratch
             return NodeStatus.UNAVAILABLE;
         }
 
