@@ -48,6 +48,9 @@ import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.router.Router;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 public class TestExamples {
     @Test
     public void testPipelineGenerator() {
@@ -64,8 +67,7 @@ public class TestExamples {
     }
 
     /*
-     * This test is a reproduction of Lesson1.java. The code is not used directly so
-     * as to keep the original example simple and unencumbered.
+     * Tests the counter Generator. Some code is generated from the source file so that assertions can be inserted.
      */
     @ParameterizedTest
     @CsvSource({
@@ -75,9 +77,10 @@ public class TestExamples {
             "xczu3eg-sbva484-1-i, SLICE_X0Y147, 32, 0, 1, false",
             "xczu3eg-sbva484-1-i, SLICE_X1Y1, 1, 0, 1, false",
             "xczu3eg-sbva484-1-i, SLICE_X1Y1, 65, 0, 1, false",
+            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 1024, 0, 1, false",
             "xczu3eg-sbva484-1-i, SLICE_X1Y1, 32, 1024, 1, true",
             "xczu3eg-sbva484-1-i, SLICE_X1Y1, 32, 0, 1024, false",
-
+            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 1, 1, 1, false",
     })
     public void testCounterGenerator(String device,  String sliceName, int width, long initValue, long step,
                                      boolean countDown,  @TempDir Path tempDir) {
@@ -94,7 +97,7 @@ public class TestExamples {
             if (eci.getName().startsWith("add")) {
                 numOfAddLuts++;
                 String initString = eci.getProperty("INIT").getValue();
-                Assertions.assertTrue(countDown ? initString.endsWith("h9") : initString.endsWith("h6"));
+                assertTrue(countDown ? initString.endsWith("h9") : initString.endsWith("h6"));
             }
             else if (eci.getName().startsWith("sum")) {
                 numOfSumFFs++;
@@ -117,13 +120,41 @@ public class TestExamples {
             char bit = stepBin.charAt(i);
             EDIFNet constNet = bit == '0' ? gnd : vcc;
             EDIFPortInst pi = submoduleInst.getPortInst("B["+i+"]");
-            EDIFNet net = pi.getNet();
             Assertions.assertEquals(pi.getNet(), constNet);
         }
 
         String countDownOpt = countDown ? "-m" : "";
-        CounterGenerator.main(new String[]{"-p", device, "-o", tempDir.toAbsolutePath().toString()+"/test.dcp", "-w",
+        CounterGenerator.main(new String[]{"-p", device, "-o", tempDir.toAbsolutePath()+"/test.dcp", "-w",
                 Integer.toString(width), "-s", sliceName, "-t", Long.toString(step), "-i", Long.toString(initValue),
                 countDownOpt});
+    }
+
+    /*
+     * Tests several invalid inputs for the counter generator to make sure the correct runtime exceptions are thrown.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "xczu3eg-sbva484-1-i, RAMB36_X0Y35, 32, 0, 1, false, ERROR: Slice RAMB36_X0Y35 is not a valid logic site for xczu3eg-sbva484-1-i.",
+            "xcku040-ffva1156-2-e, SLICE_X500Y500, 32, 0, 1, false, ERROR: Slice SLICE_X500Y500 is not a valid logic site for xcku040-ffva1156-2-e.",
+            "xczu3eg-sbva484-1-i, SLICE_X1Y177, 32, 0, 1, false, ERROR: The maximum width for a counter implemented on xczu3eg-sbva484-1-i starting at site SLICE_X1Y177 is 24",
+            "xczu3eg-sbva484-1-i, SLICE_X1Y179, 1024, 0, 1, false, ERROR: The maximum width for a counter implemented on xczu3eg-sbva484-1-i starting at site SLICE_X1Y179 is 8",
+            "xc7z020clg400-1, SLICE_X1Y1, 32, 0, 1, false, ERROR: Invalid/unsupported part xc7z020clg400-1.",
+            "xczu3eg-sbva484-1-i, SLICE_X0Y0, 0, 0, 1, false, ERROR: The counter's width must be greater than 0.",
+            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 1, 2, 1, false, ERROR: The counter's initial value must be greater than or equal to 0 and less than 2^{width}.",
+            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 1, 0, 2, false, ERROR: The counter's step must be greater than 0 and less than 2^{width}.",
+            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 32, -1, 1, false, ERROR: The counter's initial value must be greater than or equal to 0 and less than 2^{width}.",
+            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 32, 0, 0, false, ERROR: The counter's step must be greater than 0 and less than 2^{width}.",
+    })
+    public void testCounterGeneratorExceptions(String device,  String sliceName, int width, long initValue, long step,
+                                     boolean countDown, String exceptionMessage, @TempDir Path tempDir) {
+        String countDownOpt = countDown ? "-m" : "";
+        Exception exception = assertThrows(RuntimeException.class, () -> {
+            CounterGenerator.main(new String[]{"-p", device, "-o", tempDir.toAbsolutePath()+"/test.dcp", "-w",
+                    Integer.toString(width), "-s", sliceName, "-t", Long.toString(step), "-i", Long.toString(initValue),
+                    countDownOpt});
+        });
+
+        String actualMessage = exception.getMessage();
+        assertTrue(actualMessage.contains(exceptionMessage));
     }
 }

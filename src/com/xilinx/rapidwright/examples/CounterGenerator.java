@@ -40,6 +40,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
@@ -52,6 +53,8 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
+import org.python.antlr.ast.Slice;
+import org.python.modules.math;
 
 import static com.xilinx.rapidwright.examples.ArithmeticGenerator.INPUT_A_NAME;
 import static com.xilinx.rapidwright.examples.ArithmeticGenerator.INPUT_B_NAME;
@@ -201,8 +204,8 @@ public class CounterGenerator {
             accepts(WIDTH_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(width).describedAs("Operand width");
             accepts(SLICE_SITES_OPT).withOptionalArg().defaultsTo(sliceSite).describedAs("Lower left slice to be used for adder/subtracter");
             accepts(COUNT_DOWN_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(countDown).describedAs("Counts down instead of up");
-            accepts(STEP_OPT).withOptionalArg().ofType(Long.class).defaultsTo(step).describedAs("Counts down instead of up");
-            accepts(INIT_OPT).withOptionalArg().ofType(Long.class).defaultsTo(initValue).describedAs("Counts down instead of up");
+            accepts(STEP_OPT).withOptionalArg().ofType(Long.class).defaultsTo(step).describedAs("The amount to increment/decrement each clock cycle");
+            accepts(INIT_OPT).withOptionalArg().ofType(Long.class).defaultsTo(initValue).describedAs("The value the counter starts at");
             accepts(VERBOSE_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(verbose).describedAs("Print verbose output");
             acceptsAll( Arrays.asList(HELP_OPT, "?"), "Print Help" ).forHelp();
         }};
@@ -252,13 +255,46 @@ public class CounterGenerator {
         // Perform some error checking on inputs
         Part part = PartNameTools.getPart(partName);
         if (part == null || part.isSeries7() || part.isVersal()) {
-            throw new RuntimeException("ERROR: Invalid/unsupport part " + partName + ".");
+            throw new RuntimeException("ERROR: Invalid/unsupported part " + partName + ".");
         }
 
-        if (verbose) t.stop().start("Create Counter");
+        if (width <= 0) {
+            throw new RuntimeException("ERROR: The counter's width must be greater than 0.");
+        }
+
+        if (step <= 0 || step >= math.pow(2, width)) {
+            throw new RuntimeException("ERROR: The counter's step must be greater than 0 and less than 2^{width}.");
+        }
+
+        if (initValue < 0 || initValue >= math.pow(2, width)) {
+            throw new RuntimeException("ERROR: The counter's initial value must be greater than or equal to 0 " +
+                    "and less than 2^{width}.");
+        }
 
         Design cntrDesign = new Design(designName, partName);
         Site slice = cntrDesign.getDevice().getSite(sliceName);
+        if (slice == null || !sliceName.startsWith("SLICE")) {
+            throw new RuntimeException("ERROR: Slice " + sliceName + " is not a valid logic site for "
+                    + partName + ".");
+        }
+
+        int sliceX = slice.getInstanceX();
+        int sliceY = slice.getInstanceY();
+        String topSliceName = String.format("SLICE_X%dY%d", sliceX, sliceY+width/8-1);
+        Site topSlice = cntrDesign.getDevice().getSite(topSliceName);
+
+        if (topSlice == null) {
+            int i = 0;
+            while (topSlice == null) {
+                i+=8;
+                topSliceName = String.format("SLICE_X%dY%d", sliceX, sliceY+(width-i)/8-1);
+                topSlice = cntrDesign.getDevice().getSite(topSliceName);
+            }
+            throw new RuntimeException("ERROR: The maximum width for a counter implemented on " + partName +
+                    " starting at site " + sliceName + " is " + (width-i));
+        }
+
+        if (verbose) t.stop().start("Create Counter");
 
         createCounter(cntrDesign, slice, width, initValue, step, countDown);
 
