@@ -251,7 +251,7 @@ public class CounterGenerator {
 
         // Perform some error checking on inputs
         Part part = PartNameTools.getPart(partName);
-        if (part == null || part.isSeries7()) {
+        if (part == null || part.isSeries7() || part.isVersal()) {
             throw new RuntimeException("ERROR: Invalid/unsupport part " + partName + ".");
         }
 
