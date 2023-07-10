@@ -211,13 +211,13 @@ public class PhysNetlistWriter {
             for (Entry<String,AltPinMapping> e : cell.getAltPinMappings().entrySet()) {
                 PinMapping.Builder pinMapping = pinMap.get(idx);
                 pinMapping.setBel(strings.getIndex(cell.getBELName()));
-                pinMapping.setCellPin(strings.getIndex(e.getValue().getLogicalName()));
+                AltPinMapping altPinMapping = e.getValue();
+                pinMapping.setCellPin(strings.getIndex(altPinMapping.getLogicalName()));
                 pinMapping.setBelPin(strings.getIndex(e.getKey()));
-                if (pinMapping.isOtherCell()) {
-                    MultiCellPinMapping.Builder otherCell = pinMapping.getOtherCell();
-                    otherCell.setMultiCell(strings.getIndex(e.getValue().getAltCellName()));
-                    otherCell.setMultiType(strings.getIndex(e.getValue().getAltCellType()));
-                }
+
+                MultiCellPinMapping.Builder otherCell = pinMapping.initOtherCell();
+                otherCell.setMultiCell(strings.getIndex(e.getValue().getAltCellName()));
+                otherCell.setMultiType(strings.getIndex(e.getValue().getAltCellType()));
                 idx++;
             }
         }
