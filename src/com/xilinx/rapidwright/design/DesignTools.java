@@ -3092,6 +3092,9 @@ public class DesignTools {
         for (Cell cell : design.getCells()) {
             if (isUnisimFlipFlopType(cell.getType())) {
                 SiteInst si = cell.getSiteInst();
+                if (!Utils.isSLICE(si)) {
+                    continue;
+                }
                 BEL bel = cell.getBEL();
                 Pair<String, String> sitePinNames = pinMapping.get(bel.getBELType());
                 String[] pins = new String[] {"CE", "SR"};
