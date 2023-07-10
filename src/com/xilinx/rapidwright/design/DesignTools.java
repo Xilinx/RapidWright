@@ -1737,6 +1737,26 @@ public class DesignTools {
             BEL bel = c.getBEL();
             SiteInst si = c.getSiteInst();
 
+            // Check for VCC on A6 and remove if needed
+            if (c.getBEL().isLUT() && c.getBELName().endsWith("5LUT")) {
+                SitePinInst vcc = c.getSiteInst().getSitePinInst(c.getBELName().charAt(0) + "6");
+                if (vcc != null && vcc.getNet().getName().equals(Net.VCC_NET)) {
+                    boolean hasOtherSink = false;
+                    for (BELPin otherSink : si.getSiteWirePins(vcc.getBELPin().getSiteWireIndex())) {
+                        if (otherSink.isOutput())
+                            continue;
+                        Cell otherCell = si.getCell(otherSink.getBEL());
+                        if (otherCell != null && otherCell.getLogicalPinMapping(otherSink.getName()) != null) {
+                            hasOtherSink = true;
+                            break;
+                        }
+                    }
+                    if (!hasOtherSink) {
+                        pinsToRemove.computeIfAbsent(vcc.getNet(), $ -> new HashSet<>()).add(vcc);
+                    }
+                }
+            }
+
             // Remove all physical nets first
             for (String logPin : c.getPinMappingsP2L().values()) {
                 List<SitePinInst> removePins = unrouteCellPinSiteRouting(c, logPin);
