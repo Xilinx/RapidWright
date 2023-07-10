@@ -27,6 +27,8 @@ import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
+import java.util.Arrays;
+
 public class TestTile {
     @ParameterizedTest
     @CsvSource({
@@ -43,5 +45,18 @@ public class TestTile {
         } else {
             Assertions.assertDoesNotThrow(e);
         }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvu3p,LAG_LAG_X30Y50,'[]'",
+            "xcvu3p,LAG_LAG_X30Y250,'[]'",
+            "xcvu5p,LAG_LAG_X30Y50,'[]'",
+            "xcvu5p,LAG_LAG_X30Y250,'[LAGUNA_X6Y140, LAGUNA_X6Y141, LAGUNA_X7Y140, LAGUNA_X7Y141]'",
+    })
+    public void testGetSites(String partName, String tileName, String expectedSites) {
+        Device dev = Device.getDevice(partName);
+        Tile tile = dev.getTile(tileName);
+        Assertions.assertEquals(expectedSites, Arrays.toString(tile.getSites()));
     }
 }
