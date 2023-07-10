@@ -95,6 +95,7 @@ import com.xilinx.rapidwright.util.DesignImplementationDiff;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.JobQueue;
 import com.xilinx.rapidwright.util.Jython;
+import com.xilinx.rapidwright.util.MakeBlackBox;
 import com.xilinx.rapidwright.util.PartPrinter;
 import com.xilinx.rapidwright.util.PerformanceExplorer;
 import com.xilinx.rapidwright.util.ReplaceEDIFInDCP;
@@ -152,6 +153,7 @@ public class MainEntrypoint {
         addFunction("Lesson1", Lesson1::main);
         addFunction("LogicalNetlistExample", LogicalNetlistExample::main);
         addFunction("LUTTools", LUTTools::main);
+        addFunction("MakeBlackBox", MakeBlackBox::main);
         addFunction("MergeDesigns", MergeDesigns::main);
         addFunction("MetadataParser", MetadataParser::main);
         addFunction("ModuleOptimizer", ModuleOptimizer::main);
