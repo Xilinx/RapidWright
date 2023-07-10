@@ -258,8 +258,8 @@ public class CounterGenerator {
             throw new RuntimeException("ERROR: Invalid/unsupported part " + partName + ".");
         }
 
-        if (width <= 0) {
-            throw new RuntimeException("ERROR: The counter's width must be greater than 0.");
+        if (width <= 1) {
+            throw new RuntimeException("ERROR: The counter's width must be greater than 1.");
         }
 
         if (step <= 0 || step >= math.pow(2, width)) {

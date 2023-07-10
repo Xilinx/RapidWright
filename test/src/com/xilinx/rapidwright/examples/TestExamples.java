@@ -75,12 +75,12 @@ public class TestExamples {
             "xcku040-ffva1156-2-e,  SLICE_X1Y1, 32, 0, 1, false", // Device.KCU105
             "xczu3eg-sbva484-1-i, SLICE_X0Y0, 32, 0, 1, false",
             "xczu3eg-sbva484-1-i, SLICE_X0Y147, 32, 0, 1, false",
-            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 1, 0, 1, false",
+            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 2, 0, 1, false",
             "xczu3eg-sbva484-1-i, SLICE_X1Y1, 65, 0, 1, false",
             "xczu3eg-sbva484-1-i, SLICE_X1Y1, 1024, 0, 1, false",
             "xczu3eg-sbva484-1-i, SLICE_X1Y1, 32, 1024, 1, true",
             "xczu3eg-sbva484-1-i, SLICE_X1Y1, 32, 0, 1024, false",
-            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 1, 1, 1, false",
+            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 2, 3, 3, false",
     })
     public void testCounterGenerator(String device,  String sliceName, int width, long initValue, long step,
                                      boolean countDown,  @TempDir Path tempDir) {
@@ -139,9 +139,10 @@ public class TestExamples {
             "xczu3eg-sbva484-1-i, SLICE_X1Y177, 32, 0, 1, false, ERROR: The maximum width for a counter implemented on xczu3eg-sbva484-1-i starting at site SLICE_X1Y177 is 24",
             "xczu3eg-sbva484-1-i, SLICE_X1Y179, 1024, 0, 1, false, ERROR: The maximum width for a counter implemented on xczu3eg-sbva484-1-i starting at site SLICE_X1Y179 is 8",
             "xc7z020clg400-1, SLICE_X1Y1, 32, 0, 1, false, ERROR: Invalid/unsupported part xc7z020clg400-1.",
-            "xczu3eg-sbva484-1-i, SLICE_X0Y0, 0, 0, 1, false, ERROR: The counter's width must be greater than 0.",
-            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 1, 2, 1, false, ERROR: The counter's initial value must be greater than or equal to 0 and less than 2^{width}.",
-            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 1, 0, 2, false, ERROR: The counter's step must be greater than 0 and less than 2^{width}.",
+            "xczu3eg-sbva484-1-i, SLICE_X0Y0, 0, 0, 1, false, ERROR: The counter's width must be greater than 1.",
+            "xczu3eg-sbva484-1-i, SLICE_X0Y0, 1, 0, 1, false, ERROR: The counter's width must be greater than 1.",
+            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 2, 4, 1, false, ERROR: The counter's initial value must be greater than or equal to 0 and less than 2^{width}.",
+            "xczu3eg-sbva484-1-i, SLICE_X1Y1, 2, 0, 4, false, ERROR: The counter's step must be greater than 0 and less than 2^{width}.",
             "xczu3eg-sbva484-1-i, SLICE_X1Y1, 32, -1, 1, false, ERROR: The counter's initial value must be greater than or equal to 0 and less than 2^{width}.",
             "xczu3eg-sbva484-1-i, SLICE_X1Y1, 32, 0, 0, false, ERROR: The counter's step must be greater than 0 and less than 2^{width}.",
     })
