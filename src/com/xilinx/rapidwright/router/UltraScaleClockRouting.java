@@ -351,6 +351,7 @@ public class UltraScaleClockRouting {
                         }
                         assert(status == NodeStatus.AVAILABLE);
                     }
+                    curr.setParent(null);
                     distLines.add(curr);
                     continue nextClockRegion;
                 }
