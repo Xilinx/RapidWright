@@ -539,4 +539,19 @@ class TestEDIFNetlist {
         Assertions.assertEquals(childInst.getCellType().getName(), "OBUFTDS_DCIEN_DUAL_BUF");
         Assertions.assertEquals(childInst.getCellType().getCellInsts().size(), 3);
     }
+
+    @Test
+    public void testRAM32X1SExpansion() {
+        EDIFNetlist n = EDIFTools.createNewNetlist("test");
+
+        EDIFCell ram32x1s = n.getHDIPrimitivesLibrary().addCell(Design.getUnisimCell(Unisim.RAM32X1S));
+        n.getTopCell().createChildCellInst("inst", ram32x1s);
+
+        Assertions.assertNull(n.getCellInstFromHierName("inst/SP"));
+
+        n.expandMacroUnisims(Series.Series7);
+        EDIFCellInst inst = n.getCellInstFromHierName("inst/SP");
+        Assertions.assertNotNull(inst);
+        Assertions.assertEquals("string(1'b0)", inst.getProperty("IS_CLK_INVERTED").toString());
+    }
 }
