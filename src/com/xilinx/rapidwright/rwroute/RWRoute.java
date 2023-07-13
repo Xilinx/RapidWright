@@ -1224,6 +1224,9 @@ public class RWRoute{
         if (rnode != null) {
             queue.clear();
             finishRouteConnection(connection, rnode);
+            if (!connection.getSink().isRouted()) {
+                throw new RuntimeException("Unable to save routing for connection " + connection);
+            }
             if (config.isTimingDriven()) connection.updateRouteDelay();
             assert(connection.getSink().isRouted());
         } else {
@@ -1303,16 +1306,22 @@ public class RWRoute{
      * @param connection The routed target connection.
      */
     protected void finishRouteConnection(Connection connection, RouteNode rnode) {
-        saveRouting(connection, rnode);
-        updateUsersAndPresentCongestionCost(connection);
+        boolean routed = saveRouting(connection, rnode);
+        if (routed) {
+            connection.getSink().setRouted(routed);
+            updateUsersAndPresentCongestionCost(connection);
+        } else {
+            connection.resetRoute();
+        }
     }
 
     /**
      * Traces back for a connection from its sink rnode to its source, in order to build and store the routing path.
      * @param connection: The connection that is being routed.
      * @param rnode RouteNode to start backtracking from.
+     * @return True if backtracking successful.
      */
-    private void saveRouting(Connection connection, RouteNode rnode) {
+    private boolean saveRouting(Connection connection, RouteNode rnode) {
         RouteNode sinkRnode = connection.getSinkRnode();
         RouteNode altSinkRnode = connection.getAltSinkRnode();
         if (rnode != sinkRnode && rnode != altSinkRnode) {
@@ -1350,17 +1359,14 @@ public class RWRoute{
                     connection.setSource(altSource);
                     connection.setSourceRnode(altSourceRnode);
                 } else {
-                    throw new RuntimeException(connection + " expected " + altSourceINTNode +
-                            " or " + connection.getSourceRnode().getNode() +
-                            " got " + sourceRnode.getNode());
+                    return false;
                 }
             } else {
-                throw new RuntimeException(connection + " expected " + connection.getSourceRnode().getNode() +
-                        " got " + sourceRnode.getNode());
+                return false;
             }
         }
 
-        connection.getSink().setRouted(true);
+        return true;
     }
 
     /**

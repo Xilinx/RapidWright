@@ -335,11 +335,11 @@ public class PartialRouter extends RWRoute {
 
             Set<SitePinInst> pinsToRoute = netToPins.get(net);
 
-            // Use the prev pointers to update the routing for each already-routed connection
+            // Use the prev pointers to attempt to recover routing for those connections
+            // that are not to be routed
             for (Connection connection : netWrapper.getConnections()) {
                 if (!pinsToRoute.contains(connection.getSink())) {
                     finishRouteConnection(connection, connection.getSinkRnode());
-                    assert(connection.getSink().isRouted());
                 }
             }
         }
@@ -559,10 +559,9 @@ public class PartialRouter extends RWRoute {
                 rend.setPrev(rstart);
             }
 
-            // Use the prev pointers to update the routing for each connection
+            // Try and use prev pointers to recover the routing for each connection
             for (Connection connection : netWrapper.getConnections()) {
                 finishRouteConnection(connection, connection.getSinkRnode());
-                assert(connection.getSink().isRouted());
             }
 
             netToPins.put(net, new HashSet<>(net.getSinkPins()));
