@@ -652,10 +652,12 @@ public class PartialRouter extends RWRoute {
 
     /**
      * Return all SitePinInst objects belonging to fully unrouted nets (containing no routing PIPs).
+     * This method assumes that {@link RWRoute#preprocess(Design)}, where necessary, has already
+     * been executed.
      * @param design The {@link Design} instance to be examined.
      * @return A list of unrouted SitePinInst objects.
      */
-    private static List<SitePinInst> getUnroutedPins(Design design) {
+    public static List<SitePinInst> getUnroutedPins(Design design) {
         List<SitePinInst> pinsToRoute = new ArrayList<>();
         for (Net net : design.getNets()) {
             if (net.getSource() == null && !net.isStaticNet()) {
