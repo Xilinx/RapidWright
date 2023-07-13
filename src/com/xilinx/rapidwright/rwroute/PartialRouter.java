@@ -202,6 +202,13 @@ public class PartialRouter extends RWRoute {
             if (net.isStaticNet()) {
                 return NodeStatus.UNAVAILABLE;
             }
+
+            // FIXME: It's still possible to encounter a node that is
+            //        a must-have for a preserved net here (e.g. a
+            //        PINBOUNCE sink node). When that preserved net
+            //        is not (yet) one that is queued for routing,
+            //        some more work is needed to determine if it
+            //        really is a must-have.
         }
 
         RouteNode rnode = routingGraph.getNode(node);
