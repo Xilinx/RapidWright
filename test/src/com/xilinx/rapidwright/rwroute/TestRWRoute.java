@@ -150,11 +150,8 @@ public class TestRWRoute {
         Design design = RapidWrightDCP.loadDCP("picoblaze_partial.dcp");
         design.setTrackNetChanges(true);
 
-        Design routed = PartialRouter.routeDesignWithUserDefinedArguments(
-                design,
-                new String[]{
-                        "--nonTimingDriven"
-                });
+        boolean softPreserve = false;
+        Design routed = PartialRouter.routeDesignPartialNonTimingDriven(design, null, softPreserve);
 
         Assertions.assertFalse(routed.getModifiedNets().isEmpty());
         for (Net net : routed.getModifiedNets()) {
@@ -175,11 +172,8 @@ public class TestRWRoute {
         Design design = RapidWrightDCP.loadDCP("picoblaze_partial.dcp");
         design.setTrackNetChanges(true);
 
-        Design routed = PartialRouter.routeDesignWithUserDefinedArguments(
-                design,
-                new String[]{
-                        "--timingDriven"
-                });
+        boolean softPreserve = false;
+        Design routed = PartialRouter.routeDesignPartialTimingDriven(design, null, false);
 
         Assertions.assertFalse(routed.getModifiedNets().isEmpty());
         for (Net net : routed.getModifiedNets()) {
