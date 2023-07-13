@@ -540,18 +540,24 @@ class TestEDIFNetlist {
         Assertions.assertEquals(childInst.getCellType().getCellInsts().size(), 3);
     }
 
-    @Test
-    public void testRAM32X1SExpansion() {
+    @ParameterizedTest
+    @CsvSource({
+            "RAM32X1S,1'b0",
+            "RAM32X1S_1,1'b1",
+            "RAM16X1S,1'b0",
+            "RAM16X1S_1,1'b1",
+    })
+    public void testRAM32X1SExpansion(String unisim, String expected) {
         EDIFNetlist n = EDIFTools.createNewNetlist("test");
 
-        EDIFCell ram32x1s = n.getHDIPrimitivesLibrary().addCell(Design.getUnisimCell(Unisim.RAM32X1S));
-        n.getTopCell().createChildCellInst("inst", ram32x1s);
+        EDIFCell macro = n.getHDIPrimitivesLibrary().addCell(Design.getUnisimCell(Unisim.valueOf(unisim)));
+        n.getTopCell().createChildCellInst("inst", macro);
 
         Assertions.assertNull(n.getCellInstFromHierName("inst/SP"));
 
         n.expandMacroUnisims(Series.Series7);
         EDIFCellInst inst = n.getCellInstFromHierName("inst/SP");
         Assertions.assertNotNull(inst);
-        Assertions.assertEquals("string(1'b0)", inst.getProperty("IS_CLK_INVERTED").toString());
+        Assertions.assertEquals(expected, inst.getProperty("IS_CLK_INVERTED").getValue());
     }
 }
