@@ -60,7 +60,7 @@ public class PartialRouter extends RWRoute {
 
     protected Set<NetWrapper> partiallyPreservedNets;
 
-    protected Map<Net, List<SitePinInst>> netToPins;
+    protected Map<Net, Set<SitePinInst>> netToPins;
 
     protected class RouteNodeGraphPartial extends RouteNodeGraph {
 
@@ -91,7 +91,7 @@ public class PartialRouter extends RWRoute {
         partiallyPreservedNets = new HashSet<>();
         netToPins = pinsToRoute.stream()
                 .filter((spi) -> !spi.isOutPin())
-                .collect(Collectors.groupingBy(SitePinInst::getNet));
+                .collect(Collectors.groupingBy(SitePinInst::getNet, Collectors.toSet()));
     }
 
     public PartialRouter(Design design, RWRouteConfig config, Collection<SitePinInst> pinsToRoute) {
@@ -333,9 +333,11 @@ public class PartialRouter extends RWRoute {
                 rend.setPrev(rstart);
             }
 
-            // Use the prev pointers to update the routing for each connection
+            Set<SitePinInst> pinsToRoute = netToPins.get(net);
+
+            // Use the prev pointers to update the routing for each already-routed connection
             for (Connection connection : netWrapper.getConnections()) {
-                if (connection.getSink().isRouted()) {
+                if (!pinsToRoute.contains(connection.getSink())) {
                     finishRouteConnection(connection, connection.getSinkRnode());
                     assert(connection.getSink().isRouted());
                 }
@@ -353,7 +355,7 @@ public class PartialRouter extends RWRoute {
             preserveNet(clk, true);
             numPreservedClks++;
 
-            List<SitePinInst> clkPins = netToPins.get(clk);
+            Collection<SitePinInst> clkPins = netToPins.get(clk);
             if (clkPins != null && !clkPins.isEmpty()) {
                 clkNets.add(clk);
                 numPreservedRoutableNets++;
@@ -370,7 +372,7 @@ public class PartialRouter extends RWRoute {
             numPreservedStaticNets++;
         }
 
-        List<SitePinInst> staticPins = netToPins.get(staticNet);
+        Collection<SitePinInst> staticPins = netToPins.get(staticNet);
         if (staticPins == null || staticPins.isEmpty()) {
             if (staticNet.hasPIPs()) {
                 numPreservedRoutableNets++;
@@ -390,7 +392,6 @@ public class PartialRouter extends RWRoute {
         if (pinsToRoute == null) {
             pinsToPreserve = net.getPins();
         } else {
-            pinsToRoute = new HashSet<>(pinsToRoute);
             pinsToPreserve = new ArrayList<>();
             for (SitePinInst spi : net.getPins()) {
                 if (!pinsToRoute.contains(spi)) {
@@ -407,7 +408,7 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected void addNetConnectionToRoutingTargets(Net net) {
-        List<SitePinInst> pinsToRoute = netToPins.get(net);
+        Set<SitePinInst> pinsToRoute = netToPins.get(net);
         if (pinsToRoute != null) {
             assert(!pinsToRoute.isEmpty());
 
@@ -559,12 +560,12 @@ public class PartialRouter extends RWRoute {
             }
 
             // Use the prev pointers to update the routing for each connection
-            for (Connection netnewConnection : netWrapper.getConnections()) {
-                if (netnewConnection.getSink().isRouted()) {
-                    finishRouteConnection(netnewConnection, netnewConnection.getSinkRnode());
-                    assert(netnewConnection.getSink().isRouted());
-                }
+            for (Connection connection : netWrapper.getConnections()) {
+                finishRouteConnection(connection, connection.getSinkRnode());
+                assert(connection.getSink().isRouted());
             }
+
+            netToPins.put(net, new HashSet<>(net.getSinkPins()));
 
             // Update the timing graph
             if (timingManager != null) {
