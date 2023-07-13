@@ -288,7 +288,7 @@ public class RWRoute{
         indirectConnections = new ArrayList<>();
         directConnections = new ArrayList<>();
         clkNets = new ArrayList<>();
-        staticNetAndRoutingTargets = new IdentityHashMap<>();
+        staticNetAndRoutingTargets = new HashMap<>();
 
         for (Net net : design.getNets()) {
             if (net.isClockNet()) {
@@ -441,6 +441,9 @@ public class RWRoute{
 
     protected void addStaticNetRoutingTargets(Net staticNet, List<SitePinInst> sinks) {
         staticNetAndRoutingTargets.put(staticNet, sinks);
+        for (SitePinInst spi : sinks) {
+            routingGraph.preserve(spi.getConnectedNode(), staticNet);
+        }
     }
 
     /**
@@ -460,39 +463,16 @@ public class RWRoute{
             }
         }
 
-        Map<Node,Net> preservedStaticNodes;
-        if (staticNetAndRoutingTargets.size() > 1) {
-            // Annotate all static pin nodes with the net they're associated with to ensure that one
-            // net cannot unknowingly use a node needed by the other net
-            preservedStaticNodes = new HashMap<>();
-            for (Map.Entry<Net, List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
-                Net staticNet = e.getKey();
-                for (SitePinInst sink : e.getValue()) {
-                    Node node = sink.getConnectedNode();
-                    preservedStaticNodes.put(node, staticNet);
-                    assert (!routingGraph.isPreserved(node));
-                }
+        for (Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
+            Net staticNet = e.getKey();
+            List<SitePinInst> pins = e.getValue();
+            for (SitePinInst spi : pins) {
+                routingGraph.unpreserve(spi.getConnectedNode());
             }
-        } else {
-            preservedStaticNodes = Collections.emptyMap();
-        }
 
-        // Iterate through both static nets in a stable order (not guaranteed by IdentityHashMap)
-        for (Net staticNet : Arrays.asList(design.getGndNet(), design.getVccNet())) {
-            List<SitePinInst> pins = staticNetAndRoutingTargets.get(staticNet);
-            if (pins == null) {
-                continue;
-            }
             System.out.println("INFO: Routing " + pins.size() + " pins of " + staticNet);
 
-            Function<Node, NodeStatus> gns = (node) -> {
-                // Check that this node is not needed by a pin on the other static net
-                Net preservedNet = preservedStaticNodes.get(node);
-                if (preservedNet != null && preservedNet != staticNet) {
-                    return NodeStatus.UNAVAILABLE;
-                }
-                return getGlobalRoutingNodeStatus(staticNet, node);
-            };
+            Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(staticNet, node);
             GlobalSignalRouting.routeStaticNet(staticNet, gns, design, routethruHelper);
 
             preserveNet(staticNet, false);
