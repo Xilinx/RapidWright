@@ -377,20 +377,37 @@ public class PartialRouter extends RWRoute {
     }
 
     @Override
+    protected void preserveNet(Net net, boolean async) {
+        Collection<SitePinInst> pinsToRoute = netToPins.get(net);
+        List<SitePinInst> pinsToPreserve;
+        if (pinsToRoute == null) {
+            pinsToPreserve = net.getPins();
+        } else {
+            pinsToRoute = new HashSet<>(pinsToRoute);
+            pinsToPreserve = new ArrayList<>();
+            for (SitePinInst spi : net.getPins()) {
+                if (!pinsToRoute.contains(spi)) {
+                    pinsToPreserve.add(spi);
+                }
+            }
+        }
+        if (async) {
+            routingGraph.preserveAsync(net, pinsToPreserve);
+        } else {
+            routingGraph.preserve(net, pinsToPreserve);
+        }
+    }
+
+    @Override
     protected void addNetConnectionToRoutingTargets(Net net) {
-        List<SitePinInst> sinkPins = net.getSinkPins();
         List<SitePinInst> pinsToRoute = netToPins.get(net);
         if (pinsToRoute != null) {
             assert(!pinsToRoute.isEmpty());
 
-            boolean partiallyPreserved = (pinsToRoute.size() < sinkPins.size());
-            if (partiallyPreserved) {
-                // Mark all pins as being routed, then unmark those that need routing
-                sinkPins.forEach((spi) -> spi.setRouted(true));
-            }
-            pinsToRoute.forEach((spi) -> spi.setRouted(false));
-
             NetWrapper netWrapper = createNetWrapperAndConnections(net);
+
+            List<SitePinInst> sinkPins = net.getSinkPins();
+            boolean partiallyPreserved = (pinsToRoute.size() < sinkPins.size());
             if (partiallyPreserved) {
                 partiallyPreservedNets.add(netWrapper);
             }

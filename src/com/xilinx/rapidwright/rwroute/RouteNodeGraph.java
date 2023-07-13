@@ -225,14 +225,9 @@ public class RouteNodeGraph {
         return oldNet;
     }
 
-    public void preserve(Net net) {
-        List<SitePinInst> pins = net.getPins();
-        SitePinInst sourcePin = net.getSource();
-        assert (sourcePin == null || pins.contains(sourcePin));
-        SitePinInst altSourcePin = net.getAlternateSource();
-        assert (altSourcePin == null || pins.contains(altSourcePin));
+    public void preserve(Net net, List<SitePinInst> pins) {
         boolean drivenByHierPort = DesignTools.isNetDrivenByHierPort(net);
-        for (SitePinInst pin : net.getPins()) {
+        for (SitePinInst pin : pins) {
             // Do not preserve if pin is not routed unless it's a hier port in which
             // case do so otherwise Vivado will recognize it as a conflict.
             // (SitePinInst.isRouted() is meaningless for output pins)
@@ -249,17 +244,25 @@ public class RouteNodeGraph {
         }
     }
 
-    public void preserveAsync(Net net) {
+    public void preserveAsync(Net net, List<SitePinInst> pins) {
         asyncPreserveOutstanding.countUp();
         ParallelismTools.submit(() -> {
             try {
-                preserve(net);
+                preserve(net, pins);
             } catch (Throwable t) {
                 t.printStackTrace();
             } finally {
                 asyncPreserveOutstanding.countDown();
             }
         });
+    }
+
+    public void preserve(Net net) {
+        preserve(net, net.getPins());
+    }
+
+    public void preserveAsync(Net net) {
+        preserveAsync(net, net.getPins());
     }
 
     public void awaitPreserve() {
