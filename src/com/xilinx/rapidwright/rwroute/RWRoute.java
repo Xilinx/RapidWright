@@ -1761,6 +1761,7 @@ public class RWRoute{
 
         // For testing
         System.setProperty("rapidwright.rwroute.nodesPopped", String.valueOf(nodesPopped));
+        System.setProperty("rapidwright.rwroute.numStaticNetPins", String.valueOf(getNumStaticNetPins()));
     }
 
     /**
