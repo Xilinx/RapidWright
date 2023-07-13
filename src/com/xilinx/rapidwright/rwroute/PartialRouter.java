@@ -44,7 +44,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -195,15 +194,24 @@ public class PartialRouter extends RWRoute {
         if (preservedNet == net) {
             return NodeStatus.INUSE;
         }
-        if (!softPreserve && preservedNet != null) {
-            return NodeStatus.UNAVAILABLE;
+        if (preservedNet != null) {
+            if (!softPreserve) {
+                return NodeStatus.UNAVAILABLE;
+            }
+
+            if (net.isStaticNet()) {
+                return NodeStatus.UNAVAILABLE;
+            }
         }
 
         RouteNode rnode = routingGraph.getNode(node);
         if (rnode != null) {
-            // In softPreserve mode, allow global router to use all nodes -- including
-            // those already preserved by another net, unless it's an input pin
-            if (!softPreserve || rnode.getType() == RouteNodeType.PINFEED_I) {
+            if (!softPreserve) {
+                return NodeStatus.UNAVAILABLE;
+            }
+
+            if (rnode.getType() == RouteNodeType.PINFEED_I) {
+                // Node must be a sink pin for a non-global net
                 return NodeStatus.UNAVAILABLE;
             }
         }
@@ -218,47 +226,75 @@ public class PartialRouter extends RWRoute {
 
         super.routeGlobalClkNets();
 
-        if (softPreserve) {
-            // Even though routeGlobalClkNets() has called preserveNet() for all clkNets,
-            // it will not overwrite those nodes which have already been preserved by other
-            // nets.
-            // Discover such occurrences so that the entire 'other' net can be correctly
-            // unpreserved (thus re-routed) and re-preserve clk.
-            List<Net> unpreserveNets = new ArrayList<>();
-            for (Net clk : clkNets) {
-                for (PIP pip : clk.getPIPs()) {
-                    for (Node node : Arrays.asList(pip.getStartNode(), pip.getEndNode())) {
-                        Net preservedNet = routingGraph.getPreservedNet(node);
-                        if (preservedNet == clk) {
-                            continue;
-                        }
-                        if (preservedNet == null) {
-                            // Assume this node has already been unpreserved
-                        } else {
-                            unpreserveNet(preservedNet);
-                            unpreserveNets.add(preservedNet);
-                        }
-
-                        // Redo preserving clk
-                        Net oldNet = routingGraph.preserve(node, clk);
-                        assert(oldNet == null);
-
-                        // Clear preservedNode's prev pointer so that it doesn't get misinterpreted
-                        // by RouteNodeGraph.mustInclude as being part of an existing route
-                        RouteNode rnode = routingGraph.getNode(node);
-                        assert(rnode.getPrev() != null);
-                        rnode.clearPrev();
-                    }
-                }
+        List<Net> unpreserveNets = unpreserveCongestedNets(clkNets);
+        if (!unpreserveNets.isEmpty()) {
+            System.out.println("INFO: Unpreserving " + unpreserveNets.size() + " nets due to clock congestion");
+            for (Net net : unpreserveNets) {
+                System.out.println("\t" + net);
             }
+        }
+    }
 
-            if (!unpreserveNets.isEmpty()) {
-                System.out.println("INFO: Unpreserving " + unpreserveNets.size() + " nets due to clock congestion");
-                for (Net net : unpreserveNets) {
-                    System.out.println("\t" + net);
+    @Override
+    protected void routeStaticNets() {
+        if (staticNetAndRoutingTargets.isEmpty())
+            return;
+
+        super.routeStaticNets();
+
+        List<Net> unpreserveNets = unpreserveCongestedNets(staticNetAndRoutingTargets.keySet());
+        if (!unpreserveNets.isEmpty()) {
+            System.out.println("INFO: Unpreserving " + unpreserveNets.size() + " nets due to static net congestion");
+            for (Net net : unpreserveNets) {
+                System.out.println("\t" + net);
+            }
+        }
+    }
+
+    private List<Net> unpreserveCongestedNets(Collection<Net> globalNets) {
+        if (!softPreserve) {
+            return Collections.emptyList();
+        }
+
+        // Even though route{GlobalClk,Static}Nets() has called preserveNet() for all its nets,
+        // it will not overwrite those nodes which have already been preserved by other nets.
+        // Discover such occurrences so that the entire 'victim' net can be correctly
+        // unpreserved (thus re-routed) and re-preserve the global.
+        List<Net> unpreserveNets = new ArrayList<>();
+        for (Net net : globalNets) {
+            for (PIP pip : net.getPIPs()) {
+                for (Node node : Arrays.asList(pip.getStartNode(), pip.getEndNode())) {
+                    Net preservedNet = routingGraph.getPreservedNet(node);
+                    if (preservedNet == net) {
+                        continue;
+                    }
+                    if (preservedNet == null) {
+                        // Assume this node has already been unpreserved
+                    } else {
+                        unpreserveNet(preservedNet);
+                        unpreserveNets.add(preservedNet);
+                    }
+
+                    // Redo preserving clk
+                    Net oldNet = routingGraph.preserve(node, net);
+                    assert(oldNet == null);
+
+                    // RouteNode must exist since the net has been unpreserved
+                    RouteNode rnode = routingGraph.getNode(node);
+
+                    // Clear its prev pointer so that it doesn't get misinterpreted
+                    // by RouteNodeGraph.mustInclude as being part of an existing route
+                    assert(rnode.getPrev() != null);
+                    rnode.clearPrev();
+
+                    // Since we don't currently support the deletion of a RouteNode, increment
+                    // it with a null net (since global nets have no NetWrapper) in order to
+                    // prevent it from being used by non-global nets
+                    rnode.incrementUser(null);
                 }
             }
         }
+        return unpreserveNets;
     }
 
     @Override
@@ -300,25 +336,6 @@ public class PartialRouter extends RWRoute {
         }
 
         routingGraph.resetExpansion();
-
-        // Mark each static sink node -- if it exists -- as being used, unpreserving any nets
-        // using those nodes (likely bounce points) as needed
-        for (Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
-            Net staticNet = e.getKey();
-            List<SitePinInst> netRouteTargetPins = e.getValue();
-            for (SitePinInst sink : netRouteTargetPins) {
-                Node node = sink.getConnectedNode();
-                Net preservedNet = routingGraph.getPreservedNet(node);
-                if (preservedNet != null && !preservedNet.equals(staticNet)) {
-                    unpreserveNet(preservedNet);
-                }
-
-                RouteNode rnode = routingGraph.getNode(node);
-                if (rnode != null) {
-                    rnode.incrementUser(null);
-                }
-            }
-        }
     }
 
     @Override
