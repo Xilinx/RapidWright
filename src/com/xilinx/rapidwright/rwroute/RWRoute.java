@@ -83,7 +83,7 @@ public class RWRoute{
     /** A list of global clock nets */
     protected List<Net> clkNets;
     /** Static nets */
-    protected Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
+    protected Map<Net, Collection<SitePinInst>> staticNetAndRoutingTargets;
     /** Several integers to indicate the netlist info */
     protected int numPreservedRoutableNets;
     protected int numPreservedClks;
@@ -438,7 +438,7 @@ public class RWRoute{
         }
     }
 
-    protected void addStaticNetRoutingTargets(Net staticNet, List<SitePinInst> sinks) {
+    protected void addStaticNetRoutingTargets(Net staticNet, Collection<SitePinInst> sinks) {
         staticNetAndRoutingTargets.put(staticNet, sinks);
         for (SitePinInst spi : sinks) {
             routingGraph.preserve(spi.getConnectedNode(), staticNet);
@@ -452,7 +452,7 @@ public class RWRoute{
         if (staticNetAndRoutingTargets.isEmpty())
             return;
 
-        List<SitePinInst> gndPins = staticNetAndRoutingTargets.get(design.getGndNet());
+        Collection<SitePinInst> gndPins = staticNetAndRoutingTargets.get(design.getGndNet());
         if (gndPins != null) {
             Set<SitePinInst> newVccPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins);
             if (!newVccPins.isEmpty()) {
@@ -462,9 +462,9 @@ public class RWRoute{
             }
         }
 
-        for (Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
+        for (Map.Entry<Net,Collection<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
             Net staticNet = e.getKey();
-            List<SitePinInst> pins = e.getValue();
+            Collection<SitePinInst> pins = e.getValue();
             for (SitePinInst spi : pins) {
                 routingGraph.unpreserve(spi.getConnectedNode());
             }
@@ -1649,8 +1649,8 @@ public class RWRoute{
 
     private int getNumStaticNetPins() {
         int totalSitePins = 0;
-        for (Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
-            List<SitePinInst> pins = e.getValue();
+        for (Entry<Net,Collection<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
+            Collection<SitePinInst> pins = e.getValue();
             totalSitePins += pins.size();
         }
         return totalSitePins;

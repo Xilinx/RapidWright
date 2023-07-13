@@ -558,7 +558,7 @@ public class UltraScaleClockRouting {
      *                      for same net as we're routing), or unavailable (preserved for other net).
      */
     public static void incrementalClockRouter(Net clkNet,
-                                              List<SitePinInst> clkPins,
+                                              Collection<SitePinInst> clkPins,
                                               Function<Node,NodeStatus> getNodeStatus) {
         // Find all horizontal distribution lines to be used as starting points and create a map
         // lookup by clock region
