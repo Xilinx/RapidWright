@@ -543,9 +543,6 @@ class TestEDIFNetlist {
     @ParameterizedTest
     @CsvSource({
             "RAM32X1S,1'b0",
-            "RAM32X1S_1,1'b1",
-            "RAM16X1S,1'b0",
-            "RAM16X1S_1,1'b1",
     })
     public void testRAM32X1SExpansion(String unisim, String expected) {
         EDIFNetlist n = EDIFTools.createNewNetlist("test");
@@ -559,5 +556,28 @@ class TestEDIFNetlist {
         EDIFCellInst inst = n.getCellInstFromHierName("inst/SP");
         Assertions.assertNotNull(inst);
         Assertions.assertEquals(expected, inst.getProperty("IS_CLK_INVERTED").getValue());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "RAM32X1S_1",
+            "RAM16X1S",
+            "RAM16X1S_1",
+    })
+    public void testUnsupportedMacroExpansionAndProperty(String unisim) {
+        EDIFNetlist n = EDIFTools.createNewNetlist("test");
+
+        EDIFCell macro = n.getHDIPrimitivesLibrary().addCell(Design.getUnisimCell(Unisim.valueOf(unisim)));
+        EDIFCellInst inst = n.getTopCell().createChildCellInst("inst", macro);
+
+        Assertions.assertEquals(0, inst.getCellType().getCellInsts().size());
+
+        n.expandMacroUnisims(Series.Series7);
+
+        // Assert no expansion/retargeting occurred for unsupported macros
+        Assertions.assertEquals(0, inst.getCellType().getCellInsts().size());
+
+        // Assert no property exists on unsupported macros either
+        Assertions.assertNull(inst.getProperty("IS_CLK_INVERTED"));
     }
 }
