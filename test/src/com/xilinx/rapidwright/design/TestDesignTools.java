@@ -1004,6 +1004,27 @@ public class TestDesignTools {
         Assertions.assertEquals(31, numSitewires);
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testMakePhysNetNamesConsistentStaticNets(boolean gnd) {
+        Design design = new Design("design", Device.AWS_F1);
+        Net staticNet = gnd ? design.getGndNet() : design.getVccNet();
+
+        Net anotherStaticNet = design.createNet("anotherStaticNet");
+        anotherStaticNet.setType(staticNet.getType());
+
+        Cell cell = design.createAndPlaceCell("cell", Unisim.LUT1, "SLICE_X0Y0/A6LUT");
+        SitePinInst spi = anotherStaticNet.connect(cell, "I0");
+
+        Assertions.assertEquals(0, staticNet.getPins().size());
+        Assertions.assertEquals(Arrays.asList(spi), anotherStaticNet.getPins());
+
+        DesignTools.makePhysNetNamesConsistent(design);
+
+        Assertions.assertNull(design.getNet(anotherStaticNet.getName()));
+        Assertions.assertEquals(Arrays.asList(spi), staticNet.getPins());
+    }
+
     @Test
     public void testPlaceCell() {
         //test a design that already contains a Carry4 cell
