@@ -539,7 +539,7 @@ public class RWRoute{
                 indirectConnections.add(connection);
                 checkSinkRoutability(net, sinkINTNode);
                 connection.setSinkRnode(getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I));
-                if (sourceINTRnode == null) {
+                if (sourceINTRnode == null && altSourceINTRnode == null) {
                     Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
 
                     // Pre-emptively set up alternate source since we may expand from both sources
@@ -552,32 +552,31 @@ public class RWRoute{
                         }
                     }
 
-                    // Where the primary source cannot be projected to an INT tile,
-                    // (e.g. for a dedicated pin like COUT) replace with the alternate
-                    // source if it exists
-                    if (altSource != null && sourceINTNode == null) {
-                        sourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-                        source = altSource;
-                        altSource = null;
-                        connection.setSource(source);
-                    }
-                    if (sourceINTNode == null) {
-                        throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
-                    }
-                    sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
-
                     if (altSource != null) {
                         assert(!altSource.equals(source));
                         Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
-                        if (altSourceNode != null) {
-                            altSourceINTRnode = getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O);
-                        } else {
-                            // No projection exists -- could be a dedicated pin like COUT, for example
-                        }
+                        assert(altSourceNode != null);
+                        altSourceINTRnode = getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O);
+                    }
+
+                    if (sourceINTNode != null) {
+                        sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
+                    }
+
+                    if (sourceINTRnode == null && altSourceINTRnode == null) {
+                        throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
                     }
                 }
-                connection.setSourceRnode(sourceINTRnode);
-                connection.setAltSourceRnode(altSourceINTRnode);
+                if (sourceINTRnode != null) {
+                    connection.setSourceRnode(sourceINTRnode);
+                    connection.setAltSourceRnode(altSourceINTRnode);
+                } else {
+                    // Primary source does not reach the fabric (e.g. COUT)
+                    // just use alternate source
+                    assert(altSourceINTRnode != null);
+                    connection.setSource(net.getAlternateSource());
+                    connection.setSourceRnode(altSourceINTRnode);
+                }
                 connection.setDirect(false);
                 indirect++;
                 connection.computeHpwl();
