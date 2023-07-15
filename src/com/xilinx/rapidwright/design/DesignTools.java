@@ -2137,17 +2137,15 @@ public class DesignTools {
     /**
      * Gets the site pin that is currently routed to the specified cell pin.  If
      * the site instance is not routed, it will return null.
-     * Side Effect: It will set alternative source site pins on the net if present.
      * @param cell The cell with the pin of interest.
      * @param net The physical net to which this pin belongs
      * @param belPinName The physical pin name of the cell
-     * @return The name of the site pin on the cell's site to which the pin is routed.
+     * @return The name of the first site pin on the cell's site to which the pin is routed.
      */
     public static String getRoutedSitePinFromPhysicalPin(Cell cell, Net net, String belPinName) {
         SiteInst inst = cell.getSiteInst();
         if (belPinName == null) return null;
         Set<String> siteWires = new HashSet<>(inst.getSiteWiresFromNet(net));
-        String toReturn = null;
         Queue<BELPin> queue = new LinkedList<>();
         queue.add(cell.getBEL().getPin(belPinName));
         while (!queue.isEmpty()) {
@@ -2183,23 +2181,7 @@ public class DesignTools {
                     if (!siteWires.contains(sink.getSiteWireName())) continue;
                     if (sink.isSitePort()) {
                         // Check if there is a dual output scenario
-                        if (toReturn != null) {
-                            SitePinInst source = net.getSource();
-                            String toCreate;
-                            if (source != null && source.getName().equals(sink.getName())) {
-                                toCreate = toReturn;
-                                toReturn = sink.getName();
-                            } else {
-                                toCreate = sink.getName();
-                            }
-                            if (inst.getSitePinInst(toCreate) == null)
-                                net.createPin(toCreate, inst);
-                            // We'll return the first one we found, store the 2nd in the alternate
-                            // reference on the net
-                            return toReturn;
-                        } else {
-                            toReturn = sink.getName();
-                        }
+                        return sink.getName();
                     } else if (sink.getBEL().getBELClass() == BELClass.RBEL) {
                         // Check if the SitePIP is being used
                         SitePIP sitePIP = inst.getUsedSitePIP(sink.getBELName());
@@ -2218,7 +2200,7 @@ public class DesignTools {
                 }
             }
         }
-        return toReturn;
+        return null;
     }
 
     /**
