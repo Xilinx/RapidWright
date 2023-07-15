@@ -528,13 +528,6 @@ public class RWRoute{
         RouteNode altSourceINTRnode = null;
 
         for (SitePinInst sink : net.getSinkPins()) {
-            if (RouterHelper.isExternalConnectionToCout(source, sink)) {
-                source = net.getAlternateSource();
-                if (source == null) {
-                    String errMsg = "Null alternate source is for COUT-CIN connection: " + net.toStringFull();
-                     throw new IllegalArgumentException(errMsg);
-                }
-            }
             Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
 
             List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
@@ -548,12 +541,8 @@ public class RWRoute{
                 connection.setSinkRnode(getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I));
                 if (sourceINTRnode == null) {
                     Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
-                    if (sourceINTNode == null) {
-                        throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
-                    }
-                    sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
 
-                    // Pre-emptively set up alternate source since we are expanding from both sources
+                    // Pre-emptively set up alternate source since we may expand from both sources
                     SitePinInst altSource = net.getAlternateSource();
                     if (altSource == null) {
                         altSource = DesignTools.getLegalAlternativeOutputPin(net);
@@ -562,6 +551,21 @@ public class RWRoute{
                             DesignTools.routeAlternativeOutputSitePin(net, altSource);
                         }
                     }
+
+                    // Where the primary source cannot be projected to an INT tile,
+                    // (e.g. for a dedicated pin like COUT) replace with the alternate
+                    // source if it exists
+                    if (altSource != null && sourceINTNode == null) {
+                        sourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
+                        source = altSource;
+                        altSource = null;
+                        connection.setSource(source);
+                    }
+                    if (sourceINTNode == null) {
+                        throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
+                    }
+                    sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
+
                     if (altSource != null) {
                         assert(!altSource.equals(source));
                         Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
