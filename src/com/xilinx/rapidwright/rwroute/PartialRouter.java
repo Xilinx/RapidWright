@@ -294,9 +294,9 @@ public class PartialRouter extends RWRoute {
                     assert(rnode.getPrev() != null);
                     rnode.clearPrev();
 
-                    // Since we don't currently support the deletion of a RouteNode, increment
-                    // it with a null net (since global nets have no NetWrapper) in order to
-                    // prevent it from being used by non-global nets
+                    // Increment this RouteNode with a null net (since global nets have
+                    // no NetWrapper) in order to flag it as being overused by non-global
+                    // nets
                     rnode.incrementUser(null);
                 }
             }
@@ -333,14 +333,9 @@ public class PartialRouter extends RWRoute {
                 rend.setPrev(rstart);
             }
 
-            Set<SitePinInst> pinsToRoute = netToPins.get(net);
-
-            // Use the prev pointers to attempt to recover routing for those connections
-            // that are not to be routed
+            // Use the prev pointers to attempt to recover routing for all connections
             for (Connection connection : netWrapper.getConnections()) {
-                if (!pinsToRoute.contains(connection.getSink())) {
-                    finishRouteConnection(connection, connection.getSinkRnode());
-                }
+                finishRouteConnection(connection, connection.getSinkRnode());
             }
         }
 
@@ -388,6 +383,7 @@ public class PartialRouter extends RWRoute {
     @Override
     protected void preserveNet(Net net, boolean async) {
         Collection<SitePinInst> pinsToRoute = netToPins.get(net);
+        // Only preserve those pins that are not to be routed
         List<SitePinInst> pinsToPreserve;
         if (pinsToRoute == null) {
             pinsToPreserve = net.getPins();
