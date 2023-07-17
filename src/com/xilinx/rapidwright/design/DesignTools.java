@@ -1313,8 +1313,7 @@ public class DesignTools {
             }
             if (otherUser == false) {
                 // Unroute site routing back to pin and remove site pin
-                String sitePinName = getRoutedSitePinFromPhysicalPin(cell, net, pin.getName());
-                if (sitePinName != null) {
+                for (String sitePinName : getAllRoutedSitePinsFromPhysicalPin(cell, net, pin.getName())) {
                     BELPin sitePortBelPin = siteInst.getSite().getBELPin(sitePinName);
                     assert(sitePortBelPin.isSitePort());
                     boolean outputSitePin = sitePortBelPin.isInput(); // Input BELPin means output SitePin
