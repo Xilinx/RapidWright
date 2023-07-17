@@ -555,8 +555,7 @@ public class RWRoute{
                     if (altSource != null) {
                         assert(!altSource.equals(source));
                         Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
-                        assert(altSourceNode != null);
-                        altSourceINTRnode = getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O);
+                        altSourceINTRnode = altSourceNode != null ? getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O) : null;
                     }
 
                     if (sourceINTNode != null) {
