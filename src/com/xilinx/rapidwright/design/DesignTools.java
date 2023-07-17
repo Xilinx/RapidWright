@@ -2157,7 +2157,7 @@ public class DesignTools {
      */
     public static List<String> getAllRoutedSitePinsFromPhysicalPin(Cell cell, Net net, String belPinName) {
         SiteInst inst = cell.getSiteInst();
-        if (belPinName == null) return null;
+        if (belPinName == null) return Collections.emptyList();
         List<String> sitePins = new ArrayList<>();
         Set<String> siteWires = new HashSet<>(inst.getSiteWiresFromNet(net));
         Queue<BELPin> queue = new LinkedList<>();
@@ -2170,11 +2170,11 @@ public class DesignTools {
                 if (siteWireName.equals("CIN") || siteWireName.equals("COUT")) {
                     return Collections.singletonList(siteWireName);
                 }
-                return null;
+                return Collections.emptyList();
             }
             if (curr.isInput()) {
                 BELPin source = curr.getSourcePin();
-                if (source == null) return null;
+                if (source == null) return Collections.emptyList();
                 if (source.isSitePort()) {
                     return Collections.singletonList(source.getName());
                 } else if (source.getBEL().getBELClass() == BELClass.RBEL) {
@@ -3185,7 +3185,9 @@ public class DesignTools {
         Net net = (netOnSiteWire != null) ? netOnSiteWire : si.getDesign().getVccNet();
         if (net.isStaticNet()) {
             // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
-            if (cell.getType().equals("SRL16E") && siteWireName.endsWith("6")) {
+            if (cell.getType().equals("SRL16E") && siteWireName.endsWith("6") &&
+                    //
+                    cell.getEDIFHierCellInst() != null) {
                 EDIFPropertyValue val = cell.getProperty("XILINX_LEGACY_PRIM");
                 if (val != null && val.getValue().equals("SRLC32E")) {
                     net = si.getDesign().getGndNet();
