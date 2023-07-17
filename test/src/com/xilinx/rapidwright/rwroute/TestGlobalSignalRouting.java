@@ -27,6 +27,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Device;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -48,6 +49,10 @@ public class TestGlobalSignalRouting {
             target.addPinMapping(logicalPinName + "U", logicalPinName);
         }
         globalNet.connect(target, logicalPinName);
+
+        // FIXME: Currently, Net.connect() only connects the first physical pin to the net
+        //        This is a canary assertion that will light up when this gets fixed.
+        Assertions.assertEquals(2 /* 3 */, globalNet.getPins().size());
 
         GlobalSignalRouting.symmetricClkRouting(globalNet, design.getDevice(), (n) -> NodeStatus.AVAILABLE);
     }
