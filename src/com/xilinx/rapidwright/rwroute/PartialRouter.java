@@ -295,8 +295,8 @@ public class PartialRouter extends RWRoute {
                     rnode.clearPrev();
 
                     // Increment this RouteNode with a null net (since global nets have
-                    // no NetWrapper) in order to flag it as being overused by non-global
-                    // nets
+                    // no corresponding NetWrapper) in order to flag it as being permanently
+                    // overused
                     rnode.incrementUser(null);
                 }
             }

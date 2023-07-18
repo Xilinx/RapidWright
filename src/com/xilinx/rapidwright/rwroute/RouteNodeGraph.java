@@ -226,15 +226,7 @@ public class RouteNodeGraph {
     }
 
     public void preserve(Net net, List<SitePinInst> pins) {
-        boolean drivenByHierPort = DesignTools.isNetDrivenByHierPort(net);
         for (SitePinInst pin : pins) {
-            // Do not preserve if pin is not routed unless it's a hier port in which
-            // case do so otherwise Vivado will recognize it as a conflict.
-            // (SitePinInst.isRouted() is meaningless for output pins)
-            if (!pin.isOutPin() && !pin.isRouted() && !drivenByHierPort) {
-                continue;
-            }
-
             preserve(pin.getConnectedNode(), net);
         }
 
