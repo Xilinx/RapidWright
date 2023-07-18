@@ -26,9 +26,12 @@ package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
 import com.xilinx.rapidwright.timing.TimingManager;
@@ -199,18 +202,23 @@ public class PartialRouter extends RWRoute {
                 return NodeStatus.UNAVAILABLE;
             }
 
-            // Do not unpreserve other global nets, since we can't tell if they
+            // Do not steal from other global nets, since we can't tell if they
             // can be re-routed
             if (preservedNet.isClockNet() || preservedNet.isStaticNet()) {
                 return NodeStatus.UNAVAILABLE;
             }
 
-            // FIXME: It's still possible to encounter a node that is
-            //        a must-have for a preserved net here (e.g. a
-            //        PINBOUNCE sink node). When that preserved net
-            //        is not (yet) one that is queued for routing,
-            //        some more work is needed to determine if it
-            //        really is a must-have.
+            // Do not steal PINBOUNCEs from preserved nets that serve as
+            // a used site pin
+            if (node.getIntentCode() == IntentCode.NODE_PINBOUNCE) {
+                SitePin sitePin = node.getSitePin();
+                SiteInst si = (sitePin != null) ? design.getSiteInstFromSite(sitePin.getSite()) : null;
+                Net netOnSiteWire = (si != null) ? si.getNetFromSiteWire(sitePin.getPinName()) : null;
+                if (netOnSiteWire != null) {
+                    assert(netOnSiteWire == preservedNet);
+                    return NodeStatus.UNAVAILABLE;
+                }
+            }
         }
 
         RouteNode rnode = routingGraph.getNode(node);
