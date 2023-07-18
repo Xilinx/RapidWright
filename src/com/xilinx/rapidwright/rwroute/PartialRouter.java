@@ -63,7 +63,7 @@ public class PartialRouter extends RWRoute {
 
     protected Set<NetWrapper> partiallyPreservedNets;
 
-    protected Map<Net, Set<SitePinInst>> netToPins;
+    protected Map<Net, List<SitePinInst>> netToPins;
 
     protected class RouteNodeGraphPartial extends RouteNodeGraph {
 
@@ -94,7 +94,7 @@ public class PartialRouter extends RWRoute {
         partiallyPreservedNets = new HashSet<>();
         netToPins = pinsToRoute.stream()
                 .filter((spi) -> !spi.isOutPin())
-                .collect(Collectors.groupingBy(SitePinInst::getNet, Collectors.toSet()));
+                .collect(Collectors.groupingBy(SitePinInst::getNet));
     }
 
     public PartialRouter(Design design, RWRouteConfig config, Collection<SitePinInst> pinsToRoute) {
@@ -367,7 +367,7 @@ public class PartialRouter extends RWRoute {
             preserveNet(clk, true);
             numPreservedClks++;
 
-            Collection<SitePinInst> clkPins = netToPins.get(clk);
+            List<SitePinInst> clkPins = netToPins.get(clk);
             if (clkPins != null && !clkPins.isEmpty()) {
                 clkNets.add(clk);
                 numPreservedRoutableNets++;
@@ -384,7 +384,7 @@ public class PartialRouter extends RWRoute {
             numPreservedStaticNets++;
         }
 
-        Collection<SitePinInst> staticPins = netToPins.get(staticNet);
+        List<SitePinInst> staticPins = netToPins.get(staticNet);
         if (staticPins == null || staticPins.isEmpty()) {
             if (staticNet.hasPIPs()) {
                 numPreservedRoutableNets++;
@@ -399,15 +399,16 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected void preserveNet(Net net, boolean async) {
-        Collection<SitePinInst> pinsToRoute = netToPins.get(net);
+        List<SitePinInst> pinsToRoute = netToPins.get(net);
         // Only preserve those pins that are not to be routed
         List<SitePinInst> pinsToPreserve;
         if (pinsToRoute == null) {
             pinsToPreserve = net.getPins();
         } else {
             pinsToPreserve = new ArrayList<>();
+            Set<SitePinInst> pinsToRouteSet = new HashSet<>(pinsToRoute);
             for (SitePinInst spi : net.getPins()) {
-                if (!pinsToRoute.contains(spi)) {
+                if (!pinsToRouteSet.contains(spi)) {
                     pinsToPreserve.add(spi);
                 }
             }
@@ -421,7 +422,7 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected void addNetConnectionToRoutingTargets(Net net) {
-        Set<SitePinInst> pinsToRoute = netToPins.get(net);
+        List<SitePinInst> pinsToRoute = netToPins.get(net);
         if (pinsToRoute != null) {
             assert(!pinsToRoute.isEmpty());
 
@@ -577,7 +578,7 @@ public class PartialRouter extends RWRoute {
                 finishRouteConnection(connection, connection.getSinkRnode());
             }
 
-            netToPins.put(net, new HashSet<>(net.getSinkPins()));
+            netToPins.put(net, net.getSinkPins());
 
             // Update the timing graph
             if (timingManager != null) {
