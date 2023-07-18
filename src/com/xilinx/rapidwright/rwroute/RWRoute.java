@@ -356,11 +356,14 @@ public class RWRoute{
 
     /**
      * Adds the clock net to the list of clock routing targets, if the clock has source and sink {@link SitePinInst} instances.
+     * Any existing routing on such nets will be unrouted.
      * @param clk The clock net in question.
      */
     protected void addGlobalClkRoutingTargets(Net clk) {
         if (RouterHelper.isRoutableNetWithSourceSinks(clk)) {
             clk.unroute();
+            // Preserve all pins (e.g. in case of BOUNCE nodes that may serve as a site pin)
+            preserveNet(clk, true);
             clkNets.add(clk);
         } else {
             numNotNeedingRoutingNets++;
@@ -398,6 +401,10 @@ public class RWRoute{
         if (clkNets.isEmpty())
             return;
         for (Net clk : clkNets) {
+            // Since we preserved all pins in addGlobalClkRoutingTargets(), unpreserve them here
+            for (SitePinInst spi : clk.getPins()) {
+                routingGraph.unpreserve(spi.getConnectedNode());
+            }
             Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(clk, node);
             if (routesToSinkINTTiles != null) {
                 // routes clock nets with references of partial routes
@@ -422,24 +429,19 @@ public class RWRoute{
     }
 
     /**
-     * Adds a static net to the static net routing target list.
+     * Adds a static net to the static net routing target list, unrouting it
+     * if any routing exists.
      * @param staticNet The static net in question, i.e. VCC or GND.
      */
     protected void addStaticNetRoutingTargets(Net staticNet) {
-        assert(!staticNet.hasPIPs());
-
         List<SitePinInst> sinks = staticNet.getSinkPins();
         if (sinks.size() > 0) {
-            addStaticNetRoutingTargets(staticNet, sinks);
+            staticNet.unroute();
+            // Preserve all pins (e.g. in case of BOUNCE nodes that may serve as a site pin)
+            preserveNet(staticNet, true);
+            staticNetAndRoutingTargets.put(staticNet, sinks);
         } else {
             numNotNeedingRoutingNets++;
-        }
-    }
-
-    protected void addStaticNetRoutingTargets(Net staticNet, Collection<SitePinInst> sinks) {
-        staticNetAndRoutingTargets.put(staticNet, sinks);
-        for (SitePinInst spi : sinks) {
-            routingGraph.preserve(spi.getConnectedNode(), staticNet);
         }
     }
 
@@ -463,6 +465,7 @@ public class RWRoute{
         for (Map.Entry<Net,Collection<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
             Net staticNet = e.getKey();
             Collection<SitePinInst> pins = e.getValue();
+            // Since we preserved all pins in addStaticNetRoutingTargets(), unpreserve them here
             for (SitePinInst spi : pins) {
                 routingGraph.unpreserve(spi.getConnectedNode());
             }
