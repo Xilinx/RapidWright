@@ -341,7 +341,7 @@ public class GlobalSignalRouting {
         for (SitePinInst sink : currNet.getPins()) {
             if (sink.isRouted()) continue;
             if (sink.isOutPin()) continue;
-            int watchdog = 10000;
+            int watchdog = 30000;
             if (debug) {
                 System.out.println("SINK: TILE = " + sink.getTile().getName() + " NODE = " + sink.getConnectedNode().toString());
             }
