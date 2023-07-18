@@ -199,7 +199,9 @@ public class PartialRouter extends RWRoute {
                 return NodeStatus.UNAVAILABLE;
             }
 
-            if (net.isStaticNet()) {
+            // Do not unpreserve other global nets, since we can't tell if they
+            // can be re-routed
+            if (preservedNet.isClockNet() || preservedNet.isStaticNet()) {
                 return NodeStatus.UNAVAILABLE;
             }
         }
