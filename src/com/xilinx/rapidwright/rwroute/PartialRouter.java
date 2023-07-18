@@ -279,27 +279,34 @@ public class PartialRouter extends RWRoute {
                     }
                     if (preservedNet == null) {
                         // Assume this node has already been unpreserved
-                    } else {
+                    } else if (RouterHelper.isRoutableNetWithSourceSinks(preservedNet)) {
                         unpreserveNet(preservedNet);
                         unpreserveNets.add(preservedNet);
                     }
 
                     // Redo preserving clk
                     Net oldNet = routingGraph.preserve(node, net);
-                    assert(oldNet == null);
+                    if (oldNet != null) {
+                        // oldNet/preservedNet is not a routable net (e.g. driven by hier port)
+                        assert(oldNet == preservedNet);
+                        assert(!RouterHelper.isRoutableNetWithSourceSinks(preservedNet));
+                    }
 
-                    // RouteNode must exist since the net has been unpreserved
+                    // RouteNode must only exist if the net has been unpreserved
                     RouteNode rnode = routingGraph.getNode(node);
+                    if (rnode != null) {
+                        // Clear its prev pointer so that it doesn't get misinterpreted
+                        // by RouteNodeGraph.mustInclude as being part of an existing route
+                        assert (rnode.getPrev() != null);
+                        rnode.clearPrev();
 
-                    // Clear its prev pointer so that it doesn't get misinterpreted
-                    // by RouteNodeGraph.mustInclude as being part of an existing route
-                    assert(rnode.getPrev() != null);
-                    rnode.clearPrev();
-
-                    // Increment this RouteNode with a null net (since global nets have
-                    // no corresponding NetWrapper) in order to flag it as being permanently
-                    // overused
-                    rnode.incrementUser(null);
+                        // Increment this RouteNode with a null net (since global nets have
+                        // no corresponding NetWrapper) in order to flag it as being permanently
+                        // overused
+                        rnode.incrementUser(null);
+                    } else {
+                        assert(oldNet != null);
+                    }
                 }
             }
         }
