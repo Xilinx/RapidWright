@@ -2125,7 +2125,7 @@ public class DesignTools {
      * @param cell The cell with the pin of interest.
      * @param net The physical net to which this pin belongs
      * @param logicalPinName The logical pin name of the cell to query.
-     * @return The name of the site pin name on the cell's site to which the pin is routed.
+     * @return The name of the first site pin on the cell's site to which the pin is routed.
      */
     public static String getRoutedSitePin(Cell cell, Net net, String logicalPinName) {
         String belPinName = cell.getPhysicalPinMapping(logicalPinName);
@@ -2138,7 +2138,7 @@ public class DesignTools {
      * @param cell The cell with the pin of interest.
      * @param net The physical net to which this pin belongs
      * @param belPinName The physical pin name of the cell
-     * @return The name of the first site pin name on the cell's site to which the pin is routed.
+     * @return The name of the first site pin on the cell's site to which the pin is routed.
      */
     public static String getRoutedSitePinFromPhysicalPin(Cell cell, Net net, String belPinName) {
         List<String> sitePins = getAllRoutedSitePinsFromPhysicalPin(cell, net, belPinName);
@@ -2178,7 +2178,7 @@ public class DesignTools {
                     return Collections.singletonList(source.getName());
                 } else if (source.getBEL().getBELClass() == BELClass.RBEL) {
                     SitePIP sitePIP = inst.getUsedSitePIP(source.getBELName());
-                    if (sitePIP == null) return Collections.emptyList();
+                    if (sitePIP == null) continue;
                     queue.add(sitePIP.getInputPin());
                 } else if (source.getBEL().isLUT() || source.getBEL().getBELType().endsWith("MUX")) {
                     Cell possibleRouteThru = inst.getCell(source.getBEL());
