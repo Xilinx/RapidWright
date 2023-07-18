@@ -44,7 +44,6 @@ import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -255,7 +254,7 @@ public class GlobalSignalRouting {
      * @param clkPins List of clock pins in question.
      * @return A map between leaf clock buffer nodes and sink SitePinInsts.
      */
-    public static Map<RouteNode, List<SitePinInst>> getLCBPinMappings(Collection<SitePinInst> clkPins,
+    public static Map<RouteNode, List<SitePinInst>> getLCBPinMappings(List<SitePinInst> clkPins,
                                                                       Function<Node,NodeStatus> getNodeStatus) {
         Map<RouteNode, List<SitePinInst>> lcbMappings = new HashMap<>();
         List<Node> lcbCandidates = new ArrayList<>();
