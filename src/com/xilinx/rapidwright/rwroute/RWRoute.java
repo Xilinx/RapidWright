@@ -628,13 +628,13 @@ public class RWRoute{
         MessageGenerator.printHeader("Route Design");
 
         routerTimer.createRuntimeTracker("route clock", "Routing").start();
-        // routeGlobalClkNets();
+        routeGlobalClkNets();
         routerTimer.getRuntimeTracker("route clock").stop();
 
         routerTimer.createRuntimeTracker("route static nets", "Routing").start();
         // Routes static nets (VCC and GND) before signals for now.
         // All the used nodes by other nets should be marked as unavailable, if static nets are routed after signals.
-        // routeStaticNets();
+        routeStaticNets();
         // Connection-based router for indirectly connected pairs of output pin and input pin */
         routerTimer.getRuntimeTracker("route static nets").stop();
 
