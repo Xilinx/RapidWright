@@ -96,7 +96,7 @@ public class GlobalSignalRouting {
         }
         clk.setPIPs(clkPIPs);
 
-        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
+        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk.getPins(), getNodeStatus);
 
         UltraScaleClockRouting.routeToLCBs(clk, getStartingPoint(horDistributionLines, device), lcbMappings.keySet());
 
@@ -204,7 +204,7 @@ public class GlobalSignalRouting {
         List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
         if (downLines != null) upDownDistLines.addAll(downLines);
 
-        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
+        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk.getPins(), getNodeStatus);
         UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
 
         UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
@@ -242,15 +242,6 @@ public class GlobalSignalRouting {
 
     /**
      * Maps each sink SitePinInsts of a clock net to a leaf clock buffer node.
-     * @param clk The clock net in question.
-     * @return A map between leaf clock buffer nodes and sink SitePinInsts.
-     */
-    public static Map<RouteNode, List<SitePinInst>> getLCBPinMappings(Net clk) {
-        return getLCBPinMappings(clk.getPins(), (n) -> NodeStatus.AVAILABLE);
-    }
-
-    /**
-     * Maps each sink SitePinInsts of a clock net to a leaf clock buffer node.
      * @param clkPins List of clock pins in question.
      * @return A map between leaf clock buffer nodes and sink SitePinInsts.
      */
@@ -262,13 +253,13 @@ public class GlobalSignalRouting {
         for (SitePinInst p : clkPins) {
             if (p.isOutPin()) continue;
             assert(lcbCandidates.isEmpty());
-            Tile intTile = p.getSite().getIntTile();
+            List<Node> intNodes = RouterHelper.projectInputPinToINTNode(p);
+            if (intNodes == null || intNodes.isEmpty()) {
+                throw new RuntimeException("Unable to get INT tile for pin " + p);
+            }
+            Node intNode = intNodes.get(0);
 
-            outer: for (Node prev : p.getConnectedNode().getAllUphillNodes()) {
-                if (!prev.getTile().equals(intTile)) {
-                    continue;
-                }
-
+            outer: for (Node prev : intNode.getAllUphillNodes()) {
                 NodeStatus prevNodeStatus = getNodeStatus.apply(prev);
                 if (prevNodeStatus == NodeStatus.UNAVAILABLE) {
                     continue;
