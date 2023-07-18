@@ -329,7 +329,7 @@ public class RouterHelper {
      * @param design The target design.
      * @param pins The static net pins.
      */
-    public static Set<SitePinInst> invertPossibleGndPinsToVccPins(Design design, Collection<SitePinInst> pins) {
+    public static Set<SitePinInst> invertPossibleGndPinsToVccPins(Design design, List<SitePinInst> pins) {
         Net staticNet = design.getGndNet();
         Set<SitePinInst> toInvertPins = new HashSet<>();
         for (SitePinInst currSitePinInst : pins) {

@@ -84,7 +84,7 @@ public class RWRoute{
     /** A list of global clock nets */
     protected List<Net> clkNets;
     /** Static nets */
-    protected Map<Net, Collection<SitePinInst>> staticNetAndRoutingTargets;
+    protected Map<Net, List<SitePinInst>> staticNetAndRoutingTargets;
     /** Several integers to indicate the netlist info */
     protected int numPreservedRoutableNets;
     protected int numPreservedClks;
@@ -452,7 +452,7 @@ public class RWRoute{
         if (staticNetAndRoutingTargets.isEmpty())
             return;
 
-        Collection<SitePinInst> gndPins = staticNetAndRoutingTargets.get(design.getGndNet());
+        List<SitePinInst> gndPins = staticNetAndRoutingTargets.get(design.getGndNet());
         if (gndPins != null) {
             Set<SitePinInst> newVccPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins);
             if (!newVccPins.isEmpty()) {
@@ -462,9 +462,9 @@ public class RWRoute{
             }
         }
 
-        for (Map.Entry<Net,Collection<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
+        for (Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
             Net staticNet = e.getKey();
-            Collection<SitePinInst> pins = e.getValue();
+            List<SitePinInst> pins = e.getValue();
             // Since we preserved all pins in addStaticNetRoutingTargets(), unpreserve them here
             for (SitePinInst spi : pins) {
                 routingGraph.unpreserve(spi.getConnectedNode());
@@ -1656,8 +1656,8 @@ public class RWRoute{
 
     private int getNumStaticNetPins() {
         int totalSitePins = 0;
-        for (Entry<Net,Collection<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
-            Collection<SitePinInst> pins = e.getValue();
+        for (Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
+            List<SitePinInst> pins = e.getValue();
             totalSitePins += pins.size();
         }
         return totalSitePins;
