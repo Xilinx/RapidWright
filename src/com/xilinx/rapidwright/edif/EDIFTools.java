@@ -1521,7 +1521,7 @@ public class EDIFTools {
      * @param lockAction The method of action (lock or unlock) to apply to
      *                   {@link EDIFPropertyObject} objects.
      */
-    private static void lockNetlist(EDIFNetlist netlist, Function<EDIFPropertyObject, EDIFPropertyValue> lockAction) {
+    private static void lockNetlist(EDIFNetlist netlist, Consumer<EDIFPropertyValue> lockAction) {
         EDIFCell top = netlist.getTopCell();
         for (EDIFLibrary lib : netlist.getLibraries()) {
             if (lib.isHDIPrimitivesLibrary()) continue;

@@ -3798,7 +3798,7 @@ public class DesignTools {
     /**
      * This adds PROHIBIT constraints to the design (via .XDC) that will prohibit
      * the use of BEL sites in the same half SLICE if there are any other cells
-     * placed it it. This is used for shell creation when an existing placed and
+     * placed in it. This is used for shell creation when an existing placed and
      * routed implementation is desired to be preserved but to allow additional
      * logic to be placed and routed on top of it without an area (pblock)
      * constraint.
