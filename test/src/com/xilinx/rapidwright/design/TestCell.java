@@ -79,6 +79,6 @@ public class TestCell {
     public void testGetPropertyNoEDIFCellInst() {
         Cell cell = new Cell("cell");
         Assertions.assertNull(cell.getEDIFCellInst());
-        Assertions.assertNull(cell.getProperty("a_property_that_doesnt_exist"));
+        Assertions.assertNull(cell.getProperty("any_property"));
     }
 }
