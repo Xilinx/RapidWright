@@ -38,9 +38,9 @@ public class TestGlobalSignalRouting {
             "RSTRAMB"
     })
     public void testRAMB36(String logicalPinName) {
-        Design design = new Design("design", Device.AWS_F1);
+        Design design = new Design("design", "xcvu3p");
         Cell bufg = design.createAndPlaceCell("test_bufg", Unisim.BUFGCE, "BUFGCE_X0Y0/BUFCE");
-        Net globalNet = design.createNet("clk");
+        Net globalNet = design.createNet("global");
         globalNet.connect(bufg,"O");
 
         Cell target = design.createAndPlaceCell("test_ram", Unisim.RAMB36E2, "RAMB36_X0Y0/RAMB36E2");
