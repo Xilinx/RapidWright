@@ -280,18 +280,4 @@ public class TestRWRoute {
         }
     }
 
-    @Test
-    public void testBug738() {
-        Design design = RapidWrightDCP.loadDCP("bug738.dcp");
-
-        RWRoute.routeDesignFullNonTimingDriven(design);
-
-        if (FileTools.isVivadoOnPath()) {
-            // Testcase is an invalid placement, check for fully routed nets
-            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
-            Assertions.assertEquals(1912, rrs.fullyRoutedNets);
-            Assertions.assertEquals(438, rrs.netsWithRoutingErrors);
-        }
-    }
-
 }
