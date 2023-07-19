@@ -232,10 +232,13 @@ public class PartialRouter extends RWRoute {
                         if (preservedNet == clk) {
                             continue;
                         }
-                        assert(preservedNet != null);
+                        if (preservedNet == null) {
+                            // Assume this node has already been unpreserved
+                        } else {
+                            unpreserveNet(preservedNet);
+                            unpreserveNets.add(preservedNet);
+                        }
 
-                        unpreserveNet(preservedNet);
-                        unpreserveNets.add(preservedNet);
                         // Redo preserving clk
                         Net oldNet = routingGraph.preserve(node, clk);
                         assert(oldNet == null);

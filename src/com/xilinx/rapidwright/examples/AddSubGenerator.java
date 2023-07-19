@@ -44,6 +44,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
@@ -83,12 +84,16 @@ public class AddSubGenerator extends ArithmeticGenerator {
         char letter = ff.getBELName().charAt(0);
         boolean isFF2 = ff.getBELName().endsWith("2");
         boolean isLowerSlice = 'A' <= letter && letter <= 'D';
-        String clkPinName = isLowerSlice ? "CLK1" : "CLK2";
-        String rstPinName = isLowerSlice ? "SRST1" : "SRST2";
-        String cePinName = "CKEN" + (isLowerSlice ? (isFF2 ? "2" : "1") : (isFF2 ? "4" : "3"));
+
+        String postfix = clk.getDesign().getDevice().getSeries() == Series.UltraScale ? "_B" : "";
+
+        String clkPinName = "CLK" + postfix + (isLowerSlice ? "1" : "2");
+        String rstPinName = "SRST" + postfix + (isLowerSlice ? "1" : "2");
+        String cePinName = "CKEN" + postfix + (isLowerSlice ? (isFF2 ? "2" : "1") : (isFF2 ? "4" : "3"));
+
         if (ff.getSiteInst().getSitePinInst(clkPinName) == null) {
             clk.createPin(clkPinName, ff.getSiteInst());
-            ff.getSiteInst().addSitePIP(clkPinName + "INV","CLK");
+            ff.getSiteInst().addSitePIP(clkPinName.replace(postfix, "") + "INV","CLK");
         }
         if (ff.getSiteInst().getSitePinInst(rstPinName) == null) {
             rst.createPin(rstPinName, ff.getSiteInst());

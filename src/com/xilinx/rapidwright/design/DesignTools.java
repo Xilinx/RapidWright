@@ -2990,43 +2990,61 @@ public class DesignTools {
         Map<EDIFHierNet, EDIFHierNet> netParentMap = design.getNetlist().getParentNetMap();
         EDIFNetlist netlist = design.getNetlist();
         for (Net net : new ArrayList<>(design.getNets())) {
-            if (net.isStaticNet()) continue;
-            EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
-            if (hierNet == null) {
-                // Likely an encrypted cell
-                continue;
-            }
-            EDIFHierNet parentHierNet = netParentMap.get(hierNet);
-            if (parentHierNet == null) {
-                // System.out.println("WARNING: Couldn't find parent net for '" +
-                //         hierNet.getHierarchicalNetName() + "'");
-                continue;
-            }
-            if (!hierNet.equals(parentHierNet)) {
-                String parentNetName = parentHierNet.getNet().getName();
-                Net parentPhysNet;
-                // Assume that a net named <const1> or <const0> is always a VCC or GND net
-                if (parentNetName.equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
-                    parentPhysNet = design.getVccNet();
-                } else if (parentNetName.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
+            Net parentPhysNet = null;
+            if (net.isStaticNet()) {
+                if (net.getType() == NetType.GND) {
                     parentPhysNet = design.getGndNet();
+                } else if (net.getType() == NetType.VCC) {
+                    parentPhysNet = design.getVccNet();
                 } else {
-                    parentPhysNet = design.getNet(parentHierNet.getHierarchicalNetName());
+                    throw new RuntimeException();
                 }
-                if (parentPhysNet != null) {
-                    // Merge both physical nets together
-                    for (SiteInst si : new ArrayList<>(net.getSiteInsts())) {
-                        List<String> siteWires = new ArrayList<>(si.getSiteWiresFromNet(net));
-                        for (String siteWire : siteWires) {
-                            BELPin[] pins = si.getSiteWirePins(siteWire);
-                            si.unrouteIntraSiteNet(pins[0], pins[0]);
-                            si.routeIntraSiteNet(parentPhysNet, pins[0], pins[0]);
-                        }
+                if (parentPhysNet == net) {
+                    continue;
+                }
+            } else {
+                EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
+                if (hierNet == null) {
+                    // Likely an encrypted cell
+                    continue;
+                }
+                EDIFHierNet parentHierNet = netParentMap.get(hierNet);
+                if (parentHierNet == null) {
+                    // System.out.println("WARNING: Couldn't find parent net for '" +
+                    //         hierNet.getHierarchicalNetName() + "'");
+                    continue;
+                }
+
+                if (!hierNet.equals(parentHierNet)) {
+                    String parentNetName = parentHierNet.getNet().getName();
+                    // Assume that a net named <const1> or <const0> is always a VCC or GND net
+                    if (parentNetName.equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
+                        parentPhysNet = design.getVccNet();
+                    } else if (parentNetName.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
+                        parentPhysNet = design.getGndNet();
+                    } else {
+                        parentPhysNet = design.getNet(parentHierNet.getHierarchicalNetName());
                     }
-                    design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
-                } else if (!net.rename(parentHierNet.getHierarchicalNetName())) {
-                    System.out.println("WARNING: Failed to adjust physical net name " + net.getName());
+
+                    if (parentPhysNet != null) {
+                        // Fall through
+                    } else if (!net.rename(parentHierNet.getHierarchicalNetName())) {
+                        System.out.println("WARNING: Failed to adjust physical net name " + net.getName());
+                    }
                 }
+            }
+
+            if (parentPhysNet != null) {
+                // Merge both physical nets together
+                for (SiteInst si : new ArrayList<>(net.getSiteInsts())) {
+                    List<String> siteWires = new ArrayList<>(si.getSiteWiresFromNet(net));
+                    for (String siteWire : siteWires) {
+                        BELPin[] pins = si.getSiteWirePins(siteWire);
+                        si.unrouteIntraSiteNet(pins[0], pins[0]);
+                        si.routeIntraSiteNet(parentPhysNet, pins[0], pins[0]);
+                    }
+                }
+                design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
             }
         }
     }
