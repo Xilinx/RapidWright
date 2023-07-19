@@ -3202,9 +3202,7 @@ public class DesignTools {
         Net net = (netOnSiteWire != null) ? netOnSiteWire : si.getDesign().getVccNet();
         if (net.isStaticNet()) {
             // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
-            if (cell.getType().equals("SRL16E") && siteWireName.endsWith("6") &&
-                    //
-                    cell.getEDIFHierCellInst() != null) {
+            if (cell.getType().equals("SRL16E") && siteWireName.endsWith("6")) {
                 EDIFPropertyValue val = cell.getProperty("XILINX_LEGACY_PRIM");
                 if (val != null && val.getValue().equals("SRLC32E")) {
                     net = si.getDesign().getGndNet();
