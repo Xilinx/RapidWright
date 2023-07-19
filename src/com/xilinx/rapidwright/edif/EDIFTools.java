@@ -47,7 +47,7 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
+import java.util.function.Consumer;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -1521,7 +1521,7 @@ public class EDIFTools {
      * @param lockAction The method of action (lock or unlock) to apply to
      *                   {@link EDIFPropertyObject} objects.
      */
-    private static void lockNetlist(EDIFNetlist netlist, Consumer<EDIFPropertyValue> lockAction) {
+    private static void lockNetlist(EDIFNetlist netlist, Consumer<EDIFPropertyObject> lockAction) {
         EDIFCell top = netlist.getTopCell();
         for (EDIFLibrary lib : netlist.getLibraries()) {
             if (lib.isHDIPrimitivesLibrary()) continue;
@@ -1531,7 +1531,7 @@ public class EDIFTools {
                     if (cellType.isPrimitive() && !cellType.hasContents()) {
                         String type = cellType.getName();
                         if (!type.equals(Unisim.GND.name()) && !type.equals(Unisim.VCC.name())) {
-                            lockAction.apply(inst);
+                            lockAction.accept(inst);
                         }
                     }
                 }
@@ -1539,7 +1539,7 @@ public class EDIFTools {
                 for (EDIFNet net : cell.getNets()) {
                     if (net != null && !net.isGND() && !net.isVCC()) {
                         if (cell == top || net.isInternalToParent()) {
-                            lockAction.apply(net);
+                            lockAction.accept(net);
                         }
                     }
                 }
