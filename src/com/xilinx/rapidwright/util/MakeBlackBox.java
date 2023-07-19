@@ -29,6 +29,7 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 /**
  * Command line wrapper to black box one or more cell instances in a design.
+ * Also prohibits partially used half SLICEs from being used.
  * 
  */
 public class MakeBlackBox {
@@ -47,6 +48,9 @@ public class MakeBlackBox {
         for (int i = 2; i < args.length; i++) {
             DesignTools.makeBlackBox(input, args[i]);
         }
+
+        // Necessary to make the design place-able by Vivado later
+        DesignTools.prohibitPartialHalfSlices(input);
 
         t.stop().start("Write DCP");
         input.writeCheckpoint(args[1], CodePerfTracker.SILENT);
