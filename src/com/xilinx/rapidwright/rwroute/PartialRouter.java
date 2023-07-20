@@ -660,7 +660,7 @@ public class PartialRouter extends RWRoute {
      * update the SitePinInst.isRouted() result for all pins in the design.
      * @param design Design to preprocess
      */
-    protected static void preprocess(Design design) {
+    public static void preprocess(Design design) {
         RWRoute.preprocess(design);
 
         for (Net net : design.getNets()) {
