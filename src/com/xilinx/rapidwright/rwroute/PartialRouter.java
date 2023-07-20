@@ -350,9 +350,11 @@ public class PartialRouter extends RWRoute {
                 rend.setPrev(rstart);
             }
 
-            // Use the prev pointers to attempt to recover routing for all connections
+            // Use the prev pointers to attempt to recover routing for all indirect connections
             for (Connection connection : netWrapper.getConnections()) {
-                finishRouteConnection(connection, connection.getSinkRnode());
+                if (!connection.isDirect()) {
+                    finishRouteConnection(connection, connection.getSinkRnode());
+                }
             }
         }
 
