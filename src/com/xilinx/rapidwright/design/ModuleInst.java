@@ -389,6 +389,11 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                 if (pipSet != null) {
                     pipSet.add(newPip);
                 }
+                // Some tiles have nodes that are depopulated, we need to detect those
+                if (newPip.getEndNode().getAllDownhillPIPs().size() == 0
+                        && pip.getEndNode().getAllDownhillPIPs().size() != 0) {
+                    return false;
+                }
                 net.addPIP(newPip);
             }
         }
