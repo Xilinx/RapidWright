@@ -1173,8 +1173,5 @@ public class TestDesignTools {
                 Assertions.assertTrue(spi.isOutPin() || spi.isRouted());
             }
         }
-
-
-
     }
 }
