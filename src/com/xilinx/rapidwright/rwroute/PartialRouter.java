@@ -292,7 +292,7 @@ public class PartialRouter extends RWRoute {
                         unpreserveNets.add(preservedNet);
                     }
 
-                    // Redo preserving clk
+                    // Preserve node for global net
                     Net oldNet = routingGraph.preserve(node, net);
                     if (oldNet != null) {
                         // oldNet/preservedNet is not a routable net (e.g. driven by hier port)
@@ -309,8 +309,8 @@ public class PartialRouter extends RWRoute {
                         rnode.clearPrev();
 
                         // Increment this RouteNode with a null net (since global nets have
-                        // no corresponding NetWrapper) in order to flag it as being permanently
-                        // overused
+                        // no corresponding NetWrapper) in order to flag it as being irreversibly
+                        // used by a global net thus forcing the non-global to find another path
                         rnode.incrementUser(null);
                     } else {
                         assert(oldNet != null);
