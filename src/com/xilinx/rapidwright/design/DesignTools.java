@@ -3687,7 +3687,7 @@ public class DesignTools {
             List<Node> fanouts = node2fanout.get(node);
             if (fanouts != null) {
                 for (Node fanout : fanouts) {
-                    // In the case of bidir PIPs, do not go back on yourself by re-enqueue
+                    // In the case of bidir PIPs, do not go back on yourself by re-enqueuing
                     // the node you came from
                     if (bidirNode2node.getOrDefault(fanout, null) != node) {
                         queue.add(fanout);
