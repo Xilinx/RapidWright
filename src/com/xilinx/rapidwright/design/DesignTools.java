@@ -32,6 +32,7 @@ import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -3633,5 +3634,49 @@ public class DesignTools {
         }
 
         return true;
+    }
+
+    public static void updatePinsIsRouted(Net net) {
+        Queue<Node> queue = new ArrayDeque<>();
+        Map<Node, List<Node>> node2fanout = new HashMap<>();
+        for (PIP pip : net.getPIPs()) {
+            boolean isReversed = pip.isReversed();
+            Node startNode = isReversed ? pip.getEndNode() : pip.getStartNode();
+            Node endNode = isReversed ? pip.getStartNode() : pip.getEndNode();
+            node2fanout.computeIfAbsent(startNode, k -> new ArrayList<>())
+                    .add(endNode);
+            if (net.getType() == NetType.GND) {
+                System.err.print("");
+            }
+
+            if ((net.getType() == NetType.GND && startNode.isTiedToGnd()) ||
+                (net.getType() == NetType.VCC && startNode.isTiedToVcc())) {
+                queue.add(startNode);
+            }
+        }
+
+        Map<Node, SitePinInst> node2spi = new HashMap<>();
+        for (SitePinInst spi : net.getPins()) {
+            spi.setRouted(false);
+            Node node = spi.getConnectedNode();
+            if (spi.isOutPin()) {
+                queue.add(node);
+                continue;
+            }
+            node2spi.put(spi.getConnectedNode(), spi);
+        }
+
+        while (!queue.isEmpty()) {
+            Node node = queue.poll();
+            SitePinInst spi = node2spi.get(node);
+            if (spi != null) {
+                spi.setRouted(true);
+            }
+
+            List<Node> fanout = node2fanout.get(node);
+            if (fanout != null) {
+                queue.addAll(fanout);
+            }
+        }
     }
 }

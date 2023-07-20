@@ -1158,4 +1158,23 @@ public class TestDesignTools {
         Assertions.assertNull(si4.getUsedSitePIP("FFMUXB1"));
         Assertions.assertNull(si4.getNetFromSiteWire("B_O"));
     }
+
+    @Test
+    public void testUpdatePinsIsRouted() {
+        String dcpPath = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.dcp");
+        Design design = Design.readCheckpoint(dcpPath);
+
+        for (Net net : design.getNets()) {
+            for (SitePinInst spi : net.getPins()) {
+                Assertions.assertFalse(spi.isRouted());
+            }
+            DesignTools.updatePinsIsRouted(net);
+            for (SitePinInst spi : net.getPins()) {
+                Assertions.assertTrue(spi.isOutPin() || spi.isRouted());
+            }
+        }
+
+
+
+    }
 }
