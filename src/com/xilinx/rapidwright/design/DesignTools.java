@@ -1671,7 +1671,8 @@ public class DesignTools {
      * In Vivado, this can be accomplished by running: (1)
      * {@code update_design -cells <name> -black_box} or (2) by deleting all of the
      * cells and nets insides of a cell instance. Method (2) is more likely to have
-     * complications.
+     * complications. This also unroutes both GND and VCC nets to avoid
+     * implementation issues by Vivado in subsequent place and route runs.
      * 
      * @param d                The current design
      * @param hierarchicalCell The hierarchical cell to become a black box.
@@ -3619,8 +3620,9 @@ public class DesignTools {
     }
 
     /**
-     * Locks the logical netlist of the design using the DONT_TOUCH property.
-     * {@link EDIFTools#lockNetlist(EDIFNetlist)}.
+     * Locks the logical netlist of the design using the DONT_TOUCH property. This
+     * strives to be as close as possible to what Vivado's 'lock_design -level
+     * netlist' does to lock the design. {@link EDIFTools#lockNetlist(EDIFNetlist)}.
      * 
      * @param design The design of the netlist to lock.
      */
@@ -3630,7 +3632,9 @@ public class DesignTools {
 
     /**
      * Unlocks the logical netlist of the design by removing the DONT_TOUCH
-     * property. {@link EDIFTools#unlockNetlist(EDIFNetlist)}.
+     * property. This strives to be as close as possible to what Vivado's
+     * 'lock_design -unlock -level netlist' does to lock the
+     * design.{@link EDIFTools#unlockNetlist(EDIFNetlist)}.
      * 
      * @param design The design of the netlist to unlock.
      */
@@ -3641,7 +3645,8 @@ public class DesignTools {
     /**
      * Locks or unlocks all placement of a design against changes in Vivado. It will
      * also lock or unlock the netlist of the design (see
-     * {@link #lockNetlist(Design)}).
+     * {@link #lockNetlist(Design)}). This strives to be as close as possible to
+     * what Vivado's 'lock_design -level placement' does to lock the design.
      * 
      * @param design The design to lock
      * @param lock   Flag indicating to lock (true) or unlock (false) the design's
@@ -3664,7 +3669,9 @@ public class DesignTools {
 
     /**
      * Locks placement of cells of a design against changes in Vivado. It will also
-     * lock the netlist the design (see {@link #lockNetlist(Design)}).
+     * lock the netlist the design (see {@link #lockNetlist(Design)}). This strives
+     * to be as close as possible to what Vivado's 'lock_design -level placement'
+     * does to lock the design.
      * 
      * @param design The design to lock
      */
@@ -3674,7 +3681,9 @@ public class DesignTools {
 
     /**
      * Unlocks placement of cells of a design. It will also unlock the netlist the
-     * design (see {@link #unlockNetlist(Design)}).
+     * design (see {@link #unlockNetlist(Design)}). This strives to be as close as
+     * possible to what Vivado's 'lock_design -unlock -level placement' does to lock
+     * the design.
      * 
      * @param design The design to unlock
      */
@@ -3685,7 +3694,9 @@ public class DesignTools {
     /**
      * Locks or unlocks all routing of a design (except GND and VCC nets) against
      * changes in Vivado. It will also lock or unlock the netlist and placement of
-     * the design (see {@link #lockPlacement(Design, boolean)}).
+     * the design (see {@link #lockPlacement(Design, boolean)}). This strives to be
+     * as close as possible to what Vivado's 'lock_design -level routing' does to
+     * lock the design.
      * 
      * @param design The design to lock
      * @param lock   Flag indicating to lock (true) or unlock (false) the design's
@@ -3704,7 +3715,9 @@ public class DesignTools {
 
     /**
      * Locks all routing of a design (except GND and VCC nets) against changes in
-     * Vivado. It will also lock the netlist and placement of the design.
+     * Vivado. It will also lock the netlist and placement of the design. This
+     * strives to be as close as possible to what Vivado's 'lock_design -level
+     * routing' does to lock the design.
      * 
      * @param design The design to lock
      */
@@ -3714,7 +3727,8 @@ public class DesignTools {
 
     /**
      * Unlocks any and all routing of a design. It will also unlock the netlist and
-     * placement of the design.
+     * placement of the design. This strives to be as close as possible to what
+     * Vivado's 'lock_design -unlock -level routing' does to lock the design.
      * 
      * @param design The design to unlock
      */
