@@ -3140,12 +3140,15 @@ public class DesignTools {
             gndInvertibleToVcc = design.getGndNet();
         }
         Map<String, Pair<String, String>> pinMapping = belTypeSitePinNameMapping.get(series);
+        final String[] pins = new String[] {"CE", "SR"};
         for (Cell cell : design.getCells()) {
             if (isUnisimFlipFlopType(cell.getType())) {
                 SiteInst si = cell.getSiteInst();
+                if (!Utils.isSLICE(si)) {
+                    continue;
+                }
                 BEL bel = cell.getBEL();
                 Pair<String, String> sitePinNames = pinMapping.get(bel.getBELType());
-                String[] pins = new String[] {"CE", "SR"};
                 for (String pin : pins) {
                     BELPin belPin = cell.getBEL().getPin(pin);
                     Net net = si.getNetFromSiteWire(belPin.getSiteWireName());
