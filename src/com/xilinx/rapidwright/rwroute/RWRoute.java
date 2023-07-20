@@ -52,7 +52,7 @@ import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
-import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
@@ -180,11 +180,11 @@ public class RWRoute{
 
     /**
      * Pre-process the design to ensure that only the physical {@link Net}-s corresponding to
-     * the parent logical {@link EDIFNet} exists, and that such {@link Net}-s contain
+     * the parent logical {@link EDIFHierNet} exists, and that such {@link Net}-s contain
      * all necessary {@link SitePinInst} objects.
      * @param design Design to preprocess
      */
-    public static void preprocess(Design design) {
+    protected static void preprocess(Design design) {
         Series series = design.getPart().getSeries();
         if (!SUPPORTED_SERIES.contains(series)) {
             throw new RuntimeException(getUnsupportedSeriesMessage(design.getPart()));

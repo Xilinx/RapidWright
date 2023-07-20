@@ -25,6 +25,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -103,10 +104,10 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected void preprocess() {
-        // By default, preprocessing is expected to be performed manually and added to pinsToRoute
-        // ahead of constructing this PartialRouter class.
-        // Preprocessing can be invoked manually with RWRoute.preprocess(Design), as done by
-        // routeDesignWithUserDefinedArguments() which needs to infer pinsToRoute.
+        // By default, preprocessing is expected to be performed manually and pinsToRoute
+        // determined ahead of calling this PartialRouter class.
+        // Preprocessing and inferring pinsToRoute can be invoked manually with preprocess(Design),
+        // as done by the routeDesign*() entrypoints when pinsToRoute == null.
     }
 
     @Override
@@ -655,6 +656,19 @@ public class PartialRouter extends RWRoute {
     }
 
     /**
+     * Calls {@link RWRoute#preprocess(Design)} to preprocess the design, and furthermore
+     * update the SitePinInst.isRouted() result for all pins in the design.
+     * @param design Design to preprocess
+     */
+    protected static void preprocess(Design design) {
+        RWRoute.preprocess(design);
+
+        for (Net net : design.getNets()) {
+            DesignTools.updatePinsIsRouted(net);
+        }
+    }
+
+    /**
      * Partially routes a {@link Design} instance; specifically, all nets with no routing PIPs already present.
      * @param design The {@link Design} instance to be routed.
      * @param args An array of string arguments, can be null.
@@ -664,7 +678,7 @@ public class PartialRouter extends RWRoute {
      * @return Routed design.
      */
     public static Design routeDesignWithUserDefinedArguments(Design design, String[] args, boolean softPreserve) {
-        RWRoute.preprocess(design);
+        preprocess(design);
 
         List<SitePinInst> pinsToRoute = getUnroutedPins(design);
 
@@ -674,21 +688,24 @@ public class PartialRouter extends RWRoute {
     }
 
     /**
-     * Return all SitePinInst objects belonging to fully unrouted nets (containing no routing PIPs).
-     * This method assumes that {@link RWRoute#preprocess(Design)}, where necessary, has already
-     * been executed.
+     * Return all input SitePinInst objects where SitePinInst.isRouted() is false.
+     * This method assumes that all Net objects in the Design is correctly populated
+     * with all its pins, and that its isRouted() result is up-to-date.
+     * If this is not the case, consider {@link #preprocess(Design)}.
      * @param design The {@link Design} instance to be examined.
-     * @return A list of unrouted SitePinInst objects.
+     * @return A list of unrouted input SitePinInst objects.
      */
-    public static List<SitePinInst> getUnroutedPins(Design design) {
+    private static List<SitePinInst> getUnroutedPins(Design design) {
         List<SitePinInst> pinsToRoute = new ArrayList<>();
         for (Net net : design.getNets()) {
-            if (net.getSource() == null && !net.isStaticNet()) {
-                // Source-less nets may exist since this is an out-of-context design
+            if (DesignTools.isNetDrivenByHierPort(net)) {
                 continue;
             }
-            if (!net.hasPIPs()) {
-                pinsToRoute.addAll(net.getSinkPins());
+            for (SitePinInst spi : net.getPins()) {
+                if (spi.isRouted() || spi.isOutPin()) {
+                    continue;
+                }
+                pinsToRoute.add(spi);
             }
         }
         return pinsToRoute;
@@ -702,7 +719,7 @@ public class PartialRouter extends RWRoute {
      */
     public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         if (pinsToRoute == null) {
-            RWRoute.preprocess(design);
+            preprocess(design);
             pinsToRoute = getUnroutedPins(design);
         }
 
@@ -725,7 +742,7 @@ public class PartialRouter extends RWRoute {
      */
     public static Design routeDesignPartialTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         if (pinsToRoute == null) {
-            RWRoute.preprocess(design);
+            preprocess(design);
             pinsToRoute = getUnroutedPins(design);
         }
 
