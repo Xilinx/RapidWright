@@ -24,10 +24,9 @@ package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
@@ -69,9 +68,7 @@ public class TestGlobalSignalRouting {
     public void testRouteStaticNet() {
         Design design = RapidWrightDCP.loadDCP("optical-flow.dcp");
 
-        DesignTools.makePhysNetNamesConsistent(design);
-        DesignTools.createPossiblePinsToStaticNets(design);
-        DesignTools.createMissingSitePinInsts(design);
+        RWRoute.preprocess(design);
 
         List<SitePinInst> gndPins = design.getGndNet().getPins();
         List<SitePinInst> vccPins = design.getVccNet().getPins();
