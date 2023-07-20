@@ -184,7 +184,7 @@ public class RWRoute{
      * all necessary {@link SitePinInst} objects.
      * @param design Design to preprocess
      */
-    protected static void preprocess(Design design) {
+    public static void preprocess(Design design) {
         Series series = design.getPart().getSeries();
         if (!SUPPORTED_SERIES.contains(series)) {
             throw new RuntimeException(getUnsupportedSeriesMessage(design.getPart()));

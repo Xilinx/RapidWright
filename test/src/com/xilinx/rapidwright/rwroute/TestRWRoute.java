@@ -26,6 +26,7 @@ package com.xilinx.rapidwright.rwroute;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
 import com.xilinx.rapidwright.util.VivadoTools;
@@ -49,11 +50,16 @@ import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestRWRoute {
-    private static void assertAllSinksRouted(List<SitePinInst> pins) {
-        for (SitePinInst spi : pins) {
-            if (spi.isOutPin())
-                continue;
-            Assertions.assertTrue(spi.isRouted());
+    private static void assertAllSinksRouted(Net net) {
+        for (SitePinInst spi : net.getPins()) {
+            Assertions.assertTrue(spi.isOutPin() || spi.isRouted());
+        }
+
+        // Re-compute the isRouted() state by analyzing from PIPs
+        DesignTools.updatePinsIsRouted(net);
+
+        for (SitePinInst spi : net.getPins()) {
+            Assertions.assertTrue(spi.isOutPin() || spi.isRouted());
         }
     }
 
@@ -72,7 +78,7 @@ public class TestRWRoute {
                 // Source-less nets may exist in out-of-context design
                 continue;
             }
-            assertAllSinksRouted(net.getPins());
+            assertAllSinksRouted(net);
         }
     }
 
@@ -155,7 +161,7 @@ public class TestRWRoute {
 
         Assertions.assertFalse(routed.getModifiedNets().isEmpty());
         for (Net net : routed.getModifiedNets()) {
-            assertAllSinksRouted(net.getPins());
+            assertAllSinksRouted(net);
         }
         assertVivadoFullyRouted(design);
     }
@@ -173,11 +179,11 @@ public class TestRWRoute {
         design.setTrackNetChanges(true);
 
         boolean softPreserve = false;
-        Design routed = PartialRouter.routeDesignPartialTimingDriven(design, null, false);
+        Design routed = PartialRouter.routeDesignPartialTimingDriven(design, null, softPreserve);
 
         Assertions.assertFalse(routed.getModifiedNets().isEmpty());
         for (Net net : routed.getModifiedNets()) {
-            assertAllSinksRouted(net.getPins());
+            assertAllSinksRouted(net);
         }
         assertVivadoFullyRouted(design);
     }
@@ -264,8 +270,9 @@ public class TestRWRoute {
         Assertions.assertTrue(vcc.getPins().stream().allMatch(SitePinInst::isRouted));
 
         Net gnd = design.getGndNet();
-        Assertions.assertEquals(31, gnd.getPins().size());
-        Assertions.assertTrue(gnd.getPins().stream().allMatch(SitePinInst::isRouted));
+        List<SitePinInst> sinks = gnd.getSinkPins();
+        Assertions.assertEquals(31, sinks.size());
+        Assertions.assertTrue(sinks.stream().allMatch(SitePinInst::isRouted));
 
         if (FileTools.isVivadoOnPath()) {
             // Testcase has a number of undriven nets, so just check for unrouted nets

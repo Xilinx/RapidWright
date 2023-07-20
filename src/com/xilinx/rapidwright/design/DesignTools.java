@@ -1213,15 +1213,28 @@ public class DesignTools {
                         curr = reverseConns.get(sink);
                         fanoutCount = fanout.getOrDefault(sink, 0);
                     }
-                    if (curr == null && fanout.size() == 1 && !net.isStaticNet()) {
-                        // We got all the way back to the source site. It is likely that
-                        // the net is using dual exit points from the site as is common in
-                        // SLICEs -- we should unroute the sitenet
-                        SitePin sPin = sink.getSitePin();
-                        if (net.getSource() != null) {
-                            SiteInst si = net.getSource().getSiteInst();
-                            BELPin belPin = sPin.getBELPin();
-                            si.unrouteIntraSiteNet(belPin, belPin);
+                    if (curr == null && !net.isStaticNet()) {
+                        if (fanoutCount == 1 && net.getAlternateSource() != null && net.getSource() != null) {
+                            // check if this is a dual-output net and if we just removed one of the outputs
+                            // if so, remove the logical driver flag
+                            for (PIP pip : net.getPIPs()) {
+                                if (pip.isLogicalDriver()) {
+                                    pip.setIsLogicalDriver(false);
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (fanout.size() == 1) {
+                            // We got all the way back to the source site. It is likely that
+                            // the net is using dual exit points from the site as is common in
+                            // SLICEs -- we should unroute the sitenet
+                            SitePin sPin = sink.getSitePin();
+                            if (net.getSource() != null) {
+                                SiteInst si = net.getSource().getSiteInst();
+                                BELPin belPin = sPin.getBELPin();
+                                si.unrouteIntraSiteNet(belPin, belPin);
+                            }
                         }
                     }
                 }
@@ -1724,6 +1737,26 @@ public class DesignTools {
             }
             BEL bel = c.getBEL();
             SiteInst si = c.getSiteInst();
+
+            // Check for VCC on A6 and remove if needed
+            if (c.getBEL().isLUT() && c.getBELName().endsWith("5LUT")) {
+                SitePinInst vcc = c.getSiteInst().getSitePinInst(c.getBELName().charAt(0) + "6");
+                if (vcc != null && vcc.getNet().getName().equals(Net.VCC_NET)) {
+                    boolean hasOtherSink = false;
+                    for (BELPin otherSink : si.getSiteWirePins(vcc.getBELPin().getSiteWireIndex())) {
+                        if (otherSink.isOutput())
+                            continue;
+                        Cell otherCell = si.getCell(otherSink.getBEL());
+                        if (otherCell != null && otherCell.getLogicalPinMapping(otherSink.getName()) != null) {
+                            hasOtherSink = true;
+                            break;
+                        }
+                    }
+                    if (!hasOtherSink) {
+                        pinsToRemove.computeIfAbsent(vcc.getNet(), $ -> new HashSet<>()).add(vcc);
+                    }
+                }
+            }
 
             // Remove all physical nets first
             for (String logPin : c.getPinMappingsP2L().values()) {
@@ -3108,12 +3141,15 @@ public class DesignTools {
             gndInvertibleToVcc = design.getGndNet();
         }
         Map<String, Pair<String, String>> pinMapping = belTypeSitePinNameMapping.get(series);
+        final String[] pins = new String[] {"CE", "SR"};
         for (Cell cell : design.getCells()) {
             if (isUnisimFlipFlopType(cell.getType())) {
                 SiteInst si = cell.getSiteInst();
+                if (!Utils.isSLICE(si)) {
+                    continue;
+                }
                 BEL bel = cell.getBEL();
                 Pair<String, String> sitePinNames = pinMapping.get(bel.getBELType());
-                String[] pins = new String[] {"CE", "SR"};
                 for (String pin : pins) {
                     BELPin belPin = cell.getBEL().getPin(pin);
                     Net net = si.getNetFromSiteWire(belPin.getSiteWireName());
@@ -3600,17 +3636,28 @@ public class DesignTools {
         return true;
     }
 
+    /**
+     * Update the SitePinInst.isRouted() value of all sink pins on the given
+     * Net. A pin will be marked as being routed if it is reachable from the
+     * Net's source pins (or in the case of a static net, a node tied to GND
+     * or VCC) when following the Net's PIPs.
+     * @param net Net on which pins are to be updated.
+     */
     public static void updatePinsIsRouted(Net net) {
         Queue<Node> queue = new ArrayDeque<>();
         Map<Node, List<Node>> node2fanout = new HashMap<>();
+        Map<Node, Node> bidirNode2node = new HashMap<>();
         for (PIP pip : net.getPIPs()) {
             boolean isReversed = pip.isReversed();
             Node startNode = isReversed ? pip.getEndNode() : pip.getStartNode();
             Node endNode = isReversed ? pip.getStartNode() : pip.getEndNode();
             node2fanout.computeIfAbsent(startNode, k -> new ArrayList<>())
                     .add(endNode);
-            if (net.getType() == NetType.GND) {
-                System.err.print("");
+            if (pip.isBidirectional()) {
+                bidirNode2node.put(startNode, endNode);
+                bidirNode2node.put(endNode, startNode);
+                node2fanout.computeIfAbsent(endNode, k -> new ArrayList<>())
+                        .add(startNode);
             }
 
             if ((net.getType() == NetType.GND && startNode.isTiedToGnd()) ||
@@ -3637,9 +3684,15 @@ public class DesignTools {
                 spi.setRouted(true);
             }
 
-            List<Node> fanout = node2fanout.get(node);
-            if (fanout != null) {
-                queue.addAll(fanout);
+            List<Node> fanouts = node2fanout.get(node);
+            if (fanouts != null) {
+                for (Node fanout : fanouts) {
+                    // In the case of bidir PIPs, do not go back on yourself by re-enqueue
+                    // the node you came from
+                    if (bidirNode2node.getOrDefault(fanout, null) != node) {
+                        queue.add(fanout);
+                    }
+                }
             }
         }
     }
