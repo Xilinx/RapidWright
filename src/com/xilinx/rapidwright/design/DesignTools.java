@@ -3636,17 +3636,28 @@ public class DesignTools {
         return true;
     }
 
+    /**
+     * Update the SitePinInst.isRouted() value of all sink pins on the given
+     * Net. A pin will be marked as being routed if it is reachable from the
+     * Net's source pins (or in the case of a static net, a node tied to GND
+     * or VCC) when following the Net's PIPs.
+     * @param net Net on which pins are to be updated.
+     */
     public static void updatePinsIsRouted(Net net) {
         Queue<Node> queue = new ArrayDeque<>();
         Map<Node, List<Node>> node2fanout = new HashMap<>();
+        Map<Node, Node> bidirNode2node = new HashMap<>();
         for (PIP pip : net.getPIPs()) {
             boolean isReversed = pip.isReversed();
             Node startNode = isReversed ? pip.getEndNode() : pip.getStartNode();
             Node endNode = isReversed ? pip.getStartNode() : pip.getEndNode();
             node2fanout.computeIfAbsent(startNode, k -> new ArrayList<>())
                     .add(endNode);
-            if (net.getType() == NetType.GND) {
-                System.err.print("");
+            if (pip.isBidirectional()) {
+                bidirNode2node.put(startNode, endNode);
+                bidirNode2node.put(endNode, startNode);
+                node2fanout.computeIfAbsent(endNode, k -> new ArrayList<>())
+                        .add(startNode);
             }
 
             if ((net.getType() == NetType.GND && startNode.isTiedToGnd()) ||
@@ -3673,9 +3684,15 @@ public class DesignTools {
                 spi.setRouted(true);
             }
 
-            List<Node> fanout = node2fanout.get(node);
-            if (fanout != null) {
-                queue.addAll(fanout);
+            List<Node> fanouts = node2fanout.get(node);
+            if (fanouts != null) {
+                for (Node fanout : fanouts) {
+                    // In the case of bidir PIPs, do not go back on yourself by re-enqueue
+                    // the node you came from
+                    if (bidirNode2node.getOrDefault(fanout, null) != node) {
+                        queue.add(fanout);
+                    }
+                }
             }
         }
     }
