@@ -1355,7 +1355,7 @@ public class RWRoute{
                     altSource = net.getSource();
                 }
                 Node altSourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-                if (altSourceINTNode.equals(sourceRnode.getNode())) {
+                if (sourceRnode.getNode().equals(altSourceINTNode)) {
                     RouteNode altSourceRnode = sourceRnode;
                     connection.setSource(altSource);
                     connection.setSourceRnode(altSourceRnode);
