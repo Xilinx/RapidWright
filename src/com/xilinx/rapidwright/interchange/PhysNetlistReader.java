@@ -95,7 +95,7 @@ public class PhysNetlistReader {
      *  Checks that constant routing and net names are valid.
      *  This incurs a runtime overhead.
      */
-    public static boolean CHECK_CONSTANT_ROUTING_AND_NET_NAMING = true;
+    public static boolean CHECK_CONSTANT_ROUTING_AND_NET_NAMING = false;
 
     /**
      * Examines a design to ensure that the provided macro placement is consistent with the
@@ -758,6 +758,7 @@ public class PhysNetlistReader {
                     if (innerNet != null) {
                         netsToExpand.add(innerNet);
                     } else {
+                        // FIXME: portInst is non-hierarchical, whereas cellPinToPhysicalNet expects a hierarchical name
                         PhysNet.Reader physNet = cellPinToPhysicalNet.get(portInst.getFullName());
                         if (physNet != null) {
                             if (physNet.getType() != PhysNetlist.NetType.VCC && physNet.getType() != PhysNetlist.NetType.GND) {
