@@ -241,8 +241,6 @@ public class TestModuleInst {
         Design design = new Design("top", modDesign.getPartName());
         ModuleInst mi = design.createModuleInst("inst0", module);
 
-        System.out.println(module.getAnchor().getName());
-
         Set<Site> validAnchorSites = new HashSet<>(mi.getAllValidPlacements());
 
         Assertions.assertFalse(validAnchorSites.contains(design.getDevice().getSite("SLICE_X117Y589")));
