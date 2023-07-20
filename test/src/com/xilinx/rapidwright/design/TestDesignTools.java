@@ -973,6 +973,15 @@ public class TestDesignTools {
     }
 
     @Test
+    public void testCreateCeSrRstPinsToVCCLaguna() {
+        Device device = Device.getDevice("xcvu5p");
+        Design design = new Design("testDesign", device.getName());
+        design.createAndPlaceCell("cell", Unisim.FDRE, "LAGUNA_X7Y341/RX_REG0");
+
+        DesignTools.createCeSrRstPinsToVCC(design);
+    }
+
+    @Test
     public void testMakePhysNetNamesConsistentLogicalVccGnd() {
         Design design = RapidWrightDCP.loadDCP("bug701.dcp");
 
