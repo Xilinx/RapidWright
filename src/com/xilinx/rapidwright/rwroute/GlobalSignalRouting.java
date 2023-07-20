@@ -35,6 +35,7 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.placer.blockplacer.Point;
@@ -338,6 +339,7 @@ public class GlobalSignalRouting {
             System.out.println("Net: " + currNet.getName());
         }
 
+        Set<SitePin> sitePinsToCreate = new HashSet<>();
         for (SitePinInst sink : currNet.getPins()) {
             if (sink.isRouted()) continue;
             if (sink.isOutPin()) continue;
@@ -373,6 +375,18 @@ public class GlobalSignalRouting {
                         routingNode = routingNode.getPrev();
                     }
                     netPIPs.addAll(RouterHelper.getPIPsFromNodes(pathNodes));
+
+                    // If the source is an output site pin, put it aside for consideration
+                    // to add as a new source pin
+                    Node sourceNode = pathNodes.get(0);
+                    if (((currNet.getType() == NetType.GND && !sourceNode.isTiedToGnd()) ||
+                            (currNet.getType() == NetType.VCC && !sourceNode.isTiedToVcc()))) {
+                        SitePin sitePin = sourceNode.getSitePin();
+                        if (sitePin != null && !sitePin.isInput()) {
+                            sitePinsToCreate.add(sitePin);
+                        }
+                    }
+
                     if (debug) {
                         for (Node pathNode:pathNodes) {
                             System.out.println(pathNode.toString());
@@ -401,6 +415,22 @@ public class GlobalSignalRouting {
             } else {
                 sink.setRouted(true);
             }
+        }
+
+        for (SitePin sitePin : sitePinsToCreate) {
+            Site site = sitePin.getSite();
+            SiteInst si = design.getSiteInstFromSite(site);
+            if (si == null) {
+                // Create a dummy TIEOFF SiteInst
+                String name = SiteInst.STATIC_SOURCE + "_" + site.getName();
+                si = new SiteInst(name, site.getSiteTypeEnum());
+                si.place(site);
+                // Ensure it is not attached to the design
+                assert (si.getDesign() == null);
+            } else {
+                assert(si.getSitePinInst(sitePin.getPinName()) == null);
+            }
+            currNet.createPin(sitePin.getPinName(), si);
         }
 
         currNet.setPIPs(netPIPs);

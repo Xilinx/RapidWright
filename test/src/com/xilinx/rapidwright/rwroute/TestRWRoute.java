@@ -264,8 +264,9 @@ public class TestRWRoute {
         Assertions.assertTrue(vcc.getPins().stream().allMatch(SitePinInst::isRouted));
 
         Net gnd = design.getGndNet();
-        Assertions.assertEquals(31, gnd.getPins().size());
-        Assertions.assertTrue(gnd.getPins().stream().allMatch(SitePinInst::isRouted));
+        List<SitePinInst> sinks = gnd.getSinkPins();
+        Assertions.assertEquals(31, sinks.size());
+        Assertions.assertTrue(sinks.stream().allMatch(SitePinInst::isRouted));
 
         if (FileTools.isVivadoOnPath()) {
             // Testcase has a number of undriven nets, so just check for unrouted nets
