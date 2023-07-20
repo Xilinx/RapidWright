@@ -24,12 +24,20 @@ package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.Unisim;
-import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.router.RouteThruHelper;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+
+import java.util.List;
+import java.util.function.Function;
 
 public class TestGlobalSignalRouting {
     @ParameterizedTest
@@ -55,5 +63,34 @@ public class TestGlobalSignalRouting {
         Assertions.assertEquals(2 /* 3 */, globalNet.getPins().size());
 
         GlobalSignalRouting.symmetricClkRouting(globalNet, design.getDevice(), (n) -> NodeStatus.AVAILABLE);
+    }
+
+    @Test
+    public void testRouteStaticNet() {
+        Design design = RapidWrightDCP.loadDCP("optical-flow.dcp");
+
+        DesignTools.makePhysNetNamesConsistent(design);
+        DesignTools.createPossiblePinsToStaticNets(design);
+        DesignTools.createMissingSitePinInsts(design);
+
+        List<SitePinInst> gndPins = design.getGndNet().getPins();
+        List<SitePinInst> vccPins = design.getVccNet().getPins();
+        // Note: these numbers are slightly different from RWRoute since RWRoute.routeStaticNets()
+        //       uses RouterHelper.invertPossibleGndPinsToVccPins()
+        Assertions.assertEquals(22760, gndPins.size());
+        Assertions.assertEquals(19402, vccPins.size());
+
+        Function<Node, NodeStatus> gns = (n) -> NodeStatus.AVAILABLE;
+        RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
+
+        GlobalSignalRouting.routeStaticNet(design.getGndNet(), gns, design, routeThruHelper);
+        gndPins = design.getGndNet().getPins();
+        Assertions.assertEquals(1781, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
+        Assertions.assertEquals(22760, gndPins.stream().filter((spi) -> !spi.isOutPin()).count());
+
+        GlobalSignalRouting.routeStaticNet(design.getVccNet(), gns, design, routeThruHelper);
+        vccPins = design.getVccNet().getPins();
+        Assertions.assertEquals(0, vccPins.stream().filter((spi) -> spi.isOutPin()).count());
+        Assertions.assertEquals(19402, vccPins.stream().filter((spi) -> !spi.isOutPin()).count());
     }
 }
