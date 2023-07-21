@@ -288,7 +288,8 @@ public class GlobalSignalRouting {
             }
 
             if (lcbCandidates.isEmpty()) {
-                throw new RuntimeException("ERROR: No mapped LCB to SitePinInst " + p);
+                System.err.println("ERROR: No mapped LCB to SitePinInst " + p);
+                continue;
             }
             Node n = lcbCandidates.get(0);
             RouteNode rn = new RouteNode(n.getTile(), n.getWire());
