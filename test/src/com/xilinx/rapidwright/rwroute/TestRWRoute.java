@@ -150,11 +150,8 @@ public class TestRWRoute {
         Design design = RapidWrightDCP.loadDCP("picoblaze_partial.dcp");
         design.setTrackNetChanges(true);
 
-        Design routed = PartialRouter.routeDesignWithUserDefinedArguments(
-                design,
-                new String[]{
-                        "--nonTimingDriven"
-                });
+        boolean softPreserve = false;
+        Design routed = PartialRouter.routeDesignPartialNonTimingDriven(design, null, softPreserve);
 
         Assertions.assertFalse(routed.getModifiedNets().isEmpty());
         for (Net net : routed.getModifiedNets()) {
@@ -175,11 +172,8 @@ public class TestRWRoute {
         Design design = RapidWrightDCP.loadDCP("picoblaze_partial.dcp");
         design.setTrackNetChanges(true);
 
-        Design routed = PartialRouter.routeDesignWithUserDefinedArguments(
-                design,
-                new String[]{
-                        "--timingDriven"
-                });
+        boolean softPreserve = false;
+        Design routed = PartialRouter.routeDesignPartialTimingDriven(design, null, false);
 
         Assertions.assertFalse(routed.getModifiedNets().isEmpty());
         for (Net net : routed.getModifiedNets()) {
@@ -270,8 +264,9 @@ public class TestRWRoute {
         Assertions.assertTrue(vcc.getPins().stream().allMatch(SitePinInst::isRouted));
 
         Net gnd = design.getGndNet();
-        Assertions.assertEquals(31, gnd.getPins().size());
-        Assertions.assertTrue(gnd.getPins().stream().allMatch(SitePinInst::isRouted));
+        List<SitePinInst> sinks = gnd.getSinkPins();
+        Assertions.assertEquals(31, sinks.size());
+        Assertions.assertTrue(sinks.stream().allMatch(SitePinInst::isRouted));
 
         if (FileTools.isVivadoOnPath()) {
             // Testcase has a number of undriven nets, so just check for unrouted nets

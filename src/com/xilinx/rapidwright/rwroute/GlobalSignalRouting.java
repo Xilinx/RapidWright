@@ -35,6 +35,7 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.placer.blockplacer.Point;
@@ -96,7 +97,7 @@ public class GlobalSignalRouting {
         }
         clk.setPIPs(clkPIPs);
 
-        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
+        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk.getPins(), getNodeStatus);
 
         UltraScaleClockRouting.routeToLCBs(clk, getStartingPoint(horDistributionLines, device), lcbMappings.keySet());
 
@@ -204,7 +205,7 @@ public class GlobalSignalRouting {
         List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
         if (downLines != null) upDownDistLines.addAll(downLines);
 
-        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
+        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk.getPins(), getNodeStatus);
         UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
 
         UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
@@ -242,15 +243,6 @@ public class GlobalSignalRouting {
 
     /**
      * Maps each sink SitePinInsts of a clock net to a leaf clock buffer node.
-     * @param clk The clock net in question.
-     * @return A map between leaf clock buffer nodes and sink SitePinInsts.
-     */
-    public static Map<RouteNode, List<SitePinInst>> getLCBPinMappings(Net clk) {
-        return getLCBPinMappings(clk.getPins(), (n) -> NodeStatus.AVAILABLE);
-    }
-
-    /**
-     * Maps each sink SitePinInsts of a clock net to a leaf clock buffer node.
      * @param clkPins List of clock pins in question.
      * @return A map between leaf clock buffer nodes and sink SitePinInsts.
      */
@@ -262,13 +254,13 @@ public class GlobalSignalRouting {
         for (SitePinInst p : clkPins) {
             if (p.isOutPin()) continue;
             assert(lcbCandidates.isEmpty());
-            Tile intTile = p.getSite().getIntTile();
+            List<Node> intNodes = RouterHelper.projectInputPinToINTNode(p);
+            if (intNodes == null || intNodes.isEmpty()) {
+                throw new RuntimeException("Unable to get INT tile for pin " + p);
+            }
+            Node intNode = intNodes.get(0);
 
-            outer: for (Node prev : p.getConnectedNode().getAllUphillNodes()) {
-                if (!prev.getTile().equals(intTile)) {
-                    continue;
-                }
-
+            outer: for (Node prev : intNode.getAllUphillNodes()) {
                 NodeStatus prevNodeStatus = getNodeStatus.apply(prev);
                 if (prevNodeStatus == NodeStatus.UNAVAILABLE) {
                     continue;
@@ -347,6 +339,7 @@ public class GlobalSignalRouting {
             System.out.println("Net: " + currNet.getName());
         }
 
+        Set<SitePin> sitePinsToCreate = new HashSet<>();
         for (SitePinInst sink : currNet.getPins()) {
             if (sink.isRouted()) continue;
             if (sink.isOutPin()) continue;
@@ -382,6 +375,18 @@ public class GlobalSignalRouting {
                         routingNode = routingNode.getPrev();
                     }
                     netPIPs.addAll(RouterHelper.getPIPsFromNodes(pathNodes));
+
+                    // If the source is an output site pin, put it aside for consideration
+                    // to add as a new source pin
+                    Node sourceNode = pathNodes.get(0);
+                    if (((currNet.getType() == NetType.GND && !sourceNode.isTiedToGnd()) ||
+                            (currNet.getType() == NetType.VCC && !sourceNode.isTiedToVcc()))) {
+                        SitePin sitePin = sourceNode.getSitePin();
+                        if (sitePin != null && !sitePin.isInput()) {
+                            sitePinsToCreate.add(sitePin);
+                        }
+                    }
+
                     if (debug) {
                         for (Node pathNode:pathNodes) {
                             System.out.println(pathNode.toString());
@@ -410,6 +415,22 @@ public class GlobalSignalRouting {
             } else {
                 sink.setRouted(true);
             }
+        }
+
+        for (SitePin sitePin : sitePinsToCreate) {
+            Site site = sitePin.getSite();
+            SiteInst si = design.getSiteInstFromSite(site);
+            if (si == null) {
+                // Create a dummy TIEOFF SiteInst
+                String name = SiteInst.STATIC_SOURCE + "_" + site.getName();
+                si = new SiteInst(name, site.getSiteTypeEnum());
+                si.place(site);
+                // Ensure it is not attached to the design
+                assert (si.getDesign() == null);
+            } else {
+                assert(si.getSitePinInst(sitePin.getPinName()) == null);
+            }
+            currNet.createPin(sitePin.getPinName(), si);
         }
 
         currNet.setPIPs(netPIPs);

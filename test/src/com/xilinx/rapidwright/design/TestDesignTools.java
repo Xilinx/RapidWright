@@ -961,6 +961,15 @@ public class TestDesignTools {
     }
 
     @Test
+    public void testCreateCeSrRstPinsToVCCLaguna() {
+        Device device = Device.getDevice("xcvu5p");
+        Design design = new Design("testDesign", device.getName());
+        design.createAndPlaceCell("cell", Unisim.FDRE, "LAGUNA_X7Y341/RX_REG0");
+
+        DesignTools.createCeSrRstPinsToVCC(design);
+    }
+
+    @Test
     public void testMakePhysNetNamesConsistentLogicalVccGnd() {
         Design design = RapidWrightDCP.loadDCP("bug701.dcp");
 
@@ -989,6 +998,27 @@ public class TestDesignTools {
             numSitewires += si.getSiteWiresFromNet(gnd).size();
         }
         Assertions.assertEquals(31, numSitewires);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testMakePhysNetNamesConsistentStaticNets(boolean gnd) {
+        Design design = new Design("design", Device.AWS_F1);
+        Net staticNet = gnd ? design.getGndNet() : design.getVccNet();
+
+        Net anotherStaticNet = design.createNet("anotherStaticNet");
+        anotherStaticNet.setType(staticNet.getType());
+
+        Cell cell = design.createAndPlaceCell("cell", Unisim.LUT1, "SLICE_X0Y0/A6LUT");
+        SitePinInst spi = anotherStaticNet.connect(cell, "I0");
+
+        Assertions.assertEquals(0, staticNet.getPins().size());
+        Assertions.assertEquals(Arrays.asList(spi), anotherStaticNet.getPins());
+
+        DesignTools.makePhysNetNamesConsistent(design);
+
+        Assertions.assertNull(design.getNet(anotherStaticNet.getName()));
+        Assertions.assertEquals(Arrays.asList(spi), staticNet.getPins());
     }
 
     @Test

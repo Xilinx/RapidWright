@@ -27,7 +27,6 @@ package com.xilinx.rapidwright.rwroute;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -53,6 +52,7 @@ import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
@@ -178,7 +178,13 @@ public class RWRoute{
                 + "supported series: " + SUPPORTED_SERIES;
     }
 
-    protected static void preprocess(Design design) {
+    /**
+     * Pre-process the design to ensure that only the physical {@link Net}-s corresponding to
+     * the parent logical {@link EDIFHierNet} exists, and that such {@link Net}-s contain
+     * all necessary {@link SitePinInst} objects.
+     * @param design Design to preprocess
+     */
+    public static void preprocess(Design design) {
         Series series = design.getPart().getSeries();
         if (!SUPPORTED_SERIES.contains(series)) {
             throw new RuntimeException(getUnsupportedSeriesMessage(design.getPart()));
@@ -288,7 +294,7 @@ public class RWRoute{
         indirectConnections = new ArrayList<>();
         directConnections = new ArrayList<>();
         clkNets = new ArrayList<>();
-        staticNetAndRoutingTargets = new IdentityHashMap<>();
+        staticNetAndRoutingTargets = new HashMap<>();
 
         for (Net net : design.getNets()) {
             if (net.isClockNet()) {
@@ -302,14 +308,6 @@ public class RWRoute{
                     addNetConnectionToRoutingTargets(net);
                 } else if (RouterHelper.isDriverLessOrLoadLessNet(net)) {
                     preserveNet(net, true);
-                    if (DesignTools.isNetDrivenByHierPort(net)) {
-                        // For the case of nets driven by hierarchical ports (out of context designs)
-                        // create a RouteNode for all its sink ports in order to prevent them from
-                        // being unpreserved
-                        for (SitePinInst spi : net.getSinkPins()) {
-                            getOrCreateRouteNode(spi.getConnectedNode(), RouteNodeType.PINFEED_I);
-                        }
-                    }
                     numNotNeedingRoutingNets++;
                 } else if (RouterHelper.isInternallyRoutedNet(net)) {
                     preserveNet(net, true);
@@ -359,11 +357,14 @@ public class RWRoute{
 
     /**
      * Adds the clock net to the list of clock routing targets, if the clock has source and sink {@link SitePinInst} instances.
+     * Any existing routing on such nets will be unrouted.
      * @param clk The clock net in question.
      */
     protected void addGlobalClkRoutingTargets(Net clk) {
         if (RouterHelper.isRoutableNetWithSourceSinks(clk)) {
             clk.unroute();
+            // Preserve all pins (e.g. in case of BOUNCE nodes that may serve as a site pin)
+            preserveNet(clk, true);
             clkNets.add(clk);
         } else {
             numNotNeedingRoutingNets++;
@@ -401,6 +402,10 @@ public class RWRoute{
         if (clkNets.isEmpty())
             return;
         for (Net clk : clkNets) {
+            // Since we preserved all pins in addGlobalClkRoutingTargets(), unpreserve them here
+            for (SitePinInst spi : clk.getPins()) {
+                routingGraph.unpreserve(spi.getConnectedNode());
+            }
             Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(clk, node);
             if (routesToSinkINTTiles != null) {
                 // routes clock nets with references of partial routes
@@ -425,22 +430,20 @@ public class RWRoute{
     }
 
     /**
-     * Adds a static net to the static net routing target list.
+     * Adds a static net to the static net routing target list, unrouting it
+     * if any routing exists.
      * @param staticNet The static net in question, i.e. VCC or GND.
      */
     protected void addStaticNetRoutingTargets(Net staticNet) {
-        assert(!staticNet.hasPIPs());
-
         List<SitePinInst> sinks = staticNet.getSinkPins();
         if (sinks.size() > 0) {
-            addStaticNetRoutingTargets(staticNet, sinks);
+            staticNet.unroute();
+            // Preserve all pins (e.g. in case of BOUNCE nodes that may serve as a site pin)
+            preserveNet(staticNet, true);
+            staticNetAndRoutingTargets.put(staticNet, sinks);
         } else {
             numNotNeedingRoutingNets++;
         }
-    }
-
-    protected void addStaticNetRoutingTargets(Net staticNet, List<SitePinInst> sinks) {
-        staticNetAndRoutingTargets.put(staticNet, sinks);
     }
 
     /**
@@ -460,39 +463,17 @@ public class RWRoute{
             }
         }
 
-        Map<Node,Net> preservedStaticNodes;
-        if (staticNetAndRoutingTargets.size() > 1) {
-            // Annotate all static pin nodes with the net they're associated with to ensure that one
-            // net cannot unknowingly use a node needed by the other net
-            preservedStaticNodes = new HashMap<>();
-            for (Map.Entry<Net, List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
-                Net staticNet = e.getKey();
-                for (SitePinInst sink : e.getValue()) {
-                    Node node = sink.getConnectedNode();
-                    preservedStaticNodes.put(node, staticNet);
-                    assert (!routingGraph.isPreserved(node));
-                }
+        for (Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
+            Net staticNet = e.getKey();
+            List<SitePinInst> pins = e.getValue();
+            // Since we preserved all pins in addStaticNetRoutingTargets(), unpreserve them here
+            for (SitePinInst spi : pins) {
+                routingGraph.unpreserve(spi.getConnectedNode());
             }
-        } else {
-            preservedStaticNodes = Collections.emptyMap();
-        }
 
-        // Iterate through both static nets in a stable order (not guaranteed by IdentityHashMap)
-        for (Net staticNet : Arrays.asList(design.getGndNet(), design.getVccNet())) {
-            List<SitePinInst> pins = staticNetAndRoutingTargets.get(staticNet);
-            if (pins == null) {
-                continue;
-            }
             System.out.println("INFO: Routing " + pins.size() + " pins of " + staticNet);
 
-            Function<Node, NodeStatus> gns = (node) -> {
-                // Check that this node is not needed by a pin on the other static net
-                Net preservedNet = preservedStaticNodes.get(node);
-                if (preservedNet != null && preservedNet != staticNet) {
-                    return NodeStatus.UNAVAILABLE;
-                }
-                return getGlobalRoutingNodeStatus(staticNet, node);
-            };
+            Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(staticNet, node);
             GlobalSignalRouting.routeStaticNet(staticNet, gns, design, routethruHelper);
 
             preserveNet(staticNet, false);
@@ -1245,6 +1226,9 @@ public class RWRoute{
         if (rnode != null) {
             queue.clear();
             finishRouteConnection(connection, rnode);
+            if (!connection.getSink().isRouted()) {
+                throw new RuntimeException("Unable to save routing for connection " + connection);
+            }
             if (config.isTimingDriven()) connection.updateRouteDelay();
             assert(connection.getSink().isRouted());
         } else {
@@ -1324,16 +1308,22 @@ public class RWRoute{
      * @param connection The routed target connection.
      */
     protected void finishRouteConnection(Connection connection, RouteNode rnode) {
-        saveRouting(connection, rnode);
-        updateUsersAndPresentCongestionCost(connection);
+        boolean routed = saveRouting(connection, rnode);
+        if (routed) {
+            connection.getSink().setRouted(routed);
+            updateUsersAndPresentCongestionCost(connection);
+        } else {
+            connection.resetRoute();
+        }
     }
 
     /**
      * Traces back for a connection from its sink rnode to its source, in order to build and store the routing path.
      * @param connection: The connection that is being routed.
      * @param rnode RouteNode to start backtracking from.
+     * @return True if backtracking successful.
      */
-    private void saveRouting(Connection connection, RouteNode rnode) {
+    private boolean saveRouting(Connection connection, RouteNode rnode) {
         RouteNode sinkRnode = connection.getSinkRnode();
         RouteNode altSinkRnode = connection.getAltSinkRnode();
         if (rnode != sinkRnode && rnode != altSinkRnode) {
@@ -1366,22 +1356,19 @@ public class RWRoute{
                     altSource = net.getSource();
                 }
                 Node altSourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-                if (altSourceINTNode.equals(sourceRnode.getNode())) {
+                if (sourceRnode.getNode().equals(altSourceINTNode)) {
                     RouteNode altSourceRnode = sourceRnode;
                     connection.setSource(altSource);
                     connection.setSourceRnode(altSourceRnode);
                 } else {
-                    throw new RuntimeException(connection + " expected " + altSourceINTNode +
-                            " or " + connection.getSourceRnode().getNode() +
-                            " got " + sourceRnode.getNode());
+                    return false;
                 }
             } else {
-                throw new RuntimeException(connection + " expected " + connection.getSourceRnode().getNode() +
-                        " got " + sourceRnode.getNode());
+                return false;
             }
         }
 
-        connection.getSink().setRouted(true);
+        return true;
     }
 
     /**

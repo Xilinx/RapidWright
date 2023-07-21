@@ -34,6 +34,7 @@ import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockRange;
 import com.xilinx.rapidwright.design.noc.NOCClient;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
@@ -388,6 +389,12 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                 newPip.setTile(newPipTile);
                 if (pipSet != null) {
                     pipSet.add(newPip);
+                }
+                // Some tiles have nodes that are depopulated, we need to detect those
+                Node endNode = newPip.getEndNode();
+                if (endNode != null && endNode.getAllDownhillPIPs().size() == 0
+                        && pip.getEndNode().getAllDownhillPIPs().size() != 0) {
+                    return false;
                 }
                 net.addPIP(newPip);
             }
