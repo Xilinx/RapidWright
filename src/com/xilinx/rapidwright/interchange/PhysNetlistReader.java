@@ -631,7 +631,7 @@ public class PhysNetlistReader {
             }
             case SITE_P_I_P:{
                 PhysSitePIP.Reader spReader = segment.getSitePIP();
-                SiteInst siteInst = getOrCreatePlacedSiteInst(spReader.getSite(), et);
+                SiteInst siteInst = getOrCreatePlacedSiteInst(spReader.getSite(), net);
                 BELPin belPin = getBELPin(siteInst, spReader.getBel(), spReader.getPin());
                 SitePIP sitePIP = siteInst.getSitePIP(belPin);
                 addSitePIPToSiteInst(sitePIP, siteInst);
