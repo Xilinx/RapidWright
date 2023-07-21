@@ -1667,18 +1667,23 @@ public class DesignTools {
 
     /**
      * Turns the cell named hierarchicalCell into a blackbox and removes any
-     * associated placement and routing information associated with that instance. In Vivado,
-     * this can be accomplished by running: (1) {@code update_design -cells <name> -black_box} or (2)
-     * by deleting all of the cells and nets insides of a cell instance.  Method (2) is
-     * more likely to have complications.
-     * @param d The current design
+     * associated placement and routing information associated with that instance.
+     * In Vivado, this can be accomplished by running: (1)
+     * {@code update_design -cells <name> -black_box} or (2) by deleting all of the
+     * cells and nets insides of a cell instance. Method (2) is more likely to have
+     * complications. This also unroutes both GND and VCC nets to avoid
+     * implementation issues by Vivado in subsequent place and route runs.
+     * 
+     * @param d                The current design
      * @param hierarchicalCell The hierarchical cell to become a black box.
      */
     public static void makeBlackBox(Design d, EDIFHierCellInst hierarchicalCell) {
-        CodePerfTracker t = CodePerfTracker.SILENT;//  new CodePerfTracker("makeBlackBox", true);
+        CodePerfTracker t = CodePerfTracker.SILENT;// new CodePerfTracker("makeBlackBox", true);
         t.start("Init");
         EDIFCellInst futureBlackBox = hierarchicalCell.getInst();
-        if (futureBlackBox == null) throw new RuntimeException("ERROR: Couldn't find cell " + hierarchicalCell + " in source design " + d.getName());
+        if (futureBlackBox == null)
+            throw new RuntimeException(
+                    "ERROR: Couldn't find cell " + hierarchicalCell + " in source design " + d.getName());
 
         if (hierarchicalCell.getCellType() == d.getTopEDIFCell()) {
             d.unplaceDesign();
@@ -1688,7 +1693,7 @@ public class DesignTools {
         }
 
         Set<SiteInst> touched = new HashSet<>();
-        Map<String,String> boundaryNets = new HashMap<>();
+        Map<String, String> boundaryNets = new HashMap<>();
 
         Map<Net, Set<SitePinInst>> pinsToRemove = new HashMap<>();
 
@@ -1696,13 +1701,15 @@ public class DesignTools {
         // Find all the nets that connect to the cell (keep them)
         for (EDIFPortInst portInst : futureBlackBox.getPortInsts()) {
             EDIFNet net = portInst.getNet();
-            EDIFHierCellInst hierParentName =hierarchicalCell.getParent();
+            EDIFHierCellInst hierParentName = hierarchicalCell.getParent();
             EDIFHierNet hierNetName = new EDIFHierNet(hierParentName, net);
             EDIFHierNet parentNetName = d.getNetlist().getParentNet(hierNetName);
-            boundaryNets.put(parentNetName.getHierarchicalNetName(), portInst.isOutput() ? hierNetName.getHierarchicalNetName() : null);
+            boundaryNets.put(parentNetName.getHierarchicalNetName(),
+                    portInst.isOutput() ? hierNetName.getHierarchicalNetName() : null);
 
             // Remove parts of routed GND/VCC nets exiting the black box
-            if (portInst.isInput()) continue;
+            if (portInst.isInput())
+                continue;
             NetType netType = NetType.getNetTypeFromNetName(parentNetName.getHierarchicalNetName());
             if (netType.isStaticNetType()) {
                 // Black box is supplying VCC/GND, we must unroute connected tree
@@ -1711,7 +1718,8 @@ public class DesignTools {
                 // extract site wire and site pins and nodes to unroute
                 for (EDIFHierPortInst sink : sinks) {
                     Cell c = d.getCell(sink.getFullHierarchicalInstName());
-                    if (c == null || !c.isPlaced()) continue;
+                    if (c == null || !c.isPlaced())
+                        continue;
                     String logicalPinName = sink.getPortInst().getName();
                     // Remove all physical nets first
                     List<SitePinInst> removePins = unrouteCellPinSiteRouting(c, logicalPinName);
@@ -1726,8 +1734,8 @@ public class DesignTools {
 
         List<EDIFHierCellInst> allLeafs = d.getNetlist().getAllLeafDescendants(hierarchicalCell);
 
-
-        // Remove all placement and routing information related to the cell to be blackboxed
+        // Remove all placement and routing information related to the cell to be
+        // blackboxed
         for (EDIFHierCellInst i : allLeafs) {
             // Get the physical cell, make sure we can unplace/unroute it first
             Cell c = d.getCell(i.getFullHierarchicalInstName());
@@ -1785,7 +1793,8 @@ public class DesignTools {
 
         t.stop().start("new net names");
 
-        // Update black box output nets with new net names (those with sinks inside the black box)
+        // Update black box output nets with new net names (those with sinks inside the
+        // black box)
         Map<Net, String> netsToUpdate = new HashMap<>();
         for (Net n : d.getNets()) {
             String newName = boundaryNets.get(n.getName());
@@ -1806,19 +1815,12 @@ public class DesignTools {
 
         t.stop().start("cleanup siteinsts");
 
-        // Keep track of site instances to remove, but keep those supplying static sources
+        // Keep track of site instances to remove, but keep those supplying static
+        // sources
         List<SiteInst> siteInstsToRemove = new ArrayList<>();
         for (SiteInst siteInst : touched) {
             if (siteInst.getCells().size() == 0) {
-                boolean keepSiteInst = false;
-                for (SitePinInst pin : siteInst.getSitePinInsts()) {
-                    if (pin.getNet() != null && pin.getNet().isStaticNet() && pin.isOutPin()) {
-                        keepSiteInst = true;
-                    }
-                }
-                if (!keepSiteInst) {
-                    siteInstsToRemove.add(siteInst);
-                }
+                siteInstsToRemove.add(siteInst);
             }
         }
 
@@ -1838,13 +1840,16 @@ public class DesignTools {
         t.stop().start("create bbox");
 
         // Make EDIFCell blackbox
-        EDIFCell blackBox = new EDIFCell(futureBlackBox.getCellType().getLibrary(),"black_box" +
-                uniqueBlackBoxCount++);
+        EDIFCell blackBox = new EDIFCell(futureBlackBox.getCellType().getLibrary(),
+                "black_box" + uniqueBlackBoxCount++);
         for (EDIFPort port : futureBlackBox.getCellType().getPorts()) {
             blackBox.addPort(port);
         }
         futureBlackBox.setCellType(blackBox);
         futureBlackBox.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+
+        unrouteGNDNetAndLUTSources(d);
+        d.getVccNet().unroute();
 
         t.stop().printSummary();
     }
@@ -3634,4 +3639,256 @@ public class DesignTools {
 
         return true;
     }
+
+    /**
+     * Locks the logical netlist of the design using the DONT_TOUCH property. This
+     * strives to be as close as possible to what Vivado's 'lock_design -level
+     * netlist' does to lock the design. {@link EDIFTools#lockNetlist(EDIFNetlist)}.
+     * 
+     * @param design The design of the netlist to lock.
+     */
+    public static void lockNetlist(Design design) {
+        EDIFTools.lockNetlist(design.getNetlist());
+    }
+
+    /**
+     * Unlocks the logical netlist of the design by removing the DONT_TOUCH
+     * property. This strives to be as close as possible to what Vivado's
+     * 'lock_design -unlock -level netlist' does to lock the
+     * design.{@link EDIFTools#unlockNetlist(EDIFNetlist)}.
+     * 
+     * @param design The design of the netlist to unlock.
+     */
+    public static void unlockNetlist(Design design) {
+        EDIFTools.unlockNetlist(design.getNetlist());
+    }
+
+    /**
+     * Locks or unlocks all placement of a design against changes in Vivado. It will
+     * also lock or unlock the netlist of the design (see
+     * {@link #lockNetlist(Design)}). This strives to be as close as possible to
+     * what Vivado's 'lock_design -level placement' does to lock the design.
+     * 
+     * @param design The design to lock
+     * @param lock   Flag indicating to lock (true) or unlock (false) the design's
+     *               placement and netlist.
+     */
+    public static void lockPlacement(Design design, boolean lock) {
+        if (lock) {
+            lockNetlist(design);
+        } else {
+            unlockNetlist(design);
+        }
+        for (SiteInst si : design.getSiteInsts()) {
+            si.setSiteLocked(lock);
+            for (Cell cell : si.getCells()) {
+                cell.setBELFixed(lock);
+                cell.setSiteFixed(lock);
+            }
+        }
+    }
+
+    /**
+     * Locks placement of cells of a design against changes in Vivado. It will also
+     * lock the netlist the design (see {@link #lockNetlist(Design)}). This strives
+     * to be as close as possible to what Vivado's 'lock_design -level placement'
+     * does to lock the design.
+     * 
+     * @param design The design to lock
+     */
+    public static void lockPlacement(Design design) {
+        lockPlacement(design, true);
+    }
+
+    /**
+     * Unlocks placement of cells of a design. It will also unlock the netlist the
+     * design (see {@link #unlockNetlist(Design)}). This strives to be as close as
+     * possible to what Vivado's 'lock_design -unlock -level placement' does to lock
+     * the design.
+     * 
+     * @param design The design to unlock
+     */
+    public static void unlockPlacement(Design design) {
+        lockPlacement(design, false);
+    }
+
+    /**
+     * Locks or unlocks all routing of a design (except GND and VCC nets) against
+     * changes in Vivado. It will also lock or unlock the netlist and placement of
+     * the design (see {@link #lockPlacement(Design, boolean)}). This strives to be
+     * as close as possible to what Vivado's 'lock_design -level routing' does to
+     * lock the design.
+     * 
+     * @param design The design to lock
+     * @param lock   Flag indicating to lock (true) or unlock (false) the design's
+     *               routing, placement and netlist.
+     */
+    public static void lockRouting(Design design, boolean lock) {
+        lockPlacement(design, lock);
+        for (Net net : design.getNets()) {
+            if (net.isStaticNet())
+                continue;
+            for (PIP p : net.getPIPs()) {
+                p.setIsPIPFixed(lock);
+            }
+        }
+    }
+
+    /**
+     * Locks all routing of a design (except GND and VCC nets) against changes in
+     * Vivado. It will also lock the netlist and placement of the design. This
+     * strives to be as close as possible to what Vivado's 'lock_design -level
+     * routing' does to lock the design.
+     * 
+     * @param design The design to lock
+     */
+    public static void lockRouting(Design design) {
+        lockRouting(design, true);
+    }
+
+    /**
+     * Unlocks any and all routing of a design. It will also unlock the netlist and
+     * placement of the design. This strives to be as close as possible to what
+     * Vivado's 'lock_design -unlock -level routing' does to lock the design.
+     * 
+     * @param design The design to unlock
+     */
+    public static void unlockRouting(Design design) {
+        lockRouting(design, false);
+    }
+
+    /***
+     * Unroutes the GND net of a design and unroutes the site routing of any LUT GND
+     * sources while leaving other site routing inputs intact.
+     * 
+     * @param design The design to modify.
+     */
+    public static void unrouteGNDNetAndLUTSources(Design design) {
+        // Unroute the site routing of implicit LUT GND sources
+        Set<Node> gndNodes = new HashSet<>();
+        for (PIP p : design.getGndNet().getPIPs()) {
+            gndNodes.add(p.getStartNode());
+        }
+
+        for (Node n : gndNodes) {
+            SitePin sp = n.getSitePin();
+            if (sp != null && !sp.isInput() && Utils.isSLICE(sp.getSite().getSiteTypeEnum())) {
+                BELPin src = sp.getBELPin().getSourcePin();
+                if (src.getBEL().isLUT()) {
+                    SiteInst si = design.getSiteInstFromSite(sp.getSite());
+                    if (si != null) {
+                        si.unrouteIntraSiteNet(src, sp.getBELPin());
+                    }
+                }
+            }
+        }
+
+        design.getGndNet().unroute();
+    }
+
+    /**
+     * Adds a PROHIBIT constraint for each LUT BEL supplying GND. This is useful
+     * when trying to preserve a partially implemented design that have additional
+     * logic placed and routed onto it later. The Vivado placer doesn't recognize
+     * the GND sources so this prevents the placer from using those BEL sites.
+     * 
+     * @param design The design to which the PROHIBIT constraints are added.
+     */
+    public static void prohibitGNDSources(Design design) {
+        Set<Node> gndNodes = new HashSet<>();
+        for (PIP p : design.getGndNet().getPIPs()) {
+            gndNodes.add(p.getStartNode());
+        }
+
+        List<String> bels = new ArrayList<>();
+        for (Node n : gndNodes) {
+            SitePin sp = n.getSitePin();
+            if (sp != null && !sp.isInput() && Utils.isSLICE(sp.getSite().getSiteTypeEnum())) {
+                BELPin src = sp.getBELPin().getSourcePin();
+                if (src.getBEL().isLUT()) {
+                    bels.add(sp.getSite().getName() + "/" + src.getBELName());
+                }
+            }
+        }
+        addProhibitConstraint(design, bels);
+    }
+
+    /**
+     * Checks the provided BEL's first letter to determine if it is in the top half
+     * of a SLICE or bottom half.
+     * 
+     * @param bel The BEL of a SLICE to query
+     * @return True if the BEL resides in the top half of a SLICE (E6LUT, E5LUT,
+     *         EFF, EFF2, ..). Returns false if it is in the bottom half and null if
+     *         it couldn't be determined.
+     */
+    public static Boolean isUltraScaleSliceTop(BEL bel) {
+        if (bel.isLUT() || bel.isFF()) {
+            char letter = bel.getName().charAt(0);
+            return letter >= 'E' && letter <= 'H';
+        }
+        return null;
+    }
+
+    /**
+     * This adds PROHIBIT constraints to the design (via .XDC) that will prohibit
+     * the use of BEL sites in the same half SLICE if there are any other cells
+     * placed in it. This is used for shell creation when an existing placed and
+     * routed implementation is desired to be preserved but to allow additional
+     * logic to be placed and routed on top of it without an area (pblock)
+     * constraint.
+     * 
+     * @param design The design to which the constraints are added.
+     */
+    public static void prohibitPartialHalfSlices(Design design) {
+        List<String> bels = new ArrayList<>();
+
+        for (SiteInst si : design.getSiteInsts()) {
+            if (!Utils.isSLICE(si)) continue;
+            boolean bottomUsed = false;
+            boolean topUsed = false;
+            for (Cell c : si.getCells()) {
+                Boolean sliceHalf = isUltraScaleSliceTop(c.getBEL());
+                if (sliceHalf != null) {
+                    if (sliceHalf) {
+                        topUsed = true;
+                    } else {
+                        bottomUsed = true;
+                    }
+                }
+            }
+
+            for (BEL bel : si.getSite().getBELs()) {
+                if (bel.getBELClass() == BELClass.BEL && si.getCell(bel) == null) {
+                    Boolean isTop = isUltraScaleSliceTop(bel);
+                    if (isTop != null) {
+                        if ((isTop && topUsed) || (!isTop && bottomUsed)) {
+                            bels.add(si.getSiteName() + "/" + bel.getName());
+                        }
+                    }
+                }
+            }
+        }
+        addProhibitConstraint(design, bels);
+    }
+
+    /**
+     * Adds a PROHIBIT constraint to the specified BEL Locations (ex:
+     * "SLICE_X10Y10/AFF")
+     * 
+     * @param design       The design to which the constraint should be added
+     * @param belLocations A list of BEL locations using the syntax
+     *                     '<SITE-NAME>/<BEL-NAME>'.
+     */
+    public static void addProhibitConstraint(Design design, List<String> belLocations) {
+        if (belLocations.size() > 0) {
+            StringBuilder sb = new StringBuilder();
+            for (String bel : belLocations) {
+                sb.append(bel);
+                sb.append(" ");
+            }
+            design.addXDCConstraint(ConstraintGroup.LATE,
+                    "set_property PROHIBIT true [get_bels { " + sb.toString() + "} ]");
+        }
+    }  
 }
