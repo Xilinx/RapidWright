@@ -32,6 +32,7 @@ import java.util.Map.Entry;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
@@ -97,8 +98,39 @@ public class LUTTools {
      * @return The companion LUT name or null if undetermined.
      */
     public static String getCompanionLUTName(String lutName) {
-            String[] belNames = getLUTBELNames(lutName.charAt(0));
-            return belNames[(lutName.charAt(1) == '6') ? 1 : 0];
+        String[] belNames = getLUTBELNames(lutName.charAt(0));
+        return belNames[(lutName.charAt(1) == '6') ? 1 : 0];
+    }
+
+    /**
+     * From a placed LUT cell, get the companion LUT BEL location. For example, a
+     * cell placed on A5LUT would return the A6LUT and vice versa.
+     * 
+     * @param cell A placed cell on a LUT BEL.
+     * @return The companion LUT BEL or null if the cell is not placed on a LUT BEL
+     *         location.
+     */
+    public static BEL getCompanionLUT(Cell cell) {
+        assert (cell.getBEL().isLUT());
+        String belName = cell.getBELName();
+        if (belName == null) return null;
+        String otherLUTName = getCompanionLUTName(belName);
+        return otherLUTName != null ? cell.getSite().getBEL(otherLUTName) : null;
+    }
+
+    /**
+     * From a placed LUT cell, get the cell in the companion LUT BEL location. For
+     * example, a cell placed on A5LUT would return the cell in the A6LUT and vice
+     * versa.
+     * 
+     * @param cell A placed cell on a LUT BEL.
+     * @return The companion cell placed in the LUT BEL location or null if the cell
+     *         is not placed on a LUT BEL location or there is no cell in the
+     *         companion LUT BEL.
+     */
+    public static Cell getCompanionLUTCell(Cell cell) {
+        SiteInst si = cell.getSiteInst();
+        return si != null ? si.getCell(getCompanionLUT(cell)) : null;
     }
 
     /**
