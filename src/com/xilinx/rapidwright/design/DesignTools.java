@@ -32,6 +32,7 @@ import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -3890,5 +3891,67 @@ public class DesignTools {
             design.addXDCConstraint(ConstraintGroup.LATE,
                     "set_property PROHIBIT true [get_bels { " + sb.toString() + "} ]");
         }
-    }  
+    }
+
+    /**
+     * Update the SitePinInst.isRouted() value of all sink pins on the given
+     * Net. A pin will be marked as being routed if it is reachable from the
+     * Net's source pins (or in the case of static nets, also from nodes
+     * tied to GND or VCC) when following the Net's PIPs.
+     * @param net Net on which pins are to be updated.
+     */
+    public static void updatePinsIsRouted(Net net) {
+        Queue<Node> queue = new ArrayDeque<>();
+        Map<Node, List<Node>> node2fanout = new HashMap<>();
+        Map<Node, Set<Node>> bidirNode2nodes = new HashMap<>();
+        for (PIP pip : net.getPIPs()) {
+            boolean isReversed = pip.isReversed();
+            Node startNode = isReversed ? pip.getEndNode() : pip.getStartNode();
+            Node endNode = isReversed ? pip.getStartNode() : pip.getEndNode();
+            node2fanout.computeIfAbsent(startNode, k -> new ArrayList<>())
+                    .add(endNode);
+            if (pip.isBidirectional()) {
+                bidirNode2nodes.computeIfAbsent(startNode, k -> new HashSet<>()).add(endNode);
+                bidirNode2nodes.computeIfAbsent(endNode, k -> new HashSet<>()).add(startNode);
+                node2fanout.computeIfAbsent(endNode, k -> new ArrayList<>())
+                        .add(startNode);
+            }
+
+            if ((net.getType() == NetType.GND && startNode.isTiedToGnd()) ||
+                    (net.getType() == NetType.VCC && startNode.isTiedToVcc())) {
+                queue.add(startNode);
+            }
+        }
+
+        Map<Node, SitePinInst> node2spi = new HashMap<>();
+        for (SitePinInst spi : net.getPins()) {
+            spi.setRouted(false);
+            Node node = spi.getConnectedNode();
+            if (spi.isOutPin()) {
+                queue.add(node);
+                continue;
+            }
+            node2spi.put(spi.getConnectedNode(), spi);
+        }
+
+        while (!queue.isEmpty()) {
+            Node node = queue.poll();
+            SitePinInst spi = node2spi.get(node);
+            if (spi != null) {
+                spi.setRouted(true);
+            }
+
+            List<Node> fanouts = node2fanout.get(node);
+            if (fanouts != null) {
+                for (Node fanout : fanouts) {
+                    if (bidirNode2nodes.getOrDefault(fanout, Collections.emptySet()).contains(node)) {
+                        // In the case of bidir PIPs, remove the ability to go from the fanout
+                        // node back to this node
+                        node2fanout.get(fanout).remove(node);
+                    }
+                    queue.add(fanout);
+                }
+            }
+        }
+    }
 }
