@@ -244,6 +244,7 @@ public class PhysNetlistReader {
                 if (c == null) {
                     BEL bel = siteInst.getBEL(belName);
                     c = new Cell(PhysNetlistWriter.LOCKED, bel);
+                    c.setType(strings.get(placement.getType()));
                     c.setBELFixed(placement.getIsBelFixed());
                     c.setNullBEL(bel == null);
                     siteInst.addCell(c);
