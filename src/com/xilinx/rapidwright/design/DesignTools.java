@@ -32,6 +32,7 @@ import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -1212,15 +1213,28 @@ public class DesignTools {
                         curr = reverseConns.get(sink);
                         fanoutCount = fanout.getOrDefault(sink, 0);
                     }
-                    if (curr == null && fanout.size() == 1 && !net.isStaticNet()) {
-                        // We got all the way back to the source site. It is likely that
-                        // the net is using dual exit points from the site as is common in
-                        // SLICEs -- we should unroute the sitenet
-                        SitePin sPin = sink.getSitePin();
-                        if (net.getSource() != null) {
-                            SiteInst si = net.getSource().getSiteInst();
-                            BELPin belPin = sPin.getBELPin();
-                            si.unrouteIntraSiteNet(belPin, belPin);
+                    if (curr == null && !net.isStaticNet()) {
+                        if (fanoutCount == 1 && net.getAlternateSource() != null && net.getSource() != null) {
+                            // check if this is a dual-output net and if we just removed one of the outputs
+                            // if so, remove the logical driver flag
+                            for (PIP pip : net.getPIPs()) {
+                                if (pip.isLogicalDriver()) {
+                                    pip.setIsLogicalDriver(false);
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (fanout.size() == 1) {
+                            // We got all the way back to the source site. It is likely that
+                            // the net is using dual exit points from the site as is common in
+                            // SLICEs -- we should unroute the sitenet
+                            SitePin sPin = sink.getSitePin();
+                            if (net.getSource() != null) {
+                                SiteInst si = net.getSource().getSiteInst();
+                                BELPin belPin = sPin.getBELPin();
+                                si.unrouteIntraSiteNet(belPin, belPin);
+                            }
                         }
                     }
                 }
@@ -1300,8 +1314,7 @@ public class DesignTools {
             }
             if (otherUser == false) {
                 // Unroute site routing back to pin and remove site pin
-                String sitePinName = getRoutedSitePinFromPhysicalPin(cell, net, pin.getName());
-                if (sitePinName != null) {
+                for (String sitePinName : getAllRoutedSitePinsFromPhysicalPin(cell, net, pin.getName())) {
                     BELPin sitePortBelPin = siteInst.getSite().getBELPin(sitePinName);
                     assert(sitePortBelPin.isSitePort());
                     boolean outputSitePin = sitePortBelPin.isInput(); // Input BELPin means output SitePin
@@ -1654,18 +1667,23 @@ public class DesignTools {
 
     /**
      * Turns the cell named hierarchicalCell into a blackbox and removes any
-     * associated placement and routing information associated with that instance. In Vivado,
-     * this can be accomplished by running: (1) {@code update_design -cells <name> -black_box} or (2)
-     * by deleting all of the cells and nets insides of a cell instance.  Method (2) is
-     * more likely to have complications.
-     * @param d The current design
+     * associated placement and routing information associated with that instance.
+     * In Vivado, this can be accomplished by running: (1)
+     * {@code update_design -cells <name> -black_box} or (2) by deleting all of the
+     * cells and nets insides of a cell instance. Method (2) is more likely to have
+     * complications. This also unroutes both GND and VCC nets to avoid
+     * implementation issues by Vivado in subsequent place and route runs.
+     * 
+     * @param d                The current design
      * @param hierarchicalCell The hierarchical cell to become a black box.
      */
     public static void makeBlackBox(Design d, EDIFHierCellInst hierarchicalCell) {
-        CodePerfTracker t = CodePerfTracker.SILENT;//  new CodePerfTracker("makeBlackBox", true);
+        CodePerfTracker t = CodePerfTracker.SILENT;// new CodePerfTracker("makeBlackBox", true);
         t.start("Init");
         EDIFCellInst futureBlackBox = hierarchicalCell.getInst();
-        if (futureBlackBox == null) throw new RuntimeException("ERROR: Couldn't find cell " + hierarchicalCell + " in source design " + d.getName());
+        if (futureBlackBox == null)
+            throw new RuntimeException(
+                    "ERROR: Couldn't find cell " + hierarchicalCell + " in source design " + d.getName());
 
         if (hierarchicalCell.getCellType() == d.getTopEDIFCell()) {
             d.unplaceDesign();
@@ -1675,7 +1693,7 @@ public class DesignTools {
         }
 
         Set<SiteInst> touched = new HashSet<>();
-        Map<String,String> boundaryNets = new HashMap<>();
+        Map<String, String> boundaryNets = new HashMap<>();
 
         Map<Net, Set<SitePinInst>> pinsToRemove = new HashMap<>();
 
@@ -1683,13 +1701,15 @@ public class DesignTools {
         // Find all the nets that connect to the cell (keep them)
         for (EDIFPortInst portInst : futureBlackBox.getPortInsts()) {
             EDIFNet net = portInst.getNet();
-            EDIFHierCellInst hierParentName =hierarchicalCell.getParent();
+            EDIFHierCellInst hierParentName = hierarchicalCell.getParent();
             EDIFHierNet hierNetName = new EDIFHierNet(hierParentName, net);
             EDIFHierNet parentNetName = d.getNetlist().getParentNet(hierNetName);
-            boundaryNets.put(parentNetName.getHierarchicalNetName(), portInst.isOutput() ? hierNetName.getHierarchicalNetName() : null);
+            boundaryNets.put(parentNetName.getHierarchicalNetName(),
+                    portInst.isOutput() ? hierNetName.getHierarchicalNetName() : null);
 
             // Remove parts of routed GND/VCC nets exiting the black box
-            if (portInst.isInput()) continue;
+            if (portInst.isInput())
+                continue;
             NetType netType = NetType.getNetTypeFromNetName(parentNetName.getHierarchicalNetName());
             if (netType.isStaticNetType()) {
                 // Black box is supplying VCC/GND, we must unroute connected tree
@@ -1698,7 +1718,8 @@ public class DesignTools {
                 // extract site wire and site pins and nodes to unroute
                 for (EDIFHierPortInst sink : sinks) {
                     Cell c = d.getCell(sink.getFullHierarchicalInstName());
-                    if (c == null || !c.isPlaced()) continue;
+                    if (c == null || !c.isPlaced())
+                        continue;
                     String logicalPinName = sink.getPortInst().getName();
                     // Remove all physical nets first
                     List<SitePinInst> removePins = unrouteCellPinSiteRouting(c, logicalPinName);
@@ -1713,8 +1734,8 @@ public class DesignTools {
 
         List<EDIFHierCellInst> allLeafs = d.getNetlist().getAllLeafDescendants(hierarchicalCell);
 
-
-        // Remove all placement and routing information related to the cell to be blackboxed
+        // Remove all placement and routing information related to the cell to be
+        // blackboxed
         for (EDIFHierCellInst i : allLeafs) {
             // Get the physical cell, make sure we can unplace/unroute it first
             Cell c = d.getCell(i.getFullHierarchicalInstName());
@@ -1723,6 +1744,26 @@ public class DesignTools {
             }
             BEL bel = c.getBEL();
             SiteInst si = c.getSiteInst();
+
+            // Check for VCC on A6 and remove if needed
+            if (c.getBEL().isLUT() && c.getBELName().endsWith("5LUT")) {
+                SitePinInst vcc = c.getSiteInst().getSitePinInst(c.getBELName().charAt(0) + "6");
+                if (vcc != null && vcc.getNet().getName().equals(Net.VCC_NET)) {
+                    boolean hasOtherSink = false;
+                    for (BELPin otherSink : si.getSiteWirePins(vcc.getBELPin().getSiteWireIndex())) {
+                        if (otherSink.isOutput())
+                            continue;
+                        Cell otherCell = si.getCell(otherSink.getBEL());
+                        if (otherCell != null && otherCell.getLogicalPinMapping(otherSink.getName()) != null) {
+                            hasOtherSink = true;
+                            break;
+                        }
+                    }
+                    if (!hasOtherSink) {
+                        pinsToRemove.computeIfAbsent(vcc.getNet(), $ -> new HashSet<>()).add(vcc);
+                    }
+                }
+            }
 
             // Remove all physical nets first
             for (String logPin : c.getPinMappingsP2L().values()) {
@@ -1752,7 +1793,8 @@ public class DesignTools {
 
         t.stop().start("new net names");
 
-        // Update black box output nets with new net names (those with sinks inside the black box)
+        // Update black box output nets with new net names (those with sinks inside the
+        // black box)
         Map<Net, String> netsToUpdate = new HashMap<>();
         for (Net n : d.getNets()) {
             String newName = boundaryNets.get(n.getName());
@@ -1773,19 +1815,12 @@ public class DesignTools {
 
         t.stop().start("cleanup siteinsts");
 
-        // Keep track of site instances to remove, but keep those supplying static sources
+        // Keep track of site instances to remove, but keep those supplying static
+        // sources
         List<SiteInst> siteInstsToRemove = new ArrayList<>();
         for (SiteInst siteInst : touched) {
             if (siteInst.getCells().size() == 0) {
-                boolean keepSiteInst = false;
-                for (SitePinInst pin : siteInst.getSitePinInsts()) {
-                    if (pin.getNet() != null && pin.getNet().isStaticNet() && pin.isOutPin()) {
-                        keepSiteInst = true;
-                    }
-                }
-                if (!keepSiteInst) {
-                    siteInstsToRemove.add(siteInst);
-                }
+                siteInstsToRemove.add(siteInst);
             }
         }
 
@@ -1805,13 +1840,16 @@ public class DesignTools {
         t.stop().start("create bbox");
 
         // Make EDIFCell blackbox
-        EDIFCell blackBox = new EDIFCell(futureBlackBox.getCellType().getLibrary(),"black_box" +
-                uniqueBlackBoxCount++);
+        EDIFCell blackBox = new EDIFCell(futureBlackBox.getCellType().getLibrary(),
+                "black_box" + uniqueBlackBoxCount++);
         for (EDIFPort port : futureBlackBox.getCellType().getPorts()) {
             blackBox.addPort(port);
         }
         futureBlackBox.setCellType(blackBox);
         futureBlackBox.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+
+        unrouteGNDNetAndLUTSources(d);
+        d.getVccNet().unroute();
 
         t.stop().printSummary();
     }
@@ -2088,13 +2126,12 @@ public class DesignTools {
     }
 
     /**
-     * Gets the site pin that is currently routed to the specified cell pin.  If
+     * Gets the first site pin that is currently routed to the specified cell pin.  If
      * the site instance is not routed, it will return null.
-     * Side Effect: It will set alternative source site pins on the net if present.
      * @param cell The cell with the pin of interest.
      * @param net The physical net to which this pin belongs
      * @param logicalPinName The logical pin name of the cell to query.
-     * @return The name of the site pin on the cell's site to which the pin is routed.
+     * @return The name of the first site pin on the cell's site to which the pin is routed.
      */
     public static String getRoutedSitePin(Cell cell, Net net, String logicalPinName) {
         String belPinName = cell.getPhysicalPinMapping(logicalPinName);
@@ -2102,19 +2139,32 @@ public class DesignTools {
     }
 
     /**
-     * Gets the site pin that is currently routed to the specified cell pin.  If
+     * Gets the first site pin that is currently routed to the specified cell pin.  If
      * the site instance is not routed, it will return null.
-     * Side Effect: It will set alternative source site pins on the net if present.
      * @param cell The cell with the pin of interest.
      * @param net The physical net to which this pin belongs
      * @param belPinName The physical pin name of the cell
-     * @return The name of the site pin on the cell's site to which the pin is routed.
+     * @return The name of the first site pin on the cell's site to which the pin is routed.
      */
     public static String getRoutedSitePinFromPhysicalPin(Cell cell, Net net, String belPinName) {
+        List<String> sitePins = getAllRoutedSitePinsFromPhysicalPin(cell, net, belPinName);
+        return (!sitePins.isEmpty()) ? sitePins.get(0) : null;
+    }
+
+    /**
+     * Gets all site pins that are currently routed to the specified cell pin.  If
+     * the site instance is not routed, it will return null.
+     * @param cell The cell with the pin of interest.
+     * @param net The physical net to which this pin belongs
+     * @param belPinName The physical pin name of the cell
+     * @return A list of site pin names on the cell's site to which the pin is routed.
+     * @since 2023.1.2
+     */
+    public static List<String> getAllRoutedSitePinsFromPhysicalPin(Cell cell, Net net, String belPinName) {
         SiteInst inst = cell.getSiteInst();
-        if (belPinName == null) return null;
+        if (belPinName == null) return Collections.emptyList();
+        List<String> sitePins = new ArrayList<>();
         Set<String> siteWires = new HashSet<>(inst.getSiteWiresFromNet(net));
-        String toReturn = null;
         Queue<BELPin> queue = new LinkedList<>();
         queue.add(cell.getBEL().getPin(belPinName));
         while (!queue.isEmpty()) {
@@ -2123,18 +2173,18 @@ public class DesignTools {
             if (!siteWires.contains(siteWireName)) {
                 // Allow dedicated paths to pass without site routing
                 if (siteWireName.equals("CIN") || siteWireName.equals("COUT")) {
-                    return siteWireName;
+                    return Collections.singletonList(siteWireName);
                 }
-                return null;
+                return Collections.emptyList();
             }
             if (curr.isInput()) {
                 BELPin source = curr.getSourcePin();
-                if (source == null) return null;
+                if (source == null) return Collections.emptyList();
                 if (source.isSitePort()) {
-                    return source.getName();
+                    return Collections.singletonList(source.getName());
                 } else if (source.getBEL().getBELClass() == BELClass.RBEL) {
                     SitePIP sitePIP = inst.getUsedSitePIP(source.getBELName());
-                    if (sitePIP == null) return null;
+                    if (sitePIP == null) continue;
                     queue.add(sitePIP.getInputPin());
                 } else if (source.getBEL().isLUT() || source.getBEL().getBELType().endsWith("MUX")) {
                     Cell possibleRouteThru = inst.getCell(source.getBEL());
@@ -2143,49 +2193,32 @@ public class DesignTools {
                         queue.add(source.getBEL().getPin(routeThru));
                     }
                 } else {
-                    return null;
+                    return Collections.emptyList();
                 }
             } else { // output
                 for (BELPin sink : curr.getSiteConns()) {
                     if (!siteWires.contains(sink.getSiteWireName())) continue;
                     if (sink.isSitePort()) {
-                        // Check if there is a dual output scenario
-                        if (toReturn != null) {
-                            SitePinInst source = net.getSource();
-                            String toCreate;
-                            if (source != null && source.getName().equals(sink.getName())) {
-                                toCreate = toReturn;
-                                toReturn = sink.getName();
-                            } else {
-                                toCreate = sink.getName();
-                            }
-                            if (inst.getSitePinInst(toCreate) == null)
-                                net.createPin(toCreate, inst);
-                            // We'll return the first one we found, store the 2nd in the alternate
-                            // reference on the net
-                            return toReturn;
-                        } else {
-                            toReturn = sink.getName();
-                        }
+                        sitePins.add(sink.getName());
                     } else if (sink.getBEL().getBELClass() == BELClass.RBEL) {
                         // Check if the SitePIP is being used
                         SitePIP sitePIP = inst.getUsedSitePIP(sink.getBELName());
                         if (sitePIP == null) continue;
-                        // Don't proceed if its configured for a different pin
+                        // Don't proceed if it's configured for a different pin
                         if (!sitePIP.getInputPinName().equals(sink.getName())) continue;
                         // Make this the new source to search from and keep looking...
                         queue.add(sitePIP.getOutputPin());
-                    } else if (sink.getBELName().contains("FF")) {
+                    } else if (sink.getBEL().isFF()) {
                         // FF pass thru option (not a site PIP)
                         siteWireName = sink.getBEL().getPin("Q").getSiteWireName();
                         if (siteWires.contains(siteWireName)) {
-                            return siteWireName;
+                            sitePins.add(siteWireName);
                         }
                     }
                 }
             }
         }
-        return toReturn;
+        return sitePins;
     }
 
     /**
@@ -3600,5 +3633,319 @@ public class DesignTools {
         }
 
         return true;
+    }
+
+    /**
+     * Locks the logical netlist of the design using the DONT_TOUCH property. This
+     * strives to be as close as possible to what Vivado's 'lock_design -level
+     * netlist' does to lock the design. {@link EDIFTools#lockNetlist(EDIFNetlist)}.
+     * 
+     * @param design The design of the netlist to lock.
+     */
+    public static void lockNetlist(Design design) {
+        EDIFTools.lockNetlist(design.getNetlist());
+    }
+
+    /**
+     * Unlocks the logical netlist of the design by removing the DONT_TOUCH
+     * property. This strives to be as close as possible to what Vivado's
+     * 'lock_design -unlock -level netlist' does to lock the
+     * design.{@link EDIFTools#unlockNetlist(EDIFNetlist)}.
+     * 
+     * @param design The design of the netlist to unlock.
+     */
+    public static void unlockNetlist(Design design) {
+        EDIFTools.unlockNetlist(design.getNetlist());
+    }
+
+    /**
+     * Locks or unlocks all placement of a design against changes in Vivado. It will
+     * also lock or unlock the netlist of the design (see
+     * {@link #lockNetlist(Design)}). This strives to be as close as possible to
+     * what Vivado's 'lock_design -level placement' does to lock the design.
+     * 
+     * @param design The design to lock
+     * @param lock   Flag indicating to lock (true) or unlock (false) the design's
+     *               placement and netlist.
+     */
+    public static void lockPlacement(Design design, boolean lock) {
+        if (lock) {
+            lockNetlist(design);
+        } else {
+            unlockNetlist(design);
+        }
+        for (SiteInst si : design.getSiteInsts()) {
+            si.setSiteLocked(lock);
+            for (Cell cell : si.getCells()) {
+                cell.setBELFixed(lock);
+                cell.setSiteFixed(lock);
+            }
+        }
+    }
+
+    /**
+     * Locks placement of cells of a design against changes in Vivado. It will also
+     * lock the netlist the design (see {@link #lockNetlist(Design)}). This strives
+     * to be as close as possible to what Vivado's 'lock_design -level placement'
+     * does to lock the design.
+     * 
+     * @param design The design to lock
+     */
+    public static void lockPlacement(Design design) {
+        lockPlacement(design, true);
+    }
+
+    /**
+     * Unlocks placement of cells of a design. It will also unlock the netlist the
+     * design (see {@link #unlockNetlist(Design)}). This strives to be as close as
+     * possible to what Vivado's 'lock_design -unlock -level placement' does to lock
+     * the design.
+     * 
+     * @param design The design to unlock
+     */
+    public static void unlockPlacement(Design design) {
+        lockPlacement(design, false);
+    }
+
+    /**
+     * Locks or unlocks all routing of a design (except GND and VCC nets) against
+     * changes in Vivado. It will also lock or unlock the netlist and placement of
+     * the design (see {@link #lockPlacement(Design, boolean)}). This strives to be
+     * as close as possible to what Vivado's 'lock_design -level routing' does to
+     * lock the design.
+     * 
+     * @param design The design to lock
+     * @param lock   Flag indicating to lock (true) or unlock (false) the design's
+     *               routing, placement and netlist.
+     */
+    public static void lockRouting(Design design, boolean lock) {
+        lockPlacement(design, lock);
+        for (Net net : design.getNets()) {
+            if (net.isStaticNet())
+                continue;
+            for (PIP p : net.getPIPs()) {
+                p.setIsPIPFixed(lock);
+            }
+        }
+    }
+
+    /**
+     * Locks all routing of a design (except GND and VCC nets) against changes in
+     * Vivado. It will also lock the netlist and placement of the design. This
+     * strives to be as close as possible to what Vivado's 'lock_design -level
+     * routing' does to lock the design.
+     * 
+     * @param design The design to lock
+     */
+    public static void lockRouting(Design design) {
+        lockRouting(design, true);
+    }
+
+    /**
+     * Unlocks any and all routing of a design. It will also unlock the netlist and
+     * placement of the design. This strives to be as close as possible to what
+     * Vivado's 'lock_design -unlock -level routing' does to lock the design.
+     * 
+     * @param design The design to unlock
+     */
+    public static void unlockRouting(Design design) {
+        lockRouting(design, false);
+    }
+
+    /***
+     * Unroutes the GND net of a design and unroutes the site routing of any LUT GND
+     * sources while leaving other site routing inputs intact.
+     * 
+     * @param design The design to modify.
+     */
+    public static void unrouteGNDNetAndLUTSources(Design design) {
+        // Unroute the site routing of implicit LUT GND sources
+        Set<Node> gndNodes = new HashSet<>();
+        for (PIP p : design.getGndNet().getPIPs()) {
+            gndNodes.add(p.getStartNode());
+        }
+
+        for (Node n : gndNodes) {
+            SitePin sp = n.getSitePin();
+            if (sp != null && !sp.isInput() && Utils.isSLICE(sp.getSite().getSiteTypeEnum())) {
+                BELPin src = sp.getBELPin().getSourcePin();
+                if (src.getBEL().isLUT()) {
+                    SiteInst si = design.getSiteInstFromSite(sp.getSite());
+                    if (si != null) {
+                        si.unrouteIntraSiteNet(src, sp.getBELPin());
+                    }
+                }
+            }
+        }
+
+        design.getGndNet().unroute();
+    }
+
+    /**
+     * Adds a PROHIBIT constraint for each LUT BEL supplying GND. This is useful
+     * when trying to preserve a partially implemented design that have additional
+     * logic placed and routed onto it later. The Vivado placer doesn't recognize
+     * the GND sources so this prevents the placer from using those BEL sites.
+     * 
+     * @param design The design to which the PROHIBIT constraints are added.
+     */
+    public static void prohibitGNDSources(Design design) {
+        Set<Node> gndNodes = new HashSet<>();
+        for (PIP p : design.getGndNet().getPIPs()) {
+            gndNodes.add(p.getStartNode());
+        }
+
+        List<String> bels = new ArrayList<>();
+        for (Node n : gndNodes) {
+            SitePin sp = n.getSitePin();
+            if (sp != null && !sp.isInput() && Utils.isSLICE(sp.getSite().getSiteTypeEnum())) {
+                BELPin src = sp.getBELPin().getSourcePin();
+                if (src.getBEL().isLUT()) {
+                    bels.add(sp.getSite().getName() + "/" + src.getBELName());
+                }
+            }
+        }
+        addProhibitConstraint(design, bels);
+    }
+
+    /**
+     * Checks the provided BEL's first letter to determine if it is in the top half
+     * of a SLICE or bottom half.
+     * 
+     * @param bel The BEL of a SLICE to query
+     * @return True if the BEL resides in the top half of a SLICE (E6LUT, E5LUT,
+     *         EFF, EFF2, ..). Returns false if it is in the bottom half and null if
+     *         it couldn't be determined.
+     */
+    public static Boolean isUltraScaleSliceTop(BEL bel) {
+        if (bel.isLUT() || bel.isFF()) {
+            char letter = bel.getName().charAt(0);
+            return letter >= 'E' && letter <= 'H';
+        }
+        return null;
+    }
+
+    /**
+     * This adds PROHIBIT constraints to the design (via .XDC) that will prohibit
+     * the use of BEL sites in the same half SLICE if there are any other cells
+     * placed in it. This is used for shell creation when an existing placed and
+     * routed implementation is desired to be preserved but to allow additional
+     * logic to be placed and routed on top of it without an area (pblock)
+     * constraint.
+     * 
+     * @param design The design to which the constraints are added.
+     */
+    public static void prohibitPartialHalfSlices(Design design) {
+        List<String> bels = new ArrayList<>();
+
+        for (SiteInst si : design.getSiteInsts()) {
+            if (!Utils.isSLICE(si)) continue;
+            boolean bottomUsed = false;
+            boolean topUsed = false;
+            for (Cell c : si.getCells()) {
+                Boolean sliceHalf = isUltraScaleSliceTop(c.getBEL());
+                if (sliceHalf != null) {
+                    if (sliceHalf) {
+                        topUsed = true;
+                    } else {
+                        bottomUsed = true;
+                    }
+                }
+            }
+
+            for (BEL bel : si.getSite().getBELs()) {
+                if (bel.getBELClass() == BELClass.BEL && si.getCell(bel) == null) {
+                    Boolean isTop = isUltraScaleSliceTop(bel);
+                    if (isTop != null) {
+                        if ((isTop && topUsed) || (!isTop && bottomUsed)) {
+                            bels.add(si.getSiteName() + "/" + bel.getName());
+                        }
+                    }
+                }
+            }
+        }
+        addProhibitConstraint(design, bels);
+    }
+
+    /**
+     * Adds a PROHIBIT constraint to the specified BEL Locations (ex:
+     * "SLICE_X10Y10/AFF")
+     * 
+     * @param design       The design to which the constraint should be added
+     * @param belLocations A list of BEL locations using the syntax
+     *                     '<SITE-NAME>/<BEL-NAME>'.
+     */
+    public static void addProhibitConstraint(Design design, List<String> belLocations) {
+        if (belLocations.size() > 0) {
+            StringBuilder sb = new StringBuilder();
+            for (String bel : belLocations) {
+                sb.append(bel);
+                sb.append(" ");
+            }
+            design.addXDCConstraint(ConstraintGroup.LATE,
+                    "set_property PROHIBIT true [get_bels { " + sb.toString() + "} ]");
+        }
+    }
+
+    /**
+     * Update the SitePinInst.isRouted() value of all sink pins on the given
+     * Net. A pin will be marked as being routed if it is reachable from the
+     * Net's source pins (or in the case of static nets, also from nodes
+     * tied to GND or VCC) when following the Net's PIPs.
+     * @param net Net on which pins are to be updated.
+     */
+    public static void updatePinsIsRouted(Net net) {
+        Queue<Node> queue = new ArrayDeque<>();
+        Map<Node, List<Node>> node2fanout = new HashMap<>();
+        Map<Node, Set<Node>> bidirNode2nodes = new HashMap<>();
+        for (PIP pip : net.getPIPs()) {
+            boolean isReversed = pip.isReversed();
+            Node startNode = isReversed ? pip.getEndNode() : pip.getStartNode();
+            Node endNode = isReversed ? pip.getStartNode() : pip.getEndNode();
+            node2fanout.computeIfAbsent(startNode, k -> new ArrayList<>())
+                    .add(endNode);
+            if (pip.isBidirectional()) {
+                bidirNode2nodes.computeIfAbsent(startNode, k -> new HashSet<>()).add(endNode);
+                bidirNode2nodes.computeIfAbsent(endNode, k -> new HashSet<>()).add(startNode);
+                node2fanout.computeIfAbsent(endNode, k -> new ArrayList<>())
+                        .add(startNode);
+            }
+
+            if ((net.getType() == NetType.GND && startNode.isTiedToGnd()) ||
+                    (net.getType() == NetType.VCC && startNode.isTiedToVcc())) {
+                queue.add(startNode);
+            }
+        }
+
+        Map<Node, SitePinInst> node2spi = new HashMap<>();
+        for (SitePinInst spi : net.getPins()) {
+            spi.setRouted(false);
+            Node node = spi.getConnectedNode();
+            if (spi.isOutPin()) {
+                queue.add(node);
+                continue;
+            }
+            node2spi.put(spi.getConnectedNode(), spi);
+        }
+
+        while (!queue.isEmpty()) {
+            Node node = queue.poll();
+            SitePinInst spi = node2spi.get(node);
+            if (spi != null) {
+                spi.setRouted(true);
+            }
+
+            List<Node> fanouts = node2fanout.get(node);
+            if (fanouts != null) {
+                for (Node fanout : fanouts) {
+                    if (bidirNode2nodes.getOrDefault(fanout, Collections.emptySet()).contains(node)) {
+                        // In the case of bidir PIPs, remove the ability to go from the fanout
+                        // node back to this node
+                        node2fanout.get(fanout).remove(node);
+                    }
+                    queue.add(fanout);
+                }
+            }
+        }
     }
 }

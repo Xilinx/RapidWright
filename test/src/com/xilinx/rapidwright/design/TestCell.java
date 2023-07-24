@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -73,5 +73,12 @@ public class TestCell {
         Assertions.assertEquals("D5", si.getUsedSitePIP("FFMUXG1").getInputPinName());
         
         Assertions.assertEquals(pin.getName(), cell.getCorrespondingSitePinName("D"));
+    }
+
+    @Test
+    public void testGetPropertyNoEDIFCellInst() {
+        Cell cell = new Cell("cell");
+        Assertions.assertNull(cell.getEDIFCellInst());
+        Assertions.assertNull(cell.getProperty("any_property"));
     }
 }
