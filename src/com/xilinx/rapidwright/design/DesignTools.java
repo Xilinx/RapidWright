@@ -3896,8 +3896,8 @@ public class DesignTools {
     /**
      * Update the SitePinInst.isRouted() value of all sink pins on the given
      * Net. A pin will be marked as being routed if it is reachable from the
-     * Net's source pins (or in the case of a static net, a node tied to GND
-     * or VCC) when following the Net's PIPs.
+     * Net's source pins (or in the case of static nets, also from nodes
+     * tied to GND or VCC) when following the Net's PIPs.
      * @param net Net on which pins are to be updated.
      */
     public static void updatePinsIsRouted(Net net) {
