@@ -678,7 +678,7 @@ public class PartialRouter extends RWRoute {
      * @param design The {@link Design} instance to be examined.
      * @return A list of unrouted SitePinInst objects.
      */
-    private static List<SitePinInst> getUnroutedPins(Design design) {
+    public static List<SitePinInst> getUnroutedPins(Design design) {
         List<SitePinInst> pinsToRoute = new ArrayList<>();
         for (Net net : design.getNets()) {
             if (net.getSource() == null && !net.isStaticNet()) {
