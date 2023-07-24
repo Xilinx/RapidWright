@@ -212,23 +212,35 @@ public class TestDesignTools {
 
         final Set<String> dualOutputNets = new HashSet<String>() {{
             add("picoblaze_2_25/processor/alu_result_0");
-            add("picoblaze_2_25/processor/alu_result_1");
             add("picoblaze_2_25/processor/alu_result_2");
-            add("picoblaze_8_43/processor/pc_move_is_valid");
             add("picoblaze_0_43/processor/E[0]");
+        }};
+
+        final Set<String> possibleDualOutputNets = new HashSet<String>() {{
+            add("picoblaze_2_25/processor/alu_result_1");
+            add("picoblaze_8_43/processor/pc_move_is_valid");
         }};
 
         for (Net net : design.getNets()) {
             Collection<SitePinInst> pins = net.getPins();
-            if (net.getSource() != null) {
-                Assertions.assertTrue(pins.contains(net.getSource()));
+            SitePinInst source = net.getSource();
+            if (source != null) {
+                Assertions.assertTrue(pins.contains(source));
             }
-            if (net.getAlternateSource() != null) {
-                Assertions.assertTrue(pins.contains(net.getAlternateSource()));
+            SitePinInst altSource = net.getAlternateSource();
+            if (altSource != null) {
+                Assertions.assertTrue(pins.contains(altSource));
             }
 
             if (dualOutputNets.contains(net.getName())) {
-                Assertions.assertTrue(net.getSource() != null && net.getAlternateSource() != null);
+                Assertions.assertNotNull(source);
+                Assertions.assertNotNull(altSource);
+            } else if (possibleDualOutputNets.contains(net.getName())) {
+                Assertions.assertNotNull(source);
+                Assertions.assertNull(altSource);
+                altSource = DesignTools.getLegalAlternativeOutputPin(net);
+                Assertions.assertNotNull(altSource);
+                Assertions.assertNotEquals(altSource, source);
             }
         }
     }
