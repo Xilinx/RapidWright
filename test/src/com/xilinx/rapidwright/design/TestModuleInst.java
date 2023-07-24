@@ -27,6 +27,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -36,6 +37,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.HashSet;
+import java.util.Set;
 
 public class TestModuleInst {
     @ParameterizedTest
@@ -215,5 +217,34 @@ public class TestModuleInst {
         mi1.connect("output_port_x", 0, mi2, "input_port_a", 0);
         Assertions.assertEquals("[OUT SLICE_X15Y237.HQ2, IN SLICE_X16Y233.A2]", net1.getPins().toString());
         Assertions.assertTrue(net2.getPins().isEmpty());
+    }
+
+    @Test
+    public void testPlaceWithDepopulatedNodes() {
+        Design modDesign = new Design("module", "xcvu13p-fsga2577-1-i");
+        Cell src = modDesign.createAndPlaceCell("src", Unisim.LUT6, "SLICE_X148Y899/H6LUT");
+        Cell snk = modDesign.createAndPlaceCell("snk", Unisim.FDCE, "SLICE_X145Y899/DFF2");
+
+        Net physNet = TestDesignHelper.createTestNet(modDesign, "net0",
+                new String[] { "INT_X94Y899/INT.LOGIC_OUTS_E28->INT_NODE_SDQ_42_INT_OUT0",
+                        "INT_X94Y899/INT.INT_NODE_SDQ_42_INT_OUT1->>WW4_E_BEG7",
+                        "INT_X92Y899/INT.WW4_E_END7->>INT_NODE_GLOBAL_12_INT_OUT1", // Node fanout does not exist in all
+                                                                                    // Tiles
+                        "INT_X92Y899/INT.INT_NODE_GLOBAL_12_INT_OUT1->>CTRL_W1", });
+
+        EDIFNet logNet = physNet.getLogicalNet();
+        logNet.createPortInst("O", src);
+        logNet.createPortInst("CE", snk);
+
+        Module module = new Module(modDesign);
+
+        Design design = new Design("top", modDesign.getPartName());
+        ModuleInst mi = design.createModuleInst("inst0", module);
+
+        Set<Site> validAnchorSites = new HashSet<>(mi.getAllValidPlacements());
+
+        Assertions.assertFalse(validAnchorSites.contains(design.getDevice().getSite("SLICE_X117Y589")));
+        Assertions.assertEquals(70560, validAnchorSites.size());
+
     }
 }

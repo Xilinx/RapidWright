@@ -36,6 +36,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import com.xilinx.rapidwright.design.Cell;
+import com.xilinx.rapidwright.design.Unisim;
 
 /**
  * Represents a net within an EDIF netlist.
@@ -357,6 +358,69 @@ public class EDIFNet extends EDIFPropertyObject {
     protected EDIFPortInstList getEDIFPortInstList() {
         return portInsts;
     }
+
+    /**
+     * Checks if this net is a logical VCC net. It first checks if the net matches
+     * the defacto name for VCC in Vivado synthesis, "\<const1\>"
+     * ({@link EDIFTools#LOGICAL_VCC_NET_NAME}). If there is not match, it will also
+     * check the source of the net to see if it is a VCC primitive.
+     * 
+     * @return True if this is a logical VCC net, false otherwise.
+     */
+    public boolean isVCC() {
+        return checkIsStaticSource(EDIFTools.LOGICAL_VCC_NET_NAME, Unisim.VCC.name());
+    }
+
+    /**
+     * Checks if this net is a logical GND net. It first checks if the net matches
+     * the defacto name for GND in Vivado synthesis, "\<const0\>"
+     * ({@link EDIFTools#LOGICAL_GND_NET_NAME}). If there is not match, it will also
+     * check the source of the net to see if it is a GND primitive.
+     * 
+     * @return True if this is a logical GND net, false otherwise.
+     */
+    public boolean isGND() {
+        return checkIsStaticSource(EDIFTools.LOGICAL_GND_NET_NAME, Unisim.GND.name());
+    }
+
+    /**
+     * Helper method to {@link #isVCC()} and {@link #isGND()} by checking the net
+     * name and source if it is the queried static source net.
+     * 
+     * @param name     Defacto Vivado static source net name (see
+     *                 ({@link EDIFTools#LOGICAL_VCC_NET_NAME}) or
+     *                 ({@link EDIFTools#LOGICAL_GND_NET_NAME})).
+     * @param cellType This would be either 'VCC' or 'GND'.
+     * @return True if it was determined that the static net query matched, false
+     *         otherwise.
+     */
+    private boolean checkIsStaticSource(String name, String cellType) {
+        // Rely on Vivado-standardized logical names
+        if (!getName().equals(name)) {
+            // Check source
+            for (EDIFPortInst portInst : getSourcePortInsts(false)) {
+                if (portInst.getCellInst().getCellType().getName().equals(cellType)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Checks if the net has all port instances (terminals) within the parent cell.
+     * 
+     * @return True if all port instances are internal to this net's parent cell,
+     *         false otherwise. If the net has not port instances, it returns true.
+     */
+    public boolean isInternalToParent() {
+        for (EDIFPortInst pi : getPortInsts()) {
+            if (pi.isTopLevelPort()) return false;
+        }
+        return true;
+    }
+    
 
     public static final byte[] EXPORT_CONST_NET_START = "         (net ".getBytes(StandardCharsets.UTF_8);
     public static final byte[] EXPORT_CONST_JOINED = " (joined\n".getBytes(StandardCharsets.UTF_8);

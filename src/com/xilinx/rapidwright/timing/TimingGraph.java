@@ -52,6 +52,7 @@ import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.rwroute.Connection;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.util.Pair;
@@ -1088,8 +1089,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                     EDIFPortInst epiForI5 =  eciParent.getPortInst("I5");
                     EDIFNet enForI5 = epiForI5.getNet();
 
-                    boolean pinI5ConnectedToConst0 = enForI5.getName().equals("<const0>");
-                    boolean pinI5ConnectedToConst1 = enForI5.getName().equals("<const1>");
+                    boolean pinI5ConnectedToConst0 = enForI5.getName().equals(EDIFTools.LOGICAL_GND_NET_NAME);
+                    boolean pinI5ConnectedToConst1 = enForI5.getName().equals(EDIFTools.LOGICAL_VCC_NET_NAME);
                     boolean thisCellIsLUT5 = c.getType().equals("LUT5");
 
                     thisCellEquation =  LUTTools.getLUTEquation(eciParent);

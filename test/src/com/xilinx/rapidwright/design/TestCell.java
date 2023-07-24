@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -79,6 +79,6 @@ public class TestCell {
     public void testGetPropertyNoEDIFCellInst() {
         Cell cell = new Cell("cell");
         Assertions.assertNull(cell.getEDIFCellInst());
-        Assertions.assertNull(cell.getProperty("a_property_that_doesnt_exist"));
+        Assertions.assertNull(cell.getProperty("any_property"));
     }
 }
