@@ -428,7 +428,15 @@ public class GlobalSignalRouting {
                 // Ensure it is not attached to the design
                 assert (si.getDesign() == null);
             } else {
-                assert(si.getSitePinInst(sitePin.getPinName()) == null);
+                SitePinInst spi = si.getSitePinInst(sitePin.getPinName());
+                if (spi != null) {
+                    if (spi.getNet() == currNet) {
+                        continue;
+                    }
+                    throw new RuntimeException("ERROR: Site pin " + spi.getSitePinName() + " cannot be attached to " +
+                            "net '" + currNet.getName() + "' as it's already connected to " +
+                            "net '" + spi.getNet().getName() + "'");
+                }
             }
             currNet.createPin(sitePin.getPinName(), si);
         }
