@@ -3969,6 +3969,7 @@ public class DesignTools {
      * Creates a physical nets from the provided logical EDIF net. Assumes that the EDIF netlist is finalized.
      * @param d The design that contains the complete logical netlist and where the physical net will be created.
      * @param edifNet The EDIF Net to create into a physical net.
+     * @return A list of the SitePinInsts added to the newly created physical net
      */
     static public List<SitePinInst> createPhysNetFromLogical(Design d, EDIFHierNet edifNet) {
         //check whether net already exists
