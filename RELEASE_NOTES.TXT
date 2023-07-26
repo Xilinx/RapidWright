@@ -1,3 +1,46 @@
+============= RapidWright 2023.1.2-beta released on 2023-07-24 ================
+Notes:
+  - Shell creation improvements to enable lock_design and timing closure preservation (#760)
+  - Adds a MakeBlackBox command line tool (#747)
+  - Removes the VCC A6 pin on 5LUT usages when removing cells (#741)
+  - Add DesignTools.getAllRoutedSitePinsFromPhysicalPin() (#755) 
+  - Correctly update dual-output route flags when unrouting (#737) 
+  - [PhysNetlistReader] Set cell type of LOCKED cells (#767)
+  - Updates RAM32X1S property to correct default (#751)
+  - [Interchange] PhysNetlistReader to create STATIC_SOURCE SiteInsts (#766)
+  - RWRoute Fixes (#765)
+  - GlobalSignalRouting.routeStaticNet() to create output SPIs (#761)
+  - DesignTools.createCeSrRstPinsToVCC() to skip non-SLICE FFs (#744)
+  - [PartialRouter] Improve incremental global routing (#759)
+  - GlobalSignalRouting fixes for routing to non clock-pins (#757)
+  - DesignTools.makePhysNetNamesConsistent() to merge static nets too (#753) 
+  - [UltraScaleClockRouting] Reset RouteNode.parent (#752)
+  - Created parameterizable counter with an adder as a submodule (#713)
+  - [RWRoute] Fix PartialRouter for when clk node already unpreserved (#746) 
+  - [Interchange] Fix PhysicalNetlist's MultiCellPinMapping (#743)
+  - Unroute site routing when removing a cell (#729)
+  - PartialRouter's global router to not unpreserve sink nodes (#736)
+  - DesignTools.makePhysNetNamesConsistent() to use hier name (#735)
+  - DesignTools.makePhysNetNamesConsistent() to consider */<const{0,1}> (#734)
+  - Add DcpToInterchange class (#704)
+  - Add compile step (#733)
+  - Add EdifToLogicalNetlist to MainEntrypoint (#731)
+  - Fix Javadoc warnings (#723)
+  - Fixes an issue with makeBlackBox trying to remove pins from renamed nets (#728)
+  - [PhysNetlistReader] Set Cell type for routethru cells (#727)
+  - Multilevel macro expansion (#726)
+  - TestReplaceEDIFInDCP to copy DCP before replacing in-place (#725)
+  - DesignTools.createMissingSitePinInsts() to skip node-less site pins (#724)
+  - Fix to create alternate source pins on dual output nets.
+  - Fixes incorrect Versal SLR corner tile entries
+  - Cell.getProperty() returns null if no EDIFCellInst found
+  - Cell.getAllSitePinsFromLogicalPin() to not return any null pins
+  - Cell.getAllCorrespondingSitePinNames() to not NPE if no physical pin mapping
+  - Cell.getCorrespondingSitePinName() to consider F?MUX routethrus
+- API Additions:
+  - com.xilinx.rapidwright.device.PIP "public boolean isLogicalDriver()"
+  - com.xilinx.rapidwright.design.Cell "public String getCorrespondingSitePinName(String logicalPinName, String physPinName, List<String> siteWires)"
+
 ============= RapidWright 2023.1.1-beta released on 2023-06-21 ================
 Notes:
   - UltraScale Incremental Clock Router Improvements (#540)

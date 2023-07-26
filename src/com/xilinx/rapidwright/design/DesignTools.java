@@ -32,6 +32,7 @@ import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -1313,8 +1314,7 @@ public class DesignTools {
             }
             if (otherUser == false) {
                 // Unroute site routing back to pin and remove site pin
-                String sitePinName = getRoutedSitePinFromPhysicalPin(cell, net, pin.getName());
-                if (sitePinName != null) {
+                for (String sitePinName : getAllRoutedSitePinsFromPhysicalPin(cell, net, pin.getName())) {
                     BELPin sitePortBelPin = siteInst.getSite().getBELPin(sitePinName);
                     assert(sitePortBelPin.isSitePort());
                     boolean outputSitePin = sitePortBelPin.isInput(); // Input BELPin means output SitePin
@@ -2131,7 +2131,7 @@ public class DesignTools {
      * @param cell The cell with the pin of interest.
      * @param net The physical net to which this pin belongs
      * @param logicalPinName The logical pin name of the cell to query.
-     * @return The name of the site pin name on the cell's site to which the pin is routed.
+     * @return The name of the first site pin on the cell's site to which the pin is routed.
      */
     public static String getRoutedSitePin(Cell cell, Net net, String logicalPinName) {
         String belPinName = cell.getPhysicalPinMapping(logicalPinName);
@@ -2184,7 +2184,7 @@ public class DesignTools {
                     return Collections.singletonList(source.getName());
                 } else if (source.getBEL().getBELClass() == BELClass.RBEL) {
                     SitePIP sitePIP = inst.getUsedSitePIP(source.getBELName());
-                    if (sitePIP == null) return Collections.emptyList();
+                    if (sitePIP == null) continue;
                     queue.add(sitePIP.getInputPin());
                 } else if (source.getBEL().isLUT() || source.getBEL().getBELType().endsWith("MUX")) {
                     Cell possibleRouteThru = inst.getCell(source.getBEL());
@@ -2218,7 +2218,6 @@ public class DesignTools {
                 }
             }
         }
-
         return sitePins;
     }
 
@@ -3212,9 +3211,7 @@ public class DesignTools {
         Net net = (netOnSiteWire != null) ? netOnSiteWire : si.getDesign().getVccNet();
         if (net.isStaticNet()) {
             // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
-            if (cell.getType().equals("SRL16E") && siteWireName.endsWith("6") &&
-                    //
-                    cell.getEDIFHierCellInst() != null) {
+            if (cell.getType().equals("SRL16E") && siteWireName.endsWith("6")) {
                 EDIFPropertyValue val = cell.getProperty("XILINX_LEGACY_PRIM");
                 if (val != null && val.getValue().equals("SRLC32E")) {
                     net = si.getDesign().getGndNet();
@@ -3888,5 +3885,67 @@ public class DesignTools {
             design.addXDCConstraint(ConstraintGroup.LATE,
                     "set_property PROHIBIT true [get_bels { " + sb.toString() + "} ]");
         }
-    }  
+    }
+
+    /**
+     * Update the SitePinInst.isRouted() value of all sink pins on the given
+     * Net. A pin will be marked as being routed if it is reachable from the
+     * Net's source pins (or in the case of static nets, also from nodes
+     * tied to GND or VCC) when following the Net's PIPs.
+     * @param net Net on which pins are to be updated.
+     */
+    public static void updatePinsIsRouted(Net net) {
+        Queue<Node> queue = new ArrayDeque<>();
+        Map<Node, List<Node>> node2fanout = new HashMap<>();
+        Map<Node, Set<Node>> bidirNode2nodes = new HashMap<>();
+        for (PIP pip : net.getPIPs()) {
+            boolean isReversed = pip.isReversed();
+            Node startNode = isReversed ? pip.getEndNode() : pip.getStartNode();
+            Node endNode = isReversed ? pip.getStartNode() : pip.getEndNode();
+            node2fanout.computeIfAbsent(startNode, k -> new ArrayList<>())
+                    .add(endNode);
+            if (pip.isBidirectional()) {
+                bidirNode2nodes.computeIfAbsent(startNode, k -> new HashSet<>()).add(endNode);
+                bidirNode2nodes.computeIfAbsent(endNode, k -> new HashSet<>()).add(startNode);
+                node2fanout.computeIfAbsent(endNode, k -> new ArrayList<>())
+                        .add(startNode);
+            }
+
+            if ((net.getType() == NetType.GND && startNode.isTiedToGnd()) ||
+                    (net.getType() == NetType.VCC && startNode.isTiedToVcc())) {
+                queue.add(startNode);
+            }
+        }
+
+        Map<Node, SitePinInst> node2spi = new HashMap<>();
+        for (SitePinInst spi : net.getPins()) {
+            spi.setRouted(false);
+            Node node = spi.getConnectedNode();
+            if (spi.isOutPin()) {
+                queue.add(node);
+                continue;
+            }
+            node2spi.put(spi.getConnectedNode(), spi);
+        }
+
+        while (!queue.isEmpty()) {
+            Node node = queue.poll();
+            SitePinInst spi = node2spi.get(node);
+            if (spi != null) {
+                spi.setRouted(true);
+            }
+
+            List<Node> fanouts = node2fanout.get(node);
+            if (fanouts != null) {
+                for (Node fanout : fanouts) {
+                    if (bidirNode2nodes.getOrDefault(fanout, Collections.emptySet()).contains(node)) {
+                        // In the case of bidir PIPs, remove the ability to go from the fanout
+                        // node back to this node
+                        node2fanout.get(fanout).remove(node);
+                    }
+                    queue.add(fanout);
+                }
+            }
+        }
+    }
 }
