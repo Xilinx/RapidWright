@@ -29,8 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.xilinx.rapidwright.design.Unisim;
-import com.xilinx.rapidwright.device.Series;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -39,10 +37,12 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IOStandard;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.edif.compare.EDIFNetlistComparator;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
@@ -520,5 +520,64 @@ class TestEDIFNetlist {
 
         netlist.expandMacroUnisims(Series.UltraScalePlus);
         Assertions.assertEquals(cellType, obufds.getCellType().getName());
+    }
+
+    @Test
+    public void testMultiLevelMacroExpansion() {
+        final EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
+        netlist.setDevice(Device.getDevice(Device.AWS_F1));
+
+        EDIFCell top = netlist.getTopCell();
+
+        EDIFCellInst iobufdse3 = top.createChildCellInst("IOBUFDSE3_expandme",
+                netlist.getHDIPrimitive(Unisim.IOBUFDSE3));
+        netlist.getHDIPrimitivesLibrary().addCell(iobufdse3.getCellType());
+
+        netlist.expandMacroUnisims(Series.UltraScalePlus);
+
+        EDIFCellInst childInst = iobufdse3.getCellType().getCellInst("OBUFTDS");
+        Assertions.assertEquals(childInst.getCellType().getName(), "OBUFTDS_DCIEN_DUAL_BUF");
+        Assertions.assertEquals(childInst.getCellType().getCellInsts().size(), 3);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "RAM32X1S,1'b0",
+    })
+    public void testRAM32X1SExpansion(String unisim, String expected) {
+        EDIFNetlist n = EDIFTools.createNewNetlist("test");
+
+        EDIFCell macro = n.getHDIPrimitivesLibrary().addCell(Design.getUnisimCell(Unisim.valueOf(unisim)));
+        n.getTopCell().createChildCellInst("inst", macro);
+
+        Assertions.assertNull(n.getCellInstFromHierName("inst/SP"));
+
+        n.expandMacroUnisims(Series.Series7);
+        EDIFCellInst inst = n.getCellInstFromHierName("inst/SP");
+        Assertions.assertNotNull(inst);
+        Assertions.assertEquals(expected, inst.getProperty("IS_CLK_INVERTED").getValue());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "RAM32X1S_1",
+            "RAM16X1S",
+            "RAM16X1S_1",
+    })
+    public void testUnsupportedMacroExpansionAndProperty(String unisim) {
+        EDIFNetlist n = EDIFTools.createNewNetlist("test");
+
+        EDIFCell macro = n.getHDIPrimitivesLibrary().addCell(Design.getUnisimCell(Unisim.valueOf(unisim)));
+        EDIFCellInst inst = n.getTopCell().createChildCellInst("inst", macro);
+
+        Assertions.assertEquals(0, inst.getCellType().getCellInsts().size());
+
+        n.expandMacroUnisims(Series.Series7);
+
+        // Assert no expansion/retargeting occurred for unsupported macros
+        Assertions.assertEquals(0, inst.getCellType().getCellInsts().size());
+
+        // Assert no property exists on unsupported macros either
+        Assertions.assertNull(inst.getProperty("IS_CLK_INVERTED"));
     }
 }

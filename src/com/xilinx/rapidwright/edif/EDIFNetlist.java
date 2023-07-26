@@ -171,6 +171,7 @@ public class EDIFNetlist extends EDIFName {
             // Prim -> Macro (when set IOStandard matches expansion set)
             seriesMacroExpandExceptionMap.put("OBUFDS", new Pair<>("OBUFDS_DUAL_BUF", obufExpansion));
             seriesMacroExpandExceptionMap.put("OBUFTDS", new Pair<>("OBUFTDS_DUAL_BUF", obufExpansion));
+            seriesMacroExpandExceptionMap.put("OBUFTDS_DCIEN", new Pair<>("OBUFTDS_DCIEN_DUAL_BUF", obufExpansion));
             macroExpandExceptionMap.put(s, seriesMacroExpandExceptionMap);
 
             for (Entry<String,Pair<String,EnumSet<IOStandard>>> e : seriesMacroExpandExceptionMap.entrySet()) {
@@ -1614,44 +1615,29 @@ public class EDIFNetlist extends EDIFName {
                         if (!isHDILib) {
                             Pair<String, EnumSet<IOStandard>> exception = seriesMacroExpandExceptionMap.get(cellName);
                             if (exception != null) {
-                                Boolean expand = null;
-                                for (EDIFPropertyValue value : getIOStandards(inst)) {
-                                    IOStandard ioStandard = IOStandard.valueOf(value.getValue());
-                                    boolean contained = exception.getSecond().contains(ioStandard);
-                                    if (expand == null) {
-                                        expand = contained;
-                                    } else {
-                                        if (expand != contained) {
-                                            throw new RuntimeException("ERROR: EDIFCellInst '" + inst + "' has conflicting IOSTANDARDs " +
-                                                    "propagated from multiple top-level nets. Consider uniquifying the EDIFNetlist to " +
-                                                    "enable correct macro expansion.");
-                                        }
-                                    }
-                                }
-                                if (expand) {
+                                if (checkIOStandardForExpansion(inst, exception)) {
                                     cellName = exception.getFirst();
                                 }
                             }
                         }
-                        EDIFCell newCell = netlistPrims.getCell(cellName);
-                        if (newCell == null) {
-                            EDIFCell macro = macros.getCell(cellName);
-                            if (macro == null) {
-                                throw new RuntimeException("failed to find cell macro "+cellName+", we are in "+lib.getName());
-                            }
-                            primsToRemoveOnCollapse.add(cellName);
-                            newCell = new EDIFCell(netlistPrims, macro, cellName);
-                            for (EDIFCellInst childInst : newCell.getCellInsts()) {
-                                EDIFCell primCell = netlistPrims.getCell(childInst.getCellType().getName());
-                                if (primCell == null) {
-                                    primCell = new EDIFCell(netlistPrims, childInst.getCellType());
-                                    primsToRemoveOnCollapse.add(childInst.getCellType().getName());
+                        expandMacroCellType(cellName, inst, macros, netlistPrims);
+                        // Check for multi-level expansion for IOBUFDSE3 (only one known)
+                        if (inst.getCellType().getName().equals("IOBUFDSE3")) {
+                            EDIFCellInst child = inst.getCellType().getCellInst("OBUFTDS");
+                            if (child != null && child.getCellType().getName().equals("OBUFTDS_DCIEN")) {
+                                Pair<String, EnumSet<IOStandard>> exception = seriesMacroExpandExceptionMap
+                                        .get(child.getCellType().getName());
+                                String newChildType = null;
+                                if (exception != null) {
+                                    if (checkIOStandardForExpansion(child, exception)) {
+                                        newChildType = exception.getFirst();
+                                    }
                                 }
-                                childInst.setCellType(primCell);
+                                if (newChildType != null) {
+                                    expandMacroCellType(newChildType, child, macros, netlistPrims);
+                                }
                             }
                         }
-                        assert(newCell == netlistPrims.getCell(cellName));
-                        inst.setCellType(newCell);
                     }
                 }
             }
@@ -1664,6 +1650,48 @@ public class EDIFNetlist extends EDIFName {
                 }
             }
         }
+    }
+
+    private Boolean checkIOStandardForExpansion(EDIFCellInst inst, Pair<String, EnumSet<IOStandard>> exception) {
+        Boolean expand = null;
+        for (EDIFPropertyValue value : getIOStandards(inst)) {
+            IOStandard ioStandard = IOStandard.valueOf(value.getValue());
+            boolean contained = exception.getSecond().contains(ioStandard);
+            if (expand == null) {
+                expand = contained;
+            } else {
+                if (expand != contained) {
+                    throw new RuntimeException("ERROR: EDIFCellInst '" + inst + "' has conflicting IOSTANDARDs "
+                            + "propagated from multiple top-level nets. Consider uniquifying the EDIFNetlist to "
+                            + "enable correct macro expansion.");
+                }
+            }
+        }
+        return expand;
+    }
+
+    private void expandMacroCellType(String newCellType, EDIFCellInst instToExpand, EDIFLibrary macros,
+            EDIFLibrary netlistPrims) {
+        EDIFCell newCell = netlistPrims.getCell(newCellType);
+        if (newCell == null) {
+            EDIFCell macro = macros.getCell(newCellType);
+            if (macro == null) {
+                throw new RuntimeException("failed to find cell macro " + newCellType + ", we are in "
+                        + instToExpand.getParentCell().getLibrary().getName());
+            }
+            primsToRemoveOnCollapse.add(newCellType);
+            newCell = new EDIFCell(netlistPrims, macro, newCellType);
+            for (EDIFCellInst childInst : newCell.getCellInsts()) {
+                EDIFCell primCell = netlistPrims.getCell(childInst.getCellType().getName());
+                if (primCell == null) {
+                    primCell = new EDIFCell(netlistPrims, childInst.getCellType());
+                    primsToRemoveOnCollapse.add(childInst.getCellType().getName());
+                }
+                childInst.setCellType(primCell);
+            }
+        }
+        assert (newCell == netlistPrims.getCell(newCellType));
+        instToExpand.setCellType(newCell);
     }
 
     /**

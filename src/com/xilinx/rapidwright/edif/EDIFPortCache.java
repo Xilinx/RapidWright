@@ -28,7 +28,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Cache for speeding up {@link EDIFCell#getPortByLegalName(String)} when querying many ports
+ * Cache for speeding up {@link EDIFCell#getPortByLegalName(String, EDIFReadLegalNameCache)} when querying many ports
  */
 public class EDIFPortCache {
     private final Map<String, EDIFPort> cache;

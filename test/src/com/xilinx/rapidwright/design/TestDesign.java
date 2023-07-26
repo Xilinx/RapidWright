@@ -29,8 +29,6 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
 
-import com.xilinx.rapidwright.edif.EDIFHierCellInst;
-import com.xilinx.rapidwright.edif.EDIFHierNet;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -43,6 +41,8 @@ import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
@@ -82,6 +82,7 @@ public class TestDesign {
     @Test
     public void checkDcpRoundtrip(@TempDir Path tempDir) throws IOException {
         //Keep a reference to the device to avoid it being garbage collected during testcase execution
+        @SuppressWarnings("unused")
         Device device = Device.getDevice(DEVICE);
 
         //Use separate files for writing/reading so we can identify leaking file handles by filename
@@ -306,5 +307,22 @@ public class TestDesign {
         }
         final int extraNets = 5; // {a, b, o, GLOBAL_USEDNET, GLOBAL_LOGIC0}
         Assertions.assertEquals(design.getNets().size(), 2 + extraNets);
+    }
+    
+    @Test
+    public void testFindDualOutputSitePins() {
+        Design d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
+
+        String[] testNets = new String[] {
+            "base_mb_i/microblaze_0/U0/MicroBlaze_Core_I/Performance.Core/Data_Flow_I/Operand_Select_I/Gen_Bit[14].MUXF7_I1/Using_FPGA.Native_0[0]",
+            "base_mb_i/microblaze_0/U0/MicroBlaze_Core_I/Performance.Core/Data_Flow_I/exception_registers_I1/Using_FPGA_LUT6.Gen_Ret_Addr[20].MUXCY_XOR_I/LOCKSTEP_Out_reg[3027][0]",
+            "u_ila_0/inst/ila_core_inst/u_ila_regs/slaveRegDo_mux_2[15]_i_1_n_0"
+        };
+
+        for (int i = 0; i < testNets.length; i++) {
+            Net net = d.getNet(testNets[i]);
+            Assertions.assertNotNull(net.getSource());
+            Assertions.assertNotNull(net.getAlternateSource());
+        }
     }
 }

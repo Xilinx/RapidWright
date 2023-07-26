@@ -230,7 +230,9 @@ public class UltraScaleClockRouting {
         }
 
         ClockRegion currCR = centroidRouteLine.getTile().getClockRegion();
-        if (down) currCR = currCR.getNeighborClockRegion(-1, 0);
+        if (down && currCR.getRow() > 0) {
+            currCR = currCR.getNeighborClockRegion(-1, 0);
+        }
         return transitionCentroidToDistributionLine(clk, centroidRouteLine, currCR);
     }
 
@@ -351,6 +353,7 @@ public class UltraScaleClockRouting {
                         }
                         assert(status == NodeStatus.AVAILABLE);
                     }
+                    curr.setParent(null);
                     distLines.add(curr);
                     continue nextClockRegion;
                 }
