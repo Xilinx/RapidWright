@@ -82,9 +82,29 @@ public class VivadoTools {
      * @return the contents of the log file as a list of strings
      */
     public static List<String> runTcl(Path outputLog, Path tclScript, boolean verbose) {
+        return runTcl(outputLog, tclScript, verbose, null, null);
+    }
+
+    /**
+     * method to run a Tcl script in vivado
+     * 
+     * @param outputLog Path to the log file that vivado will generate
+     * @param tclScript Path to the Tcl script that will be run
+     * @param verbose   If true vivado command line and std.out/err will be printed
+     *                  to std.out
+     * @param environ   array of strings, each element of which has environment
+     *                  variable settings in the format name=value, or null if the
+     *                  subprocess should inherit the environment of the current
+     *                  process.
+     * @param runDir    the working directory of the subprocess, or null if the
+     *                  subprocess should inherit the working directory of the
+     *                  current process.
+     * @return the contents of the log file as a list of strings
+     */
+    public static List<String> runTcl(Path outputLog, Path tclScript, boolean verbose, String[] environ, File runDir) {
         final String vivadoCmd = "vivado -log " + outputLog.toString() + " -mode batch -source "
                 + tclScript.toString();
-        Integer exitCode = FileTools.runCommand(vivadoCmd, verbose);
+        Integer exitCode = FileTools.runCommand(vivadoCmd, verbose, environ, runDir);
         if (exitCode != 0) {
             throw new RuntimeException("Vivado exited with code: " + exitCode);
         }
