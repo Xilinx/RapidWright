@@ -104,6 +104,10 @@ import com.xilinx.rapidwright.util.Unzip;
 import com.xilinx.rapidwright.util.performance_evaluation.PerformanceEvaluation;
 
 public class MainEntrypoint {
+    interface MainStyleFunction<E extends Throwable> {
+        void main(String[] args) throws E;
+    }
+
     private static final Map<String, MainStyleFunction<?>> functions = new HashMap<>();
     private static final List<String> functionNames = new ArrayList<>();
 
