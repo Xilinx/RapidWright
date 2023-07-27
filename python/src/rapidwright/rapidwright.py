@@ -45,7 +45,6 @@ def start_jvm():
         print("ERROR: RAPIDWRIGHT_PATH is set but CLASSPATH is not set.  Please set CLASSPATH=" + classpath)
         exit(1)
     if not jpype.isJVMStarted():
-        
         jpype.startJVM(**kwargs)
 
 def block_system_exit_calls():
