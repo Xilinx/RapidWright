@@ -1074,7 +1074,7 @@ public class EDIFNetlist extends EDIFName {
 
         while (!toProcess.isEmpty()) {
             EDIFHierCellInst curr = toProcess.poll();
-            if (curr.getCellType().isPrimitive() && (includeStaticSources && curr.getCellType().isStaticSource())) {
+            if (curr.getCellType().isPrimitive() && (includeStaticSources || !curr.getCellType().isStaticSource())) {
                 leafCells.add(curr);
             } else {
                 curr.addChildren(toProcess);
@@ -1415,7 +1415,7 @@ public class EDIFNetlist extends EDIFName {
         while (!q.isEmpty()) {
             EDIFCellInst curr = q.poll();
             for (EDIFCellInst eci : curr.getCellType().getCellInsts()) {
-                if (eci.getCellType().isPrimitive() && (includeStaticSources && eci.getCellType().isStaticSource()))
+                if (eci.getCellType().isPrimitive() && (includeStaticSources || !eci.getCellType().isStaticSource()))
                     insts.add(eci);
                 else
                     q.add(eci);
