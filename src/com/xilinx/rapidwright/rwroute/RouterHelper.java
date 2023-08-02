@@ -249,6 +249,9 @@ public class RouterHelper {
             if (wire.getTile().equals(loadTile)) {
                 pip = loadTile.getPIP(wire.getWireIndex(), loadWire);
                 if (pip != null) {
+                    if (pip.isBidirectional() && pip.getStartWireIndex() == loadWire) {
+                        pip.setIsReversed(true);
+                    }
                     break;
                 }
             }
@@ -268,8 +271,12 @@ public class RouterHelper {
                 return p;
         }
         for (PIP p : driver.getAllUphillPIPs()) {
-            if (p.getStartNode().equals(load))
+            if (p.getStartNode().equals(load)) {
+                if (p.isBidirectional()) {
+                    p.setIsReversed(true);
+                }
                 return p;
+            }
         }
         return null;
     }
