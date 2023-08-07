@@ -57,6 +57,11 @@ public abstract class Job {
 
     public static final String DEFAULT_COMMAND_LOG_FILE = DEFAULT_COMMAND_NAME + DEFAULT_LOG_EXTENSION;
 
+    private String scriptBaseName=DEFAULT_SCRIPT_NAME;
+    private String scriptLogFile = DEFAULT_SCRIPT_LOG_FILE;
+    private String cmdLogFile = DEFAULT_COMMAND_LOG_FILE;
+
+
     public abstract long launchJob();
 
     public abstract JobState getJobState();
@@ -78,14 +83,26 @@ public abstract class Job {
         FileTools.makeDirs(dir);
 
         startupScript.add("cd " + dir);
-        startupScript.add(getCommand() + " > " + DEFAULT_COMMAND_LOG_FILE + " 2>&1");
+        startupScript.add(getCommand() + " > " + cmdLogFile + " 2>&1");
 
-        String startupScriptName = dir + File.separator + DEFAULT_SCRIPT_NAME + scriptExt;
+        String startupScriptName = dir + File.separator + scriptBaseName + scriptExt;
         FileTools.writeLinesToTextFile(startupScript, startupScriptName);
         new File(startupScriptName).setExecutable(true);
-        String startupScriptLog = dir + File.separator + DEFAULT_SCRIPT_LOG_FILE;
+        String startupScriptLog = dir + File.separator + scriptLogFile;
         return new Pair<String,String>(startupScriptName,startupScriptLog);
     }
+
+    /**
+     * @param scriptBaseName the script's base name to set
+     */
+    public void setScriptBaseName(String scriptBaseName) {this.scriptBaseName = scriptBaseName;}
+
+
+    /**
+     * @return the script's base name
+     */
+    public String getCommandLogFileName(){return cmdLogFile;}
+
     /**
      * @return the command
      */
@@ -157,6 +174,6 @@ public abstract class Job {
     }
 
     public String getLogFilename() {
-        return getRunDir() + File.separator + Job.DEFAULT_COMMAND_LOG_FILE;
+        return getRunDir() + File.separator + this.cmdLogFile;
     }
 }
