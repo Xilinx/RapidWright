@@ -126,7 +126,8 @@ public class VivadoTools {
         final Path dcp = workdir.resolve("checkpoint.dcp");
         design.writeCheckpoint(dcp);
 
-        ReportRouteStatusResult rrs = reportRouteStatus(dcp, workdir);
+        boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
+        ReportRouteStatusResult rrs = reportRouteStatus(dcp, workdir, encrypted);
 
         FileTools.deleteFolder(workdir.toString());
 
@@ -134,19 +135,32 @@ public class VivadoTools {
     }
 
     /**
-     * Run Vivado's `report_route_status` command on the provided DCP path
-     * and return its result as a ReportRouteStatusResult object.
+     * Run Vivado's `report_route_status` command on the provided DCP (which is assumed
+     * to be unencrypted) path and return its result as a ReportRouteStatusResult object.
      *
      * @param dcp Path to DCP to report on.
      * @return ReportRouteStatusResult object.
      */
     public static ReportRouteStatusResult reportRouteStatus(Path dcp) {
+        return reportRouteStatus(dcp, false);
+    }
+
+    /**
+     * Run Vivado's `report_route_status` command on the provided DCP path
+     * and return its result as a ReportRouteStatusResult object.
+     *
+     * @param dcp Path to DCP to report on.
+     * @param encrypted Boolean indicating whether DCP is accompanied by multiple EDIF
+     *                  files containing encrypted IP.
+     * @return ReportRouteStatusResult object.
+     */
+    public static ReportRouteStatusResult reportRouteStatus(Path dcp, boolean encrypted) {
         final Path workdir = FileSystems.getDefault()
                 .getPath("vivadoToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
         File workdirHandle = new File(workdir.toString());
         workdirHandle.mkdirs();
 
-        ReportRouteStatusResult rrs = reportRouteStatus(dcp, workdir);
+        ReportRouteStatusResult rrs = reportRouteStatus(dcp, workdir, encrypted);
 
         FileTools.deleteFolder(workdir.toString());
 
@@ -159,13 +173,19 @@ public class VivadoTools {
      *
      * @param dcp Path to DCP to report on.
      * @param workdir Directory to work within.
+     * @param encrypted Boolean indicating whether DCP is accompanied by multiple EDIF
+     *                  files containing encrypted IP.
      * @return ReportRouteStatusResult object.
      */
-    public static ReportRouteStatusResult reportRouteStatus(Path dcp, Path workdir) {
+    public static ReportRouteStatusResult reportRouteStatus(Path dcp, Path workdir, boolean encrypted) {
         final Path outputLog = workdir.resolve("outputLog.log");
 
         StringBuilder sb = new StringBuilder();
-        sb.append("open_checkpoint " + dcp + "; ");
+        if (encrypted) {
+            sb.append("source " + FileTools.removeFileExtension(dcp.toString()) + "_load.tcl; ");
+        } else {
+            sb.append("open_checkpoint " + dcp + "; ");
+        }
         sb.append(REPORT_ROUTE_STATUS);
 
         List<String> log = VivadoTools.runTcl(outputLog, sb.toString(), true);
