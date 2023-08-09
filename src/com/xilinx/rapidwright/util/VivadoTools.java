@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.util;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.edif.EDIFTools;
 
 import java.io.File;
 import java.nio.file.FileSystems;
@@ -150,8 +151,7 @@ public class VivadoTools {
      * and return its result as a ReportRouteStatusResult object.
      *
      * @param dcp Path to DCP to report on.
-     * @param encrypted Boolean indicating whether DCP is accompanied by multiple EDIF
-     *                  files containing encrypted IP.
+     * @param encrypted Indicates whether DCP contains encrypted EDIF cells.
      * @return ReportRouteStatusResult object.
      */
     public static ReportRouteStatusResult reportRouteStatus(Path dcp, boolean encrypted) {
@@ -173,8 +173,7 @@ public class VivadoTools {
      *
      * @param dcp Path to DCP to report on.
      * @param workdir Directory to work within.
-     * @param encrypted Boolean indicating whether DCP is accompanied by multiple EDIF
-     *                  files containing encrypted IP.
+     * @param encrypted Indicates whether DCP contains encrypted EDIF cells.
      * @return ReportRouteStatusResult object.
      */
     public static ReportRouteStatusResult reportRouteStatus(Path dcp, Path workdir, boolean encrypted) {
@@ -182,7 +181,8 @@ public class VivadoTools {
 
         StringBuilder sb = new StringBuilder();
         if (encrypted) {
-            sb.append("source " + FileTools.removeFileExtension(dcp.toString()) + "_load.tcl; ");
+            Path tclFileName = FileTools.replaceExtension(dcp.getFileName(), EDIFTools.LOAD_TCL_SUFFIX);
+            sb.append("source " + tclFileName + "; ");
         } else {
             sb.append("open_checkpoint " + dcp + "; ");
         }
