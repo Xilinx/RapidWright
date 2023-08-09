@@ -1769,7 +1769,7 @@ public class EDIFNetlist extends EDIFName {
      * @return A list of EDN filenames that may populate encrypted cells within the netlist.
      */
     public List<String> getEncryptedCells() {
-        return encryptedCells;
+        return encryptedCells != null ? encryptedCells : Collections.emptyList();
     }
 
     protected void setEncryptedCells(List<String> encryptedCells) {
