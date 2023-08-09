@@ -1584,11 +1584,33 @@ public class FileTools {
      * @return The return value of the process if it terminated, if there was a problem it returns null.
      */
     public static Integer runCommand(String command, boolean verbose) {
+        return runCommand(command, verbose, null, null);
+    }
+
+    /**
+     * A generic method to run a command from the system command line.
+     * 
+     * @param command The command to execute. This method blocks until the command
+     *                finishes.
+     * @param verbose When true, it will first print to std.out the command and also
+     *                all of the command's output (both std.out and std.err) to
+     *                std.out.
+     * @param environ array of strings, each element of which has environment
+     *                variable settings in the format name=value, or null if the
+     *                subprocess should inherit the environment of the current
+     *                process.
+     * @param runDir  the working directory of the subprocess, or null if the
+     *                subprocess should inherit the working directory of the current
+     *                process.
+     * @return The return value of the process if it terminated, if there was a
+     *         problem it returns null.
+     */
+    public static Integer runCommand(String command, boolean verbose, String[] environ, File runDir) {
         if (verbose) System.out.println(command);
         int returnValue = 0;
         Process p = null;
         try {
-            p = Runtime.getRuntime().exec(command);
+            p = Runtime.getRuntime().exec(command, environ, runDir);
             StreamGobbler input = new StreamGobbler(p.getInputStream(), verbose);
             StreamGobbler err = new StreamGobbler(p.getErrorStream(), verbose);
             input.start();
