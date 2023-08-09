@@ -121,17 +121,16 @@ public class RouterHelper {
      * @return A node that connects to an INT tile from an output pin.
      */
     public static Node projectOutputPinToINTNode(SitePinInst output) {
-        Node intNode = output.getConnectedNode();
+        Node intNode = null;
         int watchdog = 5;
 
-        List<Node> downhillNodes = intNode.getAllDownhillNodes();
+        List<Node> downhillNodes = output.getConnectedNode().getAllDownhillNodes();
         while (!downhillNodes.isEmpty() && downhillNodes.get(0).getTile().getTileTypeEnum() != TileTypeEnum.INT) {
-            List<Node> downhills = intNode.getAllDownhillNodes();
-            intNode = downhills.get(0);
-            if (downhills.size() > 1) {
+            intNode = downhillNodes.get(0);
+            if (downhillNodes.size() > 1) {
                 int i = 1;
                 while (intNode.getAllDownhillNodes().size() == 0) {
-                    intNode = downhills.get(i);
+                    intNode = downhillNodes.get(i);
                     i++;
                 }
             }
