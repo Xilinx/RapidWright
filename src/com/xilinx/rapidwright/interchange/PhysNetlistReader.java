@@ -95,7 +95,7 @@ public class PhysNetlistReader {
      *  Checks that constant routing and net names are valid.
      *  This incurs a runtime overhead.
      */
-    public static boolean CHECK_CONSTANT_ROUTING_AND_NET_NAMING = false;
+    public static boolean CHECK_CONSTANT_ROUTING_AND_NET_NAMING = true;
 
     /**
      * Examines a design to ensure that the provided macro placement is consistent with the
