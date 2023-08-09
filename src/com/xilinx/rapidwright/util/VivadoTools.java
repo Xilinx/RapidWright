@@ -103,7 +103,7 @@ public class VivadoTools {
      * @return the contents of the log file as a list of strings
      */
     public static List<String> runTcl(Path outputLog, Path tclScript, boolean verbose, String[] environ, File runDir) {
-        final String vivadoCmd = "vivado -log " + outputLog.toString() + " -mode batch -source "
+        final String vivadoCmd = "vivado -log " + outputLog.toString() + " -nojournal -mode batch -source "
                 + tclScript.toString();
         Integer exitCode = FileTools.runCommand(vivadoCmd, verbose, environ, runDir);
         if (exitCode != 0) {
@@ -136,11 +136,24 @@ public class VivadoTools {
     }
 
     /**
+     * Run Vivado's `report_route_status` command on the provided DCP (which is assumed
+     * to be unencrypted) path and return its result as a ReportRouteStatusResult object.
+     *
+     * @param dcp Path to DCP to report on.
+     * @return ReportRouteStatusResult object.
+     */
+    public static ReportRouteStatusResult reportRouteStatus(Path dcp) {
+        return reportRouteStatus(dcp, false);
+    }
+
+    /**
      * Run Vivado's `report_route_status` command on the provided DCP path
      * and return its result as a ReportRouteStatusResult object.
      * DCP is assumed to not contain encrypted EDIF cells.
      *
      * @param dcp Path to DCP to report on.
+     * @param encrypted Boolean indicating whether DCP is accompanied by multiple EDIF
+     *                  files containing encrypted IP.
      * @return ReportRouteStatusResult object.
      */
     public static ReportRouteStatusResult reportRouteStatus(Path dcp) {
