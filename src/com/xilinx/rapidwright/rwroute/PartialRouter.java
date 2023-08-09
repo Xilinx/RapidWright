@@ -60,7 +60,7 @@ import java.util.stream.Collectors;
  */
 public class PartialRouter extends RWRoute {
 
-    protected final boolean softPreserve;
+    protected boolean softPreserve;
 
     protected Set<NetWrapper> partiallyPreservedNets;
 
@@ -258,7 +258,12 @@ public class PartialRouter extends RWRoute {
         if (staticNetAndRoutingTargets.isEmpty())
             return;
 
+        boolean savedSoftPreserve = softPreserve;
+        softPreserve = false;
+
         super.routeStaticNets();
+
+        softPreserve = savedSoftPreserve;
 
         List<Net> unpreserveNets = unpreserveCongestedNets(staticNetAndRoutingTargets.keySet());
         if (!unpreserveNets.isEmpty()) {
