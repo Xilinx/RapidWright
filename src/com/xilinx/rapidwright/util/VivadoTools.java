@@ -149,20 +149,6 @@ public class VivadoTools {
     /**
      * Run Vivado's `report_route_status` command on the provided DCP path
      * and return its result as a ReportRouteStatusResult object.
-     * DCP is assumed to not contain encrypted EDIF cells.
-     *
-     * @param dcp Path to DCP to report on.
-     * @param encrypted Boolean indicating whether DCP is accompanied by multiple EDIF
-     *                  files containing encrypted IP.
-     * @return ReportRouteStatusResult object.
-     */
-    public static ReportRouteStatusResult reportRouteStatus(Path dcp) {
-        return reportRouteStatus(dcp, false);
-    }
-
-    /**
-     * Run Vivado's `report_route_status` command on the provided DCP path
-     * and return its result as a ReportRouteStatusResult object.
      *
      * @param dcp Path to DCP to report on.
      * @param encrypted Indicates whether DCP contains encrypted EDIF cells.
