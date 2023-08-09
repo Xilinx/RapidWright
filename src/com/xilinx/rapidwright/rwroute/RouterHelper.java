@@ -124,21 +124,24 @@ public class RouterHelper {
         Node intNode = output.getConnectedNode();
         int watchdog = 5;
 
-        while (intNode.getAllDownhillNodes().get(0).getTile().getTileTypeEnum() != TileTypeEnum.INT) {
-            List<Node> downhills = intNode.getAllDownhillNodes();
-            intNode = downhills.get(0);
-            if (downhills.size() > 1) {
+        List<Node> downhillNodes = intNode.getAllDownhillNodes();
+        if (downhillNodes.isEmpty()) {
+            return null;
+        }
+        while (downhillNodes.get(0).getTile().getTileTypeEnum() != TileTypeEnum.INT) {
+            intNode = downhillNodes.get(0);
+            if (downhillNodes.size() > 1) {
                 int i = 1;
                 while (intNode.getAllDownhillNodes().size() == 0) {
-                    intNode = downhills.get(i);
+                    intNode = downhillNodes.get(i);
                     i++;
                 }
             }
             watchdog--;
             if (intNode.getAllDownhillNodes().size() == 0 || watchdog < 0) {
-                intNode = null;
-                break;
+                return null;
             }
+            downhillNodes = intNode.getAllDownhillNodes();
         }
         return intNode;
     }

@@ -244,6 +244,7 @@ public class PhysNetlistReader {
                 if (c == null) {
                     BEL bel = siteInst.getBEL(belName);
                     c = new Cell(PhysNetlistWriter.LOCKED, bel);
+                    c.setType(strings.get(placement.getType()));
                     c.setBELFixed(placement.getIsBelFixed());
                     c.setNullBEL(bel == null);
                     siteInst.addCell(c);
@@ -573,7 +574,7 @@ public class PhysNetlistReader {
             }
             case BEL_PIN:{
                 PhysBelPin.Reader bpReader = segment.getBelPin();
-                SiteInst siteInst = getPlacedSiteInst(bpReader.getSite());
+                SiteInst siteInst = getOrCreatePlacedSiteInst(bpReader.getSite(), net);
                 BELPin belPin = getBELPin(siteInst, bpReader.getBel(), bpReader.getPin());
 
                 // Examine LUT input pins only
@@ -631,7 +632,7 @@ public class PhysNetlistReader {
             }
             case SITE_P_I_P:{
                 PhysSitePIP.Reader spReader = segment.getSitePIP();
-                SiteInst siteInst = getPlacedSiteInst(spReader.getSite());
+                SiteInst siteInst = getOrCreatePlacedSiteInst(spReader.getSite(), net);
                 BELPin belPin = getBELPin(siteInst, spReader.getBel(), spReader.getPin());
                 SitePIP sitePIP = siteInst.getSitePIP(belPin);
                 addSitePIPToSiteInst(sitePIP, siteInst);
@@ -639,20 +640,7 @@ public class PhysNetlistReader {
             }
             case SITE_PIN: {
                 PhysSitePin.Reader spReader = segment.getSitePin();
-                SiteInst siteInst = siteInsts.computeIfAbsent(spReader.getSite(), (k) -> {
-                    Site site = device.getSite(strings.get(k));
-                    if (!net.isStaticNet()) {
-                        throw new RuntimeException("ERROR: SiteInst for Site " + site.getName() + " not found.");
-                    }
-                    // Create a dummy TIEOFF SiteInst
-                    String name = SiteInst.STATIC_SOURCE + "_" + site.getName();
-                    SiteInst si = new SiteInst(name, site.getSiteTypeEnum());
-                    si.place(site);
-                    // Ensure it is not attached to the design
-                    assert(si.getDesign() == null);
-                    return si;
-                });
-
+                SiteInst siteInst = getOrCreatePlacedSiteInst(spReader.getSite(), net);
                 createSitePin(spReader.getPin(), siteInst, net);
                 assert(routeThruLutInput == null);
                 break;
@@ -689,8 +677,20 @@ public class PhysNetlistReader {
         return siteInsts.get(stringIdx);
     }
 
-    private SiteInst getPlacedSiteInst(int stringIdx) {
-        SiteInst siteInst = getSiteInst(stringIdx);
+    private SiteInst getOrCreatePlacedSiteInst(int siteIdx, Net net) {
+        SiteInst siteInst = siteInsts.computeIfAbsent(siteIdx, (k) -> {
+            Site site = device.getSite(strings.get(k));
+            if (!net.isStaticNet()) {
+                throw new RuntimeException("ERROR: SiteInst for Site " + site.getName() + " not found.");
+            }
+            // Create a dummy TIEOFF SiteInst
+            String name = SiteInst.STATIC_SOURCE + "_" + site.getName();
+            SiteInst si = new SiteInst(name, site.getSiteTypeEnum());
+            si.place(site);
+            // Ensure it is not attached to the design
+            assert(si.getDesign() == null);
+            return si;
+        });
         assert(siteInst != null && siteInst.isPlaced());
         return siteInst;
     }
