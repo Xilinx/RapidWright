@@ -669,7 +669,7 @@ public class SATRouter {
      * @param key The name of the site and letter of LUT pair (ex: SLICE_X54Y44/D)
      * @param pinSwaps The list of pin swaps to be performed on the pair of LUT sites
      */
-    public void processPinSwaps(String key, ArrayList<PinSwap> pinSwaps) {
+    public static void processPinSwaps(String key, ArrayList<PinSwap> pinSwaps) {
         LinkedHashMap<String,PinSwap> overwrittenPins = new LinkedHashMap<>();
         LinkedHashMap<String,PinSwap> emptySlots = new LinkedHashMap<>();
         for (PinSwap ps : pinSwaps) {
