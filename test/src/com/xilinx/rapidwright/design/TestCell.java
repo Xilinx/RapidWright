@@ -81,4 +81,13 @@ public class TestCell {
         Assertions.assertNull(cell.getEDIFCellInst());
         Assertions.assertNull(cell.getProperty("any_property"));
     }
+    
+    @Test
+    public void testCreatingCellWithFlattenedHierarchy() {
+        Cell cell;
+        Design d = new Design("test", "xczu1cg-sbva484-2-e");
+
+        cell = d.createAndPlaceCell("flattened/hier", Unisim.LUT3, "SLICE_X25Y147/H6LUT");
+        Assertions.assertNotNull(cell.getEDIFHierCellInst());
+    }
 }
