@@ -3953,7 +3953,7 @@ public class DesignTools {
          * Creates physical nets from all the logical EDIF nets. Assumes that the EDIF netlist is finalized.
          * @param d The design that contains the complete logical netlist and where the physical nets will be created.
          */
-        static public void createPhysNetsFromLogical(Design d) {
+        public static void createPhysNetsFromLogical(Design d) {
             EDIFNet gnd = EDIFTools.getStaticNet(NetType.GND, d.getTopEDIFCell(), d.getNetlist());
             EDIFNet vcc = EDIFTools.getStaticNet(NetType.VCC, d.getTopEDIFCell(), d.getNetlist());
 
