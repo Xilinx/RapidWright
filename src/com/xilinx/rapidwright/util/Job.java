@@ -95,7 +95,9 @@ public abstract class Job {
     /**
      * @param scriptBaseName the script's base name to set
      */
-    public void setScriptBaseName(String scriptBaseName) {this.scriptBaseName = scriptBaseName;}
+    public void setScriptBaseName(String scriptBaseName) {
+        this.scriptBaseName = scriptBaseName;
+    }
 
 
     /**
