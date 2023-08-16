@@ -101,7 +101,7 @@ public abstract class Job {
 
 
     /**
-     * @return the script's base name
+     * @return the path to the command logfile
      */
     public String getCommandLogFileName() {
         return cmdLogFile;
