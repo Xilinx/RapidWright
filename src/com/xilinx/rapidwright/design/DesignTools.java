@@ -4021,7 +4021,7 @@ public class DesignTools {
      * @param dstPort port of destination cell
      * @return true if the ports can be connected without leaving the site. False otherwise.
      */
-    private static boolean  isIntraSiteConnection(Cell srcCell, EDIFPortInst srcPort, Cell dstCell, EDIFPortInst dstPort) {
+    public static boolean isIntraSiteConnection(Cell srcCell, EDIFPortInst srcPort, Cell dstCell, EDIFPortInst dstPort) {
         if (dstCell.getSite().equals(srcCell.getSite())) {
             Queue<BELPin> queue = new LinkedList<>();
             queue.add(srcCell.getBELPin(srcPort));
