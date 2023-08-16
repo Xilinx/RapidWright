@@ -20,7 +20,7 @@
  *
  */
 
-package com.xilinx.rapidwright.util.rwroute;
+package com.xilinx.rapidwright.util;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;

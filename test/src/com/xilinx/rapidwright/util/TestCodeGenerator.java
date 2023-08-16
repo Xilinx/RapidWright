@@ -23,12 +23,10 @@
 package com.xilinx.rapidwright.util;
 
 import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.util.rwroute.CodeGenerator;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 public class TestCodeGenerator {
