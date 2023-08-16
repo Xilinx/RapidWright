@@ -57,7 +57,7 @@ public abstract class Job {
 
     public static final String DEFAULT_COMMAND_LOG_FILE = DEFAULT_COMMAND_NAME + DEFAULT_LOG_EXTENSION;
 
-    private String scriptBaseName=DEFAULT_SCRIPT_NAME;
+    private String scriptBaseName = DEFAULT_SCRIPT_NAME;
     private String scriptLogFile = DEFAULT_SCRIPT_LOG_FILE;
     private String cmdLogFile = DEFAULT_COMMAND_LOG_FILE;
 
