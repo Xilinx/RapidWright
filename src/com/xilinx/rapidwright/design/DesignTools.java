@@ -3971,7 +3971,7 @@ public class DesignTools {
      * @param edifNet The EDIF Net to create into a physical net.
      * @return A list of the SitePinInsts added to the newly created physical net
      */
-    static public List<SitePinInst> createPhysNetFromLogical(Design d, EDIFHierNet edifNet) {
+    public static List<SitePinInst> createPhysNetFromLogical(Design d, EDIFHierNet edifNet) {
         //check whether net already exists
         if (d.getNet(edifNet.getHierarchicalNetName())  != null) return null;
 
