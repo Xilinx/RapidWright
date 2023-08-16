@@ -3973,7 +3973,7 @@ public class DesignTools {
      */
     public static List<SitePinInst> createPhysNetFromLogical(Design d, EDIFHierNet edifNet) {
         //check whether net already exists
-        if (d.getNet(edifNet.getHierarchicalNetName())  != null) return null;
+        if (d.getNet(edifNet.getHierarchicalNetName()) != null) return null;
 
         Net net = d.createNet(edifNet); //create physical net
 
