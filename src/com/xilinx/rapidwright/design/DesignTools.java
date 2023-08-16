@@ -3949,21 +3949,21 @@ public class DesignTools {
         }
     }
 
-        /**
-         * Creates physical nets from all the logical EDIF nets. Assumes that the EDIF netlist is finalized.
-         * @param d The design that contains the complete logical netlist and where the physical nets will be created.
-         */
-        public static void createPhysNetsFromLogical(Design d) {
-            EDIFNet gnd = EDIFTools.getStaticNet(NetType.GND, d.getTopEDIFCell(), d.getNetlist());
-            EDIFNet vcc = EDIFTools.getStaticNet(NetType.VCC, d.getTopEDIFCell(), d.getNetlist());
+    /**
+     * Creates physical nets from all the logical EDIF nets. Assumes that the EDIF netlist is finalized.
+     * @param d The design that contains the complete logical netlist and where the physical nets will be created.
+     */
+    public static void createPhysNetsFromLogical(Design d) {
+        EDIFNet gnd = EDIFTools.getStaticNet(NetType.GND, d.getTopEDIFCell(), d.getNetlist());
+        EDIFNet vcc = EDIFTools.getStaticNet(NetType.VCC, d.getTopEDIFCell(), d.getNetlist());
 
-            // Iterate through all canonical nets
-            Map<EDIFHierNet, EDIFHierNet> parentNetMap = d.getNetlist().getParentNetMap();
-            for (EDIFHierNet n : parentNetMap.values()) {
-                if (n.getNet().equals(gnd) || n.getNet().equals(vcc)) continue; // Static nets do not have physical equivalents
-                createPhysNetFromLogical(d, n);
-            }
+        // Iterate through all canonical nets
+        Map<EDIFHierNet, EDIFHierNet> parentNetMap = d.getNetlist().getParentNetMap();
+        for (EDIFHierNet n : parentNetMap.values()) {
+            if (n.getNet().equals(gnd) || n.getNet().equals(vcc)) continue; // Static nets do not have physical equivalents
+            createPhysNetFromLogical(d, n);
         }
+    }
 
     /**
      * Creates a physical nets from the provided logical EDIF net. Assumes that the EDIF netlist is finalized.
