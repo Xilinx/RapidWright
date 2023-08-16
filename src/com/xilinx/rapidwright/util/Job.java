@@ -178,6 +178,6 @@ public abstract class Job {
     }
 
     public String getLogFilename() {
-        return getRunDir() + File.separator + this.cmdLogFile;
+        return getRunDir() + File.separator + cmdLogFile;
     }
 }
