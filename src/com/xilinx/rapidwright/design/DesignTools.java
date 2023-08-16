@@ -3960,7 +3960,7 @@ public class DesignTools {
             // Iterate through all canonical nets
             Map<EDIFHierNet, EDIFHierNet> parentNetMap = d.getNetlist().getParentNetMap();
             for (EDIFHierNet n : parentNetMap.values()) {
-                if(n.getNet().equals(gnd) || n.getNet().equals(vcc)) continue; // Static nets do not have physical equivalents
+                if (n.getNet().equals(gnd) || n.getNet().equals(vcc)) continue; // Static nets do not have physical equivalents
                 createPhysNetFromLogical(d, n);
             }
         }
