@@ -4002,7 +4002,7 @@ public class DesignTools {
 
             // Only create connection if the net goes outside the site. This prevents sitePins instances from
             // erroneously being created.
-            if(!isIntraSiteConnection(srcCell, srcPort.getPortInst(), cell, portInst))
+            if (!isIntraSiteConnection(srcCell, srcPort.getPortInst(), cell, portInst))
                 sitePins.add(net.connect(cell, portInst.getName()));
         }
 
