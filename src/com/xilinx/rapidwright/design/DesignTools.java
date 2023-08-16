@@ -4033,7 +4033,7 @@ public class DesignTools {
                         return true;
                     }
                     else if (pin.isInput() && pin.getBEL().getBELClass() == BELClass.RBEL) {
-                        for(BELPin nextPin : pin.getBEL().getPins()) {
+                        for (BELPin nextPin : pin.getBEL().getPins()) {
                             if (nextPin.isOutput()) {
                                 queue.add(nextPin);
                             }
