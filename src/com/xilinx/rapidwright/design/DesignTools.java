@@ -4014,7 +4014,7 @@ public class DesignTools {
     }
 
     /**
-     * checks if the two provided ports of two cells can be connected without leaving the site.
+     * Checks if the two provided ports of two cells can be connected without leaving the site.
      * @param srcCell source cell
      * @param srcPort port of source Cell
      * @param dstCell destination cell
