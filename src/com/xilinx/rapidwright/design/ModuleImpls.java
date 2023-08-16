@@ -68,7 +68,7 @@ public class ModuleImpls extends ArrayList<Module> {
     private void checkSameNetlist() {
         for (Module mod : this) {
             if (mod.getNetlist() != getNetlist()) {
-                throw new RuntimeException("In the ModuleImpls "+mod.getName()+", the netlists are not pointer-equal");
+                System.err.println("In the ModuleImpls " + mod.getName() + ", the netlists are not pointer-equal");
             }
         }
     }
