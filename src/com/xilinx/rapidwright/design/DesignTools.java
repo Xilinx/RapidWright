@@ -4028,7 +4028,7 @@ public class DesignTools {
             BELPin dstPin = dstCell.getBELPin(dstPort);
             while (!queue.isEmpty()) {
                 ArrayList<BELPin> conns = queue.poll().getSiteConns();
-                for(BELPin pin : conns) {
+                for (BELPin pin : conns) {
                     if (pin.equals(dstPin)) {
                         return true;
                     }
