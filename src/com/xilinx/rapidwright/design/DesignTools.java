@@ -853,7 +853,7 @@ public class DesignTools {
                 }
             }
             String logPinName = c.getLogicalPinMapping(pin.getName());
-            EDIFPortInst portInst = c.getEDIFCellInst().getPortInst(logPinName);
+            EDIFPortInst portInst = logPinName == null ? null : c.getEDIFCellInst().getPortInst(logPinName);
             if (portInst == null) continue;
             EDIFNet net =  portInst.getNet();
             String netName = c.getParentHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP + net.getName();
@@ -1509,7 +1509,7 @@ public class DesignTools {
      * Preserves other parts of the net if used by other sinks in the site if an
      * input. For the unrouting to be successful, this method depends on the site
      * routing to be consistent.
-     * 
+     *
      * @param cell           The cell of the pin
      * @param logicalPinName The logical pin name source or sink to have routing
      *                       removed.
@@ -1587,9 +1587,9 @@ public class DesignTools {
                                         }
                                     } else {
                                         // site routing terminates here or is invalid
-                                    }                                    
+                                    }
                                 }
-                                
+
                             } else if (otherCell != cell && otherCell.getLogicalPinMapping(pin.getName()) != null) {
                                 // Don't search farther, we don't need to unroute anything else
                                 if (pin.isInput() && belPin.isInput()) {
@@ -1673,7 +1673,7 @@ public class DesignTools {
      * cells and nets insides of a cell instance. Method (2) is more likely to have
      * complications. This also unroutes both GND and VCC nets to avoid
      * implementation issues by Vivado in subsequent place and route runs.
-     * 
+     *
      * @param d                The current design
      * @param hierarchicalCell The hierarchical cell to become a black box.
      */
@@ -1857,7 +1857,7 @@ public class DesignTools {
     /**
      * Helper method for makeBlackBox(). When cutting out nets that used to be
      * source'd from something inside a black box, the net names need to be updated.
-     * 
+     *
      * @param d         The current design
      * @param currNet   Current net that requires a name change
      * @param newSource The source net (probably a pin on the black box)
@@ -3639,7 +3639,7 @@ public class DesignTools {
      * Locks the logical netlist of the design using the DONT_TOUCH property. This
      * strives to be as close as possible to what Vivado's 'lock_design -level
      * netlist' does to lock the design. {@link EDIFTools#lockNetlist(EDIFNetlist)}.
-     * 
+     *
      * @param design The design of the netlist to lock.
      */
     public static void lockNetlist(Design design) {
@@ -3651,7 +3651,7 @@ public class DesignTools {
      * property. This strives to be as close as possible to what Vivado's
      * 'lock_design -unlock -level netlist' does to lock the
      * design.{@link EDIFTools#unlockNetlist(EDIFNetlist)}.
-     * 
+     *
      * @param design The design of the netlist to unlock.
      */
     public static void unlockNetlist(Design design) {
@@ -3663,7 +3663,7 @@ public class DesignTools {
      * also lock or unlock the netlist of the design (see
      * {@link #lockNetlist(Design)}). This strives to be as close as possible to
      * what Vivado's 'lock_design -level placement' does to lock the design.
-     * 
+     *
      * @param design The design to lock
      * @param lock   Flag indicating to lock (true) or unlock (false) the design's
      *               placement and netlist.
@@ -3688,7 +3688,7 @@ public class DesignTools {
      * lock the netlist the design (see {@link #lockNetlist(Design)}). This strives
      * to be as close as possible to what Vivado's 'lock_design -level placement'
      * does to lock the design.
-     * 
+     *
      * @param design The design to lock
      */
     public static void lockPlacement(Design design) {
@@ -3700,7 +3700,7 @@ public class DesignTools {
      * design (see {@link #unlockNetlist(Design)}). This strives to be as close as
      * possible to what Vivado's 'lock_design -unlock -level placement' does to lock
      * the design.
-     * 
+     *
      * @param design The design to unlock
      */
     public static void unlockPlacement(Design design) {
@@ -3713,7 +3713,7 @@ public class DesignTools {
      * the design (see {@link #lockPlacement(Design, boolean)}). This strives to be
      * as close as possible to what Vivado's 'lock_design -level routing' does to
      * lock the design.
-     * 
+     *
      * @param design The design to lock
      * @param lock   Flag indicating to lock (true) or unlock (false) the design's
      *               routing, placement and netlist.
@@ -3734,7 +3734,7 @@ public class DesignTools {
      * Vivado. It will also lock the netlist and placement of the design. This
      * strives to be as close as possible to what Vivado's 'lock_design -level
      * routing' does to lock the design.
-     * 
+     *
      * @param design The design to lock
      */
     public static void lockRouting(Design design) {
@@ -3745,7 +3745,7 @@ public class DesignTools {
      * Unlocks any and all routing of a design. It will also unlock the netlist and
      * placement of the design. This strives to be as close as possible to what
      * Vivado's 'lock_design -unlock -level routing' does to lock the design.
-     * 
+     *
      * @param design The design to unlock
      */
     public static void unlockRouting(Design design) {
@@ -3755,7 +3755,7 @@ public class DesignTools {
     /***
      * Unroutes the GND net of a design and unroutes the site routing of any LUT GND
      * sources while leaving other site routing inputs intact.
-     * 
+     *
      * @param design The design to modify.
      */
     public static void unrouteGNDNetAndLUTSources(Design design) {
@@ -3786,7 +3786,7 @@ public class DesignTools {
      * when trying to preserve a partially implemented design that have additional
      * logic placed and routed onto it later. The Vivado placer doesn't recognize
      * the GND sources so this prevents the placer from using those BEL sites.
-     * 
+     *
      * @param design The design to which the PROHIBIT constraints are added.
      */
     public static void prohibitGNDSources(Design design) {
@@ -3811,7 +3811,7 @@ public class DesignTools {
     /**
      * Checks the provided BEL's first letter to determine if it is in the top half
      * of a SLICE or bottom half.
-     * 
+     *
      * @param bel The BEL of a SLICE to query
      * @return True if the BEL resides in the top half of a SLICE (E6LUT, E5LUT,
      *         EFF, EFF2, ..). Returns false if it is in the bottom half and null if
@@ -3832,7 +3832,7 @@ public class DesignTools {
      * routed implementation is desired to be preserved but to allow additional
      * logic to be placed and routed on top of it without an area (pblock)
      * constraint.
-     * 
+     *
      * @param design The design to which the constraints are added.
      */
     public static void prohibitPartialHalfSlices(Design design) {
@@ -3870,7 +3870,7 @@ public class DesignTools {
     /**
      * Adds a PROHIBIT constraint to the specified BEL Locations (ex:
      * "SLICE_X10Y10/AFF")
-     * 
+     *
      * @param design       The design to which the constraint should be added
      * @param belLocations A list of BEL locations using the syntax
      *                     '<SITE-NAME>/<BEL-NAME>'.
