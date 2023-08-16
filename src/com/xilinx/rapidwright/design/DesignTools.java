@@ -4026,7 +4026,7 @@ public class DesignTools {
             Queue<BELPin> queue = new LinkedList<>();
             queue.add(srcCell.getBELPin(srcPort));
             BELPin dstPin = dstCell.getBELPin(dstPort);
-            while(!queue.isEmpty()) {
+            while (!queue.isEmpty()) {
                 ArrayList<BELPin> conns = queue.poll().getSiteConns();
                 for(BELPin pin : conns) {
                     if (pin.equals(dstPin)) {
