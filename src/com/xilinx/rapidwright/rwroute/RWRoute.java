@@ -529,6 +529,7 @@ public class RWRoute{
                         altSource = DesignTools.getLegalAlternativeOutputPin(net);
                         if (altSource != null) {
                             net.addPin(altSource);
+                            altSource.getSiteInst().getSitePinInstMap().put(altSource.getName(), altSource);
                             DesignTools.routeAlternativeOutputSitePin(net, altSource);
                         }
                     }
