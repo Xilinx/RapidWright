@@ -827,6 +827,35 @@ public class RWRoute{
             // fix routes with cycles and / or multi-driver nodes
             Set<NetWrapper> routes = fixRoutes();
             if (config.isTimingDriven()) updateTimingAfterFixingRoutes(routes);
+
+            // Unset the routed state of all source pins
+            for (Net net : nets.keySet()) {
+                for (SitePinInst spi : Arrays.asList(net.getSource(), net.getAlternateSource())) {
+                    if (spi != null) {
+                        net.getSource().setRouted(false);
+                    }
+                }
+            }
+
+            // Set the routed state on those source pins that were actually used
+            for (Connection connection : indirectConnections) {
+                List<RouteNode> rnodes = connection.getRnodes();
+                if (rnodes.isEmpty()) {
+                    // Unroutable connection
+                    continue;
+                }
+
+                RouteNode sourceRnode = rnodes.get(rnodes.size() - 1);
+                if (sourceRnode.equals(connection.getSourceRnode())) {
+                    connection.getSource().setRouted(true);
+                } else {
+                    assert(sourceRnode.equals(connection.getAltSourceRnode()));
+
+                    Net net = connection.getNetWrapper().getNet();
+                    assert(connection.getSource().equals(net.getSource()));
+                    net.getAlternateSource().setRouted(true);
+                }
+            }
         }
     }
 
