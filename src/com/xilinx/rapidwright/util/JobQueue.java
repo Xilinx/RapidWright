@@ -80,33 +80,52 @@ public class JobQueue {
         return running.add(j);
     }
 
+    public int getRunningCount() {
+        return running.size();
+    }
+
+    private Map<JobState, List<Job>> getJobsByState() {
+        return running.stream().collect(Collectors.groupingBy(Job::getJobState, () -> new EnumMap<>(JobState.class), Collectors.toList()));
+    }
+
+    public boolean refreshQueue() {
+        return refreshQueue(isLSFAvailable() ? JobQueue.MAX_LSF_CONCURRENT_JOBS : JobQueue.MAX_LOCAL_CONCURRENT_JOBS);
+    }
+    public boolean refreshQueue(int maxNumRunningJobs) {
+        return refreshQueue(maxNumRunningJobs, getJobsByState());
+    }
+
+    private boolean refreshQueue(int maxNumRunningJobs, final Map<JobState, List<Job>> jobsByState) {
+        final List<Job> exited = jobsByState.get(JobState.EXITED);
+        if (exited != null) {
+            for (Job job : exited) {
+                running.remove(job);
+                finished.add(job);
+            }
+            //Removing from map so they don't show up in our printout
+            jobsByState.remove(JobState.EXITED);
+        }
+        boolean launched = false;
+        while (!waitingToRun.isEmpty() && maxNumRunningJobs > running.size()) {
+            Job j = waitingToRun.poll();
+            long pid = j.launchJob();
+            running.add(j);
+            if (printJobStart) {
+                System.out.println("Running job [" + pid + "] " + j.getCommand() + " in " + j.getRunDir());
+            }
+            launched = true;
+        }
+        return launched;
+    }
+
     public boolean runAllToCompletion() {
         return runAllToCompletion(isLSFAvailable() ? JobQueue.MAX_LSF_CONCURRENT_JOBS : JobQueue.MAX_LOCAL_CONCURRENT_JOBS);
     }
 
     public boolean runAllToCompletion(int maxNumRunningJobs) {
         while (!waitingToRun.isEmpty() || !running.isEmpty()) {
-
-            final Map<JobState, List<Job>> jobsByState = running.stream().collect(Collectors.groupingBy(Job::getJobState, ()->new EnumMap<>(JobState.class), Collectors.toList()));
-            final List<Job> exited = jobsByState.get(JobState.EXITED);
-            if (exited != null) {
-                for (Job job : exited) {
-                    running.remove(job);
-                    finished.add(job);
-                }
-                //Removing from map so they don't show up in our printout
-                jobsByState.remove(JobState.EXITED);
-            }
-            boolean launched = false;
-            while (!waitingToRun.isEmpty() && maxNumRunningJobs > running.size()) {
-                Job j = waitingToRun.poll();
-                long pid = j.launchJob();
-                running.add(j);
-                if (printJobStart) {
-                    System.out.println("Running job [" + pid + "] " + j.getCommand() + " in " + j.getRunDir());
-                }
-                launched = true;
-            }
+            final Map<JobState, List<Job>> jobsByState = getJobsByState();
+            boolean launched = refreshQueue(maxNumRunningJobs, getJobsByState());
 
             if (!launched || !printJobStart) {
                 System.out.print("Waiting on ");
