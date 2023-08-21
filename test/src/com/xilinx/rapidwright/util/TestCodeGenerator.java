@@ -103,7 +103,5 @@ public class TestCodeGenerator {
                 "SiteInst si1 = design.createSiteInst(design.getDevice().getSite(\"IOB_X0Y1\"));\n";
 
         Assertions.assertEquals(expectedString, actualString);
-
     }
-
 }

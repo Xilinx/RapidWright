@@ -78,7 +78,7 @@ public class CodeGenerator {
         code.append("Device device = design.getDevice();\n\n");
 
         int netIdx = 0;
-        for(String netName : nets) {
+        for (String netName : nets) {
             Net net = design.getNet(netName);
             String varName = "net";
             if (nets.size() > 1) varName += netIdx;
@@ -100,13 +100,10 @@ public class CodeGenerator {
         code.append("\n");
 
         int siteIdx = 0;
-        for(String siteName : siteInsts)
-        {
+        for (String siteName : siteInsts) {
             String varName = "si";
             if (nets.size() > 1) varName += siteIdx;
-
             code.append(String.format("SiteInst %s = design.createSiteInst(design.getDevice().getSite(\"%s\"));\n", varName, siteName));
-
             siteIdx++;
         }
 
