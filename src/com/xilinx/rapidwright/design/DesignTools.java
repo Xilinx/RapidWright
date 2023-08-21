@@ -3960,7 +3960,7 @@ public class DesignTools {
         // Iterate through all canonical nets
         Map<EDIFHierNet, EDIFHierNet> parentNetMap = d.getNetlist().getParentNetMap();
         for (EDIFHierNet n : parentNetMap.values()) {
-            if (n.getNet().equals(gnd) || n.getNet().equals(vcc)) continue; // Static nets do not have physical equivalents
+//            if (n.getNet().equals(gnd) || n.getNet().equals(vcc)) continue; // Static nets do not have physical equivalents
             createPhysNetFromLogical(d, n);
         }
     }
@@ -3975,7 +3975,13 @@ public class DesignTools {
         //check whether net already exists
         if (d.getNet(edifNet.getHierarchicalNetName()) != null) return null;
 
-        Net net = d.createNet(edifNet); //create physical net
+        Net net;  //create physical net
+        if(edifNet.getNet().equals(EDIFTools.getStaticNet(NetType.GND, d.getTopEDIFCell(), d.getNetlist())))
+            net = d.getGndNet();
+        else if(edifNet.getNet().equals(EDIFTools.getStaticNet(NetType.VCC, d.getTopEDIFCell(), d.getNetlist())))
+            net = d.getVccNet();
+        else 
+            net = d.createNet(edifNet);
 
         // Get source EDIF port inst
         EDIFHierPortInst srcPort = null;
