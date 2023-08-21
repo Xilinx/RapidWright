@@ -29,6 +29,11 @@ import com.xilinx.rapidwright.device.PIP;
 import java.util.Collection;
 import java.util.List;
 
+/**
+ * This utility class is used to create RapidWright code from a DCP file that is tedious to create by hand.
+ * @author Hayden Cook
+ * Created on: August 16, 2023
+ */
 public class CodeGenerator {
 
     /**
@@ -82,7 +87,6 @@ public class CodeGenerator {
             Net net = design.getNet(netName);
             String varName = "net";
             if (nets.size() > 1) varName += netIdx;
-
             code.append(String.format("Net %s = TestDesignHelper.createTestNet(design, \"%s\", new String[]{\n", varName, varName));
 
             List<PIP> pips = net.getPIPs();
@@ -93,7 +97,6 @@ public class CodeGenerator {
                     code.append(",");
                 code.append("\n");
             }
-
             code.append("});\n");
             netIdx++;
         }
