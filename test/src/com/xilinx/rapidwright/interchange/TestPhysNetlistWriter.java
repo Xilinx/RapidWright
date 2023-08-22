@@ -187,4 +187,32 @@ public class TestPhysNetlistWriter {
             break;
         }
     }
+
+    @Test
+    public void testReversedPIPs(@TempDir Path tempDir) throws IOException {
+        Design design = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
+
+        String interchangePath = tempDir.resolve("design.phys").toString();
+        PhysNetlistWriter.writePhysNetlist(design, interchangePath);
+
+        ReaderOptions rdOptions =
+                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
+                        ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
+        MessageReader readMsg = Interchange.readInterchangeFile(interchangePath, rdOptions);
+
+        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
+
+        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
+
+        for (PhysNet.Reader net : physNetlist.getPhysNets()) {
+            String netName = allStrings.get(net.getName());
+            if (!netName.equals("base_mb_i/clk_wiz_1/inst/clk_out1") &&
+                !netName.equals("base_mb_i/mdm_1/U0/No_Dbg_Reg_Access.BUFG_DRCK/Dbg_Clk_31")) {
+                continue;
+            }
+
+            Assertions.assertEquals(1, net.getSources().size());
+            Assertions.assertEquals(0, net.getStubs().size());
+        }
+    }
 }
