@@ -206,8 +206,11 @@ public class TestPhysNetlistWriter {
 
         for (PhysNet.Reader net : physNetlist.getPhysNets()) {
             String netName = allStrings.get(net.getName());
+            // It's known that all these clock nets are fully routed
             if (!netName.equals("base_mb_i/clk_wiz_1/inst/clk_out1") &&
-                !netName.equals("base_mb_i/mdm_1/U0/No_Dbg_Reg_Access.BUFG_DRCK/Dbg_Clk_31")) {
+                !netName.equals("base_mb_i/mdm_1/U0/No_Dbg_Reg_Access.BUFG_DRCK/Dbg_Clk_31") &&
+                !netName.equals("base_mb_i/clk_wiz_1/inst/clkfbout_buf_base_mb_clk_wiz_1_0") &&
+                !netName.equals("dbg_hub/inst/BSCANID.u_xsdbm_id/itck_i")) {
                 continue;
             }
 
