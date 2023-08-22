@@ -140,4 +140,51 @@ public class TestPhysNetlistWriter {
         }
     }
 
+    @Test
+    public void testMissingBELPin(@TempDir Path tempDir) throws IOException {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+
+        String interchangePath = tempDir.resolve("design.phys").toString();
+        PhysNetlistWriter.writePhysNetlist(design, interchangePath);
+
+        ReaderOptions rdOptions =
+                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
+                        ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
+        MessageReader readMsg = Interchange.readInterchangeFile(interchangePath, rdOptions);
+
+        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
+
+        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
+
+        for (PhysNet.Reader net : physNetlist.getPhysNets()) {
+            String netName = allStrings.get(net.getName());
+            if (!netName.equals("processor/alu_decode1_lut/O6"))
+                continue;
+
+            StructList.Reader<RouteBranch.Reader> fanouts = net.getSources();
+            Assertions.assertEquals(1, fanouts.size());
+            RouteBranch.Reader CLUT6_O6_branch = fanouts.get(0);
+            Assertions.assertEquals("BEL_PIN", CLUT6_O6_branch.getRouteSegment().which().toString());
+            PhysBelPin.Reader CLUT6_O6 = CLUT6_O6_branch.getRouteSegment().getBelPin();
+            Assertions.assertEquals("C6LUT", allStrings.get(CLUT6_O6.getBel()));
+            Assertions.assertEquals("O6", allStrings.get(CLUT6_O6.getPin()));
+
+            fanouts = CLUT6_O6_branch.getBranches();
+            Assertions.assertEquals(1, fanouts.size());
+            RouteBranch.Reader C_O_C_O_branch = fanouts.get(0);
+            Assertions.assertEquals("BEL_PIN", C_O_C_O_branch.getRouteSegment().which().toString());
+            PhysBelPin.Reader C_O_C_O = C_O_C_O_branch.getRouteSegment().getBelPin();
+            Assertions.assertEquals("C_O", allStrings.get(C_O_C_O.getBel()));
+            Assertions.assertEquals("C_O", allStrings.get(C_O_C_O.getPin()));
+
+            fanouts = C_O_C_O_branch.getBranches();
+            Assertions.assertEquals(1, fanouts.size());
+            RouteBranch.Reader C_O_branch = fanouts.get(0);
+            Assertions.assertEquals("SITE_PIN", C_O_branch.getRouteSegment().which().toString());
+            PhysNetlist.PhysSitePin.Reader C_O = C_O_branch.getRouteSegment().getSitePin();
+            Assertions.assertEquals("SLICE_X16Y239", allStrings.get(C_O.getSite()));
+            Assertions.assertEquals("C_O", allStrings.get(C_O.getPin()));
+            break;
+        }
+    }
 }
