@@ -3923,7 +3923,10 @@ public class DesignTools {
             Node node = spi.getConnectedNode();
             if (spi.isOutPin()) {
                 queue.add(node);
-                continue;
+
+                if (node2fanout.get(spi.getConnectedNode()) == null) {
+                    continue;
+                }
             }
             node2spi.put(spi.getConnectedNode(), spi);
         }
