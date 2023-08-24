@@ -310,6 +310,12 @@ public class EDIFHierCellInst {
         return getFullHierarchicalInstName();
     }
 
+    /**
+     * Creates a reference copy of this cell instance--a deep copy of the instance
+     * without this new instance being referenced in the design or netlist object.
+     * 
+     * @return The newly created reference copy of this instance.
+     */
     public EDIFHierCellInst getReferenceCopy() {
         EDIFCellInst[] copyInsts = new EDIFCellInst[cellInsts.length];
         for (int i = 0; i < copyInsts.length; i++) {
