@@ -320,7 +320,6 @@ public class EDIFHierCellInst {
             for (Entry<String, EDIFPropertyValue> e : ref.getPropertiesMap().entrySet()) {
                 copy.addProperty(e.getKey(), new EDIFPropertyValue(e.getValue()));
             }
-
             copyInsts[i] = copy;
         }
         return new EDIFHierCellInst(copyInsts);
