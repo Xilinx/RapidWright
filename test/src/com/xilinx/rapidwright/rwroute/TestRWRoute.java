@@ -26,10 +26,6 @@ package com.xilinx.rapidwright.rwroute;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.xilinx.rapidwright.design.DesignTools;
-import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.ReportRouteStatusResult;
-import com.xilinx.rapidwright.util.VivadoTools;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Disabled;
@@ -39,15 +35,21 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.ReportRouteStatusResult;
+import com.xilinx.rapidwright.util.VivadoTools;
 
 public class TestRWRoute {
     private static void assertAllSinksRouted(Net net) {
@@ -82,6 +84,36 @@ public class TestRWRoute {
         }
     }
 
+    private static void assertAllSourcesRoutedFlagSet(Design design) {
+        for (Net net : design.getNets()) {
+            if (net.getSource() == null) {
+                // Source-less nets may exist in out-of-context design
+                continue;
+            }
+            for (SitePinInst src : new SitePinInst[] { net.getSource(), net.getAlternateSource() }) {
+                if (src == null)
+                    continue;
+                Assertions.assertTrue(src.isRouted() == isSourceUsed(src));
+            }
+        }
+    }
+
+    private static boolean isSourceUsed(SitePinInst src) {
+        Node srcNode = src.getConnectedNode();
+        for (PIP p : src.getNet().getPIPs()) {
+            if (p.getStartNode().equals(srcNode))
+                return true;
+        }
+        return false;
+    }
+
+    @Test
+    public void testNonTimingDrivenFullRoutingWithoutVivado() {
+        Design design = RapidWrightDCP.loadDCP("bnn.dcp");
+        RWRoute.routeDesignFullNonTimingDriven(design);
+        assertAllSourcesRoutedFlagSet(design);
+    }
+
     /**
      * Tests the non-timing driven full routing, i.e., RWRoute running in its wirelength-driven mode.
      * The bnn design from Rosetta benchmarks is used.
@@ -92,10 +124,10 @@ public class TestRWRoute {
     @Test
     @LargeTest
     public void testNonTimingDrivenFullRouting() {
-        String dcpPath = RapidWrightDCP.getString("bnn.dcp");
-        Design design = Design.readCheckpoint(dcpPath);
+        Design design = RapidWrightDCP.loadDCP("bnn.dcp");
         RWRoute.routeDesignFullNonTimingDriven(design);
         assertAllSinksRouted(design);
+        assertAllSourcesRoutedFlagSet(design);
         assertVivadoFullyRouted(design);
     }
 
@@ -113,10 +145,10 @@ public class TestRWRoute {
     @Test
     @LargeTest
     public void testTimingDrivenFullRouting() {
-        String dcpPath = RapidWrightDCP.getString("bnn.dcp");
-        Design design = Design.readCheckpoint(dcpPath);
+        Design design = RapidWrightDCP.loadDCP("bnn.dcp");
         RWRoute.routeDesignFullTimingDriven(design);
         assertAllSinksRouted(design);
+        assertAllSourcesRoutedFlagSet(design);
         assertVivadoFullyRouted(design);
     }
 
@@ -133,10 +165,10 @@ public class TestRWRoute {
         // Sporadically failing due to OutOfMemoryException (see #439)
         long maxMemoryNeeded = 1024L*1024L*1024L*8L;
         Assumptions.assumeTrue(Runtime.getRuntime().maxMemory() >= maxMemoryNeeded);
-        String dcpPath = RapidWrightDCP.getString("optical-flow.dcp");
-        Design design = Design.readCheckpoint(dcpPath);
+        Design design = RapidWrightDCP.loadDCP("optical-flow.dcp");
         RWRoute.routeDesignFullNonTimingDriven(design);
         assertAllSinksRouted(design);
+        assertAllSourcesRoutedFlagSet(design);
         assertVivadoFullyRouted(design);
     }
 
@@ -280,5 +312,4 @@ public class TestRWRoute {
             Assertions.assertEquals(0, rrs.unroutedNets);
         }
     }
-
 }
