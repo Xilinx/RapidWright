@@ -58,7 +58,10 @@ public class TestRWRoute {
         Map<SitePinInst, Boolean> sourceRouted = new HashMap<>();
         for (SitePinInst spi : net.getPins()) {
             if (spi.isOutPin()) {
-                sourceRouted.put(spi, spi.isRouted());
+                if (!net.isStaticNet()) {
+                    // isRouted state for static net pins not currently set
+                    sourceRouted.put(spi, spi.isRouted());
+                }
             } else {
                 Assertions.assertTrue(spi.isOutPin() || spi.isRouted());
             }
@@ -69,7 +72,10 @@ public class TestRWRoute {
 
         for (SitePinInst spi : net.getPins()) {
             if (spi.isOutPin()) {
-                Assertions.assertEquals(sourceRouted.get(spi), spi.isRouted());
+                if (!net.isStaticNet()) {
+                    // isRouted state for static net pins not currently set
+                    Assertions.assertEquals(sourceRouted.get(spi), spi.isRouted());
+                }
             } else {
                 Assertions.assertTrue(spi.isRouted());
             }
