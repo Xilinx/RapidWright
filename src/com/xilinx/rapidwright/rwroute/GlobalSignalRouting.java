@@ -374,7 +374,10 @@ public class GlobalSignalRouting {
                         if (debug) System.out.println("  " + routingNode.toString());
                         routingNode = routingNode.getPrev();
                     }
-                    netPIPs.addAll(RouterHelper.getPIPsFromNodes(pathNodes));
+
+                    // Note that the static net router goes backward from sinks to sources,
+                    // requiring the srcToSinkOrder parameter to be set to true below
+                    netPIPs.addAll(RouterHelper.getPIPsFromNodes(pathNodes, true));
 
                     // If the source is an output site pin, put it aside for consideration
                     // to add as a new source pin

@@ -989,7 +989,7 @@ public class EDIFNetlist extends EDIFName {
 
         Map<EDIFHierNet,EDIFHierNet> parentNetMap = getParentNetMap();
         EDIFHierNet parentNetName = parentNetMap.get(p.getHierarchicalNet());
-        Net n = d.getNet(parentNetName.getHierarchicalNetName());
+        Net n = parentNetName == null ? null : d.getNet(parentNetName.getHierarchicalNetName());
         if (n == null) {
             if (parentNetName == null) {
                 // Maybe it is GND/VCC
@@ -1769,7 +1769,7 @@ public class EDIFNetlist extends EDIFName {
      * @return A list of EDN filenames that may populate encrypted cells within the netlist.
      */
     public List<String> getEncryptedCells() {
-        return encryptedCells;
+        return encryptedCells != null ? encryptedCells : Collections.emptyList();
     }
 
     protected void setEncryptedCells(List<String> encryptedCells) {
