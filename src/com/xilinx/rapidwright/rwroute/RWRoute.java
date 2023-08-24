@@ -829,31 +829,37 @@ public class RWRoute{
             if (config.isTimingDriven()) updateTimingAfterFixingRoutes(routes);
 
             // Unset the routed state of all source pins
-            for (Net net : nets.keySet()) {
-                for (SitePinInst spi : Arrays.asList(net.getSource(), net.getAlternateSource())) {
+            for (Map.Entry<Net, NetWrapper> e : nets.entrySet()) {
+                Net net = e.getKey();
+                SitePinInst source = net.getSource();
+                SitePinInst altSource = net.getAlternateSource();
+                for (SitePinInst spi : Arrays.asList(source, altSource)) {
                     if (spi != null) {
-                        net.getSource().setRouted(false);
+                        source.setRouted(false);
                     }
                 }
-            }
 
-            // Set the routed state on those source pins that were actually used
-            for (Connection connection : indirectConnections) {
-                List<RouteNode> rnodes = connection.getRnodes();
-                if (rnodes.isEmpty()) {
-                    // Unroutable connection
-                    continue;
-                }
+                // Set the routed state on those source pins that were actually used
+                NetWrapper netWrapper = e.getValue();
+                for (Connection connection : netWrapper.getConnections()) {
+                    List<Node> nodes = connection.getNodes();
+                    if (nodes.isEmpty()) {
+                        // Unroutable connection
+                        continue;
+                    }
 
-                RouteNode sourceRnode = rnodes.get(rnodes.size() - 1);
-                if (sourceRnode.equals(connection.getSourceRnode())) {
-                    connection.getSource().setRouted(true);
-                } else {
-                    assert(sourceRnode.equals(connection.getAltSourceRnode()));
+                    Node sourceRnode = nodes.get(nodes.size() - 1);
+                    if (sourceRnode.equals(connection.getSource().getConnectedNode())) {
+                        connection.getSource().setRouted(true);
+                    } else {
+                        assert (sourceRnode.equals(altSource.getConnectedNode()));
+                        assert (connection.getSource().equals(source));
+                        altSource.setRouted(true);
+                    }
 
-                    Net net = connection.getNetWrapper().getNet();
-                    assert(connection.getSource().equals(net.getSource()));
-                    net.getAlternateSource().setRouted(true);
+                    if (source.isRouted() && (altSource == null || altSource.isRouted())) {
+                        break;
+                    }
                 }
             }
         }
