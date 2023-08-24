@@ -37,6 +37,10 @@ public class AltPinMapping {
 
     private String altCellType;
 
+    protected AltPinMapping getReferenceCopy() {
+        return new AltPinMapping(logicalName, altCellName, altCellType);
+    }
+
     /**
      * @return the logicalName
      */
