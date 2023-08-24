@@ -417,6 +417,11 @@ public class RWRoute{
                 GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), gns);
             }
             preserveNet(clk, false);
+
+            if (clk.hasPIPs()) {
+                clk.getSource().setRouted(true);
+                assert(clk.getAlternateSource() == null);
+            }
         }
     }
 
