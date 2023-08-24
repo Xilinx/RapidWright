@@ -1254,6 +1254,9 @@ public class DesignTools {
     private static void fullyUnplaceCellHelper(Cell cell, Map<Net, Set<SitePinInst>> deferRemovals) {
         SiteInst siteInst = cell.getSiteInst();
         BEL bel = cell.getBEL();
+        if (siteInst == null || bel == null) {
+            return;
+        }
         // If cell was using shared control signals (CLK, CE, RST), check to see if this was
         // the last cell used and then remove the site routing, site pin, and partial routing if
         // it exists
@@ -1388,7 +1391,7 @@ public class DesignTools {
 
     /**
      * This method will completely remove a placed cell (both logical and physical) from a design.
-     * In the case where the removed cell is the last user of a shared control signal (CLK, CE, SR)
+     * In the case where the removed cell is the last user of a shared control signal (CLK, CE, getSR)
      * then that pin will also be removed and unrouted immediately if deferRemovals is null, otherwise
      * it is added to this map.
      * @param design The design where the cell is instantiated
@@ -1404,13 +1407,16 @@ public class DesignTools {
         design.removeCell(cell);
 
         // Remove Logical Cell
-        for (EDIFPortInst portInst : cell.getEDIFCellInst().getPortInsts()) {
+        // (do not use Cell.getEDIFCellInst() as that requires Cell.getSiteInst())
+        EDIFHierCellInst ehci = design.getNetlist().getHierCellInstFromName(cell.getName());
+        EDIFCellInst eci = ehci.getInst();
+        for (EDIFPortInst portInst : eci.getPortInsts()) {
             EDIFNet en = portInst.getNet();
             if (en != null) {
                 en.removePortInst(portInst);
             }
         }
-        cell.getParentCell().removeCellInst(cell.getEDIFCellInst());
+        eci.getParentCell().removeCellInst(eci);
     }
 
     private static void handlePinRemovals(SitePinInst spi, Map<Net,Set<SitePinInst>> deferRemovals) {
