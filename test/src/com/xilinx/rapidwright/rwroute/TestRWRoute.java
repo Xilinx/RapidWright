@@ -126,8 +126,8 @@ public class TestRWRoute {
     public void testNonTimingDrivenFullRouting() {
         Design design = RapidWrightDCP.loadDCP("bnn.dcp");
         RWRoute.routeDesignFullNonTimingDriven(design);
-        assertAllSinksRouted(design);
         assertAllSourcesRoutedFlagSet(design);
+        assertAllSinksRouted(design);
         assertVivadoFullyRouted(design);
     }
 
@@ -147,8 +147,8 @@ public class TestRWRoute {
     public void testTimingDrivenFullRouting() {
         Design design = RapidWrightDCP.loadDCP("bnn.dcp");
         RWRoute.routeDesignFullTimingDriven(design);
-        assertAllSinksRouted(design);
         assertAllSourcesRoutedFlagSet(design);
+        assertAllSinksRouted(design);
         assertVivadoFullyRouted(design);
     }
 
@@ -167,8 +167,8 @@ public class TestRWRoute {
         Assumptions.assumeTrue(Runtime.getRuntime().maxMemory() >= maxMemoryNeeded);
         Design design = RapidWrightDCP.loadDCP("optical-flow.dcp");
         RWRoute.routeDesignFullNonTimingDriven(design);
-        assertAllSinksRouted(design);
         assertAllSourcesRoutedFlagSet(design);
+        assertAllSinksRouted(design);
         assertVivadoFullyRouted(design);
     }
 
