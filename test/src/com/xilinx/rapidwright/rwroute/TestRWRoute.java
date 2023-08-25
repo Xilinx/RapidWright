@@ -118,13 +118,6 @@ public class TestRWRoute {
         return false;
     }
 
-    @Test
-    public void testNonTimingDrivenFullRoutingWithoutVivado() {
-        Design design = RapidWrightDCP.loadDCP("bnn.dcp");
-        RWRoute.routeDesignFullNonTimingDriven(design);
-        assertAllSourcesRoutedFlagSet(design);
-    }
-
     /**
      * Tests the non-timing driven full routing, i.e., RWRoute running in its wirelength-driven mode.
      * The bnn design from Rosetta benchmarks is used.
