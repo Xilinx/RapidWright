@@ -87,8 +87,8 @@ public class TestRWRoute {
             return;
         }
 
-        // ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
-        // Assertions.assertTrue(rrs.isFullyRouted());
+        ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+        Assertions.assertTrue(rrs.isFullyRouted());
     }
 
     private static void assertAllPinsRouted(Design design) {
