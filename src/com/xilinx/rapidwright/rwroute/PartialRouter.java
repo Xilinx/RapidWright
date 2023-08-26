@@ -183,6 +183,17 @@ public class PartialRouter extends RWRoute {
     }
 
     @Override
+    protected int getNumGlobalPins() {
+        int globalPins = 0;
+        for (Net clk : clkNets) {
+            List<SitePinInst> clkPins = netToPins.getOrDefault(clk, Collections.emptyList());
+            globalPins += clkPins.size();
+        }
+        return globalPins;
+    }
+
+
+    @Override
     protected int getNumConnectionsCrossingSLRs() {
         int numCrossingSLRs = 0;
         for (Connection c : indirectConnections) {

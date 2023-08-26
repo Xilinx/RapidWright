@@ -1649,6 +1649,14 @@ public class RWRoute{
         return indirectConnections.size();
     }
 
+    protected int getNumGlobalPins() {
+        int globalPins = 0;
+        for (Net clk : clkNets) {
+            globalPins += clk.getSinkPins().size();
+        }
+        return globalPins;
+    }
+
     protected int getNumConnectionsCrossingSLRs() {
         int numCrossingSLRs = 0;
         for (Connection c : indirectConnections) {
@@ -1708,16 +1716,13 @@ public class RWRoute{
         printFormattedString("    GLOBAL_CLOCK: ", clkNets.size());
         printFormattedString("    Static nets: ", staticNetAndRoutingTargets.size());
         printFormattedString("    WIRE: ", nets.size());
-        int clkPins = 0;
-        for (Net clk : clkNets) {
-            clkPins += clk.getSinkPins().size();
-        }
         int indirectPins = getNumIndirectConnectionPins();
         int staticPins = getNumStaticNetPins();
+        int clkPins = getNumGlobalPins();
         printFormattedString("  All site pins to be routed: ", (indirectPins + staticPins + clkPins));
         printFormattedString("    Connections to be routed: ", indirectPins);
         printFormattedString("      With SLR crossings: ", getNumConnectionsCrossingSLRs());
-        printFormattedString("    Static net pins: ", getNumStaticNetPins());
+        printFormattedString("    Static net pins: ", staticPins);
         printFormattedString("    Clock pins: ", clkPins);
         printFormattedString("Nets not needing routing: ", numNotNeedingRoutingNets);
         if (numUnrecognizedNets != 0)
