@@ -1349,10 +1349,9 @@ public class DesignTools {
         if (bel.isLUT() && bel.getName().endsWith("5LUT")) {
             String lut6 = bel.getName().replace('5', '6');
             if (siteInst.getCell(lut6) == null) {
-                SitePinInst vccSpi = siteInst.getSitePinInst(lut6.substring(0,2));
-                assert(vccSpi.getNet().getType() == NetType.VCC);
-                siteInst.unrouteIntraSiteNet(vccSpi.getBELPin(), siteInst.getBELPin(lut6, "A6"));
-                handlePinRemovals(vccSpi, deferRemovals);
+                SitePinInst a6Spi = siteInst.getSitePinInst(lut6.substring(0,2));
+                siteInst.unrouteIntraSiteNet(a6Spi.getBELPin(), siteInst.getBELPin(lut6, "A6"));
+                handlePinRemovals(a6Spi, deferRemovals);
             }
         }
 
@@ -1413,12 +1412,19 @@ public class DesignTools {
         cell.getParentCell().removeCellInst(cell.getEDIFCellInst());
     }
 
-    private static void handlePinRemovals(SitePinInst spi, Map<Net,Set<SitePinInst>> deferRemovals) {
-        boolean preserveOtherRoutes = true;
+    /**
+     * Helper method for either removing (and unrouting) a SitePinInst immediately (when deferRemovals is null)
+     * or deferring its removal by putting it into the deferRemovals map.
+     * @param spi SitePinInst object to be removed/unrouted.
+     * @param deferRemovals Optional map for deferring the removal of SitePinInst objects, grouped by their
+     *                      associated Net object.
+     */
+    public static void handlePinRemovals(SitePinInst spi, Map<Net,Set<SitePinInst>> deferRemovals) {
         if (deferRemovals != null) {
             Set<SitePinInst> pins = deferRemovals.computeIfAbsent(spi.getNet(), p -> new HashSet<>());
             pins.add(spi);
         } else {
+            final boolean preserveOtherRoutes = true;
             spi.getNet().removePin(spi, preserveOtherRoutes);
         }
     }
@@ -2192,8 +2198,6 @@ public class DesignTools {
                         String routeThru = possibleRouteThru.getPinMappingsP2L().keySet().iterator().next();
                         queue.add(source.getBEL().getPin(routeThru));
                     }
-                } else {
-                    return Collections.emptyList();
                 }
             } else { // output
                 for (BELPin sink : curr.getSiteConns()) {
@@ -3895,6 +3899,10 @@ public class DesignTools {
      * @param net Net on which pins are to be updated.
      */
     public static void updatePinsIsRouted(Net net) {
+        if (!net.hasPIPs()) {
+            return;
+        }
+
         Queue<Node> queue = new ArrayDeque<>();
         Map<Node, List<Node>> node2fanout = new HashMap<>();
         Map<Node, Set<Node>> bidirNode2nodes = new HashMap<>();
@@ -3949,6 +3957,17 @@ public class DesignTools {
                     queue.add(fanout);
                 }
             }
+        }
+    }
+
+    /**
+     * Update the SitePinInst.isRouted() value of all sink pins in the given
+     * Design. See {@link #updatePinsIsRouted(Net)}.
+     * @param design Design in which pins are to be updated.
+     */
+    public static void updatePinsIsRouted(Design design) {
+        for (Net net : design.getNets()) {
+            updatePinsIsRouted(net);
         }
     }
 }
