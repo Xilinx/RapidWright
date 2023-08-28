@@ -3899,32 +3899,12 @@ public class DesignTools {
      * @param net Net on which pins are to be updated.
      */
     public static void updatePinsIsRouted(Net net) {
-        final boolean hasPIPs = net.hasPIPs();
-
-        Queue<Node> queue = new ArrayDeque<>();
-        Map<Node, List<Node>> node2fanout = new HashMap<>();
-        Map<Node, SitePinInst> node2spi = new HashMap<>();
-        for (SitePinInst spi : net.getPins()) {
-            spi.setRouted(false);
-            if (!hasPIPs) {
-                continue;
-            }
-
-            Node node = spi.getConnectedNode();
-            if (spi.isOutPin()) {
-                queue.add(node);
-
-                if (node2fanout.get(spi.getConnectedNode()) == null) {
-                    continue;
-                }
-            }
-            node2spi.put(spi.getConnectedNode(), spi);
-        }
-
-        if (!hasPIPs) {
+        if (!net.hasPIPs()) {
             return;
         }
 
+        Queue<Node> queue = new ArrayDeque<>();
+        Map<Node, List<Node>> node2fanout = new HashMap<>();
         Map<Node, Set<Node>> bidirNode2nodes = new HashMap<>();
         for (PIP pip : net.getPIPs()) {
             boolean isReversed = pip.isReversed();
@@ -3943,6 +3923,20 @@ public class DesignTools {
                     (net.getType() == NetType.VCC && startNode.isTiedToVcc())) {
                 queue.add(startNode);
             }
+        }
+
+        Map<Node, SitePinInst> node2spi = new HashMap<>();
+        for (SitePinInst spi : net.getPins()) {
+            spi.setRouted(false);
+            Node node = spi.getConnectedNode();
+            if (spi.isOutPin()) {
+                queue.add(node);
+
+                if (node2fanout.get(spi.getConnectedNode()) == null) {
+                    continue;
+                }
+            }
+            node2spi.put(spi.getConnectedNode(), spi);
         }
 
         while (!queue.isEmpty()) {
