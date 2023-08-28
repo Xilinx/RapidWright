@@ -3899,6 +3899,9 @@ public class DesignTools {
      * @param net Net on which pins are to be updated.
      */
     public static void updatePinsIsRouted(Net net) {
+        for (SitePinInst spi : net.getPins()) {
+            spi.setRouted(false);
+        }
         if (!net.hasPIPs()) {
             return;
         }
@@ -3927,7 +3930,6 @@ public class DesignTools {
 
         Map<Node, SitePinInst> node2spi = new HashMap<>();
         for (SitePinInst spi : net.getPins()) {
-            spi.setRouted(false);
             Node node = spi.getConnectedNode();
             if (spi.isOutPin()) {
                 queue.add(node);
