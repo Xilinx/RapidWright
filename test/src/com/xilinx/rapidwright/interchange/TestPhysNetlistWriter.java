@@ -169,7 +169,7 @@ public class TestPhysNetlistWriter {
         StructList.Reader<RouteBranch.Reader> fanouts = net.getSources();
         Assertions.assertEquals(1, fanouts.size());
         RouteBranch.Reader CLUT6_O6_branch = fanouts.get(0);
-        Assertions.assertEquals("BEL_PIN", CLUT6_O6_branch.getRouteSegment().which().toString());
+        Assertions.assertEquals(RouteSegment.Which.BEL_PIN, CLUT6_O6_branch.getRouteSegment().which());
         PhysBelPin.Reader CLUT6_O6 = CLUT6_O6_branch.getRouteSegment().getBelPin();
         Assertions.assertEquals("C6LUT", allStrings.get(CLUT6_O6.getBel()));
         Assertions.assertEquals("O6", allStrings.get(CLUT6_O6.getPin()));
@@ -177,7 +177,7 @@ public class TestPhysNetlistWriter {
         fanouts = CLUT6_O6_branch.getBranches();
         Assertions.assertEquals(1, fanouts.size());
         RouteBranch.Reader C_O_C_O_branch = fanouts.get(0);
-        Assertions.assertEquals("BEL_PIN", C_O_C_O_branch.getRouteSegment().which().toString());
+        Assertions.assertEquals(RouteSegment.Which.BEL_PIN, C_O_C_O_branch.getRouteSegment().which());
         PhysBelPin.Reader C_O_C_O = C_O_C_O_branch.getRouteSegment().getBelPin();
         Assertions.assertEquals("C_O", allStrings.get(C_O_C_O.getBel()));
         Assertions.assertEquals("C_O", allStrings.get(C_O_C_O.getPin()));
@@ -185,7 +185,7 @@ public class TestPhysNetlistWriter {
         fanouts = C_O_C_O_branch.getBranches();
         Assertions.assertEquals(1, fanouts.size());
         RouteBranch.Reader C_O_branch = fanouts.get(0);
-        Assertions.assertEquals("SITE_PIN", C_O_branch.getRouteSegment().which().toString());
+        Assertions.assertEquals(RouteSegment.Which.SITE_PIN, C_O_branch.getRouteSegment().which());
         PhysNetlist.PhysSitePin.Reader C_O = C_O_branch.getRouteSegment().getSitePin();
         Assertions.assertEquals("SLICE_X16Y239", allStrings.get(C_O.getSite()));
         Assertions.assertEquals("C_O", allStrings.get(C_O.getPin()));
