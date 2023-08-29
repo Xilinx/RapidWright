@@ -37,6 +37,8 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SitePIPStatus;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.CellPlacement;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.MultiCellPinMapping;
@@ -355,10 +357,25 @@ public class PhysNetlistWriter {
                             // Skip if cell is not a routethru
                             continue;
                         }
-                        if (cell.getLogicalPinMapping(belPin.getName()) == null) {
-                            // Skip if pin not used (e.g. A1 connects to A[56]LUT.A1;
+                        String logicalPin = cell.getLogicalPinMapping(belPin.getName());
+                        if (logicalPin == null) {
+                            // Skip if pin has no logical mapping (e.g. A1 connects to A[56]LUT.A1;
                             // both cells can exist but not both need be using this pin)
                             continue;
+                        }
+                        EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
+                        if (ehci != null) {
+                            EDIFPortInst epi = ehci.getInst().getPortInst(logicalPin);
+                            if (epi == null || epi.getNet() == null) {
+                                // Skip if pin is not connected to anything (e.g. the low input bits of
+                                // a CARRY8 may be used, but the upper input bits are effectively don't
+                                // care meaning that those upper LUTs can still be used despite hard-wired
+                                // to some CARRY8 inputs)
+                                continue;
+                            }
+                        } else {
+                            // Logical cell unavailable (e.g. logical netlist has been detached)
+                            // Assume connected
                         }
 
                         // Fall through
