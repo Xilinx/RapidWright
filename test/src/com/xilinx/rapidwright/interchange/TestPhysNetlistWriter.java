@@ -156,36 +156,39 @@ public class TestPhysNetlistWriter {
 
         List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
 
-        for (PhysNet.Reader net : physNetlist.getPhysNets()) {
-            String netName = allStrings.get(net.getName());
+        PhysNet.Reader net = null;
+        for (PhysNet.Reader n : physNetlist.getPhysNets()) {
+            String netName = allStrings.get(n.getName());
             if (!netName.equals("processor/alu_decode1_lut/O6"))
                 continue;
 
-            StructList.Reader<RouteBranch.Reader> fanouts = net.getSources();
-            Assertions.assertEquals(1, fanouts.size());
-            RouteBranch.Reader CLUT6_O6_branch = fanouts.get(0);
-            Assertions.assertEquals("BEL_PIN", CLUT6_O6_branch.getRouteSegment().which().toString());
-            PhysBelPin.Reader CLUT6_O6 = CLUT6_O6_branch.getRouteSegment().getBelPin();
-            Assertions.assertEquals("C6LUT", allStrings.get(CLUT6_O6.getBel()));
-            Assertions.assertEquals("O6", allStrings.get(CLUT6_O6.getPin()));
-
-            fanouts = CLUT6_O6_branch.getBranches();
-            Assertions.assertEquals(1, fanouts.size());
-            RouteBranch.Reader C_O_C_O_branch = fanouts.get(0);
-            Assertions.assertEquals("BEL_PIN", C_O_C_O_branch.getRouteSegment().which().toString());
-            PhysBelPin.Reader C_O_C_O = C_O_C_O_branch.getRouteSegment().getBelPin();
-            Assertions.assertEquals("C_O", allStrings.get(C_O_C_O.getBel()));
-            Assertions.assertEquals("C_O", allStrings.get(C_O_C_O.getPin()));
-
-            fanouts = C_O_C_O_branch.getBranches();
-            Assertions.assertEquals(1, fanouts.size());
-            RouteBranch.Reader C_O_branch = fanouts.get(0);
-            Assertions.assertEquals("SITE_PIN", C_O_branch.getRouteSegment().which().toString());
-            PhysNetlist.PhysSitePin.Reader C_O = C_O_branch.getRouteSegment().getSitePin();
-            Assertions.assertEquals("SLICE_X16Y239", allStrings.get(C_O.getSite()));
-            Assertions.assertEquals("C_O", allStrings.get(C_O.getPin()));
+            net = n;
             break;
         }
+
+        StructList.Reader<RouteBranch.Reader> fanouts = net.getSources();
+        Assertions.assertEquals(1, fanouts.size());
+        RouteBranch.Reader CLUT6_O6_branch = fanouts.get(0);
+        Assertions.assertEquals("BEL_PIN", CLUT6_O6_branch.getRouteSegment().which().toString());
+        PhysBelPin.Reader CLUT6_O6 = CLUT6_O6_branch.getRouteSegment().getBelPin();
+        Assertions.assertEquals("C6LUT", allStrings.get(CLUT6_O6.getBel()));
+        Assertions.assertEquals("O6", allStrings.get(CLUT6_O6.getPin()));
+
+        fanouts = CLUT6_O6_branch.getBranches();
+        Assertions.assertEquals(1, fanouts.size());
+        RouteBranch.Reader C_O_C_O_branch = fanouts.get(0);
+        Assertions.assertEquals("BEL_PIN", C_O_C_O_branch.getRouteSegment().which().toString());
+        PhysBelPin.Reader C_O_C_O = C_O_C_O_branch.getRouteSegment().getBelPin();
+        Assertions.assertEquals("C_O", allStrings.get(C_O_C_O.getBel()));
+        Assertions.assertEquals("C_O", allStrings.get(C_O_C_O.getPin()));
+
+        fanouts = C_O_C_O_branch.getBranches();
+        Assertions.assertEquals(1, fanouts.size());
+        RouteBranch.Reader C_O_branch = fanouts.get(0);
+        Assertions.assertEquals("SITE_PIN", C_O_branch.getRouteSegment().which().toString());
+        PhysNetlist.PhysSitePin.Reader C_O = C_O_branch.getRouteSegment().getSitePin();
+        Assertions.assertEquals("SLICE_X16Y239", allStrings.get(C_O.getSite()));
+        Assertions.assertEquals("C_O", allStrings.get(C_O.getPin()));
     }
 
     @Test
@@ -204,6 +207,7 @@ public class TestPhysNetlistWriter {
 
         List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
 
+        int numNetsFound = 0;
         for (PhysNet.Reader net : physNetlist.getPhysNets()) {
             String netName = allStrings.get(net.getName());
             // It's known that all these clock nets are fully routed
@@ -216,6 +220,10 @@ public class TestPhysNetlistWriter {
 
             Assertions.assertEquals(1, net.getSources().size());
             Assertions.assertEquals(0, net.getStubs().size());
+
+            numNetsFound++;
         }
+
+        Assertions.assertEquals(4, numNetsFound);
     }
 }
