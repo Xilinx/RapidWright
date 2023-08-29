@@ -353,5 +353,81 @@ public class TestPhysNetlistWriter {
         Assertions.assertEquals("[SLICE_X15Y237/G6LUT/O6, SLICE_X15Y237/G_O/G_O, SLICE_X15Y237/OUTMUXG/D6, SLICE_X15Y237/OUTMUXG/OUT, SLICE_X16Y236/H_I/H_I, SLICE_X16Y236/H5LUT/DI1, SLICE_X16Y236/G_I/G_I, SLICE_X16Y236/G5LUT/DI1, SLICE_X13Y235/B3/B3, SLICE_X13Y235/B5LUT/A3, SLICE_X13Y235/B6LUT/A3]",
                 belPins.toString());
     }
+
+    @Test
+    public void testSitePIP(@TempDir Path tempDir) throws IOException {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+
+        String interchangePath = tempDir.resolve("design.phys").toString();
+        PhysNetlistWriter.writePhysNetlist(design, interchangePath);
+
+        ReaderOptions rdOptions =
+                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
+                        ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
+        MessageReader readMsg = Interchange.readInterchangeFile(interchangePath, rdOptions);
+
+        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
+
+        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
+
+        PhysNet.Reader net = null;
+        for (PhysNet.Reader n : physNetlist.getPhysNets()) {
+            String netName = allStrings.get(n.getName());
+            if (!netName.equals("processor/active_interrupt_lut/O5"))
+                continue;
+
+            net = n;
+            break;
+        }
+
+        StructList.Reader<RouteBranch.Reader> fanouts = net.getSources();
+        Assertions.assertEquals(1, fanouts.size());
+        RouteBranch.Reader HLUT5_O5_branch = fanouts.get(0);
+        Assertions.assertEquals(RouteSegment.Which.BEL_PIN, HLUT5_O5_branch.getRouteSegment().which());
+        PhysBelPin.Reader HLUT5_O5 = HLUT5_O5_branch.getRouteSegment().getBelPin();
+        Assertions.assertEquals("H5LUT", allStrings.get(HLUT5_O5.getBel()));
+        Assertions.assertEquals("O5", allStrings.get(HLUT5_O5.getPin()));
+
+        fanouts = HLUT5_O5_branch.getBranches();
+        Assertions.assertEquals(1, fanouts.size());
+        RouteBranch.Reader OUTMUXH_D5_branch = fanouts.get(0);
+        Assertions.assertEquals(RouteSegment.Which.BEL_PIN, OUTMUXH_D5_branch.getRouteSegment().which());
+        PhysBelPin.Reader OUTMUXH_D5 = OUTMUXH_D5_branch.getRouteSegment().getBelPin();
+        Assertions.assertEquals("OUTMUXH", allStrings.get(OUTMUXH_D5.getBel()));
+        Assertions.assertEquals("D5", allStrings.get(OUTMUXH_D5.getPin()));
+
+        fanouts = OUTMUXH_D5_branch.getBranches();
+        Assertions.assertEquals(1, fanouts.size());
+        RouteBranch.Reader OUTMUXH_branch = fanouts.get(0);
+        Assertions.assertEquals(RouteSegment.Which.SITE_P_I_P, OUTMUXH_branch.getRouteSegment().which());
+        PhysNetlist.PhysSitePIP.Reader OUTMUXH = OUTMUXH_branch.getRouteSegment().getSitePIP();
+        Assertions.assertEquals("SLICE_X13Y239", allStrings.get(OUTMUXH.getSite()));
+        Assertions.assertEquals("OUTMUXH", allStrings.get(OUTMUXH.getBel()));
+        Assertions.assertEquals("D5", allStrings.get(OUTMUXH.getPin()));
+
+        fanouts = OUTMUXH_branch.getBranches();
+        Assertions.assertEquals(1, fanouts.size());
+        RouteBranch.Reader OUTMUXH_OUT_branch = fanouts.get(0);
+        Assertions.assertEquals(RouteSegment.Which.BEL_PIN, OUTMUXH_OUT_branch.getRouteSegment().which());
+        PhysBelPin.Reader OUTMUXH_OUT = OUTMUXH_OUT_branch.getRouteSegment().getBelPin();
+        Assertions.assertEquals("OUTMUXH", allStrings.get(OUTMUXH_OUT.getBel()));
+        Assertions.assertEquals("OUT", allStrings.get(OUTMUXH_OUT.getPin()));
+
+        fanouts = OUTMUXH_OUT_branch.getBranches();
+        Assertions.assertEquals(1, fanouts.size());
+        RouteBranch.Reader HMUX_HMUX_branch = fanouts.get(0);
+        Assertions.assertEquals(RouteSegment.Which.BEL_PIN, HMUX_HMUX_branch.getRouteSegment().which());
+        PhysBelPin.Reader HMUX_HMUX = HMUX_HMUX_branch.getRouteSegment().getBelPin();
+        Assertions.assertEquals("HMUX", allStrings.get(HMUX_HMUX.getBel()));
+        Assertions.assertEquals("HMUX", allStrings.get(HMUX_HMUX.getPin()));
+
+        fanouts = HMUX_HMUX_branch.getBranches();
+        Assertions.assertEquals(1, fanouts.size());
+        RouteBranch.Reader HMUX_branch = fanouts.get(0);
+        Assertions.assertEquals("SITE_PIN", HMUX_branch.getRouteSegment().which().toString());
+        PhysNetlist.PhysSitePin.Reader HMUX = HMUX_branch.getRouteSegment().getSitePin();
+        Assertions.assertEquals("SLICE_X13Y239", allStrings.get(HMUX.getSite()));
+        Assertions.assertEquals("HMUX", allStrings.get(HMUX.getPin()));
+    }
 }
 }
