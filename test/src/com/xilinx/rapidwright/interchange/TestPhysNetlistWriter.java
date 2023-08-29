@@ -25,8 +25,11 @@ package com.xilinx.rapidwright.interchange;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Queue;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -217,5 +220,56 @@ public class TestPhysNetlistWriter {
             Assertions.assertEquals(1, net.getSources().size());
             Assertions.assertEquals(0, net.getStubs().size());
         }
+    }
+
+    @Test
+    public void testUnconnectedBELPin(@TempDir Path tempDir) throws IOException {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+
+        String interchangePath = tempDir.resolve("design.phys").toString();
+        PhysNetlistWriter.writePhysNetlist(design, interchangePath);
+
+        ReaderOptions rdOptions =
+                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
+                        ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
+        MessageReader readMsg = Interchange.readInterchangeFile(interchangePath, rdOptions);
+
+        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
+
+        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
+
+        PhysNet.Reader net = null;
+        for (PhysNet.Reader n : physNetlist.getPhysNets()) {
+            String netName = allStrings.get(n.getName());
+            if (!netName.equals("processor/alu_result_2"))
+                continue;
+
+            net = n;
+            break;
+        }
+
+        StructList.Reader<RouteBranch.Reader> sources = net.getSources();
+        Assertions.assertEquals(1, sources.size());
+
+        List<String> belPins = new ArrayList<>();
+        Queue<RouteBranch.Reader> queue = new ArrayDeque<>();
+        queue.add(sources.get(0));
+        while (!queue.isEmpty()) {
+            RouteBranch.Reader rb = queue.poll();
+            RouteSegment.Reader rs = rb.getRouteSegment();
+            if (rs.which() == RouteSegment.Which.BEL_PIN) {
+                PhysBelPin.Reader bp = rs.getBelPin();
+                String site = allStrings.get(bp.getSite());
+                String bel = allStrings.get(bp.getBel());
+                String pin = allStrings.get(bp.getPin());
+                belPins.add(site + "/" + bel + "/" + pin);
+            }
+            for (RouteBranch.Reader fanout : rb.getBranches()) {
+                queue.add(fanout);
+            }
+        }
+
+        Assertions.assertEquals("[SLICE_X15Y237/G6LUT/O6, SLICE_X15Y237/G_O/G_O, SLICE_X15Y237/OUTMUXG/D6, SLICE_X15Y237/OUTMUXG/OUT, SLICE_X16Y236/H_I/H_I, SLICE_X16Y236/H5LUT/DI1, SLICE_X16Y236/G_I/G_I, SLICE_X16Y236/G5LUT/DI1, SLICE_X13Y235/B3/B3, SLICE_X13Y235/B5LUT/A3, SLICE_X13Y235/B6LUT/A3]",
+                belPins.toString());
     }
 }
