@@ -150,7 +150,7 @@ public class VivadoTools {
      *                       be loaded with a Tcl script.
      * @return The output of Vivado as a list of Strings
      */
-    public static List<String> createBitstream(Path dcp, Path bitFile, boolean hasEncryptedIP) {
+    public static List<String> writeBitstream(Path dcp, Path bitFile, boolean hasEncryptedIP) {
         final Path outputLog = dcp.getParent().resolve("outputLog.log");
         StringBuilder sb = new StringBuilder();
         sb.append(createTclDCPLoadCommand(dcp, hasEncryptedIP));
@@ -168,10 +168,10 @@ public class VivadoTools {
      * @param bitFile The location of the bit file to generate
      * @return The output of Vivado as a list of Strings
      */
-    public static List<String> createBitstream(Design design, Path bitFile) {
+    public static List<String> writeBitstream(Design design, Path bitFile) {
         Path dcp = writeCheckpoint(design);
         boolean hasEncryptedIP = !design.getNetlist().getEncryptedCells().isEmpty();
-        return createBitstream(dcp, bitFile, hasEncryptedIP);
+        return writeBitstream(dcp, bitFile, hasEncryptedIP);
     }
 
     /**
