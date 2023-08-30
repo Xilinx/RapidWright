@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.util;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.examples.Lesson1;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -70,6 +72,25 @@ public class TestVivadoTools {
         }
 
         Assertions.assertEquals(12144, rrs.unroutedNets);
+    }
+
+    @Test
+    public void testCreateBitstream(@TempDir Path tempDir) {
+        Assumptions.assumeTrue(FileTools.isVivadoOnPath());
+        Path dcpFolder = tempDir.resolve("dcp");
+        FileTools.makeDir(dcpFolder.toString());
+        Path dcp = dcpFolder.resolve("HelloWorld.dcp");
+        Path bit = tempDir.resolve("HelloWorld.bit");
+        Lesson1.main(new String[] { dcp.toString() });
+        List<String> log = VivadoTools.createBitstream(dcp, bit, false);
+        boolean foundSuccess = false;
+        for (String line : log) {
+            if (line.contains("write_bitstream completed successfully")) {
+                foundSuccess = true;
+            }
+        }
+        Assertions.assertTrue(foundSuccess);
+        Assertions.assertTrue(Files.exists(bit));
     }
 }
 
