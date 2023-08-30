@@ -29,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -289,15 +290,15 @@ public class LUTTools {
                     LUT_INIT + " string \'" + init + "'");
     }
 
-    protected static long setBit(long value, int bitIndex) {
+    public static long setBit(long value, int bitIndex) {
         return value | (1L << bitIndex);
     }
 
-    protected static int getBit(int value, int bitIndex) {
+    public static int getBit(int value, int bitIndex) {
         return (value >> bitIndex) & 0x1;
     }
 
-    protected static int getBit(long value, int bitIndex) {
+    public static int getBit(long value, int bitIndex) {
         return (int)(value >> bitIndex) & 0x1;
     }
 
@@ -372,6 +373,11 @@ public class LUTTools {
      * @return The equation following LUT equation syntax or null if cell is not configured.
      */
     public static String getLUTEquation(Cell c) {
+        if (c.isRoutethru()) {
+            Set<Entry<String, String>> entrySet = c.getPinMappingsP2L().entrySet();
+            assert (entrySet.size() == 1);
+            return "O" + c.getBELName().charAt(1) + "=" + entrySet.iterator().next().getKey();
+        }
         return getLUTEquation(c.getEDIFCellInst());
     }
 
