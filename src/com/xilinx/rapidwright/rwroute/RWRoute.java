@@ -304,14 +304,13 @@ public class RWRoute{
                 addStaticNetRoutingTargets(net);
 
             } else if (net.getType().equals(NetType.WIRE)) {
-                if (RouterHelper.isRoutableNetWithSourceSinks(net)) {
+                if (RouterHelper.isDriverLessOrLoadLessNet(net) ||
+                        RouterHelper.isInternallyRoutedNet(net) ||
+                        net.getName().equals(Net.Z_NET)) {
+                    preserveNet(net, true);
+                    numNotNeedingRoutingNets++;
+                } else if (RouterHelper.isRoutableNetWithSourceSinks(net)) {
                     addNetConnectionToRoutingTargets(net);
-                } else if (RouterHelper.isDriverLessOrLoadLessNet(net)) {
-                    preserveNet(net, true);
-                    numNotNeedingRoutingNets++;
-                } else if (RouterHelper.isInternallyRoutedNet(net)) {
-                    preserveNet(net, true);
-                    numNotNeedingRoutingNets++;
                 } else {
                     numNotNeedingRoutingNets++;
                 }
