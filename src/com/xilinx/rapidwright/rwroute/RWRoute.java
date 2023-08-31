@@ -846,22 +846,25 @@ public class RWRoute{
                 // Set the routed state on those source pins that were actually used
                 NetWrapper netWrapper = e.getValue();
                 for (Connection connection : netWrapper.getConnections()) {
-                    List<Node> nodes = connection.getNodes();
-                    if (nodes.isEmpty()) {
+                    List<RouteNode> rnodes = connection.getRnodes();
+                    if (rnodes.isEmpty()) {
                         // Unroutable connection
                         continue;
                     }
 
-                    Node sourceRnode = nodes.get(nodes.size() - 1);
-                    if (sourceRnode.equals(connection.getSource().getConnectedNode())) {
+                    // Set the routed state of the used source node
+                    RouteNode sourceRnode = rnodes.get(rnodes.size() - 1);
+                    if (sourceRnode.equals(connection.getSourceRnode())) {
                         connection.getSource().setRouted(true);
                     } else {
-                        assert (sourceRnode.equals(altSource.getConnectedNode()));
-                        assert (connection.getSource().equals(source));
+                        // Source used must have been the Net's alternate source
+                        assert(sourceRnode.equals(connection.getAltSourceRnode()));
+                        assert(!altSource.equals(connection.getSource()));
                         altSource.setRouted(true);
                     }
 
                     if (source.isRouted() && (altSource == null || altSource.isRouted())) {
+                        // Break if all sources have been set to be routed
                         break;
                     }
                 }
