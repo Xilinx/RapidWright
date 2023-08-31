@@ -1387,30 +1387,32 @@ public class RWRoute{
         } while ((rnode = rnode.getPrev()) != null);
 
         List<RouteNode> rnodes = connection.getRnodes();
+        if (rnodes.size() == 1) {
+            // No prev pointer from sink rnode -> not routed
+            return false;
+        }
+
         RouteNode sourceRnode = rnodes.get(rnodes.size()-1);
         if (!sourceRnode.equals(connection.getSourceRnode())) {
+            // Used source node is different to the one set on the connection
             Net net = connection.getNetWrapper().getNet();
-            SitePinInst altSource = DesignTools.getLegalAlternativeOutputPin(net);
-            if (altSource != null) {
-                if (net.getAlternateSource() == null) {
-                    DesignTools.routeAlternativeOutputSitePin(net, altSource);
-                }
-                if (altSource == connection.getSource()) {
-                    // This connection is already using the alternate source.
-                    // Swap back to primary source
-                    altSource = net.getSource();
-                }
-                Node altSourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-                if (sourceRnode.getNode().equals(altSourceINTNode)) {
-                    RouteNode altSourceRnode = sourceRnode;
-                    connection.setSource(altSource);
-                    connection.setSourceRnode(altSourceRnode);
-                } else {
-                    return false;
-                }
+
+            // Update connection's source SPI
+            assert(sourceRnode.equals(connection.getAltSourceRnode()));
+            if (connection.getSource() == net.getSource()) {
+                // Swap to alternate source
+                connection.setSource(net.getAlternateSource());
+            } else if (connection.getSource() == net.getAlternateSource()) {
+                // Swap back to main source
+                connection.setSource(net.getSource());
             } else {
-                return false;
+                // Backtracked to neither the net's source nor its alternate source
+                throw new RuntimeException("Backtracking terminated at unexpected rnode: " + rnode);
             }
+
+            // Swap source rnode
+            connection.setAltSourceRnode(connection.getSourceRnode());
+            connection.setSourceRnode(sourceRnode);
         }
 
         return true;
