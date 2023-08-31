@@ -22,12 +22,13 @@
 
 package com.xilinx.rapidwright.util;
 
-import com.xilinx.rapidwright.support.RapidWrightDCP;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestCodeGenerator {
 
@@ -49,7 +50,7 @@ public class TestCodeGenerator {
                 "Design design = new Design(\"top\", \"xc7a35tcpg236-1\");\n" +
                 "Device device = design.getDevice();\n" +
                 "\n" +
-                "Net net = TestDesignHelper.createTestNet(design, \"net\", new String[]{\n" +
+                "Net net = com.xilinx.rapidwright.util.CodeGenerator.createTestNet(design, \"net\", new String[]{\n" +
                 "        \"LIOI3_X0Y1/LIOI3.LIOI_IBUF1->LIOI_I1\",\n" +
                 "        \"LIOI3_X0Y1/LIOI3.LIOI_I1->LIOI_ILOGIC1_D\",\n" +
                 "        \"LIOI3_X0Y1/LIOI3.LIOI_ILOGIC1_D->>IOI_ILOGIC1_O\",\n" +
@@ -61,8 +62,12 @@ public class TestCodeGenerator {
                 "        \"INT_L_X2Y0/INT_L.BYP_ALT1->>BYP_L1\",\n" +
                 "        \"CLBLL_L_X2Y0/CLBLL_L.CLBLL_BYP1->CLBLL_LL_AX\"\n" +
                 "});\n" +
+                "SiteInst si1 = design.createSiteInst(device.getSite(\"IOB_X0Y1\"));\n" +
+                "net.createPin(\"I\", si1);\n" +
+                "SiteInst si2 = design.createSiteInst(device.getSite(\"SLICE_X0Y0\"));\n" +
+                "net.createPin(\"AX\", si2);\n" +
                 "\n" +
-                "SiteInst si = design.createSiteInst(design.getDevice().getSite(\"SLICE_X0Y0\"));\n";
+                "SiteInst si3 = design.createSiteInst(device.getSite(\"SLICE_X0Y0\"));\n";
 
         Assertions.assertEquals(expectedString, actualString);
 
@@ -70,13 +75,13 @@ public class TestCodeGenerator {
         siteInsts.add("IOB_X0Y1");
 
         actualString = CodeGenerator.testNetGenerator(dcpName, nets, siteInsts);
-        System.out.println(actualString);
+
 
         expectedString =
                 "Design design = new Design(\"top\", \"xc7a35tcpg236-1\");\n" +
                 "Device device = design.getDevice();\n" +
                 "\n" +
-                "Net net0 = TestDesignHelper.createTestNet(design, \"net0\", new String[]{\n" +
+                "Net net0 = com.xilinx.rapidwright.util.CodeGenerator.createTestNet(design, \"net0\", new String[]{\n" +
                 "        \"LIOI3_X0Y1/LIOI3.LIOI_IBUF1->LIOI_I1\",\n" +
                 "        \"LIOI3_X0Y1/LIOI3.LIOI_I1->LIOI_ILOGIC1_D\",\n" +
                 "        \"LIOI3_X0Y1/LIOI3.LIOI_ILOGIC1_D->>IOI_ILOGIC1_O\",\n" +
@@ -88,7 +93,11 @@ public class TestCodeGenerator {
                 "        \"INT_L_X2Y0/INT_L.BYP_ALT1->>BYP_L1\",\n" +
                 "        \"CLBLL_L_X2Y0/CLBLL_L.CLBLL_BYP1->CLBLL_LL_AX\"\n" +
                 "});\n" +
-                "Net net1 = TestDesignHelper.createTestNet(design, \"net1\", new String[]{\n" +
+                "SiteInst si1 = design.createSiteInst(device.getSite(\"IOB_X0Y1\"));\n" +
+                "net0.createPin(\"I\", si1);\n" +
+                "SiteInst si2 = design.createSiteInst(device.getSite(\"SLICE_X0Y0\"));\n" +
+                "net0.createPin(\"AX\", si2);\n" +
+                "Net net1 = com.xilinx.rapidwright.util.CodeGenerator.createTestNet(design, \"net1\", new String[]{\n" +
                 "        \"LIOI3_SING_X0Y0/LIOI3_SING.LIOI_IBUF0->LIOI_I0\",\n" +
                 "        \"LIOI3_SING_X0Y0/LIOI3_SING.LIOI_I0->LIOI_ILOGIC0_D\",\n" +
                 "        \"LIOI3_SING_X0Y0/LIOI3_SING.LIOI_ILOGIC0_D->>IOI_ILOGIC0_O\",\n" +
@@ -98,10 +107,14 @@ public class TestCodeGenerator {
                 "        \"INT_L_X2Y0/INT_L.EE2END0->>IMUX_L1\",\n" +
                 "        \"CLBLL_L_X2Y0/CLBLL_L.CLBLL_IMUX1->CLBLL_LL_A3\"\n" +
                 "});\n" +
+                "SiteInst si3 = design.createSiteInst(device.getSite(\"IOB_X0Y0\"));\n" + 
+                "net1.createPin(\"I\", si3);\n" +
+                "SiteInst si4 = design.createSiteInst(device.getSite(\"SLICE_X0Y0\"));\n" +
+                "net1.createPin(\"A3\", si4);\n" +
                 "\n" +
-                "SiteInst si0 = design.createSiteInst(design.getDevice().getSite(\"SLICE_X0Y0\"));\n" +
-                "SiteInst si1 = design.createSiteInst(design.getDevice().getSite(\"IOB_X0Y1\"));\n";
-
+                "SiteInst si5 = design.createSiteInst(device.getSite(\"SLICE_X0Y0\"));\n" +
+                "SiteInst si6 = design.createSiteInst(device.getSite(\"IOB_X0Y1\"));\n";
+        System.out.println(actualString);
         Assertions.assertEquals(expectedString, actualString);
     }
 }
