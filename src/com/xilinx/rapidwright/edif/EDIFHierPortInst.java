@@ -173,7 +173,8 @@ public class EDIFHierPortInst {
     }
 
     public EDIFHierNet getHierarchicalNet() {
-        return new EDIFHierNet(hierarchicalInst, portInst.getNet());
+        EDIFNet net = getNet();
+        return (net != null) ? new EDIFHierNet(hierarchicalInst, net) : null;
     }
 
     public boolean isOutput() {
