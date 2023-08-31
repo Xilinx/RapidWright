@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map.Entry;
 
 /**
  * An {@link EDIFCellInst} with its hierarchy, described by all the {@link EDIFCellInst}s that sit above it within
@@ -307,5 +308,26 @@ public class EDIFHierCellInst {
     @Override
     public String toString() {
         return getFullHierarchicalInstName();
+    }
+
+    /**
+     * Creates a reference copy of this cell instance--a deep copy of the instance
+     * without this new instance being referenced in the design or netlist object.
+     * 
+     * @return The newly created reference copy of this instance.
+     */
+    public EDIFHierCellInst getReferenceCopy() {
+        EDIFCellInst[] copyInsts = new EDIFCellInst[cellInsts.length];
+        for (int i = 0; i < copyInsts.length; i++) {
+            EDIFCellInst ref = cellInsts[i];
+            EDIFCellInst copy = new EDIFCellInst();
+            copy.setName(ref.getName());
+            copy.setCellType(ref.getCellType());
+            for (Entry<String, EDIFPropertyValue> e : ref.getPropertiesMap().entrySet()) {
+                copy.addProperty(e.getKey(), new EDIFPropertyValue(e.getValue()));
+            }
+            copyInsts[i] = copy;
+        }
+        return new EDIFHierCellInst(copyInsts);
     }
 }

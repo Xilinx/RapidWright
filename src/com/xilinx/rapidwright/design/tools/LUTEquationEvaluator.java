@@ -28,7 +28,7 @@ package com.xilinx.rapidwright.design.tools;
  * Helper class to parse LUT equations.
  * @author clavin
  */
-class LUTEquationEvaluator {
+public class LUTEquationEvaluator {
 
     public static final char XOR = '^';
     public static final char XOR2 = '@';

@@ -124,21 +124,24 @@ public class RouterHelper {
         Node intNode = output.getConnectedNode();
         int watchdog = 5;
 
-        while (intNode.getAllDownhillNodes().get(0).getTile().getTileTypeEnum() != TileTypeEnum.INT) {
-            List<Node> downhills = intNode.getAllDownhillNodes();
-            intNode = downhills.get(0);
-            if (downhills.size() > 1) {
+        List<Node> downhillNodes = intNode.getAllDownhillNodes();
+        if (downhillNodes.isEmpty()) {
+            return null;
+        }
+        while (downhillNodes.get(0).getTile().getTileTypeEnum() != TileTypeEnum.INT) {
+            intNode = downhillNodes.get(0);
+            if (downhillNodes.size() > 1) {
                 int i = 1;
                 while (intNode.getAllDownhillNodes().size() == 0) {
-                    intNode = downhills.get(i);
+                    intNode = downhillNodes.get(i);
                     i++;
                 }
             }
             watchdog--;
             if (intNode.getAllDownhillNodes().size() == 0 || watchdog < 0) {
-                intNode = null;
-                break;
+                return null;
             }
+            downhillNodes = intNode.getAllDownhillNodes();
         }
         return intNode;
     }
@@ -197,19 +200,41 @@ public class RouterHelper {
         return getPIPsFromNodes(connection.getNodes());
     }
 
-
     /**
      * Gets a list of {@link PIP} instances from a list of {@link Node} instances.
-     * @param connectionNodes The list of nodes of a routed {@link Connection} instance.
+     * 
+     * @param connectionNodes The list of nodes of a routed {@link Connection}
+     *                        instance.
      * @return A list of PIPs generated from the list of nodes.
      */
     public static List<PIP> getPIPsFromNodes(List<Node> connectionNodes) {
+        return getPIPsFromNodes(connectionNodes, false);
+    }
+
+    /**
+     * Gets a list of {@link PIP} instances from a list of {@link Node} instances.
+     * 
+     * @param connectionNodes The list of nodes of a routed {@link Connection}
+     *                        instance.
+     * @param srcToSinkOrder  Specifies the order of the connection nodes. True
+     *                        indicates the first node is the source and the last
+     *                        is the sink. False indicates the opposite.
+     * @return A list of PIPs generated from the list of nodes.
+     */
+    public static List<PIP> getPIPsFromNodes(List<Node> connectionNodes, boolean srcToSinkOrder) {
         List<PIP> connectionPIPs = new ArrayList<>();
         if (connectionNodes == null) return connectionPIPs;
-        // Nodes of a connection are added to the list starting from its sink to its source
+        // Nodes of a connection are added to the list starting from its sink to its
+        // source -- unless srcToSinkOrder is true (as is the case in static routing)
+        int driverOffsetIdx = 1;
+        int loadOffsetIdx = 0;
+        if (srcToSinkOrder) {
+            driverOffsetIdx = 0;
+            loadOffsetIdx = 1;
+        }
         for (int i = 0; i < connectionNodes.size() - 1; i++) {
-            Node driver = connectionNodes.get(i+1);
-            Node load = connectionNodes.get(i);
+            Node driver = connectionNodes.get(i + driverOffsetIdx);
+            Node load = connectionNodes.get(i + loadOffsetIdx);
             PIP pip = findPIPbetweenNodes(driver, load);
             if (pip != null) {
                 connectionPIPs.add(pip);
@@ -249,6 +274,9 @@ public class RouterHelper {
             if (wire.getTile().equals(loadTile)) {
                 pip = loadTile.getPIP(wire.getWireIndex(), loadWire);
                 if (pip != null) {
+                    if (pip.isBidirectional() && pip.getStartWireIndex() == loadWire) {
+                        pip.setIsReversed(true);
+                    }
                     break;
                 }
             }
@@ -268,8 +296,12 @@ public class RouterHelper {
                 return p;
         }
         for (PIP p : driver.getAllUphillPIPs()) {
-            if (p.getStartNode().equals(load))
+            if (p.getStartNode().equals(load)) {
+                if (p.isBidirectional()) {
+                    p.setIsReversed(true);
+                }
                 return p;
+            }
         }
         return null;
     }
