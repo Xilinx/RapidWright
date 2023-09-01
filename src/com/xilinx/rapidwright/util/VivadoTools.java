@@ -120,19 +120,58 @@ public class VivadoTools {
      * @return ReportRouteStatusResult object.
      */
     public static ReportRouteStatusResult reportRouteStatus(Design design) {
+        final Path dcp = writeCheckpoint(design);
+        boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
+        ReportRouteStatusResult rrs = reportRouteStatus(dcp, dcp.getParent(), encrypted);
+
+        FileTools.deleteFolder(dcp.getParent().toString());
+
+        return rrs;
+    }
+
+    private static Path writeCheckpoint(Design design) {
         final Path workdir = FileSystems.getDefault()
                 .getPath("vivadoToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
         File workdirHandle = new File(workdir.toString());
         workdirHandle.mkdirs();
         final Path dcp = workdir.resolve("checkpoint.dcp");
         design.writeCheckpoint(dcp);
+        return dcp;
+    }
 
-        boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
-        ReportRouteStatusResult rrs = reportRouteStatus(dcp, workdir, encrypted);
+    /**
+     * Run Vivado's `write_bitstream` on the provided DCP file to generate a bit
+     * file at the specified location.
+     * 
+     * @param dcp            The DCP file from which to generate a bitstream.
+     * @param bitFile        The location of the bit file to generate
+     * @param hasEncryptedIP Flag indicating if the provided DCP contains encrypted
+     *                       IP and was written by RapidWright such that it needs to
+     *                       be loaded with a Tcl script.
+     * @return The output of Vivado as a list of Strings
+     */
+    public static List<String> writeBitstream(Path dcp, Path bitFile, boolean hasEncryptedIP) {
+        final Path outputLog = dcp.getParent().resolve("outputLog.log");
+        StringBuilder sb = new StringBuilder();
+        sb.append(createTclDCPLoadCommand(dcp, hasEncryptedIP));
+        sb.append("write_bitstream " + bitFile.toString());
+        List<String> log = VivadoTools.runTcl(outputLog, sb.toString(), true);
+        FileTools.deleteFolder(dcp.getParent().toString());
+        return log;
+    }
 
-        FileTools.deleteFolder(workdir.toString());
-
-        return rrs;
+    /**
+     * Run Vivado's `write_bitstream` on the provided design to generate a bit file
+     * at the specified location.
+     * 
+     * @param design  The design from which to generate a bitstream.
+     * @param bitFile The location of the bit file to generate
+     * @return The output of Vivado as a list of Strings
+     */
+    public static List<String> writeBitstream(Design design, Path bitFile) {
+        Path dcp = writeCheckpoint(design);
+        boolean hasEncryptedIP = !design.getNetlist().getEncryptedCells().isEmpty();
+        return writeBitstream(dcp, bitFile, hasEncryptedIP);
     }
 
     /**
@@ -180,15 +219,19 @@ public class VivadoTools {
         final Path outputLog = workdir.resolve("outputLog.log");
 
         StringBuilder sb = new StringBuilder();
-        if (encrypted) {
-            Path tclFileName = FileTools.replaceExtension(dcp.getFileName(), EDIFTools.LOAD_TCL_SUFFIX);
-            sb.append("source " + tclFileName + "; ");
-        } else {
-            sb.append("open_checkpoint " + dcp + "; ");
-        }
+        sb.append(createTclDCPLoadCommand(dcp, encrypted));
         sb.append(REPORT_ROUTE_STATUS);
 
         List<String> log = VivadoTools.runTcl(outputLog, sb.toString(), true);
         return new ReportRouteStatusResult(log);
+    }
+
+    private static String createTclDCPLoadCommand(Path dcp, boolean encrypted) {
+        if (encrypted) {
+            Path tclFileName = FileTools.replaceExtension(dcp.getFileName(), EDIFTools.LOAD_TCL_SUFFIX);
+            return "source " + tclFileName + "; ";
+        } else {
+            return "open_checkpoint " + dcp + "; ";
+        }
     }
 }

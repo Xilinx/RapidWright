@@ -39,7 +39,11 @@ def start_jvm():
             url = "http://github.com/Xilinx/RapidWright/releases/download/v"+version+"-beta/" + file_name
             urllib.request.urlretrieve(url,classpath)
         kwargs['classpath'] = classpath
-        
+    if not os.environ.get('CLASSPATH'):
+        rwPath = os.environ.get('RAPIDWRIGHT_PATH')
+        classpath = rwPath + "/bin:" + rwPath + "/jars/*"
+        print("ERROR: RAPIDWRIGHT_PATH is set but CLASSPATH is not set.  Please set CLASSPATH=" + classpath)
+        exit(1)
     if not jpype.isJVMStarted():
         jpype.startJVM(**kwargs)
 

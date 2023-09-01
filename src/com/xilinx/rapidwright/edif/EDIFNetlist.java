@@ -989,7 +989,7 @@ public class EDIFNetlist extends EDIFName {
 
         Map<EDIFHierNet,EDIFHierNet> parentNetMap = getParentNetMap();
         EDIFHierNet parentNetName = parentNetMap.get(p.getHierarchicalNet());
-        Net n = d.getNet(parentNetName.getHierarchicalNetName());
+        Net n = parentNetName == null ? null : d.getNet(parentNetName.getHierarchicalNetName());
         if (n == null) {
             if (parentNetName == null) {
                 // Maybe it is GND/VCC

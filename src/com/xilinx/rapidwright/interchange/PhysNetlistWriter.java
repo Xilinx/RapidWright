@@ -454,9 +454,11 @@ public class PhysNetlistWriter {
                             PIP pip = driverBranch.getPIP();
                             if (pip.isBidirectional() && rb.getType() == RouteSegmentType.PIP) {
                                 PIP curr = rb.getPIP();
+                                Node currNode = !curr.isReversed() ?
+                                                curr.getStartNode() : curr.getEndNode();
                                 Node driverNode = pip.isReversed() ?
                                                   pip.getStartNode() : pip.getEndNode();
-                                if (!curr.getStartNode().equals(driverNode)) {
+                                if (!currNode.equals(driverNode)) {
                                     continue;
                                 }
                             }
