@@ -114,7 +114,6 @@ public class TestCodeGenerator {
                 "\n" +
                 "SiteInst si5 = design.createSiteInst(device.getSite(\"SLICE_X0Y0\"));\n" +
                 "SiteInst si6 = design.createSiteInst(device.getSite(\"IOB_X0Y1\"));\n";
-        System.out.println(actualString);
         Assertions.assertEquals(expectedString, actualString);
     }
 }
