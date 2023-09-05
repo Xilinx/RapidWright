@@ -3325,8 +3325,21 @@ public class DesignTools {
     public static List<PIP> getConnectionPIPs(SitePinInst sinkPin) {
         if (sinkPin.isOutPin() || sinkPin.getNet() == null) return Collections.emptyList();
         Map<Node, PIP> reverseNodeToPIPMap = new HashMap<>();
+        List<PIP> biDirs = null;
         for (PIP p : sinkPin.getNet().getPIPs()) {
-            reverseNodeToPIPMap.put(p.getEndNode(), p);
+            PIP collision = reverseNodeToPIPMap.put(p.getEndNode(), p);
+            if (collision != null) {
+                if (p.isBidirectional()) {
+                    // Put back the original if trying to add a bi-directional PIP
+                    reverseNodeToPIPMap.put(collision.getEndNode(), collision);
+                }
+            }
+            if (p.isBidirectional()) {
+                if (biDirs == null) {
+                    biDirs = new ArrayList<>(1);
+                }
+                biDirs.add(p);
+            }
         }
 
         Node sinkNode = sinkPin.getConnectedNode();
@@ -3334,8 +3347,17 @@ public class DesignTools {
         Node curr = sinkNode;
 
         List<PIP> path = new ArrayList<>();
-        while (!curr.equals(srcNode)) {
+        loop: while (!curr.equals(srcNode)) {
             PIP pip = reverseNodeToPIPMap.get(curr);
+            if (pip == null) {
+                for (PIP biDirPIP : biDirs) {
+                    if (biDirPIP.getStartNode().equals(curr)) {
+                        path.add(biDirPIP);
+                        curr = biDirPIP.getEndNode();
+                        continue loop;
+                    }
+                }
+            }
             path.add(pip);
             curr = pip.getStartNode();
         }
