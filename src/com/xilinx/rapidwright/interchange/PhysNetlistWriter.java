@@ -174,7 +174,21 @@ public class PhysNetlistWriter {
                     j++;
                 }
             }
-            Builder<PinMapping.Builder> pinMap = physCell.initPinMap(cell.getPinMappingsP2L().size()
+
+            EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
+            int numPinMappings;
+            if (ehci == null) {
+                numPinMappings = cell.getPinMappingsP2L().size();
+            } else {
+                numPinMappings = 0;
+                for (Entry<String, String> e : cell.getPinMappingsP2L().entrySet()) {
+                    String logicalPin = e.getValue();
+                    EDIFPortInst epi = ehci.getInst().getPortInst(logicalPin);
+                    numPinMappings += (epi != null && epi.getNet() != null) ? 1 : 0;
+                }
+            }
+
+            Builder<PinMapping.Builder> pinMap = physCell.initPinMap(numPinMappings
                  + additionalPinMappings);
             int idx = addCellPinMappings(cell, strings, pinMap, 0);
             if (otherBels != null) {
@@ -201,7 +215,13 @@ public class PhysNetlistWriter {
 
     private static int addCellPinMappings(Cell cell, StringEnumerator strings,
                                             Builder<PinMapping.Builder> pinMap, Integer idx) {
+        EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
         for (Entry<String,String> e : cell.getPinMappingsP2L().entrySet()) {
+            EDIFPortInst epi = (ehci != null) ? ehci.getInst().getPortInst(e.getValue()) : null;
+            if (ehci != null && (epi == null || epi.getNet() == null)) {
+                // Skip pin mapping if we know this port isn't connected
+                continue;
+            }
             PinMapping.Builder pinMapping = pinMap.get(idx);
             pinMapping.setBel(strings.getIndex(cell.getBELName()));
             pinMapping.setCellPin(strings.getIndex(e.getValue()));
