@@ -178,8 +178,11 @@ public class PhysNetlistWriter {
             EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
             int numPinMappings;
             if (ehci == null) {
+                // Logical cell unavailable (e.g. logical netlist has been detached)
+                // Assume connected and propagate all pin mappings
                 numPinMappings = cell.getPinMappingsP2L().size();
             } else {
+                // Only write out pin mappings where a net is connected
                 numPinMappings = 0;
                 for (Entry<String, String> e : cell.getPinMappingsP2L().entrySet()) {
                     String logicalPin = e.getValue();
