@@ -120,6 +120,12 @@ public class PhysNetlistWriter {
         return cellName;
     }
 
+    private static EDIFHierCellInst getEDIFHierCellInst(Cell cell) {
+        Design design = cell.getSiteInst().getDesign();
+        return design.getNetlist() != null ? cell.getEDIFHierCellInst() : null;
+    }
+
+
     protected static void writePlacement(PhysNetlist.Builder physNetlist, Design design,
                                          StringEnumerator strings) {
         writePlacement(physNetlist, design, strings, design.getSiteInsts());
@@ -175,7 +181,7 @@ public class PhysNetlistWriter {
                 }
             }
 
-            EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
+            EDIFHierCellInst ehci = getEDIFHierCellInst(cell);
             int numPinMappings;
             if (ehci == null) {
                 numPinMappings = cell.getPinMappingsP2L().size();
@@ -215,7 +221,7 @@ public class PhysNetlistWriter {
 
     private static int addCellPinMappings(Cell cell, StringEnumerator strings,
                                             Builder<PinMapping.Builder> pinMap, Integer idx) {
-        EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
+        EDIFHierCellInst ehci = getEDIFHierCellInst(cell);
         for (Entry<String,String> e : cell.getPinMappingsP2L().entrySet()) {
             EDIFPortInst epi = (ehci != null) ? ehci.getInst().getPortInst(e.getValue()) : null;
             if (ehci != null && (epi == null || epi.getNet() == null)) {
@@ -382,7 +388,7 @@ public class PhysNetlistWriter {
                                 // both cells can exist but not both need be using this pin)
                                 continue;
                             }
-                            EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
+                            EDIFHierCellInst ehci = getEDIFHierCellInst(cell);
                             if (ehci != null) {
                                 EDIFPortInst epi = ehci.getInst().getPortInst(logicalPin);
                                 if (epi == null || epi.getNet() == null) {
