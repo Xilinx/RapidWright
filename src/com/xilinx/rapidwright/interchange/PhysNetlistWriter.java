@@ -369,33 +369,48 @@ public class PhysNetlistWriter {
                 boolean routethru = false;
                 if (belPin.isInput()) {
                     if (bel.getBELClass() == BELClass.BEL) {
-                        if (cell == null) {
-                            // Skip if nothing placed here
-                            continue;
-                        }
-                        if (!VERBOSE_PHYSICAL_NET_ROUTING && !cell.isRoutethru()) {
-                            // Skip if cell is not a routethru
-                            continue;
-                        }
-                        String logicalPin = cell.getLogicalPinMapping(belPin.getName());
-                        if (logicalPin == null) {
-                            // Skip if pin has no logical mapping (e.g. A1 connects to A[56]LUT.A1;
-                            // both cells can exist but not both need be using this pin)
-                            continue;
-                        }
-                        EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
-                        if (ehci != null) {
-                            EDIFPortInst epi = ehci.getInst().getPortInst(logicalPin);
-                            if (epi == null || epi.getNet() == null) {
-                                // Skip if pin is not connected to anything (e.g. the low input bits of
-                                // a CARRY8 may be used, but the upper input bits are effectively don't
-                                // care meaning that those upper LUTs can still be used despite hard-wired
-                                // to some CARRY8 inputs)
+                        if (cell != null) {
+                            // A cell is placed here
+
+                            if (!VERBOSE_PHYSICAL_NET_ROUTING && !cell.isRoutethru()) {
+                                // Skip if cell is not a routethru
                                 continue;
                             }
+                            String logicalPin = cell.getLogicalPinMapping(belPin.getName());
+                            if (logicalPin == null) {
+                                // Skip if pin has no logical mapping (e.g. A1 connects to A[56]LUT.A1;
+                                // both cells can exist but not both need be using this pin)
+                                continue;
+                            }
+                            EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
+                            if (ehci != null) {
+                                EDIFPortInst epi = ehci.getInst().getPortInst(logicalPin);
+                                if (epi == null || epi.getNet() == null) {
+                                    // Skip if pin is not connected to anything (e.g. the low input bits of
+                                    // a CARRY8 may be used, but the upper input bits are effectively don't
+                                    // care meaning that those upper LUTs can still be used despite hard-wired
+                                    // to some CARRY8 inputs)
+                                    continue;
+                                }
+                            } else {
+                                // Logical cell unavailable (e.g. logical netlist has been detached)
+                                // Assume connected
+                            }
                         } else {
-                            // Logical cell unavailable (e.g. logical netlist has been detached)
-                            // Assume connected
+                            // No cell placed on this BEL; check for FF routethrus
+
+                            if (bel.isFF()) {
+                                BELPin belPinQ = bel.getPin("Q");
+                                String siteWireName = belPinQ.getSiteWireName();
+                                if (siteInst.getNetFromSiteWire(siteWireName) != net) {
+                                    continue;
+                                }
+
+                                // Net on output pin of BEL is same as input pin -- must be a routethru
+                            } else {
+                                // BEL is not FF
+                                continue;
+                            }
                         }
 
                         // Fall through
