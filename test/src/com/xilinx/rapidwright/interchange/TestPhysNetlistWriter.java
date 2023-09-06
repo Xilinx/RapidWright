@@ -25,8 +25,11 @@ package com.xilinx.rapidwright.interchange;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Queue;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -353,5 +356,4 @@ public class TestPhysNetlistWriter {
         Assertions.assertEquals("[SLICE_X15Y237/G6LUT/O6, SLICE_X15Y237/G_O/G_O, SLICE_X15Y237/OUTMUXG/D6, SLICE_X15Y237/OUTMUXG/OUT, SLICE_X16Y236/H_I/H_I, SLICE_X16Y236/H5LUT/DI1, SLICE_X16Y236/G_I/G_I, SLICE_X16Y236/G5LUT/DI1, SLICE_X13Y235/B3/B3, SLICE_X13Y235/B5LUT/A3, SLICE_X13Y235/B6LUT/A3]",
                 belPins.toString());
     }
-}
 }
