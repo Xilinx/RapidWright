@@ -168,7 +168,7 @@ public class RouteBranchNode {
             }
             case SITE_PIP:{
                 SiteSitePIP sitePIP = getSitePIP();
-                BELPin belPinSrc = sitePIP.sitePIP.getInputPin().getSourcePin();
+                BELPin belPinSrc = sitePIP.sitePIP.getInputPin();
                 drivers.add(sitePIP.site.getName() + "/" + belPinSrc.toString());
                 break;
             }
