@@ -53,6 +53,7 @@ import org.capnproto.Void;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.Supplier;
@@ -301,11 +302,16 @@ public class LogNetlistWriter {
         }
     }
 
-    protected void writeAllStringsToNetlistBuilder(Netlist.Builder netlist) {
-        int stringCount = allStrings.size();
+    /**
+     * Writes list of String objects to the Cap'n Proto message netlist
+     * @param netlist The netlist builder.
+     * @param strings List of String objects to be written.
+     */
+    public static void writeStrings(Netlist.Builder netlist, List<String> strings) {
+        int stringCount = strings.size();
         TextList.Builder strList = netlist.initStrList(stringCount);
         for (int i=0; i < stringCount; i++) {
-            strList.set(i, new Text.Reader(allStrings.get(i)));
+            strList.set(i, new Text.Reader(strings.get(i)));
         }
     }
 
@@ -348,7 +354,7 @@ public class LogNetlistWriter {
         t.start("Write Top");
         writer.writeTopNetlistStuffToNetlistBuilder(n, netlist);
         t.stop().start("Write Strings");
-        writer.writeAllStringsToNetlistBuilder(netlist);
+        writeStrings(netlist, writer.allStrings);
         t.stop().start("Write File");
         Interchange.writeInterchangeFile(fileName, message);
         t.stop().printSummary();

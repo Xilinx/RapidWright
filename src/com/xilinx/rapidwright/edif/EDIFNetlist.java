@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.Deque;
 import java.util.EnumSet;
@@ -53,6 +54,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.function.BiFunction;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -201,6 +203,54 @@ public class EDIFNetlist extends EDIFName {
 
     protected EDIFNetlist() {
         init();
+    }
+
+    /**
+     * Creates an ordered list of cells such that each cell that appears
+     * in the list only references cells that have already been seen in
+     * the list. This is a requirement when exporting the EDIF to a file.
+     * @param cells A set of cells to consider.
+     * @param stable makes sure that the list is always the same for the same input
+     * @return The ordered list.
+     */
+    public static List<EDIFCell> getValidCellExportOrder(Set<EDIFCell> cells, boolean stable) {
+        Predicate<EDIFCell> recurseIf = cells::contains;
+        return getValidCellExportOrder(cells, stable, recurseIf);
+    }
+
+    static List<EDIFCell> getValidCellExportOrder(Collection<EDIFCell> cellsToExport, boolean stable, Predicate<EDIFCell> recurseIf) {
+        List<EDIFCell> visited = new ArrayList<>();
+        Iterable<EDIFCell> cells;
+        if (stable) {
+            cells = cellsToExport.stream().sorted(Comparator.comparing(EDIFName::getName))::iterator;
+        } else {
+            cells = cellsToExport;
+        }
+        Set<EDIFCell> visitedSet = new HashSet<>();
+        for (EDIFCell cell : cells) {
+            getValidCellExportOrderVisit(cell, visited, visitedSet, stable, recurseIf);
+        }
+
+        return visited;
+    }
+
+    private static void getValidCellExportOrderVisit(EDIFCell cell, List<EDIFCell> visitedList, Set<EDIFCell> visitedSet, boolean stable, Predicate<EDIFCell> recurseIf) {
+        if (!visitedSet.add(cell)) {
+            return;
+        }
+        final Iterable<EDIFCellInst> cellInsts;
+        if (stable) {
+            cellInsts = cell.getCellInsts().stream().sorted(Comparator.comparing(EDIFName::getName))::iterator;
+        } else {
+            cellInsts = cell.getCellInsts();
+        }
+        for (EDIFCellInst i : cellInsts) {
+            EDIFCell childCell = i.getCellType();
+            if (recurseIf.test(childCell)) {
+                getValidCellExportOrderVisit(childCell, visitedList, visitedSet, stable, recurseIf);
+            }
+        }
+        visitedList.add(cell);
     }
 
     private void init() {

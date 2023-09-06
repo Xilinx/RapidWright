@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -21,6 +21,7 @@
  * limitations under the License.
  *
  */
+
 package com.xilinx.rapidwright.edif;
 
 import java.io.BufferedOutputStream;
@@ -30,12 +31,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Future;
+import java.util.function.Predicate;
 
 import com.xilinx.rapidwright.util.NoCloseOutputStream;
 import com.xilinx.rapidwright.util.ParallelDCPInput;
@@ -253,19 +254,8 @@ public class EDIFLibrary extends EDIFName {
      * @return The ordered list.
      */
     public List<EDIFCell> getValidCellExportOrder(boolean stable) {
-        List<EDIFCell> visited = new ArrayList<>();
-        Iterable<EDIFCell> cells;
-        if (stable) {
-            cells = getCells().stream().sorted(Comparator.comparing(EDIFName::getName))::iterator;
-        } else {
-            cells = getCells();
-        }
-        Set<EDIFCell> visitedSet = new HashSet<>();
-        for (EDIFCell cell : cells) {
-            visit(cell, visited, visitedSet, stable);
-        }
-
-        return visited;
+        Predicate<EDIFCell> recurseIf = (c) -> c.getLibrary() == this;
+        return EDIFNetlist.getValidCellExportOrder(getCells(), stable, recurseIf);
     }
 
     /**
@@ -284,25 +274,6 @@ public class EDIFLibrary extends EDIFName {
      */
     public boolean isHDIPrimitivesLibrary() {
         return getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME);
-    }
-
-    private void visit(EDIFCell cell, List<EDIFCell> visitedList, Set<EDIFCell> visitedSet, boolean stable) {
-        if (!visitedSet.add(cell)) {
-            return;
-        }
-        final Iterable<EDIFCellInst> cellInsts;
-        if (stable) {
-            cellInsts = cell.getCellInsts().stream().sorted(Comparator.comparing(EDIFName::getName))::iterator;
-        } else {
-            cellInsts = cell.getCellInsts();
-        }
-        for (EDIFCellInst i : cellInsts) {
-            EDIFCell childCell = i.getCellType();
-            if (childCell.getLibrary() == this) {
-                visit(childCell,visitedList,visitedSet, stable);
-            }
-        }
-        visitedList.add(cell);
     }
 
     private static final byte[] EXPORT_CONST_LIBRARY_START = "  (Library ".getBytes(StandardCharsets.UTF_8);

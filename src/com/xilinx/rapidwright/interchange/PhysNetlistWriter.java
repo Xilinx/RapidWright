@@ -575,7 +575,12 @@ public class PhysNetlistWriter {
         ooc.setValue(strings.getIndex(design.isDesignOutOfContext() ? "1" : "0"));
     }
 
-    public static void writeStrings(PhysNetlist.Builder physNetlist, StringEnumerator strings) {
+    /**
+     * Writes list of String objects to the Cap'n Proto message physical netlist
+     * @param physNetlist The physical netlist builder.
+     * @param strings List of String objects to be written.
+     */
+    public static void writeStrings(PhysNetlist.Builder physNetlist, List<String> strings) {
         TextList.Builder strList = physNetlist.initStrList(strings.size());
         int stringCount = strList.size();
         for (int i=0; i < stringCount; i++) {
