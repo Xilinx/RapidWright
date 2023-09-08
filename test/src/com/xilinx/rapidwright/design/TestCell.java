@@ -25,6 +25,9 @@ package com.xilinx.rapidwright.design;
 
 
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.VivadoTools;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -80,5 +83,24 @@ public class TestCell {
         Cell cell = new Cell("cell");
         Assertions.assertNull(cell.getEDIFCellInst());
         Assertions.assertNull(cell.getProperty("any_property"));
+    }
+
+    @Test
+    public void testFFRoutethruCell() {
+        Design d = RapidWrightDCP.loadDCP("optical-flow.dcp");
+        SiteInst si = d.getSiteInstFromSiteName("SLICE_X72Y144");
+        Cell rtCell = si.getCell("CFF");
+        Assertions.assertNotNull(rtCell);
+        Assertions.assertTrue(rtCell.isRoutethru());
+        Assertions.assertTrue(rtCell.isFFRoutethruCell());
+        Assertions.assertEquals(Cell.FF_ROUTETHRU_TYPE, rtCell.getType());
+        Assertions.assertEquals("D", rtCell.getLogicalPinMapping("D"));
+        Assertions.assertEquals("Q", rtCell.getLogicalPinMapping("Q"));
+
+        Assertions.assertNull(d.getCell(rtCell.getName()));
+
+        if (FileTools.isVivadoOnPath()) {
+            Assertions.assertTrue(VivadoTools.reportRouteStatus(d).isFullyRouted());
+        }
     }
 }
