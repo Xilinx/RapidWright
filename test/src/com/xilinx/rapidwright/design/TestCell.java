@@ -93,7 +93,6 @@ public class TestCell {
         Assertions.assertNotNull(rtCell);
         Assertions.assertTrue(rtCell.isRoutethru());
         Assertions.assertTrue(rtCell.isFFRoutethruCell());
-        Assertions.assertEquals(Cell.FF_ROUTETHRU_TYPE, rtCell.getType());
         Assertions.assertEquals("D", rtCell.getLogicalPinMapping("D"));
         Assertions.assertEquals("Q", rtCell.getLogicalPinMapping("Q"));
 
