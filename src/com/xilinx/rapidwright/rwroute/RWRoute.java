@@ -513,6 +513,8 @@ public class RWRoute{
         RouteNode altSourceINTRnode = null;
 
         for (SitePinInst sink : net.getSinkPins()) {
+            assert(sink.getSiteInst().getSitePinInst(sink.getName()) == sink);
+
             Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
 
             List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
@@ -755,6 +757,8 @@ public class RWRoute{
             List<Connection> unroutableConnections = getUnroutableConnections();
             boolean needsResorting = false;
             for (Connection connection : unroutableConnections) {
+                // if (connection.hashCode() != 16087)
+                //     continue;
                 System.out.printf("CRITICAL WARNING: Unroutable connection in iteration #%d\n", routeIteration);
                 System.out.println("                 " + connection);
                 needsResorting = handleUnroutableConnection(connection) || needsResorting;
@@ -859,9 +863,14 @@ public class RWRoute{
                         connection.getSource().setRouted(true);
                     } else {
                         // Source used must have been the Net's alternate source
-                        assert(!altSource.equals(connection.getSource()));
-                        assert(sourceNode.equals(altSource.getConnectedNode()));
-                        altSource.setRouted(true);
+                        if (sourceNode.equals(source.getConnectedNode())) {
+                            assert(connection.getSource().equals(altSource));
+                            source.setRouted(true);
+                        } else {
+                            assert(sourceNode.equals(altSource.getConnectedNode()));
+                            assert(connection.getSource().equals(source));
+                            altSource.setRouted(true);
+                        }
                     }
 
                     if (source.isRouted() && (altSource == null || altSource.isRouted())) {
@@ -1181,7 +1190,7 @@ public class RWRoute{
      * Rips up a connection.
      * @param connection The connection to be ripped up.
      */
-    private void ripUp(Connection connection) {
+    protected void ripUp(Connection connection) {
         for (RouteNode rnode : connection.getRnodes()) {
             rnode.decrementUser(connection.getNetWrapper());
             rnode.updatePresentCongestionCost(presentCongestionFactor);
@@ -1359,6 +1368,7 @@ public class RWRoute{
             connection.getSink().setRouted(routed);
             updateUsersAndPresentCongestionCost(connection);
         } else {
+            connection.getRnodes().clear();
             connection.resetRoute();
         }
     }
@@ -1382,6 +1392,7 @@ public class RWRoute{
             rnode = prevRouting.get(0);
         }
 
+        connection.getRnodes().clear();
         connection.resetRoute();
         do {
             connection.addRnode(rnode);
@@ -1395,11 +1406,14 @@ public class RWRoute{
 
         RouteNode sourceRnode = rnodes.get(rnodes.size()-1);
         if (!sourceRnode.equals(connection.getSourceRnode())) {
+            // Update connection's source SPI
+
+            if (!sourceRnode.equals(connection.getAltSourceRnode())) {
+                return false;
+            }
+
             // Used source node is different to the one set on the connection
             Net net = connection.getNetWrapper().getNet();
-
-            // Update connection's source SPI
-            assert(sourceRnode.equals(connection.getAltSourceRnode()));
             if (connection.getSource() == net.getSource()) {
                 // Swap to alternate source
                 connection.setSource(net.getAlternateSource());

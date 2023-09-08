@@ -270,7 +270,7 @@ public class Connection implements Comparable<Connection>{
     }
 
     public void resetRoute() {
-        getRnodes().clear();
+        assert(getRnodes().isEmpty());
         sink.setRouted(false);
     }
 

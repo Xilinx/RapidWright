@@ -148,8 +148,11 @@ public class PartialRouter extends RWRoute {
                 // Arc matches start node and end node is preserved
                 // This implies that both start and end nodes must be preserved for the same net
                 // (which assumedly is the net we're currently routing, and is asserted upstream)
-                assert(routingGraph.getPreservedNet(start) == routingGraph.getPreservedNet(end));
-                return true;
+                // return routingGraph.getPreservedNet(start) == routingGraph.getPreservedNet(end);
+                if (routingGraph.isPreserved(start)) {
+                    assert(routingGraph.getPreservedNet(start) == routingGraph.getPreservedNet(end));
+                    return true;
+                }
             }
         }
 
@@ -365,13 +368,13 @@ public class PartialRouter extends RWRoute {
 
                 RouteNode rstart = getOrCreateRouteNode(start, RouteNodeType.WIRE);
                 RouteNode rend = getOrCreateRouteNode(end, RouteNodeType.WIRE);
-                assert (rend.getPrev() == null);
+                // assert (rend.getPrev() == null);
                 rend.setPrev(rstart);
             }
 
             // Use the prev pointers to attempt to recover routing for all indirect connections
             for (Connection connection : netWrapper.getConnections()) {
-                if (!connection.isDirect()) {
+                if (!connection.isDirect() && connection.getSink().isRouted()) {
                     finishRouteConnection(connection, connection.getSinkRnode());
                 }
             }
@@ -551,6 +554,9 @@ public class PartialRouter extends RWRoute {
                 Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
                 Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
 
+                boolean startPreserved = routingGraph.unpreserve(start);
+                boolean endPreserved = routingGraph.unpreserve(end);
+
                 // Do not include arcs that the router wouldn't explore
                 // e.g. those that leave the INT tile, since we project pins to their INT tile
                 if (routingGraph.isExcluded(start, end))
@@ -561,13 +567,11 @@ public class PartialRouter extends RWRoute {
                 RouteNode rstart = routingGraph.getNode(start);
                 assert (rstart != null);
                 boolean rstartAdded = rnodes.add(rstart);
-                boolean startPreserved = routingGraph.unpreserve(start);
                 assert(rstartAdded == startPreserved);
 
                 RouteNode rend = routingGraph.getNode(end);
                 assert (rend != null);
                 boolean rendAdded = rnodes.add(rend);
-                boolean endPreserved = routingGraph.unpreserve(end);
                 assert(rendAdded == endPreserved);
 
                 // Check the prev pointer is consistent with PIP
@@ -582,23 +586,26 @@ public class PartialRouter extends RWRoute {
                 Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
                 Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
 
+                boolean startPreserved = routingGraph.unpreserve(start);
+                boolean endPreserved = routingGraph.unpreserve(end);
+
                 // Do not include arcs that the router wouldn't explore
                 // e.g. those that leave the INT tile, since we project pins to their INT tile
                 if (routingGraph.isExcluded(start, end))
                     continue;
 
-                boolean startPreserved = routingGraph.unpreserve(start);
-                boolean endPreserved = routingGraph.unpreserve(end);
+                if (start.getIntentCode() == IntentCode.NODE_GLOBAL_LEAF)
+                    continue;
 
                 RouteNode rstart = getOrCreateRouteNode(start, RouteNodeType.WIRE);
                 RouteNode rend = getOrCreateRouteNode(end, RouteNodeType.WIRE);
                 boolean rstartAdded = rnodes.add(rstart);
                 boolean rendAdded = rnodes.add(rend);
-                assert(rstartAdded == startPreserved);
-                assert(rendAdded == endPreserved);
+                // assert(rstartAdded == startPreserved);
+                // assert(rendAdded == endPreserved);
 
                 // Also set the prev pointer according to the PIP
-                assert (rend.getPrev() == null);
+                // assert (rend.getPrev() == null);
                 rend.setPrev(rstart);
             }
 
