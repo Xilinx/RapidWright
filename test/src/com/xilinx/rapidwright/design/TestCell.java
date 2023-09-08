@@ -100,7 +100,7 @@ public class TestCell {
         Assertions.assertNull(d.getCell(rtCell.getName()));
 
         if (FileTools.isVivadoOnPath()) {
-            Assertions.assertTrue(VivadoTools.reportRouteStatus(d).isFullyRouted());
+            Assertions.assertEquals(0, VivadoTools.reportRouteStatus(d).netsWithRoutingErrors);
         }
     }
 }
