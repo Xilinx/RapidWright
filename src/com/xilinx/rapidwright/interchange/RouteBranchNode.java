@@ -168,6 +168,7 @@ public class RouteBranchNode {
             }
             case SITE_PIP:{
                 SiteSitePIP sitePIP = getSitePIP();
+                // The "driver" of the site PIP is the input BELPin used to enter
                 BELPin belPinSrc = sitePIP.sitePIP.getInputPin();
                 drivers.add(sitePIP.site.getName() + "/" + belPinSrc.toString());
                 break;

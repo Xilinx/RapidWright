@@ -1186,4 +1186,40 @@ public class TestDesignTools {
             }
         }
     }
+
+    @Test
+    public void testGetConnectionPIPsBiDir() {
+        Design design = new Design("cw305_top", "xc7a100tftg256-2");
+        Device device = design.getDevice();
+
+        Net net = com.xilinx.rapidwright.util.CodeGenerator.createTestNet(design, "net", new String[] {
+                "CLBLM_L_X26Y155/CLBLM_L.CLBLM_L_BQ->CLBLM_LOGIC_OUTS1", "INT_L_X26Y155/INT_L.LOGIC_OUTS_L1->>IMUX_L11",
+                "CLBLM_L_X26Y155/CLBLM_L.CLBLM_IMUX11->CLBLM_M_A4", "INT_L_X26Y155/INT_L.LOGIC_OUTS_L1->>IMUX_L27",
+                "CLBLM_L_X26Y155/CLBLM_L.CLBLM_IMUX27->CLBLM_M_B4", "INT_L_X26Y155/INT_L.LOGIC_OUTS_L1->>SR1BEG2",
+                "INT_L_X26Y154/INT_L.SR1END2->>ER1BEG3", "INT_R_X27Y154/INT_R.ER1END3->>LH0",
+                "INT_R_X15Y154/INT_R.LV0<<->>LH12", "INT_R_X15Y172/INT_R.LV18->>NE6BEG3",
+                "INT_R_X17Y176/INT_R.NE6END3->>SL1BEG3", "INT_R_X17Y175/INT_R.SL1END3->>IMUX22",
+                "CLBLL_R_X17Y175/CLBLL_R.CLBLL_IMUX22->CLBLL_LL_C3", "INT_L_X26Y155/INT_L.LOGIC_OUTS_L1->>NN6BEG1",
+                "INT_L_X26Y161/INT_L.NN6END1->>NW6BEG1", "INT_L_X24Y165/INT_L.NW6END1->>NW6BEG1",
+                "INT_L_X22Y169/INT_L.NW6END1->>NW6BEG1", "INT_L_X20Y173/INT_L.NW6END1->>WW2BEG0",
+                "INT_L_X18Y173/INT_L.WW2END0->>NW2BEG1", "INT_R_X17Y174/INT_R.NW2END1->>IMUX42",
+                "CLBLL_R_X17Y174/CLBLL_R.CLBLL_IMUX42->CLBLL_L_D6", "INT_L_X18Y173/INT_L.WW2END0->>WR1BEG2",
+                "INT_R_X17Y173/INT_R.WR1END2->>IMUX13", "CLBLL_R_X17Y173/CLBLL_R.CLBLL_IMUX13->CLBLL_L_B6",
+                "INT_R_X17Y173/INT_R.WR1END2->>NW2BEG2", "INT_L_X16Y174/INT_L.NW2END2->>NL1BEG1",
+                "INT_L_X16Y175/INT_L.NL1END1->>IMUX_L26", "CLBLL_L_X16Y175/CLBLL_L.CLBLL_IMUX26->CLBLL_L_B4",
+                "INT_L_X16Y174/INT_L.NW2END2->>IMUX_L20", "CLBLL_L_X16Y174/CLBLL_L.CLBLL_IMUX20->CLBLL_L_C2",
+                "INT_L_X20Y173/INT_L.NW6END1->>NW2BEG1", "INT_R_X19Y174/INT_R.NW2END1->>FAN_ALT2",
+                "INT_R_X19Y174/INT_R.FAN_ALT2->>FAN_BOUNCE2", "INT_R_X19Y174/INT_R.FAN_BOUNCE2->>IMUX0",
+                "CLBLL_R_X19Y174/CLBLL_R.CLBLL_IMUX0->CLBLL_L_A3", "INT_R_X19Y174/INT_R.NW2END1->>IMUX33",
+                "CLBLL_R_X19Y174/CLBLL_R.CLBLL_IMUX33->CLBLL_L_C1", "INT_R_X19Y174/INT_R.NW2END1->>IMUX41",
+                "CLBLL_R_X19Y174/CLBLL_R.CLBLL_IMUX41->CLBLL_L_D1" });
+        SiteInst si1 = design.createSiteInst(device.getSite("SLICE_X43Y155"));
+        net.createPin("BQ", si1);
+        SiteInst si2 = design.createSiteInst(device.getSite("SLICE_X26Y175"));
+        net.createPin("C3", si2);
+
+        List<PIP> pips = DesignTools.getConnectionPIPs(si2.getSitePinInst("C3"));
+        Assertions.assertNotNull(pips);
+        Assertions.assertEquals(9, pips.size());
+    }
 }
