@@ -148,11 +148,8 @@ public class PartialRouter extends RWRoute {
                 // Arc matches start node and end node is preserved
                 // This implies that both start and end nodes must be preserved for the same net
                 // (which assumedly is the net we're currently routing, and is asserted upstream)
-                // return routingGraph.getPreservedNet(start) == routingGraph.getPreservedNet(end);
-                if (routingGraph.isPreserved(start)) {
-                    assert(routingGraph.getPreservedNet(start) == routingGraph.getPreservedNet(end));
-                    return true;
-                }
+                assert(routingGraph.getPreservedNet(start) == routingGraph.getPreservedNet(end));
+                return true;
             }
         }
 
@@ -594,9 +591,6 @@ public class PartialRouter extends RWRoute {
                 if (routingGraph.isExcluded(start, end))
                     continue;
 
-                if (start.getIntentCode() == IntentCode.NODE_GLOBAL_LEAF)
-                    continue;
-
                 RouteNode rstart = getOrCreateRouteNode(start, RouteNodeType.WIRE);
                 RouteNode rend = getOrCreateRouteNode(end, RouteNodeType.WIRE);
                 boolean rstartAdded = rnodes.add(rstart);
@@ -611,7 +605,14 @@ public class PartialRouter extends RWRoute {
 
             // Try and use prev pointers to recover the routing for each connection
             for (Connection connection : netWrapper.getConnections()) {
-                finishRouteConnection(connection, connection.getSinkRnode());
+                RouteNode sinkRnode = connection.getSinkRnode();
+                sinkRnode.setType(RouteNodeType.PINFEED_I);
+                for (RouteNode sourceRnode : Arrays.asList(connection.getSourceRnode(), connection.getAltSourceRnode())) {
+                    if (sourceRnode != null) {
+                        sourceRnode.setType(RouteNodeType.PINFEED_O);
+                    }
+                }
+                finishRouteConnection(connection, sinkRnode);
             }
 
             netToPins.put(net, net.getSinkPins());

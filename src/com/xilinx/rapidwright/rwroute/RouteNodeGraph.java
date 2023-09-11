@@ -59,12 +59,12 @@ public class RouteNodeGraph {
      * A map of nodes to created rnodes
      */
     protected final Map<Tile, RouteNode[]> nodesMap;
-    private int nodesMapSize;
+    protected int nodesMapSize;
 
     /**
      * A map of preserved nodes to their nets
      */
-    private final Map<Tile, Net[]> preservedMap;
+    protected final Map<Tile, Net[]> preservedMap;
     private final AtomicInteger preservedMapSize;
 
     /**
@@ -213,7 +213,7 @@ public class RouteNodeGraph {
         return oldNet;
     }
 
-    private Net preserve(Tile tile, int wireIndex, Net net) {
+    protected Net preserve(Tile tile, int wireIndex, Net net) {
         // Assumes that tile/wireIndex describes the base wire on the node
         // No need to synchronize access to 'nets' since collisions are not expected
         Net[] nets = preservedMap.computeIfAbsent(tile, (t) -> new Net[t.getWireCount()]);
@@ -270,7 +270,7 @@ public class RouteNodeGraph {
         return unpreserved;
     }
 
-    private boolean unpreserve(Tile tile, int wireIndex) {
+    protected boolean unpreserve(Tile tile, int wireIndex) {
         // Assumes that tile/wireIndex describes the base wire on its node
         Net[] nets = preservedMap.get(tile);
         if (nets == null || nets[wireIndex] == null)
@@ -312,7 +312,7 @@ public class RouteNodeGraph {
         return getPreservedNet(node.getTile(), node.getWire());
     }
 
-    private Net getPreservedNet(Tile tile, int wireIndex) {
+    protected Net getPreservedNet(Tile tile, int wireIndex) {
         // Assumes that tile/wireIndex describes the base wire on its node
         Net[] nets = preservedMap.get(tile);
         return nets != null ? nets[wireIndex] : null;

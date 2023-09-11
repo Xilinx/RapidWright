@@ -52,7 +52,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     /** The associated {@link Node} instance */
     protected Node node;
     /** The type of a rnode*/
-    private final RouteNodeType type;
+    private RouteNodeType type;
     /** The tileXCoordinate and tileYCoordinate of the INT tile that the associated node stops at */
     private final short endTileXCoordinate;
     private final short endTileYCoordinate;
@@ -206,6 +206,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                     case NODE_VLONG:
                         baseCost = 0.7f;
                         break;
+                    case NODE_INT_INTERFACE:
+                        break;
                     default:
                         throw new RuntimeException(ic.toString());
                 }
@@ -342,6 +344,10 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      */
     public RouteNodeType getType() {
         return type;
+    }
+
+    public void setType(RouteNodeType type) {
+        this.type = type;
     }
 
     /**

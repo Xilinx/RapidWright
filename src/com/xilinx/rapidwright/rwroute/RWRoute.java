@@ -127,7 +127,7 @@ public class RWRoute{
     /** Count of rnodes created in the current routing iteration */
     protected long rnodesCreatedThisIteration;
     /** The queue to store candidate nodes to route a connection */
-    private PriorityQueue<RouteNode> queue;
+    protected PriorityQueue<RouteNode> queue;
 
     /** Total wirelength of the routed design */
     private int totalWL;
@@ -140,7 +140,7 @@ public class RWRoute{
     /** The total number of connections that are routed */
     protected int connectionsRouted;
     /** The total number of connections routed in an iteration */
-    private int connectionsRoutedIteration;
+    protected int connectionsRoutedIteration;
     /** Total number of nodes pushed/popped from the queue */
     private long nodesPushed;
     private long nodesPopped;
@@ -1379,7 +1379,7 @@ public class RWRoute{
      * @param rnode RouteNode to start backtracking from.
      * @return True if backtracking successful.
      */
-    private boolean saveRouting(Connection connection, RouteNode rnode) {
+    protected boolean saveRouting(Connection connection, RouteNode rnode) {
         RouteNode sinkRnode = connection.getSinkRnode();
         RouteNode altSinkRnode = connection.getAltSinkRnode();
         if (rnode != sinkRnode && rnode != altSinkRnode) {
@@ -1561,11 +1561,11 @@ public class RWRoute{
             newPartialPathCost += rnodeDelayWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode.getNode(), longParent));
         }
 
-        int childX = childRnode.getEndTileXCoordinate();
-        int childY = childRnode.getEndTileYCoordinate();
-        RouteNode sinkRnode = connection.getSinkRnode();
-        int sinkX = sinkRnode.getBeginTileXCoordinate();
-        int sinkY = sinkRnode.getBeginTileYCoordinate();
+        int childX = getEndTileXCoordinate(childRnode);
+        int childY = getEndTileYCoordinate(childRnode);
+        RouteNode sinkRnode = getTargetRnode(connection);
+        int sinkX = getBeginTileXCoordinate(sinkRnode);
+        int sinkY = getBeginTileYCoordinate(sinkRnode);
         int deltaX = Math.abs(childX - sinkX);
         int deltaY = Math.abs(childY - sinkY);
         if (connection.isCrossSLR()) {
@@ -1614,6 +1614,26 @@ public class RWRoute{
         push(childRnode, newPartialPathCost, newTotalPathCost);
     }
 
+    protected RouteNode getTargetRnode(Connection connection) {
+        return connection.getSinkRnode();
+    }
+
+    protected short getEndTileXCoordinate(RouteNode rnode) {
+        return rnode.getEndTileXCoordinate();
+    }
+
+    protected short getEndTileYCoordinate(RouteNode rnode) {
+        return rnode.getEndTileYCoordinate();
+    }
+
+    protected short getBeginTileXCoordinate(RouteNode rnode) {
+        return rnode.getBeginTileXCoordinate();
+    }
+
+    protected short getBeginTileYCoordinate(RouteNode rnode) {
+        return rnode.getBeginTileYCoordinate();
+    }
+
     /**
      * Gets the congestion cost and bias cost of a rnode.
      * @param rnode The rnode in question.
@@ -1639,7 +1659,7 @@ public class RWRoute{
         if (!rnode.isTarget() && rnode.getType() != RouteNodeType.SUPER_LONG_LINE) {
             NetWrapper net = connection.getNetWrapper();
             biasCost = rnode.getBaseCost() / net.getConnections().size() *
-                    (Math.abs(rnode.getEndTileXCoordinate() - net.getXCenter()) + Math.abs(rnode.getEndTileYCoordinate() - net.getYCenter())) / net.getDoubleHpwl();
+                    (Math.abs(getEndTileXCoordinate(rnode) - net.getXCenter()) + Math.abs(getEndTileYCoordinate(rnode) - net.getYCenter())) / net.getDoubleHpwl();
         }
 
         return rnode.getBaseCost() * rnode.getHistoricalCongestionCost() * presentCongestionCost / sharingFactor + biasCost;
