@@ -121,12 +121,6 @@ public class PhysNetlistWriter {
         return cellName;
     }
 
-    private static EDIFHierCellInst getEDIFHierCellInst(Cell cell) {
-        Design design = cell.getSiteInst().getDesign();
-        return design.getNetlist() != null ? cell.getEDIFHierCellInst() : null;
-    }
-
-
     protected static void writePlacement(PhysNetlist.Builder physNetlist, Design design,
                                          StringEnumerator strings) {
         writePlacement(physNetlist, design, strings, design.getSiteInsts());
@@ -186,7 +180,7 @@ public class PhysNetlistWriter {
                 }
             }
 
-            EDIFHierCellInst ehci = getEDIFHierCellInst(cell);
+            EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
             int numPinMappings;
             if (ehci == null) {
                 numPinMappings = cell.getPinMappingsP2L().size();
@@ -226,7 +220,7 @@ public class PhysNetlistWriter {
 
     private static int addCellPinMappings(Cell cell, StringEnumerator strings,
                                             Builder<PinMapping.Builder> pinMap, Integer idx) {
-        EDIFHierCellInst ehci = getEDIFHierCellInst(cell);
+        EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
         for (Entry<String,String> e : cell.getPinMappingsP2L().entrySet()) {
             EDIFPortInst epi = (ehci != null) ? ehci.getInst().getPortInst(e.getValue()) : null;
             if (ehci != null && (epi == null || epi.getNet() == null)) {
