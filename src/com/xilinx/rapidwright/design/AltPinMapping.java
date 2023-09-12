@@ -38,6 +38,16 @@ public class AltPinMapping {
     private String altCellType;
 
     /**
+     * Creates a reference copy of this alternate pin mapping--a deep copy of the
+     * object without this new instance being referenced in any cell of the design.
+     * 
+     * @return The newly created reference copy.
+     */
+    public AltPinMapping getReferenceCopy() {
+        return new AltPinMapping(logicalName, altCellName, altCellType);
+    }
+
+    /**
      * @return the logicalName
      */
     public String getLogicalName() {

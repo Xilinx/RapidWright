@@ -304,14 +304,13 @@ public class RWRoute{
                 addStaticNetRoutingTargets(net);
 
             } else if (net.getType().equals(NetType.WIRE)) {
-                if (RouterHelper.isRoutableNetWithSourceSinks(net)) {
+                if (RouterHelper.isDriverLessOrLoadLessNet(net) ||
+                        RouterHelper.isInternallyRoutedNet(net) ||
+                        net.getName().equals(Net.Z_NET)) {
+                    preserveNet(net, true);
+                    numNotNeedingRoutingNets++;
+                } else if (RouterHelper.isRoutableNetWithSourceSinks(net)) {
                     addNetConnectionToRoutingTargets(net);
-                } else if (RouterHelper.isDriverLessOrLoadLessNet(net)) {
-                    preserveNet(net, true);
-                    numNotNeedingRoutingNets++;
-                } else if (RouterHelper.isInternallyRoutedNet(net)) {
-                    preserveNet(net, true);
-                    numNotNeedingRoutingNets++;
                 } else {
                     numNotNeedingRoutingNets++;
                 }
@@ -417,6 +416,11 @@ public class RWRoute{
                 GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), gns);
             }
             preserveNet(clk, false);
+
+            if (clk.hasPIPs()) {
+                clk.getSource().setRouted(true);
+                assert(clk.getAlternateSource() == null);
+            }
         }
     }
 
@@ -529,6 +533,7 @@ public class RWRoute{
                         altSource = DesignTools.getLegalAlternativeOutputPin(net);
                         if (altSource != null) {
                             net.addPin(altSource);
+                            altSource.getSiteInst().getSitePinInstMap().put(altSource.getName(), altSource);
                             DesignTools.routeAlternativeOutputSitePin(net, altSource);
                         }
                     }
@@ -826,6 +831,45 @@ public class RWRoute{
             // fix routes with cycles and / or multi-driver nodes
             Set<NetWrapper> routes = fixRoutes();
             if (config.isTimingDriven()) updateTimingAfterFixingRoutes(routes);
+
+            // Unset the routed state of all source pins
+            for (Map.Entry<Net, NetWrapper> e : nets.entrySet()) {
+                Net net = e.getKey();
+                SitePinInst source = net.getSource();
+                SitePinInst altSource = net.getAlternateSource();
+                for (SitePinInst spi : Arrays.asList(source, altSource)) {
+                    if (spi != null) {
+                        source.setRouted(false);
+                    }
+                }
+
+                // Set the routed state on those source pins that were actually used
+                NetWrapper netWrapper = e.getValue();
+                for (Connection connection : netWrapper.getConnections()) {
+                    // Examine getNodes() because connection.getRnodes() is empty for direct connections
+                    List<Node> nodes = connection.getNodes();
+                    if (nodes.isEmpty()) {
+                        // Unroutable connection
+                        continue;
+                    }
+
+                    // Set the routed state of the used source node
+                    Node sourceNode = nodes.get(nodes.size() - 1);
+                    if (sourceNode.equals(connection.getSource().getConnectedNode())) {
+                        connection.getSource().setRouted(true);
+                    } else {
+                        // Source used must have been the Net's alternate source
+                        assert(!altSource.equals(connection.getSource()));
+                        assert(sourceNode.equals(altSource.getConnectedNode()));
+                        altSource.setRouted(true);
+                    }
+
+                    if (source.isRouted() && (altSource == null || altSource.isRouted())) {
+                        // Break if all sources have been set to be routed
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -1344,30 +1388,32 @@ public class RWRoute{
         } while ((rnode = rnode.getPrev()) != null);
 
         List<RouteNode> rnodes = connection.getRnodes();
+        if (rnodes.size() == 1) {
+            // No prev pointer from sink rnode -> not routed
+            return false;
+        }
+
         RouteNode sourceRnode = rnodes.get(rnodes.size()-1);
         if (!sourceRnode.equals(connection.getSourceRnode())) {
+            // Used source node is different to the one set on the connection
             Net net = connection.getNetWrapper().getNet();
-            SitePinInst altSource = DesignTools.getLegalAlternativeOutputPin(net);
-            if (altSource != null) {
-                if (net.getAlternateSource() == null) {
-                    DesignTools.routeAlternativeOutputSitePin(net, altSource);
-                }
-                if (altSource == connection.getSource()) {
-                    // This connection is already using the alternate source.
-                    // Swap back to primary source
-                    altSource = net.getSource();
-                }
-                Node altSourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-                if (sourceRnode.getNode().equals(altSourceINTNode)) {
-                    RouteNode altSourceRnode = sourceRnode;
-                    connection.setSource(altSource);
-                    connection.setSourceRnode(altSourceRnode);
-                } else {
-                    return false;
-                }
+
+            // Update connection's source SPI
+            assert(sourceRnode.equals(connection.getAltSourceRnode()));
+            if (connection.getSource() == net.getSource()) {
+                // Swap to alternate source
+                connection.setSource(net.getAlternateSource());
+            } else if (connection.getSource() == net.getAlternateSource()) {
+                // Swap back to main source
+                connection.setSource(net.getSource());
             } else {
-                return false;
+                // Backtracked to neither the net's source nor its alternate source
+                throw new RuntimeException("Backtracking terminated at unexpected rnode: " + rnode);
             }
+
+            // Swap source rnode
+            connection.setAltSourceRnode(connection.getSourceRnode());
+            connection.setSourceRnode(sourceRnode);
         }
 
         return true;
