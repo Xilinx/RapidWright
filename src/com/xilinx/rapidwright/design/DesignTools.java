@@ -3039,15 +3039,6 @@ public class DesignTools {
             }
 
             if (parentPhysNet != null) {
-                // Merge both physical nets together
-                for (SiteInst si : new ArrayList<>(net.getSiteInsts())) {
-                    List<String> siteWires = new ArrayList<>(si.getSiteWiresFromNet(net));
-                    for (String siteWire : siteWires) {
-                        BELPin[] pins = si.getSiteWirePins(siteWire);
-                        si.unrouteIntraSiteNet(pins[0], pins[0]);
-                        si.routeIntraSiteNet(parentPhysNet, pins[0], pins[0]);
-                    }
-                }
                 design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
             }
         }
