@@ -23,16 +23,13 @@
 
 package com.xilinx.rapidwright.interchange;
 
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.List;
-
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.CellPlacement;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.NetType;
@@ -42,12 +39,17 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PinMapping
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.RouteSegment;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.capnproto.MessageReader;
 import org.capnproto.ReaderOptions;
 import org.capnproto.StructList;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 
 public class TestPhysNetlistWriter {
     private void testAllRouteSegmentsEndInBELInputPins(Design design, RouteBranch.Reader routeBranch, List<String> strings) {
@@ -301,5 +303,35 @@ public class TestPhysNetlistWriter {
         PhysNetlist.PhysSitePin.Reader HMUX = HMUX_branch.getRouteSegment().getSitePin();
         Assertions.assertEquals("SLICE_X13Y239", allStrings.get(HMUX.getSite()));
         Assertions.assertEquals("HMUX", allStrings.get(HMUX.getPin()));
+    }
+
+    @Test
+    public void testNetWithNoLoads(@TempDir Path tempDir) throws IOException {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+
+        String netNameWithNoLoads = "processor/spm_enable_lut/O5";
+        EDIFHierNet ehn = design.getNetlist().getHierNetFromName(netNameWithNoLoads);
+        for (EDIFHierPortInst epi : ehn.getPortInsts()) {
+            // Net only contains sources
+            Assertions.assertTrue(epi.isOutput());
+        }
+
+        String interchangePath = tempDir.resolve("design.phys").toString();
+        PhysNetlistWriter.writePhysNetlist(design, interchangePath);
+
+        ReaderOptions rdOptions =
+                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
+                        ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
+        MessageReader readMsg = Interchange.readInterchangeFile(interchangePath, rdOptions);
+
+        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
+
+        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
+
+        // Load-less nets to not appear as a physical net
+        for (PhysNet.Reader n : physNetlist.getPhysNets()) {
+            String netName = allStrings.get(n.getName());
+            Assertions.assertNotEquals(netNameWithNoLoads, netName);
+        }
     }
 }
