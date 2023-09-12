@@ -25,6 +25,9 @@ package com.xilinx.rapidwright.design;
 
 
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.VivadoTools;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -35,10 +38,17 @@ import java.util.List;
 public class TestCell {
     @ParameterizedTest
     @CsvSource({
+            // Input pins (many site pin options for single logical pin)
             "xcvu3p,SLICE_X0Y0,CARRY8,S[4],S4,'[E1, E2, E3, E4, E5, E6]'",  // SLICEL
             "xcvu3p,SLICE_X0Y0,CARRY8,DI[2],DI2,'[C1, C2, C3, C4, C5]'",
             "xcvu3p,SLICE_X1Y0,CARRY8,S[7],S7,'[H1, H2, H3, H4, H5, H6]'",  // SLICEM
             "xcvu3p,SLICE_X1Y0,CARRY8,DI[3],DI3,'[D1, D2, D3, D4, D5]'",
+
+            // Output pins (single logical pin has options to drive many site pins)
+            "xcvu3p,SLICE_X0Y0,E6LUT,O,O6,'[E_O, EMUX]'",
+            "xcvu3p,SLICE_X0Y0,CARRY8,O[7],O7,'[HMUX]'",
+            "xcvu3p,SLICE_X0Y0,CARRY8,CO[7],CO7,'[COUT, HMUX]'",
+            "xcvu3p,SLICE_X1Y0,A5LUT,O,O5,'[AMUX]'",
     })
     public void testGetAllCorrespondingSitePinNames(String deviceName,
                                                     String siteName,
@@ -80,5 +90,23 @@ public class TestCell {
         Cell cell = new Cell("cell");
         Assertions.assertNull(cell.getEDIFCellInst());
         Assertions.assertNull(cell.getProperty("any_property"));
+    }
+
+    @Test
+    public void testFFRoutethruCell() {
+        Design d = RapidWrightDCP.loadDCP("optical-flow.dcp");
+        SiteInst si = d.getSiteInstFromSiteName("SLICE_X72Y144");
+        Cell rtCell = si.getCell("CFF");
+        Assertions.assertNotNull(rtCell);
+        Assertions.assertTrue(rtCell.isRoutethru());
+        Assertions.assertTrue(rtCell.isFFRoutethruCell());
+        Assertions.assertEquals("D", rtCell.getLogicalPinMapping("D"));
+        Assertions.assertEquals("Q", rtCell.getLogicalPinMapping("Q"));
+
+        Assertions.assertNull(d.getCell(rtCell.getName()));
+
+        if (FileTools.isVivadoOnPath()) {
+            Assertions.assertEquals(0, VivadoTools.reportRouteStatus(d).netsWithRoutingErrors);
+        }
     }
 }
