@@ -376,6 +376,15 @@ public class PartialRouter extends RWRoute {
                 }
             }
 
+            // Clear prev to avoid assertions firing
+            for (PIP pip : net.getPIPs()) {
+                Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
+                RouteNode rend = routingGraph.getNode(end);
+                if (rend != null) {
+                    rend.clearPrev();
+                }
+            }
+
             // Restore prev to avoid assertions firing
             for (Map.Entry<RouteNode, RouteNode> e2 : stashedPrev.entrySet()) {
                 RouteNode rnode = e2.getKey();

@@ -525,7 +525,9 @@ public class RWRoute{
                 Node sinkINTNode = nodes.get(0);
                 indirectConnections.add(connection);
                 checkSinkRoutability(net, sinkINTNode);
-                connection.setSinkRnode(getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I));
+                RouteNode sinkINTRnode = getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I);
+                sinkINTRnode.setType(RouteNodeType.PINFEED_I);
+                connection.setSinkRnode(sinkINTRnode);
                 if (sourceINTRnode == null && altSourceINTRnode == null) {
                     Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
 
@@ -544,10 +546,14 @@ public class RWRoute{
                         assert(!altSource.equals(source));
                         Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
                         altSourceINTRnode = altSourceNode != null ? getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O) : null;
+                        if (altSourceINTRnode != null) {
+                            altSourceINTRnode.setType(RouteNodeType.PINFEED_O);
+                        }
                     }
 
                     if (sourceINTNode != null) {
                         sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
+                        sourceINTRnode.setType(RouteNodeType.PINFEED_O);
                     }
 
                     if (sourceINTRnode == null && altSourceINTRnode == null) {
@@ -1288,6 +1294,7 @@ public class RWRoute{
             assert(connection.getSink().isRouted());
         } else {
             assert(queue.isEmpty());
+            connection.getRnodes().clear();
             // Clears previous route of the connection
             connection.resetRoute();
             assert(connection.getRnodes().isEmpty());
