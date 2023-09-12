@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -21,9 +21,7 @@
  * limitations under the License.
  *
  */
-/**
- *
- */
+
 package com.xilinx.rapidwright.edif;
 
 import java.util.ArrayList;
@@ -282,18 +280,17 @@ public class EDIFHierNet {
                     // Moving up in hierarchy
                     if (!p.getHierarchicalInst().isTopLevelInst()) {
                         final EDIFHierPortInst upPort = p.getPortInParent();
-                        if (upPort != null) {
+                        final EDIFHierNet upNet = (upPort != null) ? upPort.getHierarchicalNet() : null;
+                        if (upNet != null) {
                             queue.add(upPort.getHierarchicalNet());
                         }
                     }
                 } else {
                     // Moving down in hierarchy
-                    EDIFHierNet otherNet = p.getInternalNet();
-                    if (otherNet == null) {
-                        // Looks unconnected
-                        continue;
+                    EDIFHierNet downNet = p.getInternalNet();
+                    if (downNet != null) {
+                        queue.add(downNet);
                     }
-                    queue.add(otherNet);
                 }
             }
         }

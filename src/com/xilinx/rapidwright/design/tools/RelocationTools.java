@@ -287,10 +287,13 @@ public class RelocationTools {
                     } else {
                         String destTileName = st.getRootName() + "_X" + (st.getTileXCoordinate() + tileColOffset)
                                 + "Y" + (st.getTileYCoordinate() + tileRowOffset);
-                        System.out.println("ERROR: Failed to move PIP '" + sp + "' to Tile '" + destTileName +
-                                "' (Net '" + n.getName() + "')");
-                        revertRouting = true;
-                        throw new RuntimeException();
+                        if (sp.isStub()) {
+                            System.out.println("INFO: Skipping stub PIP '" + sp + "' that failed to move to Tile '" + destTileName +
+                                    "' (Net '" + n.getName() + "')");
+                        } else {
+                            throw new RuntimeException("ERROR: Failed to move PIP '" + sp + "' to Tile '" + destTileName +
+                                    "' (Net '" + n.getName() + "')");
+                        }
                     }
                 } else {
                     assert (st.getTileTypeEnum() == dt.getTileTypeEnum());
