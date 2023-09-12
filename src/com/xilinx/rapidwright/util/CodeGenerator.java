@@ -24,10 +24,14 @@ package com.xilinx.rapidwright.util;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * This utility class is used to create RapidWright code from a DCP file that is tedious to create by hand.
@@ -83,11 +87,15 @@ public class CodeGenerator {
         code.append("Device device = design.getDevice();\n\n");
 
         int netIdx = 0;
+        int siteIdx = 0;
+        Map<String, Integer> siteInstsCreated = new HashMap<>();
         for (String netName : nets) {
             Net net = design.getNet(netName);
             String varName = "net";
             if (nets.size() > 1) varName += netIdx;
-            code.append(String.format("Net %s = TestDesignHelper.createTestNet(design, \"%s\", new String[]{\n", varName, varName));
+            code.append(String.format(
+                    "Net %s = " + CodeGenerator.class.getName() + ".createTestNet(design, \"%s\", new String[]{\n",
+                    varName, varName));
 
             List<PIP> pips = net.getPIPs();
             for(int i = 0; i < pips.size(); i++) {
@@ -98,18 +106,46 @@ public class CodeGenerator {
                 code.append("\n");
             }
             code.append("});\n");
+            for (SitePinInst pin : net.getPins()) {
+                String siteName = pin.getSiteInst().getSiteName();
+                Integer siteInstIdx = siteInstsCreated.get(siteName);
+                if (siteInstIdx == null) {
+                    siteIdx++;
+                    code.append(createSiteInstCode(siteIdx, siteName));
+                }
+                code.append(varName + ".createPin(\"" + pin.getName() + "\", " + getSiteInstVarName(siteIdx) + ");\n");
+            }
             netIdx++;
         }
         code.append("\n");
 
-        int siteIdx = 0;
         for (String siteName : siteInsts) {
-            String varName = "si";
-            if (nets.size() > 1) varName += siteIdx;
-            code.append(String.format("SiteInst %s = design.createSiteInst(design.getDevice().getSite(\"%s\"));\n", varName, siteName));
             siteIdx++;
+            code.append(createSiteInstCode(siteIdx, siteName));
         }
 
         return code.toString();
+    }
+    
+    private static String createSiteInstCode(int siteInstIdx, String siteName) {
+        String varName = getSiteInstVarName(siteInstIdx);
+        return String.format("SiteInst %s = design.createSiteInst(device.getSite(\"%s\"));\n", varName, siteName);
+    }
+
+    private static String getSiteInstVarName(int siteInstIdx) {
+        return "si" + siteInstIdx;
+    }
+
+    public static Net createTestNet(Design design, String netName, String[] pips) {
+        Net net = design.createNet(netName);
+        addPIPs(net, pips);
+        return net;
+    }
+
+    public static void addPIPs(Net net, String[] pips) {
+        Device device = net.getDesign().getDevice();
+        for (String pip : pips) {
+            net.addPIP(device.getPIP(pip));
+        }
     }
 }
