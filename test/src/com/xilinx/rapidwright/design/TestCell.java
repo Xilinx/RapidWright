@@ -35,10 +35,17 @@ import java.util.List;
 public class TestCell {
     @ParameterizedTest
     @CsvSource({
+            // Input pins (many site pin options for single logical pin)
             "xcvu3p,SLICE_X0Y0,CARRY8,S[4],S4,'[E1, E2, E3, E4, E5, E6]'",  // SLICEL
             "xcvu3p,SLICE_X0Y0,CARRY8,DI[2],DI2,'[C1, C2, C3, C4, C5]'",
             "xcvu3p,SLICE_X1Y0,CARRY8,S[7],S7,'[H1, H2, H3, H4, H5, H6]'",  // SLICEM
             "xcvu3p,SLICE_X1Y0,CARRY8,DI[3],DI3,'[D1, D2, D3, D4, D5]'",
+
+            // Output pins (single logical pin has options to drive many site pins)
+            "xcvu3p,SLICE_X0Y0,E6LUT,O,O6,'[E_O, EMUX]'",
+            "xcvu3p,SLICE_X0Y0,CARRY8,O[7],O7,'[HMUX]'",
+            "xcvu3p,SLICE_X0Y0,CARRY8,CO[7],CO7,'[COUT, HMUX]'",
+            "xcvu3p,SLICE_X1Y0,A5LUT,O,O5,'[AMUX]'",
     })
     public void testGetAllCorrespondingSitePinNames(String deviceName,
                                                     String siteName,
