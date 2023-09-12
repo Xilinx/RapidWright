@@ -37,6 +37,8 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SitePIPStatus;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.CellPlacement;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.MultiCellPinMapping;
@@ -229,18 +231,39 @@ public class PhysNetlistWriter {
         writeNullNet(physNetlist, design, strings);
 
         int physNetCount = design.getNets().size();
-        Builder<PhysNet.Builder> nets = physNetlist.initPhysNets(physNetCount);
-        Net[] keys = design.getNets().toArray(new Net[design.getNets().size()]);
-        writePhysNetsRange(nets, keys, design, strings, 0, keys.length - 1);
+        List<Net> keys = new ArrayList<>(physNetCount);
+        for (Net net : design.getNets()) {
+            if (net.getPins().isEmpty()) {
+                // Net has no SitePinInst-s, check if it is entirely loadless
+                // (rather than just fully intra-site)
+                EDIFNet en = net.getLogicalNet();
+                if (en != null) {
+                    boolean loadLess = true;
+                    for (EDIFPortInst epi : en.getPortInsts()) {
+                        if (!epi.isOutput()) {
+                            loadLess = false;
+                            break;
+                        }
+                    }
+                    if (loadLess) {
+                        continue;
+                    }
+                }
+            }
+            keys.add(net);
+        }
+        Builder<PhysNet.Builder> nets = physNetlist.initPhysNets(keys.size());
+        writePhysNetsRange(nets, keys, design, strings, 0, keys.size() - 1);
     }
 
-   protected static void writePhysNetsRange(Builder<PhysNet.Builder> nets, Net[] keys,
+   protected static void writePhysNetsRange(Builder<PhysNet.Builder> nets, List<Net> keys,
                                             Design design, StringEnumerator strings, int start,
                                             int end) {
         for (int i = start; i <= end; i++) {
-            String netName = keys[i].getName();
+            String netName = keys.get(i).getName();
             Net net = design.getNet(netName);
             assert(net != null);
+
             PhysNet.Builder physNet = nets.get(i - start);
             buildNet(net, physNet, strings);
         }
