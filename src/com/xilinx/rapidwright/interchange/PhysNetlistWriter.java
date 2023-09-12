@@ -475,16 +475,7 @@ public class PhysNetlistWriter {
                     }
                 } else {
                     if (bel.getBELClass() == BELClass.BEL) {
-                        if (cell != null) {
-                            routethru = cell.isRoutethru();
-                        } else {
-                            // No cell placed on this BEL; check for FF routethrus
-                            if (bel.isFF()) {
-                                BELPin belPinD = bel.getPin("D");
-                                String siteWireName = belPinD.getSiteWireName();
-                                routethru = (siteInst.getNetFromSiteWire(siteWireName) == net);
-                            }
-                        }
+                        routethru = cell != null && cell.isRoutethru();
 
                         // Fall through
                     } else if (bel.getBELClass() == BELClass.RBEL) {
