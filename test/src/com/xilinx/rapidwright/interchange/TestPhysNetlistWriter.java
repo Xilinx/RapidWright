@@ -309,12 +309,18 @@ public class TestPhysNetlistWriter {
     public void testNetWithNoLoads(@TempDir Path tempDir) throws IOException {
         Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
 
-        String netNameWithNoLoads = "processor/spm_enable_lut/O5";
+        // "get_property ROUTE_STATUS [get_nets processor/stack_pointer_carry_0]" gives "NOLOADS"
+        String netNameWithNoLoads = "processor/stack_pointer_carry_0";
+        Assertions.assertNotNull(design.getNet(netNameWithNoLoads));
         EDIFHierNet ehn = design.getNetlist().getHierNetFromName(netNameWithNoLoads);
         for (EDIFHierPortInst epi : ehn.getPortInsts()) {
             // Net only contains sources
             Assertions.assertTrue(epi.isOutput());
         }
+
+        // "get_property ROUTE_STATUS [get_nets processor/stack_pointer_carry_0]" gives "INTRASITE"
+        String netNameIntraSite = "processor/t_state_lut/O6";
+        Assertions.assertNotNull(design.getNet(netNameIntraSite));
 
         String interchangePath = tempDir.resolve("design.phys").toString();
         PhysNetlistWriter.writePhysNetlist(design, interchangePath);
@@ -329,9 +335,16 @@ public class TestPhysNetlistWriter {
         List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
 
         // Load-less nets to not appear as a physical net
+        boolean seenNetNameWithNoLoads = false;
+        // Intra-site nets to remain a physical net
+        boolean seenNetNameIntraSite = false;
         for (PhysNet.Reader n : physNetlist.getPhysNets()) {
             String netName = allStrings.get(n.getName());
-            Assertions.assertNotEquals(netNameWithNoLoads, netName);
+            seenNetNameWithNoLoads = seenNetNameWithNoLoads || netName.equals(netNameWithNoLoads);
+            seenNetNameIntraSite = seenNetNameIntraSite || netName.equals(netNameIntraSite);
         }
+
+        Assertions.assertFalse(seenNetNameWithNoLoads);
+        Assertions.assertTrue(seenNetNameIntraSite);
     }
 }

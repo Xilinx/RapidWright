@@ -240,7 +240,7 @@ public class PhysNetlistWriter {
                 if (en != null) {
                     boolean loadLess = true;
                     for (EDIFPortInst epi : en.getPortInsts()) {
-                        if (!epi.isOutput()) {
+                        if (!epi.isOutput() || epi.isTopLevelPort()) {
                             loadLess = false;
                             break;
                         }
