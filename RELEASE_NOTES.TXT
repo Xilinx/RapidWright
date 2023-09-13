@@ -44,6 +44,7 @@ Notes:
   - com.xilinx.rapidwright.bitstream.FAR "public Block getConfigBlock(int slrCfgOrder)"
   - com.xilinx.rapidwright.bitstream.Packet "public int hashCode()"
   - com.xilinx.rapidwright.bitstream.Packet "public boolean equals(Object obj)"
+  - com.xilinx.rapidwright.design.Cell "public static final String FF_ROUTETHRU_TYPE"
   - com.xilinx.rapidwright.design.Cell "public Cell getReferenceCopy()"
   - com.xilinx.rapidwright.design.Cell "public boolean isFFRoutethruCell()"
   - com.xilinx.rapidwright.design.Design "public boolean isCopyingOriginalNetsRouting()"
@@ -53,8 +54,8 @@ Notes:
   - com.xilinx.rapidwright.design.Design "public void setCopyingOriginalSiteInsts(boolean copyOrigSiteInsts)"
   - com.xilinx.rapidwright.design.Design "public Map<String, SiteInst> getOriginalSiteInsts()"
   - com.xilinx.rapidwright.design.Net "public List<PIP> getCopyOfPIPs()"
+  - com.xilinx.rapidwright.design.SiteInst "public void addPin(SitePinInst sitePinInst)"
   - com.xilinx.rapidwright.design.SiteInst "public SiteInst getReferenceCopy()"
-
 
 ============= RapidWright 2023.1.2-beta released on 2023-07-24 ================
 Notes:
