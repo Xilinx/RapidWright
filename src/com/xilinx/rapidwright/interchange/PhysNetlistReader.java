@@ -317,6 +317,7 @@ public class PhysNetlistReader {
                 cell.setType(cellType);
                 if (cell.isFFRoutethruCell()) {
                     cell.setRoutethru(true);
+                    cell.setSiteInst(siteInst);
                     siteInst.getCellMap().put(belName, cell);
                 } else {
                     siteInst.addCell(cell);
