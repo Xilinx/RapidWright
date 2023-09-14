@@ -395,7 +395,16 @@ public class PhysNetlistWriter {
                     }
                 } else {
                     if (bel.getBELClass() == BELClass.BEL) {
-                        routethru = cell != null && cell.isRoutethru();
+                        if (cell == null) {
+                            // Skip if nothing placed here
+                            continue;
+                        }
+
+                        if (cell.getType().equals(PORT)) {
+                            continue;
+                        }
+
+                        routethru = cell.isRoutethru();
 
                         // Fall through
                     } else if (bel.getBELClass() == BELClass.RBEL) {
