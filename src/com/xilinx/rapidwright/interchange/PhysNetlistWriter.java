@@ -415,6 +415,11 @@ public class PhysNetlistWriter {
                             // onto site instance)
                             continue;
                         }
+
+                        if (bel.getName().equals("IO") && siteInst.getSitePinInst(belPin.getName()) == null) {
+                            // Skip IO site ports without a site pin
+                            continue;
+                        }
                     }
                 }
 
