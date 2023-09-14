@@ -38,7 +38,7 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SitePIPStatus;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
-import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.CellPlacement;
@@ -261,9 +261,18 @@ public class PhysNetlistWriter {
             if (net.getPins().isEmpty()) {
                 // Net has no SitePinInst-s, check if it is entirely loadless
                 // (rather than just fully intra-site)
-                EDIFHierNet ehn = net.getLogicalHierNet();
-                if (ehn != null && ehn.getLeafHierPortInsts(false).isEmpty()) {
-                    continue;
+                EDIFNet en = net.getLogicalNet();
+                if (en != null) {
+                    boolean loadLess = true;
+                    for (EDIFPortInst epi : en.getPortInsts()) {
+                        if (!epi.isOutput() || epi.isTopLevelPort()) {
+                            loadLess = false;
+                            break;
+                        }
+                    }
+                    if (loadLess) {
+                        continue;
+                    }
                 }
             }
             keys.add(net);
