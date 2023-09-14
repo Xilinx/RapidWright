@@ -459,7 +459,7 @@ public class PhysNetlistWriter {
                             continue;
                         }
 
-                        if (cell.isPortCell()) {
+                        if (cell.getType().equals(PORT)) {
                             continue;
                         }
 
