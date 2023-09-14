@@ -396,6 +396,10 @@ public class PhysNetlistWriter {
                             continue;
                         }
 
+                        if (cell.isPortCell()) {
+                            continue;
+                        }
+
                         routethru = cell.isRoutethru();
 
                         // Fall through
