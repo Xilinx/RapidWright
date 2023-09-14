@@ -17,7 +17,7 @@
 #     $ python3 -mvenv env
 #     $ source env/bin/activate
 #     $ pip install jpype1
-#     $ python3 -m pip install --index-url https://test.pypi.org/simple/ rapidwright
+#     $ python3 -m pip install --index-url https://test.pypi.org/simple/ rapidwright # if need to install a specific version 'rapidwright==2023.1.3a0'
 #     $ python3 <run test script>
 #  6. If step 2 was run, run 'make clean; make update_version; make package'
 #  7. Upload to PyPi with 'make upload_to_pypi'
