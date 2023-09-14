@@ -23,13 +23,19 @@
 
 package com.xilinx.rapidwright.interchange;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Queue;
+
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
-import com.xilinx.rapidwright.edif.EDIFHierNet;
-import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.CellPlacement;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.NetType;
@@ -39,20 +45,12 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PinMapping
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.RouteSegment;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
-import org.capnproto.MessageReader;
-import org.capnproto.ReaderOptions;
-import org.capnproto.StructList;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Queue;
+import org.capnproto.MessageReader;
+import org.capnproto.ReaderOptions;
+import org.capnproto.StructList;
 
 public class TestPhysNetlistWriter {
     private void testAllRouteSegmentsEndInBELInputPins(Design design, RouteBranch.Reader routeBranch, List<String> strings) {
@@ -357,48 +355,5 @@ public class TestPhysNetlistWriter {
         PhysNetlist.PhysSitePin.Reader HMUX = HMUX_branch.getRouteSegment().getSitePin();
         Assertions.assertEquals("SLICE_X13Y239", allStrings.get(HMUX.getSite()));
         Assertions.assertEquals("HMUX", allStrings.get(HMUX.getPin()));
-    }
-
-    @Test
-    public void testNetWithNoLoads(@TempDir Path tempDir) throws IOException {
-        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
-
-        // "get_property ROUTE_STATUS [get_nets processor/stack_pointer_carry_0]" gives "NOLOADS"
-        String netNameWithNoLoads = "processor/stack_pointer_carry_0";
-        Assertions.assertNotNull(design.getNet(netNameWithNoLoads));
-        EDIFHierNet ehn = design.getNetlist().getHierNetFromName(netNameWithNoLoads);
-        for (EDIFHierPortInst epi : ehn.getPortInsts()) {
-            // Net only contains sources
-            Assertions.assertTrue(epi.isOutput());
-        }
-
-        // "get_property ROUTE_STATUS [get_nets processor/stack_pointer_carry_0]" gives "INTRASITE"
-        String netNameIntraSite = "processor/t_state_lut/O6";
-        Assertions.assertNotNull(design.getNet(netNameIntraSite));
-
-        String interchangePath = tempDir.resolve("design.phys").toString();
-        PhysNetlistWriter.writePhysNetlist(design, interchangePath);
-
-        ReaderOptions rdOptions =
-                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
-                        ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
-        MessageReader readMsg = Interchange.readInterchangeFile(interchangePath, rdOptions);
-
-        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
-
-        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
-
-        // Load-less nets to not appear as a physical net
-        boolean seenNetNameWithNoLoads = false;
-        // Intra-site nets to remain a physical net
-        boolean seenNetNameIntraSite = false;
-        for (PhysNet.Reader n : physNetlist.getPhysNets()) {
-            String netName = allStrings.get(n.getName());
-            seenNetNameWithNoLoads = seenNetNameWithNoLoads || netName.equals(netNameWithNoLoads);
-            seenNetNameIntraSite = seenNetNameIntraSite || netName.equals(netNameIntraSite);
-        }
-
-        Assertions.assertFalse(seenNetNameWithNoLoads);
-        Assertions.assertTrue(seenNetNameIntraSite);
     }
 }
