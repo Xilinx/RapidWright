@@ -136,7 +136,11 @@ public class PhysNetlistWriter {
                 if (!cell.isPlaced()) continue;
                 String cellName = cell.getName();
                 if (cellName.equals(PhysNetlistWriter.LOCKED)) continue;
-                if (!design.getCell(cellName).getBELName().equals(cell.getBELName())) {
+                Cell multiCell = design.getCell(cellName);
+                if (multiCell == null) {
+                    assert(cell.isFFRoutethruCell());
+                }
+                else if (!multiCell.getBELName().equals(cell.getBELName())) {
                     multiBelCells.computeIfAbsent(cellName, (k) -> new ArrayList<>())
                             .add(cell);
                     // Don't add multi-bel cells, store relevant info in pin placements
