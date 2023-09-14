@@ -525,9 +525,7 @@ public class PhysNetlistWriter {
                 physPIP.setWire0(strings.getIndex(pip.getStartWireName()));
                 physPIP.setWire1(strings.getIndex(pip.getEndWireName()));
                 physPIP.setIsFixed(pip.isPIPFixed());
-                if (pip.isBidirectional()) {
-                    physPIP.setForward(!pip.isReversed());
-                }
+                physPIP.setForward(!pip.isReversed());
                 break;
             }
             case BEL_PIN:{
