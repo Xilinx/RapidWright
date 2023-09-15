@@ -853,6 +853,7 @@ public class RWRoute{
                     }
 
                     // Set the routed state of the used source node
+                    // and if used and not already present, add it to the SiteInst
                     Node sourceNode = nodes.get(nodes.size() - 1);
                     if (sourceNode.equals(connection.getSource().getConnectedNode())) {
                         SitePinInst src = connection.getSource();
