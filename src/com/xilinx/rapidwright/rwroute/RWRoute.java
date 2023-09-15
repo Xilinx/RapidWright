@@ -533,7 +533,6 @@ public class RWRoute{
                         altSource = DesignTools.getLegalAlternativeOutputPin(net);
                         if (altSource != null) {
                             net.addPin(altSource);
-                            altSource.getSiteInst().getSitePinInstMap().put(altSource.getName(), altSource);
                             DesignTools.routeAlternativeOutputSitePin(net, altSource);
                         }
                     }
@@ -856,12 +855,19 @@ public class RWRoute{
                     // Set the routed state of the used source node
                     Node sourceNode = nodes.get(nodes.size() - 1);
                     if (sourceNode.equals(connection.getSource().getConnectedNode())) {
-                        connection.getSource().setRouted(true);
+                        SitePinInst src = connection.getSource();
+                        src.setRouted(true);
+                        if (src.getSiteInst().getSitePinInst(src.getName()) == null) {
+                            src.getSiteInst().addPin(src);
+                        }
                     } else {
                         // Source used must have been the Net's alternate source
                         assert(!altSource.equals(connection.getSource()));
                         assert(sourceNode.equals(altSource.getConnectedNode()));
                         altSource.setRouted(true);
+                        if (altSource.getSiteInst().getSitePinInst(altSource.getName()) == null) {
+                            altSource.getSiteInst().addPin(altSource);
+                        }
                     }
 
                     if (source.isRouted() && (altSource == null || altSource.isRouted())) {
