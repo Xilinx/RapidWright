@@ -38,10 +38,13 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
@@ -367,24 +370,48 @@ public class RouterHelper {
         for (SitePinInst currSitePinInst : pins) {
             if (!currSitePinInst.getNet().equals(staticNet))
                 throw new RuntimeException(currSitePinInst.toString());
-            BELPin[] belPins = currSitePinInst.getSiteInst().getSiteWirePins(currSitePinInst.getName());
-            // DSP or BRAM
-            if (belPins.length == 2) {
-                for (BELPin belPin : belPins) {
-                    if (belPin.isSitePort())    continue;
-                    // DO NOT invert CLK_OPTINV_CLKB_L and CLK_OPTINV_CLKB_U
-                    if (belPin.getBEL().getName().contains("CLKB")) continue;
-                    if (currSitePinInst.toString().contains("RAM")) {
-                        if (belPin.getBEL().canInvert()) {
-                            // SRST2 of SLICE also has an inverter, but should not be invertible
-                            toInvertPins.add(currSitePinInst);
-                        }
-                    } else if (currSitePinInst.toString().contains("DSP")) {
-                        if (isInvertibleDSPBELPin(belPin)) {
-                            toInvertPins.add(currSitePinInst);
+            if (currSitePinInst.isLUTInputPin()) {
+                for (Cell cell : DesignTools.getConnectedCells(currSitePinInst)) {
+                    BEL bel = cell.getBEL();
+                    assert(bel.isLUT());
+
+                    // Find the logical pin name
+                    String physicalPinName = "A" + currSitePinInst.getName().charAt(1);
+                    String logicalPinName = cell.getLogicalPinMapping(physicalPinName);
+
+                    // Get the LUT equation
+                    String lutEquation = LUTTools.getLUTEquation(cell);
+                    assert(lutEquation.contains(logicalPinName));
+
+                    // Compute a new LUT equation with that logical input inverted
+                    String newLutEquation = lutEquation.replace(logicalPinName, "!" + logicalPinName)
+                            // Cancel out double inversions
+                            .replace("!!", "");
+                    // TODO: This may modify an folded EDIFCellInst!!!
+                    LUTTools.configureLUT(cell, newLutEquation);
+                }
+
+                toInvertPins.add(currSitePinInst);
+            } else {
+                BELPin[] belPins = currSitePinInst.getSiteInst().getSiteWirePins(currSitePinInst.getName());
+                // DSP or BRAM
+                if (belPins.length == 2) {
+                    for (BELPin belPin : belPins) {
+                        if (belPin.isSitePort()) continue;
+                        // DO NOT invert CLK_OPTINV_CLKB_L and CLK_OPTINV_CLKB_U
+                        if (belPin.getBEL().getName().contains("CLKB")) continue;
+                        if (currSitePinInst.toString().contains("RAM")) {
+                            if (belPin.getBEL().canInvert()) {
+                                // SRST2 of SLICE also has an inverter, but should not be invertible
+                                toInvertPins.add(currSitePinInst);
+                            }
+                        } else if (currSitePinInst.toString().contains("DSP")) {
+                            if (isInvertibleDSPBELPin(belPin)) {
+                                toInvertPins.add(currSitePinInst);
+                            }
                         }
                     }
-               }
+                }
             }
         }
 
