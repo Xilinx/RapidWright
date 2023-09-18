@@ -372,8 +372,9 @@ public class RouterHelper {
                 throw new RuntimeException(currSitePinInst.toString());
             if (currSitePinInst.isLUTInputPin()) {
                 for (Cell cell : DesignTools.getConnectedCells(currSitePinInst)) {
-                    BEL bel = cell.getBEL();
-                    assert(bel.isLUT());
+                    if (!LUTTools.isCellALUT(cell)) {
+                        continue;
+                    }
 
                     // Find the logical pin name
                     String physicalPinName = "A" + currSitePinInst.getName().charAt(1);
