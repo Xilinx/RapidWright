@@ -82,4 +82,29 @@ public class TestPhysNetlistReader {
         Assertions.assertEquals("ERROR: Cell \"LUT6_2_70/LUT6\" placement on BEL SLICE_X61Y155/B6LUT conflicts with previously placed cell \"LUT6_2_70/LUT5\".",
                 ex.getMessage());
     }
+
+    @Test
+    public void testFFRoutethruCell(@TempDir Path tempDir) throws IOException {
+        Design design = RapidWrightDCP.loadDCP("optical-flow.dcp");
+
+        String interchangePath = tempDir.resolve("design.phys").toString();
+        PhysNetlistWriter.writePhysNetlist(design, interchangePath);
+
+        PhysNetlistReader.CHECK_CONSTANT_ROUTING_AND_NET_NAMING = false;
+        PhysNetlistReader.VALIDATE_MACROS_PLACED_FULLY = false;
+        PhysNetlistReader.CHECK_MACROS_CONSISTENT = false;
+        PhysNetlistReader.CHECK_AND_CREATE_LOGICAL_CELL_IF_NOT_PRESENT = false;
+
+        Design roundtripDesign = PhysNetlistReader.readPhysNetlist(interchangePath);
+        SiteInst si = roundtripDesign.getSiteInstFromSiteName("SLICE_X72Y144");
+        Cell rtCell = si.getCell("CFF");
+        Assertions.assertNotNull(rtCell);
+        Assertions.assertSame(si, rtCell.getSiteInst());
+        Assertions.assertTrue(rtCell.isRoutethru());
+        Assertions.assertTrue(rtCell.isFFRoutethruCell());
+        Assertions.assertEquals("D", rtCell.getLogicalPinMapping("D"));
+        Assertions.assertEquals("Q", rtCell.getLogicalPinMapping("Q"));
+
+        Assertions.assertNull(roundtripDesign.getCell(rtCell.getName()));
+    }
 }

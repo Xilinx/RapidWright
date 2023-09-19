@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.device;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -58,5 +59,15 @@ public class TestBEL {
                 Assertions.assertEquals(bel.getBELClass(), BELClass.BEL);
             }
         }
+    }
+
+    @Test
+    public void testIsSliceFFClkMod() {
+        Device d = Device.getDevice("xcvc1902");
+        Site s = d.getSite("SLICE_X290Y265");
+        BEL b = s.getBEL("FF_CLK_MOD");
+        Assertions.assertNotNull(b);
+        Assertions.assertTrue(b.isSliceFFClkMod());
+        Assertions.assertFalse(b.isFF());
     }
 }

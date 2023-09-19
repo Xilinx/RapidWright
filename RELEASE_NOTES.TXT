@@ -1,3 +1,62 @@
+============= RapidWright 2023.1.3-beta released on 2023-09-13 ================
+Notes:
+  - Fix DesignTools.getConnectionPIPs() (#809) 
+  - [PhysNetlistWriter] RouteBranchNode.getDrivers() to return input BelPin (#800)
+  - Adds site pins to example code generation for nets. (#807)
+  - Update to fixed microblazeAndILA_3pblocks.dcp (#808)
+  - [LogNetlistWriter] Refactor writeStrings method to be public static (#804)
+  - [VivadoTools] ReportRouteStatusResult to parse more stats (#805) 
+  - EDIF improvements (#806)
+  - RWRoute improvements (#803)
+  - Adds a createBitstream() method to VivadoTools (#801)
+  - Small DesignTools improvements (#797)
+  - added static function that helps produce test nets (including PIPs) (#784)
+  - Add reference copy methods (#794)
+  - [RWRoute] Add alternate source pins and set source routed flags (#787)
+  - Adds support for RouteThru LUT equations and makes LUTEquationEvaluator public (#795)
+  - Fix TestDCPLoad to prevent issues with parallel testing (#793)
+  - [PhysNetlistWriter] Fix route tree construction for bidir PIPs (#791)
+  - VivadoTools.reportRouteStatus() to handle encrypted cells (#777)
+  - [PhysNetlistWriter] Insert site port BELPin before site pin (#790)
+  - fixed null pointer exception in getPhysicalNetFromPin() (#775)
+  - LUT cell companion helper methods (#764) 
+  - Check for error situation RAPIDWRIGHT_PATH set but not CLASSPATH (#772) 
+  - Set reversed flag on bi-directional PIPs used from end->start (#774)
+  - Fix RouterHelper.projectOutputPinToINTNode() for depop pins (#779)
+  - Make PartialRouter.getUnroutedPins() public (#778)
+  - FileTools.runCommand() - Adds ability to choose run directory (#769)
+  - [GlobalSignalRouting] Static router to not create site pin if exists (#768)
+  - RouteThru support for FFs in UltraScale architecture
+  - Fixes minor SitePinInst creation when reading a DCP
+  - Improvements to Net.rename() when tracking changes 
+  - Design.detachNetlist() to detach routethru cells
+  - Adds reference copy APIs and ability to keep copies of modified
+  SiteInsts and Nets
+  - Improvements to DCP reading compatibility for different flows
+    within Vivado
+- API Additions:
+  - com.xilinx.rapidwright.bitstream.BitLocation "public int hashCode()"
+  - com.xilinx.rapidwright.bitstream.BitLocation "public boolean equals(Object obj)"
+  - com.xilinx.rapidwright.bitstream.Bitstream "public static Bitstream readBitstream(Path fileName)"
+  - com.xilinx.rapidwright.bitstream.Block "public int getBit(BitLocation bit, Tile tile)"
+  - com.xilinx.rapidwright.bitstream.Block "public boolean updateBit(BitLocation bit, Tile tile, int value, Block golden)"
+  - com.xilinx.rapidwright.bitstream.ConfigRow "public ConfigRow(int configRowIdx)"
+  - com.xilinx.rapidwright.bitstream.FAR "public Block getConfigBlock(int slrCfgOrder)"
+  - com.xilinx.rapidwright.bitstream.Packet "public int hashCode()"
+  - com.xilinx.rapidwright.bitstream.Packet "public boolean equals(Object obj)"
+  - com.xilinx.rapidwright.design.Cell "public static final String FF_ROUTETHRU_TYPE"
+  - com.xilinx.rapidwright.design.Cell "public Cell getReferenceCopy()"
+  - com.xilinx.rapidwright.design.Cell "public boolean isFFRoutethruCell()"
+  - com.xilinx.rapidwright.design.Design "public boolean isCopyingOriginalNetsRouting()"
+  - com.xilinx.rapidwright.design.Design "public void setCopyingOriginalNetsRouting(boolean copyOrigNets)"
+  - com.xilinx.rapidwright.design.Design "public Map<String, List<PIP>> getOriginalNetRouting()"
+  - com.xilinx.rapidwright.design.Design "public boolean isCopyingOriginalSiteInsts()"
+  - com.xilinx.rapidwright.design.Design "public void setCopyingOriginalSiteInsts(boolean copyOrigSiteInsts)"
+  - com.xilinx.rapidwright.design.Design "public Map<String, SiteInst> getOriginalSiteInsts()"
+  - com.xilinx.rapidwright.design.Net "public List<PIP> getCopyOfPIPs()"
+  - com.xilinx.rapidwright.design.SiteInst "public void addPin(SitePinInst sitePinInst)"
+  - com.xilinx.rapidwright.design.SiteInst "public SiteInst getReferenceCopy()"
+
 ============= RapidWright 2023.1.2-beta released on 2023-07-24 ================
 Notes:
   - Shell creation improvements to enable lock_design and timing closure preservation (#760)

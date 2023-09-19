@@ -24,7 +24,7 @@ from jpype.types import *
 from typing import List, Optional
 import os, urllib.request, platform
 
-version='2023.1.2'
+version='2023.1.3'
 
 def start_jvm():
     os_str = 'lin64'
@@ -39,7 +39,7 @@ def start_jvm():
             url = "http://github.com/Xilinx/RapidWright/releases/download/v"+version+"-beta/" + file_name
             urllib.request.urlretrieve(url,classpath)
         kwargs['classpath'] = classpath
-    if not os.environ.get('CLASSPATH'):
+    if not os.environ.get('CLASSPATH') and os.environ.get('RAPIDWRIGHT_PATH'):
         rwPath = os.environ.get('RAPIDWRIGHT_PATH')
         classpath = rwPath + "/bin:" + rwPath + "/jars/*"
         print("ERROR: RAPIDWRIGHT_PATH is set but CLASSPATH is not set.  Please set CLASSPATH=" + classpath)

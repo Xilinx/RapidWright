@@ -366,7 +366,11 @@ public class RouteNode implements Comparable<RouteNode> {
                 for (Wire w1 : curr.tile.getWireConnections(parentWire.getWireIndex())) {
                     if (w1.getWireIndex() == curr.wire) {
                         if (w1.isEndPIPWire()) {
-                            pips.add(new PIP(curr.tile, parentWire.getWireIndex(), curr.wire, w1.getPIPType()));
+                            PIP p = new PIP(curr.tile, parentWire.getWireIndex(), curr.wire, w1.getPIPType());
+                            if (p.isBidirectional()) {
+                                p.setIsReversed(p.getStartWire().equals(w1));
+                            }
+                            pips.add(p);
                             break;
                         }
                     }

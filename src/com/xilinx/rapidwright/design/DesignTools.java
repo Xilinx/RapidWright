@@ -3039,15 +3039,6 @@ public class DesignTools {
             }
 
             if (parentPhysNet != null) {
-                // Merge both physical nets together
-                for (SiteInst si : new ArrayList<>(net.getSiteInsts())) {
-                    List<String> siteWires = new ArrayList<>(si.getSiteWiresFromNet(net));
-                    for (String siteWire : siteWires) {
-                        BELPin[] pins = si.getSiteWirePins(siteWire);
-                        si.unrouteIntraSiteNet(pins[0], pins[0]);
-                        si.routeIntraSiteNet(parentPhysNet, pins[0], pins[0]);
-                    }
-                }
                 design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
             }
         }
@@ -3065,38 +3056,30 @@ public class DesignTools {
         for (SiteInst si : design.getSiteInsts()) {
             if (!Utils.isSLICE(si)) continue;
             for (BEL bel : si.getBELs()) {
-                if (si.getCell(bel) != null) continue;
-                BELPin q = bel.getPin("Q");
-                if (q != null) {
-                    Net netQ = si.getNetFromSiteWire(q.getSiteWireName());
-                    if (netQ == null) continue;
-                    BELPin dPin = bel.getPin("D");
-                    if (dPin != null) {
-                        Net netD = si.getNetFromSiteWire(dPin.getSiteWireName());
-                        if (netQ == netD) {
-                            //System.out.println(si.getSiteName() + "/" + bel + ": " + netQ);
-                            // Need VCC at CE
-                            BELPin ceInput = bel.getPin("CE");
-                            String ceInputSitePinName = ceInput.getConnectedSitePinName();
-                            SitePinInst ceSitePin = si.getSitePinInst(ceInputSitePinName);
-                            if (ceSitePin == null) {
-                                ceSitePin = vcc.createPin(ceInputSitePinName, si);
-                            }
-                            si.routeIntraSiteNet(vcc, ceSitePin.getBELPin(), ceInput);
-                            // ...and GND at CLK
-                            BELPin clkInput = bel.getPin("CLK");
-                            BELPin clkInvOut = clkInput.getSourcePin();
-                            si.routeIntraSiteNet(gnd, clkInvOut, clkInput);
-                            BELPin clkInvIn = clkInvOut.getBEL().getPin(0);
-                            String clkInputSitePinName = clkInvIn.getConnectedSitePinName();
-                            SitePinInst clkInputSitePin = si.getSitePinInst(clkInputSitePinName);
-                            if (clkInputSitePin == null) {
-                                clkInputSitePin = vcc.createPin(clkInputSitePinName, si);
-                            }
-                            si.routeIntraSiteNet(vcc, clkInputSitePin.getBELPin(), clkInvIn);
-                        }
-                    }
+                Cell cell = si.getCell(bel);
+                if (cell == null || !cell.isFFRoutethruCell()) {
+                    continue;
                 }
+
+                // Need VCC at CE
+                BELPin ceInput = bel.getPin("CE");
+                String ceInputSitePinName = ceInput.getConnectedSitePinName();
+                SitePinInst ceSitePin = si.getSitePinInst(ceInputSitePinName);
+                if (ceSitePin == null) {
+                    ceSitePin = vcc.createPin(ceInputSitePinName, si);
+                }
+                si.routeIntraSiteNet(vcc, ceSitePin.getBELPin(), ceInput);
+                // ...and GND at CLK
+                BELPin clkInput = bel.getPin("CLK");
+                BELPin clkInvOut = clkInput.getSourcePin();
+                si.routeIntraSiteNet(gnd, clkInvOut, clkInput);
+                BELPin clkInvIn = clkInvOut.getBEL().getPin(0);
+                String clkInputSitePinName = clkInvIn.getConnectedSitePinName();
+                SitePinInst clkInputSitePin = si.getSitePinInst(clkInputSitePinName);
+                if (clkInputSitePin == null) {
+                    clkInputSitePin = vcc.createPin(clkInputSitePinName, si);
+                }
+                si.routeIntraSiteNet(vcc, clkInputSitePin.getBELPin(), clkInvIn);
             }
         }
     }
@@ -3325,8 +3308,21 @@ public class DesignTools {
     public static List<PIP> getConnectionPIPs(SitePinInst sinkPin) {
         if (sinkPin.isOutPin() || sinkPin.getNet() == null) return Collections.emptyList();
         Map<Node, PIP> reverseNodeToPIPMap = new HashMap<>();
+        List<PIP> biDirs = null;
         for (PIP p : sinkPin.getNet().getPIPs()) {
-            reverseNodeToPIPMap.put(p.getEndNode(), p);
+            PIP collision = reverseNodeToPIPMap.put(p.getEndNode(), p);
+            if (collision != null) {
+                if (p.isBidirectional()) {
+                    // Put back the original if trying to add a bi-directional PIP
+                    reverseNodeToPIPMap.put(collision.getEndNode(), collision);
+                }
+            }
+            if (p.isBidirectional()) {
+                if (biDirs == null) {
+                    biDirs = new ArrayList<>(1);
+                }
+                biDirs.add(p);
+            }
         }
 
         Node sinkNode = sinkPin.getConnectedNode();
@@ -3334,8 +3330,17 @@ public class DesignTools {
         Node curr = sinkNode;
 
         List<PIP> path = new ArrayList<>();
-        while (!curr.equals(srcNode)) {
+        loop: while (!curr.equals(srcNode)) {
             PIP pip = reverseNodeToPIPMap.get(curr);
+            if (pip == null) {
+                for (PIP biDirPIP : biDirs) {
+                    if (biDirPIP.getStartNode().equals(curr)) {
+                        path.add(biDirPIP);
+                        curr = biDirPIP.getEndNode();
+                        continue loop;
+                    }
+                }
+            }
             path.add(pip);
             curr = pip.getStartNode();
         }
