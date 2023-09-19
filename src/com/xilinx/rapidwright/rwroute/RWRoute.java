@@ -836,9 +836,10 @@ public class RWRoute{
                 Net net = e.getKey();
                 SitePinInst source = net.getSource();
                 SitePinInst altSource = net.getAlternateSource();
+                boolean altSourcePreviouslyRouted = altSource != null ? altSource.isRouted() : false;
                 for (SitePinInst spi : Arrays.asList(source, altSource)) {
                     if (spi != null) {
-                        source.setRouted(false);
+                        spi.setRouted(false);
                     }
                 }
 
@@ -874,6 +875,17 @@ public class RWRoute{
                     if (source.isRouted() && (altSource == null || altSource.isRouted())) {
                         // Break if all sources have been set to be routed
                         break;
+                    }
+                }
+                // If the alt source was previously routed, and is no longer, let's remove it
+                if (altSource != null && altSourcePreviouslyRouted && !altSource.isRouted()) {
+                    boolean sourceRouted = source.isRouted();
+                    altSource.getSiteInst().removePin(altSource);
+                    net.removePin(altSource);
+                    source.setRouted(sourceRouted);
+                    if (altSource.getName().endsWith("_O") && source.getName().endsWith("MUX") && source.isRouted()) {
+                        // Add site routing back if we are keeping the MUX pin
+                        source.getSiteInst().routeIntraSiteNet(net, altSource.getBELPin(), altSource.getBELPin());
                     }
                 }
             }
