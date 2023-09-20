@@ -26,6 +26,8 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Series;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
