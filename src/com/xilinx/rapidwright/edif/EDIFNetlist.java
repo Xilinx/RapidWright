@@ -1652,7 +1652,14 @@ public class EDIFNetlist extends EDIFName {
             }
             // Add copy to prim library to avoid destructive changes when collapsed
             // Needs to be a deep copy because it may have child instances that will get updated
-            new EDIFCell(netlistPrims, toAdd, cellName);
+            EDIFCell deepCopy = new EDIFCell(netlistPrims, toAdd, cellName);
+            for (EDIFCellInst inst : deepCopy.getCellInsts()) {
+                EDIFCell child = netlistPrims.getCell(inst.getCellName());
+                if (child == null) {
+                    EDIFCell childCopy = new EDIFCell(netlistPrims, inst.getCellType(), inst.getCellType().getName());
+                    inst.setCellType(childCopy);
+                }
+            }
         }
 
         // Update all cell references to macro versions

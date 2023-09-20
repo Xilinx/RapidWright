@@ -117,6 +117,11 @@ public class UltraScaleClockRouting {
             for (Wire w : curr.getWireConnections()) {
                 RouteNode parent = curr.getParent();
                 if (parent != null) {
+                    if (parent.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE &&
+                            w.getIntentCode() == IntentCode.NODE_GLOBAL_HROUTE) {
+                        // Disallow ability to go from VROUTE back to HROUTE
+                        continue;
+                    }
                     if (w.getIntentCode()     == IntentCode.NODE_GLOBAL_VDISTR &&
                        curr.getIntentCode()   == IntentCode.NODE_GLOBAL_VROUTE &&
                        parent.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE &&

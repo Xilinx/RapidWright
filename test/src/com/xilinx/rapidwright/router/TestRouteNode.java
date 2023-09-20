@@ -34,11 +34,11 @@ import java.util.ArrayList;
 public class TestRouteNode {
     @ParameterizedTest
     @CsvSource({
-            // Connecting east:
+            // Connecting west:
             //   node RCLK_DSP_INTF_CLKBUF_L_X36Y629/CLK_HDISTR_R8 ->
             //   node RCLK_DSP_INTF_CLKBUF_L_X19Y629/CLK_HDISTR_R8
             "RCLK_DSP_INTF_CLKBUF_L_X36Y629/CLK_HDISTR_R8,RCLK_DSP_INTF_CLKBUF_L_X36Y629/CLK_HDISTR_L8,RCLK_DSP_INTF_CLKBUF_L_X36Y629/RCLK_DSP_INTF_CLKBUF_L.CLK_HDISTR_L8<<->>CLK_HDISTR_R8,true",
-            // Connecting west:
+            // Connecting east:
             //   node RCLK_DSP_INTF_CLKBUF_L_X36Y629/CLK_HDISTR_R8 ->
             //   node RCLK_DSP_INTF_CLKBUF_L_X59Y629/CLK_HDISTR_R8
             "RCLK_DSP_INTF_CLKBUF_L_X59Y629/CLK_HDISTR_L8,RCLK_DSP_INTF_CLKBUF_L_X59Y629/CLK_HDISTR_R8,RCLK_DSP_INTF_CLKBUF_L_X59Y629/RCLK_DSP_INTF_CLKBUF_L.CLK_HDISTR_L8<<->>CLK_HDISTR_R8,false",
