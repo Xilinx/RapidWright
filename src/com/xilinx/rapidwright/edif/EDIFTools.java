@@ -47,6 +47,7 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -75,6 +76,8 @@ public class EDIFTools {
     public static final String EDIF_LIBRARY_WORK_NAME = "work";
 
     public static final String EDIF_PART_PROP = "PART";
+
+    public static final String DONT_TOUCH = "DONT_TOUCH";
 
     public static final Set<String> edifKeywordSet =
         new HashSet<>(Arrays.asList(
@@ -1484,5 +1487,63 @@ public class EDIFTools {
             return collection.entrySet();
         }
         return collection.entrySet().stream().sorted(Entry.comparingByKey())::iterator;
+    }
+
+    /**
+     * Locks the netlist by applying the DONT_TOUCH property to instances and nets
+     * so that Vivado won't make changes to it during opt_design, place_design,
+     * phys_opt_design, or route_design. Note: RapidWright doesn't respect the
+     * DONT_TOUCH attribute.
+     * 
+     * @param netlist The netlist to lock
+     */
+    public static void lockNetlist(EDIFNetlist netlist) {
+        EDIFPropertyValue value = new EDIFPropertyValue("true", EDIFValueType.BOOLEAN);
+        lockNetlist(netlist, i -> i.addProperty(DONT_TOUCH, value));
+    }
+
+    /**
+     * Unlocks the netlist by removing the DONT_TOUCH property on instances and nets
+     * so that Vivado won't make changes to it during opt_design, place_design,
+     * phys_opt_design, or route_design.
+     * 
+     * @param netlist The netlist to unlock
+     */
+    public static void unlockNetlist(EDIFNetlist netlist) {
+        lockNetlist(netlist, i -> i.removeProperty(DONT_TOUCH));
+    }
+
+    /**
+     * Traversal helper method to {@link #lockNetlist(EDIFNetlist)} and
+     * {@link #unlockNetlist(EDIFNetlist)}.
+     * 
+     * @param netlist    The netlist on which to apply the action.
+     * @param lockAction The method of action (lock or unlock) to apply to
+     *                   {@link EDIFPropertyObject} objects.
+     */
+    private static void lockNetlist(EDIFNetlist netlist, Consumer<EDIFPropertyObject> lockAction) {
+        EDIFCell top = netlist.getTopCell();
+        for (EDIFLibrary lib : netlist.getLibraries()) {
+            if (lib.isHDIPrimitivesLibrary()) continue;
+            for (EDIFCell cell : lib.getCells()) {
+                for (EDIFCellInst inst : cell.getCellInsts()) {
+                    EDIFCell cellType = inst.getCellType();
+                    if (cellType.isPrimitive() && !cellType.hasContents()) {
+                        String type = cellType.getName();
+                        if (!type.equals(Unisim.GND.name()) && !type.equals(Unisim.VCC.name())) {
+                            lockAction.accept(inst);
+                        }
+                    }
+                }
+    
+                for (EDIFNet net : cell.getNets()) {
+                    if (net != null && !net.isGND() && !net.isVCC()) {
+                        if (cell == top || net.isInternalToParent()) {
+                            lockAction.accept(net);
+                        }
+                    }
+                }
+            }
+        }
     }
 }

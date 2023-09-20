@@ -23,16 +23,17 @@
 
 package com.xilinx.rapidwright.design;
 
-import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestNet {
     @Test
@@ -95,7 +96,7 @@ public class TestNet {
         Design design = new Design("test", Device.KCU105);
 
         // Net with two outputs (HMUX primary and H_O alternate) and two sinks (SRST_B2 & B2)
-        Net net = TestDesignTools.createTestNet(design, "net", new String[]{
+        Net net = TestDesignHelper.createTestNet(design, "net", new String[]{
                 // SLICE_X65Y158/HMUX-> SLICE_X64Y158/SRST_B2
                 "INT_X42Y158/INT.LOGIC_OUTS_E16->>INT_NODE_SINGLE_DOUBLE_46_INT_OUT",
                 "INT_X42Y158/INT.INT_NODE_SINGLE_DOUBLE_46_INT_OUT->>INT_INT_SINGLE_51_INT_OUT",
@@ -164,7 +165,7 @@ public class TestNet {
         Net gndNet = design.getGndNet();
         SitePinInst a6 = gndNet.createPin("A6", si);
         SitePinInst b6 = gndNet.createPin("B6", si);
-        TestDesignTools.addPIPs(gndNet, new String[]{
+        TestDesignHelper.addPIPs(gndNet, new String[]{
                 "INT_X0Y0/INT.LOGIC_OUTS_E29->>INT_NODE_SINGLE_DOUBLE_101_INT_OUT",
                 "INT_X0Y0/INT.INT_NODE_SINGLE_DOUBLE_101_INT_OUT->>SS1_E_BEG7",
                 "INT_X0Y0/INT.INT_NODE_IMUX_64_INT_OUT->>IMUX_E16",
@@ -340,5 +341,17 @@ public class TestNet {
         Assertions.assertSame(spi1, net.getSource());
 
         Assertions.assertThrows(RuntimeException.class, () -> net.setAlternateSource(spi2));
+    }
+
+    @Test
+    public void testInternalConnectNet() {
+        Design design = new Design("test", Device.KCU105);
+        Cell lut0 = design.createAndPlaceCell("lut0", Unisim.LUT5, "SLICE_X0Y0/C6LUT");
+        Cell f7mux0 = design.createAndPlaceCell("f7mux0", Unisim.MUXF7, "SLICE_X0Y0/F7MUX_CD");
+        Net net0 = design.createNet("O");
+        net0.connect(lut0, "O");
+        net0.connect(f7mux0, "I1");
+
+        Assertions.assertEquals("I1", net0.getLogicalNet().getPortInst(f7mux0.getEDIFCellInst(), "I1").getName());
     }
 }

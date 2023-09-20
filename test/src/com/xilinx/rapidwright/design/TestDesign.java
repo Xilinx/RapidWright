@@ -29,6 +29,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
 
+import com.xilinx.rapidwright.device.Series;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -307,5 +308,80 @@ public class TestDesign {
         }
         final int extraNets = 5; // {a, b, o, GLOBAL_USEDNET, GLOBAL_LOGIC0}
         Assertions.assertEquals(design.getNets().size(), 2 + extraNets);
+    }
+    
+    @Test
+    public void testFindDualOutputSitePins() {
+        Design d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
+
+        String[] testNets = new String[] {
+            "base_mb_i/microblaze_0/U0/MicroBlaze_Core_I/Performance.Core/Data_Flow_I/Operand_Select_I/Gen_Bit[14].MUXF7_I1/Using_FPGA.Native_0[0]",
+            "base_mb_i/microblaze_0/U0/MicroBlaze_Core_I/Performance.Core/Data_Flow_I/exception_registers_I1/Using_FPGA_LUT6.Gen_Ret_Addr[20].MUXCY_XOR_I/LOCKSTEP_Out_reg[3027][0]",
+            "u_ila_0/inst/ila_core_inst/u_ila_regs/slaveRegDo_mux_2[15]_i_1_n_0"
+        };
+
+        for (int i = 0; i < testNets.length; i++) {
+            Net net = d.getNet(testNets[i]);
+            Assertions.assertNotNull(net.getSource());
+            Assertions.assertNotNull(net.getAlternateSource());
+        }
+    }
+
+    @Test
+    public void testMovePinsToNewNetDeleteOldNet() {
+        Design d = new Design("testMovePinsToNewNetDeleteOldNet", "xcvu3p");
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
+        Unisim unisim = Unisim.CARRY8;
+        d.createAndPlaceCell("carry", unisim, si.getSiteName() + "/" + unisim);
+
+        Net oldNet = d.createNet("oldNet");
+        oldNet.createPin("A1", si);
+        oldNet.createPin("HQ", si);
+        Assertions.assertTrue(si.routeIntraSiteNet(oldNet, si.getBELPin("A1", "A1"),
+                si.getBELPin(unisim.toString(), "DI0")));
+        Assertions.assertEquals("[IN SLICE_X32Y73.A1, OUT SLICE_X32Y73.HQ]", oldNet.getPins().toString());
+        Assertions.assertEquals("[A1, HQ, A5LUT_O5]", si.getSiteWiresFromNet(oldNet).toString());
+
+        Net newNet = d.createNet("newNet");
+        SitePinInst h6 = newNet.createPin("H6", si);
+        newNet.addPIP(h6.getConnectedNode().getAllUphillPIPs().get(0));
+        Assertions.assertEquals("[IN SLICE_X32Y73.H6]", newNet.getPins().toString());
+        Assertions.assertEquals("[H6]", si.getSiteWiresFromNet(newNet).toString());
+        Assertions.assertEquals("[INT_X21Y73/INT.VCC_WIRE->>IMUX_E47]", newNet.getPIPs().toString());
+
+        d.movePinsToNewNetDeleteOldNet(oldNet, newNet, true);
+
+        Assertions.assertNull(d.getNet(oldNet.getName()));
+        Assertions.assertSame(newNet, d.getNet(newNet.getName()));
+        Assertions.assertEquals("[IN SLICE_X32Y73.H6, IN SLICE_X32Y73.A1, OUT SLICE_X32Y73.HQ]", newNet.getPins().toString());
+        Assertions.assertEquals("[H6, A1, HQ, A5LUT_O5]", si.getSiteWiresFromNet(newNet).toString());
+        Assertions.assertEquals("[INT_X21Y73/INT.VCC_WIRE->>IMUX_E47]", newNet.getPIPs().toString());
+    }
+
+    @Test
+    public void testMovePinsToNewNetDeleteOldNetIntraSiteOnly() {
+        Design d = new Design("testMovePinsToNewNetDeleteOldNetIntraSiteOnly", "xcvu3p");
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
+
+        Net oldNet = d.createNet("oldNet");
+        // Note that oldNet has no site pins or inter-site routing
+        Assertions.assertTrue(si.routeIntraSiteNet(oldNet, si.getBELPin("B6LUT", "O6"),
+                si.getBELPin("BFF", "D")));
+        Assertions.assertEquals("[B_O, FFMUXB1_OUT1]", si.getSiteWiresFromNet(oldNet).toString());
+
+        Net newNet = d.createNet("newNet");
+        SitePinInst h6 = newNet.createPin("H6", si);
+        newNet.addPIP(h6.getConnectedNode().getAllUphillPIPs().get(0));
+        Assertions.assertEquals("[IN SLICE_X32Y73.H6]", newNet.getPins().toString());
+        Assertions.assertEquals("[H6]", si.getSiteWiresFromNet(newNet).toString());
+        Assertions.assertEquals("[INT_X21Y73/INT.VCC_WIRE->>IMUX_E47]", newNet.getPIPs().toString());
+
+        d.movePinsToNewNetDeleteOldNet(oldNet, newNet, false);
+
+        Assertions.assertNull(d.getNet(oldNet.getName()));
+        Assertions.assertSame(newNet, d.getNet(newNet.getName()));
+        Assertions.assertEquals("[IN SLICE_X32Y73.H6]", newNet.getPins().toString());
+        Assertions.assertEquals("[H6, B_O, FFMUXB1_OUT1]", si.getSiteWiresFromNet(newNet).toString());
+        Assertions.assertTrue(newNet.getPIPs().isEmpty());
     }
 }

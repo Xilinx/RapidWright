@@ -77,6 +77,6 @@ public class Lesson1 {
         new Router(d).routeDesign();
 
         // Save our work in a Checkpoint
-        d.writeCheckpoint("HelloWorld.dcp");
+        d.writeCheckpoint(args.length > 0 ? args[0] : "HelloWorld.dcp");
     }
 }

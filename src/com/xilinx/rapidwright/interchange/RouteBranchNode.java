@@ -168,14 +168,15 @@ public class RouteBranchNode {
             }
             case SITE_PIP:{
                 SiteSitePIP sitePIP = getSitePIP();
-                BELPin belPinSrc = sitePIP.sitePIP.getInputPin().getSourcePin();
+                // The "driver" of the site PIP is the input BELPin used to enter
+                BELPin belPinSrc = sitePIP.sitePIP.getInputPin();
                 drivers.add(sitePIP.site.getName() + "/" + belPinSrc.toString());
                 break;
             }
             case SITE_PIN:{
                 SitePinInst spi = getSitePin();
                 if (spi.isOutPin()) {
-                    BELPin belPin = spi.getBELPin().getSourcePin();
+                    BELPin belPin = spi.getBELPin();
                     drivers.add(spi.getSite().getName() + "/" + belPin.toString());
                 } else {
                     Node node = getSitePin().getConnectedNode();
@@ -195,8 +196,14 @@ public class RouteBranchNode {
                         drivers.add(site + p.toString());
                     }
                 } else if (belPin.belPin.getBEL().getBELClass() == BELClass.PORT) {
-                    String site = belPin.site.getName() + ".";
-                    drivers.add(site + belPin.belPin.getName());
+                    String site = belPin.site.getName();
+                    if (belPin.belPin.isOutput()) {
+                        // Input site pin
+                        drivers.add(site + "." + belPin.belPin.getName());
+                    } else {
+                        // Output site pin
+                        drivers.add(site + "/" + belPin.belPin.getSourcePin().toString());
+                    }
                 } else {
                     String site = belPin.site.getName() + "/";
                     if (belPin.belPin.isInput()) {
