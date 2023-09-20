@@ -311,10 +311,17 @@ public class PhysNetlistReader {
                                     + belName + " conflicts with previously placed cell \"" + existingCell.getName()
                                     + "\".");
                 }
-                Cell cell = new Cell(cellName, siteInst, bel);
+                Cell cell = new Cell(cellName, bel);
                 cell.setBELFixed(placement.getIsBelFixed());
                 cell.setSiteFixed(placement.getIsSiteFixed());
                 cell.setType(cellType);
+                if (cell.isFFRoutethruCell()) {
+                    cell.setRoutethru(true);
+                    cell.setSiteInst(siteInst);
+                    siteInst.getCellMap().put(belName, cell);
+                } else {
+                    siteInst.addCell(cell);
+                }
 
                 if (placement.hasOtherBels()) {
                     PrimitiveList.Int.Reader otherBELs = placement.getOtherBels();

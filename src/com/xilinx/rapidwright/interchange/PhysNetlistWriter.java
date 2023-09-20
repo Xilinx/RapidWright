@@ -136,7 +136,11 @@ public class PhysNetlistWriter {
                 if (!cell.isPlaced()) continue;
                 String cellName = cell.getName();
                 if (cellName.equals(PhysNetlistWriter.LOCKED)) continue;
-                if (!design.getCell(cellName).getBELName().equals(cell.getBELName())) {
+                Cell multiCell = design.getCell(cellName);
+                if (multiCell == null) {
+                    assert(cell.isFFRoutethruCell());
+                }
+                else if (!multiCell.getBELName().equals(cell.getBELName())) {
                     multiBelCells.computeIfAbsent(cellName, (k) -> new ArrayList<>())
                             .add(cell);
                     // Don't add multi-bel cells, store relevant info in pin placements
@@ -391,7 +395,16 @@ public class PhysNetlistWriter {
                     }
                 } else {
                     if (bel.getBELClass() == BELClass.BEL) {
-                        routethru = cell != null && cell.isRoutethru();
+                        if (cell == null) {
+                            // Skip if nothing placed here
+                            continue;
+                        }
+
+                        if (cell.getType().equals(PORT)) {
+                            continue;
+                        }
+
+                        routethru = cell.isRoutethru();
 
                         // Fall through
                     } else if (bel.getBELClass() == BELClass.RBEL) {
@@ -409,6 +422,11 @@ public class PhysNetlistWriter {
                         if (!VERBOSE_PHYSICAL_NET_ROUTING) {
                             // Skip output pins on site ports (will be set when site pin is added
                             // onto site instance)
+                            continue;
+                        }
+
+                        if (bel.getName().equals("IO") && siteInst.getSitePinInst(belPin.getName()) == null) {
+                            // Skip IO site ports without a site pin
                             continue;
                         }
                     }
@@ -521,9 +539,7 @@ public class PhysNetlistWriter {
                 physPIP.setWire0(strings.getIndex(pip.getStartWireName()));
                 physPIP.setWire1(strings.getIndex(pip.getEndWireName()));
                 physPIP.setIsFixed(pip.isPIPFixed());
-                if (pip.isBidirectional()) {
-                    physPIP.setForward(!pip.isReversed());
-                }
+                physPIP.setForward(!pip.isReversed());
                 break;
             }
             case BEL_PIN:{
