@@ -54,9 +54,6 @@ public class TestEDIFHierPortInst {
         
         EDIFCell macro = n.getHDIPrimitivesLibrary().addCell(Design.getUnisimCell(Unisim.valueOf("RAM64X1D")));
         n.getTopCell().createChildCellInst("inst", macro);
-
-
-
         n.expandMacroUnisims(Series.Versal);
 
         String cellName = "inst/DP/RAMD64_INST";
