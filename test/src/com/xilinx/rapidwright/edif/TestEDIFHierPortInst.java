@@ -54,13 +54,14 @@ public class TestEDIFHierPortInst {
         Design design = new Design("design", "xcvc1902-vsvd1760-2MP-e-S");
         EDIFNetlist n = design.getNetlist();
         
-        EDIFCell macro = n.getHDIPrimitivesLibrary().addCell(Design.getUnisimCell(Unisim.valueOf("RAM64X1D")));
+        EDIFCell macro = n.getHDIPrimitive(Unisim.RAM64X1D);
+        Assertions.assertSame(n.getHDIPrimitivesLibrary(), macro.getLibrary());
         n.getTopCell().createChildCellInst("inst", macro);
         n.expandMacroUnisims(Series.Versal);
 
         String cellName = "inst/DP/RAMD64_INST";
 
-        // We can't instantiate RAM64X1D since its a transformed prim, so we'll update
+        // We can't instantiate RAM64X1D since it's a transformed prim, so we'll update
         // the type after creation
         Cell c = design.createAndPlaceCell(cellName, Unisim.LUT6, "SLICE_X235Y138/B6LUT");
         c.setType(Unisim.RAM64X1D.toString());
