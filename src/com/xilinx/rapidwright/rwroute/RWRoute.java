@@ -1414,11 +1414,15 @@ public class RWRoute{
 
         RouteNode sourceRnode = rnodes.get(rnodes.size()-1);
         if (!sourceRnode.equals(connection.getSourceRnode())) {
+            if (!sourceRnode.equals(connection.getAltSourceRnode())) {
+                // Didn't backtrack to alternate source either -- invalid routing
+                return false;
+            }
+
             // Used source node is different to the one set on the connection
             Net net = connection.getNetWrapper().getNet();
 
             // Update connection's source SPI
-            assert(sourceRnode.equals(connection.getAltSourceRnode()));
             if (connection.getSource() == net.getSource()) {
                 // Swap to alternate source
                 connection.setSource(net.getAlternateSource());
