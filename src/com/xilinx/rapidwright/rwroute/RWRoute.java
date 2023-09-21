@@ -836,9 +836,10 @@ public class RWRoute{
                 Net net = e.getKey();
                 SitePinInst source = net.getSource();
                 SitePinInst altSource = net.getAlternateSource();
+                boolean altSourcePreviouslyRouted = altSource != null ? altSource.isRouted() : false;
                 for (SitePinInst spi : Arrays.asList(source, altSource)) {
                     if (spi != null) {
-                        source.setRouted(false);
+                        spi.setRouted(false);
                     }
                 }
 
@@ -874,6 +875,17 @@ public class RWRoute{
                     if (source.isRouted() && (altSource == null || altSource.isRouted())) {
                         // Break if all sources have been set to be routed
                         break;
+                    }
+                }
+                // If the alt source was previously routed, and is no longer, let's remove it
+                if (altSource != null && altSourcePreviouslyRouted && !altSource.isRouted()) {
+                    boolean sourceRouted = source.isRouted();
+                    altSource.getSiteInst().removePin(altSource);
+                    net.removePin(altSource);
+                    source.setRouted(sourceRouted);
+                    if (altSource.getName().endsWith("_O") && source.getName().endsWith("MUX") && source.isRouted()) {
+                        // Add site routing back if we are keeping the MUX pin
+                        source.getSiteInst().routeIntraSiteNet(net, altSource.getBELPin(), altSource.getBELPin());
                     }
                 }
             }
@@ -1402,11 +1414,15 @@ public class RWRoute{
 
         RouteNode sourceRnode = rnodes.get(rnodes.size()-1);
         if (!sourceRnode.equals(connection.getSourceRnode())) {
+            if (!sourceRnode.equals(connection.getAltSourceRnode())) {
+                // Didn't backtrack to alternate source either -- invalid routing
+                return false;
+            }
+
             // Used source node is different to the one set on the connection
             Net net = connection.getNetWrapper().getNet();
 
             // Update connection's source SPI
-            assert(sourceRnode.equals(connection.getAltSourceRnode()));
             if (connection.getSource() == net.getSource()) {
                 // Swap to alternate source
                 connection.setSource(net.getAlternateSource());
