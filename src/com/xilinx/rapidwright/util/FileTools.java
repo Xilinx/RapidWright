@@ -1827,7 +1827,7 @@ public class FileTools {
         if (isVivadoOnPath()) {
             List<String> lines = execCommandGetOutput(true, "vivado", "-version");
             for (String line : lines) {
-                if (line.startsWith("Vivado ")) {
+                if (line.toLowerCase().startsWith("vivado ")) {
                     String[] tokens = line.split("\\s+");
                     return tokens[1];
                 }
