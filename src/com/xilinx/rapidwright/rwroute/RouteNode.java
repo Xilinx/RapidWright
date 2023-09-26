@@ -65,7 +65,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     /** Byte for the use as general purpose flags */
     private byte flags;
     /** The children (downhill rnodes) of this rnode */
-    protected RouteNode[] children;
+    public RouteNode[] children;
 
     /** Present congestion cost */
     private float presentCongestionCost;

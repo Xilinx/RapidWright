@@ -3204,8 +3204,9 @@ public class DesignTools {
                     net = si.getDesign().getGndNet();
                 }
             }
-            String belName = belPin.getBELName();
-            if (LUTTools.isCellALUT(cell) &&
+            BEL bel = belPin.getBEL();
+            String belName = bel.getName();
+            if (bel.isLUT() && // Examine BEL since the Cell could be a routethru
                     // No net originally present on input sitewire
                     netOnSiteWire != net &&
                     // No cell placed in the 5LUT spot
@@ -3218,10 +3219,10 @@ public class DesignTools {
             SitePinInst pin = si.getSitePinInst(siteWireName);
             if (pin == null) {
                 net.createPin(siteWireName, si);
-            } else if (!pin.getNet().equals(net)) {
+            } /*else if (!pin.getNet().equals(net)) { // FIXME: BITSLICE_RX_TX_X0Y650/RX_RESET (which inverts) is removed from GLOBAL_LOGIC1 (unrouting the whole net) and added to GLOBAL_LOGIC0
                 pin.getNet().removePin(pin);
                 net.addPin(pin);
-            }
+            }*/
         }
     }
 
