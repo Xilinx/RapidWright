@@ -1,19 +1,19 @@
 # FPGA Interchange Format for RapidWright
 
-The FPGA interchange format allows designs from other tools such as [VTR](https://github.com/verilog-to-routing/vtr-verilog-to-routing) and [nextpnr](https://github.com/YosysHQ/nextpnr) to read and write placed and routed designs with RapidWright.  This interface depends on [Cap'n Proto](https://capnproto.org/index.html) for serialization and you'll need to [install](https://capnproto.org/install.html) it with the [Java plugin](https://dwrensha.github.io/capnproto-java/index.html).
+The FPGA interchange format allows designs from other tools such as [DREAMPlaceFPGA](https://github.com/rachelselinar/DREAMPlaceFPGA) to read and write placed and routed designs with RapidWright.  This interface depends on [Cap'n Proto](https://capnproto.org/index.html) for serialization and you'll need to [install](https://capnproto.org/install.html) it with the [Java plugin](https://dwrensha.github.io/capnproto-java/index.html).
 
 Current schema for the interchange format can be found here:
-https://github.com/SymbiFlow/fpga-interchange-schema
+https://github.com/chipsalliance/fpga-interchange-schema
 
 ## Easiest way to Setup a RapidWright Repo Locally:
 ```
-wget http://www.rapidwright.io/docs/_downloads/rapidwright-installer.jar
-java -jar rapidwright-installer.jar -t
-source rapidwright.sh 
+git clone https://github.com/Xilinx/RapidWright.git
 cd RapidWright
+./gradlew compileJava
 ```
-More details here: 
-http://www.rapidwright.io/docs/Automatic_Install.html#automatic-install
+
+More details here:
+http://www.rapidwright.io/docs/Install.html
 
 ## How to Run Example
 ```
