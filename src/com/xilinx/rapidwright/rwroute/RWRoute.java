@@ -674,6 +674,11 @@ public class RWRoute{
 
         routerTimer.getRuntimeTracker("Routing").stop();
 
+        if (config.getExportOutOfContext()) {
+            getDesign().setAutoIOBuffers(false);
+            getDesign().setDesignOutOfContext(true);
+        }
+
         // Prints routing statistics, e.g. total wirelength, runtime and timing report
         printRoutingStatistics();
     }

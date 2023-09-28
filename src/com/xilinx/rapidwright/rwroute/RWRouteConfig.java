@@ -84,6 +84,8 @@ public class RWRouteConfig {
     private boolean verbose;
     /** true to display connection span statistics */
     private boolean printConnectionSpan;
+    /** Flag indicating if RWRoute exports a DCP, to flag it as out of context */
+    private boolean exportOutOfContext;
 
     /** Constructs a Configuration Object */
     public RWRouteConfig(String[] arguments) {
@@ -207,6 +209,9 @@ public class RWRouteConfig {
                 break;
             case "--printConnectionSpan":
                 setPrintConnectionSpan(true);
+                break;
+            case "--outOfContext":
+                setExportDesignOutOfContext(true);
                 break;
             default:
                 throw new IllegalArgumentException("ERROR: RWRoute argument '" + arg + "' not recognized.");
@@ -670,9 +675,20 @@ public class RWRouteConfig {
     }
 
     /**
-     * Sets critical path delay pessimism factor b.
-     * It should be greater than 0. Default: 100.
-     * Can be modified by using "--pessimismB" option, e.g. "--pessimismB 50".
+     * Gets the flag indicating if the design returned after routing should be
+     * marked out of context. Default: false.
+     * 
+     * @return True if the flag is set, false otherwise.
+     */
+    public boolean getExportOutOfContext() {
+        return exportOutOfContext;
+    }
+
+    /**
+     * Sets critical path delay pessimism factor b. It should be greater than 0.
+     * Default: 100. Can be modified by using "--pessimismB" option, e.g.
+     * "--pessimismB 50".
+     * 
      * @param pessimismB
      */
     public void setPessimismB(short pessimismB) {
@@ -749,6 +765,16 @@ public class RWRouteConfig {
      */
     public void setPrintConnectionSpan(boolean printConnectionSpan) {
         this.printConnectionSpan = printConnectionSpan;
+    }
+
+    /**
+     * Sets a flag indicating the design should be exported as out of context.
+     * Default: false.
+     * 
+     * @param exportOutOfContext true to export design as out of context.
+     */
+    public void setExportDesignOutOfContext(boolean exportOutOfContext) {
+        this.exportOutOfContext = exportOutOfContext;
     }
 
     /**
