@@ -35,6 +35,7 @@ import org.capnproto.ReaderOptions;
 import org.capnproto.Serialize;
 import org.capnproto.SerializePacked;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
