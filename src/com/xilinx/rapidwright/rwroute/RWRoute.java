@@ -1916,7 +1916,7 @@ public class RWRoute{
 
         // Writes out the routed design checkpoint
         routed.writeCheckpoint(routedDCPfileName,t);
-        System.out.println("\nINFO: Write routed design\n " + routedDCPfileName + "\n");
+        System.out.println("\nINFO: Wrote routed design\n " + routedDCPfileName + "\n");
     }
 
 }
