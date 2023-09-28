@@ -326,7 +326,6 @@ public class TestRWRoute {
 
     private Design generateSmallPlacedDesign() {
         Design d = new Design("HelloWorld", Device.KCU105);
-
         Cell and2 = d.createAndPlaceCell("and2", Unisim.AND2, "SLICE_X100Y100/A6LUT");
         Net net0 = d.createNet("button0_IBUF");
         net0.connect(and2, "O");
@@ -346,17 +345,10 @@ public class TestRWRoute {
         Interchange.writeDesignToInterchange(generateSmallPlacedDesign(), rootFile.toString());
         Path outputFile = dir.resolve("output.dcp");
         RWRoute.main(new String[] { 
-                rootFile.toString() + Interchange.LOG_NETLIST_EXT, 
+                rootFile.toString() + Interchange.PHYS_NETLIST_EXT, 
                 outputFile.toString(),
                 "--nonTimingDriven"
                 });
         Assertions.assertTrue(Files.exists(outputFile));
-        Path outputFile2 = dir.resolve("output2.dcp");
-        RWRoute.main(new String[] { 
-                rootFile.toString() + Interchange.PHYS_NETLIST_EXT, 
-                outputFile2.toString(),
-                "--nonTimingDriven",
-                });
-        Assertions.assertTrue(Files.exists(outputFile2));
     }
 }

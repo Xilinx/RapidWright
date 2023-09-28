@@ -1896,7 +1896,7 @@ public class RWRoute{
      */
     public static void main(String[] args) {
         if (args.length < 2) {
-            System.out.println("USAGE: <input.dcp|input.netlist|input.phys> <output.dcp>");
+            System.out.println("USAGE: <input.dcp|input.phys> <output.dcp>");
             return;
         }
         // Reads the output directory and set the output design checkpoint file name

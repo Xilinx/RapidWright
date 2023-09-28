@@ -160,20 +160,6 @@ public class StringTools {
     }
 
     /**
-     * Replaces the file extension of the provided file name. The current extension
-     * includes the final period '.' and all characters following it. If the file
-     * has no extension, it will add it as a suffix to the filename.
-     * 
-     * @param fileName     Name of the file to receive the updated extension.
-     * @param newExtension The new extension (should include starting period '.')
-     * @return The newly updated file name.
-     */
-    public static String replaceExtension(String fileName, String newExtension) {
-        int idx = fileName.lastIndexOf('.');
-        return fileName.substring(0, idx == -1 ? fileName.length() : idx) + newExtension;
-    }
-
-    /**
      * Sorts strings using the 'natural' sort approach where numbers are sorted by
      * their magnitudes, i.e. {1,2,3,4,5,6,7,8,9,10,...} as opposed to strict ASCII
      * sorting {1,10,11,12,13, ...}

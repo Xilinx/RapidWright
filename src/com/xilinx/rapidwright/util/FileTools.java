@@ -1997,7 +1997,15 @@ public class FileTools {
         return path.resolveSibling(path.getFileName().toString()+extension);
     }
 
-
+    /**
+     * Replaces the file extension of the provided file name. The current extension
+     * includes the final period '.' and all characters following it. If the file
+     * has no extension, it will add it as a suffix to the filename.
+     * 
+     * @param path         Name of the file to receive the updated extension.
+     * @param newExtension The new extension (should include starting period '.')
+     * @return The newly updated file path.
+     */
     public static Path replaceExtension(Path path, String newExtension) {
         String fn = path.getFileName().toString();
         int idx = fn.lastIndexOf('.');
