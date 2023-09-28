@@ -23,10 +23,12 @@
 
 package com.xilinx.rapidwright.interchange;
 
+import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.StringTools;
 import org.capnproto.MessageBuilder;
 import org.capnproto.MessageReader;
 import org.capnproto.ReaderOptions;
@@ -36,11 +38,15 @@ import org.capnproto.SerializePacked;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -50,6 +56,155 @@ public class Interchange {
     public static boolean IS_PACKED = false;
     /** Flag indicating that files are gzipped on output */
     public static boolean IS_GZIPPED = true;
+    /** Standard file extension for a logical netlist in the FPGA Interchange Format */
+    public static final String LOG_NETLIST_EXT = ".netlist";
+    /** Standard file extension for a physical netlist in the FPGA Interchange Format */
+    public static final String PHYS_NETLIST_EXT = ".phys";
+
+    /**
+     * Reads an FPGA Interchange Format design from a specified file. The file could
+     * be a logical netlist or physical netlist and this method will assume the
+     * corresponding file with the same root name to load as a companion. If the
+     * provided name is a logical netlist and no physical netlist is found, it will
+     * only load the logical netlist. It will also load any XDC file with the same
+     * root name.
+     * 
+     * @param fileName The logical or physical netlist filename.
+     * @return The loaded design.
+     */
+    public static Design readInterchangeDesign(String fileName) {
+        String logFileName = fileName.endsWith(LOG_NETLIST_EXT) ? fileName : getExistingCompanionFile(fileName);
+        String physFileName = fileName.endsWith(PHYS_NETLIST_EXT) ? fileName : getExistingCompanionFile(fileName);
+
+        if (logFileName == null) {
+            throw new RuntimeException("ERROR: Could not find logical netlist file: " + logFileName);
+        }
+
+        String xdcFileName = StringTools.replaceExtension(logFileName, ".xdc");
+
+        return readInterchangeDesign(logFileName, physFileName, xdcFileName, false, null);
+    }
+    
+    /**
+     * Gets the existing Interchange companion file name based on the provided
+     * filename. For example, if the logical netlist file name is provided, it will
+     * return the physical netlist filename if it exists. If the physical netlist is
+     * provided, it returns the logical netlist filename if the file exists.
+     * 
+     * @param fileName Name of an existing FPGA Interchange file (logical netlist
+     *                 with the {@link #LOG_NETLIST_EXT} extension or physical
+     *                 netlist with the {@link #PHYS_NETLIST_EXT})
+     * @return The companion file if it exists or null if it could not be found.
+     */
+    private static String getExistingCompanionFile(String fileName) {
+        String lowerFileName = fileName.toLowerCase();
+        if (lowerFileName.endsWith(LOG_NETLIST_EXT)) {
+            String physFileName = StringTools.replaceExtension(fileName, PHYS_NETLIST_EXT);
+            if (new File(physFileName).exists()) {
+                return physFileName;
+            }
+        } else if (lowerFileName.endsWith(PHYS_NETLIST_EXT)) {
+            String logFileName = StringTools.replaceExtension(fileName, LOG_NETLIST_EXT);
+            if (new File(logFileName).exists()) {
+                return logFileName;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Reads a set of existing FPGA Interchange files and returns a new design.
+     * 
+     * @param logFileName    The logical netlist file to be loaded.
+     * @param physFileName   The physical netlist file to be loaded, this can be
+     *                       null for no placement or routing information.
+     * @param xdcFileName    The constraints to associate with the design, this can
+     *                       be null for no constraints.
+     * @param isOutOfContext A flag indicating if the design should be marked out of
+     *                       context.
+     * @param t              If using an existing CodePerfTracker, this allows
+     *                       continuity otherwise the default is null (an instance
+     *                       will be created each time) and will track runtime of
+     *                       each loading step. To silence this measurement, provide
+     *                       {@link CodePerfTracker#SILENT}).
+     * @return The newly created design based on the provided files.
+     */
+    public static Design readInterchangeDesign(String logFileName, String physFileName, String xdcFileName,
+            boolean isOutOfContext, CodePerfTracker t) {
+        String msg = "Reading Interchange: " + logFileName;
+        CodePerfTracker tt = t == null ? new CodePerfTracker(msg, true) : t;
+        Design design = null;
+        try {
+            tt.start("Read Logical Netlist");
+            EDIFNetlist n = LogNetlistReader.readLogNetlist(logFileName);
+            if (physFileName != null) {
+                tt.stop().start("Read Physical Netlist");
+                design = PhysNetlistReader.readPhysNetlist(physFileName, n);
+            } else {
+                // No physical netlist information, let's attach the logical netlist to a new
+                // design
+                design = new Design(n);
+            }
+            if (xdcFileName != null) {
+                File xdcFile = new File(xdcFileName);
+                if (xdcFile.exists()) {
+                    // Add XDC constraints
+                    tt.stop().start("Read Constraints");
+                    List<String> lines = Files.readAllLines(xdcFile.toPath(), Charset.defaultCharset());
+                    design.setXDCConstraints(lines, ConstraintGroup.NORMAL);
+                }
+            }
+            if (isOutOfContext) {
+                design.setAutoIOBuffers(false);
+                design.setDesignOutOfContext(true);
+            }
+            tt.stop().printSummary();
+            return design;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * Writes out a set of interchange files for the given design. It will write up
+     * to 3 files with the logical netlist always being written out. The two
+     * optional files are the physical netlist and XDC (constraints) file.
+     * 
+     * @param design       The design in memory to write out.
+     * @param rootFileName The root or common name among the output files.
+     */
+    public static void writeDesignToInterchange(Design design, String rootFileName) {
+        String logFileName = rootFileName + LOG_NETLIST_EXT;
+        try {
+            LogNetlistWriter.writeLogNetlist(design.getNetlist(), logFileName);
+
+            if (design.getSiteInsts().size() > 0 || design.getNets().size() > 0) {
+                String physFileName = rootFileName + PHYS_NETLIST_EXT;
+                PhysNetlistWriter.writePhysNetlist(design, physFileName);
+            }
+
+            if (!design.getXDCConstraints(ConstraintGroup.NORMAL).isEmpty()) {
+                String xdcFileName = rootFileName + ".xdc";
+                FileTools.writeLinesToTextFile(design.getXDCConstraints(ConstraintGroup.NORMAL), xdcFileName);
+            }
+
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * Checks if the provided file name is a logical or physical FPGA Interchange
+     * file.
+     * 
+     * @param fileName The file name in question.
+     * @return True if the file name matches the logical or physical netlist file
+     *         name type.
+     */
+    public static boolean isInterchangeFile(String fileName) {
+        String lowerFileName = fileName.toLowerCase();
+        return lowerFileName.endsWith(LOG_NETLIST_EXT) || lowerFileName.endsWith(PHYS_NETLIST_EXT);
+    }
 
     /**
      * Common method to write out Interchange files

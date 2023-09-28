@@ -23,6 +23,8 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -32,21 +34,26 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
@@ -315,5 +322,41 @@ public class TestRWRoute {
             ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
             Assertions.assertEquals(0, rrs.unroutedNets);
         }
+    }
+
+    private Design generateSmallPlacedDesign() {
+        Design d = new Design("HelloWorld", Device.KCU105);
+
+        Cell and2 = d.createAndPlaceCell("and2", Unisim.AND2, "SLICE_X100Y100/A6LUT");
+        Net net0 = d.createNet("button0_IBUF");
+        net0.connect(and2, "O");
+        net0.connect(and2, "I0");
+        net0.connect(and2, "I1");
+
+        // Route site internal nets
+        d.routeSites();
+
+        EDIFTools.ensureCorrectPartInEDIF(d.getNetlist(), d.getPartName());
+        return d;
+    }
+
+    @Test
+    public void testRWRouteInterchange(@TempDir Path dir) {
+        Path rootFile = dir.resolve("interchange-design");
+        Interchange.writeDesignToInterchange(generateSmallPlacedDesign(), rootFile.toString());
+        Path outputFile = dir.resolve("output.dcp");
+        RWRoute.main(new String[] { 
+                rootFile.toString() + Interchange.LOG_NETLIST_EXT, 
+                outputFile.toString(),
+                "--nonTimingDriven"
+                });
+        Assertions.assertTrue(Files.exists(outputFile));
+        Path outputFile2 = dir.resolve("output2.dcp");
+        RWRoute.main(new String[] { 
+                rootFile.toString() + Interchange.PHYS_NETLIST_EXT, 
+                outputFile2.toString(),
+                "--nonTimingDriven",
+                });
+        Assertions.assertTrue(Files.exists(outputFile2));
     }
 }
