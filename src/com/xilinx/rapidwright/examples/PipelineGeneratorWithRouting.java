@@ -107,6 +107,7 @@ public class PipelineGeneratorWithRouting {
     protected static final String DEPTH_OPT = "m";
     protected static final String DISTANCE_X_OPT = "t";
     protected static final String DISTANCE_Y_OPT = "u";
+    protected static final String ROUTING_OPT = "r";
     protected static final String VERBOSE_OPT = "v";
     protected static final String HELP_OPT = "h";
     public static final int BITS_PER_CLE = 8;
@@ -800,7 +801,7 @@ public class PipelineGeneratorWithRouting {
         //int distanceY = 0;
         //String sliceSite = "SLICE_X84Y68";
 
-
+        boolean useDistanceBasedRouter = false;
         boolean verbose1 = true;
 
         double clkPeriodConstraint = Math.pow(frequencyMHz, -1)*1000;
@@ -819,6 +820,8 @@ public class PipelineGeneratorWithRouting {
             accepts(DEPTH_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(depth).describedAs("depth");
             accepts(DISTANCE_X_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(distanceX).describedAs("distance X");
             accepts(DISTANCE_Y_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(distanceY).describedAs("distance Y");
+            accepts(ROUTING_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(useDistanceBasedRouter)
+                                .describedAs("Use distance-based router (true) or timing-driven router (false)");
             accepts(SLICE_SITES_OPT).withOptionalArg().defaultsTo(sliceSite).describedAs("Lower left slice to be used for pipeline");
             accepts(VERBOSE_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(verbose1).describedAs("Print verbose output");
             acceptsAll( Arrays.asList(HELP_OPT, "?"), "Print Help" ).forHelp();
@@ -860,6 +863,7 @@ public class PipelineGeneratorWithRouting {
         String outputDCPFileName = (String) opts.valueOf(OUT_DCP_OPT);
         String clkName = (String) opts.valueOf(CLK_NAME_OPT);
         double clkPeriodConstraint = (double) opts.valueOf(CLK_CONSTRAINT_OPT);
+        boolean useDistanceBasedRouter = (boolean) opts.valueOf(ROUTING_OPT);
 
         int width = (int) opts.valueOf(WIDTH_OPT);
         int depth = (int) opts.valueOf(DEPTH_OPT);
@@ -891,7 +895,6 @@ public class PipelineGeneratorWithRouting {
                 "\n");
 
         boolean shouldRoute = true;
-        boolean useDistanceBasedRouter = false;
         createPipeline(d, slice, width, depth, distanceX, distanceY, dir, shouldRoute, useDistanceBasedRouter);
 
         // Add a clock constraint
