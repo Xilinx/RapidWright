@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -383,5 +383,28 @@ public class TestDesign {
         Assertions.assertEquals("[IN SLICE_X32Y73.H6]", newNet.getPins().toString());
         Assertions.assertEquals("[H6, B_O, FFMUXB1_OUT1]", si.getSiteWiresFromNet(newNet).toString());
         Assertions.assertTrue(newNet.getPIPs().isEmpty());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testCreateModuleInstCopiesStaticSource(boolean unrouteStaticNets) {
+        Design design = new Design("testCreateModuleInstCopiesStaticSource", "xcku035");
+
+        Design microblaze = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
+        Assertions.assertNotNull(microblaze.getSiteInstFromSiteName("SLICE_X60Y116"));
+
+        Module module = new Module(microblaze, unrouteStaticNets);
+        ModuleInst mi = design.createModuleInst("inst", module);
+        SiteInst si = design.getSiteInstFromSiteName("SLICE_X60Y116");
+        Assertions.assertNull(si);
+
+        mi.placeOnOriginalAnchor();
+        si = design.getSiteInstFromSiteName("SLICE_X60Y116");
+        if (!unrouteStaticNets) {
+            Assertions.assertNotNull(si);
+            Assertions.assertEquals(mi.getName() + "/STATIC_SOURCE_SLICE_X60Y116", si.getName());
+        } else {
+            Assertions.assertNull(si);
+        }
     }
 }
