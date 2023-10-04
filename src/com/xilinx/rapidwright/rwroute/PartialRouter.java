@@ -33,6 +33,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
@@ -44,6 +45,7 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
 import com.xilinx.rapidwright.timing.TimingManager;
@@ -243,7 +245,21 @@ public class PartialRouter extends RWRoute {
         if (clkNets.isEmpty())
             return;
 
-        super.routeGlobalClkNets();
+        for (Net clk : clkNets) {
+            List<SitePinInst> clkPins = netToPins.get(clk);
+            if (clkPins == null || clkPins.isEmpty()) {
+                continue;
+            }
+
+            if (!clk.hasPIPs()) {
+                super.routeGlobalClkNet(clk);
+            } else {
+                System.out.println("INFO: Routing " + clkPins.size() + " pins of clock " + clk + " (non timing-driven)");
+                Function<Node, NodeStatus> gns = (node) -> this.getGlobalRoutingNodeStatus(clk, node);
+                UltraScaleClockRouting.incrementalClockRouter(clk, clkPins, gns);
+                preserveNet(clk, false);
+            }
+        }
 
         List<Net> unpreserveNets = unpreserveCongestedNets(clkNets);
         if (!unpreserveNets.isEmpty()) {
