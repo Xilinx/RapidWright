@@ -103,6 +103,10 @@ public class VivadoTools {
      * @return the contents of the log file as a list of strings
      */
     public static List<String> runTcl(Path outputLog, Path tclScript, boolean verbose, String[] environ, File runDir) {
+        if (!FileTools.isVivadoOnPath()) {
+            throw new RuntimeException(
+                    "ERROR: Could not find vivado executable, current PATH=" + System.getenv("PATH"));
+        }
         final String vivadoCmd = "vivado -log " + outputLog.toString() + " -nojournal -mode batch -source "
                 + tclScript.toString();
         Integer exitCode = FileTools.runCommand(vivadoCmd, verbose, environ, runDir);

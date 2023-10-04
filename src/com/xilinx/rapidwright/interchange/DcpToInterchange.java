@@ -24,7 +24,6 @@ package com.xilinx.rapidwright.interchange;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
@@ -43,8 +42,8 @@ public class DcpToInterchange {
         Design design = Design.readCheckpoint(args[0]);
         String baseName = Paths.get(args[0]).getFileName().toString();
         baseName = FileTools.removeFileExtension(baseName);
-        String logNetlistName = baseName + ".netlist";
-        String physNetlistName = baseName + ".phys";
+        String logNetlistName = baseName + Interchange.LOG_NETLIST_EXT;
+        String physNetlistName = baseName + Interchange.PHYS_NETLIST_EXT;
         String xdcName = baseName + ".xdc";
 
         LogNetlistWriter.writeLogNetlist(design.getNetlist(), logNetlistName);

@@ -372,14 +372,15 @@ public class RouterHelper {
             if (belPins.length == 2) {
                 for (BELPin belPin : belPins) {
                     if (belPin.isSitePort())    continue;
-                    // DO NOT invert CLK_OPTINV_CLKB_L and CLK_OPTINV_CLKB_U
-                    if (belPin.getBEL().getName().contains("CLKB")) continue;
-                    if (currSitePinInst.toString().contains("RAM")) {
-                        if (belPin.getBEL().canInvert()) {
-                            // SRST2 of SLICE also has an inverter, but should not be invertible
-                            toInvertPins.add(currSitePinInst);
+                    if (currSitePinInst.getSite().getName().startsWith("RAM")) {
+                        if (!belPin.getBEL().canInvert()) {
+                            continue;
                         }
-                    } else if (currSitePinInst.toString().contains("DSP")) {
+                        if (belPin.getBELName().startsWith("CLK")) {
+                            continue;
+                        }
+                        toInvertPins.add(currSitePinInst);
+                    } else if (currSitePinInst.getSite().getName().startsWith("DSP")) {
                         if (isInvertibleDSPBELPin(belPin)) {
                             toInvertPins.add(currSitePinInst);
                         }
