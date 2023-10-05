@@ -1,6 +1,6 @@
 # FPGA Interchange Format for RapidWright
 
-The FPGA interchange format allows designs from other tools such as [DREAMPlaceFPGA](https://github.com/rachelselinar/DREAMPlaceFPGA) to read and write placed and routed designs with RapidWright.  This interface depends on [Cap'n Proto](https://capnproto.org/index.html) for serialization and you'll need to [install](https://capnproto.org/install.html) it with the [Java plugin](https://dwrensha.github.io/capnproto-java/index.html).
+The [FPGA Interchange Format](http://www.rapidwright.io/docs/FPGA_Interchange_Format.html) allows designs from other tools such as [DREAMPlaceFPGA](https://github.com/rachelselinar/DREAMPlaceFPGA) to read and write placed and routed designs with RapidWright.  This interface depends on [Cap'n Proto](https://capnproto.org/index.html) for serialization and you'll need to [install](https://capnproto.org/install.html) it with the [Java plugin](https://dwrensha.github.io/capnproto-java/index.html).
 
 Current schema for the interchange format can be found here:
 https://github.com/chipsalliance/fpga-interchange-schema
