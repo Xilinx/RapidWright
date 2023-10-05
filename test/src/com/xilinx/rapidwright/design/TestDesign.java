@@ -391,18 +391,19 @@ public class TestDesign {
         Design design = new Design("testCreateModuleInstCopiesStaticSource", "xcku035");
 
         Design microblaze = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
-        Assertions.assertNotNull(microblaze.getSiteInstFromSiteName("SLICE_X60Y116"));
+        final String siteName = "SLICE_X60Y116";
+        Assertions.assertNotNull(microblaze.getSiteInstFromSiteName(siteName));
 
         Module module = new Module(microblaze, unrouteStaticNets);
         ModuleInst mi = design.createModuleInst("inst", module);
-        SiteInst si = design.getSiteInstFromSiteName("SLICE_X60Y116");
+        SiteInst si = design.getSiteInstFromSiteName(siteName);
         Assertions.assertNull(si);
 
         mi.placeOnOriginalAnchor();
-        si = design.getSiteInstFromSiteName("SLICE_X60Y116");
+        si = design.getSiteInstFromSiteName(siteName);
         if (!unrouteStaticNets) {
             Assertions.assertNotNull(si);
-            Assertions.assertEquals(mi.getName() + "/STATIC_SOURCE_SLICE_X60Y116", si.getName());
+            Assertions.assertEquals(mi.getName() + "/STATIC_SOURCE_" + si.getSiteName(), si.getName());
         } else {
             Assertions.assertNull(si);
         }
