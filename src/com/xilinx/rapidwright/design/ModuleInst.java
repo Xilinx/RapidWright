@@ -1,7 +1,7 @@
 /*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
  * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -699,10 +699,24 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         if (p0.isOutPort()) {
             physicalNet = getCorrespondingNet(p0);
             if (physicalNet == null) {
-                // This is a pass-thru situation and we'll need to create the net
-                EDIFCell top = getCellInst().getParentCell();
-                String newNetName = super.getNewNetName(portName, busIndex0, other, otherPortName, busIndex1);
-                physicalNet = design.createNet(newNetName);
+                if (p0.getType() == PortType.UNCONNECTED) {
+                    return;
+                }
+                if (p0.getType() == PortType.POWER) {
+                    physicalNet = design.getVccNet();
+                } else if (p0.getType() == PortType.GROUND) {
+                    physicalNet = design.getGndNet();
+                } else {
+                    // This must be a pass-thru situation
+                    List<String> passThruPortNames = p0.getPassThruPortNames();
+                    if (passThruPortNames.isEmpty()) {
+                        throw new RuntimeException("Expecting a pass-thru situation");
+                    }
+
+                    // No updates needed for the physical netlist -- with the logical netlist
+                    // already updated, the two physical nets will be interpreted as aliases
+                    return;
+                }
             }
             inPort = p1;
             modInst = other;

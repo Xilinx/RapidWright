@@ -24,6 +24,17 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
@@ -38,17 +49,6 @@ import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.RuntimeTracker;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * A class extending {@link RWRoute} for partial routing.
@@ -786,6 +786,6 @@ public class PartialRouter extends RWRoute {
 
         // Writes out the routed design checkpoint
         routed.writeCheckpoint(routedDCPfileName,t);
-        System.out.println("\nINFO: Write routed design\n " + routedDCPfileName + "\n");
+        System.out.println("\nINFO: Wrote routed design\n " + routedDCPfileName + "\n");
     }
 }

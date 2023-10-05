@@ -44,6 +44,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
@@ -53,6 +54,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
@@ -532,6 +534,7 @@ public class RWRoute{
                     if (altSource == null) {
                         altSource = DesignTools.getLegalAlternativeOutputPin(net);
                         if (altSource != null) {
+                            // Add this SitePinInst to the net, but not to the SiteInst
                             net.addPin(altSource);
                             DesignTools.routeAlternativeOutputSitePin(net, altSource);
                         }
@@ -672,6 +675,11 @@ public class RWRoute{
         routerTimer.getRuntimeTracker("finalize routes").stop();
 
         routerTimer.getRuntimeTracker("Routing").stop();
+
+        if (config.getExportOutOfContext()) {
+            getDesign().setAutoIOBuffers(false);
+            getDesign().setDesignOutOfContext(true);
+        }
 
         // Prints routing statistics, e.g. total wirelength, runtime and timing report
         printRoutingStatistics();
@@ -836,10 +844,12 @@ public class RWRoute{
                 Net net = e.getKey();
                 SitePinInst source = net.getSource();
                 SitePinInst altSource = net.getAlternateSource();
+                SiteInst si = source.getSiteInst();
                 boolean altSourcePreviouslyRouted = altSource != null ? altSource.isRouted() : false;
                 for (SitePinInst spi : Arrays.asList(source, altSource)) {
                     if (spi != null) {
                         spi.setRouted(false);
+                        assert(spi.getSiteInst() == si);
                     }
                 }
 
@@ -856,20 +866,21 @@ public class RWRoute{
                     // Set the routed state of the used source node
                     // and if used and not already present, add it to the SiteInst
                     Node sourceNode = nodes.get(nodes.size() - 1);
-                    if (sourceNode.equals(connection.getSource().getConnectedNode())) {
-                        SitePinInst src = connection.getSource();
-                        src.setRouted(true);
-                        if (src.getSiteInst().getSitePinInst(src.getName()) == null) {
-                            src.getSiteInst().addPin(src);
+                    SitePinInst usedSpi = null;
+                    for (SitePinInst spi : Arrays.asList(source, altSource)) {
+                        if (spi != null && sourceNode.equals(spi.getConnectedNode())) {
+                            usedSpi = spi;
                         }
-                    } else {
-                        // Source used must have been the Net's alternate source
-                        assert(!altSource.equals(connection.getSource()));
-                        assert(sourceNode.equals(altSource.getConnectedNode()));
-                        altSource.setRouted(true);
-                        if (altSource.getSiteInst().getSitePinInst(altSource.getName()) == null) {
-                            altSource.getSiteInst().addPin(altSource);
-                        }
+                    }
+                    if (usedSpi == null) {
+                        throw new RuntimeException("ERROR: Unknown source node " + sourceNode + " on net " + net.getName());
+                    }
+
+                    // Now that we know this SitePinInst is used, make sure it exists in
+                    // the SiteInst
+                    usedSpi.setRouted(true);
+                    if (si.getSitePinInst(usedSpi.getName()) == null) {
+                        si.addPin(usedSpi);
                     }
 
                     if (source.isRouted() && (altSource == null || altSource.isRouted())) {
@@ -1886,13 +1897,16 @@ public class RWRoute{
     }
 
     /**
-     * The main interface of {@link RWRoute} that reads in a {@link Design} checkpoint,
-     * and parses the arguments for the {@link RWRouteConfig} object of the router.
-     * @param args An array of strings that are used to create a {@link RWRouteConfig} object for the router.
+     * The main interface of {@link RWRoute} that reads in a {@link Design} design
+     * (DCP or FPGA Interchange), and parses the arguments for the
+     * {@link RWRouteConfig} object of the router.
+     * 
+     * @param args An array of strings that are used to create a
+     *             {@link RWRouteConfig} object for the router.
      */
     public static void main(String[] args) {
         if (args.length < 2) {
-            System.out.println("USAGE: <input.dcp> <output.dcp>");
+            System.out.println("USAGE: <input.dcp|input.phys> <output.dcp>");
             return;
         }
         // Reads the output directory and set the output design checkpoint file name
@@ -1900,13 +1914,19 @@ public class RWRoute{
 
         CodePerfTracker t = new CodePerfTracker("RWRoute", true);
 
-        // Reads in a design checkpoint and routes it
+        // Reads in a design and routes it
         String[] rwrouteArgs = Arrays.copyOfRange(args, 2, args.length);
-        Design routed = routeDesignWithUserDefinedArguments(Design.readCheckpoint(args[0]), rwrouteArgs);
+        Design input = null;
+        if (Interchange.isInterchangeFile(args[0])) {
+            input = Interchange.readInterchangeDesign(args[0]);
+        } else {
+            input = Design.readCheckpoint(args[0]);
+        }
+        Design routed = routeDesignWithUserDefinedArguments(input, rwrouteArgs);
 
         // Writes out the routed design checkpoint
         routed.writeCheckpoint(routedDCPfileName,t);
-        System.out.println("\nINFO: Write routed design\n " + routedDCPfileName + "\n");
+        System.out.println("\nINFO: Wrote routed design\n " + routedDCPfileName + "\n");
     }
 
 }
