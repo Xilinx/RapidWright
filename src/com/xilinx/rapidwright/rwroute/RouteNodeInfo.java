@@ -143,7 +143,10 @@ public class RouteNodeInfo {
                 return RouteNodeType.PINBOUNCE;
 
             case NODE_PINFEED:
-                return pinfeedIntoLaguna ? RouteNodeType.LAGUNA_I : RouteNodeType.PINFEED_I;
+                if (pinfeedIntoLaguna) {
+                    return RouteNodeType.LAGUNA_I;
+                }
+                break;
 
             case NODE_LAGUNA_OUTPUT: // UltraScale+ only
                 assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);

@@ -528,7 +528,7 @@ public class RWRoute{
                 indirectConnections.add(connection);
                 checkSinkRoutability(net, sinkINTNode);
                 RouteNode sinkINTRnode = getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I);
-                sinkINTRnode.setType(RouteNodeType.PINFEED_I);
+                assert(sinkINTRnode.getType() == RouteNodeType.PINFEED_I);
                 connection.setSinkRnode(sinkINTRnode);
                 if (sourceINTRnode == null && altSourceINTRnode == null) {
                     Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
@@ -1529,6 +1529,10 @@ public class RWRoute{
                         }
                         break;
                     case PINFEED_I:
+                        if (!childRNode.isTarget()) {
+                            // Do not enqueue a PINFEED_I unless it's the target
+                            continue;
+                        }
                         break;
                     case LAGUNA_I:
                         if (!connection.isCrossSLR() ||
