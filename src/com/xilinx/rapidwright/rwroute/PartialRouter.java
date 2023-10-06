@@ -752,7 +752,7 @@ public class PartialRouter extends RWRoute {
     /**
      * Routes a design in the partial non-timing-driven routing mode.
      * @param design The {@link Design} instance to be routed.
-     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all nets with no routing PIPs already present.
+     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all unrouted pins in the design.
      */
     public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute) {
         return routeDesignPartialNonTimingDriven(design, pinsToRoute, false);
@@ -761,7 +761,7 @@ public class PartialRouter extends RWRoute {
     /**
      * Routes a design in the partial non-timing-driven routing mode.
      * @param design The {@link Design} instance to be routed.
-     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all nets with no routing PIPs already present.
+     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all unrouted pins in the design.
      * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
      */
     public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
@@ -784,7 +784,7 @@ public class PartialRouter extends RWRoute {
     /**
      * Routes a design in the partial timing-driven routing mode.
      * @param design The {@link Design} instance to be routed.
-     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all nets with no routing PIPs already present.
+     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all unrouted pins in the design.
      * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
      */
     public static Design routeDesignPartialTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
