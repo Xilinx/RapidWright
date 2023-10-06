@@ -1818,13 +1818,24 @@ public class RWRoute{
         printFormattedString("Total nets: ", design.getNets().size());
         printFormattedString("Routable nets: ", numPreservedRoutableNets + numPreservedClks + numPreservedStaticNets + nets.size() + staticNetAndRoutingTargets.size() + clkNets.size());
         printFormattedString("  Preserved routable nets: ", numPreservedRoutableNets);
-        printFormattedString("    GLOBAL_CLOCK: ", numPreservedClks);
-        printFormattedString("    Static nets: ", numPreservedStaticNets);
-        printFormattedString("    WIRE: ", numPreservedWire);
-        printFormattedString("  Nets to be routed: ", (nets.size() +  staticNetAndRoutingTargets.size() + clkNets.size()));
-        printFormattedString("    GLOBAL_CLOCK: ", clkNets.size());
-        printFormattedString("    Static nets: ", staticNetAndRoutingTargets.size());
-        printFormattedString("    WIRE: ", nets.size());
+        printFormattedString("    Global: ", numPreservedClks);
+        printFormattedString("    Static: ", numPreservedStaticNets);
+        printFormattedString("    Wire: ", numPreservedWire);
+        printFormattedString("  Routable nets: ", (nets.size() +  staticNetAndRoutingTargets.size() + clkNets.size()));
+        printFormattedString("    Global: ", clkNets.size());
+        printFormattedString("    Static: ", staticNetAndRoutingTargets.size());
+        printFormattedString("    Wire: ", nets.size());
+        int netsWithErrors = 0;
+        for (Map.Entry<Net,NetWrapper> e : nets.entrySet()) {
+            NetWrapper netWrapper = e.getValue();
+            for (Connection connection : netWrapper.getConnections()) {
+                if (!connection.getSink().isRouted() || connection.isCongested()) {
+                    netsWithErrors++;
+                    break;
+                }
+            }
+        }
+        printFormattedString("  Nets with routing errors: ", netsWithErrors);
         int clkPins = 0;
         for (Net clk : clkNets) {
             clkPins += clk.getSinkPins().size();
@@ -1832,10 +1843,10 @@ public class RWRoute{
         int indirectPins = getNumIndirectConnectionPins();
         int staticPins = getNumStaticNetPins();
         printFormattedString("  All site pins to be routed: ", (indirectPins + staticPins + clkPins));
-        printFormattedString("    Connections to be routed: ", indirectPins);
+        printFormattedString("    Global pins: ", clkPins);
+        printFormattedString("    Static pins: ", getNumStaticNetPins());
+        printFormattedString("    Wire pins: ", indirectPins);
         printFormattedString("      With SLR crossings: ", getNumConnectionsCrossingSLRs());
-        printFormattedString("    Static net pins: ", getNumStaticNetPins());
-        printFormattedString("    Clock pins: ", clkPins);
         printFormattedString("Nets not needing routing: ", numNotNeedingRoutingNets);
         if (numUnrecognizedNets != 0)
             printFormattedString("Nets unrecognized: ", numUnrecognizedNets);
