@@ -1799,7 +1799,7 @@ public class RWRoute{
         printFormattedString("  All site pins to be routed: ", (indirectPins + staticPins + clkPins));
         printFormattedString("    Connections to be routed: ", indirectPins);
         printFormattedString("      With SLR crossings: ", getNumConnectionsCrossingSLRs());
-        printFormattedString("    Static net pins: ", getNumStaticNetPins());
+        printFormattedString("    Static net pins: ", staticPins);
         printFormattedString("    Clock pins: ", clkPins);
         printFormattedString("Nets not needing routing: ", numNotNeedingRoutingNets);
         if (numUnrecognizedNets != 0)
@@ -1841,6 +1841,7 @@ public class RWRoute{
 
         // For testing
         System.setProperty("rapidwright.rwroute.nodesPopped", String.valueOf(nodesPopped));
+        System.setProperty("rapidwright.rwroute.numStaticNetPins", String.valueOf(getNumStaticNetPins()));
     }
 
     /**
