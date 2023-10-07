@@ -292,29 +292,35 @@ public class Connection implements Comparable<Connection>{
         return sourceRnode;
     }
 
-    public void setSourceRnode(RouteNode sourceNode) {
-        sourceRnode = sourceNode;
+    public void setSourceRnode(RouteNode sourceRnode) {
+        assert(sourceRnode.getType() == RouteNodeType.PINFEED_O);
+        this.sourceRnode = sourceRnode;
     }
 
     public RouteNode getAltSourceRnode() {
         return altSourceRnode;
     }
 
-    public void setAltSourceRnode(RouteNode altSourceNode) {
-        altSourceRnode = altSourceNode;
+    public void setAltSourceRnode(RouteNode altSourceRnode) {
+        assert(altSourceRnode == null || altSourceRnode.getType() == RouteNodeType.PINFEED_O);
+        this.altSourceRnode = altSourceRnode;
     }
 
     public RouteNode getSinkRnode() {
         return sinkRnode;
     }
 
-    public void setSinkRnode(RouteNode childRnode) {
-        sinkRnode = childRnode;
+    public void setSinkRnode(RouteNode sinkRnode) {
+        assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
+        this.sinkRnode = sinkRnode;
     }
 
     public RouteNode getAltSinkRnode() { return altSinkRnode; }
 
-    public void setAltSinkRnode(RouteNode childRnode) { altSinkRnode = childRnode; }
+    public void setAltSinkRnode(RouteNode altSinkRnode) {
+        assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
+        this.altSinkRnode = altSinkRnode;
+    }
 
     public short getXMinBB() {
         return xMinBB;
