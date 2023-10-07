@@ -584,6 +584,19 @@ public class PartialRouter extends RWRoute {
                 assert(rend.getPrev() == rstart);
             }
         } else {
+            // Fix up all sink pins rnodes to be PINFEED_I now
+            for (SitePinInst spi : net.getPins()) {
+                if (spi.isOutPin()) {
+                    continue;
+                }
+                List<Node> nodes = RouterHelper.projectInputPinToINTNode(spi);
+                if (!nodes.isEmpty()) {
+                    Node sinkINTNode = nodes.get(0);
+                    RouteNode rnode = getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I);
+                    rnode.setType(RouteNodeType.PINFEED_I);
+                }
+            }
+
             // Net needs to be created
             netWrapper = createNetWrapperAndConnections(net);
 
