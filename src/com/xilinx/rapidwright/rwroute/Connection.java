@@ -229,10 +229,24 @@ public class Connection implements Comparable<Connection>{
      * @param rn RouteNode to add
      */
     public void addRnode(RouteNode rn) {
-        xMinBB = (short) Math.min(xMinBB, rn.getBeginTileXCoordinate() - 1);
-        xMaxBB = (short) Math.max(xMaxBB, rn.getEndTileXCoordinate() + 1);
-        yMinBB = (short) Math.min(yMinBB, rn.getBeginTileYCoordinate() - 1);
-        yMaxBB = (short) Math.max(yMaxBB, rn.getEndTileYCoordinate() + 1);
+        short xMin = rn.getBeginTileXCoordinate();
+        short xMax = rn.getEndTileXCoordinate();
+        if (xMin > xMax) {
+            short tmp = xMin;
+            xMin = xMax;
+            xMax = tmp;
+        }
+        short yMin = rn.getBeginTileYCoordinate();
+        short yMax = rn.getEndTileYCoordinate();
+        if (yMin > yMax) {
+            short tmp = yMin;
+            yMin = yMax;
+            yMax = tmp;
+        }
+        xMinBB = (short) Math.min(xMinBB, xMin - 1);
+        xMaxBB = (short) Math.max(xMaxBB, xMax + 1);
+        yMinBB = (short) Math.min(yMinBB, yMin - 1);
+        yMaxBB = (short) Math.max(yMaxBB, yMax + 1);
         rnodes.add(rn);
     }
 
