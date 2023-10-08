@@ -1530,8 +1530,8 @@ public class RWRoute{
                         break;
                     case PINFEED_I:
                         if (!childRNode.isTarget()) {
-                            if (childRNode.getNode().getIntentCode() != IntentCode.NODE_PINBOUNCE ||
-                                    childRNode.countConnectionsOfUser(netWrapper) == 0) {
+                            if (childRNode.countConnectionsOfUser(netWrapper) == 0 ||
+                                    childRNode.getNode().getIntentCode() != IntentCode.NODE_PINBOUNCE) {
                                 // This PINFEED_I is not the target, nor is it a PINBOUNCE already
                                 // used by this net (indicating that it may be a target of a different
                                 // connection on this same net)
