@@ -528,7 +528,6 @@ public class RWRoute{
                 indirectConnections.add(connection);
                 checkSinkRoutability(net, sinkINTNode);
                 RouteNode sinkINTRnode = getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I);
-                assert(sinkINTRnode.getType() == RouteNodeType.PINFEED_I);
                 connection.setSinkRnode(sinkINTRnode);
                 if (sourceINTRnode == null && altSourceINTRnode == null) {
                     Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
@@ -1484,12 +1483,13 @@ public class RWRoute{
         boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(rnode.getNode());
         for (RouteNode childRNode:rnode.getChildren()) {
             // Targets that are visited more than once must be overused
-            assert(!childRNode.isTarget() || !childRNode.isVisited(connectionsRouted) || childRNode.willOverUse(connection.getNetWrapper()));
+            NetWrapper netWrapper = connection.getNetWrapper();
+            assert(!childRNode.isTarget() || !childRNode.isVisited(connectionsRouted) || childRNode.willOverUse(netWrapper));
 
             // If childRnode is preserved, then it must be preserved for the current net we're routing
             Net preservedNet;
             assert((preservedNet = routingGraph.getPreservedNet(childRNode.getNode())) == null ||
-                    preservedNet == connection.getNetWrapper().getNet());
+                    preservedNet == netWrapper.getNet());
 
             if (childRNode.isVisited(connectionsRouted)) {
                 // Node must be in queue already.
@@ -1506,7 +1506,7 @@ public class RWRoute{
                 // otherwise terminate if this target will not be overused since we may find that
                 // the alternate sink is less congested
                 if ((childRNode == connection.getSinkRnode() && connection.getAltSinkRnode() == null) ||
-                        !childRNode.willOverUse(connection.getNetWrapper())) {
+                        !childRNode.willOverUse(netWrapper)) {
                     assert(!childRNode.isVisited(connectionsRouted));
                     nodesPushed += queue.size();
                     queue.clear();
@@ -1530,8 +1530,13 @@ public class RWRoute{
                         break;
                     case PINFEED_I:
                         if (!childRNode.isTarget()) {
-                            // Do not enqueue a PINFEED_I unless it's the target
-                            continue;
+                            if (childRNode.getNode().getIntentCode() != IntentCode.NODE_PINBOUNCE ||
+                                    childRNode.countConnectionsOfUser(netWrapper) == 0) {
+                                // This PINFEED_I is not the target, nor is it a PINBOUNCE already
+                                // used by this net (indicating that it may be a target of a different
+                                // connection on this same net)
+                                continue;
+                            }
                         }
                         break;
                     case LAGUNA_I:
