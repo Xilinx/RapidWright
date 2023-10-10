@@ -134,7 +134,7 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
     }
 
     @Override
-    protected boolean isExcluded(Node parent, Node child) {
+    public boolean isExcluded(Node parent, Node child) {
         if (super.isExcluded(parent, child))
             return true;
         if (maskNodesCrossRCLK) {

@@ -145,7 +145,7 @@ public class RWRoute{
     protected int connectionsRoutedIteration;
     /** Total number of nodes pushed/popped from the queue */
     private long nodesPushed;
-    private long nodesPopped;
+    protected long nodesPopped;
 
     /** The maximum criticality constraint of connection */
     private static final float MAX_CRITICALITY = 0.99f;
@@ -1231,7 +1231,7 @@ public class RWRoute{
      * Updates the users and present congestion cost of rnodes used by a routed connection.
      * @param connection The routed connection.
      */
-    private void updateUsersAndPresentCongestionCost(Connection connection) {
+    protected void updateUsersAndPresentCongestionCost(Connection connection) {
         for (RouteNode rnode : connection.getRnodes()) {
             rnode.incrementUser(connection.getNetWrapper());
             rnode.updatePresentCongestionCost(presentCongestionFactor);
@@ -1258,7 +1258,7 @@ public class RWRoute{
     /**
      * Checks if there are PIP overlaps among routed nets.
      */
-    private void checkPIPsUsage() {
+    protected void checkPIPsUsage() {
         Map<PIP, Set<Net>> pipsUsage = new HashMap<>();
         for (Net net : design.getNets()) {
             for (PIP pip:net.getPIPs()) {
@@ -1547,8 +1547,9 @@ public class RWRoute{
                         }
                         break;
                     case SUPER_LONG_LINE:
-                        assert(connection.isCrossSLR() &&
-                                connection.getSinkRnode().getSLRIndex() != rnode.getSLRIndex());
+                        // Disabled for backward routing
+                        // assert(connection.isCrossSLR() &&
+                        //         connection.getSinkRnode().getSLRIndex() != rnode.getSLRIndex());
                         break;
                     default:
                         throw new RuntimeException("Unexpected rnode type: " + childRNode.getType());

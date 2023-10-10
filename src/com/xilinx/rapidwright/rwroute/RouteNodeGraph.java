@@ -302,7 +302,7 @@ public class RouteNodeGraph {
         return false;
     }
 
-    protected boolean isExcluded(Node parent, Node child) {
+    public boolean isExcluded(Node parent, Node child) {
         Tile tile = child.getTile();
         TileTypeEnum tileType = tile.getTileTypeEnum();
         return !allowedTileEnums.contains(tileType);

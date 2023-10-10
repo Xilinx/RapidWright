@@ -371,7 +371,7 @@ public class PartialRouter extends RWRoute {
 
             // Use the prev pointers to attempt to recover routing for all indirect connections
             for (Connection connection : netWrapper.getConnections()) {
-                if (!connection.isDirect() && connection.getSink().isRouted()) {
+                if (!connection.isDirect() /*&& connection.getSink().isRouted()*/) {
                     finishRouteConnection(connection, connection.getSinkRnode());
                 }
             }
