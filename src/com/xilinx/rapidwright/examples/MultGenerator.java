@@ -47,6 +47,7 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFTools;
@@ -70,60 +71,19 @@ public class MultGenerator extends ArithmeticGenerator {
     private static final String OPMODE_VALUE = "000000101";
 
     public static EDIFCellInst createDSP48E2CellInstance(Design d, EDIFCell parent, String name) {
-        EDIFCell dsp48e2 = new EDIFCell(d.getNetlist().getHDIPrimitivesLibrary(),"DSP48E2");
+        EDIFCell dsp48e2 = Design.getMacroPrimitives(d.getDevice().getSeries()).getCell("DSP48E2");
+        if (parent.getNetlist().getCell("DSP48E2") == null) {
+            EDIFLibrary lib = parent.getNetlist().getHDIPrimitivesLibrary();
+            EDIFCell copy = new EDIFCell(lib, dsp48e2, dsp48e2.getName());
+            lib.addCell(copy);
 
-        dsp48e2.createPort("CARRYCASCOUT",EDIFDirection.OUTPUT,1);
-        dsp48e2.createPort("MULTSIGNOUT",EDIFDirection.OUTPUT,1);
-        dsp48e2.createPort("OVERFLOW",EDIFDirection.OUTPUT,1);
-        dsp48e2.createPort("PATTERNBDETECT",EDIFDirection.OUTPUT,1);
-        dsp48e2.createPort("PATTERNDETECT",EDIFDirection.OUTPUT,1);
-        dsp48e2.createPort("UNDERFLOW",EDIFDirection.OUTPUT,1);
-        dsp48e2.createPort("CARRYCASCIN",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("CARRYIN",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("CEA1",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("CEA2",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("CEAD",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("CEALUMODE",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("CEB1",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("CEB2",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("CEC",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("CECARRYIN",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("CECTRL",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("CED",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("CEINMODE",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("CEM",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("CEP",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("CLK",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("MULTSIGNIN",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("RSTA",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("RSTALLCARRYIN",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("RSTALUMODE",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("RSTB",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("RSTC",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("RSTCTRL",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("RSTD",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("RSTINMODE",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("RSTM",EDIFDirection.INPUT,1);
-        dsp48e2.createPort("RSTP",EDIFDirection.INPUT,1);
-
-        dsp48e2.createPort("ACOUT[29:0]",EDIFDirection.OUTPUT,30);
-        dsp48e2.createPort("BCOUT[17:0]",EDIFDirection.OUTPUT,18);
-        dsp48e2.createPort("CARRYOUT[3:0]",EDIFDirection.OUTPUT,4);
-        dsp48e2.createPort("PCOUT[47:0]",EDIFDirection.OUTPUT,48);
-        dsp48e2.createPort("P[47:0]",EDIFDirection.OUTPUT,48);
-        dsp48e2.createPort("XOROUT[7:0]",EDIFDirection.OUTPUT,8);
-        dsp48e2.createPort("ACIN[29:0]",EDIFDirection.INPUT,30);
-        dsp48e2.createPort("ALUMODE[3:0]",EDIFDirection.INPUT,4);
-        dsp48e2.createPort("A[29:0]",EDIFDirection.INPUT,30);
-        dsp48e2.createPort("BCIN[17:0]",EDIFDirection.INPUT,18);
-        dsp48e2.createPort("B[17:0]",EDIFDirection.INPUT,18);
-        dsp48e2.createPort("CARRYINSEL[2:0]",EDIFDirection.INPUT,3);
-        dsp48e2.createPort("C[47:0]",EDIFDirection.INPUT,48);
-        dsp48e2.createPort("D[26:0]",EDIFDirection.INPUT,27);
-        dsp48e2.createPort("INMODE[4:0]",EDIFDirection.INPUT,5);
-        dsp48e2.createPort("OPMODE[8:0]",EDIFDirection.INPUT,9);
-        dsp48e2.createPort("PCIN[47:0]",EDIFDirection.INPUT,48);
-
+            for (EDIFCellInst childInst : copy.getCellInsts()) {
+                EDIFCell child = childInst.getCellType();
+                EDIFCell deepCopy = new EDIFCell(lib, child, child.getName());
+                childInst.setCellType(deepCopy);
+            }
+            dsp48e2 = copy;
+        }
         EDIFCellInst i = dsp48e2.createCellInst(name, parent);
 
         i.addProperty("USE_MULT","MULTIPLY");
@@ -226,44 +186,6 @@ public class MultGenerator extends ArithmeticGenerator {
             }
         }
 
-
-
-
-        /*
-        for (String gndBus : gndBusses) {
-            EDIFPort p = inst.getCellType().getPort(gndBus);
-            int stop = p.getWidth();
-            boolean isAorB = gndBus.equals("A") || gndBus.equals("B");
-            if (isAorB) {
-                // Don't gnd the inputs
-                stop = p.getWidth() - width;
-            }
-            for (int i=0; i < stop; i++) {
-                gnd.createPortInst(p, i, inst);
-                if (gndBus.equals("D")) gndBus = "DIN";
-                logic0.createPin(false, gndBus + (isAorB ? i+width : i), si);
-            }
-        }
-
-        for (String pin : vccPins) {
-            vcc.createPortInst(pin, inst);
-            logic1.createPin(false, pin, si);
-        }
-
-
-        String opmodeValue = "000000101";
-        EDIFPort opmode = inst.getPort("OPMODE");
-        for (int i=0; i < opmode.getWidth(); i++) {
-            char c = opmodeValue.charAt(i);
-            if (c == '1') {
-                gnd.createPortInst(opmode, i, inst);
-                logic0.createPin(false, opmode.getBusName()+(opmode.getWidth()-i-1), si);
-            } else {
-                vcc.createPortInst(opmode, i, inst);
-                logic1.createPin(false, opmode.getBusName()+(opmode.getWidth()-i-1), si);
-            }
-        }*/
-
         // Connect logical outside connections/ports
         clk.createPortInst("CLK",inst);
         Net physClk = d.createNet(clk.getName());
@@ -282,7 +204,7 @@ public class MultGenerator extends ArithmeticGenerator {
             suffix = "["+i+"]";
             EDIFNet aNet = top.createNet(INPUT_A_NAME + suffix);
             EDIFNet bNet = top.createNet(INPUT_B_NAME + suffix);
-            EDIFNet rNet = top.createNet(designName + "/" + RESULT_NAME + suffix);
+            EDIFNet rNet = top.createNet(RESULT_NAME + suffix);
 
             aNet.createPortInst(a,width-i-1);
             bNet.createPortInst(b,width-i-1);
@@ -292,9 +214,10 @@ public class MultGenerator extends ArithmeticGenerator {
             bNet.createPortInst(INPUT_B_NAME, bWidth-i-1, inst);
             rNet.createPortInst(RESULT_NAME, pWidth-i-1, inst);
 
-            Net physA = d.createNet(aNet.getName());
-            Net physB = d.createNet(bNet.getName());
-            Net physR = d.createNet(rNet.getName());
+
+            Net physA = d.createNet(inst + "/" + aNet.getName());
+            Net physB = d.createNet(inst + "/" + bNet.getName());
+            Net physR = d.createNet(inst + "/" + rNet.getName());
 
             physA.createPin(INPUT_A_NAME + i, si);
             physB.createPin(INPUT_B_NAME + i, si);
@@ -302,10 +225,10 @@ public class MultGenerator extends ArithmeticGenerator {
         }
         for (int i=width; i < pWidth; i++) {
             suffix = "["+i+"]";
-            EDIFNet rNet = top.createNet(designName + "/" + RESULT_NAME + suffix);
+            EDIFNet rNet = top.createNet(RESULT_NAME + suffix);
             rNet.createPortInst(r,pWidth-i-1);
             rNet.createPortInst(RESULT_NAME, pWidth-i-1, inst);
-            Net physR = d.createNet(rNet.getName());
+            Net physR = d.createNet(inst + "/" + rNet.getName());
             physR.createPin(RESULT_NAME + i, si);
         }
 
@@ -338,9 +261,10 @@ public class MultGenerator extends ArithmeticGenerator {
             if (!port.isOutput()) continue;
             if (port.getBusName().equals(RESULT_NAME)) continue;
             for (int i=0; i < port.getWidth(); i++) {
-                EDIFNet net = top.createNet(designName + "/" + port.getBusName() + (port.getWidth() > 1 ? "["+i+"]" : ""));
-                net.createPortInst(port.getBusName(), i, inst);
-                Net physNet = d.createNet(net.getName());
+                EDIFNet net = top.createNet(port.getBusName() + (port.getWidth() > 1 ? "[" + i + "]" : ""));
+                int ii = port.getWidth() - 1 - i;
+                net.createPortInst(port.getBusName(), ii, inst);
+                Net physNet = d.createNet(inst + "/" + net.getName());
 
                 // Correct differences in physical pin names
                 String busName = port.getBusName();
