@@ -33,9 +33,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -43,6 +45,7 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
 import com.xilinx.rapidwright.timing.TimingManager;
@@ -106,7 +109,7 @@ public class PartialRouter extends RWRoute {
     protected void preprocess() {
         // By default, preprocessing is expected to be performed manually and added to pinsToRoute
         // ahead of constructing this PartialRouter class.
-        // Preprocessing can be invoked manually with RWRoute.preprocess(Design), as done by
+        // Preprocessing can be invoked manually with preprocess(Design), as done by
         // routeDesignWithUserDefinedArguments() which needs to infer pinsToRoute.
     }
 
@@ -242,7 +245,21 @@ public class PartialRouter extends RWRoute {
         if (clkNets.isEmpty())
             return;
 
-        super.routeGlobalClkNets();
+        for (Net clk : clkNets) {
+            List<SitePinInst> clkPins = netToPins.get(clk);
+            if (clkPins == null || clkPins.isEmpty()) {
+                continue;
+            }
+
+            if (!clk.hasPIPs()) {
+                super.routeGlobalClkNet(clk);
+            } else {
+                System.out.println("INFO: Routing " + clkPins.size() + " pins of clock " + clk + " (non timing-driven)");
+                Function<Node, NodeStatus> gns = (node) -> this.getGlobalRoutingNodeStatus(clk, node);
+                UltraScaleClockRouting.incrementalClockRouter(clk, clkPins, gns);
+                preserveNet(clk, false);
+            }
+        }
 
         List<Net> unpreserveNets = unpreserveCongestedNets(clkNets);
         if (!unpreserveNets.isEmpty()) {
@@ -691,7 +708,7 @@ public class PartialRouter extends RWRoute {
      * @return Routed design.
      */
     public static Design routeDesignWithUserDefinedArguments(Design design, String[] args, boolean softPreserve) {
-        RWRoute.preprocess(design);
+        preprocess(design);
 
         List<SitePinInst> pinsToRoute = getUnroutedPins(design);
 
@@ -712,22 +729,44 @@ public class PartialRouter extends RWRoute {
                 // Source-less nets may exist since this is an out-of-context design
                 continue;
             }
-            if (!net.hasPIPs()) {
-                pinsToRoute.addAll(net.getSinkPins());
+            for (SitePinInst spi : net.getPins()) {
+                if (spi.isRouted() || spi.isOutPin()) {
+                    continue;
+                }
+                pinsToRoute.add(spi);
             }
         }
         return pinsToRoute;
     }
 
     /**
+     * Calls {@link RWRoute#preprocess(Design)} to preprocess the design, and furthermore
+     * update the SitePinInst.isRouted() result for all pins in the design.
+     * @param design Design to preprocess
+     */
+    public static void preprocess(Design design) {
+        RWRoute.preprocess(design);
+        DesignTools.updatePinsIsRouted(design);
+    }
+
+    /**
      * Routes a design in the partial non-timing-driven routing mode.
      * @param design The {@link Design} instance to be routed.
-     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all nets with no routing PIPs already present.
+     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all unrouted pins in the design.
+     */
+    public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute) {
+        return routeDesignPartialNonTimingDriven(design, pinsToRoute, false);
+    }
+
+    /**
+     * Routes a design in the partial non-timing-driven routing mode.
+     * @param design The {@link Design} instance to be routed.
+     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all unrouted pins in the design.
      * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
      */
     public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         if (pinsToRoute == null) {
-            RWRoute.preprocess(design);
+            preprocess(design);
             pinsToRoute = getUnroutedPins(design);
         }
 
@@ -745,12 +784,12 @@ public class PartialRouter extends RWRoute {
     /**
      * Routes a design in the partial timing-driven routing mode.
      * @param design The {@link Design} instance to be routed.
-     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all nets with no routing PIPs already present.
+     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all unrouted pins in the design.
      * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
      */
     public static Design routeDesignPartialTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         if (pinsToRoute == null) {
-            RWRoute.preprocess(design);
+            preprocess(design);
             pinsToRoute = getUnroutedPins(design);
         }
 
