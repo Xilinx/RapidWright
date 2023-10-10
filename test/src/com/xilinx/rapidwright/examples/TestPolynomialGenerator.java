@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.examples;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -50,13 +51,13 @@ public class TestPolynomialGenerator {
         for (Cell c : d.getCells()) {
             if (c.isLocked() || c.isRoutethru())
                 continue;
-            assert (c.isPlaced());
+            Assertions.assertTrue(c.isPlaced());
         }
 
         DesignTools.updatePinsIsRouted(d);
         for (Net n : d.getNets()) {
             for (SitePinInst spi : n.getPins()) {
-                assert (spi.isRouted());
+                Assertions.assertTrue(spi.isRouted());
             }
         }
     }

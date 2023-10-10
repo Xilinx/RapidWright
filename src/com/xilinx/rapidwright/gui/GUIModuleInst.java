@@ -120,17 +120,15 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
             }
             if (!occupiedTiles.contains(tile)) {
                 occupiedTiles.add(tile);
-                //int col = tile.getColumn();
-                //int row = tile.getRow();
                 int col = scene.getDrawnTileX(tile);
                 int row = scene.getDrawnTileY(tile);
 
                 maxCol = (maxCol >= col) ? maxCol : col;
                 maxRow = (maxRow >= row) ? maxRow : row;
-                String tileTypeStr = tile.getTileTypeEnum().toString();
-                if (tileTypeStr.startsWith("BRAM")) {
+                TileTypeEnum type = tile.getTileTypeEnum();
+                if (Utils.isBRAM(type)) {
                     row = row - 3;
-                } else if (tileTypeStr.startsWith("DSP")) {
+                } else if (Utils.isDSP(type)) {
                     row = row - 4;
                 }
                 minCol = (minCol <= col) ? minCol : col;
@@ -164,17 +162,16 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
         }
 
         for (Tile tile : occupiedTiles) {
-            //int tileX = tile.getColumn() - minCol;
-            //int tileY = tile.getRow() - minRow;
             int tileX = scene.getDrawnTileX(tile) - minCol;
             int tileY = scene.getDrawnTileY(tile) - minRow;
-            if (tile.getTileTypeEnum().toString().startsWith("BRAM")) {
+            TileTypeEnum type = tile.getTileTypeEnum();
+            if (Utils.isBRAM(type)) {
                 hmTileMap[tileY][tileX] = true;
                 hmTileMap[tileY - 1][tileX] = true;
                 hmTileMap[tileY - 2][tileX] = true;
                 hmTileMap[tileY - 3][tileX] = true;
 
-            } else if (tile.getTileTypeEnum().toString().startsWith("DSP")) {
+            } else if (Utils.isDSP(type)) {
                 hmTileMap[tileY][tileX] = true;
                 hmTileMap[tileY - 1][tileX] = true;
                 hmTileMap[tileY - 2][tileX] = true;
