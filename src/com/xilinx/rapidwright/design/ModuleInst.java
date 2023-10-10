@@ -334,7 +334,8 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                     if (siteType == SiteTypeEnum.RAMBFIFO36) { // UltraScale+
                         // Check that both RAMB18s are free
                         for (Site alternateSite : newTile.getSites()) {
-                            if (alternateSite.getSiteTypeEnum() != SiteTypeEnum.RAMB181) {
+                            if (alternateSite.getSiteTypeEnum() != SiteTypeEnum.RAMBFIFO18 &&
+                                alternateSite.getSiteTypeEnum() != SiteTypeEnum.RAMB181) {
                                 continue;
                             }
                             existingSiteInst = design.getSiteInstFromSite(alternateSite);
