@@ -107,6 +107,7 @@ public class PipelineGeneratorWithRouting {
     protected static final String DEPTH_OPT = "m";
     protected static final String DISTANCE_X_OPT = "t";
     protected static final String DISTANCE_Y_OPT = "u";
+    protected static final String ROUTING_OPT = "r";
     protected static final String VERBOSE_OPT = "v";
     protected static final String HELP_OPT = "h";
     public static final int BITS_PER_CLE = 8;
@@ -130,10 +131,13 @@ public class PipelineGeneratorWithRouting {
      * need to be modified for this routing example.
      * @param route Boolean specifying whether to route the design or not.  This does not need to be
      * modified for this routing example.
+     * @param useDistanceBasedRouter Boolean specifying whether to use distance-based router or
+     * timing-driven router.
      * @return
      */
     public static PBlock createPipeline(Design d, Site startingPoint, int width, int depth,
-                                        int distanceX, int distanceY, direction dir, boolean route) {
+                                        int distanceX, int distanceY, direction dir,
+                                        boolean route, boolean useDistanceBasedRouter) {
 
         if (dir == direction.vertical && (distanceY < Math.ceil(width/8))) {
             System.err.println("Error: the width (="+width+") and distance (="+distanceY+") "
@@ -372,34 +376,34 @@ public class PipelineGeneratorWithRouting {
         // Find rectangular area consumed
         PBlock footprint = new PBlock(d.getDevice(),used);
 
-        boolean useDistanceBasedRouter = false;
-
         // Route intersites
-        if (useDistanceBasedRouter) {
-            Router r = new Router(d); // the non-timing driven router from RW library
-            r.setRoutingPblock(footprint);
-            r.setSupressWarningsErrors(false);
-            r.routeDesign();
-        } else {
-            TimingManager tm = new TimingManager(d);
-            TimingModel dm1 = tm.getTimingModel();
+        if (route) {
+            if (useDistanceBasedRouter) {
+                Router r = new Router(d); // the non-timing driven router from RW library
+                r.setRoutingPblock(footprint);
+                r.setSupressWarningsErrors(false);
+                r.routeDesign();
+            } else {
+                TimingManager tm = new TimingManager(d);
+                TimingModel dm1 = tm.getTimingModel();
 
-            for (Net n : d.getNets()) {
-                SitePinInst source = n.getSource();
-                List<SitePinInst> sinkPins = n.getSinkPins();
-                if (source == null) {
-                    if (!sinkPins.isEmpty()) {
-                        System.err.println("Couldn't route net:" + n);
+                for (Net n : d.getNets()) {
+                    SitePinInst source = n.getSource();
+                    List<SitePinInst> sinkPins = n.getSinkPins();
+                    if (source == null) {
+                        if (!sinkPins.isEmpty()) {
+                            System.err.println("Couldn't route net:" + n);
+                        }
+                        continue;
                     }
-                    continue;
-                }
-                for (SitePinInst sink : sinkPins) {
-                    /* Here is where we call our example findRoute router method */
-                    List<PIP> pList = findRoute(source, sink, dm1);
-                    if (pList != null)
-                        n.setPIPs(pList);
-                    else
-                        System.err.println("Couldn't route net:"+n);
+                    for (SitePinInst sink : sinkPins) {
+                        /* Here is where we call our example findRoute router method */
+                        List<PIP> pList = findRoute(source, sink, dm1);
+                        if (pList != null)
+                            n.setPIPs(pList);
+                        else
+                            System.err.println("Couldn't route net:"+n);
+                    }
                 }
             }
         }
@@ -797,7 +801,7 @@ public class PipelineGeneratorWithRouting {
         //int distanceY = 0;
         //String sliceSite = "SLICE_X84Y68";
 
-
+        boolean useDistanceBasedRouter = false;
         boolean verbose1 = true;
 
         double clkPeriodConstraint = Math.pow(frequencyMHz, -1)*1000;
@@ -816,6 +820,8 @@ public class PipelineGeneratorWithRouting {
             accepts(DEPTH_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(depth).describedAs("depth");
             accepts(DISTANCE_X_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(distanceX).describedAs("distance X");
             accepts(DISTANCE_Y_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(distanceY).describedAs("distance Y");
+            accepts(ROUTING_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(useDistanceBasedRouter)
+                                .describedAs("Use distance-based router (true) or timing-driven router (false)");
             accepts(SLICE_SITES_OPT).withOptionalArg().defaultsTo(sliceSite).describedAs("Lower left slice to be used for pipeline");
             accepts(VERBOSE_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(verbose1).describedAs("Print verbose output");
             acceptsAll( Arrays.asList(HELP_OPT, "?"), "Print Help" ).forHelp();
@@ -857,6 +863,7 @@ public class PipelineGeneratorWithRouting {
         String outputDCPFileName = (String) opts.valueOf(OUT_DCP_OPT);
         String clkName = (String) opts.valueOf(CLK_NAME_OPT);
         double clkPeriodConstraint = (double) opts.valueOf(CLK_CONSTRAINT_OPT);
+        boolean useDistanceBasedRouter = (boolean) opts.valueOf(ROUTING_OPT);
 
         int width = (int) opts.valueOf(WIDTH_OPT);
         int depth = (int) opts.valueOf(DEPTH_OPT);
@@ -887,8 +894,8 @@ public class PipelineGeneratorWithRouting {
         System.out.println ("DistanceY:"+distanceY+"" +
                 "\n");
 
-
-        createPipeline(d, slice, width, depth, distanceX, distanceY, dir, true);
+        boolean shouldRoute = true;
+        createPipeline(d, slice, width, depth, distanceX, distanceY, dir, shouldRoute, useDistanceBasedRouter);
 
         // Add a clock constraint
         String tcl = "create_clock -name "+clkName+" -period "+clkPeriodConstraint+

@@ -98,6 +98,7 @@ public class TestCell {
         SiteInst si = d.getSiteInstFromSiteName("SLICE_X72Y144");
         Cell rtCell = si.getCell("CFF");
         Assertions.assertNotNull(rtCell);
+        Assertions.assertSame(si, rtCell.getSiteInst());
         Assertions.assertTrue(rtCell.isRoutethru());
         Assertions.assertTrue(rtCell.isFFRoutethruCell());
         Assertions.assertEquals("D", rtCell.getLogicalPinMapping("D"));

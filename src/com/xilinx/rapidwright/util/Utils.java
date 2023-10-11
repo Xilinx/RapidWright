@@ -349,7 +349,8 @@ public class Utils{
             SiteTypeEnum.DSP48E2,
             SiteTypeEnum.DSP58,
             SiteTypeEnum.DSP58_CPLX,
-            SiteTypeEnum.DSPFP
+            SiteTypeEnum.DSPFP,
+            SiteTypeEnum.DSP58_PRIMARY
         );
 
         bramTypes = EnumSet.of(
