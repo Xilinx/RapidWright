@@ -177,25 +177,6 @@ public class RouteThruHelper {
         return true;
     }
 
-    public static boolean isRouteThruPIPAvailable(Design design, Node start, Node end) {
-        SitePin outPin = end.getSitePin();
-        if (outPin == null) return false;
-        SiteInst siteInst = design.getSiteInstFromSite(outPin.getSite());
-        if (siteInst == null) return true;
-        Net outputNetCollision = siteInst.getNetFromSiteWire(outPin.getBELPin().getSiteWireName());
-        if (outputNetCollision != null) return false;
-        SitePin inPin = start.getSitePin();
-        BELPin belPin = inPin.getBELPin();
-        Net inputNetCollision = siteInst.getNetFromSiteWire(belPin.getSiteWireName());
-        if (inputNetCollision != null) return false;
-
-        for (BELPin sink : belPin.getSiteConns()) {
-            Cell collision = siteInst.getCell(sink.getBEL());
-            if (collision != null) return false;
-        }
-        return true;
-    }
-
     public static void main(String[] args) {
         RouteThruHelper rtHelper = new RouteThruHelper(Device.getDevice(Device.AWS_F1));
 
