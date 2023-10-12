@@ -1997,11 +1997,11 @@ public class DesignTools {
 
     /**
      * Looks in the site instance for cells connected to this site pin.
-     * @param pin The pin to examine for connected cells
-     * @return Set of connected cells to this pin
+     * @param pin The pint to examine for connected cells
+     * @return List of connected cells to this pin
      */
     public static Set<Cell> getConnectedCells(SitePinInst pin) {
-        HashSet<Cell> cells = new HashSet<>();
+        HashSet<Cell> cells = new HashSet<Cell>();
         SiteInst si = pin.getSiteInst();
         if (si == null) return cells;
         for (BELPin p : pin.getBELPin().getSiteConns()) {
@@ -2026,39 +2026,6 @@ public class DesignTools {
             }
         }
         return cells;
-    }
-
-    /**
-     * Looks in the site instance for BEL pins connected to this site pin.
-     * @param pin The pin to examine for connected BEL pins
-     * @return Set of BEL pins to this site pin
-     */
-    public static Set<BELPin> getConnectedBELPins(SitePinInst pin) {
-        HashSet<BELPin> pins = new HashSet<>();
-        SiteInst si = pin.getSiteInst();
-        if (si == null) return pins;
-        for (BELPin p : pin.getBELPin().getSiteConns()) {
-            if (p.getBEL().getBELClass() == BELClass.RBEL) {
-                SitePIP pip = si.getUsedSitePIP(p.getBELName());
-                if (pip == null) continue;
-                if (p.isOutput()) {
-                    p = pip.getInputPin().getSiteConns().get(0);
-                    Cell c = si.getCell(p.getBELName());
-                    if (c != null) pins.add(p);
-                } else {
-                    for (BELPin snk : pip.getOutputPin().getSiteConns()) {
-                        Cell c = si.getCell(snk.getBELName());
-                        if (c != null) pins.add(snk);
-                    }
-                }
-            } else {
-                Cell c = si.getCell(p.getBELName());
-                if (c != null && c.getLogicalPinMapping(p.getName()) != null) {
-                    pins.add(p);
-                }
-            }
-        }
-        return pins;
     }
 
     /**
