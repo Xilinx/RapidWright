@@ -1,7 +1,7 @@
 /*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
  * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -120,17 +120,16 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
             }
             if (!occupiedTiles.contains(tile)) {
                 occupiedTiles.add(tile);
-                //int col = tile.getColumn();
-                //int row = tile.getRow();
                 int col = scene.getDrawnTileX(tile);
                 int row = scene.getDrawnTileY(tile);
 
                 maxCol = (maxCol >= col) ? maxCol : col;
                 maxRow = (maxRow >= row) ? maxRow : row;
-                String tileTypeStr = tile.getTileTypeEnum().toString();
-                if (tileTypeStr.startsWith("BRAM")
-                        || tileTypeStr.startsWith("DSP")) {
+                TileTypeEnum type = tile.getTileTypeEnum();
+                if (Utils.isBRAM(type)) {
                     row = row - 3;
+                } else if (Utils.isDSP(type)) {
+                    row = row - 4;
                 }
                 minCol = (minCol <= col) ? minCol : col;
                 minRow = (minRow <= row) ? minRow : row;
@@ -163,18 +162,24 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
         }
 
         for (Tile tile : occupiedTiles) {
-            //int tileX = tile.getColumn() - minCol;
-            //int tileY = tile.getRow() - minRow;
             int tileX = scene.getDrawnTileX(tile) - minCol;
             int tileY = scene.getDrawnTileY(tile) - minRow;
-            if (tile.getTileTypeEnum().toString().startsWith("BRAM")
-                    || tile.getTileTypeEnum().toString().startsWith("DSP")) {
+            TileTypeEnum type = tile.getTileTypeEnum();
+            if (Utils.isBRAM(type)) {
                 hmTileMap[tileY][tileX] = true;
                 hmTileMap[tileY - 1][tileX] = true;
                 hmTileMap[tileY - 2][tileX] = true;
                 hmTileMap[tileY - 3][tileX] = true;
 
-            } else if (tileX >= 0 && tileX < widthInTiles && tileY >= 0
+            } else if (Utils.isDSP(type)) {
+                hmTileMap[tileY][tileX] = true;
+                hmTileMap[tileY - 1][tileX] = true;
+                hmTileMap[tileY - 2][tileX] = true;
+                hmTileMap[tileY - 3][tileX] = true;
+                hmTileMap[tileY - 4][tileX] = true;
+            }
+
+            else if (tileX >= 0 && tileX < widthInTiles && tileY >= 0
                     && tileY < heightInTiles) {
                 hmTileMap[tileY][tileX] = true;
             }
