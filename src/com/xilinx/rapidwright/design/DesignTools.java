@@ -79,6 +79,7 @@ import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.edif.EDIFValueType;
 import com.xilinx.rapidwright.placer.blockplacer.BlockPlacer2Impls;
 import com.xilinx.rapidwright.placer.blockplacer.ImplsInstancePort;
 import com.xilinx.rapidwright.placer.blockplacer.ImplsPath;
@@ -3845,8 +3846,28 @@ public class DesignTools {
      * @param design The design to which the constraints are added.
      */
     public static void prohibitPartialHalfSlices(Design design) {
+        prohibitPartialHalfSlices(design, false);
+    }
+
+    /**
+     * This adds PROHIBIT constraints to the design (via .XDC) that will prohibit
+     * the use of BEL sites in the same half SLICE if there are any other cells
+     * placed in it. This is used for shell creation when an existing placed and
+     * routed implementation is desired to be preserved but to allow additional
+     * logic to be placed and routed on top of it without an area (pblock)
+     * constraint.
+     * 
+     * @param design        The design to which the constraints are added.
+     * @param useDummyCells Instead of using PROHIBIT constraints, this will
+     *                      generate dummy cells and place them on the unused BEL
+     *                      sites (currently only LUTs)
+     */
+    public static void prohibitPartialHalfSlices(Design design, boolean useDummyCells) {
         List<String> bels = new ArrayList<>();
 
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFPropertyValue value = new EDIFPropertyValue("true", EDIFValueType.BOOLEAN);
+        int dummyCount = 0;
         for (SiteInst si : design.getSiteInsts()) {
             if (!Utils.isSLICE(si)) continue;
             boolean bottomUsed = false;
@@ -3862,18 +3883,68 @@ public class DesignTools {
                 }
             }
 
+            // LUTs appear before their corresponding FFs in the iteration sequence so we
+            // can depend on any vacant LUT BELs being populated by the time we need to
+            // evaluate action for the FF BELs
             for (BEL bel : si.getSite().getBELs()) {
                 if (bel.getBELClass() == BELClass.BEL && si.getCell(bel) == null) {
                     Boolean isTop = isUltraScaleSliceTop(bel);
                     if (isTop != null) {
                         if ((isTop && topUsed) || (!isTop && bottomUsed)) {
-                            bels.add(si.getSiteName() + "/" + bel.getName());
+                            if (useDummyCells) {
+                                if (bel.isLUT()) {
+                                    // Being used as a physical static source
+                                    Net lutOutputNet = si
+                                            .getNetFromSiteWire(LUTTools.getLUTOutputPin(bel).getSiteWireName());
+                                    if (lutOutputNet != null) {
+                                        continue;
+                                    }
+
+                                    if (bel.getName().charAt(1) == '5') {
+                                        Net net = si.getNetFromSiteWire(bel.getName().charAt(0) + "6");
+                                        if (net != null) {
+                                            continue;
+                                        }
+                                    }
+
+                                    String name = "dummy_lut_" + dummyCount++;
+                                    Cell c = design.createAndPlaceCell(top, name, Unisim.LUT1,
+                                            si.getSiteName() + "/" + bel.getName());
+                                    c.getEDIFCellInst().addProperty("INIT", "1");
+                                    c.getEDIFCellInst().addProperty(EDIFTools.DONT_TOUCH, value);
+                                    c.removePinMapping("A6");
+                                    c.removePinMapping("A5");
+                                    c.setBELFixed(true);
+                                    c.setSiteFixed(true);
+                                    boolean connected = false;
+                                    for (int i = 1; i < 5; i++) {
+                                        String inputName = bel.getName().charAt(0) + Integer.toString(i);
+                                        Net net = si.getNetFromSiteWire(inputName);
+                                        NetType type = net == null ? NetType.VCC : net.getType();
+                                        if (type == NetType.VCC || type == NetType.GND) {
+                                            c.addPinMapping("A" + i, "I0");
+                                            c.connectStaticSourceToPin(type, "I0");
+                                            connected = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!connected) {
+                                        // No open pins, we don't need to block the LUT
+                                        design.removeCell(c);
+                                        top.removeCellInst(name);
+                                    }
+                                }
+                            } else {
+                                bels.add(si.getSiteName() + "/" + bel.getName());
+                            }
                         }
                     }
                 }
             }
         }
-        addProhibitConstraint(design, bels);
+        if (!useDummyCells) {
+            addProhibitConstraint(design, bels);
+        }
     }
 
     /**
