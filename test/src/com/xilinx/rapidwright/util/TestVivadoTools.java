@@ -34,6 +34,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 
 public class TestVivadoTools {
@@ -77,6 +78,16 @@ public class TestVivadoTools {
     private void assertVivadoLogContains(List<String> log, String query) {
         List<String> result = VivadoTools.searchVivadoLog(log, query);
         Assertions.assertTrue(0 < result.size());
+    }
+
+    @Test
+    public void testReportRouteStatusInvalid() {
+        ReportRouteStatusResult rrs = new ReportRouteStatusResult(Arrays.asList(
+                "foo",
+                "bar",
+                "blah"
+        ));
+        Assertions.assertFalse(rrs.isFullyRouted());
     }
 
     @Test
