@@ -400,29 +400,31 @@ public class RWRoute{
      * TODO: fix the potential issue.
      */
     protected void routeGlobalClkNets() {
-        if (clkNets.isEmpty())
-            return;
         for (Net clk : clkNets) {
-            // Since we preserved all pins in addGlobalClkRoutingTargets(), unpreserve them here
-            for (SitePinInst spi : clk.getPins()) {
-                routingGraph.unpreserve(spi.getConnectedNode());
-            }
-            Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(clk, node);
-            if (routesToSinkINTTiles != null) {
-                // routes clock nets with references of partial routes
-                System.out.println("INFO: Routing " + clk.getPins().size() + " pins of clock " + clk + " (timing-driven)");
-                GlobalSignalRouting.routeClkWithPartialRoutes(clk, routesToSinkINTTiles, design.getDevice(), gns);
-            } else {
-                // routes clock nets from scratch
-                System.out.println("INFO: Routing " + clk.getPins().size() + " pins of clock " + clk + " (non timing-driven)");
-                GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), gns);
-            }
-            preserveNet(clk, false);
+            routeGlobalClkNet(clk);
+        }
+    }
 
-            if (clk.hasPIPs()) {
-                clk.getSource().setRouted(true);
-                assert(clk.getAlternateSource() == null);
-            }
+    protected void routeGlobalClkNet(Net clk) {
+        // Since we preserved all pins in addGlobalClkRoutingTargets(), unpreserve them here
+        for (SitePinInst spi : clk.getPins()) {
+            routingGraph.unpreserve(spi.getConnectedNode());
+        }
+        Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(clk, node);
+        if (routesToSinkINTTiles != null) {
+            // routes clock nets with references of partial routes
+            System.out.println("INFO: Routing " + clk.getPins().size() + " pins of clock " + clk + " (timing-driven)");
+            GlobalSignalRouting.routeClkWithPartialRoutes(clk, routesToSinkINTTiles, design.getDevice(), gns);
+        } else {
+            // routes clock nets from scratch
+            System.out.println("INFO: Routing " + clk.getPins().size() + " pins of clock " + clk + " (non timing-driven)");
+            GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), gns);
+        }
+        preserveNet(clk, false);
+
+        if (clk.hasPIPs()) {
+            clk.getSource().setRouted(true);
+            assert(clk.getAlternateSource() == null);
         }
     }
 
@@ -1797,7 +1799,7 @@ public class RWRoute{
         printFormattedString("  All site pins to be routed: ", (indirectPins + staticPins + clkPins));
         printFormattedString("    Connections to be routed: ", indirectPins);
         printFormattedString("      With SLR crossings: ", getNumConnectionsCrossingSLRs());
-        printFormattedString("    Static net pins: ", getNumStaticNetPins());
+        printFormattedString("    Static net pins: ", staticPins);
         printFormattedString("    Clock pins: ", clkPins);
         printFormattedString("Nets not needing routing: ", numNotNeedingRoutingNets);
         if (numUnrecognizedNets != 0)
@@ -1839,6 +1841,7 @@ public class RWRoute{
 
         // For testing
         System.setProperty("rapidwright.rwroute.nodesPopped", String.valueOf(nodesPopped));
+        System.setProperty("rapidwright.rwroute.numStaticNetPins", String.valueOf(getNumStaticNetPins()));
     }
 
     /**

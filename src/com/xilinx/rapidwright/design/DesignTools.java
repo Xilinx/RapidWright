@@ -3897,10 +3897,11 @@ public class DesignTools {
     }
 
     /**
-     * Update the SitePinInst.isRouted() value of all sink pins on the given
-     * Net. A pin will be marked as being routed if it is reachable from the
+     * Update the SitePinInst.isRouted() value of all pins on the given
+     * Net. A sink pin will be marked as being routed if it is reachable from the
      * Net's source pins (or in the case of static nets, also from nodes
      * tied to GND or VCC) when following the Net's PIPs.
+     * A source pin will be marked as being routed if it drives at least one PIP.
      * @param net Net on which pins are to be updated.
      */
     public static void updatePinsIsRouted(Net net) {
@@ -3913,7 +3914,6 @@ public class DesignTools {
 
         Queue<Node> queue = new ArrayDeque<>();
         Map<Node, List<Node>> node2fanout = new HashMap<>();
-        Map<Node, Set<Node>> bidirNode2nodes = new HashMap<>();
         for (PIP pip : net.getPIPs()) {
             boolean isReversed = pip.isReversed();
             Node startNode = isReversed ? pip.getEndNode() : pip.getStartNode();
@@ -3921,8 +3921,6 @@ public class DesignTools {
             node2fanout.computeIfAbsent(startNode, k -> new ArrayList<>())
                     .add(endNode);
             if (pip.isBidirectional()) {
-                bidirNode2nodes.computeIfAbsent(startNode, k -> new HashSet<>()).add(endNode);
-                bidirNode2nodes.computeIfAbsent(endNode, k -> new HashSet<>()).add(startNode);
                 node2fanout.computeIfAbsent(endNode, k -> new ArrayList<>())
                         .add(startNode);
             }
@@ -3937,13 +3935,13 @@ public class DesignTools {
         for (SitePinInst spi : net.getPins()) {
             Node node = spi.getConnectedNode();
             if (spi.isOutPin()) {
-                queue.add(node);
-
-                if (node2fanout.get(spi.getConnectedNode()) == null) {
+                if (node2fanout.get(node) == null) {
+                    // Skip source pins with no fanout
                     continue;
                 }
+                queue.add(node);
             }
-            node2spi.put(spi.getConnectedNode(), spi);
+            node2spi.put(node, spi);
         }
 
         while (!queue.isEmpty()) {
@@ -3953,16 +3951,9 @@ public class DesignTools {
                 spi.setRouted(true);
             }
 
-            List<Node> fanouts = node2fanout.get(node);
+            List<Node> fanouts = node2fanout.remove(node);
             if (fanouts != null) {
-                for (Node fanout : fanouts) {
-                    if (bidirNode2nodes.getOrDefault(fanout, Collections.emptySet()).contains(node)) {
-                        // In the case of bidir PIPs, remove the ability to go from the fanout
-                        // node back to this node
-                        node2fanout.get(fanout).remove(node);
-                    }
-                    queue.add(fanout);
-                }
+                queue.addAll(fanouts);
             }
         }
     }
