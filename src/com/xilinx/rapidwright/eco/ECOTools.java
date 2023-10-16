@@ -80,6 +80,18 @@ public class ECOTools {
      * state, and is modelled on Vivado's <TT>disconnect_net -pinlist</TT> command.
      * @param design The design where the pin(s) are instantiated.
      * @param pins A list of hierarchical pins for disconnection.
+     */
+    public static void disconnectNet(Design design,
+                                     List<EDIFHierPortInst> pins) {
+        disconnectNet(design, pins, null);
+    }
+
+    /**
+     * Given a list of EDIFHierPortInst objects, disconnect these pins from their current nets.
+     * This method modifies the EDIF (logical) netlist as well as the place-and-route (physical)
+     * state, and is modelled on Vivado's <TT>disconnect_net -pinlist</TT> command.
+     * @param design The design where the pin(s) are instantiated.
+     * @param pins A list of hierarchical pins for disconnection.
      * @param deferredRemovals An optional map that, if passed in non-null will be populated with
      *                         site pins marked for removal.  The map allows for persistent tracking
      *                         if this method is called many times as the process is expensive
@@ -160,6 +172,19 @@ public class ECOTools {
             // typically we would want to connect it to another net
             en.removePortInst(ehpi.getPortInst());
         }
+    }
+
+    /**
+     * Given a list of String-s with one more space-separated pins, disconnect these pins from
+     * their current nets.
+     * This method modifies the EDIF (logical) netlist as well as the place-and-route (physical)
+     * state, and is modelled on Vivado's <TT>disconnect_net -pinlist</TT> command.
+     * @param design The design where the pin(s) are instantiated.
+     * @param pins A list of hierarchical pins for disconnection.
+     */
+    public static void disconnectNetPath(Design design,
+                                         List<String> pins) {
+        disconnectNetPath(design, pins, null);
     }
 
     /**
@@ -607,6 +632,19 @@ public class ECOTools {
                 createExitSitePinInst(design, sourceEhpi, newPhysNet);
             }
         }
+    }
+
+    /**
+     * Given a list of String-s containing one net path followed by one or more pin paths
+     * (separated by spaces) connect the latter pins to the former net.
+     * This method modifies the EDIF (logical) netlist as well as the place-and-route (physical)
+     * state, and is modelled on Vivado's <TT>connect_net -hier -net_object_list</TT> command.
+     * @param design The design where the net(s) and pin(s) are instantiated.
+     * @param netPinList A list of String-s containing net and pin paths.
+     */
+    public static void connectNet(Design design,
+                                  List<String> netPinList) {
+        connectNet(design, netPinList, null);
     }
 
     /**
