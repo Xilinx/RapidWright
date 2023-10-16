@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.examples;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 
+import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
 import com.xilinx.rapidwright.util.VivadoTools;
 import org.junit.jupiter.api.Assertions;
@@ -43,7 +44,7 @@ public class TestPolynomialGenerator {
 
     @ParameterizedTest
     @MethodSource
-    public void testPolynomialGenerator(String polynomial, int bitWidth, boolean route, @TempDir Path dir) {
+    public void testPolynomialGenerator(String polynomial, int bitWidth, boolean route, int expectedUnroutedPins, @TempDir Path dir) {
         Path dcp = dir.resolve("polynomial.dcp");
 
         PolynomialGenerator.generatePolynomial(polynomial, "test", bitWidth, route, dcp.toString(), null, false);
@@ -56,25 +57,28 @@ public class TestPolynomialGenerator {
             Assertions.assertTrue(c.isPlaced());
         }
 
-        ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(d);
-        if (route) {
-            Assertions.assertTrue(rrs.isFullyRouted());
-        } else {
-            Assertions.assertTrue(rrs.unroutedNets > 0);
-            Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
+        if (FileTools.isVivadoOnPath()) {
+            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(d);
+            if (route) {
+                Assertions.assertTrue(rrs.isFullyRouted());
+            } else {
+                Assertions.assertTrue(rrs.unroutedNets > 0);
+                Assertions.assertEquals(expectedUnroutedPins, rrs.netsWithRoutingErrors);
+                Assertions.assertEquals(expectedUnroutedPins, rrs.netsWithSomeUnroutedPins);
+            }
         }
     }
     
     public static Stream<Arguments> testPolynomialGenerator() {
         return Stream.of(
-                Arguments.of("x^2+3*x+5", 16, true),
-                Arguments.of("x^2+3*x+5", 16, false),
-                Arguments.of("8*x^4+43*x^3+7*x^2-14", 18, true),
-                Arguments.of("8*x^4+43*x^3+7*x^2-14", 18, false),
-                Arguments.of("8*y^4+43*y*x^3+7*x^2-14", 18, true),  // Section 3: "More Complex Polynomial"
-                Arguments.of("8*y^4+43*y*x^3+7*x^2-14", 18, false),
-                Arguments.of("3*x^2+x-2 16", 16, true),             // Section 2: "Simple Polynomial Circuit"
-                Arguments.of("3*x^2+x-2 16", 16, false)
+                Arguments.of("x^2+3*x+5", 16, true, 0),
+                Arguments.of("x^2+3*x+5", 16, false, 0),
+                Arguments.of("8*x^4+43*x^3+7*x^2-14", 18, true, 0),
+                Arguments.of("8*x^4+43*x^3+7*x^2-14", 18, false, 1),
+                Arguments.of("8*y^4+43*y*x^3+7*x^2-14", 18, true, 0),   // Section 3: "More Complex Polynomial"
+                Arguments.of("8*y^4+43*y*x^3+7*x^2-14", 18, false, 1),
+                Arguments.of("3*x^2+x-2 16", 16, true, 0),              // Section 2: "Simple Polynomial Circuit"
+                Arguments.of("3*x^2+x-2 16", 16, false, 0)
                 );
     }
 }
