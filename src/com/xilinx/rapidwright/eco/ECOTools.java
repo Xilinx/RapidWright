@@ -74,6 +74,7 @@ import java.util.Set;
  *       modifying 'top/u1(foo1)/lut1' would no longer affect 'top/u2(foo2)/lut1'.
  */
 public class ECOTools {
+
     /**
      * Given a list of EDIFHierPortInst objects, disconnect these pins from their current nets.
      * This method modifies the EDIF (logical) netlist as well as the place-and-route (physical)
@@ -175,7 +176,7 @@ public class ECOTools {
     }
 
     /**
-     * Given a list of String-s with one more space-separated pins, disconnect these pins from
+     * Given a list of strings with one more space-separated pins, disconnect these pins from
      * their current nets.
      * This method modifies the EDIF (logical) netlist as well as the place-and-route (physical)
      * state, and is modelled on Vivado's <TT>disconnect_net -pinlist</TT> command.
@@ -981,8 +982,7 @@ public class ECOTools {
         removeCell(design, edifCellInsts, deferredRemovals);
     }
 
-    private static Pair<EDIFHierCellInst,String> getParentCellInstAndName(EDIFNetlist netlist, String path)
-    {
+    private static Pair<EDIFHierCellInst,String> getParentCellInstAndName(EDIFNetlist netlist, String path) {
         int pos = path.lastIndexOf(EDIFTools.EDIF_HIER_SEP);
         String name = path.substring(pos+1);
         EDIFHierCellInst parentEhci;
@@ -1007,10 +1007,7 @@ public class ECOTools {
      * @param reference The cell to be instantiated.
      * @param paths A list of instance paths for creation.
      */
-    public static void createCell(Design design,
-                                  EDIFCell reference,
-                                  List<String> paths)
-    {
+    public static void createCell(Design design, EDIFCell reference, List<String> paths) {
         final EDIFNetlist netlist = design.getNetlist();
         for (String path : paths) {
             // Modify logical netlist
@@ -1039,9 +1036,7 @@ public class ECOTools {
      * @param design The current design.
      * @param paths A list of net paths for creation.
      */
-    public static void createNet(Design design,
-                                 List<String> paths)
-    {
+    public static void createNet(Design design, List<String> paths) {
         final EDIFNetlist netlist = design.getNetlist();
         for (String path : paths) {
             // Modify logical netlist
