@@ -393,10 +393,8 @@ public class PolynomialGenerator {
             HandPlacer.openDesign(d);
         }
 
-        t.stop().start("Final Route");
-
         if (route) {
-            d.flattenDesign();
+            t.stop().start("RWRoute");
             RWRoute.routeDesignFullNonTimingDriven(d);
         }
 
