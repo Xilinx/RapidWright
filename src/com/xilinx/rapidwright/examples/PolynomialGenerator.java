@@ -34,7 +34,6 @@ import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.ModuleInst;
-import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.blocks.PBlock;
@@ -395,6 +394,7 @@ public class PolynomialGenerator {
 
         if (route) {
             t.stop().start("RWRoute");
+            d.flattenDesign();
             RWRoute.routeDesignFullNonTimingDriven(d);
         }
 
