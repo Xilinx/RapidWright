@@ -505,7 +505,26 @@ public class RouterHelper {
      * @return true, if the connection is successfully routed.
      */
     public static boolean routeDirectConnection(Connection directConnection) {
-        directConnection.setNodes(findPathBetweenNodes(directConnection.getSource().getConnectedNode(), directConnection.getSink().getConnectedNode()));
+        Node source = directConnection.getSource().getConnectedNode();
+        Node sink = directConnection.getSink().getConnectedNode();
+        List<Node> nodes = findPathBetweenNodes(source, sink);
+        if (nodes == null) {
+            Net net = directConnection.getNetWrapper().getNet();
+            SitePinInst altSource = net.getAlternateSource();
+            if (altSource == null) {
+                altSource = DesignTools.getLegalAlternativeOutputPin(net);
+                if (altSource != null) {
+                    // Add this SitePinInst to the net, but not to the SiteInst
+                    net.addPin(altSource);
+                    DesignTools.routeAlternativeOutputSitePin(net, altSource);
+                }
+            }
+            nodes = (altSource != null) ? findPathBetweenNodes(altSource.getConnectedNode(), sink) : null;
+            if (nodes == null) {
+                System.err.println("ERROR: Failed to find a path between two nodes: " + source + ", " + sink);
+            }
+        }
+        directConnection.setNodes(nodes);
         return directConnection.getNodes() != null;
     }
 
@@ -554,7 +573,6 @@ public class RouterHelper {
         }
 
         if (!success) {
-            System.err.println("ERROR: Failed to find a path between two nodes: " + source + ", " + sink);
             return null;
         }
         return path;

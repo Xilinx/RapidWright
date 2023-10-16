@@ -977,8 +977,12 @@ public class RWRoute{
     protected void assignNodesToConnections() {
         for (Connection connection : indirectConnections) {
             List<Node> nodes = new ArrayList<>();
-            List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode().getNode(), connection.getSink().getConnectedNode());
-            if (switchBoxToSink.size() >= 2) {
+            Node projectedSinkNode = connection.getSinkRnode().getNode();
+            Node sinkNode = connection.getSink().getConnectedNode();
+            List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(projectedSinkNode, sinkNode);
+            if (switchBoxToSink == null) {
+                System.err.println("ERROR: Failed to find a path between two nodes: " + projectedSinkNode + ", " + sinkNode);
+            } else if (switchBoxToSink.size() >= 2) {
                 for (int i = 0; i < switchBoxToSink.size() -1; i++) {
                     nodes.add(switchBoxToSink.get(i));
                 }
@@ -989,8 +993,12 @@ public class RWRoute{
                 nodes.add(rnode.getNode());
             }
 
-            List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(connection.getSource().getConnectedNode(), connection.getSourceRnode().getNode());
-            if (sourceToSwitchBox.size() >= 2) {
+            Node sourceNode = connection.getSource().getConnectedNode();
+            Node projectedSourceNode = connection.getSourceRnode().getNode();
+            List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(sourceNode, projectedSourceNode);
+            if (sourceToSwitchBox == null) {
+                System.err.println("ERROR: Failed to find a path between two nodes: " + sourceNode + ", " + projectedSourceNode);
+            } else if (sourceToSwitchBox.size() >= 2) {
                 for (int i = 1; i <= sourceToSwitchBox.size() - 1; i++) {
                     nodes.add(sourceToSwitchBox.get(i));
                 }
