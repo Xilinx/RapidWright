@@ -189,7 +189,7 @@ public class ECOTools {
     }
 
     /**
-     * Given a list of String-s with one more space-separated pins, disconnect these pins from
+     * Given a list of strings with one more space-separated pins, disconnect these pins from
      * their current nets.
      * This method modifies the EDIF (logical) netlist as well as the place-and-route (physical)
      * state, and is modelled on Vivado's <TT>disconnect_net -pinlist</TT> command.
@@ -253,6 +253,13 @@ public class ECOTools {
      * @param deferredRemovals An optional map that, if passed in non-null will allow any SitePinInst
      *                         objects deferred previously for removal to be reused for new connections.
      *                         See {@link #disconnectNet(Design, List, Map)}.
+     *
+     * By default, this method will throw a RuntimeException if there is a mismatch between
+     * the net connected to logical pins (EDIFHierPortInst) and the net connected to its physical pin
+     * (SitePinInst). The Java property "rapidwright.ecotools.connectNet.warnIfCellInstStartsWith"
+     * allows such pins with an EDIFCellInst name that start with its value to be demoted from an
+     * RuntimeException to a printed warning. An example use case for this feature would be if
+     * it is known that the conflicting logical pin will be removed later.
      */
     public static void connectNet(Design design,
                                   Map<EDIFHierNet, List<EDIFHierPortInst>> netToPortInsts,
@@ -520,7 +527,7 @@ public class ECOTools {
 
             List<EDIFHierPortInst> leafLogicalPins = ehn.getLeafHierPortInsts(true, false);
             if (leafLogicalPins.size() != 1) {
-                throw new RuntimeException();
+                throw new RuntimeException("ERROR: Net '" + ehn.getHierarchicalNetName() + "' does not contain exactly one source pin.");
             }
             EDIFHierPortInst sourceEhpi = leafLogicalPins.get(0);
 
@@ -636,12 +643,12 @@ public class ECOTools {
     }
 
     /**
-     * Given a list of String-s containing one net path followed by one or more pin paths
-     * (separated by spaces) connect the latter pins to the former net.
+     * Given a list of strings containing one net path followed by one or more pin paths
+     * separated by spaces (in line with Tcl convention) connect the latter pins to the former net.
      * This method modifies the EDIF (logical) netlist as well as the place-and-route (physical)
      * state, and is modelled on Vivado's <TT>connect_net -hier -net_object_list</TT> command.
      * @param design The design where the net(s) and pin(s) are instantiated.
-     * @param netPinList A list of String-s containing net and pin paths.
+     * @param netPinList A list of strings containing net and pin paths.
      */
     public static void connectNet(Design design,
                                   List<String> netPinList) {
@@ -649,12 +656,12 @@ public class ECOTools {
     }
 
     /**
-     * Given a list of String-s containing one net path followed by one or more pin paths
-     * (separated by spaces) connect the latter pins to the former net.
+     * Given a list of strings containing one net path followed by one or more pin paths
+     * separated by spaces (in line with Tcl convention) connect the latter pins to the former net.
      * This method modifies the EDIF (logical) netlist as well as the place-and-route (physical)
      * state, and is modelled on Vivado's <TT>connect_net -hier -net_object_list</TT> command.
      * @param design The design where the net(s) and pin(s) are instantiated.
-     * @param netPinList A list of String-s containing net and pin paths.
+     * @param netPinList A list of strings containing net and pin paths.
      * @param deferredRemovals An optional map that, if passed in non-null will allow any SitePinInst
      *                         objects deferred previously for removal to be reused for new connections.
      *                         See {@link #disconnectNet(Design, List, Map)}.
@@ -728,6 +735,12 @@ public class ECOTools {
     private static SitePinInst routeOutSitePinInstSource(Design design,
                                                          EDIFHierPortInst targetHierSrc,
                                                          Net newPhysNet) {
+        if (!targetHierSrc.isOutput()) {
+            throw new RuntimeException("ERROR: Pin '" + targetHierSrc + "' is not an output pin.");
+        }
+        if (!targetHierSrc.getCellType().isPrimitive()) {
+            throw new RuntimeException("ERROR: Pin '" + targetHierSrc + "' is not an primitive source pin.");
+        }
         // This net is internal to a site, need to create a site pin and route out to it
         Cell srcCell = design.getCell(targetHierSrc.getFullHierarchicalInstName());
         SiteInst si = srcCell.getSiteInst();
@@ -955,7 +968,7 @@ public class ECOTools {
     }
 
     /**
-     * Given a list of String-s containing the hierarchical path to cell instances,
+     * Given a list of strings containing the hierarchical path to cell instances,
      * remove these instances from the design.
      * This method removes and disconnects cells from the EDIF (logical) netlist
      * as well as the place-and-route (physical) state, and is modelled on Vivado's
