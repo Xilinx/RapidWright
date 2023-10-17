@@ -34,7 +34,6 @@ import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.ModuleInst;
-import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.blocks.PBlock;
@@ -388,34 +387,14 @@ public class PolynomialGenerator {
         d.addXDCConstraint(ConstraintGroup.LATE, "create_clock -name "+CLK_NAME+" -period 1.291 [get_ports "+CLK_NAME+"]");
         d.addXDCConstraint(ConstraintGroup.LATE, "set_property HD.CLK_SRC BUFGCE_X0Y18 [get_ports "+CLK_NAME+"]");
 
-        t.stop().start("Final Route");
-
-
-        Map<String,String> parentNetMap = n.getParentNetMapNames();
-        for (Net net : new ArrayList<>(d.getNets())) {
-            if (net.getPins().size() > 0 && net.getSource() == null) {
-                if (net.isStaticNet()) continue;
-                String parentNet = parentNetMap.get(net.getName());
-                if (parentNet.equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
-                    d.movePinsToNewNetDeleteOldNet(net, d.getVccNet(), true);
-                    continue;
-                } else if (parentNet.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
-                    d.movePinsToNewNetDeleteOldNet(net, d.getGndNet(), true);
-                    continue;
-                }
-                Net parent = d.getNet(parentNet);
-                if (parent == null) {
-                    continue;
-                }
-                d.movePinsToNewNetDeleteOldNet(net, parent, true);
-
-            }
-        }
-
         if (invokeHandPlacer) {
+            t.stop().start("Hand Placer");
             HandPlacer.openDesign(d);
         }
+
         if (route) {
+            t.stop().start("RWRoute");
+            d.flattenDesign();
             RWRoute.routeDesignFullNonTimingDriven(d);
         }
 
