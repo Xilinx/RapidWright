@@ -3917,7 +3917,7 @@ public class DesignTools {
                                     c.setBELFixed(true);
                                     c.setSiteFixed(true);
                                     boolean connected = false;
-                                    for (int i = 1; i < 5; i++) {
+                                    for (int i = 1; i <= 5; i++) {
                                         String inputName = bel.getName().charAt(0) + Integer.toString(i);
                                         Net net = si.getNetFromSiteWire(inputName);
                                         NetType type = net == null ? NetType.VCC : net.getType();
