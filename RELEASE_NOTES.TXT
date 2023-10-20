@@ -1,3 +1,61 @@
+============= RapidWright 2023.1.4-beta released on 2023-10-20 ================
+Notes:
+  - Add com.xilinx.rapidwright.eco.ECOTools package (#850)
+  - More Polynomial Generator improvements (#854)
+  - ReportRouteStatusResult.isFullyRouted() to check >0 logical net found (#852)
+  - Fixes for the PolynomialGenerator (tutorial) (#846)
+  - Test that Design.createModuleInst() copies static sources (#839)
+  - ModuleInst.place() to check both RAMB36/RAMB18 sites for overlap (#841)
+  - PartialRouter preprocessing and clock routing improvements (#843)
+  - Updates to Interchange README.md (#832)
+  - Simplify and make DesignTools.updatePinsIsRouted() more robust (#844)
+  - RouterHelper.invertPossibleGndPinsToVccPins() to not invert BRAM CLKs (#840)
+  - ModuleInst.connect() to leave physical Net alone for pass-thrus (#722)
+  - Unroute site routing when removing a cell (#729)
+  - PartialRouter's global router to not unpreserve sink nodes (#736)
+  - DesignTools.makePhysNetNamesConsistent() to use hier name (#735)
+  - DesignTools.makePhysNetNamesConsistent() to consider */<const{0,1}> (#734)
+  - Add DcpToInterchange class (#704)
+  - Add compile step (#733)
+  - Add EdifToLogicalNetlist to MainEntrypoint (#731)
+  - [PhysNetlistReader] Set Cell type for routethru cells (#727)
+  - Fix Javadoc warnings (#723)
+  - Fixes an issue with makeBlackBox trying to remove pins from renamed nets (#728)
+  - Multilevel macro expansion (#726)
+  - TestReplaceEDIFInDCP to copy DCP before replacing in-place (#725)
+  - DesignTools.createMissingSitePinInsts() to skip node-less site pins (#724)
+  - Add missing Versal DSP SiteTypeEnum (#842)
+  - [RWRoute] Further fix/cleanup around alternate source pins (#830)
+  - Adding out-of-context flag to RWRoute (#836)
+  - fix a bug in PipelineGeneratorWithRouting.createPipeline() (#837)
+  - Fix verb tense in RWRoute INFO msg (#835)
+  - Enable RWRoute to load Interchange designs from main() (#834)
+  - [VivadoTools] Check for Vivado on PATH first (#831)
+  - [EDIFNetlist] - Ensure Macro Expansion Deep Copies Children  (#828)
+  - Minor RWRoute and UltraScaleClockRouting fixes (#829)
+  - Properly add/remove dual-output pins (#825)
+  - [TestRouteNode] Update comment; swap east and west (#827)
+  - Add VivadoTools.reportRouteStatus() overload for specific net status (#823)
+  - Update link to Discussions forum (#824)
+  - [RWRoute] Only add alternative sources to SiteInst if used (#821)
+  - RouteNode.getPIPsBackToSource() to recognize reversed PIPs (#822)
+  - [PhysNetlistReader] Create FFRoutethruCell-s correctly (#817)
+  - Add test for Design.movePinsToNewNetDeleteOldNet() (#796)
+  - Test Cell.getAllCorrespondingSitePinNames() works for multi-outputs (#792)
+  - [PhysNetlistWriter] No IO site port output BELPins without SitePinInst (#820)
+  - [PhysNetlistWriter] Set PhysPip.setForward() even if not bidir (#819)
+  - [PhysNetlistWriter] Skip output BELPins without cells, and port cells (#818)
+  - Test that Design.createModuleInst() copies static sources (#839)
+  - Design.createModuleInst() to copy STATIC_SOURCE_ SiteInsts properly
+  - Store partname in netlist for new designs
+  - SiteInst.addPin() to trackChanges() when ?_O or ?MUX pin added
+  - Method parameter names preserved in API lib jar
+- API Additions:
+  - com.xilinx.rapidwright.design.Module "public Cell getCell(String cellName)"
+  - com.xilinx.rapidwright.design.Net "public boolean isVCCNet()"
+  - com.xilinx.rapidwright.design.Net "public boolean isGNDNet()"
+  - com.xilinx.rapidwright.design.Net "public boolean isUsedNet()"
+
 ============= RapidWright 2023.1.3-beta released on 2023-09-13 ================
 Notes:
   - Fix DesignTools.getConnectionPIPs() (#809) 
