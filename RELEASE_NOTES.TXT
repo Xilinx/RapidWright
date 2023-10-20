@@ -1,5 +1,6 @@
 ============= RapidWright 2023.1.4-beta released on 2023-10-20 ================
 Notes:
+  -Include RapidWright API Lib Javadoc in Gradle Build (#855)
   - Add com.xilinx.rapidwright.eco.ECOTools package (#850)
   - More Polynomial Generator improvements (#854)
   - ReportRouteStatusResult.isFullyRouted() to check >0 logical net found (#852)
