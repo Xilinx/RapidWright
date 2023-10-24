@@ -24,7 +24,6 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -187,8 +186,7 @@ public class TimingAndWirelengthReport{
         //design manipulations are necessary, otherwise there will be problems in associating timing edges with connections.
         DesignTools.makePhysNetNamesConsistent(design);
         DesignTools.createMissingSitePinInsts(design);
-        String[] rwrouteArgs = Arrays.copyOfRange(args, 1, args.length);
-        RWRouteConfig config = new RWRouteConfig(rwrouteArgs);
+        RWRouteConfig config = new RWRouteConfig(new String[0]);
         config.setTimingDriven(true);
         final boolean isPartialRouting = false;
         TimingAndWirelengthReport reporter = new TimingAndWirelengthReport(design, config, isPartialRouting);
