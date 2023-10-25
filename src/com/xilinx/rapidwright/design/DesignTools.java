@@ -853,7 +853,7 @@ public class DesignTools {
                 }
             }
             String logPinName = c.getLogicalPinMapping(pin.getName());
-            EDIFPortInst portInst = c.getEDIFCellInst().getPortInst(logPinName);
+            EDIFPortInst portInst = logPinName == null ? null : c.getEDIFCellInst().getPortInst(logPinName);
             if (portInst == null) continue;
             EDIFNet net =  portInst.getNet();
             String netName = c.getParentHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP + net.getName();
