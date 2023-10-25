@@ -771,8 +771,6 @@ public class RWRoute{
             List<Connection> unroutableConnections = getUnroutableConnections();
             boolean needsResorting = false;
             for (Connection connection : unroutableConnections) {
-                // if (connection.hashCode() != 16087)
-                //     continue;
                 System.out.printf("CRITICAL WARNING: Unroutable connection in iteration #%d\n", routeIteration);
                 System.out.println("                 " + connection);
                 needsResorting = handleUnroutableConnection(connection) || needsResorting;
