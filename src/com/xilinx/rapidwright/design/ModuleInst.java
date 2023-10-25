@@ -326,7 +326,37 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
             Tile newTile = module.getCorrespondingTile(templateSite.getTile(), newAnchorSite.getTile());
             Site newSite = templateSite.getCorrespondingSite(inst.getSiteTypeEnum(), newTile);
 
-            SiteInst existingSiteInst = allowOverlap ? null : design.getSiteInstFromSite(newSite);
+            SiteInst existingSiteInst;
+            if (allowOverlap) {
+                existingSiteInst = null;
+            } else {
+                existingSiteInst = design.getSiteInstFromSite(newSite);
+                if (existingSiteInst == null) {
+                    SiteTypeEnum siteType = newSite.getSiteTypeEnum();
+                    if (siteType == SiteTypeEnum.RAMBFIFO36) { // UltraScale+
+                        // Check that both RAMB18s are free
+                        for (Site alternateSite : newTile.getSites()) {
+                            if (alternateSite.getSiteTypeEnum() != SiteTypeEnum.RAMBFIFO18 &&
+                                alternateSite.getSiteTypeEnum() != SiteTypeEnum.RAMB181) {
+                                continue;
+                            }
+                            existingSiteInst = design.getSiteInstFromSite(alternateSite);
+                            if (existingSiteInst != null) {
+                                break;
+                            }
+                        }
+                    } else if (siteType == SiteTypeEnum.RAMB181) { // UltraScale+
+                        // Check that RAMB36 is free
+                        for (Site alternateSite : newTile.getSites()) {
+                            if (alternateSite.getSiteTypeEnum() != SiteTypeEnum.RAMBFIFO36) {
+                                continue;
+                            }
+                            existingSiteInst = design.getSiteInstFromSite(alternateSite);
+                            break;
+                        }
+                    }
+                }
+            }
 
             if (newSite == null || existingSiteInst != null) {
                 //MessageGenerator.briefError("ERROR: No matching site found." +

@@ -134,6 +134,8 @@ public class TestDesignTools {
 
         Design src = Design.readCheckpoint(dcpPath);
 
+        DesignTools.createPossiblePinsToStaticNets(src);
+
         List<EDIFHierCellInst> srcCell = src.getNetlist().findCellInsts("*"+ srcCellName);
         String cellName = srcCell.get(0).getFullHierarchicalInstName();
         EDIFNetlist srcCellNetlist = EDIFTools.createNewNetlist(src.getNetlist().getHierCellInstFromName(cellName).getInst());
