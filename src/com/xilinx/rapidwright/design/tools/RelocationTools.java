@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -23,15 +23,6 @@
 
 package com.xilinx.rapidwright.design.tools;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
@@ -39,15 +30,21 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.blocks.PBlock;
-import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.interchange.PhysNetlistWriter;
-import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * A collection of tools to help relocate designs.
@@ -238,9 +235,6 @@ public class RelocationTools {
             return false;
         }
 
-        List<Pair<Net, List<PIP>>> oldRoute = new ArrayList<>();
-        boolean revertRouting = false;
-
         DesignTools.createMissingSitePinInsts(design);
 
         for (Net n : design.getNets()) {
@@ -248,15 +242,20 @@ public class RelocationTools {
                 continue;
             }
 
+            Collection<SitePinInst> pins = n.getPins();
             SitePinInst src = n.getSource();
             if (src != null && !oldSite.containsKey(src.getSiteInst())) {
-                System.out.println("INFO: Unrouting Net '" + n.getName() + "' since output SiteInstPin '" +
-                        src + "' does not belong to SiteInsts to be relocated");
-                n.unroute();
+                for (SitePinInst spi : pins) {
+                    if (oldSite.containsKey(spi.getSiteInst())) {
+                        // Source is not reloacted, but at least one pin inside site insts to be relocated
+                        System.out.println("INFO: Unrouting Net '" + n.getName() + "' since output SiteInstPin '" +
+                                src + "' does not belong to SiteInsts to be relocated");
+                        n.unroute();
+                    }
+                }
                 continue;
             }
 
-            Collection<SitePinInst> pins = n.getPins();
             Collection<SitePinInst> nonMatchingPins = pins.stream()
                     .filter((spi) -> !oldSite.containsKey(spi.getSiteInst()))
                     // Filter out SPIs on a "STATIC_SOURCE" SiteInst that would have been unplaced above
@@ -266,19 +265,23 @@ public class RelocationTools {
                 continue;
             }
 
-            oldRoute.add(new Pair<>(n, n.getPIPs()));
-
             if (!nonMatchingPins.isEmpty()) {
-                for (SitePinInst spi : nonMatchingPins) {
-                    System.out.println("INFO: Unrouting SitePinInst '" + spi + "' branch of Net '" + n.getName() +
-                            "' since it does not belong to SiteInsts to be relocated");
+                if (n.isStaticNet()) {
+                    // Since static nets are global if there are any pins on SiteInsts that are not to be relocated,
+                    // unroute the whole net as it's not obvious how to relocate the relevant subset of its PIPs
+                    // instead of all of them
+                    n.unroute();
+                } else {
+                    for (SitePinInst spi : nonMatchingPins) {
+                        System.out.println("INFO: Unrouting SitePinInst '" + spi + "' branch of Net '" + n.getName() +
+                                "' since it does not belong to SiteInsts to be relocated");
+                    }
+                    DesignTools.unroutePins(n, nonMatchingPins);
                 }
-
-                DesignTools.unroutePins(n, nonMatchingPins);
             }
 
             boolean isClockNet = n.isClockNet() || n.hasGapRouting();
-            for (PIP sp : n.getPIPs()) {
+            n.getPIPs().removeIf((sp) -> {
                 Tile st = sp.getTile();
                 Tile dt = st.getTileXYNeighbor(tileColOffset, tileRowOffset);
                 if (dt == null) {
@@ -288,8 +291,9 @@ public class RelocationTools {
                         String destTileName = st.getRootName() + "_X" + (st.getTileXCoordinate() + tileColOffset)
                                 + "Y" + (st.getTileYCoordinate() + tileRowOffset);
                         if (sp.isStub()) {
-                            System.out.println("INFO: Skipping stub PIP '" + sp + "' that failed to move to Tile '" + destTileName +
+                            System.out.println("INFO: Removing stub PIP '" + sp + "' that failed to move to Tile '" + destTileName +
                                     "' (Net '" + n.getName() + "')");
+                            return true;
                         } else {
                             throw new RuntimeException("ERROR: Failed to move PIP '" + sp + "' to Tile '" + destTileName +
                                     "' (Net '" + n.getName() + "')");
@@ -299,23 +303,13 @@ public class RelocationTools {
                     assert (st.getTileTypeEnum() == dt.getTileTypeEnum());
                     sp.setTile(dt);
                 }
-            }
-        }
-
-        if (revertRouting) {
-            revertPlacement(oldSite);
-            revertRouting(oldRoute);
-            return false;
+                return false;
+            });
         }
 
         return true;
     }
 
-    private static void revertRouting(List<Pair<Net, List<PIP>>> oldRoute) {
-        for (Pair<Net,List<PIP>> e : oldRoute) {
-            e.getFirst().setPIPs(e.getSecond());
-        }
-    }
 
     private static void revertPlacement(Map<SiteInst, Site> oldSite) {
         for (Map.Entry<SiteInst, Site> e : oldSite.entrySet()) {
