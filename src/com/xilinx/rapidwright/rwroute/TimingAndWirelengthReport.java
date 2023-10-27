@@ -186,7 +186,7 @@ public class TimingAndWirelengthReport{
         //design manipulations are necessary, otherwise there will be problems in associating timing edges with connections.
         DesignTools.makePhysNetNamesConsistent(design);
         DesignTools.createMissingSitePinInsts(design);
-        RWRouteConfig config = new RWRouteConfig(args);
+        RWRouteConfig config = new RWRouteConfig(new String[0]);
         config.setTimingDriven(true);
         final boolean isPartialRouting = false;
         TimingAndWirelengthReport reporter = new TimingAndWirelengthReport(design, config, isPartialRouting);
