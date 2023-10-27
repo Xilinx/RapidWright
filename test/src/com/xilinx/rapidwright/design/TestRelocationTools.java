@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -41,7 +41,10 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.ReportRouteStatusResult;
+import com.xilinx.rapidwright.util.VivadoTools;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -49,7 +52,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 public class TestRelocationTools {
 
-    private void relocateModuleInstsAndCompare(int colOffset, int rowOffset, boolean expectSuccess, Design design1, Design design2, Collection<ModuleInst> moduleInsts) {
+    private void relocateModuleInstsAndCompare(int colOffset, int rowOffset, boolean expectSuccess, Design design1, Collection<ModuleInst> moduleInsts) {
         List<Pair<ModuleInst,Site>> newSite = new ArrayList<>();
         for (ModuleInst mi : moduleInsts) {
             Assertions.assertTrue(mi.isPlaced());
@@ -84,31 +87,31 @@ public class TestRelocationTools {
                         Assertions.assertEquals(c1.getSite(), c2.getSite());
                     }
                 }
+            }
 
-                for (Net n2 : mi.getNets()) {
-                    Net n1 = design1.getNet(n2.getName());
-                    if (n1 == null && n2.getName().startsWith(mi.getName() + EDIFTools.EDIF_HIER_SEP)) {
-                        // Retry without ModuleInst hierarchy in case it was flattened
-                        n1 = design1.getNet(n2.getName().substring(mi.getName().length() + 1));
-                    }
-                    Assertions.assertNotNull(n1);
+            for (Net n2 : mi.getNets()) {
+                Net n1 = design1.getNet(n2.getName());
+                if (n1 == null && n2.getName().startsWith(mi.getName() + EDIFTools.EDIF_HIER_SEP)) {
+                    // Retry without ModuleInst hierarchy in case it was flattened
+                    n1 = design1.getNet(n2.getName().substring(mi.getName().length() + 1));
+                }
+                Assertions.assertNotNull(n1);
 
-                    if (n1.isClockNet() || n1.hasGapRouting()) {
-                        // Module relocation unroutes all clock nets?
-                        Assertions.assertFalse(n2.hasPIPs());
-                        continue;
-                    }
+                if (n1.isClockNet() || n1.hasGapRouting()) {
+                    // Module relocation unroutes all clock nets?
+                    Assertions.assertFalse(n2.hasPIPs());
+                    continue;
+                }
 
-                    Set<PIP> p1 = new HashSet<>(n1.getPIPs());
-                    Set<PIP> p2 = new HashSet<>(n2.getPIPs());
-                    if (!n1.isStaticNet()) {
-                        Assertions.assertEquals(p1, p2);
-                    } else {
-                        // For static nets, ModuleInst.place() will merge its
-                        // static PIPs into the parent Design's static net, so
-                        // check that it is contained within
-                        Assertions.assertTrue(p1.containsAll(p2));
-                    }
+                Set<PIP> p1 = new HashSet<>(n1.getPIPs());
+                Set<PIP> p2 = new HashSet<>(n2.getPIPs());
+                if (!n1.isStaticNet()) {
+                    Assertions.assertEquals(p1, p2);
+                } else {
+                    // For static nets, ModuleInst.place() will merge its
+                    // static PIPs into the parent Design's static net, so
+                    // check that it is contained within
+                    Assertions.assertTrue(p1.containsAll(p2));
                 }
             }
         }
@@ -131,7 +134,7 @@ public class TestRelocationTools {
             mi.placeOnOriginalAnchor();
             Collection<ModuleInst> moduleInsts = Arrays.asList(mi);
 
-            relocateModuleInstsAndCompare(colOffset, rowOffset, expectSuccess, design1, design2, moduleInsts);
+            relocateModuleInstsAndCompare(colOffset, rowOffset, expectSuccess, design1, moduleInsts);
         }
     }
 
@@ -169,13 +172,12 @@ public class TestRelocationTools {
         if (instanceName.isEmpty()) {
             moduleInsts = design2.getModuleInsts();
         } else {
-            moduleInsts = new ArrayList<>();
             ModuleInst mi = design2.getModuleInst(instanceName);
             Assertions.assertNotNull(mi);
             moduleInsts = Arrays.asList(mi);
         }
 
-        relocateModuleInstsAndCompare(colOffset, rowOffset, expectSuccess, design1, design2, moduleInsts);
+        relocateModuleInstsAndCompare(colOffset, rowOffset, expectSuccess, design1, moduleInsts);
     }
 
     public static Stream<Arguments> testPicoblaze4OOC() {
@@ -210,7 +212,7 @@ public class TestRelocationTools {
 
         Collection<ModuleInst> moduleInsts2 = moduleInsts1.stream().map((mi) -> design2.getModuleInst(mi.getName()))
                 .collect(Collectors.toList());
-        relocateModuleInstsAndCompare(colOffset, rowOffset, expectSuccess, design1, design2, moduleInsts2);
+        relocateModuleInstsAndCompare(colOffset, rowOffset, expectSuccess, design1, moduleInsts2);
     }
 
     public static Stream<Arguments> testPicoblaze4OOC_PBlock() {
@@ -225,23 +227,28 @@ public class TestRelocationTools {
 
     @ParameterizedTest(name = "Relocate MicroBlazeAndILA ''{0}'' ({1},{2})")
     @MethodSource()
-    public void testMicroBlazeAndILA(String instanceName, int colOffset, int rowOffset, boolean expectSuccess) {
+    public void testMicroBlazeAndILA(String instanceName, int colOffset, int rowOffset, boolean expectSuccess, int expectedNetsWithRoutingErrors) {
         String dcpPath = RapidWrightDCP.getString("microblazeAndILA_3pblocks.dcp");
 
         Design design1 = Design.readCheckpoint(dcpPath, CodePerfTracker.SILENT);
 
         Assertions.assertEquals(RelocationTools.relocate(design1, instanceName, colOffset, rowOffset),
                 expectSuccess);
+
+        if (expectSuccess && FileTools.isVivadoOnPath()) {
+            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design1);
+            Assertions.assertEquals(expectedNetsWithRoutingErrors, rrs.netsWithRoutingErrors);
+        }
     }
 
     public static Stream<Arguments> testMicroBlazeAndILA() {
         return Stream.of(
-                  Arguments.of("", 0, 5, true)
-                , Arguments.of("", 0, 60, true)
-                , Arguments.of("base_mb_i", 0, 10, true)
-                , Arguments.of("dbg_hub", 0, 20, true)
-                , Arguments.of("u_ila_0", 0, 30, true)
-                , Arguments.of("dbg_hub", 16, 0, false) // placement conflict
+                  Arguments.of("", 0, 5, true, 0)
+                , Arguments.of("", 0, 60, true, 0)
+                , Arguments.of("base_mb_i", 0, 10, true, 26 /* unrouted pins and resource conflicts */ )
+                , Arguments.of("dbg_hub", 0, 20, true, 19 /* unrouted pins */)
+                , Arguments.of("u_ila_0", 0, 30, true, 0)
+                , Arguments.of("dbg_hub", 16, 0, false, -1) // placement conflict
         );
     }
 
