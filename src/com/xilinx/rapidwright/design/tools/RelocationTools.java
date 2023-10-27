@@ -247,7 +247,7 @@ public class RelocationTools {
             if (src != null && !oldSite.containsKey(src.getSiteInst())) {
                 for (SitePinInst spi : pins) {
                     if (oldSite.containsKey(spi.getSiteInst())) {
-                        // Source is not reloacted, but at least one pin inside site insts to be relocated
+                        // Source is not relocated, but at least one pin inside site insts to be relocated
                         System.out.println("INFO: Unrouting Net '" + n.getName() + "' since output SiteInstPin '" +
                                 src + "' does not belong to SiteInsts to be relocated");
                         n.unroute();
