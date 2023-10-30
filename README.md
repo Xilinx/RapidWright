@@ -1,6 +1,6 @@
 # RapidWright  
 
-Try RapidWright in your browser: [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/clavin-xlnx/RapidWright-binder/master?urlpath=%2Fnotebooks%2FHelloWorld.ipynb)
+Try RapidWright in your browser: [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/clavin-xlnx/RapidWright-binder/python3?urlpath=%2Fnotebooks%2FHelloWorld.ipynb)
 
 ![Build](https://github.com/Xilinx/RapidWright/workflows/Build/badge.svg)
 
