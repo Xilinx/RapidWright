@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -153,26 +153,80 @@ public class RouteThruHelper {
         }
     }
 
+    /**
+     * Given a routethru PIP check that it is available for use by checking for net and cell
+     * collisions on the site it is routing through.
+     */
     public static boolean isRouteThruPIPAvailable(Design design, PIP routethru) {
         if (!routethru.isRouteThru()) return false;
         return isRouteThruPIPAvailable(design, routethru.getStartWire(), routethru.getEndWire());
     }
 
+    private static boolean isRouteThruSitePinAvailable(Design design, SitePin sitePin) {
+        if (sitePin == null) {
+            return false;
+        }
+        SiteInst siteInst = design.getSiteInstFromSite(sitePin.getSite());
+        if (siteInst == null) {
+            return true;
+        }
+        Net netCollision = siteInst.getNetFromSiteWire(sitePin.getBELPin().getSiteWireName());
+        if (netCollision != null) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Given two Wire objects (assumed to make up a routethru PIP) check that this
+     * PIP is available for use by checking for net and cell collisions within the site
+     * it is routing through.
+     * Note that this method is identical to the {@link #isRouteThruPIPAvailable(Design, Node, Node)
+     * overload, kept separate to minimize unnecessary calling Node.getSitePin().}
+     */
     public static boolean isRouteThruPIPAvailable(Design design, Wire start, Wire end) {
         SitePin outPin = end.getSitePin();
-        if (outPin == null) return false;
-        SiteInst siteInst = design.getSiteInstFromSite(outPin.getSite());
-        if (siteInst == null) return true;
-        Net outputNetCollision = siteInst.getNetFromSiteWire(outPin.getBELPin().getSiteWireName());
-        if (outputNetCollision != null) return false;
+        if (!isRouteThruSitePinAvailable(design, outPin)) {
+            return false;
+        }
         SitePin inPin = start.getSitePin();
-        BELPin belPin = inPin.getBELPin();
-        Net inputNetCollision = siteInst.getNetFromSiteWire(belPin.getSiteWireName());
-        if (inputNetCollision != null) return false;
+        assert(inPin.getSite() == outPin.getSite());
+        if (!isRouteThruSitePinAvailable(design, inPin)) {
+            return false;
+        }
+        SiteInst siteInst = design.getSiteInstFromSite(inPin.getSite());
+        for (BELPin sink : inPin.getBELPin().getSiteConns()) {
+            Cell cellCollision = siteInst.getCell(sink.getBEL());
+            if (cellCollision != null) {
+                return false;
+            }
+        }
+        return true;
+    }
 
-        for (BELPin sink : belPin.getSiteConns()) {
-            Cell collision = siteInst.getCell(sink.getBEL());
-            if (collision != null) return false;
+    /**
+     * Given two Node objects (assumed to make up a routethru PIP) check that this
+     * PIP is available for use by checking for net and cell collisions within the site
+     * it is routing through.
+     * Note that this method is identical to the {@link #isRouteThruPIPAvailable(Design, Wire, Wire)
+     * overload, kept separate to minimize unnecessary calling Node.getSitePin().}
+     */
+    public static boolean isRouteThruPIPAvailable(Design design, Node start, Node end) {
+        SitePin outPin = end.getSitePin();
+        if (!isRouteThruSitePinAvailable(design, outPin)) {
+            return false;
+        }
+        SitePin inPin = start.getSitePin();
+        assert(inPin.getSite() == outPin.getSite());
+        if (!isRouteThruSitePinAvailable(design, inPin)) {
+            return false;
+        }
+        SiteInst siteInst = design.getSiteInstFromSite(inPin.getSite());
+        for (BELPin sink : inPin.getBELPin().getSiteConns()) {
+            Cell cellCollision = siteInst.getCell(sink.getBEL());
+            if (cellCollision != null) {
+                return false;
+            }
         }
         return true;
     }
