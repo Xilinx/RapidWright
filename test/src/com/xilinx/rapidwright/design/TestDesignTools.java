@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -1231,28 +1232,31 @@ public class TestDesignTools {
         SiteInst si = design.getSiteInstFromSiteName("SLICE_X15Y238");
         {
             SitePinInst spi = si.getSitePinInst("E3");
-            Assertions.assertEquals("[processor/data_path_loop[4].arith_logical_lut/LUT6(BEL: E6LUT), processor/data_path_loop[4].arith_logical_lut/LUT5(BEL: E5LUT)]",
-                    DesignTools.getConnectedCells(spi).toString());
+            Assertions.assertEquals("[processor/data_path_loop[4].arith_logical_lut/LUT5(BEL: E5LUT), processor/data_path_loop[4].arith_logical_lut/LUT6(BEL: E6LUT)]",
+                    DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
         }
         {
             SitePinInst spi = si.getSitePinInst("E6");
-            Assertions.assertEquals("[processor/data_path_loop[4].arith_logical_lut/LUT6(BEL: E6LUT)]", DesignTools.getConnectedCells(spi).toString());
+            Assertions.assertEquals("[processor/data_path_loop[4].arith_logical_lut/LUT6(BEL: E6LUT)]",
+                    DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
         }
         {
             SitePinInst spi = si.getSitePinInst("D_I");
-            Assertions.assertEquals("[output_port_z_reg[4](BEL: DFF2)]", DesignTools.getConnectedCells(spi).toString());
+            Assertions.assertEquals("[output_port_z_reg[4](BEL: DFF2)]",
+                    DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
         }
         {
             SitePinInst spi = si.getSitePinInst("CKEN2");
-            Assertions.assertEquals("[output_port_z_reg[4](BEL: DFF2)]", DesignTools.getConnectedCells(spi).toString());
+            Assertions.assertEquals("[output_port_z_reg[4](BEL: DFF2)]",
+                    DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
         }
         {
             DesignTools.createMissingSitePinInsts(design, design.getNet("clk"));
             SitePinInst spi = si.getSitePinInst("CLK2");
-            Assertions.assertEquals("[processor/data_path_loop[7].arith_logical_flop(BEL: HFF), output_port_z_reg[0](BEL: HFF2), " +
-                    "output_port_z_reg[1](BEL: GFF2), processor/data_path_loop[5].arith_logical_flop(BEL: FFF), output_port_z_reg[2](BEL: FFF2), " +
-                    "processor/data_path_loop[4].arith_logical_flop(BEL: EFF), processor/data_path_loop[6].arith_logical_flop(BEL: GFF)]",
-                    DesignTools.getConnectedCells(spi).toString());
+            Assertions.assertEquals("[output_port_z_reg[0](BEL: HFF2), output_port_z_reg[1](BEL: GFF2), output_port_z_reg[2](BEL: FFF2), " +
+                    "processor/data_path_loop[4].arith_logical_flop(BEL: EFF), processor/data_path_loop[5].arith_logical_flop(BEL: FFF), " +
+                    "processor/data_path_loop[6].arith_logical_flop(BEL: GFF), processor/data_path_loop[7].arith_logical_flop(BEL: HFF)]",
+                    DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
         }
     }
 
@@ -1262,26 +1266,29 @@ public class TestDesignTools {
         SiteInst si = design.getSiteInstFromSiteName("SLICE_X15Y238");
         {
             SitePinInst spi = si.getSitePinInst("E3");
-            Assertions.assertEquals("[E6LUT.A3, E5LUT.A3]",
-                    DesignTools.getConnectedBELPins(spi).toString());
+            Assertions.assertEquals("[E5LUT.A3, E6LUT.A3]",
+                    DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
         }
         {
             SitePinInst spi = si.getSitePinInst("E6");
-            Assertions.assertEquals("[E6LUT.A6]", DesignTools.getConnectedBELPins(spi).toString());
+            Assertions.assertEquals("[E6LUT.A6]",
+                    DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
         }
         {
             SitePinInst spi = si.getSitePinInst("D_I");
-            Assertions.assertEquals("[DFF2.D]", DesignTools.getConnectedBELPins(spi).toString());
+            Assertions.assertEquals("[DFF2.D]",
+                    DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
         }
         {
             SitePinInst spi = si.getSitePinInst("CKEN2");
-            Assertions.assertEquals("[DFF2.CE]", DesignTools.getConnectedBELPins(spi).toString());
+            Assertions.assertEquals("[DFF2.CE]",
+                    DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
         }
         {
             DesignTools.createMissingSitePinInsts(design, design.getNet("clk"));
             SitePinInst spi = si.getSitePinInst("CLK2");
-            Assertions.assertEquals("[EFF.CLK, GFF2.CLK, GFF.CLK, FFF.CLK, HFF2.CLK, HFF.CLK, EFF2.CLK, FFF2.CLK]",
-                    DesignTools.getConnectedBELPins(spi).toString());
+            Assertions.assertEquals("[EFF.CLK, EFF2.CLK, FFF.CLK, FFF2.CLK, GFF.CLK, GFF2.CLK, HFF.CLK, HFF2.CLK]",
+                    DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
         }
     }
 }
