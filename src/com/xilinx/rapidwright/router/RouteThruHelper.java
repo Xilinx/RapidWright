@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -158,21 +158,57 @@ public class RouteThruHelper {
         return isRouteThruPIPAvailable(design, routethru.getStartWire(), routethru.getEndWire());
     }
 
+    private static boolean isRouteThruSitePinAvailable(Design design, SitePin sitePin) {
+        if (sitePin == null) {
+            return false;
+        }
+        SiteInst siteInst = design.getSiteInstFromSite(sitePin.getSite());
+        if (siteInst == null) {
+            return true;
+        }
+        Net netCollision = siteInst.getNetFromSiteWire(sitePin.getBELPin().getSiteWireName());
+        if (netCollision != null) {
+            return false;
+        }
+        return true;
+    }
+
     public static boolean isRouteThruPIPAvailable(Design design, Wire start, Wire end) {
         SitePin outPin = end.getSitePin();
-        if (outPin == null) return false;
-        SiteInst siteInst = design.getSiteInstFromSite(outPin.getSite());
-        if (siteInst == null) return true;
-        Net outputNetCollision = siteInst.getNetFromSiteWire(outPin.getBELPin().getSiteWireName());
-        if (outputNetCollision != null) return false;
+        if (!isRouteThruSitePinAvailable(design, outPin)) {
+            return false;
+        }
         SitePin inPin = start.getSitePin();
-        BELPin belPin = inPin.getBELPin();
-        Net inputNetCollision = siteInst.getNetFromSiteWire(belPin.getSiteWireName());
-        if (inputNetCollision != null) return false;
+        assert(inPin.getSite() == outPin.getSite());
+        if (!isRouteThruSitePinAvailable(design, inPin)) {
+            return false;
+        }
+        SiteInst siteInst = design.getSiteInstFromSite(inPin.getSite());
+        for (BELPin sink : inPin.getBELPin().getSiteConns()) {
+            Cell cellCollision = siteInst.getCell(sink.getBEL());
+            if (cellCollision != null) {
+                return false;
+            }
+        }
+        return true;
+    }
 
-        for (BELPin sink : belPin.getSiteConns()) {
-            Cell collision = siteInst.getCell(sink.getBEL());
-            if (collision != null) return false;
+    public static boolean isRouteThruPIPAvailable(Design design, Node start, Node end) {
+        SitePin outPin = end.getSitePin();
+        if (!isRouteThruSitePinAvailable(design, outPin)) {
+            return false;
+        }
+        SitePin inPin = start.getSitePin();
+        assert(inPin.getSite() == outPin.getSite());
+        if (!isRouteThruSitePinAvailable(design, inPin)) {
+            return false;
+        }
+        SiteInst siteInst = design.getSiteInstFromSite(inPin.getSite());
+        for (BELPin sink : inPin.getBELPin().getSiteConns()) {
+            Cell cellCollision = siteInst.getCell(sink.getBEL());
+            if (cellCollision != null) {
+                return false;
+            }
         }
         return true;
     }
