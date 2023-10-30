@@ -64,11 +64,11 @@ public class TestRouteThruHelper {
             "CLEL_R_X9Y235/CLEL_R.CLE_CLE_L_SITE_0_H5->>CLE_CLE_L_SITE_0_EMUX,false",
             "CLEL_R_X9Y235/CLEL_R.CLE_CLE_L_SITE_0_H6->>CLE_CLE_L_SITE_0_EMUX,false",
 
-            // Occupied by DLUT6
+            // Occupied by D6LUT
             "CLEL_R_X9Y235/CLEL_R.CLE_CLE_L_SITE_0_D1->>CLE_CLE_L_SITE_0_D_O,false",
             "CLEL_R_X9Y235/CLEL_R.CLE_CLE_L_SITE_0_D6->>CLE_CLE_L_SITE_0_DMUX,false",
 
-            // Occupied by DLUT5
+            // Occupied by D5LUT
             "CLEL_R_X10Y239/CLEL_R.CLE_CLE_L_SITE_0_D1->>CLE_CLE_L_SITE_0_D_O,false",
             "CLEL_R_X10Y239/CLEL_R.CLE_CLE_L_SITE_0_D6->>CLE_CLE_L_SITE_0_DMUX,false",
 
