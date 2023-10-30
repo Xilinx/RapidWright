@@ -2033,7 +2033,7 @@ public class DesignTools {
      * @return Set of connected cells to this pin
      */
     public static Set<Cell> getConnectedCells(SitePinInst pin) {
-        final HashSet<Cell> cells = new HashSet<>();
+        final Set<Cell> cells = new HashSet<>();
         SiteInst si = pin.getSiteInst();
         foreachConnectedBELPin(pin, (p) -> {
             Cell c = si.getCell(p.getBELName());
@@ -2050,7 +2050,7 @@ public class DesignTools {
      * @return Set of BEL pins to this site pin
      */
     public static Set<BELPin> getConnectedBELPins(SitePinInst pin) {
-        HashSet<BELPin> pins = new HashSet<>();
+        Set<BELPin> pins = new HashSet<>();
         foreachConnectedBELPin(pin, pins::add);
         return pins;
     }
