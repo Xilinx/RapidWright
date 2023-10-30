@@ -50,6 +50,7 @@ import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.blocks.PBlock;
@@ -1996,36 +1997,62 @@ public class DesignTools {
     }
 
     /**
-     * Looks in the site instance for cells connected to this site pin.
-     * @param pin The pint to examine for connected cells
-     * @return List of connected cells to this pin
+     * Looks in the site instance for BEL pins connected to this site pin.
+     * @param pin The SitePinInst to examine for connected BEL pins
+     * param action Perform this action on each conncted BELPin
      */
-    public static Set<Cell> getConnectedCells(SitePinInst pin) {
-        HashSet<Cell> cells = new HashSet<Cell>();
+    private static void foreachConnectedBELPin(SitePinInst pin, Consumer<BELPin> action) {
         SiteInst si = pin.getSiteInst();
-        if (si == null) return cells;
+        if (si == null) {
+            return;
+        }
         for (BELPin p : pin.getBELPin().getSiteConns()) {
             if (p.getBEL().getBELClass() == BELClass.RBEL) {
                 SitePIP pip = si.getUsedSitePIP(p.getBELName());
                 if (pip == null) continue;
                 if (p.isOutput()) {
                     p = pip.getInputPin().getSiteConns().get(0);
-                    Cell c = si.getCell(p.getBELName());
-                    if (c != null) cells.add(c);
+                    action.accept(p);
                 } else {
                     for (BELPin snk : pip.getOutputPin().getSiteConns()) {
-                        Cell c = si.getCell(snk.getBELName());
-                        if (c != null) cells.add(c);
+                        action.accept(snk);
                     }
                 }
             } else {
                 Cell c = si.getCell(p.getBELName());
                 if (c != null && c.getLogicalPinMapping(p.getName()) != null) {
-                    cells.add(c);
+                    action.accept(p);
                 }
             }
         }
+    }
+
+    /**
+     * Looks in the site instance for cells connected to this site pin.
+     * @param pin The SitePinInst to examine for connected cells
+     * @return Set of connected cells to this pin
+     */
+    public static Set<Cell> getConnectedCells(SitePinInst pin) {
+        final HashSet<Cell> cells = new HashSet<>();
+        SiteInst si = pin.getSiteInst();
+        foreachConnectedBELPin(pin, (p) -> {
+            Cell c = si.getCell(p.getBELName());
+            if (c != null) {
+                cells.add(c);
+            }
+        });
         return cells;
+    }
+
+    /**
+     * Looks in the site instance for BEL pins connected to this site pin.
+     * @param pin The SitePinInst to examine for connected BEL pins
+     * @return Set of BEL pins to this site pin
+     */
+    public static Set<BELPin> getConnectedBELPins(SitePinInst pin) {
+        HashSet<BELPin> pins = new HashSet<>();
+        foreachConnectedBELPin(pin, pins::add);
+        return pins;
     }
 
     /**
