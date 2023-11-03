@@ -60,22 +60,30 @@ import java.util.Set;
  * and allowing them to be queried for unused LUT/FF BELs.
  */
 public class ECOPlacementHelper {
-    private final Map<Net, Set<Site>> flopLessSitesByClk = new HashMap<>();
+    /** Set of all sites determined to not have any unused LUTs */
     private final Set<Site> lutLessSites = new HashSet<>();
-    private final Site[][] slices;
+
+    /** Set of all sites determined to not have any unused FFs, associated by clock net */
+    private final Map<Net, Set<Site>> flopLessSitesByClk = new HashMap<>();
+    /** Set of all bypass site pins (which are used to reach a FF) that are already used for routing
+     *  and thus blocks use of its associated FF */
     private final Set<SitePin> blockedPinBounces = new HashSet<>();
-
-    private final Device device;
-
+    /** An optional map populated with the site pins marked for removal.
+     *  Sites with pins queued for removal will be treated as if the pin
+     *  was already removed for the purposes of finding unused flops.
+     */
     private final Map<Net, Set<SitePinInst>> deferredRemovals;
 
-    private static final Map<Series, String[]> ULTRASCALE_CLK_SITEPIN = new EnumMap<>(Series.class);
-
-    private final String[] clkPins;
+    private final Device device;
+    /** A 2D array for fast lookup of SLICE sites based on instanceX/Y */
+    private final Site[][] slices;
+    /** Name of clock site pins for current device series */
+    private final String[] clkSitePinNames;
+    /** Alias to {@link DesignTools#belTypeSitePinNameMapping} for current device series */
     private final Map<String, Pair<String, String>> belTypeSitePinNameMapping;
 
+    private static final Map<Series, String[]> ULTRASCALE_CLK_SITEPIN = new EnumMap<>(Series.class);
     public static final Set<String> ultraScaleFlopNames = new HashSet<>();
-
     static {
         // NOTE: Only FF BELs are considered, FF2s are not to limit congestion.
         ultraScaleFlopNames.add("AFF");
@@ -150,12 +158,13 @@ public class ECOPlacementHelper {
 
         // Extract the correct set of clock/enable/reset pins according to device series
         Series series = device.getSeries();
-        clkPins = ULTRASCALE_CLK_SITEPIN.get(series);
+        clkSitePinNames = ULTRASCALE_CLK_SITEPIN.get(series);
         belTypeSitePinNameMapping = DesignTools.belTypeSitePinNameMapping.get(series);
     }
 
     /**
      * Given a SiteInst and a clock net, find an unused flop BEL that can host a new cell.
+     * This flop BEL will have its bypass pin ([A-H](X|_I)) available.
      * Assumes that CE and SR of flop to be placed is going to be held at VCC and GND
      * respectively.
      *
@@ -196,7 +205,7 @@ public class ECOPlacementHelper {
                 // Check existing control signals (clk, rst, en) don't conflict
                 int isUpper = pairID > 'D' ? 1 : 0;
 
-                SitePinInst existingClkSpi = siteInst.getSitePinInst(clkPins[isUpper]);
+                SitePinInst existingClkSpi = siteInst.getSitePinInst(clkSitePinNames[isUpper]);
                 Net existingClk = existingClkSpi != null ? existingClkSpi.getNet() : null;
                 if (existingClk != null && existingClk != clk) {
                     // Allow pre-existing SitePinInsts if they were deferred for removal

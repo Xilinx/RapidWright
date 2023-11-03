@@ -3268,6 +3268,7 @@ public class DesignTools {
         return unisimFlipFlopTypes.contains(cellType);
     }
 
+    /** Mapping from device Series to another mapping from FF BEL name to CKEN/SRST site pin name **/
     static public final Map<Series, Map<String, Pair<String, String>>> belTypeSitePinNameMapping;
     static{
         belTypeSitePinNameMapping = new EnumMap(Series.class);
