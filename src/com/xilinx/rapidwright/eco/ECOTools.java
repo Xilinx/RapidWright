@@ -51,7 +51,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -882,7 +881,8 @@ public class ECOTools {
             Net siteWireNet = si.getNetFromSiteWire(sitePinName);
             if (siteWireNet != null && !DesignTools.isNetDrivenByHierPort(siteWireNet)) {
                 if (netAliases == null) {
-                    netAliases = Collections.newSetFromMap(new IdentityHashMap<>());
+                    // Build a set of all aliases of exit net
+                    netAliases = new HashSet<>();
                     for (EDIFHierNet ehn : design.getNetlist().getNetAliases(net.getLogicalHierNet())) {
                         Net netAlias = design.getNet(ehn.getHierarchicalNetName());
                         if (netAlias == null) {
@@ -893,7 +893,7 @@ public class ECOTools {
                 }
 
                 if (!netAliases.contains(siteWireNet)) {
-                    // Site wire net is not an alias of the physical net
+                    // Site wire net is not an alias of the exit net
                     continue;
                 }
             } else {
