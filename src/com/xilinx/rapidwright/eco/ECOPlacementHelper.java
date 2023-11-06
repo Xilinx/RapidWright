@@ -247,18 +247,20 @@ public class ECOPlacementHelper {
      * @param site Originating Site.
      * @return Iterable<Site> of neighbouring sites.
      */
-    public Iterable<Site> spiralOutFrom(Site site) {
+    public static Iterable<Site> spiralOutFrom(Site site) {
         return new Iterable<Site>() {
             @NotNull
             @Override
             public Iterator<Site> iterator() {
                 return new Iterator<Site>() {
+                    // Delta X/Y from home site
                     int dx = 0;
                     int dy = 0;
+                    // Increment X/Y
                     int ix = -1;
                     int iy = 0;
-                    int count = 0;
-                    int range = 1;
+                    int stepsSinceLastTurn = 0;
+                    int stepLimitForNextTurn = 1;
                     int watchdog = 0;
 
                     final Site home = site;
@@ -271,14 +273,14 @@ public class ECOPlacementHelper {
                                 dx += ix;
                                 dy += iy;
 
-                                if (++count == range) {
+                                if (++stepsSinceLastTurn == stepLimitForNextTurn) {
                                     int tmp = ix;
                                     ix = -iy;
                                     iy = tmp;
 
-                                    count = 0;
+                                    stepsSinceLastTurn = 0;
                                     if (iy == 0) {
-                                        range++;
+                                        stepLimitForNextTurn++;
                                     }
                                 }
                                 if (++watchdog == 1000000) {
