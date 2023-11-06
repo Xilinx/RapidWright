@@ -264,40 +264,38 @@ public class ECOPlacementHelper {
                     int watchdog = 0;
 
                     final Site home = site;
-                    Site nextSite;
+                    Site nextSite = home;
 
                     @Override
                     public boolean hasNext() {
-                        if (nextSite == null) {
-                            do {
-                                dx += ix;
-                                dy += iy;
-
-                                if (++stepsSinceLastTurn == stepLimitForNextTurn) {
-                                    int tmp = ix;
-                                    ix = -iy;
-                                    iy = tmp;
-
-                                    stepsSinceLastTurn = 0;
-                                    if (iy == 0) {
-                                        stepLimitForNextTurn++;
-                                    }
-                                }
-                                if (++watchdog == 1000000) {
-                                    return false;
-                                }
-                            } while ((nextSite = home.getNeighborSite(dx, dy)) == null);
-                        }
-                        return true;
+                        return nextSite != null;
                     }
 
                     @Override
                     public Site next() {
-                        if (nextSite == null && !hasNext()) {
+                        if (nextSite == null) {
                             throw new NoSuchElementException();
                         }
                         Site retSite = nextSite;
-                        nextSite = null;
+                        do {
+                            dx += ix;
+                            dy += iy;
+
+                            if (++stepsSinceLastTurn == stepLimitForNextTurn) {
+                                int tmp = ix;
+                                ix = -iy;
+                                iy = tmp;
+
+                                stepsSinceLastTurn = 0;
+                                if (iy == 0) {
+                                    stepLimitForNextTurn++;
+                                }
+                            }
+                            if (++watchdog == 1000000) {
+                                assert(nextSite == null);
+                                break;
+                            }
+                        } while ((nextSite = home.getNeighborSite(dx, dy)) == null);
                         return retSite;
                     }
                 };

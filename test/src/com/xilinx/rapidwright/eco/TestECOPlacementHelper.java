@@ -141,16 +141,13 @@ public class TestECOPlacementHelper {
     @Test
     public void testSpiralOutFrom() {
         Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
-        ECOPlacementHelper eph = new ECOPlacementHelper(design, null);
-        Site site = design.getDevice().getSite("SLICE_X15Y239");
+        Site home = design.getDevice().getSite("SLICE_X15Y239");
         Set<Site> sites = new HashSet<>();
-        sites.add(site);
-        Iterator<Site> it = eph.spiralOutFrom(site).iterator();
-        while (it.hasNext()) {
+        for (Site site : ECOPlacementHelper.spiralOutFrom(home)) {
             // Test that site are not duplicated
-            Assertions.assertTrue(sites.add(it.next()));
+            Assertions.assertTrue(sites.add(site));
         }
-        // Test that all SLICE sites are visited
+        // Test that all SLICE sites are ultimately visited
         Assertions.assertEquals(49260, sites.size());
     }
 }
