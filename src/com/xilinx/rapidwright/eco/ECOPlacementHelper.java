@@ -39,10 +39,8 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
-import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.util.Pair;
-import com.xilinx.rapidwright.util.Utils;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
@@ -65,7 +63,7 @@ public class ECOPlacementHelper {
 
     /** Set of all sites determined to not have any unused FFs, associated by clock net */
     private final Map<Net, Set<Site>> flopLessSitesByClk = new HashMap<>();
-    /** Set of all bypass site pins (which are used to reach a FF) that are already used for routing
+    /** Set of all bypass site pins (which are used to reach an FF) that are already used for routing
      *  and thus blocks use of its associated FF */
     private final Set<SitePin> blockedPinBounces = new HashSet<>();
     /** An optional map populated with the site pins marked for removal.
@@ -74,9 +72,6 @@ public class ECOPlacementHelper {
      */
     private final Map<Net, Set<SitePinInst>> deferredRemovals;
 
-    private final Device device;
-    /** A 2D array for fast lookup of SLICE sites based on instanceX/Y */
-    private final Site[][] slices;
     /** Name of clock site pins for current device series */
     private final String[] clkSitePinNames;
     /** Alias to {@link DesignTools#belTypeSitePinNameMapping} for current device series */
@@ -108,34 +103,8 @@ public class ECOPlacementHelper {
      *                         was already removed for the purposes of finding unused flops.
      */
     public ECOPlacementHelper(Design design, Map<Net, Set<SitePinInst>> deferredRemovals) {
-        device = design.getDevice();
+        Device device = design.getDevice();
         this.deferredRemovals = deferredRemovals;
-
-        // Find the maximum SLICE X and Y values
-        int MAX_Y = 0;
-        int MAX_X = 0;
-        for (Tile[] tiles : device.getTiles()) {
-            for (Tile tile : tiles) {
-                for (Site s : tile.getSites()) {
-                    if (Utils.isSLICE(s.getSiteTypeEnum())) {
-                        if (s.getInstanceX() > MAX_X) MAX_X = s.getInstanceX();
-                        if (s.getInstanceY() > MAX_Y) MAX_Y = s.getInstanceY();
-                    }
-                }
-            }
-        }
-
-        // Build a 2D array of SLICEs
-        slices = new Site[MAX_Y + 1][MAX_X + 1];
-        for (Tile[] tiles : device.getTiles()) {
-            for (Tile tile : tiles) {
-                for (Site s : tile.getSites()) {
-                    if (Utils.isSLICE(s.getSiteTypeEnum())) {
-                        slices[s.getInstanceY()][s.getInstanceX()] = s;
-                    }
-                }
-            }
-        }
 
         // Iterate over every net and extract all pinbounce nodes blocked by its routing
         for (Net net : design.getNets()) {
@@ -271,14 +240,6 @@ public class ECOPlacementHelper {
         return null;
     }
 
-    private Site getSite(Site site, int dx, int dy) {
-        int y = site.getInstanceY() + dy;
-        if (y < 0 || y >= slices.length) return null;
-        int x = site.getInstanceX() + dx;
-        if (x < 0 || x >= slices[y].length) return null;
-        return slices[y][x];
-    }
-
     /**
      * Given a home Site, return an Iterable that yields the neighbouring sites encountered
      * when walking outwards in a spiral fashion. To be used in conjunction with
@@ -323,7 +284,7 @@ public class ECOPlacementHelper {
                                 if (++watchdog == 1000000) {
                                     return false;
                                 }
-                            } while ((nextSite = getSite(home, dx, dy)) == null);
+                            } while ((nextSite = home.getNeighborSite(dx, dy)) == null);
                         }
                         return true;
                     }
