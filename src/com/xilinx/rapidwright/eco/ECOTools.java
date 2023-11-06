@@ -51,6 +51,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -875,14 +876,32 @@ public class ECOTools {
             }
         }
 
+        Set<Net> netAliases = null;
         SitePinInst spi = null;
         for (String sitePinName : sitePinNames) {
             Net siteWireNet = si.getNetFromSiteWire(sitePinName);
-            if (siteWireNet == null || DesignTools.isNetDrivenByHierPort(siteWireNet)) {
-                // Site Pin not currently used
-                spi = net.createPin(sitePinName, si);
-                break;
+            if (siteWireNet != null && !DesignTools.isNetDrivenByHierPort(siteWireNet)) {
+                if (netAliases == null) {
+                    netAliases = Collections.newSetFromMap(new IdentityHashMap<>());
+                    for (EDIFHierNet ehn : design.getNetlist().getNetAliases(net.getLogicalHierNet())) {
+                        Net netAlias = design.getNet(ehn.getHierarchicalNetName());
+                        if (netAlias == null) {
+                            continue;
+                        }
+                        netAliases.add(netAlias);
+                    }
+                }
+
+                if (!netAliases.contains(siteWireNet)) {
+                    // Site wire net is not an alias of the physical net
+                    continue;
+                }
+            } else {
+                // Site Pin not currently used or was driven by site port
             }
+
+            spi = net.createPin(sitePinName, si);
+            break;
         }
 
         if (spi == null) {
