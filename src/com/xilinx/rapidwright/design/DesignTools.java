@@ -1422,6 +1422,7 @@ public class DesignTools {
      */
     public static void handlePinRemovals(SitePinInst spi, Map<Net,Set<SitePinInst>> deferRemovals) {
         if (deferRemovals != null) {
+            assert(spi.getNet() != null);
             Set<SitePinInst> pins = deferRemovals.computeIfAbsent(spi.getNet(), p -> new HashSet<>());
             pins.add(spi);
         } else {
