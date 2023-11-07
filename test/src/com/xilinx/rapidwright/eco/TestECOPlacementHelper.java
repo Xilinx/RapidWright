@@ -143,11 +143,20 @@ public class TestECOPlacementHelper {
         Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
         Site home = design.getDevice().getSite("SLICE_X15Y239");
         Set<Site> sites = new HashSet<>();
+        List<Site> sitesList = new ArrayList<>();
         for (Site site : ECOPlacementHelper.spiralOutFrom(home)) {
             // Test that site are not duplicated
             Assertions.assertTrue(sites.add(site));
+            if (sitesList.size() < 10) {
+                sitesList.add(site);
+            }
         }
         // Test that all SLICE sites are ultimately visited
         Assertions.assertEquals(49260, sites.size());
+        // Test that the first 10 are as expected
+        Assertions.assertEquals("[SLICE_X15Y239, SLICE_X14Y239, " +
+                "SLICE_X14Y238, SLICE_X15Y238, SLICE_X16Y238, " +
+                "SLICE_X16Y239, " +
+                "SLICE_X16Y240, SLICE_X15Y240, SLICE_X14Y240, SLICE_X13Y240]", sitesList.toString());
     }
 }
