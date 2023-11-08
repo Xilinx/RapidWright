@@ -305,20 +305,22 @@ public class TestDesignTools {
         {
             Net i = design.getNet("i");
             Assertions.assertEquals(0, i.getPins().size());
-            // Technically should not be present since net is fully intra-site, but harmless
+            // Technically should not be present since net is fully intra-site (PAD to INBUF), but harmless
             Assertions.assertEquals("[IN IOB_X1Y253.IO]", DesignTools.createMissingSitePinInsts(design, i).toString());
 
             Net o = design.getNet("o");
             Assertions.assertEquals(0, o.getPins().size());
-            // Fully intra-site
+            // Fully intra-site (OBUF to PAD)
             Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, o).toString());
         }
         {
             Net i = design.getNet("i2_p");
+            // PAD to DIFFINBUF
             Assertions.assertEquals(2, i.getPins().size());
             Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, i).toString());
 
             i = design.getNet("i2_n");
+            // PAD to DIFFINBUF
             Assertions.assertEquals(2, i.getPins().size());
             Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, i).toString());
 
@@ -326,14 +328,18 @@ public class TestDesignTools {
             Assertions.assertNull(design.getNet("o2_n"));
 
             Net o = design.getNet("ob/O");
+            // Fully intra-site (OBUF to PAD)
             Assertions.assertEquals(0, o.getPins().size());
             Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, o).toString());
 
             o = design.getNet("ob/OB");
+
+            // Fully intra-site (OBUF to PAD)
             Assertions.assertEquals(0, o.getPins().size());
             Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, o).toString());
 
             o = design.getNet("ob/I_B");
+            // OUTINV to OBUF
             Assertions.assertEquals(2, o.getPins().size());
             Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, o).toString());
         }
