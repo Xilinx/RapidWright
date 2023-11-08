@@ -1232,7 +1232,7 @@ public class EDIFNetlist extends EDIFName {
 
         EDIFHierPortInst source = null;
         EDIFHierNet parentNet = null;
-        EDIFHierNet possibleParentNet = null;
+        EDIFHierNet fallbackParentNet = null;
         while (!queue.isEmpty()) {
             EDIFHierNet net = queue.poll();
             if (!visited.add(net)) {
@@ -1262,11 +1262,11 @@ public class EDIFNetlist extends EDIFName {
                 // and thus a parent net
                 boolean isToplevelInout = isTopLevelPortInst && !p.isInput() && !p.isOutput();
                 if (isToplevelInout) {
-                    if (possibleParentNet != null) {
+                    if (fallbackParentNet != null) {
                         throw new RuntimeException("Multiple sources!");
                     } else if (parentNet == null) {
                         source = p;
-                        possibleParentNet = net;
+                        fallbackParentNet = net;
                     }
                 }
 
@@ -1291,8 +1291,8 @@ public class EDIFNetlist extends EDIFName {
         }
 
         if (parentNet == null) {
-            // No other parent net was found, promote the possible net
-            parentNet = possibleParentNet;
+            // No other parent net was found, promote the fallback net
+            parentNet = fallbackParentNet;
         }
 
         if (parentNet != null) {
