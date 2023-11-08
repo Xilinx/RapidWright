@@ -371,6 +371,7 @@ public class TestDesignTools {
     public void testCreateMissingSitePinInstsAlias() {
         Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
         Net net = design.getNet("input_port_b[4]");
+        Assertions.assertEquals(0, net.getSinkPins().size());
 
         SiteInst si = design.getSiteInstFromSiteName("SLICE_X15Y235");
         Assertions.assertEquals(net, si.getNetFromSiteWire("C1"));
