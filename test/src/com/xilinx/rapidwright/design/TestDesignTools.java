@@ -300,6 +300,46 @@ public class TestDesignTools {
     }
 
     @Test
+    public void testCreateMissingSitePinInstsInout() {
+        Design design = RapidWrightDCP.loadDCP("inout.dcp");
+        {
+            Net i = design.getNet("i");
+            Assertions.assertEquals(0, i.getPins().size());
+            // Technically should not be present since net is fully intra-site, but harmless
+            Assertions.assertEquals("[IN IOB_X1Y253.IO]", DesignTools.createMissingSitePinInsts(design, i).toString());
+
+            Net o = design.getNet("o");
+            Assertions.assertEquals(0, o.getPins().size());
+            // Fully intra-site
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, o).toString());
+        }
+        {
+            Net i = design.getNet("i2_p");
+            Assertions.assertEquals(2, i.getPins().size());
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, i).toString());
+
+            i = design.getNet("i2_n");
+            Assertions.assertEquals(2, i.getPins().size());
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, i).toString());
+
+            Assertions.assertNull(design.getNet("o2_p"));
+            Assertions.assertNull(design.getNet("o2_n"));
+
+            Net o = design.getNet("ob/O");
+            Assertions.assertEquals(0, o.getPins().size());
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, o).toString());
+
+            o = design.getNet("ob/OB");
+            Assertions.assertEquals(0, o.getPins().size());
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, o).toString());
+
+            o = design.getNet("ob/I_B");
+            Assertions.assertEquals(2, o.getPins().size());
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, o).toString());
+        }
+    }
+
+    @Test
     public void testBlackBoxCreation() {
         Design design = RapidWrightDCP.loadDCP("bnn.dcp");
         String hierCellName = "bd_0_i/hls_inst/inst/dmem_V_U";
