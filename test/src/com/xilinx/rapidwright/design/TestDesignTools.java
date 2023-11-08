@@ -367,6 +367,27 @@ public class TestDesignTools {
         }
     }
 
+    @Test
+    public void testCreateMissingSitePinInstsAlias() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        Net net = design.getNet("input_port_b[4]");
+        Assertions.assertEquals(0, net.getSinkPins().size());
+
+        SiteInst si = design.getSiteInstFromSiteName("SLICE_X15Y235");
+        Assertions.assertEquals(net, si.getNetFromSiteWire("C1"));
+
+        // Force intra-site routing to use net alias
+        Net alias = design.createNet("processor/input_port_b[4]");
+        Assertions.assertNotNull(alias);
+        Assertions.assertNotNull(alias.getLogicalHierNet());
+        BELPin c1 = si.getBELPin("C1", "C1");
+        si.routeIntraSiteNet(alias, c1, c1);
+        Assertions.assertEquals(alias, si.getNetFromSiteWire("C1"));
+
+        // Only one site pin since it's an out-of-context hierarchical port
+        Assertions.assertEquals("[IN SLICE_X15Y235.C1]", DesignTools.createMissingSitePinInsts(design, net).toString());
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     public void testGetTrimmablePIPsFromPinsBidir(boolean unrouteAll) {
