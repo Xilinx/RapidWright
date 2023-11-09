@@ -357,4 +357,31 @@ public class TestRWRoute {
         String dcp = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.dcp");
         TimingAndWirelengthReport.main(new String[]{dcp});
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            "GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,BUFG_GT_SYNC_X0Y46,CLK_IN,0",
+            "IOB_X0Y47,I,SLICE_X77Y122,FX,600",
+    })
+    public void testSingleConnection(String srcSiteName, String srcPinName,
+                                     String dstSiteName, String dstPinName,
+                                     int nodesPoppedLimit) {
+        Design design = new Design("top", "xcvu3p");
+
+        Net net = design.createNet("net");
+        SiteInst srcSi = design.createSiteInst(srcSiteName);
+        SitePinInst srcSpi = net.createPin(srcPinName, srcSi);
+
+        SiteInst dstSi = design.createSiteInst(dstSiteName);
+        SitePinInst dstSpi = net.createPin(dstPinName, dstSi);
+
+        List<SitePinInst> pinsToRoute = new ArrayList<>();
+        pinsToRoute.add(dstSpi);
+        boolean softPreserve = false;
+        PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute, softPreserve);
+
+        Assertions.assertTrue(srcSpi.isRouted());
+        Assertions.assertTrue(dstSpi.isRouted());
+        Assertions.assertTrue(Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped")) <= nodesPoppedLimit);
+    }
 }
