@@ -492,6 +492,7 @@ public class ECOTools {
                         src + "'. Replacing with new pin '" + ehpi + "'.");
                 Cell cell = src.getPhysicalCell(design);
                 for (SitePinInst spi : cell.getAllSitePinsFromLogicalPin(src.getPortInst().getName(), null)) {
+                    assert(spi.getNet() != null);
                     deferredRemovals.computeIfAbsent(spi.getNet(), (p) -> new HashSet<>()).add(spi);
                 }
                 src.getNet().removePortInst(src.getPortInst());
