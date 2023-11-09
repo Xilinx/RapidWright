@@ -520,7 +520,25 @@ public class RWRoute{
             Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
 
             List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
-            if (nodes.isEmpty()) {
+            Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
+            // Pre-emptively set up alternate source since we may expand from both sources
+            SitePinInst altSource = net.getAlternateSource();
+            if (altSource == null) {
+                altSource = DesignTools.getLegalAlternativeOutputPin(net);
+                if (altSource != null) {
+                    // Add this SitePinInst to the net, but not to the SiteInst
+                    net.addPin(altSource);
+                    DesignTools.routeAlternativeOutputSitePin(net, altSource);
+                }
+            }
+
+            Node altSourceINTNode = null;
+            if (altSource != null) {
+                assert(!altSource.equals(source));
+                altSourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
+            }
+
+            if (nodes.isEmpty() || (sourceINTNode == null && altSourceINTNode == null)) {
                 directConnections.add(connection);
                 connection.setDirect(true);
             } else {
@@ -529,27 +547,11 @@ public class RWRoute{
                 checkSinkRoutability(net, sinkINTNode);
                 connection.setSinkRnode(getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I));
                 if (sourceINTRnode == null && altSourceINTRnode == null) {
-                    Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
-
-                    // Pre-emptively set up alternate source since we may expand from both sources
-                    SitePinInst altSource = net.getAlternateSource();
-                    if (altSource == null) {
-                        altSource = DesignTools.getLegalAlternativeOutputPin(net);
-                        if (altSource != null) {
-                            // Add this SitePinInst to the net, but not to the SiteInst
-                            net.addPin(altSource);
-                            DesignTools.routeAlternativeOutputSitePin(net, altSource);
-                        }
-                    }
-
-                    if (altSource != null) {
-                        assert(!altSource.equals(source));
-                        Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
-                        altSourceINTRnode = altSourceNode != null ? getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O) : null;
-                    }
-
                     if (sourceINTNode != null) {
                         sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
+                    }
+                    if (altSourceINTNode != null) {
+                        altSourceINTRnode = getOrCreateRouteNode(altSourceINTNode, RouteNodeType.PINFEED_O);
                     }
 
                     if (sourceINTRnode == null && altSourceINTRnode == null) {
