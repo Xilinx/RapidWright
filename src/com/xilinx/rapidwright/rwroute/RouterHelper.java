@@ -28,6 +28,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -53,6 +54,7 @@ import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.Utils;
 
 /**
  * A collection of supportive methods for the router.
@@ -121,29 +123,30 @@ public class RouterHelper {
      * @return A node that connects to an INT tile from an output pin.
      */
     public static Node projectOutputPinToINTNode(SitePinInst output) {
-        Node intNode = output.getConnectedNode();
         int watchdog = 5;
 
-        List<Node> downhillNodes = intNode.getAllDownhillNodes();
-        if (downhillNodes.isEmpty()) {
-            return null;
-        }
-        while (downhillNodes.get(0).getTile().getTileTypeEnum() != TileTypeEnum.INT) {
-            intNode = downhillNodes.get(0);
-            if (downhillNodes.size() > 1) {
-                int i = 1;
-                while (intNode.getAllDownhillNodes().size() == 0) {
-                    intNode = downhillNodes.get(i);
-                    i++;
-                }
-            }
+        // Perform a greedy search starting from the SPI's connected node,
+        // following its first downhill node that that has further downhill nodes,
+        // returning the first Interconnect tile encountered.
+        // No backtracking.
+        Queue<Node> queue = new ArrayDeque<>();
+        queue.add(output.getConnectedNode());
+        while (!queue.isEmpty() && watchdog >= 0) {
+            Node node = queue.poll();
             watchdog--;
-            if (intNode.getAllDownhillNodes().size() == 0 || watchdog < 0) {
-                return null;
+            Tile tile = node.getTile();
+            if (Utils.isInterConnect(tile.getTileTypeEnum())) {
+                return node;
             }
-            downhillNodes = intNode.getAllDownhillNodes();
+
+            List<Node> downhillNodes = node.getAllDownhillNodes();
+            if (!downhillNodes.isEmpty()) {
+                queue.clear();
+                queue.addAll(downhillNodes);
+            }
         }
-        return intNode;
+
+        return null;
     }
 
     /**
