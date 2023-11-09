@@ -231,6 +231,29 @@ public class TestRWRoute {
         assertVivadoFullyRouted(design);
     }
 
+    void testSingleConnectionHelper(String partName,
+                                    String srcSiteName, String srcPinName,
+                                    String dstSiteName, String dstPinName,
+                                    long nodesPoppedLimit) {
+        Design design = new Design("top", partName);
+
+        Net net = design.createNet("net");
+        SiteInst srcSi = design.createSiteInst(srcSiteName);
+        SitePinInst srcSpi = net.createPin(srcPinName, srcSi);
+
+        SiteInst dstSi = design.createSiteInst(dstSiteName);
+        SitePinInst dstSpi = net.createPin(dstPinName, dstSi);
+
+        List<SitePinInst> pinsToRoute = new ArrayList<>();
+        pinsToRoute.add(dstSpi);
+        boolean softPreserve = false;
+        PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute, softPreserve);
+
+        Assertions.assertTrue(srcSpi.isRouted());
+        Assertions.assertTrue(dstSpi.isRouted());
+        Assertions.assertTrue(Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped")) <= nodesPoppedLimit);
+    }
+
     @ParameterizedTest
     @CsvSource({
             // One SLR crossing
@@ -268,22 +291,7 @@ public class TestRWRoute {
             "SLICE_X168Y162,SLICE_X9Y899,1900", // Up and left
     })
     public void testSLRCrossingNonTimingDriven(String srcSiteName, String dstSiteName, long nodesPoppedLimit) {
-        Design design = new Design("top", Device.AWS_F1);
-
-        Net net = design.createNet("net");
-        SiteInst srcSi = design.createSiteInst(srcSiteName);
-        net.createPin("AQ", srcSi);
-
-        SiteInst dstSi = design.createSiteInst(dstSiteName);
-        SitePinInst dstSpi = net.createPin("A1", dstSi);
-
-        List<SitePinInst> pinsToRoute = new ArrayList<>();
-        pinsToRoute.add(dstSpi);
-        boolean softPreserve = false;
-        PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute, softPreserve);
-
-        Assertions.assertTrue(pinsToRoute.stream().allMatch(SitePinInst::isRouted));
-        Assertions.assertTrue(Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped")) <= nodesPoppedLimit);
+        testSingleConnectionHelper(Device.AWS_F1, srcSiteName, "AQ", dstSiteName, "A1", nodesPoppedLimit);
     }
 
     @ParameterizedTest
@@ -366,22 +374,9 @@ public class TestRWRoute {
     public void testSingleConnection(String srcSiteName, String srcPinName,
                                      String dstSiteName, String dstPinName,
                                      int nodesPoppedLimit) {
-        Design design = new Design("top", "xcvu3p");
-
-        Net net = design.createNet("net");
-        SiteInst srcSi = design.createSiteInst(srcSiteName);
-        SitePinInst srcSpi = net.createPin(srcPinName, srcSi);
-
-        SiteInst dstSi = design.createSiteInst(dstSiteName);
-        SitePinInst dstSpi = net.createPin(dstPinName, dstSi);
-
-        List<SitePinInst> pinsToRoute = new ArrayList<>();
-        pinsToRoute.add(dstSpi);
-        boolean softPreserve = false;
-        PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute, softPreserve);
-
-        Assertions.assertTrue(srcSpi.isRouted());
-        Assertions.assertTrue(dstSpi.isRouted());
-        Assertions.assertTrue(Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped")) <= nodesPoppedLimit);
+        testSingleConnectionHelper("xcvu3p",
+                srcSiteName, srcPinName,
+                dstSiteName, dstPinName,
+                nodesPoppedLimit);
     }
 }
