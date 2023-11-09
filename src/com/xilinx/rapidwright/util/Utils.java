@@ -313,10 +313,9 @@ public class Utils{
             TileTypeEnum.INT_L,
             //TileTypeEnum.INT_L_SLV,
             //TileTypeEnum.INT_L_SLV_FLY,
-            TileTypeEnum.INT_R,
+            TileTypeEnum.INT_R
             //TileTypeEnum.INT_R_SLV,
             //TileTypeEnum.INT_R_SLV_FLY,
-            TileTypeEnum.INT_INTF_L_IO
         );
 
         urams = EnumSet.of(
