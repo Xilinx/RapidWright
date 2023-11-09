@@ -125,13 +125,12 @@ public class RouterHelper {
     public static Node projectOutputPinToINTNode(SitePinInst output) {
         int watchdog = 5;
 
-        // Perform a greedy search starting from the SPI's connected node,
-        // following its first downhill node that that has further downhill nodes,
-        // returning the first node that connects to an Interconnect tile.
+        // Starting from the SPI's connected node, for each node in queue
+        // return the first downhill node that is in an Interconnect tile.
+        // Otherwise, restart the queue with all such downhill nodes and repeat.
         // No backtracking.
         Queue<Node> queue = new ArrayDeque<>();
         queue.add(output.getConnectedNode());
-        Node prevNode = null;
         while (!queue.isEmpty() && watchdog >= 0) {
             Node node = queue.poll();
             watchdog--;
