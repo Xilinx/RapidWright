@@ -127,22 +127,27 @@ public class RouterHelper {
 
         // Perform a greedy search starting from the SPI's connected node,
         // following its first downhill node that that has further downhill nodes,
-        // returning the first Interconnect tile encountered.
+        // returning the first node that connects to an Interconnect tile.
         // No backtracking.
         Queue<Node> queue = new ArrayDeque<>();
         queue.add(output.getConnectedNode());
+        Node prevNode = null;
         while (!queue.isEmpty() && watchdog >= 0) {
             Node node = queue.poll();
             watchdog--;
-            Tile tile = node.getTile();
-            if (Utils.isInterConnect(tile.getTileTypeEnum())) {
-                return node;
-            }
+            assert(!Utils.isInterConnect(node.getTile().getTileTypeEnum()));
 
             List<Node> downhillNodes = node.getAllDownhillNodes();
-            if (!downhillNodes.isEmpty()) {
-                queue.clear();
-                queue.addAll(downhillNodes);
+            if (downhillNodes.isEmpty()) {
+                continue;
+            }
+
+            queue.clear();
+            for (Node downhill : downhillNodes) {
+                if (Utils.isInterConnect(downhill.getTile().getTileTypeEnum())) {
+                    return node;
+                }
+                queue.add(downhill);
             }
         }
 
