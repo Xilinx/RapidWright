@@ -2276,11 +2276,15 @@ public class DesignTools {
     }
 
     /**
-     * Creates all missing SitePinInsts in a design. See also {@link #createMissingSitePinInsts(Design, Net)}
+     * Creates all missing SitePinInsts in a design, except GLOBAL_USEDNET.
+     * See also {@link #createMissingSitePinInsts(Design, Net)}.
      * @param design The current design
      */
     public static void createMissingSitePinInsts(Design design) {
         for (Net net : design.getNets()) {
+            if (net.isUsedNet()) {
+                continue;
+            }
             createMissingSitePinInsts(design,net);
         }
     }
