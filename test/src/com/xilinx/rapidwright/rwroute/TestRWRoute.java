@@ -368,7 +368,7 @@ public class TestRWRoute {
 
     @ParameterizedTest
     @CsvSource({
-            "GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,BUFG_GT_SYNC_X0Y46,CLK_IN,0",
+            "GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,BUFG_GT_SYNC_X0Y46,CLK_IN,0", // Dedicated connection, hence no nodes popped
             "IOB_X0Y47,I,SLICE_X77Y122,FX,600",
     })
     public void testSingleConnection(String srcSiteName, String srcPinName,
