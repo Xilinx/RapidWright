@@ -1422,6 +1422,7 @@ public class DesignTools {
      */
     public static void handlePinRemovals(SitePinInst spi, Map<Net,Set<SitePinInst>> deferRemovals) {
         if (deferRemovals != null) {
+            assert(spi.getNet() != null);
             Set<SitePinInst> pins = deferRemovals.computeIfAbsent(spi.getNet(), p -> new HashSet<>());
             pins.add(spi);
         } else {
@@ -2131,16 +2132,38 @@ public class DesignTools {
             return newPins;
         }
 
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFHierNet parentEhn = null;
         for (EDIFHierPortInst p :  physPins) {
             Cell c = design.getCell(p.getFullHierarchicalInstName());
-            if (c == null || c.getBEL() == null) continue;
+            if (c == null) continue;
+            BEL bel = c.getBEL();
+            if (bel == null) continue;
             String logicalPinName = p.getPortInst().getName();
             Set<String> physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
             // BRAMs can have two (or more) physical pin mappings for a logical pin
             if (physPinMappings != null) {
                 SiteInst si = c.getSiteInst();
                 for (String physPin : physPinMappings) {
-                    String sitePinName = getRoutedSitePinFromPhysicalPin(c, net, physPin);
+                    BELPin belPin = bel.getPin(physPin);
+                    // Use the net attached to the phys pin
+                    Net siteWireNet = si.getNetFromSiteWire(belPin.getSiteWireName());
+                    if (siteWireNet == null) {
+                        continue;
+                    }
+                    if (siteWireNet != net && !siteWireNet.isStaticNet()) {
+                        if (parentEhn == null) {
+                            parentEhn = netlist.getParentNet(net.getLogicalHierNet());
+                        }
+                        EDIFHierNet parentSiteWireEhn = netlist.getParentNet(siteWireNet.getLogicalHierNet());
+                        if (!parentSiteWireEhn.equals(parentEhn)) {
+                            // Site wire net is not an alias of the net
+                            throw new RuntimeException("ERROR: Net on " + si.getSiteName() + "/" + belPin +
+                                    "'" + siteWireNet.getName() + "' is not an alias of " +
+                                    "'" + net.getName() + "'");
+                        }
+                    }
+                    String sitePinName = getRoutedSitePinFromPhysicalPin(c, siteWireNet, physPin);
                     if (sitePinName == null) continue;
                     SitePinInst newPin = si.getSitePinInst(sitePinName);
                     if (newPin != null) continue;
@@ -2253,11 +2276,15 @@ public class DesignTools {
     }
 
     /**
-     * Creates all missing SitePinInsts in a design. See also {@link #createMissingSitePinInsts(Design, Net)}
+     * Creates all missing SitePinInsts in a design, except GLOBAL_USEDNET.
+     * See also {@link #createMissingSitePinInsts(Design, Net)}.
      * @param design The current design
      */
     public static void createMissingSitePinInsts(Design design) {
         for (Net net : design.getNets()) {
+            if (net.isUsedNet()) {
+                continue;
+            }
             createMissingSitePinInsts(design,net);
         }
     }
@@ -3268,6 +3295,7 @@ public class DesignTools {
         return unisimFlipFlopTypes.contains(cellType);
     }
 
+    /** Mapping from device Series to another mapping from FF BEL name to CKEN/SRST site pin name **/
     static public final Map<Series, Map<String, Pair<String, String>>> belTypeSitePinNameMapping;
     static{
         belTypeSitePinNameMapping = new EnumMap(Series.class);

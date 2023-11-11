@@ -300,6 +300,52 @@ public class TestDesignTools {
     }
 
     @Test
+    public void testCreateMissingSitePinInstsInout() {
+        Design design = RapidWrightDCP.loadDCP("inout.dcp");
+        {
+            Net i = design.getNet("i");
+            Assertions.assertEquals(0, i.getPins().size());
+            // Technically should not be present since net is fully intra-site (PAD to INBUF), but harmless
+            Assertions.assertEquals("[IN IOB_X1Y253.IO]", DesignTools.createMissingSitePinInsts(design, i).toString());
+
+            Net o = design.getNet("o");
+            Assertions.assertEquals(0, o.getPins().size());
+            // Fully intra-site (OBUF to PAD)
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, o).toString());
+        }
+        {
+            Net i = design.getNet("i2_p");
+            // PAD to DIFFINBUF
+            Assertions.assertEquals(2, i.getPins().size());
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, i).toString());
+
+            i = design.getNet("i2_n");
+            // PAD to DIFFINBUF
+            Assertions.assertEquals(2, i.getPins().size());
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, i).toString());
+
+            Assertions.assertNull(design.getNet("o2_p"));
+            Assertions.assertNull(design.getNet("o2_n"));
+
+            Net o = design.getNet("ob/O");
+            // Fully intra-site (OBUF to PAD)
+            Assertions.assertEquals(0, o.getPins().size());
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, o).toString());
+
+            o = design.getNet("ob/OB");
+
+            // Fully intra-site (OBUF to PAD)
+            Assertions.assertEquals(0, o.getPins().size());
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, o).toString());
+
+            o = design.getNet("ob/I_B");
+            // OUTINV to OBUF
+            Assertions.assertEquals(2, o.getPins().size());
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, o).toString());
+        }
+    }
+
+    @Test
     public void testBlackBoxCreation() {
         Design design = RapidWrightDCP.loadDCP("bnn.dcp");
         String hierCellName = "bd_0_i/hls_inst/inst/dmem_V_U";
@@ -365,6 +411,27 @@ public class TestDesignTools {
         } else {
             Assertions.fail();
         }
+    }
+
+    @Test
+    public void testCreateMissingSitePinInstsAlias() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        Net net = design.getNet("input_port_b[4]");
+        Assertions.assertEquals(0, net.getSinkPins().size());
+
+        SiteInst si = design.getSiteInstFromSiteName("SLICE_X15Y235");
+        Assertions.assertEquals(net, si.getNetFromSiteWire("C1"));
+
+        // Force intra-site routing to use net alias
+        Net alias = design.createNet("processor/input_port_b[4]");
+        Assertions.assertNotNull(alias);
+        Assertions.assertNotNull(alias.getLogicalHierNet());
+        BELPin c1 = si.getBELPin("C1", "C1");
+        si.routeIntraSiteNet(alias, c1, c1);
+        Assertions.assertEquals(alias, si.getNetFromSiteWire("C1"));
+
+        // Only one site pin since it's an out-of-context hierarchical port
+        Assertions.assertEquals("[IN SLICE_X15Y235.C1]", DesignTools.createMissingSitePinInsts(design, net).toString());
     }
 
     @ParameterizedTest

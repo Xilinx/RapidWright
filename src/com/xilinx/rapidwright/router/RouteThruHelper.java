@@ -195,10 +195,12 @@ public class RouteThruHelper {
             return false;
         }
         SiteInst siteInst = design.getSiteInstFromSite(inPin.getSite());
-        for (BELPin sink : inPin.getBELPin().getSiteConns()) {
-            Cell cellCollision = siteInst.getCell(sink.getBEL());
-            if (cellCollision != null) {
-                return false;
+        if (siteInst != null) {
+            for (BELPin sink : inPin.getBELPin().getSiteConns()) {
+                Cell cellCollision = siteInst.getCell(sink.getBEL());
+                if (cellCollision != null) {
+                    return false;
+                }
             }
         }
         return true;
@@ -222,10 +224,12 @@ public class RouteThruHelper {
             return false;
         }
         SiteInst siteInst = design.getSiteInstFromSite(inPin.getSite());
-        for (BELPin sink : inPin.getBELPin().getSiteConns()) {
-            Cell cellCollision = siteInst.getCell(sink.getBEL());
-            if (cellCollision != null) {
-                return false;
+        if (siteInst != null) {
+            for (BELPin sink : inPin.getBELPin().getSiteConns()) {
+                Cell cellCollision = siteInst.getCell(sink.getBEL());
+                if (cellCollision != null) {
+                    return false;
+                }
             }
         }
         return true;

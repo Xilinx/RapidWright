@@ -492,6 +492,7 @@ public class ECOTools {
                         src + "'. Replacing with new pin '" + ehpi + "'.");
                 Cell cell = src.getPhysicalCell(design);
                 for (SitePinInst spi : cell.getAllSitePinsFromLogicalPin(src.getPortInst().getName(), null)) {
+                    assert(spi.getNet() != null);
                     deferredRemovals.computeIfAbsent(spi.getNet(), (p) -> new HashSet<>()).add(spi);
                 }
                 src.getNet().removePortInst(src.getPortInst());
@@ -875,14 +876,33 @@ public class ECOTools {
             }
         }
 
+        Set<Net> netAliases = null;
         SitePinInst spi = null;
         for (String sitePinName : sitePinNames) {
             Net siteWireNet = si.getNetFromSiteWire(sitePinName);
-            if (siteWireNet == null || DesignTools.isNetDrivenByHierPort(siteWireNet)) {
-                // Site Pin not currently used
-                spi = net.createPin(sitePinName, si);
-                break;
+            if (siteWireNet != null && !DesignTools.isNetDrivenByHierPort(siteWireNet)) {
+                if (netAliases == null) {
+                    // Build a set of all aliases of exit net
+                    netAliases = new HashSet<>();
+                    for (EDIFHierNet ehn : design.getNetlist().getNetAliases(net.getLogicalHierNet())) {
+                        Net netAlias = design.getNet(ehn.getHierarchicalNetName());
+                        if (netAlias == null) {
+                            continue;
+                        }
+                        netAliases.add(netAlias);
+                    }
+                }
+
+                if (!netAliases.contains(siteWireNet)) {
+                    // Site wire net is not an alias of the exit net
+                    continue;
+                }
+            } else {
+                // Site Pin not currently used or was driven by site port
             }
+
+            spi = net.createPin(sitePinName, si);
+            break;
         }
 
         if (spi == null) {
