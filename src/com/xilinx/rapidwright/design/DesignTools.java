@@ -3912,14 +3912,10 @@ public class DesignTools {
      *                     '<SITE-NAME>/<BEL-NAME>'.
      */
     public static void addProhibitConstraint(Design design, List<String> belLocations) {
-        if (belLocations.size() > 0) {
-            StringBuilder sb = new StringBuilder();
-            for (String bel : belLocations) {
-                sb.append(bel);
-                sb.append(" ");
-            }
+        for (String bel : belLocations) {
             design.addXDCConstraint(ConstraintGroup.LATE,
-                    "set_property PROHIBIT true [get_bels { " + sb.toString() + "} ]");
+                    "set_property PROHIBIT true [get_bels { " + bel + "} ]");
+
         }
     }
 
