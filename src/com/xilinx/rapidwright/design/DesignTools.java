@@ -50,6 +50,7 @@ import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.blocks.PBlock;
@@ -853,7 +854,7 @@ public class DesignTools {
                 }
             }
             String logPinName = c.getLogicalPinMapping(pin.getName());
-            EDIFPortInst portInst = c.getEDIFCellInst().getPortInst(logPinName);
+            EDIFPortInst portInst = logPinName == null ? null : c.getEDIFCellInst().getPortInst(logPinName);
             if (portInst == null) continue;
             EDIFNet net =  portInst.getNet();
             String netName = c.getParentHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP + net.getName();
@@ -1421,6 +1422,7 @@ public class DesignTools {
      */
     public static void handlePinRemovals(SitePinInst spi, Map<Net,Set<SitePinInst>> deferRemovals) {
         if (deferRemovals != null) {
+            assert(spi.getNet() != null);
             Set<SitePinInst> pins = deferRemovals.computeIfAbsent(spi.getNet(), p -> new HashSet<>());
             pins.add(spi);
         } else {
@@ -1996,36 +1998,62 @@ public class DesignTools {
     }
 
     /**
-     * Looks in the site instance for cells connected to this site pin.
-     * @param pin The pint to examine for connected cells
-     * @return List of connected cells to this pin
+     * Looks in the site instance for BEL pins connected to this site pin.
+     * @param pin The SitePinInst to examine for connected BEL pins
+     * param action Perform this action on each conncted BELPin
      */
-    public static Set<Cell> getConnectedCells(SitePinInst pin) {
-        HashSet<Cell> cells = new HashSet<Cell>();
+    private static void foreachConnectedBELPin(SitePinInst pin, Consumer<BELPin> action) {
         SiteInst si = pin.getSiteInst();
-        if (si == null) return cells;
+        if (si == null) {
+            return;
+        }
         for (BELPin p : pin.getBELPin().getSiteConns()) {
             if (p.getBEL().getBELClass() == BELClass.RBEL) {
                 SitePIP pip = si.getUsedSitePIP(p.getBELName());
                 if (pip == null) continue;
                 if (p.isOutput()) {
                     p = pip.getInputPin().getSiteConns().get(0);
-                    Cell c = si.getCell(p.getBELName());
-                    if (c != null) cells.add(c);
+                    action.accept(p);
                 } else {
                     for (BELPin snk : pip.getOutputPin().getSiteConns()) {
-                        Cell c = si.getCell(snk.getBELName());
-                        if (c != null) cells.add(c);
+                        action.accept(snk);
                     }
                 }
             } else {
                 Cell c = si.getCell(p.getBELName());
                 if (c != null && c.getLogicalPinMapping(p.getName()) != null) {
-                    cells.add(c);
+                    action.accept(p);
                 }
             }
         }
+    }
+
+    /**
+     * Looks in the site instance for cells connected to this site pin.
+     * @param pin The SitePinInst to examine for connected cells
+     * @return Set of connected cells to this pin
+     */
+    public static Set<Cell> getConnectedCells(SitePinInst pin) {
+        final Set<Cell> cells = new HashSet<>();
+        SiteInst si = pin.getSiteInst();
+        foreachConnectedBELPin(pin, (p) -> {
+            Cell c = si.getCell(p.getBELName());
+            if (c != null) {
+                cells.add(c);
+            }
+        });
         return cells;
+    }
+
+    /**
+     * Looks in the site instance for BEL pins connected to this site pin.
+     * @param pin The SitePinInst to examine for connected BEL pins
+     * @return Set of BEL pins to this site pin
+     */
+    public static Set<BELPin> getConnectedBELPins(SitePinInst pin) {
+        Set<BELPin> pins = new HashSet<>();
+        foreachConnectedBELPin(pin, pins::add);
+        return pins;
     }
 
     /**
@@ -2104,16 +2132,38 @@ public class DesignTools {
             return newPins;
         }
 
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFHierNet parentEhn = null;
         for (EDIFHierPortInst p :  physPins) {
             Cell c = design.getCell(p.getFullHierarchicalInstName());
-            if (c == null || c.getBEL() == null) continue;
+            if (c == null) continue;
+            BEL bel = c.getBEL();
+            if (bel == null) continue;
             String logicalPinName = p.getPortInst().getName();
             Set<String> physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
             // BRAMs can have two (or more) physical pin mappings for a logical pin
             if (physPinMappings != null) {
                 SiteInst si = c.getSiteInst();
                 for (String physPin : physPinMappings) {
-                    String sitePinName = getRoutedSitePinFromPhysicalPin(c, net, physPin);
+                    BELPin belPin = bel.getPin(physPin);
+                    // Use the net attached to the phys pin
+                    Net siteWireNet = si.getNetFromSiteWire(belPin.getSiteWireName());
+                    if (siteWireNet == null) {
+                        continue;
+                    }
+                    if (siteWireNet != net && !siteWireNet.isStaticNet()) {
+                        if (parentEhn == null) {
+                            parentEhn = netlist.getParentNet(net.getLogicalHierNet());
+                        }
+                        EDIFHierNet parentSiteWireEhn = netlist.getParentNet(siteWireNet.getLogicalHierNet());
+                        if (!parentSiteWireEhn.equals(parentEhn)) {
+                            // Site wire net is not an alias of the net
+                            throw new RuntimeException("ERROR: Net on " + si.getSiteName() + "/" + belPin +
+                                    "'" + siteWireNet.getName() + "' is not an alias of " +
+                                    "'" + net.getName() + "'");
+                        }
+                    }
+                    String sitePinName = getRoutedSitePinFromPhysicalPin(c, siteWireNet, physPin);
                     if (sitePinName == null) continue;
                     SitePinInst newPin = si.getSitePinInst(sitePinName);
                     if (newPin != null) continue;
@@ -2226,11 +2276,15 @@ public class DesignTools {
     }
 
     /**
-     * Creates all missing SitePinInsts in a design. See also {@link #createMissingSitePinInsts(Design, Net)}
+     * Creates all missing SitePinInsts in a design, except GLOBAL_USEDNET.
+     * See also {@link #createMissingSitePinInsts(Design, Net)}.
      * @param design The current design
      */
     public static void createMissingSitePinInsts(Design design) {
         for (Net net : design.getNets()) {
+            if (net.isUsedNet()) {
+                continue;
+            }
             createMissingSitePinInsts(design,net);
         }
     }
@@ -3241,6 +3295,7 @@ public class DesignTools {
         return unisimFlipFlopTypes.contains(cellType);
     }
 
+    /** Mapping from device Series to another mapping from FF BEL name to CKEN/SRST site pin name **/
     static public final Map<Series, Map<String, Pair<String, String>>> belTypeSitePinNameMapping;
     static{
         belTypeSitePinNameMapping = new EnumMap(Series.class);
@@ -3885,14 +3940,10 @@ public class DesignTools {
      *                     '<SITE-NAME>/<BEL-NAME>'.
      */
     public static void addProhibitConstraint(Design design, List<String> belLocations) {
-        if (belLocations.size() > 0) {
-            StringBuilder sb = new StringBuilder();
-            for (String bel : belLocations) {
-                sb.append(bel);
-                sb.append(" ");
-            }
+        for (String bel : belLocations) {
             design.addXDCConstraint(ConstraintGroup.LATE,
-                    "set_property PROHIBIT true [get_bels { " + sb.toString() + "} ]");
+                    "set_property PROHIBIT true [get_bels { " + bel + "} ]");
+
         }
     }
 

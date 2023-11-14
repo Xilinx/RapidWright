@@ -1232,6 +1232,7 @@ public class EDIFNetlist extends EDIFName {
 
         EDIFHierPortInst source = null;
         EDIFHierNet parentNet = null;
+        EDIFHierNet fallbackParentNet = null;
         while (!queue.isEmpty()) {
             EDIFHierNet net = queue.poll();
             if (!visited.add(net)) {
@@ -1247,7 +1248,8 @@ public class EDIFNetlist extends EDIFName {
                 }
 
 
-                boolean isToplevelInput = p.getHierarchicalInst().isTopLevelInst() && relP.getCellInst() == null && p.isInput();
+                boolean isTopLevelPortInst = p.getHierarchicalInst().isTopLevelInst() && relP.getCellInst() == null;
+                boolean isToplevelInput = isTopLevelPortInst && p.isInput();
                 if (isToplevelInput || (isCellPin && p.isOutput())) {
                     if (parentNet != null) {
                         throw new RuntimeException("Multiple sources!");
@@ -1256,6 +1258,17 @@ public class EDIFNetlist extends EDIFName {
                     parentNet = net;
                 }
 
+                // For top-level INOUT ports, consider the possibility that it might be an input
+                // and thus a parent net
+                boolean isToplevelInout = isTopLevelPortInst && !p.isInput() && !p.isOutput();
+                if (isToplevelInout) {
+                    if (fallbackParentNet != null) {
+                        throw new RuntimeException("Multiple sources!");
+                    } else if (parentNet == null) {
+                        source = p;
+                        fallbackParentNet = net;
+                    }
+                }
 
                 if (p.getPortInst().getCellInst() == null) {
                     // Moving up in hierarchy
@@ -1277,6 +1290,10 @@ public class EDIFNetlist extends EDIFName {
             }
         }
 
+        if (parentNet == null) {
+            // No other parent net was found, promote the fallback net
+            parentNet = fallbackParentNet;
+        }
 
         if (parentNet != null) {
             switch (identifyNetType(source)) {
@@ -1375,11 +1392,11 @@ public class EDIFNetlist extends EDIFName {
         EDIFCell c = getTopCell();
         EDIFHierCellInst topCellInst = getTopHierCellInst();
         Queue<EDIFHierPortInst> queue = new LinkedList<>();
-        // All parent nets are either top-level inputs or outputs of leaf cells
-        // Here we gather all top-level inputs
+        // All parent nets are either top-level inputs/inouts or outputs of leaf cells
+        // Here we gather all top-level inputs/inouts
         for (EDIFNet n : c.getNets()) {
             for (EDIFPortInst p : n.getPortInsts()) {
-                if (p.isTopLevelPort() && p.isInput()) {
+                if (p.isTopLevelPort() && !p.isOutput()) {
                     queue.add(new EDIFHierPortInst(topCellInst, p));
                 }
             }
