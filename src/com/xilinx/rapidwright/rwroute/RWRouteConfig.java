@@ -86,6 +86,8 @@ public class RWRouteConfig {
     private boolean printConnectionSpan;
     /** Flag indicating if RWRoute exports a DCP, to flag it as out of context */
     private boolean exportOutOfContext;
+    /** Maximum presentCongestionFactor value that should prevent accuracy loss **/
+    private float maxPresentCongestionFactor;
 
     /** Constructs a Configuration Object */
     public RWRouteConfig(String[] arguments) {
@@ -105,7 +107,7 @@ public class RWRouteConfig {
         reroutePercentage = (short) 3;
         initialPresentCongestionFactor = 0.5f;
         presentCongestionMultiplier = 2f;
-        historicalCongestionFactor = 1f;
+        setWirelengthWeight(1f);
         timingDriven = true;
         clkRouteTiming = null;
         pessimismA = 1.03f;
@@ -373,6 +375,16 @@ public class RWRouteConfig {
         if (wirelengthWeight < 0 || wirelengthWeight > 1)
             throw new IllegalArgumentException("ERROR: wirelength-driven weighting factor wirelengthWeight should be within [0, 1].");
         this.wirelengthWeight = wirelengthWeight;
+
+        // Assume that the minimum unit we want to observe is 1/8th of the wirelengthWeight
+        // (since during RWRoute.evaluateCostAndPush(), distanceToSink is scaled by wirelengthWeight)
+        // compute the largest floating-point value that results in this Units-in-Last-Place value.
+        final float maxUlp = getWirelengthWeight() / 8;
+        float maxPresentCongestionFactor = Float.MAX_VALUE;
+        while (Math.ulp(maxPresentCongestionFactor) >= maxUlp) {
+            maxPresentCongestionFactor /= 2;
+        }
+        this.maxPresentCongestionFactor = maxPresentCongestionFactor;
     }
 
     /**
@@ -552,6 +564,15 @@ public class RWRouteConfig {
         if (presentCongestionMultiplier <= 1)
             throw new IllegalArgumentException("ERROR: the present congestion factor multiplier cannot be less than 1.");
         this.presentCongestionMultiplier = presentCongestionMultiplier;
+    }
+
+    /**
+     * Gets the max present congestion factor that should prevent accuracy loss.
+     * This value is computed by {@link #setWirelengthWeight(float)}.
+     * @return
+     */
+    public float getMaxPresentCongestionFactor() {
+        return maxPresentCongestionFactor;
     }
 
     /**
