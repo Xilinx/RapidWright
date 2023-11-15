@@ -63,7 +63,7 @@ public class TestDCPLoad {
         Path dcpPath = RapidWrightDCP.getPath("picoblaze_ooc_X10Y235_unreadable_edif.dcp");
 
         // Soft link DCP from a temporary directory to prevent parallel testing issues
-        Path tmpPath = Files.createSymbolicLink(tempDir.resolve(dcpPath.getFileName()), dcpPath);
+        Path tmpPath = Files.createSymbolicLink(tempDir.resolve(dcpPath.getFileName()), dcpPath.toAbsolutePath());
 
         Design.setAutoGenerateReadableEdif (false);
         Assertions.assertThrows(RuntimeException.class, () -> {
@@ -89,7 +89,7 @@ public class TestDCPLoad {
         Path dcpPath = RapidWrightDCP.getPath("picoblaze_ooc_X10Y235_unreadable_edif.dcp");
 
         // Soft link DCP from a temporary directory to prevent parallel testing issues
-        Path tmpPath = Files.createSymbolicLink(tempDir.resolve(dcpPath.getFileName()), dcpPath);
+        Path tmpPath = Files.createSymbolicLink(tempDir.resolve(dcpPath.getFileName()), dcpPath.toAbsolutePath());
 
         Path readableEDIFDir = DesignTools.getDefaultReadableEDIFDir(tmpPath);
         Path readableEDIF = DesignTools.getEDFAutoGenFilePath(tmpPath, readableEDIFDir);

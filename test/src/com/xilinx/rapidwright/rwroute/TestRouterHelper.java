@@ -39,7 +39,9 @@ public class TestRouterHelper {
     @CsvSource({
             "SLICE_X0Y0,COUT,null",
             "SLICE_X0Y299,COUT,null",
-            "SLICE_X0Y0,A_O,CLEL_R_X0Y0/CLE_CLE_L_SITE_0_A_O"
+            "SLICE_X0Y0,A_O,CLEL_R_X0Y0/CLE_CLE_L_SITE_0_A_O",
+            "GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,null",
+            "IOB_X1Y95,I,INT_INTF_L_IO_X72Y109/LOGIC_OUTS_R23"
     })
     public void testProjectOutputPinToINTNode(String siteName, String pinName, String nodeAsString) {
         Design design = new Design("design", "xcvu3p");

@@ -1369,14 +1369,25 @@ public class FileTools {
     }
 
     /**
-     * This method will get and return the current time as a string
-     * formatted in the same way used in most Xilinx report and XDL
-     * files.  The format used in the using the same syntax as SimpleDateFormat
-     * which is "EEE MMM dd HH:mm:ss yyyy".
+     * This method will get and return the current time as a string formatted in the
+     * same way used in most Xilinx report and XDL files. The format used in the
+     * using the same syntax as SimpleDateFormat which is "EEE MMM dd HH:mm:ss z
+     * yyyy".
+     * 
      * @return Current date and time as a formatted string.
      */
     public static String getTimeString() {
-        SimpleDateFormat formatter = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy");
+        SimpleDateFormat formatter = new SimpleDateFormat("EEE MMM dd HH:mm:ss z yyyy");
+        return formatter.format(new java.util.Date());
+    }
+
+    /**
+     * Creates a formatted string of the current time in a sortable format ("yyyy mm dd HH mm ss").
+     * 
+     * @return The time stamp as a sortable string.
+     */
+    public static String getTimeStamp() {
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
         return formatter.format(new java.util.Date());
     }
 

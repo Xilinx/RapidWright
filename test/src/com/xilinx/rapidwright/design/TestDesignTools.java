@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -299,6 +300,52 @@ public class TestDesignTools {
     }
 
     @Test
+    public void testCreateMissingSitePinInstsInout() {
+        Design design = RapidWrightDCP.loadDCP("inout.dcp");
+        {
+            Net i = design.getNet("i");
+            Assertions.assertEquals(0, i.getPins().size());
+            // Technically should not be present since net is fully intra-site (PAD to INBUF), but harmless
+            Assertions.assertEquals("[IN IOB_X1Y253.IO]", DesignTools.createMissingSitePinInsts(design, i).toString());
+
+            Net o = design.getNet("o");
+            Assertions.assertEquals(0, o.getPins().size());
+            // Fully intra-site (OBUF to PAD)
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, o).toString());
+        }
+        {
+            Net i = design.getNet("i2_p");
+            // PAD to DIFFINBUF
+            Assertions.assertEquals(2, i.getPins().size());
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, i).toString());
+
+            i = design.getNet("i2_n");
+            // PAD to DIFFINBUF
+            Assertions.assertEquals(2, i.getPins().size());
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, i).toString());
+
+            Assertions.assertNull(design.getNet("o2_p"));
+            Assertions.assertNull(design.getNet("o2_n"));
+
+            Net o = design.getNet("ob/O");
+            // Fully intra-site (OBUF to PAD)
+            Assertions.assertEquals(0, o.getPins().size());
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, o).toString());
+
+            o = design.getNet("ob/OB");
+
+            // Fully intra-site (OBUF to PAD)
+            Assertions.assertEquals(0, o.getPins().size());
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, o).toString());
+
+            o = design.getNet("ob/I_B");
+            // OUTINV to OBUF
+            Assertions.assertEquals(2, o.getPins().size());
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, o).toString());
+        }
+    }
+
+    @Test
     public void testBlackBoxCreation() {
         Design design = RapidWrightDCP.loadDCP("bnn.dcp");
         String hierCellName = "bd_0_i/hls_inst/inst/dmem_V_U";
@@ -364,6 +411,27 @@ public class TestDesignTools {
         } else {
             Assertions.fail();
         }
+    }
+
+    @Test
+    public void testCreateMissingSitePinInstsAlias() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        Net net = design.getNet("input_port_b[4]");
+        Assertions.assertEquals(0, net.getSinkPins().size());
+
+        SiteInst si = design.getSiteInstFromSiteName("SLICE_X15Y235");
+        Assertions.assertEquals(net, si.getNetFromSiteWire("C1"));
+
+        // Force intra-site routing to use net alias
+        Net alias = design.createNet("processor/input_port_b[4]");
+        Assertions.assertNotNull(alias);
+        Assertions.assertNotNull(alias.getLogicalHierNet());
+        BELPin c1 = si.getBELPin("C1", "C1");
+        si.routeIntraSiteNet(alias, c1, c1);
+        Assertions.assertEquals(alias, si.getNetFromSiteWire("C1"));
+
+        // Only one site pin since it's an out-of-context hierarchical port
+        Assertions.assertEquals("[IN SLICE_X15Y235.C1]", DesignTools.createMissingSitePinInsts(design, net).toString());
     }
 
     @ParameterizedTest
@@ -1223,5 +1291,71 @@ public class TestDesignTools {
         List<PIP> pips = DesignTools.getConnectionPIPs(si2.getSitePinInst("C3"));
         Assertions.assertNotNull(pips);
         Assertions.assertEquals(9, pips.size());
+    }
+
+    @Test
+    public void testGetConnectedCells() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        SiteInst si = design.getSiteInstFromSiteName("SLICE_X15Y238");
+        {
+            SitePinInst spi = si.getSitePinInst("E3");
+            Assertions.assertEquals("[processor/data_path_loop[4].arith_logical_lut/LUT5(BEL: E5LUT), processor/data_path_loop[4].arith_logical_lut/LUT6(BEL: E6LUT)]",
+                    DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
+        }
+        {
+            SitePinInst spi = si.getSitePinInst("E6");
+            Assertions.assertEquals("[processor/data_path_loop[4].arith_logical_lut/LUT6(BEL: E6LUT)]",
+                    DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
+        }
+        {
+            SitePinInst spi = si.getSitePinInst("D_I");
+            Assertions.assertEquals("[output_port_z_reg[4](BEL: DFF2)]",
+                    DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
+        }
+        {
+            SitePinInst spi = si.getSitePinInst("CKEN2");
+            Assertions.assertEquals("[output_port_z_reg[4](BEL: DFF2)]",
+                    DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
+        }
+        {
+            DesignTools.createMissingSitePinInsts(design, design.getNet("clk"));
+            SitePinInst spi = si.getSitePinInst("CLK2");
+            Assertions.assertEquals("[output_port_z_reg[0](BEL: HFF2), output_port_z_reg[1](BEL: GFF2), output_port_z_reg[2](BEL: FFF2), " +
+                    "processor/data_path_loop[4].arith_logical_flop(BEL: EFF), processor/data_path_loop[5].arith_logical_flop(BEL: FFF), " +
+                    "processor/data_path_loop[6].arith_logical_flop(BEL: GFF), processor/data_path_loop[7].arith_logical_flop(BEL: HFF)]",
+                    DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
+        }
+    }
+
+    @Test
+    public void testGetConnectedBELPins() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        SiteInst si = design.getSiteInstFromSiteName("SLICE_X15Y238");
+        {
+            SitePinInst spi = si.getSitePinInst("E3");
+            Assertions.assertEquals("[E5LUT.A3, E6LUT.A3]",
+                    DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
+        }
+        {
+            SitePinInst spi = si.getSitePinInst("E6");
+            Assertions.assertEquals("[E6LUT.A6]",
+                    DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
+        }
+        {
+            SitePinInst spi = si.getSitePinInst("D_I");
+            Assertions.assertEquals("[DFF2.D]",
+                    DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
+        }
+        {
+            SitePinInst spi = si.getSitePinInst("CKEN2");
+            Assertions.assertEquals("[DFF2.CE]",
+                    DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
+        }
+        {
+            DesignTools.createMissingSitePinInsts(design, design.getNet("clk"));
+            SitePinInst spi = si.getSitePinInst("CLK2");
+            Assertions.assertEquals("[EFF.CLK, EFF2.CLK, FFF.CLK, FFF2.CLK, GFF.CLK, GFF2.CLK, HFF.CLK, HFF2.CLK]",
+                    DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
+        }
     }
 }
