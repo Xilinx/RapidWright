@@ -1851,7 +1851,7 @@ public class RWRoute{
      * @param design The {@link Design} instance to be routed.
      */
     public static Design routeDesignFullTimingDriven(Design design) {
-        return routeDesign(design, new RWRouteConfig(null));
+        return routeDesignWithUserDefinedArguments(design, null);
     }
 
     /**
@@ -1859,7 +1859,7 @@ public class RWRoute{
      * @param design The {@link Design} instance to be routed.
      */
     public static Design routeDesignFullNonTimingDriven(Design design) {
-        return routeDesign(design, new RWRouteConfig(new String[] {"--nonTimingDriven", "--verbose"}));
+        return routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven"});
     }
 
     /**

@@ -674,14 +674,6 @@ public class PartialRouter extends RWRoute {
         return false;
     }
 
-    private static Design routeDesign(Design design, RWRouteConfig config, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
-        if (config.isMaskNodesCrossRCLK()) {
-            System.out.println("WARNING: Masking nodes across RCLK for partial routing could result in routability problems.");
-        }
-
-        return routeDesign(design, new PartialRouter(design, config, pinsToRoute, softPreserve));
-    }
-
     /**
      * Partially routes a {@link Design} instance; specifically, all nets with no routing PIPs already present.
      * @param design The {@link Design} instance to be routed.
@@ -692,10 +684,11 @@ public class PartialRouter extends RWRoute {
      */
     public static Design routeDesignWithUserDefinedArguments(Design design, String[] args) {
         boolean softPreserve = false;
+        List<SitePinInst> pinsToRoute = null;
 
         // Instantiates a RWRouteConfig Object and parses the arguments.
         // Uses the default configuration if basic usage only.
-        return routeDesignWithUserDefinedArguments(design, args, softPreserve);
+        return routeDesignWithUserDefinedArguments(design, args, pinsToRoute, softPreserve);
     }
 
     /**
@@ -704,17 +697,27 @@ public class PartialRouter extends RWRoute {
      * @param args An array of string arguments, can be null.
      * If null, the design will be routed in the full timing-driven routing mode with default a {@link RWRouteConfig} instance.
      * For more options of the configuration, please refer to the {@link RWRouteConfig} class.
+     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all unrouted pins in the design.
      * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
      * @return Routed design.
      */
-    public static Design routeDesignWithUserDefinedArguments(Design design, String[] args, boolean softPreserve) {
-        preprocess(design);
-
-        List<SitePinInst> pinsToRoute = getUnroutedPins(design);
-
+    public static Design routeDesignWithUserDefinedArguments(Design design,
+                                                             String[] args,
+                                                             Collection<SitePinInst> pinsToRoute,
+                                                             boolean softPreserve) {
         // Instantiates a RWRouteConfig Object and parses the arguments.
         // Uses the default configuration if basic usage only.
-        return routeDesign(design, new RWRouteConfig(args), pinsToRoute, softPreserve);
+        RWRouteConfig config = new RWRouteConfig(args);
+        if (pinsToRoute == null) {
+            preprocess(design);
+            pinsToRoute = getUnroutedPins(design);
+        }
+
+        if (config.isMaskNodesCrossRCLK()) {
+            System.out.println("WARNING: Masking nodes across RCLK for partial routing could result in routability problems.");
+        }
+
+        return routeDesign(design, new PartialRouter(design, config, pinsToRoute, softPreserve));
     }
 
     /**
@@ -755,7 +758,8 @@ public class PartialRouter extends RWRoute {
      * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all unrouted pins in the design.
      */
     public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute) {
-        return routeDesignPartialNonTimingDriven(design, pinsToRoute, false);
+        boolean softPreserve = false;
+        return routeDesignPartialNonTimingDriven(design, pinsToRoute, softPreserve);
     }
 
     /**
@@ -765,19 +769,14 @@ public class PartialRouter extends RWRoute {
      * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
      */
     public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
-        if (pinsToRoute == null) {
-            preprocess(design);
-            pinsToRoute = getUnroutedPins(design);
-        }
-
-        return routeDesign(design, new RWRouteConfig(new String[] {
+        return routeDesignWithUserDefinedArguments(design, new String[] {
                 "--fixBoundingBox",
                 // use U-turn nodes and no masking of nodes cross RCLK
                 // Pros: maximum routability
                 // Con: might result in delay optimism and a slight increase in runtime
                 "--useUTurnNodes",
                 "--nonTimingDriven",
-                "--verbose"}),
+                "--verbose"},
                 pinsToRoute, softPreserve);
     }
 
@@ -788,18 +787,13 @@ public class PartialRouter extends RWRoute {
      * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
      */
     public static Design routeDesignPartialTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
-        if (pinsToRoute == null) {
-            preprocess(design);
-            pinsToRoute = getUnroutedPins(design);
-        }
-
-        return routeDesign(design, new RWRouteConfig(new String[] {
+        return routeDesignWithUserDefinedArguments(design, new String[] {
                 "--fixBoundingBox",
                 // use U-turn nodes and no masking of nodes cross RCLK
                 // Pros: maximum routability
                 // Con: might result in delay optimism and a slight increase in runtime
                 "--useUTurnNodes",
-                "--verbose"}),
+                "--verbose"},
                 pinsToRoute, softPreserve);
     }
 
