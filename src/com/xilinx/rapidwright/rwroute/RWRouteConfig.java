@@ -98,7 +98,7 @@ public class RWRouteConfig {
         enlargeBoundingBox = false;
         extensionYIncrement = 2;
         extensionXIncrement = 1;
-        wirelengthWeight = 0.8f;
+        setWirelengthWeight(0.8f);
         timingWeight = 0.35f;
         timingMultiplier = 1f;
         shareExponent = 2;
@@ -107,7 +107,7 @@ public class RWRouteConfig {
         reroutePercentage = (short) 3;
         initialPresentCongestionFactor = 0.5f;
         presentCongestionMultiplier = 2f;
-        setWirelengthWeight(1f);
+        historicalCongestionFactor = 1f;
         timingDriven = true;
         clkRouteTiming = null;
         pessimismA = 1.03f;
@@ -378,8 +378,8 @@ public class RWRouteConfig {
 
         // Assume that the minimum unit we want to observe is 1/8th of the wirelengthWeight
         // (since during RWRoute.evaluateCostAndPush(), distanceToSink is scaled by wirelengthWeight)
-        // compute the largest floating-point value that results in this Units-in-Last-Place value.
-        final float maxUlp = getWirelengthWeight() / 8;
+        // compute the largest floating-point value that results in this Units-in-the-Last-Place value.
+        final float maxUlp = wirelengthWeight / 8;
         float maxPresentCongestionFactor = Float.MAX_VALUE;
         while (Math.ulp(maxPresentCongestionFactor) >= maxUlp) {
             maxPresentCongestionFactor /= 2;
