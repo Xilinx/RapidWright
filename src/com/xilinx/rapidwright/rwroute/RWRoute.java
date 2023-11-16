@@ -1064,6 +1064,7 @@ public class RWRoute{
     private void updateCostFactors() {
         updateCongestionCosts.start();
         presentCongestionFactor *= config.getPresentCongestionMultiplier();
+        presentCongestionFactor = Math.min(presentCongestionFactor, config.getMaxPresentCongestionFactor());
         updateCost();
         updateCongestionCosts.stop();
     }
