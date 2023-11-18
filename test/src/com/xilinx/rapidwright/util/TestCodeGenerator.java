@@ -66,8 +66,7 @@ public class TestCodeGenerator {
                 "net.createPin(\"I\", si1);\n" +
                 "SiteInst si2 = design.createSiteInst(device.getSite(\"SLICE_X0Y0\"));\n" +
                 "net.createPin(\"AX\", si2);\n" +
-                "\n" +
-                "SiteInst si3 = design.createSiteInst(device.getSite(\"SLICE_X0Y0\"));\n";
+                "\n";
 
         Assertions.assertEquals(expectedString, actualString);
 
@@ -109,11 +108,8 @@ public class TestCodeGenerator {
                 "});\n" +
                 "SiteInst si3 = design.createSiteInst(device.getSite(\"IOB_X0Y0\"));\n" + 
                 "net1.createPin(\"I\", si3);\n" +
-                "SiteInst si4 = design.createSiteInst(device.getSite(\"SLICE_X0Y0\"));\n" +
-                "net1.createPin(\"A3\", si4);\n" +
-                "\n" +
-                "SiteInst si5 = design.createSiteInst(device.getSite(\"SLICE_X0Y0\"));\n" +
-                "SiteInst si6 = design.createSiteInst(device.getSite(\"IOB_X0Y1\"));\n";
+                "net1.createPin(\"A3\", si2);\n"
+                + "\n";
         Assertions.assertEquals(expectedString, actualString);
     }
 }
