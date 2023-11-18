@@ -545,7 +545,9 @@ public class RWRoute{
                 Node sinkINTNode = nodes.get(0);
                 indirectConnections.add(connection);
                 checkSinkRoutability(net, sinkINTNode);
-                connection.setSinkRnode(getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I));
+                RouteNode sinkRnode = getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I);
+                assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
+                connection.setSinkRnode(sinkRnode);
                 if (sourceINTRnode == null && altSourceINTRnode == null) {
                     if (sourceINTNode != null) {
                         sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
@@ -1521,6 +1523,10 @@ public class RWRoute{
                         }
                         break;
                     case PINFEED_I:
+                        if (childRNode.getNode().getTile() == connection.getSinkRnode().getNode().getTile()) {
+                            // Do not consider PINFEED_Is not in the same tile as the sink
+                            continue;
+                        }
                         break;
                     case LAGUNA_I:
                         if (!connection.isCrossSLR() ||

@@ -28,6 +28,7 @@ import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
@@ -36,13 +37,16 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.RuntimeTracker;
+import com.xilinx.rapidwright.util.Utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -87,6 +91,8 @@ public class RouteNodeGraph {
     public final int[] nextLagunaColumn;
     public final int[] prevLagunaColumn;
 
+    public final Map<Tile, BitSet> lagunaI;
+
     protected class RouteNodeImpl extends RouteNode {
         protected RouteNodeImpl(Node node, RouteNodeType type) {
             super(node, type);
@@ -129,7 +135,7 @@ public class RouteNodeGraph {
 
         @Override
         public int getSLRIndex() {
-             return intYToSLRIndex[getEndTileYCoordinate()];
+             return intYToSLRIndex != null ? intYToSLRIndex[getEndTileYCoordinate()] : 0;
         }
     }
 
@@ -168,6 +174,7 @@ public class RouteNodeGraph {
             final int maxTileColumns = device.getColumns(); // An over-approximation since this isn't in tiles
             nextLagunaColumn = new int[maxTileColumns];
             prevLagunaColumn = new int[maxTileColumns];
+            lagunaI = new IdentityHashMap<>();
             Arrays.fill(nextLagunaColumn, Integer.MAX_VALUE);
             Arrays.fill(prevLagunaColumn, Integer.MIN_VALUE);
             for (int y = 0; y < lagunaTiles.length; y++) {
@@ -176,7 +183,7 @@ public class RouteNodeGraph {
                     Tile tile = lagunaTilesAtY[x];
                     if (tile != null) {
                         if (y == 0) {
-                            assert(x == tile.getTileXCoordinate());
+                            assert (x == tile.getTileXCoordinate());
                             // Looks like (on US+) LAGUNA tiles are always on the left side of an INT tile,
                             // with tile X coordinate one smaller
                             final int intTileXCoordinate = x + 1;
@@ -192,12 +199,30 @@ public class RouteNodeGraph {
                                 prevLagunaColumn[i] = intTileXCoordinate;
                             }
                         }
+
+                        BitSet bs = new BitSet(tile.getWireCount());
+                        Tile intTile = null;
+                        for (int wireIndex = 0; wireIndex < tile.getWireCount(); wireIndex++) {
+                            Node node = Node.getNode(tile, wireIndex);
+                            if (node.getIntentCode() == IntentCode.NODE_PINFEED) {
+                                assert(Utils.isInterConnect(node.getTile().getTileTypeEnum()));
+                                if (intTile == null) {
+                                    intTile = node.getTile();
+                                } else {
+                                    assert(intTile == node.getTile());
+                                }
+                                bs.set(wireIndex);
+                            }
+                        }
+                        assert(!bs.isEmpty());
+                        lagunaI.put(intTile, bs);
                     }
                 }
             }
         } else {
             nextLagunaColumn = null;
             prevLagunaColumn = null;
+            lagunaI = null;
         }
     }
 
@@ -302,10 +327,35 @@ public class RouteNodeGraph {
         return false;
     }
 
-    protected boolean isExcluded(Node parent, Node child) {
+    protected boolean isExcludedTile(Node child) {
         Tile tile = child.getTile();
         TileTypeEnum tileType = tile.getTileTypeEnum();
         return !allowedTileEnums.contains(tileType);
+    }
+
+    protected boolean isExcluded(Node parent, Node child) {
+        if (isExcludedTile(child)) {
+            return true;
+        }
+
+        if (child.getIntentCode() == IntentCode.NODE_PINFEED) {
+            // PINFEEDs can lead to a site pin, or into a Laguna tile
+            RouteNode childRnode = getNode(child);
+            if (childRnode != null) {
+                assert(childRnode.getType() == RouteNodeType.PINFEED_I ||
+                       childRnode.getType() == RouteNodeType.LAGUNA_I);
+            } else {
+                // child does not already exist in our routing graph, meaning it's not a sink pin
+                // in our design, but it could be a LAGUNA_I
+                BitSet bs = lagunaI.get(child.getTile());
+                if (bs == null || !bs.get(child.getWire())) {
+                    // It's also not a LAGUNA_I -- skip it
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     public Net getPreservedNet(Node node) {
