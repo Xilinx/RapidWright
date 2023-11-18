@@ -135,7 +135,7 @@ public class RouteNodeGraph {
 
         @Override
         public int getSLRIndex() {
-             return intYToSLRIndex != null ? intYToSLRIndex[getEndTileYCoordinate()] : 0;
+             return intYToSLRIndex[getEndTileYCoordinate()];
         }
     }
 
@@ -183,7 +183,7 @@ public class RouteNodeGraph {
                     Tile tile = lagunaTilesAtY[x];
                     if (tile != null) {
                         if (y == 0) {
-                            assert (x == tile.getTileXCoordinate());
+                            assert(x == tile.getTileXCoordinate());
                             // Looks like (on US+) LAGUNA tiles are always on the left side of an INT tile,
                             // with tile X coordinate one smaller
                             final int intTileXCoordinate = x + 1;
@@ -204,7 +204,7 @@ public class RouteNodeGraph {
                         Tile intTile = null;
                         for (int wireIndex = 0; wireIndex < tile.getWireCount(); wireIndex++) {
                             Node node = Node.getNode(tile, wireIndex);
-                            if (node.getIntentCode() == IntentCode.NODE_PINFEED) {
+                            if (node != null && node.getIntentCode() == IntentCode.NODE_PINFEED) {
                                 assert(Utils.isInterConnect(node.getTile().getTileTypeEnum()));
                                 if (intTile == null) {
                                     intTile = node.getTile();
