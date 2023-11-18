@@ -1523,7 +1523,7 @@ public class RWRoute{
                         }
                         break;
                     case PINFEED_I:
-                        if (childRNode.getNode().getTile() == connection.getSinkRnode().getNode().getTile()) {
+                        if (childRNode.getNode().getTile() != connection.getSinkRnode().getNode().getTile()) {
                             // Do not consider PINFEED_Is not in the same tile as the sink
                             continue;
                         }
