@@ -347,9 +347,13 @@ public class RouteNodeGraph {
             } else {
                 // child does not already exist in our routing graph, meaning it's not a sink pin
                 // in our design, but it could be a LAGUNA_I
+                if (lagunaI == null) {
+                    // No LAGUNA_Is -- must be a site pin
+                    return true;
+                }
                 BitSet bs = lagunaI.get(child.getTile());
                 if (bs == null || !bs.get(child.getWire())) {
-                    // It's also not a LAGUNA_I -- skip it
+                    // Not a LAGUNA_I -- skip it
                     return true;
                 }
             }
