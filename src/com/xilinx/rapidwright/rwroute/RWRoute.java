@@ -1523,8 +1523,7 @@ public class RWRoute{
                         }
                         break;
                     case PINFEED_I:
-                        if (childRNode.getNode().getTile() != connection.getSinkRnode().getNode().getTile()) {
-                            // Do not consider PINFEED_Is not in the same tile as the sink
+                        if (!isAccessiblePinfeedI(childRNode, connection)) {
                             continue;
                         }
                         break;
@@ -1561,6 +1560,22 @@ public class RWRoute{
      */
     protected boolean isAccessible(RouteNode child, Connection connection) {
         return !config.isUseBoundingBox() || child.isInConnectionBoundingBox(connection);
+    }
+
+    protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection) {
+        assert(child.getType() == RouteNodeType.PINFEED_I);
+
+        if (child.isTarget()) {
+            return true;
+        }
+
+        // TODO: Increment sink pin usage in determineRoutingTargets()
+        if (child.countConnectionsOfUser(connection.getNetWrapper()) == 0 ||
+                child.getNode().getIntentCode() != IntentCode.NODE_PINBOUNCE) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -1866,7 +1881,7 @@ public class RWRoute{
      * @param design The {@link Design} instance to be routed.
      */
     public static Design routeDesignFullNonTimingDriven(Design design) {
-        return routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven"});
+        return routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--verbose"});
     }
 
     /**
