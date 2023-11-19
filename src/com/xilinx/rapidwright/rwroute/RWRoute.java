@@ -1584,6 +1584,8 @@ public class RWRoute{
 
         if (child.countConnectionsOfUser(connection.getNetWrapper()) == 0 ||
                 child.getNode().getIntentCode() != IntentCode.NODE_PINBOUNCE) {
+            // Inaccessible if child is not a sink pin of another connection on the same
+            // net, or it is not a PINBOUNCE node
             return false;
         }
 
