@@ -548,6 +548,10 @@ public class RWRoute{
                 RouteNode sinkRnode = getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I);
                 assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
                 connection.setSinkRnode(sinkRnode);
+                // Assuming that each connection only has a single sink target, increment
+                // its usage here immediately
+                sinkRnode.incrementUser(netWrapper);
+                sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
                 if (sourceINTRnode == null && altSourceINTRnode == null) {
                     if (sourceINTNode != null) {
                         sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
@@ -1219,7 +1223,13 @@ public class RWRoute{
      * @param connection The connection to be ripped up.
      */
     private void ripUp(Connection connection) {
-        for (RouteNode rnode : connection.getRnodes()) {
+        List<RouteNode> rnodes = connection.getRnodes();
+        if (rnodes.isEmpty()) {
+            return;
+        }
+        assert(rnodes.get(0) == connection.getSinkRnode());
+        // Decrement/update for all but the sink node
+        for (RouteNode rnode : rnodes.subList(1, rnodes.size())) {
             rnode.decrementUser(connection.getNetWrapper());
             rnode.updatePresentCongestionCost(presentCongestionFactor);
         }
@@ -1230,7 +1240,10 @@ public class RWRoute{
      * @param connection The routed connection.
      */
     private void updateUsersAndPresentCongestionCost(Connection connection) {
-        for (RouteNode rnode : connection.getRnodes()) {
+        List<RouteNode> rnodes = connection.getRnodes();
+        assert(rnodes.get(0) == connection.getSinkRnode());
+        // Increment/update for all but the sink node
+        for (RouteNode rnode : rnodes.subList(1, rnodes.size())) {
             rnode.incrementUser(connection.getNetWrapper());
             rnode.updatePresentCongestionCost(presentCongestionFactor);
         }
@@ -1569,7 +1582,6 @@ public class RWRoute{
             return true;
         }
 
-        // TODO: Increment sink pin usage in determineRoutingTargets()
         if (child.countConnectionsOfUser(connection.getNetWrapper()) == 0 ||
                 child.getNode().getIntentCode() != IntentCode.NODE_PINBOUNCE) {
             return false;
