@@ -1242,7 +1242,7 @@ public class RWRoute{
         if (rnodes.isEmpty()) {
             assert(!connection.getSink().isRouted());
             if (connection.getAltSinkRnode() == null) {
-                // If there is no alternate sink, decrement only this primary sink node
+                // If there is no alternate sink, decrement only this one-and-only sink node
                 RouteNode sinkRnode = connection.getSinkRnode();
                 rnodes = Collections.singletonList(sinkRnode);
             }
@@ -1350,6 +1350,13 @@ public class RWRoute{
             connection.resetRoute();
             assert(connection.getRnodes().isEmpty());
             assert(!connection.getSink().isRouted());
+
+            // Undo what ripUp() did for the one-and-only sink node
+            if (connection.getAltSinkRnode() == null) {
+                RouteNode sinkRnode = connection.getSinkRnode();
+                sinkRnode.incrementUser(connection.getNetWrapper());
+                sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
+            }
         }
 
         routingGraph.resetExpansion();
