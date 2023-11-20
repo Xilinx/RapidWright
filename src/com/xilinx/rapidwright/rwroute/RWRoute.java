@@ -926,10 +926,10 @@ public class RWRoute{
             }
         }
 
-        if (connection.getSink().isRouted()) {
-            // Check that sink node is exclusive to this connection and never overused
-            assert(!connection.getSinkRnode().isOverUsed());
-        }
+        // Check that sink node is exclusive to this connection, is used but never overused
+        RouteNode sinkRnode = connection.getSinkRnode();
+        assert(sinkRnode.countConnectionsOfUser(connection.getNetWrapper()) > 0);
+        assert(!sinkRnode.isOverUsed());
 
         return !connection.getSink().isRouted() || connection.isCongested();
     }
