@@ -933,7 +933,7 @@ public class RWRoute{
         assert(connection.getAltSinkRnode() == null);
         List<RouteNode> rnodes = connection.getRnodes();
         assert(rnodes.get(0) == connection.getSinkRnode());
-        // Same as Connection.isCongested() except skipping the first node
+        // Same as Connection.isCongested() except skip inspecting the one-and-only sink node
         for (RouteNode rnode : rnodes.subList(1, rnodes.size())) {
             if (rnode.isOverUsed()) {
                 return true;
