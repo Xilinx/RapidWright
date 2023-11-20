@@ -213,7 +213,7 @@ public class RouteNodeGraph {
                                 } else {
                                     assert(intTile == node.getTile());
                                 }
-                                bs.set(wireIndex);
+                                bs.set(node.getWire());
                             }
                         }
                         assert(!bs.isEmpty());
