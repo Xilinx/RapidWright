@@ -32,6 +32,7 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -94,9 +95,9 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      */
     private Map<RouteNode, Integer> driversCounts;
 
-    protected RouteNode(Node node, RouteNodeType type) {
+    protected RouteNode(Node node, RouteNodeType type, Map<Tile, BitSet> lagunaI) {
         this.node = node;
-        RouteNodeInfo nodeInfo = RouteNodeInfo.get(node);
+        RouteNodeInfo nodeInfo = RouteNodeInfo.get(node, lagunaI);
         this.type = (type == RouteNodeType.WIRE) ? nodeInfo.type : type;
         endTileXCoordinate = nodeInfo.endTileXCoordinate;
         endTileYCoordinate = nodeInfo.endTileYCoordinate;
@@ -251,7 +252,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     }
 
     public static short getLength(Node node) {
-        return RouteNodeInfo.get(node).length;
+        return RouteNodeInfo.get(node, null).length;
     }
 
     /**

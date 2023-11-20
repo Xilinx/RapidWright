@@ -95,7 +95,7 @@ public class RouteNodeGraph {
 
     protected class RouteNodeImpl extends RouteNode {
         protected RouteNodeImpl(Node node, RouteNodeType type) {
-            super(node, type);
+            super(node, type, lagunaI);
         }
 
         @Override
