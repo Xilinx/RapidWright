@@ -200,6 +200,8 @@ public class RouteNodeGraph {
                             }
                         }
 
+                        // Examine all wires in Laguna tile. Record those that map to a base node with the NODE_PINFEED
+                        // intent code, since those must be driven from an INT tile.
                         BitSet bs = new BitSet(tile.getWireCount());
                         Tile intTile = null;
                         for (int wireIndex = 0; wireIndex < tile.getWireCount(); wireIndex++) {
