@@ -27,6 +27,7 @@ package com.xilinx.rapidwright.rwroute;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -1239,11 +1240,15 @@ public class RWRoute{
     private void ripUp(Connection connection) {
         List<RouteNode> rnodes = connection.getRnodes();
         if (rnodes.isEmpty()) {
-            return;
+            assert(!connection.getSink().isRouted());
+            if (connection.getAltSinkRnode() == null) {
+                // If there is no alternate sink, decrement only this primary sink node
+                RouteNode sinkRnode = connection.getSinkRnode();
+                rnodes = Collections.singletonList(sinkRnode);
+            }
         }
-        assert(rnodes.get(0) == connection.getSinkRnode());
-        // Decrement/update for all but the sink node
-        for (RouteNode rnode : rnodes.subList(1, rnodes.size())) {
+
+        for (RouteNode rnode : rnodes) {
             rnode.decrementUser(connection.getNetWrapper());
             rnode.updatePresentCongestionCost(presentCongestionFactor);
         }
@@ -1255,9 +1260,7 @@ public class RWRoute{
      */
     private void updateUsersAndPresentCongestionCost(Connection connection) {
         List<RouteNode> rnodes = connection.getRnodes();
-        assert(rnodes.get(0) == connection.getSinkRnode());
-        // Increment/update for all but the sink node
-        for (RouteNode rnode : rnodes.subList(1, rnodes.size())) {
+        for (RouteNode rnode : rnodes) {
             rnode.incrementUser(connection.getNetWrapper());
             rnode.updatePresentCongestionCost(presentCongestionFactor);
         }
@@ -1545,6 +1548,7 @@ public class RWRoute{
                         }
                         break;
                     case PINBOUNCE:
+                        assert(!childRNode.isTarget());
                         if (!usablePINBounce(childRNode, connection.getSinkRnode())) {
                             continue;
                         }
