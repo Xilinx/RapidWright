@@ -1920,7 +1920,7 @@ public class RWRoute{
      * @param design The {@link Design} instance to be routed.
      */
     public static Design routeDesignFullNonTimingDriven(Design design) {
-        return routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--verbose"});
+        return routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven"});
     }
 
     /**
