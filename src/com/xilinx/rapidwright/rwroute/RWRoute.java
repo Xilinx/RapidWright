@@ -919,13 +919,27 @@ public class RWRoute{
      * @return true, if the connection should be routed.
      */
     protected boolean shouldRoute(Connection connection) {
+        if (!connection.getSink().isRouted()) {
+            return true;
+        }
+
         if (routeIteration > 1) {
             if (connection.getCriticality() > minRerouteCriticality) {
                 return true;
             }
         }
 
-        return !connection.getSink().isRouted() || connection.isCongested() ;
+        assert(connection.getAltSinkRnode() == null);
+        List<RouteNode> rnodes = connection.getRnodes();
+        assert(rnodes.get(0) == connection.getSinkRnode());
+        // Same as Connection.isCongested() except skipping the first node
+        for (RouteNode rnode : rnodes.subList(1, rnodes.size())) {
+            if (rnode.isOverUsed()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
