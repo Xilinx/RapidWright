@@ -98,7 +98,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     protected RouteNode(Node node, RouteNodeType type, Map<Tile, BitSet> lagunaI) {
         this.node = node;
         RouteNodeInfo nodeInfo = RouteNodeInfo.get(node, lagunaI);
-        this.type = (type == RouteNodeType.WIRE) ? nodeInfo.type : type;
+        this.type = (type == null) ? nodeInfo.type : type;
         endTileXCoordinate = nodeInfo.endTileXCoordinate;
         endTileYCoordinate = nodeInfo.endTileYCoordinate;
         length = nodeInfo.length;
@@ -135,8 +135,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                     continue;
             }
 
-            final RouteNodeType type = RouteNodeType.WIRE;
-            RouteNode child = getOrCreate(downhill, type);
+            RouteNode child = getOrCreate(downhill, null);
             childrenList.add(child);//the sink rnode of a target connection has been created up-front
         }
         if (!childrenList.isEmpty()) {

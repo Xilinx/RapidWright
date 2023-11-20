@@ -27,7 +27,6 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
-import com.xilinx.rapidwright.util.Utils;
 
 import java.util.BitSet;
 import java.util.Map;
