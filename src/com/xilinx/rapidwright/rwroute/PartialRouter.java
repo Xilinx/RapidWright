@@ -377,7 +377,7 @@ public class PartialRouter extends RWRoute {
 
                 // Do not include arcs that the router wouldn't explore
                 // e.g. those that leave the INT tile, since we project pins to their INT tile
-                if (routingGraph.isExcluded(start, end))
+                if (routingGraph.isExcludedTile(end))
                     continue;
 
                 RouteNode rstart = getOrCreateRouteNode(start, RouteNodeType.WIRE);
@@ -570,7 +570,7 @@ public class PartialRouter extends RWRoute {
 
                 // Do not include arcs that the router wouldn't explore
                 // e.g. those that leave the INT tile, since we project pins to their INT tile
-                if (routingGraph.isExcluded(start, end))
+                if (routingGraph.isExcludedTile(end))
                     continue;
 
                 // Since net already exists, all the nodes it uses must already
@@ -601,7 +601,7 @@ public class PartialRouter extends RWRoute {
 
                 // Do not include arcs that the router wouldn't explore
                 // e.g. those that leave the INT tile, since we project pins to their INT tile
-                if (routingGraph.isExcluded(start, end))
+                if (routingGraph.isExcludedTile(end))
                     continue;
 
                 boolean startPreserved = routingGraph.unpreserve(start);
