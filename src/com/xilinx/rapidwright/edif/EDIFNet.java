@@ -361,7 +361,7 @@ public class EDIFNet extends EDIFPropertyObject {
 
     /**
      * Checks if this net is a logical VCC net. It first checks if the net matches
-     * the defacto name for VCC in Vivado synthesis, "\<const1\>"
+     * the defacto name for VCC in Vivado synthesis, {@literal"<const1>"}
      * ({@link EDIFTools#LOGICAL_VCC_NET_NAME}). If there is not match, it will also
      * check the source of the net to see if it is a VCC primitive.
      * 
@@ -373,9 +373,10 @@ public class EDIFNet extends EDIFPropertyObject {
 
     /**
      * Checks if this net is a logical GND net. It first checks if the net matches
-     * the defacto name for GND in Vivado synthesis, "\<const0\>"
-     * ({@link EDIFTools#LOGICAL_GND_NET_NAME}). If there is not match, it will also
-     * check the source of the net to see if it is a GND primitive.
+     * the defacto name for GND in Vivado synthesis,
+     * {@literal"<const0>"} ({@link EDIFTools#LOGICAL_GND_NET_NAME}). If there is
+     * not match, it will also check the source of the net to see if it is a GND
+     * primitive.
      * 
      * @return True if this is a logical GND net, false otherwise.
      */
