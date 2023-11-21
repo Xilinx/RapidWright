@@ -26,7 +26,7 @@ package com.xilinx.rapidwright.device;
  * object as well as a Node object. At their heart, they both specify a Tile and
  * a wire (in the case of a Node it is the base wire).
  */
-public interface WireObject {
+public interface WireInterface {
 
     public Tile getTile();
 
