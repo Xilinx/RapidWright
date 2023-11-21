@@ -3937,7 +3937,7 @@ public class DesignTools {
      * 
      * @param design       The design to which the constraint should be added
      * @param belLocations A list of BEL locations using the syntax
-     *                     '<SITE-NAME>/<BEL-NAME>'.
+     *                     {@literal '<SITE-NAME>/<BEL-NAME>'}.
      */
     public static void addProhibitConstraint(Design design, List<String> belLocations) {
         for (String bel : belLocations) {
