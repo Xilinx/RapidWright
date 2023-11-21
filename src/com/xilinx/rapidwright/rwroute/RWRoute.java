@@ -1233,7 +1233,7 @@ public class RWRoute{
         if (rnodes.isEmpty()) {
             assert(!connection.getSink().isRouted());
             if (connection.getAltSinkRnode() == null) {
-                // If there is no alternate sink, decrement only this one-and-only sink node
+                // If there is no alternate sink, decrement this one-and-only sink node
                 RouteNode sinkRnode = connection.getSinkRnode();
                 rnodes = Collections.singletonList(sinkRnode);
             }
@@ -1250,8 +1250,7 @@ public class RWRoute{
      * @param connection The routed connection.
      */
     private void updateUsersAndPresentCongestionCost(Connection connection) {
-        List<RouteNode> rnodes = connection.getRnodes();
-        for (RouteNode rnode : rnodes) {
+        for (RouteNode rnode : connection.getRnodes()) {
             rnode.incrementUser(connection.getNetWrapper());
             rnode.updatePresentCongestionCost(presentCongestionFactor);
         }
