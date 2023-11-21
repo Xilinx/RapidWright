@@ -42,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -90,7 +91,9 @@ public class RouteNodeGraph {
     public final int[] nextLagunaColumn;
     public final int[] prevLagunaColumn;
 
-    public final Map<Tile, BitSet> lagunaI;
+    protected final Map<Tile, BitSet> lagunaI;
+
+    protected final Map<TileTypeEnum, BitSet> accessibleWireOnlySameColumnAsTarget;
 
     protected class RouteNodeImpl extends RouteNode {
         protected RouteNodeImpl(Node node, RouteNodeType type) {
@@ -160,6 +163,48 @@ public class RouteNodeGraph {
             }
         }
 
+        accessibleWireOnlySameColumnAsTarget = new EnumMap<>(TileTypeEnum.class);
+        BitSet wires = new BitSet();
+        Tile intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
+        for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
+            Node baseNode = Node.getNode(intTile, wireIndex);
+            Tile baseTile = baseNode.getTile();
+            String wireName = baseNode.getWireName();
+            if (wireName.startsWith("BOUNCE_")) {
+                assert(baseNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
+                assert(baseTile.getTileXCoordinate() == intTile.getTileXCoordinate());
+                // Uphill from INT_NODE_IMUX_* in tile above/below and INODE_* in above/target or below/target tiles
+                // Downhill to INT_NODE_IMUX_* and INODE_* to above/below tile
+            } else if (wireName.startsWith("BYPASS_")) {
+                assert(baseNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
+                assert(baseTile == intTile);
+                assert(wireIndex == baseNode.getWire());
+                // Uphill and downhill are INT_NODE_IMUX_* in the target tile and INODE_* to above/below tiles
+            } else if (wireName.startsWith("INT_NODE_GLOBAL_")) {
+                assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
+                assert(baseTile == intTile);
+                assert(wireIndex == baseNode.getWire());
+                // Downhill to CTRL_* in the target tile, INODE_* to above/below tile, INT_NODE_IMUX_* in target tile
+            } else if (wireName.startsWith("INT_NODE_IMUX_")) {
+                assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
+                assert(baseTile == intTile);
+                assert(wireIndex == baseNode.getWire());
+                // Downhill to BOUNCE_* in the above/below/target tile, BYPASS_* in the base tile, IMUX_* in target tile
+            } else if (wireName.startsWith("INODE_")) {
+                assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
+                assert(baseTile.getTileXCoordinate() == intTile.getTileXCoordinate());
+                if (baseTile == intTile) {
+                    continue;
+                }
+                // Uphill from nodes in above/target or below/target tiles
+                // Downhill to BOUNCE_*/BYPASS_*/IMUX_* in above/target or below/target tiles
+            } else {
+                continue;
+            }
+            wires.set(baseNode.getWire());
+        }
+        accessibleWireOnlySameColumnAsTarget.put(intTile.getTileTypeEnum(), wires);
+
         Tile[][] lagunaTiles;
         if (device.getSeries() == Series.UltraScalePlus) {
             lagunaTiles = device.getTilesByRootName("LAG_LAG");
@@ -168,7 +213,6 @@ public class RouteNodeGraph {
         } else {
             lagunaTiles = null;
         }
-
         if (lagunaTiles != null) {
             final int maxTileColumns = device.getColumns(); // An over-approximation since this isn't in tiles
             nextLagunaColumn = new int[maxTileColumns];
@@ -202,7 +246,7 @@ public class RouteNodeGraph {
                         // Examine all wires in Laguna tile. Record those that map to a base node with the NODE_PINFEED
                         // intent code, since those must be driven from an INT tile.
                         BitSet bs = new BitSet(tile.getWireCount());
-                        Tile intTile = null;
+                        intTile = null;
                         for (int wireIndex = 0; wireIndex < tile.getWireCount(); wireIndex++) {
                             Node node = Node.getNode(tile, wireIndex);
                             if (node != null && node.getIntentCode() == IntentCode.NODE_PINFEED) {
@@ -465,4 +509,18 @@ public class RouteNodeGraph {
         }
         return Math.round((float) sum / numNodes());
     }
+
+    public boolean isAccessible(RouteNode child, RouteNode sink) {
+        Node childNode = child.getNode();
+        Tile childTile = childNode.getTile();
+        TileTypeEnum childTileType = childTile.getTileTypeEnum();
+        BitSet bs = accessibleWireOnlySameColumnAsTarget.get(childTileType);
+        if (bs == null || !bs.get(childNode.getWire())) {
+            return true;
+        }
+
+        Tile sinkTile = sink.getNode().getTile();
+        return childTile.getTileXCoordinate() == sinkTile.getTileXCoordinate();
+    }
+
 }
