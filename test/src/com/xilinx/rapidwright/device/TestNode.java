@@ -22,10 +22,14 @@
 
 package com.xilinx.rapidwright.device;
 
+import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Queue;
+import java.util.Set;
 
+import com.xilinx.rapidwright.util.Utils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -74,6 +78,44 @@ public class TestNode {
         Node n = d.getNode("INT_INT_INTERFACE_XIPHY_FT_X157Y688/LOGIC_OUTS_R0");
         Assertions.assertNotNull(n);
         Assertions.assertTrue(n.getAllUphillNodes().isEmpty());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvu3p,INT_X37Y220,BOUNCE_",
+            "xcvu3p,INT_X37Y220,BYPASS_",
+            "xcvu3p,INT_X37Y220,INT_NODE_GLOBAL_",
+            "xcvu3p,INT_X37Y220,INT_NODE_IMUX_",
+            "xcvu3p,INT_X37Y220,INODE_",
+            // These nodes fanout to NESW nodes in the tile above or below
+            // "xcvu3p,INT_X37Y220,SDQNODE_",
+    })
+    public void testNodeReachability(String partName, String tileName, String wirePrefix) {
+        Device device = Device.getDevice(partName);
+        Tile baseTile = device.getTile(tileName);
+        Set<Node> visited = new HashSet<>();
+        Queue<Node> queue = new ArrayDeque<>();
+        for (String wireName : baseTile.getWireNames()) {
+            if (!wireName.startsWith(wirePrefix)) {
+                continue;
+            }
+            queue.add(Node.getNode(baseTile, wireName));
+        }
+        while (!queue.isEmpty()) {
+            Node node = queue.poll();
+            for (Node downhill : node.getAllDownhillNodes()) {
+                if (!visited.add(downhill)) {
+                    continue;
+                }
+                if (!Utils.isInterConnect(downhill.getTile().getTileTypeEnum())) {
+                    continue;
+                }
+                Assertions.assertEquals(baseTile.getTileXCoordinate(),
+                        downhill.getTile().getTileXCoordinate());
+                queue.add(downhill);
+            }
+        }
+        System.out.println("visited.size() = " + visited.size());
     }
 }
 
