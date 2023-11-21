@@ -1591,8 +1591,12 @@ public class RWRoute{
     }
 
     protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection) {
+        return isAccessiblePinfeedI(child, connection, true);
+    }
+
+    protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection, boolean assertOnOveruse) {
         assert(child.getType() == RouteNodeType.PINFEED_I);
-        assert(!child.isOverUsed());
+        assert(!assertOnOveruse || !child.isOverUsed());
 
         if (child.isTarget()) {
             return true;
