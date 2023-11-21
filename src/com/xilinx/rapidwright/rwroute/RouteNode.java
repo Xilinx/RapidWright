@@ -32,6 +32,7 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +53,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     /** The associated {@link Node} instance */
     protected Node node;
     /** The type of a rnode*/
-    private final RouteNodeType type;
+    private RouteNodeType type;
     /** The tileXCoordinate and tileYCoordinate of the INT tile that the associated node stops at */
     private final short endTileXCoordinate;
     private final short endTileYCoordinate;
@@ -94,10 +95,10 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      */
     private Map<RouteNode, Integer> driversCounts;
 
-    protected RouteNode(Node node, RouteNodeType type) {
+    protected RouteNode(Node node, RouteNodeType type, Map<Tile, BitSet> lagunaI) {
         this.node = node;
-        RouteNodeInfo nodeInfo = RouteNodeInfo.get(node);
-        this.type = (type == RouteNodeType.WIRE) ? nodeInfo.type : type;
+        RouteNodeInfo nodeInfo = RouteNodeInfo.get(node, lagunaI);
+        this.type = (type == null) ? nodeInfo.type : type;
         endTileXCoordinate = nodeInfo.endTileXCoordinate;
         endTileYCoordinate = nodeInfo.endTileYCoordinate;
         length = nodeInfo.length;
@@ -134,8 +135,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                     continue;
             }
 
-            final RouteNodeType type = RouteNodeType.WIRE;
-            RouteNode child = getOrCreate(downhill, type);
+            RouteNode child = getOrCreate(downhill, null);
             childrenList.add(child);//the sink rnode of a target connection has been created up-front
         }
         if (!childrenList.isEmpty()) {
@@ -251,7 +251,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     }
 
     public static short getLength(Node node) {
-        return RouteNodeInfo.get(node).length;
+        return RouteNodeInfo.get(node, null).length;
     }
 
     /**
@@ -337,11 +337,22 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     }
 
     /**
-     * Gets the type of a RouteNode Object.
+     * Gets the type of a RouteNode object.
      * @return The RouteNodeType of a RouteNode Object.
      */
     public RouteNodeType getType() {
         return type;
+    }
+
+    /**
+     * Sets the type of a RouteNode object.
+     * @param type New RouteNodeType value.
+     */
+    public void setType(RouteNodeType type) {
+        // Only support demotion from PINFEED_I to WIRE or PINBOUNCE since they have the same base cost
+        assert(this.type == RouteNodeType.PINFEED_I
+                && (type == RouteNodeType.WIRE || type == RouteNodeType.PINBOUNCE));
+        this.type = type;
     }
 
     /**

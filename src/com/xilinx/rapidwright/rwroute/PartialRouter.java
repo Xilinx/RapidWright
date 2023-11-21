@@ -377,20 +377,25 @@ public class PartialRouter extends RWRoute {
 
                 // Do not include arcs that the router wouldn't explore
                 // e.g. those that leave the INT tile, since we project pins to their INT tile
-                if (routingGraph.isExcluded(start, end))
+                if (routingGraph.isExcludedTile(end))
                     continue;
 
-                RouteNode rstart = getOrCreateRouteNode(start, RouteNodeType.WIRE);
-                RouteNode rend = getOrCreateRouteNode(end, RouteNodeType.WIRE);
+                RouteNode rstart = getOrCreateRouteNode(start, null);
+                RouteNode rend = getOrCreateRouteNode(end, null);
                 assert (rend.getPrev() == null);
                 rend.setPrev(rstart);
             }
 
             // Use the prev pointers to attempt to recover routing for all indirect connections
             for (Connection connection : netWrapper.getConnections()) {
-                if (!connection.isDirect()) {
-                    finishRouteConnection(connection, connection.getSinkRnode());
+                if (connection.isDirect()) {
+                    continue;
                 }
+                RouteNode sourceRnode = connection.getSourceRnode();
+                RouteNode sinkRnode = connection.getSinkRnode();
+                assert(sourceRnode.getType() == RouteNodeType.PINFEED_O);
+                assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
+                finishRouteConnection(connection, sinkRnode);
             }
 
             // Restore prev to avoid assertions firing
@@ -570,7 +575,7 @@ public class PartialRouter extends RWRoute {
 
                 // Do not include arcs that the router wouldn't explore
                 // e.g. those that leave the INT tile, since we project pins to their INT tile
-                if (routingGraph.isExcluded(start, end))
+                if (routingGraph.isExcludedTile(end))
                     continue;
 
                 // Since net already exists, all the nodes it uses must already
@@ -601,14 +606,14 @@ public class PartialRouter extends RWRoute {
 
                 // Do not include arcs that the router wouldn't explore
                 // e.g. those that leave the INT tile, since we project pins to their INT tile
-                if (routingGraph.isExcluded(start, end))
+                if (routingGraph.isExcludedTile(end))
                     continue;
 
                 boolean startPreserved = routingGraph.unpreserve(start);
                 boolean endPreserved = routingGraph.unpreserve(end);
 
-                RouteNode rstart = getOrCreateRouteNode(start, RouteNodeType.WIRE);
-                RouteNode rend = getOrCreateRouteNode(end, RouteNodeType.WIRE);
+                RouteNode rstart = getOrCreateRouteNode(start, null);
+                RouteNode rend = getOrCreateRouteNode(end, null);
                 boolean rstartAdded = rnodes.add(rstart);
                 boolean rendAdded = rnodes.add(rend);
                 assert(rstartAdded == startPreserved);
@@ -621,7 +626,12 @@ public class PartialRouter extends RWRoute {
 
             // Try and use prev pointers to recover the routing for each connection
             for (Connection connection : netWrapper.getConnections()) {
-                finishRouteConnection(connection, connection.getSinkRnode());
+                assert(!connection.isDirect());
+                RouteNode sourceRnode = connection.getSourceRnode();
+                RouteNode sinkRnode = connection.getSinkRnode();
+                assert(sourceRnode.getType() == RouteNodeType.PINFEED_O);
+                assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
+                finishRouteConnection(connection, sinkRnode);
             }
 
             netToPins.put(net, net.getSinkPins());
