@@ -93,7 +93,6 @@ public class TestNode {
     public void testNodeReachability(String partName, String tileName, String wirePrefix) {
         Device device = Device.getDevice(partName);
         Tile baseTile = device.getTile(tileName);
-        Set<Node> visited = new HashSet<>();
         Queue<Node> queue = new ArrayDeque<>();
         for (String wireName : baseTile.getWireNames()) {
             if (!wireName.startsWith(wirePrefix)) {
@@ -101,6 +100,22 @@ public class TestNode {
             }
             queue.add(Node.getNode(baseTile, wireName));
         }
+        System.out.println("Initial queue.size() = " + queue.size());
+        System.out.println("Immediately uphill:");
+        queue.stream().map(Node::getAllUphillNodes).flatMap(List::stream).map(Node::getWireName)
+                .map(s -> s.replaceFirst("((BOUNCE|BYPASS|CTRL|INT_NODE_[^_]+|INODE)_).*", "$1"))
+                .map(s -> s.replaceFirst("((CLE_CLE_[LM]_SITE_0|CLK_LEAF_SITES|EE[124]|INT_INT_SDQ|NN[12]|SS[12]|WW[124])_).*", "$1"))
+                .distinct()
+                .sorted()
+                .forEachOrdered(s -> System.out.println("\t" + s));
+        System.out.println("Immediately downhill:");
+        queue.stream().map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getWireName)
+                .map(s -> s.replaceFirst("((BOUNCE|BYPASS|CTRL|IMUX|INT_NODE_[^_]+|INODE)_).*", "$1"))
+                .distinct()
+                .sorted()
+                .forEachOrdered(s -> System.out.println("\t" + s));
+
+        Set<Node> visited = new HashSet<>();
         while (!queue.isEmpty()) {
             Node node = queue.poll();
             for (Node downhill : node.getAllDownhillNodes()) {
