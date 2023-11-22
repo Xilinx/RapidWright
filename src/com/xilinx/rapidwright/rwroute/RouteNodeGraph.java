@@ -168,6 +168,9 @@ public class RouteNodeGraph {
         Tile intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
         for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
             Node baseNode = Node.getNode(intTile, wireIndex);
+            if (baseNode == null) {
+                continue;
+            }
             Tile baseTile = baseNode.getTile();
             String wireName = baseNode.getWireName();
             if (wireName.startsWith("BOUNCE_")) {
