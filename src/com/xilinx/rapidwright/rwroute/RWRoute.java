@@ -1402,24 +1402,6 @@ public class RWRoute{
     }
 
     /**
-     * Checks if a NODE_PINBOUNCE is suitable to be used for routing to a target.
-     * @param child The PINBOUNCE rnode in question.
-     * @param connection The connection to route.
-     * @return true, if the PINBOUNCE rnode is in the same column as the target and within one INT tile of the target.
-     */
-    private boolean isAccessiblePinbounce(RouteNode child, Connection connection) {
-        assert(child.getType() == RouteNodeType.PINBOUNCE);
-
-        if (!routingGraph.isAccessible(child, connection)) {
-            return false;
-        }
-
-        Tile childTile = child.getNode().getTile();
-        Tile sinkTile = connection.getSink().getTile();
-        return Math.abs(childTile.getTileYCoordinate() - sinkTile.getTileYCoordinate()) <= 1;
-    }
-
-    /**
      * Completes the routing process of a connection.
      * @param connection The routed target connection.
      */
@@ -1599,6 +1581,24 @@ public class RWRoute{
      */
     protected boolean isAccessible(RouteNode child, Connection connection) {
         return !config.isUseBoundingBox() || child.isInConnectionBoundingBox(connection);
+    }
+
+    /**
+     * Checks if a NODE_PINBOUNCE is suitable to be used for routing to a target.
+     * @param child The PINBOUNCE rnode in question.
+     * @param connection The connection to route.
+     * @return true, if the PINBOUNCE rnode is in the same column as the target and within one INT tile of the target.
+     */
+    protected boolean isAccessiblePinbounce(RouteNode child, Connection connection) {
+        assert(child.getType() == RouteNodeType.PINBOUNCE);
+
+        if (!routingGraph.isAccessible(child, connection)) {
+            return false;
+        }
+
+        Tile childTile = child.getNode().getTile();
+        Tile sinkTile = connection.getSink().getTile();
+        return Math.abs(childTile.getTileYCoordinate() - sinkTile.getTileYCoordinate()) <= 1;
     }
 
     protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection) {
