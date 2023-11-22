@@ -254,24 +254,25 @@ public class RouteNodeGraph {
                             }
                         }
 
-                        // Examine all wires in Laguna tile. Record those that map to a base node with the NODE_PINFEED
-                        // intent code, since those must be driven from an INT tile.
-                        BitSet bs = new BitSet(tile.getWireCount());
-                        intTile = null;
+                        // Examine all wires in Laguna tile. Record those uphill of a Super Long Line
+                        // that originates in an INT tile (and thus must be a NODE_PINFEED).
                         for (int wireIndex = 0; wireIndex < tile.getWireCount(); wireIndex++) {
-                            Node node = Node.getNode(tile, wireIndex);
-                            if (node != null && node.getIntentCode() == IntentCode.NODE_PINFEED) {
-                                assert(Utils.isInterConnect(node.getTile().getTileTypeEnum()));
-                                if (intTile == null) {
-                                    intTile = node.getTile();
-                                } else {
-                                    assert(intTile == node.getTile());
+                            if (!tile.getWireName(wireIndex).startsWith("UBUMP")) {
+                                continue;
+                            }
+                            Node sllNode = Node.getNode(tile, wireIndex);
+                            for (Node uphill1 : sllNode.getAllUphillNodes()) {
+                                for (Node uphill2 : uphill1.getAllUphillNodes()) {
+                                    Tile uphill2Tile = uphill2.getTile();
+                                    if (!Utils.isInterConnect(uphill2Tile.getTileTypeEnum())) {
+                                        continue;
+                                    }
+                                    assert(uphill2.getIntentCode() == IntentCode.NODE_PINFEED);
+                                    lagunaI.computeIfAbsent(uphill2Tile, k -> new BitSet())
+                                            .set(uphill2.getWire());
                                 }
-                                bs.set(node.getWire());
                             }
                         }
-                        assert(!bs.isEmpty());
-                        lagunaI.put(intTile, bs);
                     }
                 }
             }
