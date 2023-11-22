@@ -510,7 +510,7 @@ public class RouteNodeGraph {
         return Math.round((float) sum / numNodes());
     }
 
-    public boolean isAccessible(RouteNode child, RouteNode sink) {
+    public boolean isAccessible(RouteNode child, Connection connection) {
         Node childNode = child.getNode();
         Tile childTile = childNode.getTile();
         TileTypeEnum childTileType = childTile.getTileTypeEnum();
@@ -519,8 +519,14 @@ public class RouteNodeGraph {
             return true;
         }
 
-        Tile sinkTile = sink.getNode().getTile();
-        return childTile.getTileXCoordinate() == sinkTile.getTileXCoordinate();
+        int childX = childTile.getTileXCoordinate();
+        if (connection.isCrossSLR() && nextLagunaColumn[childX] == childX) {
+            // Connection crosses SLR and this is a Laguna column
+            return true;
+        }
+
+        Tile sinkTile = connection.getSinkRnode().getNode().getTile();
+        return childX == sinkTile.getTileXCoordinate();
     }
 
 }

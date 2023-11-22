@@ -1410,7 +1410,7 @@ public class RWRoute{
     private boolean isAccessiblePinbounce(RouteNode child, Connection connection) {
         assert(child.getType() == RouteNodeType.PINBOUNCE);
 
-        if (!routingGraph.isAccessible(child, connection.getSinkRnode())) {
+        if (!routingGraph.isAccessible(child, connection)) {
             return false;
         }
 
@@ -1549,7 +1549,9 @@ public class RWRoute{
                             // such as U-turn shape nodes near the boundary
                             continue;
                         }
-                        if (!routingGraph.isAccessible(childRNode, connection.getSinkRnode())) {
+
+                        // TODO: Maybe use new RouteNodeType.LOCAL?
+                        if (!routingGraph.isAccessible(childRNode, connection)) {
                             continue;
                         }
                         break;
