@@ -90,7 +90,7 @@ public class TestNode {
             // These nodes fanout to NESW nodes in the tile above or below
             // "xcvu3p,INT_X37Y220,SDQNODE_",
     })
-    public void testNodeReachability(String partName, String tileName, String wirePrefix) {
+    public void testNodeReachabilityUltraScalePlus(String partName, String tileName, String wirePrefix) {
         Device device = Device.getDevice(partName);
         Tile baseTile = device.getTile(tileName);
         Queue<Node> queue = new ArrayDeque<>();
@@ -105,6 +105,59 @@ public class TestNode {
         queue.stream().map(Node::getAllUphillNodes).flatMap(List::stream).map(Node::getWireName)
                 .map(s -> s.replaceFirst("((BOUNCE|BYPASS|CTRL|INT_NODE_[^_]+|INODE)_).*", "$1"))
                 .map(s -> s.replaceFirst("((CLE_CLE_[LM]_SITE_0|CLK_LEAF_SITES|EE[124]|INT_INT_SDQ|NN[12]|SS[12]|WW[124])_).*", "$1"))
+                .distinct()
+                .sorted()
+                .forEachOrdered(s -> System.out.println("\t" + s));
+        System.out.println("Immediately downhill:");
+        queue.stream().map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getWireName)
+                .map(s -> s.replaceFirst("((BOUNCE|BYPASS|CTRL|IMUX|INT_NODE_[^_]+|INODE)_).*", "$1"))
+                .distinct()
+                .sorted()
+                .forEachOrdered(s -> System.out.println("\t" + s));
+
+        Set<Node> visited = new HashSet<>();
+        while (!queue.isEmpty()) {
+            Node node = queue.poll();
+            for (Node downhill : node.getAllDownhillNodes()) {
+                if (!visited.add(downhill)) {
+                    continue;
+                }
+                if (!Utils.isInterConnect(downhill.getTile().getTileTypeEnum())) {
+                    continue;
+                }
+                Assertions.assertEquals(baseTile.getTileXCoordinate(),
+                        downhill.getTile().getTileXCoordinate());
+                queue.add(downhill);
+            }
+        }
+        System.out.println("visited.size() = " + visited.size());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvu065,INT_X38Y220,BOUNCE_",
+            "xcvu065,INT_X38Y220,BYPASS_",
+            "xcvu065,INT_X38Y220,INT_NODE_GLOBAL_",
+            "xcvu065,INT_X38Y220,INT_NODE_IMUX_",
+            "xcvu065,INT_X38Y220,INODE_",
+            // "xcvu065,INT_X38Y220,QLND",
+            // "xcvu065,INT_X38Y220,SDND",
+    })
+    public void testNodeReachabilityUltraScale(String partName, String tileName, String wirePrefix) {
+        Device device = Device.getDevice(partName);
+        Tile baseTile = device.getTile(tileName);
+        Queue<Node> queue = new ArrayDeque<>();
+        for (String wireName : baseTile.getWireNames()) {
+            if (!wireName.startsWith(wirePrefix)) {
+                continue;
+            }
+            queue.add(Node.getNode(baseTile, wireName));
+        }
+        System.out.println("Initial queue.size() = " + queue.size());
+        System.out.println("Immediately uphill:");
+        queue.stream().map(Node::getAllUphillNodes).flatMap(List::stream).map(Node::getWireName)
+                .map(s -> s.replaceFirst("((BOUNCE|BYPASS|CTRL|INT_NODE_[^_]+|INODE)_).*", "$1"))
+                .map(s -> s.replaceFirst("((CLE_CLE_[LM]_SITE_0|CLK_BUFCE_LEAF_X16_1_CLK|EE[124]|INT_INT_SINGLE|NN[12]|SS[12]|WW[124])_).*", "$1"))
                 .distinct()
                 .sorted()
                 .forEachOrdered(s -> System.out.println("\t" + s));
