@@ -1404,7 +1404,7 @@ public class RWRoute{
     /**
      * Checks if a NODE_PINBOUNCE is suitable to be used for routing to a target.
      * @param child The PINBOUNCE rnode in question.
-     * @param target The target rnode to reach.
+     * @param connection The connection to route.
      * @return true, if the PINBOUNCE rnode is in the same column as the target and within one INT tile of the target.
      */
     private boolean isAccessiblePinbounce(RouteNode child, Connection connection) {
