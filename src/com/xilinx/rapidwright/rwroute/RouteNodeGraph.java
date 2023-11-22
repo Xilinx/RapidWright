@@ -91,8 +91,15 @@ public class RouteNodeGraph {
     public final int[] nextLagunaColumn;
     public final int[] prevLagunaColumn;
 
+    /** Map indicating which wire indices within a Laguna-adjacent INT tile have
+     * IntentCode.NODE_PINFEED that lead into the Laguna tile.
+     */
     protected final Map<Tile, BitSet> lagunaI;
 
+    /** Map indicating which wire indices within an INT tile should be considered
+     * accessible only if it is within the same column (same X tile coordinate) as
+     * the target tile.
+     */
     protected final Map<TileTypeEnum, BitSet> accessibleWireOnlySameColumnAsTarget;
 
     protected class RouteNodeImpl extends RouteNode {
@@ -216,6 +223,7 @@ public class RouteNodeGraph {
         } else {
             lagunaTiles = null;
         }
+
         if (lagunaTiles != null) {
             final int maxTileColumns = device.getColumns(); // An over-approximation since this isn't in tiles
             nextLagunaColumn = new int[maxTileColumns];

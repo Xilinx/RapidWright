@@ -1526,14 +1526,12 @@ public class RWRoute{
                 }
                 switch (childRNode.getType()) {
                     case WIRE:
+                        if (!routingGraph.isAccessible(childRNode, connection)) {
+                            continue;
+                        }
                         if (!config.isUseUTurnNodes() && childRNode.getDelay() > 10000) {
                             // To filter out those nodes that are considered to be excluded with the masking resource approach,
                             // such as U-turn shape nodes near the boundary
-                            continue;
-                        }
-
-                        // TODO: Maybe use new RouteNodeType.LOCAL?
-                        if (!routingGraph.isAccessible(childRNode, connection)) {
                             continue;
                         }
                         break;
@@ -1927,7 +1925,7 @@ public class RWRoute{
      * @param design The {@link Design} instance to be routed.
      */
     public static Design routeDesignFullNonTimingDriven(Design design) {
-        return routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--verbose"});
+        return routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven"});
     }
 
     /**
