@@ -210,6 +210,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                         break;
                     case NODE_PINFEED:
                         break;
+                    case NODE_GLOBAL_LEAF:
+                        break;
                     default:
                         throw new RuntimeException(ic.toString());
                 }
