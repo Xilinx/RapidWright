@@ -558,7 +558,7 @@ public class RWRoute{
                 if (sourceINTRnode == null && altSourceINTRnode == null) {
                     if (sourceINTNode != null) {
                         sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
-                        sourceINTRnode.setType(RouteNodeType.PINFEED_O);
+                        assert(sourceINTRnode.getType() == RouteNodeType.PINFEED_O);
                     }
                     if (altSourceINTNode != null) {
                         altSourceINTRnode = getOrCreateRouteNode(altSourceINTNode, RouteNodeType.PINFEED_O);

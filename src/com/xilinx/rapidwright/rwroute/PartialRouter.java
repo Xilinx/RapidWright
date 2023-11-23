@@ -615,7 +615,7 @@ public class PartialRouter extends RWRoute {
                 if (!nodes.isEmpty()) {
                     Node sinkINTNode = nodes.get(0);
                     RouteNode rnode = getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I);
-                    rnode.setType(RouteNodeType.PINFEED_I);
+                    assert(rnode.getType() == RouteNodeType.PINFEED_I);
                 }
             }
 
