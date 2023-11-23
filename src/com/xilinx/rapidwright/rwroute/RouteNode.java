@@ -297,23 +297,13 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
         return super.equals(obj);
     }
 
-    public boolean equals(RouteNode obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        return super.equals(obj);
-    }
-
     @Override
     public boolean equals(Object obj) {
         if (this == obj)
             return true;
         if (obj == null)
             return false;
-        if (getClass() == obj.getClass()) {
-            return equals((RouteNode) obj);
-        }
+        // Explicitly call the Node.equals(Node) overload, rather than the general-purpose Node.equals(Object)
         return super.equals((Node) obj);
     }
 
