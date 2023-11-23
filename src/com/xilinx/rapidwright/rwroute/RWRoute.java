@@ -27,6 +27,7 @@ package com.xilinx.rapidwright.rwroute;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -547,8 +548,13 @@ public class RWRoute{
                 Node sinkINTNode = nodes.get(0);
                 indirectConnections.add(connection);
                 checkSinkRoutability(net, sinkINTNode);
-                RouteNode sinkINTRnode = getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I);
-                connection.setSinkRnode(sinkINTRnode);
+                RouteNode sinkRnode = getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I);
+                assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
+                connection.setSinkRnode(sinkRnode);
+                // Assuming that each connection only has a single sink target, increment
+                // its usage here immediately
+                sinkRnode.incrementUser(netWrapper);
+                sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
                 if (sourceINTRnode == null && altSourceINTRnode == null) {
                     if (sourceINTNode != null) {
                         sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
@@ -923,7 +929,12 @@ public class RWRoute{
             }
         }
 
-        return !connection.getSink().isRouted() || connection.isCongested() ;
+        // Check that sink node is exclusive to this connection, is used but never overused
+        RouteNode sinkRnode = connection.getSinkRnode();
+        assert(sinkRnode.countConnectionsOfUser(connection.getNetWrapper()) > 0);
+        assert(!sinkRnode.isOverUsed());
+
+        return !connection.getSink().isRouted() || connection.isCongested();
     }
 
     /**
@@ -1076,6 +1087,7 @@ public class RWRoute{
     private void updateCostFactors() {
         updateCongestionCosts.start();
         presentCongestionFactor *= config.getPresentCongestionMultiplier();
+        presentCongestionFactor = Math.min(presentCongestionFactor, config.getMaxPresentCongestionFactor());
         updateCost();
         updateCongestionCosts.stop();
     }
@@ -1228,7 +1240,17 @@ public class RWRoute{
      * @param connection The connection to be ripped up.
      */
     protected void ripUp(Connection connection) {
-        for (RouteNode rnode : connection.getRnodes()) {
+        List<RouteNode> rnodes = connection.getRnodes();
+        if (rnodes.isEmpty()) {
+            assert(!connection.getSink().isRouted());
+            if (connection.getAltSinkRnode() == null) {
+                // If there is no alternate sink, decrement this one-and-only sink node
+                RouteNode sinkRnode = connection.getSinkRnode();
+                rnodes = Collections.singletonList(sinkRnode);
+            }
+        }
+
+        for (RouteNode rnode : rnodes) {
             rnode.decrementUser(connection.getNetWrapper());
             rnode.updatePresentCongestionCost(presentCongestionFactor);
         }
@@ -1330,6 +1352,13 @@ public class RWRoute{
             connection.resetRoute();
             assert(connection.getRnodes().isEmpty());
             assert(!connection.getSink().isRouted());
+
+            // Undo what ripUp() did for the one-and-only sink node
+            if (connection.getAltSinkRnode() == null) {
+                RouteNode sinkRnode = connection.getSinkRnode();
+                sinkRnode.incrementUser(connection.getNetWrapper());
+                sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
+            }
         }
 
         routingGraph.resetExpansion();
@@ -1531,19 +1560,14 @@ public class RWRoute{
                         }
                         break;
                     case PINBOUNCE:
+                        assert(!childRNode.isTarget());
                         if (!usablePINBounce(childRNode, connection.getSinkRnode())) {
                             continue;
                         }
                         break;
                     case PINFEED_I:
-                        if (!childRNode.isTarget()) {
-                            if (childRNode.countConnectionsOfUser(netWrapper) == 0 ||
-                                    childRNode.getNode().getIntentCode() != IntentCode.NODE_PINBOUNCE) {
-                                // This PINFEED_I is not the target, nor is it a PINBOUNCE already
-                                // used by this net (indicating that it may be a target of a different
-                                // connection on this same net)
-                                continue;
-                            }
+                        if (!isAccessiblePinfeedI(childRNode, connection)) {
+                            continue;
                         }
                         break;
                     case LAGUNA_I:
@@ -1580,6 +1604,28 @@ public class RWRoute{
      */
     protected boolean isAccessible(RouteNode child, Connection connection) {
         return !config.isUseBoundingBox() || child.isInConnectionBoundingBox(connection);
+    }
+
+    protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection) {
+        return isAccessiblePinfeedI(child, connection, true);
+    }
+
+    protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection, boolean assertOnOveruse) {
+        assert(child.getType() == RouteNodeType.PINFEED_I);
+        assert(!assertOnOveruse || !child.isOverUsed());
+
+        if (child.isTarget()) {
+            return true;
+        }
+
+        if (child.countConnectionsOfUser(connection.getNetWrapper()) == 0 ||
+                child.getNode().getIntentCode() != IntentCode.NODE_PINBOUNCE) {
+            // Inaccessible if child is not a sink pin of another connection on the same
+            // net, or it is not a PINBOUNCE node
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -1910,7 +1956,7 @@ public class RWRoute{
      * @param design The {@link Design} instance to be routed.
      */
     public static Design routeDesignFullTimingDriven(Design design) {
-        return routeDesign(design, new RWRouteConfig(null));
+        return routeDesignWithUserDefinedArguments(design, null);
     }
 
     /**
@@ -1918,7 +1964,7 @@ public class RWRoute{
      * @param design The {@link Design} instance to be routed.
      */
     public static Design routeDesignFullNonTimingDriven(Design design) {
-        return routeDesign(design, new RWRouteConfig(new String[] {"--nonTimingDriven", "--verbose"}));
+        return routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven"});
     }
 
     /**

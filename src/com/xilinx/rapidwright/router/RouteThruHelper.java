@@ -35,6 +35,7 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
@@ -181,8 +182,8 @@ public class RouteThruHelper {
      * Given two Wire objects (assumed to make up a routethru PIP) check that this
      * PIP is available for use by checking for net and cell collisions within the site
      * it is routing through.
-     * Note that this method is identical to the {@link #isRouteThruPIPAvailable(Design, Node, Node)
-     * overload, kept separate to minimize unnecessary calling Node.getSitePin().}
+     * Note that this method is identical to the {@link #isRouteThruPIPAvailable(Design, Node, Node)}
+     * overload, kept separate to minimize unnecessary calling Node.getSitePin().
      */
     public static boolean isRouteThruPIPAvailable(Design design, Wire start, Wire end) {
         SitePin outPin = end.getSitePin();
@@ -194,11 +195,19 @@ public class RouteThruHelper {
         if (!isRouteThruSitePinAvailable(design, inPin)) {
             return false;
         }
+
         SiteInst siteInst = design.getSiteInstFromSite(inPin.getSite());
         if (siteInst != null) {
             for (BELPin sink : inPin.getBELPin().getSiteConns()) {
-                Cell cellCollision = siteInst.getCell(sink.getBEL());
+                BEL sinkBEL = sink.getBEL();
+                if (sinkBEL.getName().charAt(0) != inPin.getPinName().charAt(0)) {
+                    continue;
+                }
+                Cell cellCollision = siteInst.getCell(sinkBEL);
                 if (cellCollision != null) {
+                    // Ignore BELs that don't share the same LUT letter
+                    // Specifically, this is to prevent H[1-6] inputs on SLICEM sites
+                    // -- which also drive [A-G].WA[1-6] -- from considering [A-G]LUT[56]
                     return false;
                 }
             }
@@ -210,8 +219,8 @@ public class RouteThruHelper {
      * Given two Node objects (assumed to make up a routethru PIP) check that this
      * PIP is available for use by checking for net and cell collisions within the site
      * it is routing through.
-     * Note that this method is identical to the {@link #isRouteThruPIPAvailable(Design, Wire, Wire)
-     * overload, kept separate to minimize unnecessary calling Node.getSitePin().}
+     * Note that this method is identical to the {@link #isRouteThruPIPAvailable(Design, Wire, Wire)}
+     * overload, kept separate to minimize unnecessary calling Node.getSitePin().
      */
     public static boolean isRouteThruPIPAvailable(Design design, Node start, Node end) {
         SitePin outPin = end.getSitePin();
@@ -226,7 +235,14 @@ public class RouteThruHelper {
         SiteInst siteInst = design.getSiteInstFromSite(inPin.getSite());
         if (siteInst != null) {
             for (BELPin sink : inPin.getBELPin().getSiteConns()) {
-                Cell cellCollision = siteInst.getCell(sink.getBEL());
+                BEL sinkBEL = sink.getBEL();
+                if (sinkBEL.getName().charAt(0) != inPin.getPinName().charAt(0)) {
+                    // Ignore BELs that don't share the same LUT letter
+                    // Specifically, this is to prevent H[1-6] inputs on SLICEM sites
+                    // -- which also drive [A-G].WA[1-6] -- from considering [A-G]LUT[56]
+                    continue;
+                }
+                Cell cellCollision = siteInst.getCell(sinkBEL);
                 if (cellCollision != null) {
                     return false;
                 }

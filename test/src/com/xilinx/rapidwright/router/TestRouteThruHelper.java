@@ -72,9 +72,17 @@ public class TestRouteThruHelper {
             "CLEL_R_X10Y239/CLEL_R.CLE_CLE_L_SITE_0_D1->>CLE_CLE_L_SITE_0_D_O,false",
             "CLEL_R_X10Y239/CLEL_R.CLE_CLE_L_SITE_0_D6->>CLE_CLE_L_SITE_0_DMUX,false",
 
-            // Empty SiteInst
+            // Empty SiteInst (CLEL)
             "CLEL_R_X0Y0/CLEL_R.CLE_CLE_L_SITE_0_A1->>CLE_CLE_L_SITE_0_A_O,true",
             "CLEL_R_X0Y0/CLEL_R.CLE_CLE_L_SITE_0_A6->>CLE_CLE_L_SITE_0_AMUX,true",
+
+            // Empty SiteInst (CLEM)
+            "CLEM_X1Y0/CLEM.CLE_CLE_M_SITE_0_H1->>CLE_CLE_M_SITE_0_H_O,true",
+            "CLEM_X1Y0/CLEM.CLE_CLE_M_SITE_0_H6->>CLE_CLE_M_SITE_0_H_O,true",
+
+            // SiteInst (CLEM) with H{5,6}LUT free, but others LUTs occupied
+            "CLEM_X9Y238/CLEM.CLE_CLE_M_SITE_0_H1->>CLE_CLE_M_SITE_0_H_O,true",
+            "CLEM_X9Y238/CLEM.CLE_CLE_M_SITE_0_H6->>CLE_CLE_M_SITE_0_H_O,true",
     })
     public void testRouteThruPIPAvailable(String pipName, boolean expected) {
         Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");

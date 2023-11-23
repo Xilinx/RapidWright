@@ -1,6 +1,44 @@
+============= RapidWright 2023.2.0-beta released on 2023-11-20 ================
+Notes:
+  - SLR Corner updates in device models and handling (#886)
+  - Updates Protobuf to 3.25.0 (#882)
+  - Updates/adds timestamp APIs (#883)
+  - Refactor PROHIBIT constraint for faster Tcl interpretation (#881)
+  - [PerformanceExplorer] Number pblocks by order in file, add first site in dir name (#867)
+  - DesignTools.createMissingSitePinInsts(Design) to ignore GLOBAL_USEDNET (#880)
+  - [RWRoute] Check source & sink pin reaches INT tile for dedicated connections (#878)
+  - ECOTools.createExitSitePinInst() to detect net aliases (#871)
+  - Rewrite RouterHelper.projectOutputPinToINTNode() with fixes (#877)
+  - EDIFNetlist.{generateParentNetMap,getNetAliases}() to be inout-aware (#876)
+  - DesignTools.createMissingSitePinInsts() to cope with net aliases (#875)
+  - Improve TestECOPlacementHelper (#874)
+  - Add com.xilinx.rapidwright.eco.ECOPlacementHelper (#870)
+  - RouteThruHelper to handle SiteInst == null (#866)
+  - Add RouteThruHelper.isRouteThruPIPAvailable(Design, Node, Node) overload (#865)
+  - Add DesignTools.getConnectedBELPins() (#864)
+  - RelocationTools fixes and more robust testing (#863)
+  - Fix TimingAndWirelengthReport.main() (#860)
+  - [Tests] Symlinks to absolute paths (#862)
+  - added check to see if Cell.getLogicalPinMapping() is null (#783)
+  - [DCP] Update tests to infer SitePinInsts (#857)
+  - Replace $(shell ...) with $(wildcard) and $(subst) in Makefile (#856)
+  - Undpreccate Design.createCell()
+  - Special clock flag fix for Versal DCPs
+  - More conservative SitePinInst creation upon DCP load
+  
+API Additions:
+  - com.xilinx.rapidwright.design.SitePinInst "public int getConnectedTileWire()"
+  - com.xilinx.rapidwright.device.Device "public int getSiteIndex(String siteName)"
+  - com.xilinx.rapidwright.device.Device "public int getSiteIndex(Site site)"
+  - com.xilinx.rapidwright.device.Device "public Site getSiteByIndex(int siteIndex)"
+  - com.xilinx.rapidwright.device.Device "public Site[] getAllSites()"
+  
+API Removals:
+  - com.xilinx.rapidwright.bitstream.ConfigRow "public ConfigRow()"  
+
 ============= RapidWright 2023.1.4-beta released on 2023-10-20 ================
 Notes:
-  -Include RapidWright API Lib Javadoc in Gradle Build (#855)
+  - Include RapidWright API Lib Javadoc in Gradle Build (#855)
   - Add com.xilinx.rapidwright.eco.ECOTools package (#850)
   - More Polynomial Generator improvements (#854)
   - ReportRouteStatusResult.isFullyRouted() to check >0 logical net found (#852)
