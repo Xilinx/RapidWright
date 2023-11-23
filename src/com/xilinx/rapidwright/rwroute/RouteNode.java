@@ -303,7 +303,8 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
             return true;
         if (obj == null)
             return false;
-        // Explicitly call the Node.equals(Node) overload, rather than the general-purpose Node.equals(Object)
+        // This method requires that object is Node or a subclass of one, otherwise exception will be thrown.
+        // If so, explicitly call the Node.equals(Node) overload, rather than the general-purpose Node.equals(Object).
         return super.equals((Node) obj);
     }
 
