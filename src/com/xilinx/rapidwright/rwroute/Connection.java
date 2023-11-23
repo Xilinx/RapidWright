@@ -252,7 +252,7 @@ public class Connection implements Comparable<Connection>{
             RouteNode rnode = getRnodes().get(i);
             RouteNode parent = getRnodes().get(i+1);
             routeDelay += rnode.getDelay() +
-                    DelayEstimatorBase.getExtraDelay(rnode.getNode(), DelayEstimatorBase.isLong(parent.getNode()));
+                    DelayEstimatorBase.getExtraDelay(rnode, DelayEstimatorBase.isLong(parent));
         }
         return routeDelay;
     }

@@ -327,8 +327,8 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
     }
 
     /**
-     * Gets the associated Node of a RouteNode Object.
-     * @return The associated Node of a RouteNode Object.
+     * Returns a deep copy of the Node associated with this RouteNode Object.
+     * @return New Node deep copy.
      */
     public Node getNode() {
         return new Node(this);
