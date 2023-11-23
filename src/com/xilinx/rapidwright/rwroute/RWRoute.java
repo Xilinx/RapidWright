@@ -1591,13 +1591,7 @@ public class RWRoute{
     protected boolean isAccessiblePinbounce(RouteNode child, Connection connection) {
         assert(child.getType() == RouteNodeType.PINBOUNCE);
 
-        if (!routingGraph.isAccessible(child, connection)) {
-            return false;
-        }
-
-        Tile childTile = child.getNode().getTile();
-        Tile sinkTile = connection.getSink().getTile();
-        return Math.abs(childTile.getTileYCoordinate() - sinkTile.getTileYCoordinate()) <= 1;
+        return routingGraph.isAccessible(child, connection);
     }
 
     protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection) {

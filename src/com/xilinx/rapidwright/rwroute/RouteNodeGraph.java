@@ -538,7 +538,11 @@ public class RouteNodeGraph {
         }
 
         Tile sinkTile = connection.getSinkRnode().getNode().getTile();
-        return childX == sinkTile.getTileXCoordinate();
+        if (childX != sinkTile.getTileXCoordinate()) {
+            return false;
+        }
+
+        return Math.abs(childTile.getTileYCoordinate() - sinkTile.getTileYCoordinate()) <= 1;
     }
 
 }
