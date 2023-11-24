@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -659,7 +659,7 @@ public class SATRouter {
 
         // Make all pin swaps per LUT site simultaneously
         for (Entry<String,HashMap<String,PinSwap>> e : pinSwaps.entrySet()) {
-            processPinSwaps(e.getKey(),new ArrayList<>(e.getValue().values()));
+            processPinSwaps(e.getKey(), e.getValue().values());
         }
     }
 
@@ -669,7 +669,7 @@ public class SATRouter {
      * @param key The name of the site and letter of LUT pair (ex: SLICE_X54Y44/D)
      * @param pinSwaps The list of pin swaps to be performed on the pair of LUT sites
      */
-    public static void processPinSwaps(String key, ArrayList<PinSwap> pinSwaps) {
+    public static void processPinSwaps(String key, Collection<PinSwap> pinSwaps) {
         LinkedHashMap<String,PinSwap> overwrittenPins = new LinkedHashMap<>();
         LinkedHashMap<String,PinSwap> emptySlots = new LinkedHashMap<>();
         for (PinSwap ps : pinSwaps) {
