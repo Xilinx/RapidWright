@@ -26,6 +26,7 @@ package com.xilinx.rapidwright.design.tools;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ import java.util.Set;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.PinSwap;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -42,6 +44,9 @@ import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -539,6 +544,94 @@ public class LUTTools {
         for (Map.Entry<String,Map<String,PinSwap>> e : pinSwaps.entrySet()) {
             SATRouter.processPinSwaps(e.getKey(), e.getValue().values());
         }
+    }
+
+    /**
+     * Analyze the routing PIPs of a design to identify (based on whether a PIP existing
+     * on a Net drives the expected SitePin based on Net.getPins()) and perform any necessary
+     * LUT pin swapping.
+     * @param design Design object to analyze and fix.
+     * @return Number of pin swaps processed.
+     */
+    public static int fixPinSwaps(Design design) {
+        Map<SitePinInst, SitePin> pinSwaps = new HashMap<>();
+        Map<Site, List<SitePinInst>> siteToLutSpis = new HashMap<>();
+        List<SitePin> unmatchedSitePins = new ArrayList<>();
+        for (Net net : design.getNets()) {
+            if (net.isClockNet()) {
+                continue;
+            }
+            if (net.isVCCNet()) {
+                // All LUT inputs have a direct PIP to VCC
+                continue;
+            }
+            if (net.isGNDNet()) {
+                // TODO:
+                continue;
+            }
+            if (!net.hasPIPs()) {
+                continue;
+            }
+
+            for (SitePinInst spi : net.getPins()) {
+                if (spi.isOutPin() || !spi.isLUTInputPin()) {
+                    continue;
+                }
+                siteToLutSpis.computeIfAbsent(spi.getSite(), (k) -> new ArrayList<>(1))
+                        .add(spi);
+            }
+
+            for (PIP pip : net.getPIPs()) {
+                Node endNode = pip.getEndNode();
+                SitePin sitePin = (endNode != null) ? endNode.getSitePin() : null;
+                if (sitePin == null) {
+                    continue;
+                }
+
+                Site site = sitePin.getSite();
+                SiteInst si = design.getSiteInstFromSite(site);
+                if (si == null) {
+                    continue;
+                }
+                String newSitePinName = sitePin.getPinName();
+                if (!SitePinInst.isLUTInputPin(si, newSitePinName)) {
+                    continue;
+                }
+                SitePinInst newSpi = si.getSitePinInst(newSitePinName);
+                if (!siteToLutSpis.get(site).remove(newSpi)) {
+                    // spi is not already on this net
+                    unmatchedSitePins.add(sitePin);
+                }
+            }
+
+            for (SitePin newSitePin : unmatchedSitePins) {
+                Site site = newSitePin.getSite();
+                List<SitePinInst> unmatchedSpis = siteToLutSpis.get(site);
+                Iterator<SitePinInst> it = unmatchedSpis.iterator();
+                assert(it.hasNext());
+                char lutLetter = newSitePin.getPinName().charAt(0);
+                // Assume that unmatchedSpis is generally a small ArrayList
+                // such that O(N) operations are not unwieldy
+                boolean found = false;
+                while (it.hasNext()) {
+                    SitePinInst oldSpi = it.next();
+                    if (oldSpi.getName().charAt(0) != lutLetter) {
+                        continue;
+                    }
+                    pinSwaps.put(oldSpi, newSitePin);
+                    it.remove();
+                    found = true;
+                    break;
+                }
+                assert(found);
+            }
+
+            siteToLutSpis.clear();
+            unmatchedSitePins.clear();
+        }
+
+        swapLutPins(pinSwaps);
+        return pinSwaps.size();
     }
 
     public static void main(String[] args) {
