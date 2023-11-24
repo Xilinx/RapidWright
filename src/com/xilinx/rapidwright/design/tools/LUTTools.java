@@ -554,7 +554,7 @@ public class LUTTools {
      * @return Number of pin swaps processed.
      */
     public static int fixPinSwaps(Design design) {
-        Map<SitePinInst, SitePin> pinSwaps = new HashMap<>();
+        Map<SitePinInst, SitePin> oldPinToNewPins = new HashMap<>();
         Map<Site, List<SitePinInst>> siteToLutSpis = new HashMap<>();
         List<SitePin> unmatchedSitePins = new ArrayList<>();
         for (Net net : design.getNets()) {
@@ -618,7 +618,7 @@ public class LUTTools {
                     if (oldSpi.getName().charAt(0) != lutLetter) {
                         continue;
                     }
-                    pinSwaps.put(oldSpi, newSitePin);
+                    oldPinToNewPins.put(oldSpi, newSitePin);
                     it.remove();
                     found = true;
                     break;
@@ -630,8 +630,8 @@ public class LUTTools {
             unmatchedSitePins.clear();
         }
 
-        swapLutPins(pinSwaps);
-        return pinSwaps.size();
+        swapLutPins(oldPinToNewPins);
+        return oldPinToNewPins.size();
     }
 
     public static void main(String[] args) {

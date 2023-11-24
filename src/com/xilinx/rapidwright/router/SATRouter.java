@@ -670,13 +670,14 @@ public class SATRouter {
      * @param pinSwaps The list of pin swaps to be performed on the pair of LUT sites
      */
     public static void processPinSwaps(String key, Collection<PinSwap> pinSwaps) {
+        Collection<PinSwap> localPinSwaps = pinSwaps;
         LinkedHashMap<String,PinSwap> overwrittenPins = new LinkedHashMap<>();
         LinkedHashMap<String,PinSwap> emptySlots = new LinkedHashMap<>();
-        for (PinSwap ps : pinSwaps) {
+        for (PinSwap ps : localPinSwaps) {
             overwrittenPins.put(ps.getNewPhysicalName(),ps);
             emptySlots.put(ps.getOldPhysicalName(),ps);
         }
-        for (PinSwap ps : pinSwaps) {
+        for (PinSwap ps : localPinSwaps) {
             String oldPin = ps.getOldPhysicalName();
             String newPin = ps.getNewPhysicalName();
             if (emptySlots.containsKey(newPin) && overwrittenPins.containsKey(newPin)) {
@@ -710,7 +711,10 @@ public class SATRouter {
                         PinSwap ps = new PinSwap(neighborLUT, neighborLUT.getLogicalPinMapping(oldPhysicalPin),oldPhysicalPin,newPhysicalPin,
                                 neighborLUT.getLogicalPinMapping(newPhysicalPin),newNetPinName);
 
-                        pinSwaps.add(ps);
+                        if (localPinSwaps == pinSwaps) {
+                            localPinSwaps = new ArrayList<>(pinSwaps);
+                        }
+                        localPinSwaps.add(ps);
                         continue;
                     }
                 }
@@ -726,15 +730,21 @@ public class SATRouter {
                     ps.setCompanionCell(neighborLUT, neighborLUT.getLogicalPinMapping(oldPhysicalPin));
                 }
             }
-            pinSwaps.add(ps);
+            if (localPinSwaps == pinSwaps) {
+                localPinSwaps = new ArrayList<>(pinSwaps);
+            }
+            localPinSwaps.add(ps);
         }
 
         // Prepares pins for swapping by removing them
         Queue<SitePinInst> q = new LinkedList<>();
-        for (PinSwap ps : pinSwaps) {
+        for (PinSwap ps : localPinSwaps) {
             String oldSitePinName = ps.getCell().getSiteWireNameFromPhysicalPin(ps.getOldPhysicalName());
             SitePinInst p = ps.getCell().getSiteInst().getSitePinInst(oldSitePinName);
             q.add(p);
+            if (p == null) {
+                continue;
+            }
             p.setSiteInst(null,true);
             // Removes pin mappings to prepare for new pin mappings
             ps.getCell().removePinMapping(ps.getOldPhysicalName());
@@ -743,13 +753,18 @@ public class SATRouter {
             }
         }
 
+        assert(q.size() == localPinSwaps.size());
+
         // Perform the actual swap on cell pin mappings
-        for (PinSwap ps : pinSwaps) {
+        for (PinSwap ps : localPinSwaps) {
             ps.getCell().addPinMapping(ps.getNewPhysicalName(), ps.getLogicalName());
             if (ps.getCompanionCell() != null) {
                 ps.getCompanionCell().addPinMapping(ps.getNewPhysicalName(), ps.getCompanionLogicalName());
             }
             SitePinInst pinToMove = q.poll();
+            if (pinToMove == null) {
+                continue;
+            }
             pinToMove.setPinName(ps.getNewNetPinName());
             pinToMove.setSiteInst(ps.getCell().getSiteInst());
         }
