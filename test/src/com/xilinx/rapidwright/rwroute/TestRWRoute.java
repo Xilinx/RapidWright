@@ -92,7 +92,7 @@ public class TestRWRoute {
         Assertions.assertTrue(rrs.isFullyRouted());
     }
 
-    private static void assertAllPinsRouted(Design design) {
+    public static void assertAllPinsRouted(Design design) {
         for (Net net : design.getNets()) {
             if (net.getSource() == null && !net.isStaticNet()) {
                 // Source-less nets may exist in out-of-context design
@@ -102,7 +102,7 @@ public class TestRWRoute {
         }
     }
 
-    private static void assertAllSourcesRoutedFlagSet(Design design) {
+    public static void assertAllSourcesRoutedFlagSet(Design design) {
         for (Net net : design.getNets()) {
             if (net.getSource() == null) {
                 // Source-less nets may exist in out-of-context design
