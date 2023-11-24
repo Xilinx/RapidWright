@@ -41,22 +41,27 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.design.PinSwap;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.router.RouteThruHelper;
+import com.xilinx.rapidwright.router.SATRouter;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
 import com.xilinx.rapidwright.timing.TimingManager;
@@ -552,13 +557,31 @@ public class RWRoute{
                 assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
                 connection.setSinkRnode(sinkRnode);
 
-                if (lutPinSwapping && sink.isLUTInputPin()) {
+                // Where appropriate, allow all 6 LUT pins to be swapped to begin with
+                char lutLetter = sink.getName().charAt(0);
+                int numberOfPinsToSwap = (lutPinSwapping && sink.isLUTInputPin()) ? 6 : 0;
+                if (numberOfPinsToSwap > 0) {
+                    for (Cell cell : DesignTools.getConnectedCells(sink)) {
+                        BEL bel = cell.getBEL();
+                        assert(bel.isLUT());
+                        String belName = bel.getName();
+                        if (belName.charAt(0) != lutLetter) {
+                            // This pin connects to other LUTs! (e.g. SLICEM.H[1-6] also serves
+                            // as the WA for A-G LUTs) -- do not allow any swapping
+                            // TODO: Relax this restriction
+                            numberOfPinsToSwap = 0;
+                            break;
+                        }
+                        if (belName.charAt(1) == '5') {
+                            // Since a 5LUT cell exists, only allow bottom 5 pins to be swapped
+                            numberOfPinsToSwap = 5;
+                        }
+                    }
+                }
+
+                if (numberOfPinsToSwap > 0) {
                     Site site = sink.getSite();
-                    char lutLetter = sink.getName().charAt(0);
-                    // Allow all 6 LUT pins to be swapped if no 5LUT, otherwise just 5 pins
-                    int maxPin = sink.getSiteInst().getNetFromSiteWire(lutLetter + "5LUT_O5") == null ?
-                            6 : 5;
-                    for (int i = 1; i <= maxPin; i++) {
+                    for (int i = 1; i <= numberOfPinsToSwap; i++) {
                         Node node = site.getConnectedNode(lutLetter + Integer.toString(i));
                         assert(node.getTile().getTileTypeEnum() == TileTypeEnum.INT);
                         if (node.equals(sinkINTNode)) {
@@ -870,7 +893,85 @@ public class RWRoute{
      */
     protected void postRouteProcess() {
         if (routeIteration <= config.getMaxIterations()) {
+            // perform LUT pin mapping updates
+            if (lutPinSwapping) {
+                Map<String,Map<String,PinSwap>> pinSwaps = new HashMap<>();
+                for (Connection connection: indirectConnections) {
+                    SitePinInst oldSinkSpi = connection.getSink();
+                    if (!oldSinkSpi.isLUTInputPin() || !oldSinkSpi.isRouted()) {
+                        continue;
+                    }
+                    List<RouteNode> rnodes = connection.getRnodes();
+                    RouteNode newSinkRnode = rnodes.get(0);
+                    if (newSinkRnode == connection.getSinkRnode()) {
+                        continue;
+                    }
+                    SitePin newSitePin = newSinkRnode.getNode().getSitePin();
+                    String newSitePinName = newSitePin.getPinName();
+                    SiteInst si = oldSinkSpi.getSiteInst();
+                    if (!SitePinInst.isLUTInputPin(si, newSitePinName)) {
+                        continue;
+                    }
+
+                    Set<Cell> cells = DesignTools.getConnectedCells(connection.getSink());
+                    if (cells.isEmpty()) {
+                        continue;
+                    }
+                    PinSwap ps = null;
+                    for (Cell cell : cells) {
+                        BEL bel = cell.getBEL();
+                        if (!bel.isLUT()) {
+                            continue;
+                        }
+
+                        String oldPhysicalPinName = "A" + oldSinkSpi.getName().charAt(1);
+                        String oldLogicalPinName = cell.getLogicalPinMapping(oldPhysicalPinName);
+                        if (ps == null) {
+                            String newPhysicalPinName = "A" + newSitePin.getPinName().charAt(1);
+                            String depopulatedLogicalPinName = cell.getLogicalPinMapping(newPhysicalPinName);
+                            ps = new PinSwap(cell, oldLogicalPinName, oldPhysicalPinName,
+                                    newPhysicalPinName, depopulatedLogicalPinName, newSitePinName);
+
+                            String siteAndLut = cell.getSiteName() + "/" + bel.getName().charAt(0);
+                            String oldToNewPhysicalPin = oldPhysicalPinName + ">" + newPhysicalPinName;
+                            pinSwaps.computeIfAbsent(siteAndLut, (k) -> new HashMap<>())
+                                    .put(oldToNewPhysicalPin, ps);
+                        } else {
+                            if (bel.getName().charAt(1) == '6') {
+                                // Unpredictable set ordering can mean that x5LUT appears before x6LUT; swap them back here
+                                assert(ps.getCell().getBELName().charAt(1) == '5');
+                                ps.setCompanionCell(ps.getCell(), ps.getLogicalName());
+
+                                ps.setCell(cell);
+                                String newPhysicalPinName = "A" + newSitePin.getPinName().charAt(1);
+                                ps.setLogicalName(oldLogicalPinName);
+                                assert(ps.getOldPhysicalName().equals(oldPhysicalPinName));
+                                assert(ps.getNewPhysicalName().equals(newPhysicalPinName));
+                                String depopulatedLogicalPinName = cell.getLogicalPinMapping(newPhysicalPinName);
+                                ps.setDepopulatedLogicalName(depopulatedLogicalPinName);
+                                assert(ps.getNewNetPinName().equals(newSitePinName));
+                            } else {
+                                assert(bel.getName().charAt(1) == '5');
+                                ps.setCompanionCell(cell, oldLogicalPinName);
+                            }
+                        }
+                    }
+
+                    connection.setSinkRnode(newSinkRnode);
+
+                    // Let's remove the sitewire routing for the pins that are swapping, but we need
+                    // to wait before adding them
+                    si.unrouteIntraSiteNet(oldSinkSpi.getBELPin(), oldSinkSpi.getBELPin());
+                }
+
+                // Make all pin swaps per LUT site simultaneously
+                for (Map.Entry<String,Map<String,PinSwap>> e : pinSwaps.entrySet()) {
+                    SATRouter.processPinSwaps(e.getKey(), e.getValue().values());
+                }
+            }
+
             assignNodesToConnections();
+
             // fix routes with cycles and / or multi-driver nodes
             Set<NetWrapper> routes = fixRoutes();
             if (config.isTimingDriven()) updateTimingAfterFixingRoutes(routes);
@@ -1011,14 +1112,17 @@ public class RWRoute{
     protected void assignNodesToConnections() {
         for (Connection connection : indirectConnections) {
             List<Node> nodes = new ArrayList<>();
-            List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode().getNode(), connection.getSink().getConnectedNode());
+            RouteNode sinkRnode = connection.getSinkRnode();
+            List<RouteNode> rnodes = connection.getRnodes();
+            assert(sinkRnode == rnodes.get(0));
+            List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(sinkRnode.getNode(),
+                    connection.getSink().getConnectedNode());
             if (switchBoxToSink.size() >= 2) {
                 for (int i = 0; i < switchBoxToSink.size() -1; i++) {
                     nodes.add(switchBoxToSink.get(i));
                 }
             }
 
-            List<RouteNode> rnodes = connection.getRnodes();
             for (RouteNode rnode : rnodes) {
                 nodes.add(rnode.getNode());
             }
@@ -1946,7 +2050,7 @@ public class RWRoute{
      * @param design The {@link Design} instance to be routed.
      */
     public static Design routeDesignFullNonTimingDriven(Design design) {
-        return routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven"});
+        return routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--verbose", "--lutPinSwapping"});
     }
 
     /**
