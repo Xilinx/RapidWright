@@ -112,6 +112,7 @@ public class RWRoute{
     private float timingWeight;
     /** 1 - timingWeight */
     private float oneMinusTimingWeight;
+    protected boolean lutPinSwapping = true;
 
     /** The current routing iteration */
     protected int routeIteration;
@@ -163,8 +164,6 @@ public class RWRoute{
 
     /** A map storing routes from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
     protected Map<String, List<String>> routesToSinkINTTiles;
-
-    protected boolean enableLutPinSwapping = true;
 
     public static final EnumSet<Series> SUPPORTED_SERIES;
 
@@ -552,10 +551,13 @@ public class RWRoute{
                 assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
                 connection.setSinkRnode(sinkRnode);
 
-                if (enableLutPinSwapping && sink.isLUTInputPin()) {
+                if (lutPinSwapping && sink.isLUTInputPin()) {
                     Site site = sink.getSite();
                     char lutLetter = sink.getName().charAt(0);
-                    for (int i = 1; i <= 6; i++) {
+                    // Allow all 6 LUT pins to be swapped if no 5LUT, otherwise just 5 pins
+                    int maxPin = sink.getSiteInst().getNetFromSiteWire(lutLetter + "5LUT_O5") == null ?
+                            6 : 5;
+                    for (int i = 1; i <= maxPin; i++) {
                         Node node = site.getConnectedNode(lutLetter + Integer.toString(i));
                         assert(node.getTile().getTileTypeEnum() == TileTypeEnum.INT);
                         if (node.equals(sinkINTNode)) {
@@ -660,6 +662,7 @@ public class RWRoute{
         wlWeight = config.getWirelengthWeight();
         oneMinusTimingWeight = 1 - timingWeight;
         oneMinusWlWeight = 1 - wlWeight;
+        lutPinSwapping = config.getLutPinSwapping();
         printIterationHeader(config.isTimingDriven());
     }
 
@@ -1619,7 +1622,7 @@ public class RWRoute{
     }
 
     protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection) {
-        return isAccessiblePinfeedI(child, connection, !enableLutPinSwapping);
+        return isAccessiblePinfeedI(child, connection, !lutPinSwapping);
     }
 
     protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection, boolean assertOnOveruse) {
