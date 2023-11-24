@@ -52,7 +52,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.Series;
-import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.interchange.Interchange;
@@ -163,6 +163,8 @@ public class RWRoute{
 
     /** A map storing routes from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
     protected Map<String, List<String>> routesToSinkINTTiles;
+
+    protected boolean enableLutPinSwapping = true;
 
     public static final EnumSet<Series> SUPPORTED_SERIES;
 
@@ -549,10 +551,30 @@ public class RWRoute{
                 RouteNode sinkRnode = getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I);
                 assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
                 connection.setSinkRnode(sinkRnode);
-                // Assuming that each connection only has a single sink target, increment
-                // its usage here immediately
-                sinkRnode.incrementUser(netWrapper);
-                sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
+
+                if (enableLutPinSwapping && sink.isLUTInputPin()) {
+                    Site site = sink.getSite();
+                    char lutLetter = sink.getName().charAt(0);
+                    for (int i = 1; i <= 6; i++) {
+                        Node node = site.getConnectedNode(lutLetter + Integer.toString(i));
+                        assert(node.getTile().getTileTypeEnum() == TileTypeEnum.INT);
+                        if (node.equals(sinkINTNode)) {
+                            continue;
+                        }
+                        if (routingGraph.isPreserved(node)) {
+                            continue;
+                        }
+                        RouteNode altSinkRnode = getOrCreateRouteNode(node, RouteNodeType.PINFEED_I);
+                        assert(altSinkRnode.getType() == RouteNodeType.PINFEED_I);
+                        connection.addAltSinkRnode(altSinkRnode);
+                    }
+                } else {
+                    // Assuming that each connection only has a single sink target, increment
+                    // its usage here immediately
+                    sinkRnode.incrementUser(netWrapper);
+                    sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
+                }
+
                 if (sourceINTRnode == null && altSourceINTRnode == null) {
                     if (sourceINTNode != null) {
                         sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
@@ -926,10 +948,12 @@ public class RWRoute{
             }
         }
 
-        // Check that sink node is exclusive to this connection, is used but never overused
-        RouteNode sinkRnode = connection.getSinkRnode();
-        assert(sinkRnode.countConnectionsOfUser(connection.getNetWrapper()) > 0);
-        assert(!sinkRnode.isOverUsed());
+        if (connection.getAltSinkRnodes().isEmpty()) {
+            // Check that this connection's exclusive sink node is used but never overused
+            RouteNode sinkRnode = connection.getSinkRnode();
+            assert (sinkRnode.countConnectionsOfUser(connection.getNetWrapper()) > 0);
+            assert(!sinkRnode.isOverUsed());
+        }
 
         return !connection.getSink().isRouted() || connection.isCongested();
     }
@@ -1595,7 +1619,7 @@ public class RWRoute{
     }
 
     protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection) {
-        return isAccessiblePinfeedI(child, connection, true);
+        return isAccessiblePinfeedI(child, connection, !enableLutPinSwapping);
     }
 
     protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection, boolean assertOnOveruse) {

@@ -1325,6 +1325,20 @@ public class TestDesignTools {
                     "processor/data_path_loop[6].arith_logical_flop(BEL: GFF), processor/data_path_loop[7].arith_logical_flop(BEL: HFF)]",
                     DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
         }
+
+        si = design.getSiteInstFromSiteName("SLICE_X15Y239");
+        // Only D5LUT is present
+        {
+            // Connected to VCC
+            SitePinInst spi = si.getSitePinInst("D6");
+            Assertions.assertEquals("[]",
+                    DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
+        }
+        {
+            SitePinInst spi = si.getSitePinInst("D5");
+            Assertions.assertEquals("[processor/output_port_z[7]_i_1(BEL: D5LUT)]",
+                    DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
+        }
     }
 
     @Test
