@@ -46,9 +46,9 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
-import com.xilinx.rapidwright.design.PinSwap;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
@@ -61,7 +61,6 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.router.RouteThruHelper;
-import com.xilinx.rapidwright.router.SATRouter;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
 import com.xilinx.rapidwright.timing.TimingManager;
@@ -895,7 +894,7 @@ public class RWRoute{
         if (routeIteration <= config.getMaxIterations()) {
             // perform LUT pin mapping updates
             if (lutPinSwapping) {
-                Map<String,Map<String,PinSwap>> pinSwaps = new HashMap<>();
+                Map<SitePinInst, SitePin> pinSwaps = new HashMap<>();
                 for (Connection connection: indirectConnections) {
                     SitePinInst oldSinkSpi = connection.getSink();
                     if (!oldSinkSpi.isLUTInputPin() || !oldSinkSpi.isRouted()) {
@@ -906,68 +905,13 @@ public class RWRoute{
                     if (newSinkRnode == connection.getSinkRnode()) {
                         continue;
                     }
-                    SitePin newSitePin = newSinkRnode.getNode().getSitePin();
-                    String newSitePinName = newSitePin.getPinName();
-                    SiteInst si = oldSinkSpi.getSiteInst();
-                    if (!SitePinInst.isLUTInputPin(si, newSitePinName)) {
-                        continue;
-                    }
-
-                    Set<Cell> cells = DesignTools.getConnectedCells(connection.getSink());
-                    if (cells.isEmpty()) {
-                        continue;
-                    }
-                    PinSwap ps = null;
-                    for (Cell cell : cells) {
-                        BEL bel = cell.getBEL();
-                        if (!bel.isLUT()) {
-                            continue;
-                        }
-
-                        String oldPhysicalPinName = "A" + oldSinkSpi.getName().charAt(1);
-                        String oldLogicalPinName = cell.getLogicalPinMapping(oldPhysicalPinName);
-                        if (ps == null) {
-                            String newPhysicalPinName = "A" + newSitePin.getPinName().charAt(1);
-                            String depopulatedLogicalPinName = cell.getLogicalPinMapping(newPhysicalPinName);
-                            ps = new PinSwap(cell, oldLogicalPinName, oldPhysicalPinName,
-                                    newPhysicalPinName, depopulatedLogicalPinName, newSitePinName);
-
-                            String siteAndLut = cell.getSiteName() + "/" + bel.getName().charAt(0);
-                            String oldToNewPhysicalPin = oldPhysicalPinName + ">" + newPhysicalPinName;
-                            pinSwaps.computeIfAbsent(siteAndLut, (k) -> new HashMap<>())
-                                    .put(oldToNewPhysicalPin, ps);
-                        } else {
-                            if (bel.getName().charAt(1) == '6') {
-                                // Unpredictable set ordering can mean that x5LUT appears before x6LUT; swap them back here
-                                assert(ps.getCell().getBELName().charAt(1) == '5');
-                                ps.setCompanionCell(ps.getCell(), ps.getLogicalName());
-
-                                ps.setCell(cell);
-                                String newPhysicalPinName = "A" + newSitePin.getPinName().charAt(1);
-                                ps.setLogicalName(oldLogicalPinName);
-                                assert(ps.getOldPhysicalName().equals(oldPhysicalPinName));
-                                assert(ps.getNewPhysicalName().equals(newPhysicalPinName));
-                                String depopulatedLogicalPinName = cell.getLogicalPinMapping(newPhysicalPinName);
-                                ps.setDepopulatedLogicalName(depopulatedLogicalPinName);
-                                assert(ps.getNewNetPinName().equals(newSitePinName));
-                            } else {
-                                assert(bel.getName().charAt(1) == '5');
-                                ps.setCompanionCell(cell, oldLogicalPinName);
-                            }
-                        }
-                    }
-
                     connection.setSinkRnode(newSinkRnode);
 
-                    // Let's remove the sitewire routing for the pins that are swapping, but we need
-                    // to wait before adding them
-                    si.unrouteIntraSiteNet(oldSinkSpi.getBELPin(), oldSinkSpi.getBELPin());
+                    SitePin newSitePin = newSinkRnode.getNode().getSitePin();
+                    SitePin existing = pinSwaps.put(oldSinkSpi, newSitePin);
+                    assert(existing == null);
                 }
-
-                // Make all pin swaps per LUT site simultaneously
-                for (Map.Entry<String,Map<String,PinSwap>> e : pinSwaps.entrySet()) {
-                    SATRouter.processPinSwaps(e.getKey(), e.getValue().values());
-                }
+                LUTTools.swapLutPins(pinSwaps);
             }
 
             assignNodesToConnections();
