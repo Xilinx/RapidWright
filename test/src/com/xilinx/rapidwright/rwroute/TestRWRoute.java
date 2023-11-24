@@ -142,6 +142,9 @@ public class TestRWRoute {
         assertVivadoFullyRouted(design);
     }
 
+    /**
+     * Tests the non-timing driven full routing with LUT pin swapping enabled.
+     */
     @ParameterizedTest
     @ValueSource(strings = {
             "bnn.dcp",
