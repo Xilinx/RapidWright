@@ -112,7 +112,7 @@ public class RWRoute{
     private float timingWeight;
     /** 1 - timingWeight */
     private float oneMinusTimingWeight;
-    protected boolean lutPinSwapping = true;
+    protected boolean lutPinSwapping;
 
     /** The current routing iteration */
     protected int routeIteration;
@@ -222,6 +222,7 @@ public class RWRoute{
         rnodesCreatedThisIteration = 0;
         routethruHelper = new RouteThruHelper(design.getDevice());
         presentCongestionFactor = config.getInitialPresentCongestionFactor();
+        lutPinSwapping = config.getLutPinSwapping();
 
         routerTimer.createRuntimeTracker("determine route targets", "Initialization").start();
         determineRoutingTargets();
@@ -662,7 +663,6 @@ public class RWRoute{
         wlWeight = config.getWirelengthWeight();
         oneMinusTimingWeight = 1 - timingWeight;
         oneMinusWlWeight = 1 - wlWeight;
-        lutPinSwapping = config.getLutPinSwapping();
         printIterationHeader(config.isTimingDriven());
     }
 
