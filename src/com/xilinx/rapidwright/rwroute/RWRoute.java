@@ -894,6 +894,9 @@ public class RWRoute{
         if (routeIteration <= config.getMaxIterations()) {
             // perform LUT pin mapping updates
             if (lutPinSwapping) {
+                final boolean deferIntraSiteRoutingUpdates =
+                        Boolean.getBoolean("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates");
+
                 Map<SitePinInst, SitePin> pinSwaps = new HashMap<>();
                 for (Connection connection: indirectConnections) {
                     SitePinInst oldSinkSpi = connection.getSink();
@@ -907,9 +910,11 @@ public class RWRoute{
                     }
                     connection.setSinkRnode(newSinkRnode);
 
-                    SitePin newSitePin = newSinkRnode.getNode().getSitePin();
-                    SitePin existing = pinSwaps.put(oldSinkSpi, newSitePin);
-                    assert(existing == null);
+                    if (!deferIntraSiteRoutingUpdates) {
+                        SitePin newSitePin = newSinkRnode.getNode().getSitePin();
+                        SitePin existing = pinSwaps.put(oldSinkSpi, newSitePin);
+                        assert(existing == null);
+                    }
                 }
                 LUTTools.swapLutPins(pinSwaps);
             }
@@ -1054,16 +1059,28 @@ public class RWRoute{
      * Assigns a list nodes to each connection to complete the route path of it.
      */
     protected void assignNodesToConnections() {
+        final boolean deferIntraSiteRoutingUpdates =
+                Boolean.getBoolean("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates");
+
         for (Connection connection : indirectConnections) {
             List<Node> nodes = new ArrayList<>();
             RouteNode sinkRnode = connection.getSinkRnode();
             List<RouteNode> rnodes = connection.getRnodes();
             assert(sinkRnode == rnodes.get(0));
-            List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(sinkRnode.getNode(),
-                    connection.getSink().getConnectedNode());
-            if (switchBoxToSink.size() >= 2) {
-                for (int i = 0; i < switchBoxToSink.size() -1; i++) {
-                    nodes.add(switchBoxToSink.get(i));
+
+            SitePinInst sinkSpi = connection.getSink();
+            Node sinkNode = sinkSpi.getConnectedNode();
+            if (sinkSpi.isLUTInputPin()) {
+                // LUT input pins always should have an INT tile node
+                assert(sinkNode.getTile().getTileTypeEnum() == TileTypeEnum.INT);
+                // In fact, they should even be what the routing connects to, unless deferIntraSiteRoutingUpdates is set
+                assert(sinkNode.equals(sinkRnode.getNode()) || deferIntraSiteRoutingUpdates);
+            } else {
+                List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(sinkRnode.getNode(), sinkNode);
+                if (switchBoxToSink.size() >= 2) {
+                    for (int i = 0; i < switchBoxToSink.size() - 1; i++) {
+                        nodes.add(switchBoxToSink.get(i));
+                    }
                 }
             }
 
