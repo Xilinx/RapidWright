@@ -33,6 +33,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -353,17 +354,19 @@ public class PartialRouter extends RWRoute {
             // (it's possible for another connection to use a bounce node, but now that node is
             // needed as a site pin)
             for (Connection connection : netWrapper.getConnections()) {
-                for (RouteNode rnode : Arrays.asList(connection.getSinkRnode(), connection.getAltSinkRnode())) {
+                Consumer<RouteNode> action = (rnode) -> {
                     if (rnode == null) {
-                        continue;
+                        return;
                     }
                     RouteNode prev = rnode.getPrev();
                     if (prev == null) {
-                        continue;
+                        return;
                     }
                     stashedPrev.put(rnode, prev);
                     rnode.clearPrev();
-                }
+                };
+                action.accept(connection.getSinkRnode());
+                connection.getAltSinkRnodes().forEach(action);
             }
 
             // Create all nodes used by this net and set its previous pointer so that:

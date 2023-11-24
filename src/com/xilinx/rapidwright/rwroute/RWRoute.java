@@ -1232,7 +1232,7 @@ public class RWRoute{
         List<RouteNode> rnodes = connection.getRnodes();
         if (rnodes.isEmpty()) {
             assert(!connection.getSink().isRouted());
-            if (connection.getAltSinkRnode() == null) {
+            if (connection.getAltSinkRnodes().isEmpty()) {
                 // If there is no alternate sink, decrement this one-and-only sink node
                 RouteNode sinkRnode = connection.getSinkRnode();
                 rnodes = Collections.singletonList(sinkRnode);
@@ -1342,7 +1342,7 @@ public class RWRoute{
             assert(!connection.getSink().isRouted());
 
             // Undo what ripUp() did for the one-and-only sink node
-            if (connection.getAltSinkRnode() == null) {
+            if (connection.getAltSinkRnodes().isEmpty()) {
                 RouteNode sinkRnode = connection.getSinkRnode();
                 sinkRnode.incrementUser(connection.getNetWrapper());
                 sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
@@ -1423,8 +1423,8 @@ public class RWRoute{
      */
     private boolean saveRouting(Connection connection, RouteNode rnode) {
         RouteNode sinkRnode = connection.getSinkRnode();
-        RouteNode altSinkRnode = connection.getAltSinkRnode();
-        if (rnode != sinkRnode && rnode != altSinkRnode) {
+        List<RouteNode> altSinkRnodes = connection.getAltSinkRnodes();
+        if (rnode != sinkRnode && !altSinkRnodes.contains(rnode)) {
             List<RouteNode> prevRouting = connection.getRnodes();
             // Check that this is the sink path marked by prepareRouteConnection()
             if (!connection.getSink().isRouted() || prevRouting.isEmpty() || !rnode.isTarget()) {
@@ -1514,7 +1514,7 @@ public class RWRoute{
                 // by clearing the queue if childRnode is the one and only sink on this connection,
                 // otherwise terminate if this target will not be overused since we may find that
                 // the alternate sink is less congested
-                if ((childRNode == connection.getSinkRnode() && connection.getAltSinkRnode() == null) ||
+                if ((childRNode == connection.getSinkRnode() && connection.getAltSinkRnodes().isEmpty()) ||
                         !childRNode.willOverUse(connection.getNetWrapper())) {
                     assert(!childRNode.isVisited(connectionsRouted));
                     nodesPushed += queue.size();

@@ -25,6 +25,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import com.xilinx.rapidwright.design.Net;
@@ -49,7 +50,7 @@ public class Connection implements Comparable<Connection>{
     private RouteNode sourceRnode;
     private RouteNode altSourceRnode;
     private RouteNode sinkRnode;
-    private RouteNode altSinkRnode;
+    private List<RouteNode> altSinkRnodes;
     /**
      * true to indicate the source and the sink are connected through dedicated resources,
      * such as the carry chain connections and connections between cascaded BRAMs.
@@ -294,13 +295,22 @@ public class Connection implements Comparable<Connection>{
         return sinkRnode;
     }
 
-    public void setSinkRnode(RouteNode childRnode) {
-        sinkRnode = childRnode;
+    public void setSinkRnode(RouteNode sinkRnode) {
+        this.sinkRnode = sinkRnode;
     }
 
-    public RouteNode getAltSinkRnode() { return altSinkRnode; }
+    public List<RouteNode> getAltSinkRnodes() {
+        return altSinkRnodes == null ? Collections.emptyList() : altSinkRnodes;
+    }
 
-    public void setAltSinkRnode(RouteNode childRnode) { altSinkRnode = childRnode; }
+    public void addAltSinkRnode(RouteNode sinkRnode) {
+        if (altSinkRnodes == null) {
+            altSinkRnodes = new ArrayList<>(1);
+        } else {
+            assert(!altSinkRnodes.contains(sinkRnode));
+        }
+        altSinkRnodes.add(sinkRnode);
+    }
 
     public short getXMinBB() {
         return xMinBB;
@@ -469,8 +479,10 @@ public class Connection implements Comparable<Connection>{
 
     public void setTarget(boolean target) {
         sinkRnode.setTarget(target);
-        if (altSinkRnode != null) {
-            altSinkRnode.setTarget(target);
+        if (altSinkRnodes != null) {
+            for (RouteNode rnode : altSinkRnodes) {
+                rnode.setTarget(target);
+            }
         }
     }
 }
