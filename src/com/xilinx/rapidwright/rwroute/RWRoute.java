@@ -1537,7 +1537,7 @@ public class RWRoute{
                         break;
                     case PINBOUNCE:
                         // A PINBOUNCE can only be a target if this connection has an alternate sink
-                        assert(!childRNode.isTarget() || connection.getAltSinkRnode() != null);
+                        assert(!childRNode.isTarget() || connection.getAltSinkRnodes().isEmpty());
                         if (!isAccessiblePinbounce(childRNode, connection)) {
                             continue;
                         }
