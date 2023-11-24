@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -34,7 +34,6 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.rwroute.RWRoute;
 import com.xilinx.rapidwright.rwroute.TestRWRoute;
 import com.xilinx.rapidwright.support.LargeTest;
@@ -117,7 +116,7 @@ public class TestLUTTools {
         // Pin mapping but without a net
         cell5.addPinMapping("A3", "I0");
 
-        Assertions.assertEquals(1, LUTTools.fixPinSwaps(design));
+        Assertions.assertEquals(1, LUTTools.updateLutPinSwapsFromPIPs(design));
         // Check A1 swapped to A5
         Assertions.assertEquals("A5", oldSpiSwap.getName());
         Assertions.assertEquals("I0", cell6.getLogicalPinMapping("A5"));
@@ -140,7 +139,7 @@ public class TestLUTTools {
         Design design = RapidWrightDCP.loadDCP(path);
         System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "true");
         RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--lutPinSwapping", "--verbose"});
-        Assertions.assertTrue(LUTTools.fixPinSwaps(design) > 0);
+        Assertions.assertTrue(LUTTools.updateLutPinSwapsFromPIPs(design) > 0);
         TestRWRoute.assertAllSourcesRoutedFlagSet(design);
         TestRWRoute.assertAllPinsRouted(design);
         TestRWRoute.assertVivadoFullyRouted(design);

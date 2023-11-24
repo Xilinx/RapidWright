@@ -553,7 +553,7 @@ public class LUTTools {
      * @param design Design object to analyze and fix.
      * @return Number of pin swaps processed.
      */
-    public static int fixPinSwaps(Design design) {
+    public static int updateLutPinSwapsFromPIPs(Design design) {
         Map<SitePinInst, SitePin> oldPinToNewPins = new HashMap<>();
         Map<Site, List<SitePinInst>> siteToLutSpis = new HashMap<>();
         List<SitePin> unmatchedSitePins = new ArrayList<>();
