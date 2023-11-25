@@ -578,23 +578,23 @@ public class RWRoute{
                     }
                 }
 
-                if (numberOfPinsToSwap > 0) {
-                    Site site = sink.getSite();
-                    for (int i = 1; i <= numberOfPinsToSwap; i++) {
-                        Node node = site.getConnectedNode(lutLetter + Integer.toString(i));
-                        assert(node.getTile().getTileTypeEnum() == TileTypeEnum.INT);
-                        if (node.equals(sinkINTNode)) {
-                            continue;
-                        }
-                        if (routingGraph.isPreserved(node)) {
-                            continue;
-                        }
-                        RouteNode altSinkRnode = getOrCreateRouteNode(node, RouteNodeType.PINFEED_I);
-                        assert(altSinkRnode.getType() == RouteNodeType.PINFEED_I);
-                        connection.addAltSinkRnode(altSinkRnode);
+                Site site = sink.getSite();
+                for (int i = 1; i <= numberOfPinsToSwap; i++) {
+                    Node node = site.getConnectedNode(lutLetter + Integer.toString(i));
+                    assert(node.getTile().getTileTypeEnum() == TileTypeEnum.INT);
+                    if (node.equals(sinkINTNode)) {
+                        continue;
                     }
-                } else {
-                    // Assuming that each connection only has a single sink target, increment
+                    if (routingGraph.isPreserved(node)) {
+                        continue;
+                    }
+                    RouteNode altSinkRnode = getOrCreateRouteNode(node, RouteNodeType.PINFEED_I);
+                    assert(altSinkRnode.getType() == RouteNodeType.PINFEED_I);
+                    connection.addAltSinkRnode(altSinkRnode);
+                }
+
+                if (connection.getAltSinkRnodes().isEmpty()) {
+                    // Since this connection only has a single sink target, increment
                     // its usage here immediately
                     sinkRnode.incrementUser(netWrapper);
                     sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
