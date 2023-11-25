@@ -558,8 +558,8 @@ public class RWRoute{
 
                 // Where appropriate, allow all 6 LUT pins to be swapped to begin with
                 char lutLetter = sink.getName().charAt(0);
-                int numberOfPinsToSwap = (lutPinSwapping && sink.isLUTInputPin()) ? 6 : 0;
-                if (numberOfPinsToSwap > 0) {
+                int numberOfSwappablePins = (lutPinSwapping && sink.isLUTInputPin()) ? 6 : 0;
+                if (numberOfSwappablePins > 0) {
                     for (Cell cell : DesignTools.getConnectedCells(sink)) {
                         BEL bel = cell.getBEL();
                         assert(bel.isLUT());
@@ -568,18 +568,18 @@ public class RWRoute{
                             // This pin connects to other LUTs! (e.g. SLICEM.H[1-6] also serves
                             // as the WA for A-G LUTs) -- do not allow any swapping
                             // TODO: Relax this restriction
-                            numberOfPinsToSwap = 0;
+                            numberOfSwappablePins = 0;
                             break;
                         }
                         if (belName.charAt(1) == '5') {
                             // Since a 5LUT cell exists, only allow bottom 5 pins to be swapped
-                            numberOfPinsToSwap = 5;
+                            numberOfSwappablePins = 5;
                         }
                     }
                 }
 
                 Site site = sink.getSite();
-                for (int i = 1; i <= numberOfPinsToSwap; i++) {
+                for (int i = 1; i <= numberOfSwappablePins; i++) {
                     Node node = site.getConnectedNode(lutLetter + Integer.toString(i));
                     assert(node.getTile().getTileTypeEnum() == TileTypeEnum.INT);
                     if (node.equals(sinkINTNode)) {
