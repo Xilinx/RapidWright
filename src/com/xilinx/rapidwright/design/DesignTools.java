@@ -2173,6 +2173,10 @@ public class DesignTools {
                         // is not actually connected to the global routing fabric; skip those
                         continue;
                     }
+                    if (!si.isSitePinOutput(sitePinName) && !si.isSitePinInput(sitePinName)) {
+                        // This site pin is an INOUT (only seen in I/O tiles) -- ignore
+                        continue;
+                    }
                     newPin = net.createPin(sitePinName, si);
                     if (newPin != null) newPins.add(newPin);
                 }
