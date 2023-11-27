@@ -470,25 +470,23 @@ public class LUTTools {
     }
 
     /**
-     * Given a mapping from old SitePinInsts to new SitePins, update all state
+     * Given a mapping from old SitePinInsts to new site pin name, update all state
      * necessary to reflect these LUT pin swaps. This includes updating cells'
      * logical-to-physical pin mappings, updating intra-site routing, moving
      * the SitePinInst objects, etc.
      * @param oldPinToNewPins Mapping from old pins to new pins.
      */
-    public static void swapSingleLutPins(Map<SitePinInst, SitePin> oldPinToNewPins) {
+    public static void swapSingleLutPins(Map<SitePinInst, String> oldPinToNewPins) {
         Map<String,Map<String,PinSwap>> pinSwaps = new HashMap<>();
 
-        for (Map.Entry<SitePinInst, SitePin> e : oldPinToNewPins.entrySet()) {
+        for (Map.Entry<SitePinInst, String> e : oldPinToNewPins.entrySet()) {
             SitePinInst oldSinkSpi = e.getKey();
-            SitePin newSitePin = e.getValue();
+            String newSitePinName = e.getValue();
 
-            if (oldSinkSpi.getSite().equals(newSitePin.getSite()) &&
-                    oldSinkSpi.getName().equals(newSitePin.getPinName())) {
+            if (oldSinkSpi.getName().equals(newSitePinName)) {
                 continue;
             }
 
-            String newSitePinName = newSitePin.getPinName();
             SiteInst si = oldSinkSpi.getSiteInst();
             if (!SitePinInst.isLUTInputPin(si, newSitePinName)) {
                 continue;
@@ -508,7 +506,7 @@ public class LUTTools {
                 String oldPhysicalPinName = "A" + oldSinkSpi.getName().charAt(1);
                 String oldLogicalPinName = cell.getLogicalPinMapping(oldPhysicalPinName);
                 if (ps == null) {
-                    String newPhysicalPinName = "A" + newSitePin.getPinName().charAt(1);
+                    String newPhysicalPinName = "A" + newSitePinName.charAt(1);
                     String depopulatedLogicalPinName = cell.getLogicalPinMapping(newPhysicalPinName);
                     ps = new PinSwap(cell, oldLogicalPinName, oldPhysicalPinName,
                             newPhysicalPinName, depopulatedLogicalPinName, newSitePinName);
@@ -524,7 +522,7 @@ public class LUTTools {
                         ps.setCompanionCell(ps.getCell(), ps.getLogicalName());
 
                         ps.setCell(cell);
-                        String newPhysicalPinName = "A" + newSitePin.getPinName().charAt(1);
+                        String newPhysicalPinName = "A" + newSitePinName.charAt(1);
                         ps.setLogicalName(oldLogicalPinName);
                         assert(ps.getOldPhysicalName().equals(oldPhysicalPinName));
                         assert(ps.getNewPhysicalName().equals(newPhysicalPinName));
@@ -662,7 +660,7 @@ public class LUTTools {
      * @return Number of pin swaps processed.
      */
     public static int updateLutPinSwapsFromPIPs(Design design) {
-        Map<SitePinInst, SitePin> oldPinToNewPins = new HashMap<>();
+        Map<SitePinInst, String> oldPinToNewPins = new HashMap<>();
         Map<Site, List<SitePinInst>> siteToLutSpis = new HashMap<>();
         List<SitePin> unmatchedSitePins = new ArrayList<>();
         for (Net net : design.getNets()) {
@@ -685,30 +683,31 @@ public class LUTTools {
                 if (spi.isOutPin() || !spi.isLUTInputPin()) {
                     continue;
                 }
+                assert(spi.getSiteInst().getSitePinInst(spi.getName()) == spi);
                 siteToLutSpis.computeIfAbsent(spi.getSite(), (k) -> new ArrayList<>(1))
                         .add(spi);
             }
 
             for (PIP pip : net.getPIPs()) {
                 Node endNode = pip.getEndNode();
-                SitePin sitePin = (endNode != null) ? endNode.getSitePin() : null;
-                if (sitePin == null) {
+                SitePin newSitePin = (endNode != null) ? endNode.getSitePin() : null;
+                if (newSitePin == null) {
                     continue;
                 }
 
-                Site site = sitePin.getSite();
+                Site site = newSitePin.getSite();
                 SiteInst si = design.getSiteInstFromSite(site);
                 if (si == null) {
                     continue;
                 }
-                String newSitePinName = sitePin.getPinName();
+                String newSitePinName = newSitePin.getPinName();
                 if (!SitePinInst.isLUTInputPin(si, newSitePinName)) {
                     continue;
                 }
                 SitePinInst newSpi = si.getSitePinInst(newSitePinName);
                 if (!siteToLutSpis.get(site).remove(newSpi)) {
                     // spi is not already on this net
-                    unmatchedSitePins.add(sitePin);
+                    unmatchedSitePins.add(newSitePin);
                 }
             }
 
@@ -717,7 +716,8 @@ public class LUTTools {
                 List<SitePinInst> unmatchedSpis = siteToLutSpis.get(site);
                 Iterator<SitePinInst> it = unmatchedSpis.iterator();
                 assert(it.hasNext());
-                char lutLetter = newSitePin.getPinName().charAt(0);
+                String newSitePinName = newSitePin.getPinName();
+                char lutLetter = newSitePinName.charAt(0);
                 // Assume that unmatchedSpis is generally a small ArrayList
                 // such that O(N) operations are not unwieldy
                 boolean found = false;
@@ -726,7 +726,7 @@ public class LUTTools {
                     if (oldSpi.getName().charAt(0) != lutLetter) {
                         continue;
                     }
-                    oldPinToNewPins.put(oldSpi, newSitePin);
+                    oldPinToNewPins.put(oldSpi, newSitePinName);
                     it.remove();
                     found = true;
                     break;
