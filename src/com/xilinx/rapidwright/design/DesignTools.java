@@ -2167,9 +2167,9 @@ public class DesignTools {
                     if (sitePinName == null) continue;
                     SitePinInst newPin = si.getSitePinInst(sitePinName);
                     if (newPin != null) continue;
-                    if (sitePinName.equals("IO") && p.getCellType() == netlist.getHDIPrimitive(Unisim.INBUF)) {
-                        // Do not create a SitePinInst for the "IO" port of an INBUF primitive,
-                        // which is the expanded component of the "IBUF", "IOBUF", etc. macros.
+                    if (sitePinName.equals("IO") && Utils.isIOB(si)) {
+                        // Do not create a SitePinInst for the "IO" input port of any IOB site,
+                        // since the sitewire it drives is assumed to be driven by the IO PAD.
                         continue;
                     }
                     newPin = net.createPin(sitePinName, si);
