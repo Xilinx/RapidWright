@@ -2168,7 +2168,7 @@ public class DesignTools {
                     SitePinInst newPin = si.getSitePinInst(sitePinName);
                     if (newPin != null) continue;
                     if (sitePinName.equals("IO") && Utils.isIOB(si)) {
-                        // Do not create a SitePinInst for the "IO" input port of any IOB site,
+                        // Do not create a SitePinInst for the "IO" input site pin of any IOB site,
                         // since the sitewire it drives is assumed to be driven by the IO PAD.
                         continue;
                     }
