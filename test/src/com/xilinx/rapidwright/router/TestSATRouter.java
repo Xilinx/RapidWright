@@ -47,7 +47,6 @@ public class TestSATRouter {
         PBlock pblock = new PBlock(design.getDevice(), " SLICE_X108Y660:SLICE_X111Y664");
         SATRouter satRouter = new SATRouter(design, pblock, false);
 
-        satRouter.setTimeoutInSeconds(60);
         satRouter.route();
 
         if (FileTools.isVivadoOnPath()) {
