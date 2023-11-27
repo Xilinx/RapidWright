@@ -992,7 +992,9 @@ public class RWRoute{
             }
 
             List<RouteNode> rnodes = connection.getRnodes();
-            nodes.addAll(rnodes);
+            for (RouteNode rnode : rnodes) {
+                nodes.add(rnode.getNode());
+            }
 
             List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(connection.getSource().getConnectedNode(), connection.getSourceRnode());
             if (sourceToSwitchBox.size() >= 2) {
