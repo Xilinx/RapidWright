@@ -897,7 +897,7 @@ public class RWRoute{
                 final boolean deferIntraSiteRoutingUpdates =
                         Boolean.getBoolean("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates");
 
-                Map<SitePinInst, SitePin> pinSwaps = new HashMap<>();
+                Map<SitePinInst, String> pinSwaps = new HashMap<>();
                 for (Connection connection: indirectConnections) {
                     SitePinInst oldSinkSpi = connection.getSink();
                     if (!oldSinkSpi.isLUTInputPin() || !oldSinkSpi.isRouted()) {
@@ -912,7 +912,7 @@ public class RWRoute{
 
                     if (!deferIntraSiteRoutingUpdates) {
                         SitePin newSitePin = newSinkRnode.getNode().getSitePin();
-                        SitePin existing = pinSwaps.put(oldSinkSpi, newSitePin);
+                        String existing = pinSwaps.put(oldSinkSpi, newSitePin.getPinName());
                         assert(existing == null);
                     }
                 }
