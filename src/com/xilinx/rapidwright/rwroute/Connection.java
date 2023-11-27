@@ -309,6 +309,7 @@ public class Connection implements Comparable<Connection>{
         } else {
             assert(!altSinkRnodes.contains(sinkRnode));
         }
+        assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
         altSinkRnodes.add(sinkRnode);
     }
 

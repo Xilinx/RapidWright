@@ -1602,12 +1602,25 @@ public class RWRoute{
             }
 
             if (childRNode.isTarget()) {
-                // Despite the limitation above, on encountering a target only terminate immediately
-                // by clearing the queue if childRnode is the one and only sink on this connection,
-                // otherwise terminate if this target will not be overused since we may find that
-                // the alternate sink is less congested
-                if ((childRNode == connection.getSinkRnode() && connection.getAltSinkRnodes().isEmpty()) ||
-                        !childRNode.willOverUse(connection.getNetWrapper())) {
+                boolean earlyTermination = false;
+                if (childRNode == connection.getSinkRnode() && connection.getAltSinkRnodes().isEmpty()) {
+                    // This sink must be exclusively reserved for this connection already
+                    assert(childRNode.getOccupancy() == 0 ||
+                            childRNode.getNode().getIntentCode() == IntentCode.NODE_PINBOUNCE);
+                    earlyTermination = true;
+                } else {
+                    if (childRNode.getOccupancy() == 0) {
+                        // Target may not be an exclusive sink (or a sink for that matter)
+                        // but it is uncompletely unused
+                        earlyTermination = true;
+                    } else if (childRNode.getType() != RouteNodeType.PINFEED_I) {
+                        // Target is already used but not an alternate sink, only terminate if this net
+                        // will not overuse this resource
+                        earlyTermination = childRNode.countConnectionsOfUser(connection.getNetWrapper()) > 0;
+                    }
+                }
+
+                if (earlyTermination) {
                     assert(!childRNode.isVisited(connectionsRouted));
                     nodesPushed += queue.size();
                     queue.clear();
