@@ -535,9 +535,6 @@ public class LUTTools {
                     }
                 }
             }
-
-            // Remove the old site wire routing, in case the old pin is not swapped to again
-            si.unrouteIntraSiteNet(oldSinkSpi.getBELPin(), oldSinkSpi.getBELPin());
         }
 
         // Make all pin swaps per LUT site simultaneously
