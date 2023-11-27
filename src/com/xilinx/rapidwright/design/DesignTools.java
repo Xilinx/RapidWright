@@ -2167,17 +2167,9 @@ public class DesignTools {
                     if (sitePinName == null) continue;
                     SitePinInst newPin = si.getSitePinInst(sitePinName);
                     if (newPin != null) continue;
-                    int wireIndex = si.getSite().getTileWireIndexFromPinName(sitePinName);
-                    if (Node.getNode(si.getTile(), wireIndex) == null) {
-                        // It's possible that the discovered site pin (e.g. as for some IOB tiles)
-                        // is not actually connected to the global routing fabric; skip those
-                        continue;
-                    }
                     if (sitePinName.equals("IO") && p.getCellType() == netlist.getHDIPrimitive(Unisim.INBUF)) {
-                        assert(p.getPortInst().getParentCell() == netlist.getHDIPrimitive(Unisim.IOBUF));
                         // Do not create a SitePinInst for the "IO" port of an INBUF primitive,
-                        // which is the expanded component of the "IOBUF" macro. As stated in UG974,
-                        // this bidir IO port is to be connected directly to the top-level port.
+                        // which is the expanded component of the "IBUF", "IOBUF", etc. macros.
                         continue;
                     }
                     newPin = net.createPin(sitePinName, si);
