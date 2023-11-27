@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.router;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -115,6 +116,7 @@ public class SATRouter {
     private String pbFile = "evRouter_pb.txt";
     /** Standard out/err output file name from evRouter run */
     private String satLogFile = "evRouter.log";
+    private int timeoutInSeconds = 0;
     /** Design on which to solve */
     private Design design;
     /** Pblock used to constrain routing of the design */
@@ -550,6 +552,9 @@ public class SATRouter {
             command.add(vcNetAssignmentFile);
         }if (optRouteUtilization) {
             command.add("-opt");
+        }if (timeoutInSeconds > 0) {
+            command.add("-to");
+            command.add(Integer.toString(timeoutInSeconds));
         }
         command.add(pipFile);
         command.add(pbFile);
@@ -788,6 +793,7 @@ public class SATRouter {
 
         // Check for errors in evRouter log
         StringBuilder sb = null;
+        System.out.println(new File(satLogFile).getAbsolutePath());
         for (String line : FileTools.getLinesFromTextFile(satLogFile)) {
             if (line.contains("ERROR")) {
                 sb = new StringBuilder();
@@ -1010,6 +1016,10 @@ public class SATRouter {
      */
     public void setOptRouteUtilization(boolean optRouteUtilization) {
         this.optRouteUtilization = optRouteUtilization;
+    }
+
+    public void setTimeoutInSeconds(int timeoutInSeconds) {
+        this.timeoutInSeconds = timeoutInSeconds;
     }
 
     /**
