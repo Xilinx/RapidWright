@@ -1617,6 +1617,11 @@ public class RWRoute{
                         // Target is already used but not a sink, only terminate if this net
                         // will not overuse this resource
                         earlyTermination = childRNode.countConnectionsOfUser(connection.getNetWrapper()) > 0;
+                    } else {
+                        // Target is a sink but already used
+                        assert(childRNode.getOccupancy() > 0 && childRNode.getType() == RouteNodeType.PINFEED_I &&
+                                // But cannot be used by this net already
+                                childRNode.countConnectionsOfUser(connection.getNetWrapper()) == 0);
                     }
                 }
 
