@@ -1402,18 +1402,6 @@ public class RWRoute{
     }
 
     /**
-     * Checks if a NODE_PINBOUNCE is suitable to be used for routing to a target.
-     * @param pinBounce The PINBOUNCE rnode in question.
-     * @param target The target rnode to reach.
-     * @return true, if the PINBOUNCE rnode is in the same column as the target and within one INT tile of the target.
-     */
-    private boolean usablePINBounce(RouteNode pinBounce, RouteNode target) {
-        Tile bounce = pinBounce.getNode().getTile();
-        Tile sink = target.getNode().getTile();
-        return bounce.getTileXCoordinate() == sink.getTileXCoordinate() && Math.abs(bounce.getTileYCoordinate() - sink.getTileYCoordinate()) <= 1;
-    }
-
-    /**
      * Completes the routing process of a connection.
      * @param connection The routed target connection.
      */
@@ -1538,6 +1526,9 @@ public class RWRoute{
                 }
                 switch (childRNode.getType()) {
                     case WIRE:
+                        if (!routingGraph.isAccessible(childRNode, connection)) {
+                            continue;
+                        }
                         if (!config.isUseUTurnNodes() && childRNode.getDelay() > 10000) {
                             // To filter out those nodes that are considered to be excluded with the masking resource approach,
                             // such as U-turn shape nodes near the boundary
@@ -1545,8 +1536,9 @@ public class RWRoute{
                         }
                         break;
                     case PINBOUNCE:
-                        assert(!childRNode.isTarget());
-                        if (!usablePINBounce(childRNode, connection.getSinkRnode())) {
+                        // A PINBOUNCE can only be a target if this connection has an alternate sink
+                        assert(!childRNode.isTarget() || connection.getAltSinkRnode() != null);
+                        if (!isAccessiblePinbounce(childRNode, connection)) {
                             continue;
                         }
                         break;
@@ -1588,6 +1580,18 @@ public class RWRoute{
      */
     protected boolean isAccessible(RouteNode child, Connection connection) {
         return !config.isUseBoundingBox() || child.isInConnectionBoundingBox(connection);
+    }
+
+    /**
+     * Checks if a NODE_PINBOUNCE is suitable to be used for routing to a target.
+     * @param child The PINBOUNCE rnode in question.
+     * @param connection The connection to route.
+     * @return true, if the PINBOUNCE rnode is in the same column as the target and within one INT tile of the target.
+     */
+    protected boolean isAccessiblePinbounce(RouteNode child, Connection connection) {
+        assert(child.getType() == RouteNodeType.PINBOUNCE);
+
+        return routingGraph.isAccessible(child, connection);
     }
 
     protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection) {

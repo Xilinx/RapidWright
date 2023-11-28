@@ -49,7 +49,7 @@ public class TestSATRouter {
         PBlock pblock = new PBlock(design.getDevice(), " SLICE_X108Y660:SLICE_X111Y664");
         SATRouter satRouter = new SATRouter(design, pblock, false);
 
-        FileTools.copyFile(getClass().getResource("TestSATRouter/reduce_or_routed_7overlaps_solution.txt").toString(),
+        FileTools.copyFile(RapidWrightDCP.getString("reduce_or_routed_7overlaps_solution.txt"),
                 satRouter.getOutputFile());
 
         satRouter.applyRoutingResult();
