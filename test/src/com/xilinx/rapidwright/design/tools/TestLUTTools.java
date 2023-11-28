@@ -135,7 +135,7 @@ public class TestLUTTools {
             "optical-flow.dcp"
     })
     @LargeTest(max_memory_gb = 8)
-    public void testFixPinSwapsWithRWRoute(String path) {
+    public void testUpdateLutPinSwapsFromPIPsWithRWRoute(String path) {
         Design design = RapidWrightDCP.loadDCP(path);
         try {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "true");
