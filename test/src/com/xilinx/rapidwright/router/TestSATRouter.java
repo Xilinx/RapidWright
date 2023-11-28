@@ -31,9 +31,11 @@ import com.xilinx.rapidwright.util.VivadoTools;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+
 public class TestSATRouter {
     @Test
-    public void testSATRouter() {
+    public void testApplyResult() {
         // Adapted from https://github.com/clavin-xlnx/RapidWright-binder/blob/24527f33b6aea283cf430ab8f4eab3dc01fa5d64/SATRouter.ipynb
         Design design = RapidWrightDCP.loadDCP("reduce_or_routed_7overlaps.dcp");
 
@@ -47,7 +49,10 @@ public class TestSATRouter {
         PBlock pblock = new PBlock(design.getDevice(), " SLICE_X108Y660:SLICE_X111Y664");
         SATRouter satRouter = new SATRouter(design, pblock, false);
 
-        satRouter.route();
+        FileTools.copyFile(getClass().getResource("TestSATRouter/reduce_or_routed_7overlaps_solution.txt").toString(),
+                satRouter.getOutputFile());
+
+        satRouter.applyRoutingResult();
 
         if (FileTools.isVivadoOnPath()) {
             Assertions.assertTrue(VivadoTools.reportRouteStatus(design).isFullyRouted());
