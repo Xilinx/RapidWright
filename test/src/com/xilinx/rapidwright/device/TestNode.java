@@ -82,6 +82,7 @@ public class TestNode {
 
     @ParameterizedTest
     @CsvSource({
+            // UltraScale+ part
             "xcvu3p,INT_X37Y220,BOUNCE_",
             "xcvu3p,INT_X37Y220,BYPASS_",
             "xcvu3p,INT_X37Y220,INT_NODE_GLOBAL_",
@@ -89,52 +90,8 @@ public class TestNode {
             "xcvu3p,INT_X37Y220,INODE_",
             // These nodes fanout to NESW nodes in the tile above or below
             // "xcvu3p,INT_X37Y220,SDQNODE_",
-    })
-    public void testNodeReachabilityUltraScalePlus(String partName, String tileName, String wirePrefix) {
-        Device device = Device.getDevice(partName);
-        Tile baseTile = device.getTile(tileName);
-        Queue<Node> queue = new ArrayDeque<>();
-        for (String wireName : baseTile.getWireNames()) {
-            if (!wireName.startsWith(wirePrefix)) {
-                continue;
-            }
-            queue.add(Node.getNode(baseTile, wireName));
-        }
-        System.out.println("Initial queue.size() = " + queue.size());
-        System.out.println("Immediately uphill:");
-        queue.stream().map(Node::getAllUphillNodes).flatMap(List::stream).map(Node::getWireName)
-                .map(s -> s.replaceFirst("((BOUNCE|BYPASS|CTRL|INT_NODE_[^_]+|INODE)_).*", "$1"))
-                .map(s -> s.replaceFirst("((CLE_CLE_[LM]_SITE_0|CLK_LEAF_SITES|EE[124]|INT_INT_SDQ|NN[12]|SS[12]|WW[124])_).*", "$1"))
-                .distinct()
-                .sorted()
-                .forEachOrdered(s -> System.out.println("\t" + s));
-        System.out.println("Immediately downhill:");
-        queue.stream().map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getWireName)
-                .map(s -> s.replaceFirst("((BOUNCE|BYPASS|CTRL|IMUX|INT_NODE_[^_]+|INODE)_).*", "$1"))
-                .distinct()
-                .sorted()
-                .forEachOrdered(s -> System.out.println("\t" + s));
 
-        Set<Node> visited = new HashSet<>();
-        while (!queue.isEmpty()) {
-            Node node = queue.poll();
-            for (Node downhill : node.getAllDownhillNodes()) {
-                if (!visited.add(downhill)) {
-                    continue;
-                }
-                if (!Utils.isInterConnect(downhill.getTile().getTileTypeEnum())) {
-                    continue;
-                }
-                Assertions.assertEquals(baseTile.getTileXCoordinate(),
-                        downhill.getTile().getTileXCoordinate());
-                queue.add(downhill);
-            }
-        }
-        System.out.println("visited.size() = " + visited.size());
-    }
-
-    @ParameterizedTest
-    @CsvSource({
+            // UltraScale part
             "xcvu065,INT_X38Y220,BOUNCE_",
             "xcvu065,INT_X38Y220,BYPASS_",
             "xcvu065,INT_X38Y220,INT_NODE_GLOBAL_",
@@ -154,13 +111,23 @@ public class TestNode {
             queue.add(Node.getNode(baseTile, wireName));
         }
         System.out.println("Initial queue.size() = " + queue.size());
+
+        // Print out the prefixes of nodes that are immediately uphill of these wire prefixes
+        // (i.e. "BOUNCE_E_0_FT1" -> "BOUNCE_")
         System.out.println("Immediately uphill:");
         queue.stream().map(Node::getAllUphillNodes).flatMap(List::stream).map(Node::getWireName)
                 .map(s -> s.replaceFirst("((BOUNCE|BYPASS|CTRL|INT_NODE_[^_]+|INODE)_).*", "$1"))
-                .map(s -> s.replaceFirst("((CLE_CLE_[LM]_SITE_0|CLK_BUFCE_LEAF_X16_1_CLK|EE[124]|INT_INT_SINGLE|NN[12]|SS[12]|WW[124])_).*", "$1"))
+                .map(s -> s.replaceFirst(
+                                                   // UltraScale+
+                        (partName.endsWith("p")) ? "((CLE_CLE_[LM]_SITE_0|CLK_LEAF_SITES|EE[124]|INT_INT_SDQ|NN[12]|SS[12]|WW[124])_).*"
+                                                   // UltraScale
+                                                 : "((CLE_CLE_[LM]_SITE_0|CLK_BUFCE_LEAF_X16_1_CLK|EE[124]|INT_INT_SINGLE|NN[12]|SS[12]|WW[124])_).*",
+                        "$1"))
                 .distinct()
                 .sorted()
                 .forEachOrdered(s -> System.out.println("\t" + s));
+
+        // Print out the prefixes of nodes that are immediately downhill of these wire prefixes
         System.out.println("Immediately downhill:");
         queue.stream().map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getWireName)
                 .map(s -> s.replaceFirst("((BOUNCE|BYPASS|CTRL|IMUX|INT_NODE_[^_]+|INODE)_).*", "$1"))

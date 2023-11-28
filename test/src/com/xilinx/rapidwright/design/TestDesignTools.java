@@ -305,8 +305,7 @@ public class TestDesignTools {
         {
             Net i = design.getNet("i");
             Assertions.assertEquals(0, i.getPins().size());
-            // Technically should not be present since net is fully intra-site (PAD to INBUF), but harmless
-            Assertions.assertEquals("[IN IOB_X1Y253.IO]", DesignTools.createMissingSitePinInsts(design, i).toString());
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, i).toString());
 
             Net o = design.getNet("o");
             Assertions.assertEquals(0, o.getPins().size());
