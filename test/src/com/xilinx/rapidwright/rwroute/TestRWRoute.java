@@ -78,9 +78,6 @@ public class TestRWRoute {
             if (spi.isOutPin()) {
                 Assertions.assertEquals(sourceRouted.get(spi), spi.isRouted());
             } else {
-                if (!spi.isRouted()) {
-                    System.out.println("SPI " + spi + " on net " + net + " is not routed");
-                }
                 Assertions.assertTrue(spi.isRouted());
             }
         }
