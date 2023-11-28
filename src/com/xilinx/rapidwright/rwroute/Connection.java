@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
@@ -479,7 +480,8 @@ public class Connection implements Comparable<Connection>{
     }
 
     public void setAllTargets(boolean target) {
-        if (sinkRnode.countConnectionsOfUser(netWrapper) == 0) {
+        if (sinkRnode.countConnectionsOfUser(netWrapper) == 0 ||
+            sinkRnode.getNode().getIntentCode() == IntentCode.NODE_PINBOUNCE) {
             // Since this connection will have been ripped up, only mark a node
             // as a target if it's not already used by this net.
             // This prevents -- for the case where the same net needs to be routed
@@ -490,6 +492,7 @@ public class Connection implements Comparable<Connection>{
         if (altSinkRnodes != null) {
             for (RouteNode rnode : altSinkRnodes) {
                 if (rnode.countConnectionsOfUser(netWrapper) == 0) {
+                    assert(rnode.getNode().getIntentCode() != IntentCode.NODE_PINBOUNCE);
                     rnode.setTarget(target);
                 }
             }
