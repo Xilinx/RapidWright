@@ -1614,7 +1614,7 @@ public class RWRoute{
                         // but it is uncompletely unused
                         earlyTermination = true;
                     } else if (childRNode.getType() != RouteNodeType.PINFEED_I) {
-                        // Target is already used but not an alternate sink, only terminate if this net
+                        // Target is already used but not a sink, only terminate if this net
                         // will not overuse this resource
                         earlyTermination = childRNode.countConnectionsOfUser(connection.getNetWrapper()) > 0;
                     }
@@ -1874,7 +1874,7 @@ public class RWRoute{
         assert(queue.isEmpty());
 
         // Sets the sink rnode(s) of the connection as the target(s)
-        connectionToRoute.setTarget(true);
+        connectionToRoute.setAllTargets(true);
 
         // Adds the source rnode to the queue
         RouteNode sourceRnode = connectionToRoute.getSourceRnode();
