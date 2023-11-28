@@ -137,11 +137,15 @@ public class TestLUTTools {
     @LargeTest(max_memory_gb = 8)
     public void testFixPinSwapsWithRWRoute(String path) {
         Design design = RapidWrightDCP.loadDCP(path);
-        System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "true");
-        RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--lutPinSwapping", "--verbose"});
-        Assertions.assertTrue(LUTTools.updateLutPinSwapsFromPIPs(design) > 0);
-        TestRWRoute.assertAllSourcesRoutedFlagSet(design);
-        TestRWRoute.assertAllPinsRouted(design);
-        TestRWRoute.assertVivadoFullyRouted(design);
+        try {
+            System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "true");
+            RWRoute.routeDesignWithUserDefinedArguments(design, new String[]{"--nonTimingDriven", "--lutPinSwapping", "--verbose"});
+            Assertions.assertTrue(LUTTools.updateLutPinSwapsFromPIPs(design) > 0);
+            TestRWRoute.assertAllSourcesRoutedFlagSet(design);
+            TestRWRoute.assertAllPinsRouted(design);
+            TestRWRoute.assertVivadoFullyRouted(design);
+        } finally {
+            System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "false");
+        }
     }
 }
