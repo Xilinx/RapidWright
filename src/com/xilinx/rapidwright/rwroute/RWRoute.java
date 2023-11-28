@@ -916,7 +916,7 @@ public class RWRoute{
                         assert(existing == null);
                     }
                 }
-                LUTTools.swapLutPins(pinSwaps);
+                LUTTools.swapMultipleLutPins(pinSwaps);
             }
 
             assignNodesToConnections();
