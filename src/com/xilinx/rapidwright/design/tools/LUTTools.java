@@ -476,7 +476,7 @@ public class LUTTools {
      * the SitePinInst objects, etc.
      * @param oldPinToNewPins Mapping from old pins to new pins.
      */
-    public static void swapSingleLutPins(Map<SitePinInst, String> oldPinToNewPins) {
+    public static void swapMultipleLutPins(Map<SitePinInst, String> oldPinToNewPins) {
         Map<String,Map<String,PinSwap>> pinSwaps = new HashMap<>();
 
         for (Map.Entry<SitePinInst, String> e : oldPinToNewPins.entrySet()) {
@@ -735,7 +735,7 @@ public class LUTTools {
             unmatchedSitePins.clear();
         }
 
-        swapSingleLutPins(oldPinToNewPins);
+        swapMultipleLutPins(oldPinToNewPins);
         return oldPinToNewPins.size();
     }
 
