@@ -1337,7 +1337,7 @@ public class RWRoute{
      * Rips up a connection.
      * @param connection The connection to be ripped up.
      */
-    private void ripUp(Connection connection) {
+    protected void ripUp(Connection connection) {
         List<RouteNode> rnodes = connection.getRnodes();
         if (rnodes.isEmpty()) {
             assert(!connection.getSink().isRouted());
@@ -1450,8 +1450,8 @@ public class RWRoute{
             assert(connection.getRnodes().isEmpty());
             assert(!connection.getSink().isRouted());
 
-            // Undo what ripUp() did for the one-and-only sink node
             if (connection.getAltSinkRnodes().isEmpty()) {
+                // Undo what ripUp() did for the one-and-only sink node
                 RouteNode sinkRnode = connection.getSinkRnode();
                 sinkRnode.incrementUser(connection.getNetWrapper());
                 sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
@@ -1722,6 +1722,7 @@ public class RWRoute{
     }
 
     protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection) {
+        // When LUT pin swapping is enabled, PINFEED_I are not exclusive anymore
         return isAccessiblePinfeedI(child, connection, !lutPinSwapping);
     }
 
