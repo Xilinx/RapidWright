@@ -398,7 +398,20 @@ public class PartialRouter extends RWRoute {
                 RouteNode sinkRnode = connection.getSinkRnode();
                 assert(sourceRnode.getType() == RouteNodeType.PINFEED_O);
                 assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
+
+                // Even though this connection is not expected to have any routing yet,
+                // perform a rip up anyway in order to release any exclusive sinks
+                // ahead of finishRouteConnection()
+                assert(connection.getRnodes().isEmpty());
+                connection.getSink().setRouted(false);
+                ripUp(connection);
+
                 finishRouteConnection(connection, sinkRnode);
+                if (!connection.getSink().isRouted() && connection.getAltSinkRnodes().isEmpty()) {
+                    // Undo what ripUp() did for the one-and-only sink node
+                    sinkRnode.incrementUser(connection.getNetWrapper());
+                    sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
+                }
             }
 
             // Restore prev to avoid assertions firing
@@ -634,7 +647,20 @@ public class PartialRouter extends RWRoute {
                 RouteNode sinkRnode = connection.getSinkRnode();
                 assert(sourceRnode.getType() == RouteNodeType.PINFEED_O);
                 assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
+
+                // Even though this connection is not expected to have any routing yet,
+                // perform a rip up anyway in order to release any exclusive sinks
+                // ahead of finishRouteConnection()
+                assert(connection.getRnodes().isEmpty());
+                connection.getSink().setRouted(false);
+                ripUp(connection);
+
                 finishRouteConnection(connection, sinkRnode);
+                if (!connection.getSink().isRouted() && connection.getAltSinkRnodes().isEmpty()) {
+                    // Undo what ripUp() did for the one-and-only sink node
+                    sinkRnode.incrementUser(connection.getNetWrapper());
+                    sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
+                }
             }
 
             netToPins.put(net, net.getSinkPins());

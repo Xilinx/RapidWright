@@ -1337,7 +1337,7 @@ public class RWRoute{
      * Rips up a connection.
      * @param connection The connection to be ripped up.
      */
-    private void ripUp(Connection connection) {
+    protected void ripUp(Connection connection) {
         List<RouteNode> rnodes = connection.getRnodes();
         if (rnodes.isEmpty()) {
             assert(!connection.getSink().isRouted());
