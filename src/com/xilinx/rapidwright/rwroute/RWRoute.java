@@ -1722,7 +1722,8 @@ public class RWRoute{
     }
 
     protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection) {
-        return isAccessiblePinfeedI(child, connection, !lutPinSwapping /* TODO: Revisit */);
+        // When LUT pin swapping is enabled, PINFEED_I are not exclusive anymore
+        return isAccessiblePinfeedI(child, connection, !lutPinSwapping);
     }
 
     protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection, boolean assertOnOveruse) {
