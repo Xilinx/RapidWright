@@ -33,6 +33,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.design.tools.TestLUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist;
@@ -47,6 +48,7 @@ import com.xilinx.rapidwright.rwroute.RWRoute;
 import com.xilinx.rapidwright.rwroute.TestRWRoute;
 import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.Utils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -318,15 +320,8 @@ public class TestPhysNetlistWriter {
     @LargeTest(max_memory_gb = 8)
     public void testSimulateSwappedLutPinsWithRWRoute(String path, @TempDir Path tempDir) throws IOException {
         Design inputDesign = RapidWrightDCP.loadDCP(path);
-        // Turns out that "bnn.dcp" and "optical-flow.dcp" have all their pins fixed
-        for (Cell cell : inputDesign.getCells()) {
-            if (!cell.getBEL().isLUT()) {
-                continue;
-            }
-            for (String pin : cell.getPinMappingsP2L().keySet()) {
-                cell.unFixPin(pin);
-            }
-        }
+        // Turns out that "bnn.dcp" and "optical-flow.dcp" have all their LUT pins fixed
+        TestLUTTools.fixAllLutPins(inputDesign, false);
         try {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "true");
             RWRoute.routeDesignWithUserDefinedArguments(inputDesign, new String[]{"--nonTimingDriven", "--lutPinSwapping"});

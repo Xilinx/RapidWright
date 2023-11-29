@@ -38,6 +38,7 @@ import com.xilinx.rapidwright.rwroute.RWRoute;
 import com.xilinx.rapidwright.rwroute.TestRWRoute;
 import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.Utils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -139,18 +140,7 @@ public class TestLUTTools {
     @LargeTest(max_memory_gb = 8)
     public void testUpdateLutPinSwapsFromPIPsWithRWRoute(String path, boolean fixPins) {
         Design design = RapidWrightDCP.loadDCP(path);
-        for (Cell cell : design.getCells()) {
-            if (!cell.getBEL().isLUT()) {
-                continue;
-            }
-            for (String pin : cell.getPinMappingsP2L().keySet()) {
-                if (fixPins) {
-                    cell.fixPin(pin);
-                } else {
-                    cell.unFixPin(pin);
-                }
-            }
-        }
+        fixAllLutPins(design, fixPins);
         try {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "true");
             RWRoute.routeDesignWithUserDefinedArguments(design, new String[]{"--nonTimingDriven", "--lutPinSwapping", "--verbose"});
@@ -165,6 +155,26 @@ public class TestLUTTools {
             }
         } finally {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "false");
+        }
+    }
+
+    public static void fixAllLutPins(Design design, boolean fixPins) {
+        for (SiteInst si : design.getSiteInsts()) {
+            if (!Utils.isSLICE(si)) {
+                continue;
+            }
+            for (Cell cell : si.getCells()) {
+                if (!cell.getBEL().isLUT()) {
+                    continue;
+                }
+                for (String pin : cell.getPinMappingsP2L().keySet()) {
+                    if (fixPins) {
+                        cell.fixPin(pin);
+                    } else {
+                        cell.unFixPin(pin);
+                    }
+                }
+            }
         }
     }
 }

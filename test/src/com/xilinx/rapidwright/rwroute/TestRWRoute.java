@@ -30,6 +30,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.xilinx.rapidwright.design.tools.TestLUTTools;
+import com.xilinx.rapidwright.util.Utils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Disabled;
@@ -155,14 +157,7 @@ public class TestRWRoute {
     public void testNonTimingDrivenFullRoutingWithLutPinSwapping(String path) {
         Design design = RapidWrightDCP.loadDCP(path);
         // Turns out that "bnn.dcp" and "optical-flow.dcp" have all their pins fixed
-        for (Cell cell : design.getCells()) {
-            if (!cell.getBEL().isLUT()) {
-                continue;
-            }
-            for (String pin : cell.getPinMappingsP2L().keySet()) {
-                cell.unFixPin(pin);
-            }
-        }
+        TestLUTTools.fixAllLutPins(design, false);
         RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--lutPinSwapping"});
         assertAllSourcesRoutedFlagSet(design);
         assertAllPinsRouted(design);
