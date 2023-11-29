@@ -76,7 +76,7 @@ public class TestLUTTools {
     }
 
     @Test
-    public void testUpdateLutPinSwapsFromPIPs() {
+    public void testSwapLutPinsFromPIPs() {
         Design design = new Design("testFixPinSwaps", "xcvu3p");
         SiteInst si = design.createSiteInst("SLICE_X0Y0");
         // Create and place on both A6LUT and A5LUT
