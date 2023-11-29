@@ -576,8 +576,8 @@ public class RWRoute{
                         if (belName.charAt(0) != lutLetter) {
                             assert(cell.getType().startsWith("RAM"));
                             // This pin connects to other LUTs! (e.g. SLICEM.H[1-6] also serves
-                            // as the WA for A-G LUTs) -- do not allow any swapping
-                            // TODO: Relax this restriction
+                            // as the WA for A-G LUTs used as distributed RAM) -- do not allow any swapping
+                            // TODO: Relax this when https://github.com/Xilinx/RapidWright/issues/901 is fixed
                             numberOfSwappablePins = 0;
                             break;
                         }
