@@ -455,19 +455,6 @@ public class PhysNetlistWriter {
             sources = new ArrayList<>();
             stubs = new ArrayList<>();
 
-            // To be used in conjunction with the "rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates"
-            // property (which allows RWRoute to perform LUT pin swapping but not move the swapped SitePinInst nor
-            // perform any intra-site routing updates). With the aforementioned RWRoute option, for swapped LUT pins
-            // default PhysNetlistWriter would not be able to identify the site pin that the routing services, thus
-            // causing any swapped site pins to appear as unconnected stubs.
-            // Enabling this following option allows the PhysNetlistWriter to simulate LUT pin swapping such that
-            // any routing servicing a LUT will branch (incorrectly) to any other LUT input pin, eliminating such
-            // stubs.
-            // This feature -- despite intra-site routing updates being deferred -- enables a stub-free physical
-            // netlist to be output. In addition, when reading this netlist back into RapidWright, any simulated
-            // branches will be discarded allowing any deferred update to continue as before.
-            final boolean simulateSwappedLutPins = Boolean.getBoolean("rapidwright.physNetlistWriter.simulateSwappedLutPins");
-
             Map<String, RouteBranchNode> map = new HashMap<>();
             for (RouteBranchNode rb : routingBranches) {
                 map.put(rb.toString(), rb);
@@ -478,11 +465,7 @@ public class PhysNetlistWriter {
                 if (rb.isSource()) {
                     sources.add(rb);
                 } else {
-                    boolean simulateThisSwappedLutPin = simulateSwappedLutPins &&
-                        rb.getType() == RouteSegmentType.SITE_PIN &&
-                        rb.getSitePin().isLUTInputPin();
-
-                    for (String driver : rb.getDrivers(simulateSwappedLutPins)) {
+                    for (String driver : rb.getDrivers()) {
                         RouteBranchNode driverBranch = map.get(driver);
                         if (driverBranch == null) continue;
                         if (driverBranch.getType() == RouteSegmentType.PIP) {
@@ -498,21 +481,7 @@ public class PhysNetlistWriter {
                                 }
                             }
                         }
-                        if (simulateThisSwappedLutPin) {
-                            List<RouteBranchNode> branches = driverBranch.getBranches();
-                            if (!branches.isEmpty()) {
-                                // driver is already driving something, which must be a (LUT) site pin
-                                // that can't the current site pin. Since it's already servicing a LUT
-                                // input, it can't be used to service this one so skip it.
-                                assert(branches.get(0).getType() == RouteSegmentType.SITE_PIN);
-                                assert(branches.get(0) != rb);
-                                continue;
-                            }
-                        }
-
                         driverBranch.addBranch(rb);
-                        // Assume this must be the only driver
-                        break;
                     }
                 }
             }
