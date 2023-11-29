@@ -1011,14 +1011,10 @@ public class RWRoute{
         }
 
         if (connection.getAltSinkRnodes().isEmpty()) {
-            // Check that this connection's exclusive sink node is used...
+            // Check that this connection's exclusive sink node is used but never overused
             RouteNode sinkRnode = connection.getSinkRnode();
             assert (sinkRnode.countConnectionsOfUser(connection.getNetWrapper()) > 0);
-            // ... but never overused, unless it is a LUT pin swap.
-            assert(!sinkRnode.isOverUsed() ||
-                    (lutPinSwapping && sinkRnode.getNode().getSitePin().getPinName().matches("[A-H][1-6]")));
-            // In both cases, do not re-route this connection and force the other connection(s) to.
-            // TODO: Make sinkRnode exclusive to this connection to avoid getting into this situation to begin with
+            assert(!sinkRnode.isOverUsed());
         }
 
         return !connection.getSink().isRouted() || connection.isCongested();
@@ -1617,13 +1613,9 @@ public class RWRoute{
             if (childRNode.isTarget()) {
                 boolean earlyTermination = false;
                 if (childRNode == connection.getSinkRnode() && connection.getAltSinkRnodes().isEmpty()) {
-                    // This sink must be exclusively reserved for this connection already ...
+                    // This sink must be exclusively reserved for this connection already
                     assert(childRNode.getOccupancy() == 0 ||
-                            childRNode.getNode().getIntentCode() == IntentCode.NODE_PINBOUNCE ||
-                            // ... unless it is a LUT pin swap, in which case terminate regardless
-                            // as this connection is in the right.
-                            (lutPinSwapping && childRNode.getNode().getSitePin().getPinName().matches("[A-H][1-6]")));
-                            // TODO: Make sinkRnode exclusive to this connection to avoid getting into this situation to begin with
+                            childRNode.getNode().getIntentCode() == IntentCode.NODE_PINBOUNCE);
                     earlyTermination = true;
                 } else {
                     if (childRNode.getOccupancy() == 0) {
