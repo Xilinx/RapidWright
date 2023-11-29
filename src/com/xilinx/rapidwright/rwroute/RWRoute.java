@@ -1450,8 +1450,8 @@ public class RWRoute{
             assert(connection.getRnodes().isEmpty());
             assert(!connection.getSink().isRouted());
 
-            // Undo what ripUp() did for the one-and-only sink node
             if (connection.getAltSinkRnodes().isEmpty()) {
+                // Undo what ripUp() did for the one-and-only sink node
                 RouteNode sinkRnode = connection.getSinkRnode();
                 sinkRnode.incrementUser(connection.getNetWrapper());
                 sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
@@ -1722,7 +1722,7 @@ public class RWRoute{
     }
 
     protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection) {
-        return isAccessiblePinfeedI(child, connection, !lutPinSwapping);
+        return isAccessiblePinfeedI(child, connection, !lutPinSwapping /* TODO: Revisit */);
     }
 
     protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection, boolean assertOnOveruse) {
