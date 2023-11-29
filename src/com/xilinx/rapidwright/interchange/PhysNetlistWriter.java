@@ -459,7 +459,7 @@ public class PhysNetlistWriter {
             // property (which allows RWRoute to perform LUT pin swapping but not move the swapped SitePinInst nor
             // perform any intra-site routing updates). With the aforementioned RWRoute option, for swapped LUT pins
             // default PhysNetlistWriter would not be able to identify the site pin that the routing services, thus
-            // causing any deferred site pins to appear as unconnected stubs.
+            // causing any deferred site pin updates to appear as unconnected stubs.
             // Enabling this following option allows the PhysNetlistWriter to simulate LUT pin swapping such that
             // any routing servicing a LUT will branch (incorrectly) to any other LUT input pin, eliminating such
             // stubs.
