@@ -459,13 +459,13 @@ public class PhysNetlistWriter {
             // property (which allows RWRoute to perform LUT pin swapping but not move the swapped SitePinInst nor
             // perform any intra-site routing updates). With the aforementioned RWRoute option, for swapped LUT pins
             // default PhysNetlistWriter would not be able to identify the site pin that the routing services, thus
-            // causing any swapped site pins to appear as unconnected stubs.
+            // causing any deferred site pins to appear as unconnected stubs.
             // Enabling this following option allows the PhysNetlistWriter to simulate LUT pin swapping such that
             // any routing servicing a LUT will branch (incorrectly) to any other LUT input pin, eliminating such
             // stubs.
             // This feature -- despite intra-site routing updates being deferred -- enables a stub-free physical
-            // netlist to be output. In addition, when reading this netlist back into RapidWright, any simulated
-            // branches will be discarded allowing any deferred update to continue as before.
+            // netlist to be output. In addition, when reading this netlist back into RapidWright using PhysNetlistReader,
+            // any simulated branches will be discarded allowing deferred updates to continue as before.
             final boolean simulateSwappedLutPins = Boolean.getBoolean("rapidwright.physNetlistWriter.simulateSwappedLutPins");
 
             Map<String, RouteBranchNode> map = new HashMap<>();
