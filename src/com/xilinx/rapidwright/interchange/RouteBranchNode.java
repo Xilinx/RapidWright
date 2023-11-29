@@ -148,7 +148,7 @@ public class RouteBranchNode {
         routeBranch.setParent(this);
     }
 
-    public List<String> getDrivers() {
+    public List<String> getDrivers(boolean simulateSwappedLutPins) {
         ArrayList<String> drivers = new ArrayList<String>();
 
         switch(type) {
@@ -182,8 +182,7 @@ public class RouteBranchNode {
                     drivers.add(spi.getSite().getName() + "/" + belPin.toString());
                 } else {
                     List<Node> nodes;
-                    if (spi.isLUTInputPin() &&
-                            Boolean.getBoolean("rapidwright.physNetlistWriter.simulateSwappedLutPins")) {
+                    if (simulateSwappedLutPins && spi.isLUTInputPin()) {
                         char lutLetter = spi.getName().charAt(0);
                         int originalInput = spi.getName().charAt(1) - '0';
                         Site site = spi.getSite();
