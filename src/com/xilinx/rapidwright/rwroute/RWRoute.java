@@ -566,25 +566,18 @@ public class RWRoute{
 
                 // Where appropriate, allow all 6 LUT pins to be swapped to begin with
                 char lutLetter = sink.getName().charAt(0);
-                char lutInput = sink.getName().charAt(1);
                 int numberOfSwappablePins = (lutPinSwapping && sink.isLUTInputPin())
                         ? LUTTools.MAX_LUT_SIZE : 0;
                 if (numberOfSwappablePins > 0) {
                     for (Cell cell : DesignTools.getConnectedCells(sink)) {
-                        if (cell.isPinFixed("A" + lutInput)) {
-                            // A connected cell has specified that this physical pin is
-                            // fixed -- do not allow any swapping
-                            numberOfSwappablePins = 0;
-                            break;
-                        }
                         BEL bel = cell.getBEL();
                         assert(bel.isLUT());
                         String belName = bel.getName();
                         if (belName.charAt(0) != lutLetter) {
                             assert(cell.getType().startsWith("RAM"));
                             // This pin connects to other LUTs! (e.g. SLICEM.H[1-6] also serves
-                            // as the WA for A-G LUTs) -- do not allow any swapping
-                            // TODO: Relax this restriction
+                            // as the WA for A-G LUTs used as distributed RAM) -- do not allow any swapping
+                            // TODO: Relax this when https://github.com/Xilinx/RapidWright/issues/901 is fixed
                             numberOfSwappablePins = 0;
                             break;
                         }
