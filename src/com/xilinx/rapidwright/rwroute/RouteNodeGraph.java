@@ -91,7 +91,7 @@ public class RouteNodeGraph {
     public final int[] nextLagunaColumn;
     public final int[] prevLagunaColumn;
 
-    /**
+    /** 
      * Map indicating which wire indices within a Laguna-adjacent INT tile have
      * IntentCode.NODE_PINFEED that lead into the Laguna tile.
      */
