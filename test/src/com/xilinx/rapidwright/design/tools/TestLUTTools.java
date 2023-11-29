@@ -154,10 +154,11 @@ public class TestLUTTools {
         try {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "true");
             RWRoute.routeDesignWithUserDefinedArguments(design, new String[]{"--nonTimingDriven", "--lutPinSwapping", "--verbose"});
+            int numPinsSwapped = LUTTools.swapLutPinsFromPIPs(design);
             if (fixPins) {
-                Assertions.assertEquals(0, LUTTools.updateLutPinSwapsFromPIPs(design));
+                Assertions.assertEquals(0, numPinsSwapped);
             } else {
-                Assertions.assertTrue(LUTTools.updateLutPinSwapsFromPIPs(design) > 0);
+                Assertions.assertTrue(numPinsSwapped > 0);
                 TestRWRoute.assertAllSourcesRoutedFlagSet(design);
                 TestRWRoute.assertAllPinsRouted(design);
                 TestRWRoute.assertVivadoFullyRouted(design);

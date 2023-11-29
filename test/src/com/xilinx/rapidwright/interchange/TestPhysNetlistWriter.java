@@ -337,7 +337,7 @@ public class TestPhysNetlistWriter {
             Design outputDesign = PhysNetlistReader.readPhysNetlist(interchangePath.toString(), inputDesign.getNetlist());
             inputDesign = null;
 
-            Assertions.assertTrue(LUTTools.updateLutPinSwapsFromPIPs(outputDesign) > 0);
+            Assertions.assertTrue(LUTTools.swapLutPinsFromPIPs(outputDesign) > 0);
             DesignTools.updatePinsIsRouted(outputDesign);
             TestRWRoute.assertAllSourcesRoutedFlagSet(outputDesign);
             TestRWRoute.assertAllPinsRouted(outputDesign);
