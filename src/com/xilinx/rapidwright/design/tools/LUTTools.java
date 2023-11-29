@@ -476,7 +476,7 @@ public class LUTTools {
      * the SitePinInst objects, etc.
      * @param oldPinToNewPins Mapping from old pins to new pins.
      */
-    public static void swapMultipleLutPins(Map<SitePinInst, String> oldPinToNewPins) {
+    public static int swapMultipleLutPins(Map<SitePinInst, String> oldPinToNewPins) {
         Map<String,Map<String,PinSwap>> pinSwaps = new HashMap<>();
 
         for (Map.Entry<SitePinInst, String> e : oldPinToNewPins.entrySet()) {
@@ -538,9 +538,14 @@ public class LUTTools {
         }
 
         // Make all pin swaps per LUT site simultaneously
+        int numPinSwaps = 0;
         for (Map.Entry<String,Map<String,PinSwap>> e : pinSwaps.entrySet()) {
-            swapSingleLutPins(e.getKey(), e.getValue().values());
+            Collection<PinSwap> swaps = e.getValue().values();
+            swapSingleLutPins(e.getKey(), swaps);
+            numPinSwaps += swaps.size();
         }
+
+        return numPinSwaps;
     }
 
     /**
@@ -549,14 +554,14 @@ public class LUTTools {
      * @param pinSwaps The list of pin swaps to be performed on the pair of LUT sites
      */
     public static void swapSingleLutPins(String key, Collection<PinSwap> pinSwaps) {
-        Collection<PinSwap> localPinSwaps = pinSwaps;
+        Collection<PinSwap> copyOnWritePinSwaps = pinSwaps;
         LinkedHashMap<String,PinSwap> overwrittenPins = new LinkedHashMap<>();
         LinkedHashMap<String,PinSwap> emptySlots = new LinkedHashMap<>();
-        for (PinSwap ps : localPinSwaps) {
+        for (PinSwap ps : copyOnWritePinSwaps) {
             overwrittenPins.put(ps.getNewPhysicalName(),ps);
             emptySlots.put(ps.getOldPhysicalName(),ps);
         }
-        for (PinSwap ps : localPinSwaps) {
+        for (PinSwap ps : copyOnWritePinSwaps) {
             String oldPin = ps.getOldPhysicalName();
             String newPin = ps.getNewPhysicalName();
             if (emptySlots.containsKey(newPin) && overwrittenPins.containsKey(newPin)) {
@@ -590,10 +595,10 @@ public class LUTTools {
                         PinSwap ps = new PinSwap(neighborLUT, neighborLUT.getLogicalPinMapping(oldPhysicalPin),oldPhysicalPin,newPhysicalPin,
                                 neighborLUT.getLogicalPinMapping(newPhysicalPin),newNetPinName);
 
-                        if (localPinSwaps == pinSwaps) {
-                            localPinSwaps = new ArrayList<>(pinSwaps);
+                        if (copyOnWritePinSwaps == pinSwaps) {
+                            copyOnWritePinSwaps = new ArrayList<>(pinSwaps);
                         }
-                        localPinSwaps.add(ps);
+                        copyOnWritePinSwaps.add(ps);
                         continue;
                     }
                 }
@@ -609,33 +614,35 @@ public class LUTTools {
                     ps.setCompanionCell(neighborLUT, neighborLUT.getLogicalPinMapping(oldPhysicalPin));
                 }
             }
-            if (localPinSwaps == pinSwaps) {
-                localPinSwaps = new ArrayList<>(pinSwaps);
+            if (copyOnWritePinSwaps == pinSwaps) {
+                copyOnWritePinSwaps = new ArrayList<>(pinSwaps);
             }
-            localPinSwaps.add(ps);
+            copyOnWritePinSwaps.add(ps);
         }
 
         // Prepares pins for swapping by removing them
         Queue<SitePinInst> q = new LinkedList<>();
-        for (PinSwap ps : localPinSwaps) {
-            String oldSitePinName = ps.getCell().getSiteWireNameFromPhysicalPin(ps.getOldPhysicalName());
-            SitePinInst p = ps.getCell().getSiteInst().getSitePinInst(oldSitePinName);
+        for (PinSwap ps : copyOnWritePinSwaps) {
+            Cell cell = ps.getCell();
+            String oldSitePinName = cell.getSiteWireNameFromPhysicalPin(ps.getOldPhysicalName());
+            SiteInst si = cell.getSiteInst();
+            SitePinInst p = si.getSitePinInst(oldSitePinName);
             q.add(p);
             if (p == null) {
                 continue;
             }
             p.setSiteInst(null,true);
             // Removes pin mappings to prepare for new pin mappings
-            ps.getCell().removePinMapping(ps.getOldPhysicalName());
+            cell.removePinMapping(ps.getOldPhysicalName());
             if (ps.getCompanionCell() != null) {
                 ps.getCompanionCell().removePinMapping(ps.getOldPhysicalName());
             }
         }
 
-        assert(q.size() == localPinSwaps.size());
+        assert(q.size() == copyOnWritePinSwaps.size());
 
         // Perform the actual swap on cell pin mappings
-        for (PinSwap ps : localPinSwaps) {
+        for (PinSwap ps : copyOnWritePinSwaps) {
             ps.getCell().addPinMapping(ps.getNewPhysicalName(), ps.getLogicalName());
             if (ps.getCompanionCell() != null) {
                 ps.getCompanionCell().addPinMapping(ps.getNewPhysicalName(), ps.getCompanionLogicalName());
@@ -735,8 +742,7 @@ public class LUTTools {
             unmatchedSitePins.clear();
         }
 
-        swapMultipleLutPins(oldPinToNewPins);
-        return oldPinToNewPins.size();
+        return swapMultipleLutPins(oldPinToNewPins);
     }
 
     public static void main(String[] args) {
