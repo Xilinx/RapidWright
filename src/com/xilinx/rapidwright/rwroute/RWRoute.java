@@ -566,17 +566,10 @@ public class RWRoute{
 
                 // Where appropriate, allow all 6 LUT pins to be swapped to begin with
                 char lutLetter = sink.getName().charAt(0);
-                char lutInput = sink.getName().charAt(1);
                 int numberOfSwappablePins = (lutPinSwapping && sink.isLUTInputPin())
                         ? LUTTools.MAX_LUT_SIZE : 0;
                 if (numberOfSwappablePins > 0) {
                     for (Cell cell : DesignTools.getConnectedCells(sink)) {
-                        if (cell.isPinFixed("A" + lutInput)) {
-                            // A connected cell has specified that this physical pin is
-                            // fixed -- do not allow any swapping
-                            numberOfSwappablePins = 0;
-                            break;
-                        }
                         BEL bel = cell.getBEL();
                         assert(bel.isLUT());
                         String belName = bel.getName();
