@@ -155,8 +155,6 @@ public class TestRWRoute {
     @LargeTest(max_memory_gb = 8)
     public void testNonTimingDrivenFullRoutingWithLutPinSwapping(String path) {
         Design design = RapidWrightDCP.loadDCP(path);
-        // Turns out that "bnn.dcp" and "optical-flow.dcp" have all their pins fixed
-        TestLUTTools.fixAllLutPins(design, false);
         RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--lutPinSwapping"});
         assertAllSourcesRoutedFlagSet(design);
         assertAllPinsRouted(design);
