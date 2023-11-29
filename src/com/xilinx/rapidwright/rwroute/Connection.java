@@ -310,7 +310,9 @@ public class Connection implements Comparable<Connection>{
         } else {
             assert(!altSinkRnodes.contains(sinkRnode));
         }
-        assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
+        assert(sinkRnode.getType() == RouteNodeType.PINFEED_I ||
+               // Can be a WIRE if using LUT output pin (rather than input) as sink
+               sinkRnode.getType() == RouteNodeType.WIRE);
         altSinkRnodes.add(sinkRnode);
     }
 
