@@ -82,7 +82,7 @@ public class TestLUTTools {
     }
 
     @Test
-    public void testFixPinSwaps() {
+    public void testSwapLutPinsFromPIPs() {
         Design design = new Design("testFixPinSwaps", "xcvu3p");
         SiteInst si = design.createSiteInst("SLICE_X0Y0");
         // Create and place on both A6LUT and A5LUT
@@ -116,7 +116,7 @@ public class TestLUTTools {
         // Pin mapping but without a net
         cell5.addPinMapping("A3", "I0");
 
-        Assertions.assertEquals(1, LUTTools.updateLutPinSwapsFromPIPs(design));
+        Assertions.assertEquals(1, LUTTools.swapLutPinsFromPIPs(design));
         // Check A1 swapped to A5
         Assertions.assertEquals("A5", oldSpiSwap.getName());
         Assertions.assertEquals("I0", cell6.getLogicalPinMapping("A5"));
