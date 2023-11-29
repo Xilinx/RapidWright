@@ -318,6 +318,15 @@ public class TestPhysNetlistWriter {
     @LargeTest(max_memory_gb = 8)
     public void testSimulateSwappedLutPinsWithRWRoute(String path, @TempDir Path tempDir) throws IOException {
         Design inputDesign = RapidWrightDCP.loadDCP(path);
+        // Turns out that "bnn.dcp" and "optical-flow.dcp" have all their pins fixed
+        for (Cell cell : inputDesign.getCells()) {
+            if (!cell.getBEL().isLUT()) {
+                continue;
+            }
+            for (String pin : cell.getPinMappingsP2L().keySet()) {
+                cell.unFixPin(pin);
+            }
+        }
         try {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "true");
             RWRoute.routeDesignWithUserDefinedArguments(inputDesign, new String[]{"--nonTimingDriven", "--lutPinSwapping"});

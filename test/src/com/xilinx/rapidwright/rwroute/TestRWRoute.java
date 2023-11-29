@@ -38,6 +38,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -59,7 +60,6 @@ import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
 import com.xilinx.rapidwright.util.VivadoTools;
-import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestRWRoute {
     private static void assertAllPinsRouted(Net net) {
@@ -154,6 +154,15 @@ public class TestRWRoute {
     @LargeTest(max_memory_gb = 8)
     public void testNonTimingDrivenFullRoutingWithLutPinSwapping(String path) {
         Design design = RapidWrightDCP.loadDCP(path);
+        // Turns out that "bnn.dcp" and "optical-flow.dcp" have all their pins fixed
+        for (Cell cell : design.getCells()) {
+            if (!cell.getBEL().isLUT()) {
+                continue;
+            }
+            for (String pin : cell.getPinMappingsP2L().keySet()) {
+                cell.unFixPin(pin);
+            }
+        }
         RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--lutPinSwapping"});
         assertAllSourcesRoutedFlagSet(design);
         assertAllPinsRouted(design);
