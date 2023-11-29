@@ -465,6 +465,10 @@ public class PhysNetlistWriter {
                 if (rb.isSource()) {
                     sources.add(rb);
                 } else {
+                    boolean simulateSwappedLutPins = Boolean.getBoolean("rapidwright.physNetlistWriter.simulateSwappedLutPins") &&
+                        rb.getType() == RouteSegmentType.SITE_PIN &&
+                        rb.getSitePin().isLUTInputPin();
+
                     for (String driver : rb.getDrivers()) {
                         RouteBranchNode driverBranch = map.get(driver);
                         if (driverBranch == null) continue;
@@ -481,7 +485,21 @@ public class PhysNetlistWriter {
                                 }
                             }
                         }
+                        if (simulateSwappedLutPins) {
+                            List<RouteBranchNode> branches = driverBranch.getBranches();
+                            if (!branches.isEmpty()) {
+                                // driver is already driving something, which must be a (LUT) site pin
+                                // that can't the current site pin. Since it's already servicing a LUT
+                                // input, it can't be used to service this one so skip it.
+                                assert(branches.get(0).getType() == RouteSegmentType.SITE_PIN);
+                                assert(branches.get(0) != rb);
+                                continue;
+                            }
+                        }
+
                         driverBranch.addBranch(rb);
+                        // Assume this must be the only driver
+                        break;
                     }
                 }
             }
