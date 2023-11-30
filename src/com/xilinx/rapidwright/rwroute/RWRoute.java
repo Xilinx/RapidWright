@@ -1069,34 +1069,21 @@ public class RWRoute{
      * Assigns a list nodes to each connection to complete the route path of it.
      */
     protected void assignNodesToConnections() {
-        final boolean deferIntraSiteRoutingUpdates =
-                Boolean.getBoolean("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates");
-
         for (Connection connection : indirectConnections) {
             List<Node> nodes = new ArrayList<>();
-            connection.setNodes(nodes);
 
-            List<RouteNode> rnodes = connection.getRnodes();
-            if (rnodes.isEmpty()) {
-                continue;
-            }
             RouteNode sinkRnode = connection.getSinkRnode();
-            assert(sinkRnode == rnodes.get(0));
-
-            SitePinInst sinkSpi = connection.getSink();
-            Node sinkNode = sinkSpi.getConnectedNode();
-            if (sinkSpi.isLUTInputPin()) {
-                // LUT input pins always should have an INT tile node
-                assert(sinkNode.getTile().getTileTypeEnum() == TileTypeEnum.INT);
-                // In fact, they should even be what the routing connects to, unless deferIntraSiteRoutingUpdates is set
-                assert(sinkNode.equals(sinkRnode.getNode()) || deferIntraSiteRoutingUpdates);
-            } else {
-                List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(sinkRnode.getNode(), sinkNode);
+            List<RouteNode> rnodes = connection.getRnodes();
+            if (sinkRnode == rnodes.get(0)) {
+                List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(sinkRnode.getNode(), connection.getSink().getConnectedNode());
                 if (switchBoxToSink.size() >= 2) {
                     for (int i = 0; i < switchBoxToSink.size() - 1; i++) {
                         nodes.add(switchBoxToSink.get(i));
                     }
                 }
+            } else {
+                // Routing must go to an alternate sink
+                assert(rnodes.get(0).getNode().getSitePin() != null);
             }
 
             for (RouteNode rnode : rnodes) {
@@ -1109,6 +1096,8 @@ public class RWRoute{
                     nodes.add(sourceToSwitchBox.get(i));
                 }
             }
+
+            connection.setNodes(nodes);
         }
     }
 
