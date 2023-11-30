@@ -461,8 +461,10 @@ public class PhysNetlistWriter {
             // default PhysNetlistWriter would not be able to identify the site pin that the routing services, thus
             // causing any deferred site pin updates to appear as unconnected stubs.
             // Enabling this following option allows the PhysNetlistWriter to simulate LUT pin swapping such that
-            // any routing servicing a LUT will branch (incorrectly) to any other LUT input pin, eliminating such
-            // stubs.
+            // any routes that service an incorrect LUT input site pin are allowed to have
+            // a fake branch to the correct site pin on the same LUT for the
+            // purposes of simulating (prior to applying deferred updates) a fully
+            // routed net.
             // This feature -- despite intra-site routing updates being deferred -- enables a stub-free physical
             // netlist to be output. In addition, when reading this netlist back into RapidWright using PhysNetlistReader,
             // any simulated branches will be discarded allowing deferred updates to continue as before.
