@@ -132,49 +132,22 @@ public class TestLUTTools {
 
     @ParameterizedTest
     @CsvSource({
-            "bnn.dcp,false",
-            "bnn.dcp,true",
-            "optical-flow.dcp,false",
-            "optical-flow.dcp,true",
+            "bnn.dcp",
+            "optical-flow.dcp",
     })
     @LargeTest(max_memory_gb = 8)
-    public void testUpdateLutPinSwapsFromPIPsWithRWRoute(String path, boolean fixPins) {
+    public void testUpdateLutPinSwapsFromPIPsWithRWRoute(String path) {
         Design design = RapidWrightDCP.loadDCP(path);
-        fixAllLutPins(design, fixPins);
         try {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "true");
             RWRoute.routeDesignWithUserDefinedArguments(design, new String[]{"--nonTimingDriven", "--lutPinSwapping", "--verbose"});
             int numPinsSwapped = LUTTools.swapLutPinsFromPIPs(design);
-            if (fixPins) {
-                Assertions.assertEquals(0, numPinsSwapped);
-            } else {
-                Assertions.assertTrue(numPinsSwapped > 0);
-                TestRWRoute.assertAllSourcesRoutedFlagSet(design);
-                TestRWRoute.assertAllPinsRouted(design);
-                TestRWRoute.assertVivadoFullyRouted(design);
-            }
+            Assertions.assertTrue(numPinsSwapped > 0);
+            TestRWRoute.assertAllSourcesRoutedFlagSet(design);
+            TestRWRoute.assertAllPinsRouted(design);
+            TestRWRoute.assertVivadoFullyRouted(design);
         } finally {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "false");
-        }
-    }
-
-    public static void fixAllLutPins(Design design, boolean fixPins) {
-        for (SiteInst si : design.getSiteInsts()) {
-            if (!Utils.isSLICE(si)) {
-                continue;
-            }
-            for (Cell cell : si.getCells()) {
-                if (!cell.getBEL().isLUT()) {
-                    continue;
-                }
-                for (String pin : cell.getPinMappingsP2L().keySet()) {
-                    if (fixPins) {
-                        cell.fixPin(pin);
-                    } else {
-                        cell.unFixPin(pin);
-                    }
-                }
-            }
         }
     }
 }

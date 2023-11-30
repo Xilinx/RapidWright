@@ -490,13 +490,17 @@ public class Connection implements Comparable<Connection>{
             // to the same LUT more than once -- the illegal case of the same
             // physical pin servicing more than one logical pin
             sinkRnode.setTarget(target);
+        } else {
+            assert(altSinkRnodes != null && !altSinkRnodes.isEmpty());
         }
         if (altSinkRnodes != null) {
             for (RouteNode rnode : altSinkRnodes) {
                 // Same condition as above: only allow this as an alternate sink
                 // if it's not already in use by the current net to prevent the case
                 // where the same physical pin services more than one logical pin
-                if (rnode.countConnectionsOfUser(netWrapper) == 0) {
+                if (rnode.countConnectionsOfUser(netWrapper) == 0 ||
+                    // Except if it is not a PINFEED_I
+                    rnode.getType() != RouteNodeType.PINFEED_I) {
                     assert(rnode.getNode().getIntentCode() != IntentCode.NODE_PINBOUNCE);
                     rnode.setTarget(target);
                 }
