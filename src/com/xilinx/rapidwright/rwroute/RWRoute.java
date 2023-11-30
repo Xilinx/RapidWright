@@ -904,16 +904,15 @@ public class RWRoute{
     protected void postRouteProcess() {
         if (routeIteration <= config.getMaxIterations()) {
             // perform LUT pin mapping updates
-            if (lutPinSwapping) {
-                final boolean deferIntraSiteRoutingUpdates =
-                        Boolean.getBoolean("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates");
-
+            if (lutPinSwapping &&
+                    Boolean.getBoolean("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates")) {
                 Map<SitePinInst, String> pinSwaps = new HashMap<>();
                 for (Connection connection: indirectConnections) {
                     SitePinInst oldSinkSpi = connection.getSink();
                     if (!oldSinkSpi.isLUTInputPin() || !oldSinkSpi.isRouted()) {
                         continue;
                     }
+
                     List<RouteNode> rnodes = connection.getRnodes();
                     RouteNode newSinkRnode = rnodes.get(0);
                     if (newSinkRnode == connection.getSinkRnode()) {
@@ -921,11 +920,9 @@ public class RWRoute{
                     }
                     connection.setSinkRnode(newSinkRnode);
 
-                    if (!deferIntraSiteRoutingUpdates) {
-                        SitePin newSitePin = newSinkRnode.getNode().getSitePin();
-                        String existing = pinSwaps.put(oldSinkSpi, newSitePin.getPinName());
-                        assert(existing == null);
-                    }
+                    SitePin newSitePin = newSinkRnode.getNode().getSitePin();
+                    String existing = pinSwaps.put(oldSinkSpi, newSitePin.getPinName());
+                    assert(existing == null);
                 }
                 LUTTools.swapMultipleLutPins(pinSwaps);
             }
