@@ -116,6 +116,7 @@ public class RWRoute{
     private float timingWeight;
     /** 1 - timingWeight */
     private float oneMinusTimingWeight;
+    /** Flag for whether LUT pin swaps are to be considered */
     protected boolean lutPinSwapping;
 
     /** The current routing iteration */
@@ -1436,7 +1437,7 @@ public class RWRoute{
             assert(!connection.getSink().isRouted());
 
             if (connection.getAltSinkRnodes().isEmpty()) {
-                // Undo what ripUp() did for the one-and-only sink node
+                // Undo what ripUp() did for this connection which has a single exclusive sink
                 RouteNode sinkRnode = connection.getSinkRnode();
                 sinkRnode.incrementUser(connection.getNetWrapper());
                 sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
