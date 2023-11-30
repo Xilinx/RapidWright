@@ -1619,20 +1619,9 @@ public class RWRoute{
                             childRNode.getNode().getIntentCode() == IntentCode.NODE_PINBOUNCE);
                     earlyTermination = true;
                 } else {
-                    if (childRNode.getOccupancy() == 0) {
-                        // Target may not be an exclusive sink (or a sink for that matter)
-                        // but it is uncompletely unused
-                        earlyTermination = true;
-                    } else if (childRNode.getType() != RouteNodeType.PINFEED_I) {
-                        // Target is already used but not a sink, only terminate if this net
-                        // will not overuse this resource
-                        earlyTermination = childRNode.countConnectionsOfUser(connection.getNetWrapper()) > 0;
-                    } else {
-                        // Target is a sink but already used
-                        assert(childRNode.getOccupancy() > 0 && childRNode.getType() == RouteNodeType.PINFEED_I &&
-                                // But cannot be used by this net already
-                                childRNode.countConnectionsOfUser(connection.getNetWrapper()) == 0);
-                    }
+                    // Target is not an exclusive sink, only early terminate if this net will not
+                    // (further) overuse this node
+                    earlyTermination = !childRNode.willOverUse(connection.getNetWrapper());
                 }
 
                 if (earlyTermination) {
