@@ -1084,6 +1084,10 @@ public class RWRoute{
                 }
             } else {
                 // Routing must go to an alternate sink
+                assert(!connection.getAltSinkRnodes().isEmpty());
+
+                // Assume that it doesn't need unprojecting back to the sink pin
+                // since the sink node is a site pin
                 assert(rnodes.get(0).getNode().getSitePin() != null);
             }
 
