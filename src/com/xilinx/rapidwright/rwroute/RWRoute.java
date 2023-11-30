@@ -1073,11 +1073,14 @@ public class RWRoute{
                 Boolean.getBoolean("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates");
 
         for (Connection connection : indirectConnections) {
-            List<Node> nodes = new ArrayList<>();
-            RouteNode sinkRnode = connection.getSinkRnode();
             List<RouteNode> rnodes = connection.getRnodes();
+            if (rnodes.isEmpty()) {
+                continue;
+            }
+            RouteNode sinkRnode = connection.getSinkRnode();
             assert(sinkRnode == rnodes.get(0));
 
+            List<Node> nodes = new ArrayList<>();
             SitePinInst sinkSpi = connection.getSink();
             Node sinkNode = sinkSpi.getConnectedNode();
             if (sinkSpi.isLUTInputPin()) {
