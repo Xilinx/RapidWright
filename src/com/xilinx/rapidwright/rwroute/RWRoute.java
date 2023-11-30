@@ -1073,6 +1073,9 @@ public class RWRoute{
                 Boolean.getBoolean("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates");
 
         for (Connection connection : indirectConnections) {
+            List<Node> nodes = new ArrayList<>();
+            connection.setNodes(nodes);
+
             List<RouteNode> rnodes = connection.getRnodes();
             if (rnodes.isEmpty()) {
                 continue;
@@ -1080,7 +1083,6 @@ public class RWRoute{
             RouteNode sinkRnode = connection.getSinkRnode();
             assert(sinkRnode == rnodes.get(0));
 
-            List<Node> nodes = new ArrayList<>();
             SitePinInst sinkSpi = connection.getSink();
             Node sinkNode = sinkSpi.getConnectedNode();
             if (sinkSpi.isLUTInputPin()) {
@@ -1107,8 +1109,6 @@ public class RWRoute{
                     nodes.add(sourceToSwitchBox.get(i));
                 }
             }
-
-            connection.setNodes(nodes);
         }
     }
 
