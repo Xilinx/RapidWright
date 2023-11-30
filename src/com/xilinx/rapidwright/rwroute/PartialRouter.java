@@ -408,7 +408,7 @@ public class PartialRouter extends RWRoute {
 
                 finishRouteConnection(connection, sinkRnode);
                 if (!connection.getSink().isRouted() && connection.getAltSinkRnodes().isEmpty()) {
-                    // Undo what ripUp() did for the one-and-only sink node
+                    // Undo what ripUp() did for this connection which has a single exclusive sink
                     sinkRnode.incrementUser(connection.getNetWrapper());
                     sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
                 }
@@ -657,7 +657,7 @@ public class PartialRouter extends RWRoute {
 
                 finishRouteConnection(connection, sinkRnode);
                 if (!connection.getSink().isRouted() && connection.getAltSinkRnodes().isEmpty()) {
-                    // Undo what ripUp() did for the one-and-only sink node
+                    // Undo what ripUp() did for this connection which has a single exclusive sink
                     sinkRnode.incrementUser(connection.getNetWrapper());
                     sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
                 }
