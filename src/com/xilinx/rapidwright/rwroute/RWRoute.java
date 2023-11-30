@@ -905,7 +905,7 @@ public class RWRoute{
         if (routeIteration <= config.getMaxIterations()) {
             // perform LUT pin mapping updates
             if (lutPinSwapping &&
-                    Boolean.getBoolean("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates")) {
+                    !Boolean.getBoolean("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates")) {
                 Map<SitePinInst, String> pinSwaps = new HashMap<>();
                 for (Connection connection: indirectConnections) {
                     SitePinInst oldSinkSpi = connection.getSink();
