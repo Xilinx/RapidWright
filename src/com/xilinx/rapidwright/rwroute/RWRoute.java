@@ -116,6 +116,7 @@ public class RWRoute{
     private float timingWeight;
     /** 1 - timingWeight */
     private float oneMinusTimingWeight;
+    /** Flag for whether LUT pin swaps are to be considered */
     protected boolean lutPinSwapping;
 
     /** The current routing iteration */
@@ -903,16 +904,15 @@ public class RWRoute{
     protected void postRouteProcess() {
         if (routeIteration <= config.getMaxIterations()) {
             // perform LUT pin mapping updates
-            if (lutPinSwapping) {
-                final boolean deferIntraSiteRoutingUpdates =
-                        Boolean.getBoolean("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates");
-
+            if (lutPinSwapping &&
+                    Boolean.getBoolean("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates")) {
                 Map<SitePinInst, String> pinSwaps = new HashMap<>();
                 for (Connection connection: indirectConnections) {
                     SitePinInst oldSinkSpi = connection.getSink();
                     if (!oldSinkSpi.isLUTInputPin() || !oldSinkSpi.isRouted()) {
                         continue;
                     }
+
                     List<RouteNode> rnodes = connection.getRnodes();
                     RouteNode newSinkRnode = rnodes.get(0);
                     if (newSinkRnode == connection.getSinkRnode()) {
@@ -920,11 +920,9 @@ public class RWRoute{
                     }
                     connection.setSinkRnode(newSinkRnode);
 
-                    if (!deferIntraSiteRoutingUpdates) {
-                        SitePin newSitePin = newSinkRnode.getNode().getSitePin();
-                        String existing = pinSwaps.put(oldSinkSpi, newSitePin.getPinName());
-                        assert(existing == null);
-                    }
+                    SitePin newSitePin = newSinkRnode.getNode().getSitePin();
+                    String existing = pinSwaps.put(oldSinkSpi, newSitePin.getPinName());
+                    assert(existing == null);
                 }
                 LUTTools.swapMultipleLutPins(pinSwaps);
             }
@@ -1069,29 +1067,25 @@ public class RWRoute{
      * Assigns a list nodes to each connection to complete the route path of it.
      */
     protected void assignNodesToConnections() {
-        final boolean deferIntraSiteRoutingUpdates =
-                Boolean.getBoolean("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates");
-
         for (Connection connection : indirectConnections) {
             List<Node> nodes = new ArrayList<>();
+
             RouteNode sinkRnode = connection.getSinkRnode();
             List<RouteNode> rnodes = connection.getRnodes();
-            assert(sinkRnode == rnodes.get(0));
-
-            SitePinInst sinkSpi = connection.getSink();
-            Node sinkNode = sinkSpi.getConnectedNode();
-            if (sinkSpi.isLUTInputPin()) {
-                // LUT input pins always should have an INT tile node
-                assert(sinkNode.getTile().getTileTypeEnum() == TileTypeEnum.INT);
-                // In fact, they should even be what the routing connects to, unless deferIntraSiteRoutingUpdates is set
-                assert(sinkNode.equals(sinkRnode.getNode()) || deferIntraSiteRoutingUpdates);
-            } else {
-                List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(sinkRnode.getNode(), sinkNode);
+            if (sinkRnode == rnodes.get(0)) {
+                List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(sinkRnode.getNode(), connection.getSink().getConnectedNode());
                 if (switchBoxToSink.size() >= 2) {
                     for (int i = 0; i < switchBoxToSink.size() - 1; i++) {
                         nodes.add(switchBoxToSink.get(i));
                     }
                 }
+            } else {
+                // Routing must go to an alternate sink
+                assert(!connection.getAltSinkRnodes().isEmpty());
+
+                // Assume that it doesn't need unprojecting back to the sink pin
+                // since the sink node is a site pin
+                assert(rnodes.get(0).getNode().getSitePin() != null);
             }
 
             for (RouteNode rnode : rnodes) {
@@ -1444,7 +1438,7 @@ public class RWRoute{
             assert(!connection.getSink().isRouted());
 
             if (connection.getAltSinkRnodes().isEmpty()) {
-                // Undo what ripUp() did for the one-and-only sink node
+                // Undo what ripUp() did for this connection which has a single exclusive sink
                 RouteNode sinkRnode = connection.getSinkRnode();
                 sinkRnode.incrementUser(connection.getNetWrapper());
                 sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
@@ -1619,20 +1613,9 @@ public class RWRoute{
                             childRNode.getNode().getIntentCode() == IntentCode.NODE_PINBOUNCE);
                     earlyTermination = true;
                 } else {
-                    if (childRNode.getOccupancy() == 0) {
-                        // Target may not be an exclusive sink (or a sink for that matter)
-                        // but it is uncompletely unused
-                        earlyTermination = true;
-                    } else if (childRNode.getType() != RouteNodeType.PINFEED_I) {
-                        // Target is already used but not a sink, only terminate if this net
-                        // will not overuse this resource
-                        earlyTermination = childRNode.countConnectionsOfUser(connection.getNetWrapper()) > 0;
-                    } else {
-                        // Target is a sink but already used
-                        assert(childRNode.getOccupancy() > 0 && childRNode.getType() == RouteNodeType.PINFEED_I &&
-                                // But cannot be used by this net already
-                                childRNode.countConnectionsOfUser(connection.getNetWrapper()) == 0);
-                    }
+                    // Target is not an exclusive sink, only early terminate if this net will not
+                    // (further) overuse this node
+                    earlyTermination = !childRNode.willOverUse(connection.getNetWrapper());
                 }
 
                 if (earlyTermination) {
