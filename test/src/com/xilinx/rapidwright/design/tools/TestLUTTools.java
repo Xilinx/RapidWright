@@ -140,7 +140,7 @@ public class TestLUTTools {
         Design design = RapidWrightDCP.loadDCP(path);
         try {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "true");
-            RWRoute.routeDesignWithUserDefinedArguments(design, new String[]{"--nonTimingDriven", "--lutPinSwapping", "--verbose"});
+            RWRoute.routeDesignWithUserDefinedArguments(design, new String[]{"--nonTimingDriven", "--lutPinSwapping"});
             int numPinsSwapped = LUTTools.swapLutPinsFromPIPs(design);
             Assertions.assertTrue(numPinsSwapped > 0);
             TestRWRoute.assertAllSourcesRoutedFlagSet(design);
