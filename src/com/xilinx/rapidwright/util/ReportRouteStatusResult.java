@@ -72,7 +72,7 @@ public class ReportRouteStatusResult {
     }
 
     public boolean isFullyRouted() {
-        return unroutedNets == 0 && netsWithRoutingErrors == 0;
+        return logicalNets > 0 && unroutedNets == 0 && netsWithRoutingErrors == 0;
     }
 
 }

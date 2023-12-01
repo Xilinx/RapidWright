@@ -36,7 +36,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
- * Generated on: Wed May 17 22:32:37 2023
+ * Generated on: Fri Oct 20 21:29:57 2023
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  *
  * Class to hold utility APIs dealing with Parts and device names.
@@ -146,6 +146,7 @@ public class PartNameTools {
             case QRKINTEXU: return FamilyType.KINTEXU;
             case QRVERSALAICORE: return FamilyType.VERSAL;
             case QVERSALAICORE: return FamilyType.VERSAL;
+            case QVERSALPREMIUM: return FamilyType.VERSAL;
             case QVERSALPRIME: return FamilyType.VERSAL;
             case QVIRTEX7: return FamilyType.VIRTEX7;
             case QVIRTEXUPLUS: return FamilyType.VIRTEXUPLUS;
@@ -199,6 +200,7 @@ public class PartNameTools {
             case QRKINTEXU: return "Kintex UltraScale";
             case QRVERSALAICORE: return "Versal ACAP";
             case QVERSALAICORE: return "Versal ACAP";
+            case QVERSALPREMIUM: return "Versal ACAP";
             case QVERSALPRIME: return "Versal ACAP";
             case QVIRTEX7: return "Virtex-7";
             case QVIRTEXUPLUS: return "Virtex UltraScale+";
@@ -253,6 +255,7 @@ public class PartNameTools {
             case QRKINTEXU: return Series.UltraScale;
             case QRVERSALAICORE: return Series.Versal;
             case QVERSALAICORE: return Series.Versal;
+            case QVERSALPREMIUM: return Series.Versal;
             case QVERSALPRIME: return Series.Versal;
             case QVIRTEX7: return Series.Series7;
             case QVIRTEXUPLUS: return Series.UltraScalePlus;

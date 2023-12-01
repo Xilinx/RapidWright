@@ -23,6 +23,7 @@
 
 package com.xilinx.rapidwright.design;
 
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
@@ -34,6 +35,7 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.HashSet;
@@ -246,5 +248,45 @@ public class TestModuleInst {
         Assertions.assertFalse(validAnchorSites.contains(design.getDevice().getSite("SLICE_X117Y589")));
         Assertions.assertEquals(70560, validAnchorSites.size());
 
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "RAMB36E2,RAMB36_X1Y0/RAMB36E2",                // Regular RAMB36 conflict
+            "RAMB18E2,RAMB18_X1Y0/RAMB18E2_L",              // Regular RAMB18 (lower) conflict
+            "RAMB18E2,RAMB18_X1Y1/RAMB18E2_U",              // Regular RAMB18 (upper) conflict
+            "FIFO18E2,RAMB18_X1Y0/BELI_FIFO18E2_FIFO18E2",  // Regular FIFO18 (lower) conflict
+    })
+    public void testPlaceChecksBRAM(String unisim, String location) {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        Device device = design.getDevice();
+
+        // Unroute partially routed clock that cannot be relocated
+        design.getNet("clk").unroute();
+
+        Design emptyDesign = new Design("emptyDesign", design.getPartName());
+        Module module = new Module(design, false);
+        design = null;
+
+        ModuleInst mi = emptyDesign.createModuleInst("inst", module);
+        // Check placement successful
+        boolean skipIncompatible = false;
+        boolean allowOverlap = false;
+        Site newAnchor = device.getSite("SLICE_X16Y2");
+        Assertions.assertTrue(mi.place(newAnchor, skipIncompatible, allowOverlap));
+        mi.unplace();
+
+        // Place a cell there
+        Cell cell = emptyDesign.createAndPlaceCell("test_ram", Unisim.valueOf(unisim), location);
+        SiteInst si = cell.getSiteInst();
+        Assertions.assertNotNull(si);
+
+        // Check conflict is detected
+        Assertions.assertFalse(mi.place(newAnchor, skipIncompatible, allowOverlap));
+        Assertions.assertFalse(mi.isPlaced());
+
+        // Check conflict is cleared
+        emptyDesign.unplaceDesign();
+        Assertions.assertTrue(mi.place(newAnchor, skipIncompatible, allowOverlap));
     }
 }

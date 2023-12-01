@@ -3,7 +3,7 @@
 RapidWright welcomes contributions from the community.  You can contribute to RapidWright in the following ways:
 1. Report bugs or requesting new features by filing [a new Issue on GitHub](https://github.com/Xilinx/RapidWright/issues/new)
 2. You can send patches or new feature implementations to RapidWright by creating a pull request
-3. You can engage in discussion and ideas on the [RapidWright forum](https://groups.google.com/g/rapidwright)
+3. You can engage in discussion and ideas on the [Discussions forum](https://github.com/Xilinx/RapidWright/discussions)
 
 ## Reporting Issues
 If you are reporting a bug, please include instructions on how to reproduce the undesired behavior.  If possible/relevant, please include a design checkpoint (DCP) file, Java code and/or Python script that can reproduce the problem.

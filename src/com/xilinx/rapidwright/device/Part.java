@@ -30,7 +30,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 
 /**
- * Generated on: Wed May 17 22:32:37 2023
+ * Generated on: Fri Oct 20 21:29:57 2023
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  *
  * Class used to uniquely represent a Xilinx part.
@@ -261,6 +261,7 @@ public class Part {
         versalTypes = new FamilyType[] {
                 FamilyType.QRVERSALAICORE,
                 FamilyType.QVERSALAICORE,
+                FamilyType.QVERSALPREMIUM,
                 FamilyType.QVERSALPRIME,
                 FamilyType.VERSAL,
                 FamilyType.VERSALAICORE,

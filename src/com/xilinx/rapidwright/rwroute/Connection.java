@@ -25,8 +25,10 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
@@ -49,7 +51,7 @@ public class Connection implements Comparable<Connection>{
     private RouteNode sourceRnode;
     private RouteNode altSourceRnode;
     private RouteNode sinkRnode;
-    private RouteNode altSinkRnode;
+    private List<RouteNode> altSinkRnodes;
     /**
      * true to indicate the source and the sink are connected through dedicated resources,
      * such as the carry chain connections and connections between cascaded BRAMs.
@@ -294,13 +296,25 @@ public class Connection implements Comparable<Connection>{
         return sinkRnode;
     }
 
-    public void setSinkRnode(RouteNode childRnode) {
-        sinkRnode = childRnode;
+    public void setSinkRnode(RouteNode sinkRnode) {
+        this.sinkRnode = sinkRnode;
     }
 
-    public RouteNode getAltSinkRnode() { return altSinkRnode; }
+    public List<RouteNode> getAltSinkRnodes() {
+        return altSinkRnodes == null ? Collections.emptyList() : altSinkRnodes;
+    }
 
-    public void setAltSinkRnode(RouteNode childRnode) { altSinkRnode = childRnode; }
+    public void addAltSinkRnode(RouteNode sinkRnode) {
+        if (altSinkRnodes == null) {
+            altSinkRnodes = new ArrayList<>(1);
+        } else {
+            assert(!altSinkRnodes.contains(sinkRnode));
+        }
+        assert(sinkRnode.getType() == RouteNodeType.PINFEED_I ||
+               // Can be a WIRE if node is not exclusive a sink
+               sinkRnode.getType() == RouteNodeType.WIRE);
+        altSinkRnodes.add(sinkRnode);
+    }
 
     public short getXMinBB() {
         return xMinBB;
@@ -467,10 +481,30 @@ public class Connection implements Comparable<Connection>{
         return s.toString();
     }
 
-    public void setTarget(boolean target) {
-        sinkRnode.setTarget(target);
-        if (altSinkRnode != null) {
-            altSinkRnode.setTarget(target);
+    public void setAllTargets(boolean target) {
+        if (sinkRnode.countConnectionsOfUser(netWrapper) == 0 ||
+            sinkRnode.getNode().getIntentCode() == IntentCode.NODE_PINBOUNCE) {
+            // Since this connection will have been ripped up, only mark a node
+            // as a target if it's not already used by this net.
+            // This prevents -- for the case where the same net needs to be routed
+            // to the same LUT more than once -- the illegal case of the same
+            // physical pin servicing more than one logical pin
+            sinkRnode.setTarget(target);
+        } else {
+            assert(altSinkRnodes != null && !altSinkRnodes.isEmpty());
+        }
+        if (altSinkRnodes != null) {
+            for (RouteNode rnode : altSinkRnodes) {
+                // Same condition as above: only allow this as an alternate sink
+                // if it's not already in use by the current net to prevent the case
+                // where the same physical pin services more than one logical pin
+                if (rnode.countConnectionsOfUser(netWrapper) == 0 ||
+                    // Except if it is not a PINFEED_I
+                    rnode.getType() != RouteNodeType.PINFEED_I) {
+                    assert(rnode.getNode().getIntentCode() != IntentCode.NODE_PINBOUNCE);
+                    rnode.setTarget(target);
+                }
+            }
         }
     }
 }

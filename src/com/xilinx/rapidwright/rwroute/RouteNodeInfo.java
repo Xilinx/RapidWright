@@ -27,7 +27,9 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
-import com.xilinx.rapidwright.util.Utils;
+
+import java.util.BitSet;
+import java.util.Map;
 
 public class RouteNodeInfo {
     public final RouteNodeType type;
@@ -45,37 +47,26 @@ public class RouteNodeInfo {
         this.length = length;
     }
 
-    public static RouteNodeInfo get(Node node) {
+    public static RouteNodeInfo get(Node node, Map<Tile, BitSet> lagunaI) {
         Wire[] wires = node.getAllWiresInNode();
         Tile baseTile = node.getTile();
-        TileTypeEnum baseType = baseTile.getTileTypeEnum();
+        TileTypeEnum baseTileType = baseTile.getTileTypeEnum();
         Tile endTile = null;
-        boolean pinfeedIntoLaguna = false;
         for (Wire w : wires) {
             Tile tile = w.getTile();
             TileTypeEnum tileType = tile.getTileTypeEnum();
-            boolean lagunaTile = false;
-            if (tileType == TileTypeEnum.INT ||
-                    (lagunaTile = Utils.isLaguna(tileType))) {
-                if (!lagunaTile ||
-                        // Only consider a Laguna tile as an end tile if base tile is Laguna too
-                        // (otherwise it's a PINFEED into a Laguna)
-                        Utils.isLaguna(baseType)) {
-                    boolean endTileWasNotNull = (endTile != null);
-                    endTile = tile;
-                    // Break if this is the second INT tile
-                    if (endTileWasNotNull) break;
-                } else {
-                    assert(!Utils.isLaguna(baseType));
-                    pinfeedIntoLaguna = (node.getIntentCode() == IntentCode.NODE_PINFEED);
-                }
+            if (tileType == TileTypeEnum.INT || tileType == baseTileType) {
+                boolean endTileWasNotNull = (endTile != null);
+                endTile = tile;
+                // Break if this is the second non-null tile
+                if (endTileWasNotNull) break;
             }
         }
         if (endTile == null) {
             endTile = node.getTile();
         }
 
-        RouteNodeType type = getType(node, endTile, pinfeedIntoLaguna);
+        RouteNodeType type = getType(node, endTile, lagunaI);
         short endTileXCoordinate = getEndTileXCoordinate(node, type, (short) endTile.getTileXCoordinate());
         short endTileYCoordinate = (short) endTile.getTileYCoordinate();
         short length = getLength(baseTile, type, endTileXCoordinate, endTileYCoordinate);
@@ -135,7 +126,7 @@ public class RouteNodeInfo {
         return endTileXCoordinate;
     }
 
-    private static RouteNodeType getType(Node node, Tile endTile, boolean pinfeedIntoLaguna) {
+    private static RouteNodeType getType(Node node, Tile endTile, Map<Tile,BitSet> lagunaI) {
         // NOTE: IntentCode is device-dependent
         IntentCode ic = node.getIntentCode();
         switch (ic) {
@@ -143,7 +134,8 @@ public class RouteNodeInfo {
                 return RouteNodeType.PINBOUNCE;
 
             case NODE_PINFEED:
-                return pinfeedIntoLaguna ? RouteNodeType.LAGUNA_I : RouteNodeType.PINFEED_I;
+                BitSet bs = (lagunaI != null) ? lagunaI.get(node.getTile()) : null;
+                return (bs != null && bs.get(node.getWire())) ? RouteNodeType.LAGUNA_I : RouteNodeType.PINFEED_I;
 
             case NODE_LAGUNA_OUTPUT: // UltraScale+ only
                 assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);

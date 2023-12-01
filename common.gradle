@@ -36,7 +36,7 @@ dependencies {
   api 'org.capnproto:runtime:0.1.13'
   api 'net.sf.jopt-simple:jopt-simple:5.0.4'
   api 'org.python:jython-standalone:2.7.2'
-  api 'com.google.protobuf:protobuf-java:3.11.4'
+  api 'com.google.protobuf:protobuf-java:3.25.0'
   api 'org.jetbrains:annotations:20.1.0'
   api 'org.zeromq:jeromq:0.5.2'
   api 'commons-cli:commons-cli:1.2'
