@@ -2000,7 +2000,7 @@ public class DesignTools {
     /**
      * Looks in the site instance for BEL pins connected to this site pin.
      * @param pin The SitePinInst to examine for connected BEL pins
-     * param action Perform this action on each conncted BELPin
+     * @param action Perform this action on each connected BELPin.
      */
     private static void foreachConnectedBELPin(SitePinInst pin, Consumer<BELPin> action) {
         SiteInst si = pin.getSiteInst();
