@@ -207,11 +207,15 @@ public class RouteBranchNode {
                 } else {
                     String site = belPin.site.getName() + "/";
                     if (belPin.belPin.isInput()) {
-                        drivers.add(site + belPin.belPin.getSourcePin().toString());
+                        for (BELPin bp : belPin.belPin.getSiteConns()) {
+                            if (bp.isOutput() || bp.isBidir()) {
+                                drivers.add(site + bp);
+                            }
+                        }
                     } else if (routethru) {
                         for (BELPin bp : belPin.belPin.getBEL().getPins()) {
                             if (bp.isInput()) {
-                                drivers.add(site + bp.toString());
+                                drivers.add(site + bp);
                             }
                         }
                     }

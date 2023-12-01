@@ -38,6 +38,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -46,6 +47,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.tools.TestLUTTools;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
@@ -92,7 +94,7 @@ public class TestRWRoute {
         Assertions.assertTrue(rrs.isFullyRouted());
     }
 
-    private static void assertAllPinsRouted(Design design) {
+    public static void assertAllPinsRouted(Design design) {
         for (Net net : design.getNets()) {
             if (net.getSource() == null && !net.isStaticNet()) {
                 // Source-less nets may exist in out-of-context design
@@ -102,7 +104,7 @@ public class TestRWRoute {
         }
     }
 
-    private static void assertAllSourcesRoutedFlagSet(Design design) {
+    public static void assertAllSourcesRoutedFlagSet(Design design) {
         for (Net net : design.getNets()) {
             if (net.getSource() == null) {
                 // Source-less nets may exist in out-of-context design
@@ -142,7 +144,22 @@ public class TestRWRoute {
         assertVivadoFullyRouted(design);
     }
 
-
+    /**
+     * Tests the non-timing driven full routing with LUT pin swapping enabled.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "bnn.dcp",
+            "optical-flow.dcp"
+    })
+    @LargeTest(max_memory_gb = 8)
+    public void testNonTimingDrivenFullRoutingWithLutPinSwapping(String path) {
+        Design design = RapidWrightDCP.loadDCP(path);
+        RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--lutPinSwapping"});
+        assertAllSourcesRoutedFlagSet(design);
+        assertAllPinsRouted(design);
+        assertVivadoFullyRouted(design);
+    }
 
     /**
      * Tests the timing driven full routing, i.e., RWRoute running in timing-driven mode.

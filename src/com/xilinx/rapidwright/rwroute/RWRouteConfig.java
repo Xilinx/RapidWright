@@ -88,6 +88,8 @@ public class RWRouteConfig {
     private boolean exportOutOfContext;
     /** Maximum presentCongestionFactor value that should prevent accuracy loss **/
     private float maxPresentCongestionFactor;
+    /* true to enable LUT pin swapping */
+    private boolean lutPinSwapping;
 
     /** Constructs a Configuration Object */
     public RWRouteConfig(String[] arguments) {
@@ -214,6 +216,9 @@ public class RWRouteConfig {
                 break;
             case "--outOfContext":
                 setExportDesignOutOfContext(true);
+                break;
+            case "--lutPinSwapping":
+                setLutPinSwapping(true);
                 break;
             default:
                 throw new IllegalArgumentException("ERROR: RWRoute argument '" + arg + "' not recognized.");
@@ -706,6 +711,16 @@ public class RWRouteConfig {
     }
 
     /**
+     * Gets the flag indicating if LUT pin swapping is enabled.
+     * Default: false.
+     *
+     * @return True if the flag is set, false otherwise.
+     */
+    public boolean getLutPinSwapping() {
+        return lutPinSwapping;
+    }
+
+    /**
      * Sets critical path delay pessimism factor b. It should be greater than 0.
      * Default: 100. Can be modified by using "--pessimismB" option, e.g.
      * "--pessimismB 50".
@@ -796,6 +811,16 @@ public class RWRouteConfig {
      */
     public void setExportDesignOutOfContext(boolean exportOutOfContext) {
         this.exportOutOfContext = exportOutOfContext;
+    }
+
+    /**
+     * Sets a flag indicating LUT pins can be swapped.
+     * Default: false.
+     *
+     * @param lutPinSwapping true to enable LUT pin swapping.
+     */
+    public void setLutPinSwapping(boolean lutPinSwapping) {
+        this.lutPinSwapping = lutPinSwapping;
     }
 
     /**

@@ -2000,7 +2000,7 @@ public class DesignTools {
     /**
      * Looks in the site instance for BEL pins connected to this site pin.
      * @param pin The SitePinInst to examine for connected BEL pins
-     * param action Perform this action on each conncted BELPin
+     * @param action Perform this action on each connected BELPin.
      */
     private static void foreachConnectedBELPin(SitePinInst pin, Consumer<BELPin> action) {
         SiteInst si = pin.getSiteInst();
@@ -2167,10 +2167,9 @@ public class DesignTools {
                     if (sitePinName == null) continue;
                     SitePinInst newPin = si.getSitePinInst(sitePinName);
                     if (newPin != null) continue;
-                    int wireIndex = si.getSite().getTileWireIndexFromPinName(sitePinName);
-                    if (Node.getNode(si.getTile(), wireIndex) == null) {
-                        // It's possible that the discovered site pin (e.g. as for some IOB tiles)
-                        // is not actually connected to the global routing fabric; skip those
+                    if (sitePinName.equals("IO") && Utils.isIOB(si)) {
+                        // Do not create a SitePinInst for the "IO" input site pin of any IOB site,
+                        // since the sitewire it drives is assumed to be driven by the IO PAD.
                         continue;
                     }
                     newPin = net.createPin(sitePinName, si);
