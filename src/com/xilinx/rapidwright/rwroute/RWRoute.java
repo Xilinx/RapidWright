@@ -290,7 +290,7 @@ public class RWRoute{
         categorizeNets();
 
         // Since createNetWrapperAndConnections() both creates the primary sink node and
-        // infers computes alternate sinks (e.g. for LUT pin swaps), it is possible that
+        // computes alternate sinks (e.g. for LUT pin swaps), it is possible that
         // an alternate sink for one net later becomes an exclusive sink for another net.
         // Examine for all connections for this case and remove such alternate sinks.
         for (Connection connection : indirectConnections) {
