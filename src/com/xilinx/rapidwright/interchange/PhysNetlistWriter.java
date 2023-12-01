@@ -503,7 +503,7 @@ public class PhysNetlistWriter {
                             List<RouteBranchNode> branches = driverBranch.getBranches();
                             if (!branches.isEmpty()) {
                                 // driver is already driving something, which must be a (LUT) site pin
-                                // that can't the current site pin. Since it's already servicing a LUT
+                                // that can't be the current site pin. Since it's already servicing a LUT
                                 // input, it can't be used to service this one so skip it.
                                 assert(branches.get(0).getType() == RouteSegmentType.SITE_PIN);
                                 assert(branches.get(0) != rb);
