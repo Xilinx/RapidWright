@@ -114,18 +114,8 @@ public class RouteNodeGraph {
         }
 
         @Override
-        public boolean mustInclude(Node parent, Node child) {
-            return RouteNodeGraph.this.mustInclude(parent, child);
-        }
-
-        @Override
-        public boolean isPreserved(Node node) {
-            return RouteNodeGraph.this.isPreserved(node);
-        }
-
-        @Override
-        public boolean isExcluded(Node parent, Node child) {
-            return RouteNodeGraph.this.isExcluded(parent, child);
+        public boolean isExcluded(Node child) {
+            return RouteNodeGraph.this.isExcluded(node, child);
         }
 
         @Override
@@ -381,10 +371,6 @@ public class RouteNodeGraph {
         allowedTileEnums = EnumSet.copyOf(tempAllowedTileEnums);
     }
 
-    protected boolean mustInclude(Node parent, Node child) {
-        return false;
-    }
-
     protected boolean isExcludedTile(Node child) {
         Tile tile = child.getTile();
         TileTypeEnum tileType = tile.getTileTypeEnum();
@@ -392,6 +378,10 @@ public class RouteNodeGraph {
     }
 
     protected boolean isExcluded(Node parent, Node child) {
+        if (isPreserved(child)) {
+            return true;
+        }
+
         if (isExcludedTile(child)) {
             return true;
         }
