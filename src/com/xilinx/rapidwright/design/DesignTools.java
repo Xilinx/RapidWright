@@ -2280,9 +2280,21 @@ public class DesignTools {
      * @param design The current design
      */
     public static void createMissingSitePinInsts(Design design) {
+        EDIFNetlist netlist = design.getNetlist();
         for (Net net : design.getNets()) {
             if (net.isUsedNet()) {
                 continue;
+            }
+            EDIFHierNet ehn = net.getLogicalHierNet();
+            EDIFHierNet parentEhn = netlist.getParentNet(ehn);
+            if (!parentEhn.equals(ehn)) {
+                Net parentNet = design.getNet(parentEhn.getHierarchicalNetName());
+                if (parentNet != null) {
+                    // 'net' is not a parent net (which normally causes createMissingSitePinInsts(Design, Net)
+                    // to analyze its parent net) but that parent net also exist in the design and has been/
+                    // will be analyzed in due course, so skip doing so here
+                    continue;
+                }
             }
             createMissingSitePinInsts(design,net);
         }
