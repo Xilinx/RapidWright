@@ -39,6 +39,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.edif.EDIFCell;
@@ -435,6 +436,8 @@ public class TestDesign {
         String netName = ibufInst.getName() + "/OUT";
         Net net = design.getNet(netName);
         Assertions.assertEquals(net.getName(), netName);
-        Assertions.assertEquals(siteInst.getNetFromSiteWire("DOUT"), net);
+        Net dout = design.getDevice().getSeries().equals(Series.UltraScalePlus) ? net
+                : design.getNet(ibufInst.getName() + "/O");
+        Assertions.assertEquals(siteInst.getNetFromSiteWire("DOUT"), dout);
     }
 }
