@@ -164,7 +164,7 @@ public class RouteThruHelper {
     }
 
     /**
-     * Given a SitePin object, check that it is available for routing through.
+     * Given a SitePin object, check that it is available for use as part of a route-through.
      */
     public static boolean isRouteThruSitePinAvailable(Design design, SitePin sitePin) {
         if (sitePin == null) {
