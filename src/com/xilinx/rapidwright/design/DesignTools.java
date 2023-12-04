@@ -2286,8 +2286,8 @@ public class DesignTools {
                 continue;
             }
             EDIFHierNet ehn = net.getLogicalHierNet();
-            EDIFHierNet parentEhn = netlist.getParentNet(ehn);
-            if (!parentEhn.equals(ehn)) {
+            EDIFHierNet parentEhn = (ehn != null) ? netlist.getParentNet(ehn) : null;
+            if (parentEhn != null && !parentEhn.equals(ehn)) {
                 Net parentNet = design.getNet(parentEhn.getHierarchicalNetName());
                 if (parentNet != null) {
                     // 'net' is not a parent net (which normally causes createMissingSitePinInsts(Design, Net)
