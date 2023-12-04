@@ -33,6 +33,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -76,8 +77,12 @@ public class PartialRouter extends RWRoute {
         }
 
         @Override
-        protected boolean mustInclude(Node parent, Node child) {
-            return isPartOfExistingRoute(parent, child);
+        protected boolean isExcluded(Node parent, Node child) {
+            // Routing part of an existing (preserved) route are never excluded
+            if (isPartOfExistingRoute(parent, child)) {
+                return false;
+            }
+            return super.isExcluded(parent, child);
         }
     }
 
@@ -87,8 +92,11 @@ public class PartialRouter extends RWRoute {
         }
 
         @Override
-        protected boolean mustInclude(Node parent, Node child) {
-            return isPartOfExistingRoute(parent, child);
+        protected boolean isExcluded(Node parent, Node child) {
+            if (isPartOfExistingRoute(parent, child)) {
+                return false;
+            }
+            return super.isExcluded(parent, child);
         }
     }
 
@@ -130,7 +138,7 @@ public class PartialRouter extends RWRoute {
      * @param end End Node of arc.
      * @return True if arc is part of an existing route.
      */
-    private boolean isPartOfExistingRoute(Node start, Node end) {
+    protected boolean isPartOfExistingRoute(Node start, Node end) {
         // End node can only be part of existing route if it is in the graph already
         RouteNode endRnode = routingGraph.getNode(end);
         if (endRnode == null)
@@ -353,17 +361,19 @@ public class PartialRouter extends RWRoute {
             // (it's possible for another connection to use a bounce node, but now that node is
             // needed as a site pin)
             for (Connection connection : netWrapper.getConnections()) {
-                for (RouteNode rnode : Arrays.asList(connection.getSinkRnode(), connection.getAltSinkRnode())) {
+                Consumer<RouteNode> action = (rnode) -> {
                     if (rnode == null) {
-                        continue;
+                        return;
                     }
                     RouteNode prev = rnode.getPrev();
                     if (prev == null) {
-                        continue;
+                        return;
                     }
                     stashedPrev.put(rnode, prev);
                     rnode.clearPrev();
-                }
+                };
+                action.accept(connection.getSinkRnode());
+                connection.getAltSinkRnodes().forEach(action);
             }
 
             // Create all nodes used by this net and set its previous pointer so that:
@@ -395,7 +405,20 @@ public class PartialRouter extends RWRoute {
                 RouteNode sinkRnode = connection.getSinkRnode();
                 assert(sourceRnode.getType() == RouteNodeType.PINFEED_O);
                 assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
+
+                // Even though this connection is not expected to have any routing yet,
+                // perform a rip up anyway in order to release any exclusive sinks
+                // ahead of finishRouteConnection()
+                assert(connection.getRnodes().isEmpty());
+                connection.getSink().setRouted(false);
+                ripUp(connection);
+
                 finishRouteConnection(connection, sinkRnode);
+                if (!connection.getSink().isRouted() && connection.getAltSinkRnodes().isEmpty()) {
+                    // Undo what ripUp() did for this connection which has a single exclusive sink
+                    sinkRnode.incrementUser(connection.getNetWrapper());
+                    sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
+                }
             }
 
             // Restore prev to avoid assertions firing
@@ -631,7 +654,20 @@ public class PartialRouter extends RWRoute {
                 RouteNode sinkRnode = connection.getSinkRnode();
                 assert(sourceRnode.getType() == RouteNodeType.PINFEED_O);
                 assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
+
+                // Even though this connection is not expected to have any routing yet,
+                // perform a rip up anyway in order to release any exclusive sinks
+                // ahead of finishRouteConnection()
+                assert(connection.getRnodes().isEmpty());
+                connection.getSink().setRouted(false);
+                ripUp(connection);
+
                 finishRouteConnection(connection, sinkRnode);
+                if (!connection.getSink().isRouted() && connection.getAltSinkRnodes().isEmpty()) {
+                    // Undo what ripUp() did for this connection which has a single exclusive sink
+                    sinkRnode.incrementUser(connection.getNetWrapper());
+                    sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
+                }
             }
 
             netToPins.put(net, net.getSinkPins());

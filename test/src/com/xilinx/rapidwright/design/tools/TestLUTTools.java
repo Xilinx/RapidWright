@@ -34,6 +34,11 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.rwroute.RWRoute;
+import com.xilinx.rapidwright.rwroute.TestRWRoute;
+import com.xilinx.rapidwright.support.LargeTest;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.Utils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -44,6 +49,8 @@ import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 public class TestLUTTools {
 
@@ -121,5 +128,26 @@ public class TestLUTTools {
         Assertions.assertEquals("A2", oldSpiNoSwap.getName());
         Assertions.assertEquals("I1", cell6.getLogicalPinMapping("A2"));
         Assertions.assertEquals("I0", cell5.getLogicalPinMapping("A3"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "bnn.dcp",
+            "optical-flow.dcp",
+    })
+    @LargeTest(max_memory_gb = 8)
+    public void testUpdateLutPinSwapsFromPIPsWithRWRoute(String path) {
+        Design design = RapidWrightDCP.loadDCP(path);
+        try {
+            System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "true");
+            RWRoute.routeDesignWithUserDefinedArguments(design, new String[]{"--nonTimingDriven", "--lutPinSwapping"});
+            int numPinsSwapped = LUTTools.swapLutPinsFromPIPs(design);
+            Assertions.assertTrue(numPinsSwapped > 0);
+            TestRWRoute.assertAllSourcesRoutedFlagSet(design);
+            TestRWRoute.assertAllPinsRouted(design);
+            TestRWRoute.assertVivadoFullyRouted(design);
+        } finally {
+            System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "false");
+        }
     }
 }
