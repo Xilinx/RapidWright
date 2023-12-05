@@ -305,8 +305,7 @@ public class TestDesignTools {
         {
             Net i = design.getNet("i");
             Assertions.assertEquals(0, i.getPins().size());
-            // Technically should not be present since net is fully intra-site (PAD to INBUF), but harmless
-            Assertions.assertEquals("[IN IOB_X1Y253.IO]", DesignTools.createMissingSitePinInsts(design, i).toString());
+            Assertions.assertEquals("[]", DesignTools.createMissingSitePinInsts(design, i).toString());
 
             Net o = design.getNet("o");
             Assertions.assertEquals(0, o.getPins().size());
@@ -1323,6 +1322,20 @@ public class TestDesignTools {
             Assertions.assertEquals("[output_port_z_reg[0](BEL: HFF2), output_port_z_reg[1](BEL: GFF2), output_port_z_reg[2](BEL: FFF2), " +
                     "processor/data_path_loop[4].arith_logical_flop(BEL: EFF), processor/data_path_loop[5].arith_logical_flop(BEL: FFF), " +
                     "processor/data_path_loop[6].arith_logical_flop(BEL: GFF), processor/data_path_loop[7].arith_logical_flop(BEL: HFF)]",
+                    DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
+        }
+
+        si = design.getSiteInstFromSiteName("SLICE_X15Y239");
+        // Only D5LUT is present
+        {
+            // Connected to VCC
+            SitePinInst spi = si.getSitePinInst("D6");
+            Assertions.assertEquals("[]",
+                    DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
+        }
+        {
+            SitePinInst spi = si.getSitePinInst("D5");
+            Assertions.assertEquals("[processor/output_port_z[7]_i_1(BEL: D5LUT)]",
                     DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
         }
     }

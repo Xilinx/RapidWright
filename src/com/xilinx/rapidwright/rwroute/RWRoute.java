@@ -41,18 +41,22 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.Series;
-import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.interchange.Interchange;
@@ -112,6 +116,8 @@ public class RWRoute{
     private float timingWeight;
     /** 1 - timingWeight */
     private float oneMinusTimingWeight;
+    /** Flag for whether LUT pin swaps are to be considered */
+    protected boolean lutPinSwapping;
 
     /** The current routing iteration */
     protected int routeIteration;
@@ -221,6 +227,7 @@ public class RWRoute{
         rnodesCreatedThisIteration = 0;
         routethruHelper = new RouteThruHelper(design.getDevice());
         presentCongestionFactor = config.getInitialPresentCongestionFactor();
+        lutPinSwapping = config.getLutPinSwapping();
 
         routerTimer.createRuntimeTracker("determine route targets", "Initialization").start();
         determineRoutingTargets();
@@ -281,6 +288,14 @@ public class RWRoute{
      */
     protected void determineRoutingTargets() {
         categorizeNets();
+
+        // Since createNetWrapperAndConnections() both creates the primary sink node and
+        // computes alternate sinks (e.g. for LUT pin swaps), it is possible that
+        // an alternate sink for one net later becomes an exclusive sink for another net.
+        // Examine for all connections for this case and remove such alternate sinks.
+        for (Connection connection : indirectConnections) {
+            connection.getAltSinkRnodes().removeIf((rnode) -> rnode.getOccupancy() > 0);
+        }
 
         // Wait for all outstanding RouteNodeGraph.asyncPreserve() calls to complete
         routingGraph.awaitPreserve();
@@ -549,10 +564,53 @@ public class RWRoute{
                 RouteNode sinkRnode = getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I);
                 assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
                 connection.setSinkRnode(sinkRnode);
-                // Assuming that each connection only has a single sink target, increment
-                // its usage here immediately
-                sinkRnode.incrementUser(netWrapper);
-                sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
+
+                // Where appropriate, allow all 6 LUT pins to be swapped to begin with
+                char lutLetter = sink.getName().charAt(0);
+                int numberOfSwappablePins = (lutPinSwapping && sink.isLUTInputPin())
+                        ? LUTTools.MAX_LUT_SIZE : 0;
+                if (numberOfSwappablePins > 0) {
+                    for (Cell cell : DesignTools.getConnectedCells(sink)) {
+                        BEL bel = cell.getBEL();
+                        assert(bel.isLUT());
+                        String belName = bel.getName();
+                        if (belName.charAt(0) != lutLetter) {
+                            assert(cell.getType().startsWith("RAM"));
+                            // This pin connects to other LUTs! (e.g. SLICEM.H[1-6] also serves
+                            // as the WA for A-G LUTs used as distributed RAM) -- do not allow any swapping
+                            // TODO: Relax this when https://github.com/Xilinx/RapidWright/issues/901 is fixed
+                            numberOfSwappablePins = 0;
+                            break;
+                        }
+                        if (belName.charAt(1) == '5') {
+                            // Since a 5LUT cell exists, only allow bottom 5 pins to be swapped
+                            numberOfSwappablePins = 5;
+                        }
+                    }
+                }
+
+                Site site = sink.getSite();
+                for (int i = 1; i <= numberOfSwappablePins; i++) {
+                    Node node = site.getConnectedNode(lutLetter + Integer.toString(i));
+                    assert(node.getTile().getTileTypeEnum() == TileTypeEnum.INT);
+                    if (node.equals(sinkINTNode)) {
+                        continue;
+                    }
+                    if (routingGraph.isPreserved(node)) {
+                        continue;
+                    }
+                    RouteNode altSinkRnode = getOrCreateRouteNode(node, RouteNodeType.PINFEED_I);
+                    assert(altSinkRnode.getType() == RouteNodeType.PINFEED_I);
+                    connection.addAltSinkRnode(altSinkRnode);
+                }
+
+                if (connection.getAltSinkRnodes().isEmpty()) {
+                    // Since this connection only has a single sink target, increment
+                    // its usage here immediately
+                    sinkRnode.incrementUser(netWrapper);
+                    sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
+                }
+
                 if (sourceINTRnode == null && altSourceINTRnode == null) {
                     if (sourceINTNode != null) {
                         sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
@@ -845,7 +903,32 @@ public class RWRoute{
      */
     protected void postRouteProcess() {
         if (routeIteration <= config.getMaxIterations()) {
+            // perform LUT pin mapping updates
+            if (lutPinSwapping &&
+                    !Boolean.getBoolean("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates")) {
+                Map<SitePinInst, String> pinSwaps = new HashMap<>();
+                for (Connection connection: indirectConnections) {
+                    SitePinInst oldSinkSpi = connection.getSink();
+                    if (!oldSinkSpi.isLUTInputPin() || !oldSinkSpi.isRouted()) {
+                        continue;
+                    }
+
+                    List<RouteNode> rnodes = connection.getRnodes();
+                    RouteNode newSinkRnode = rnodes.get(0);
+                    if (newSinkRnode == connection.getSinkRnode()) {
+                        continue;
+                    }
+                    connection.setSinkRnode(newSinkRnode);
+
+                    SitePin newSitePin = newSinkRnode.getNode().getSitePin();
+                    String existing = pinSwaps.put(oldSinkSpi, newSitePin.getPinName());
+                    assert(existing == null);
+                }
+                LUTTools.swapMultipleLutPins(pinSwaps);
+            }
+
             assignNodesToConnections();
+
             // fix routes with cycles and / or multi-driver nodes
             Set<NetWrapper> routes = fixRoutes();
             if (config.isTimingDriven()) updateTimingAfterFixingRoutes(routes);
@@ -926,10 +1009,12 @@ public class RWRoute{
             }
         }
 
-        // Check that sink node is exclusive to this connection, is used but never overused
-        RouteNode sinkRnode = connection.getSinkRnode();
-        assert(sinkRnode.countConnectionsOfUser(connection.getNetWrapper()) > 0);
-        assert(!sinkRnode.isOverUsed());
+        if (connection.getAltSinkRnodes().isEmpty()) {
+            // Check that this connection's exclusive sink node is used but never overused
+            RouteNode sinkRnode = connection.getSinkRnode();
+            assert (sinkRnode.countConnectionsOfUser(connection.getNetWrapper()) > 0);
+            assert(!sinkRnode.isOverUsed());
+        }
 
         return !connection.getSink().isRouted() || connection.isCongested();
     }
@@ -984,14 +1069,25 @@ public class RWRoute{
     protected void assignNodesToConnections() {
         for (Connection connection : indirectConnections) {
             List<Node> nodes = new ArrayList<>();
-            List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(connection.getSinkRnode(), connection.getSink().getConnectedNode());
-            if (switchBoxToSink.size() >= 2) {
-                for (int i = 0; i < switchBoxToSink.size() -1; i++) {
-                    nodes.add(switchBoxToSink.get(i));
+
+            RouteNode sinkRnode = connection.getSinkRnode();
+            List<RouteNode> rnodes = connection.getRnodes();
+            if (sinkRnode == rnodes.get(0)) {
+                List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(sinkRnode.getNode(), connection.getSink().getConnectedNode());
+                if (switchBoxToSink.size() >= 2) {
+                    for (int i = 0; i < switchBoxToSink.size() - 1; i++) {
+                        nodes.add(switchBoxToSink.get(i));
+                    }
                 }
+            } else {
+                // Routing must go to an alternate sink
+                assert(!connection.getAltSinkRnodes().isEmpty());
+
+                // Assume that it doesn't need unprojecting back to the sink pin
+                // since the sink node is a site pin
+                assert(rnodes.get(0).getNode().getSitePin() != null);
             }
 
-            List<RouteNode> rnodes = connection.getRnodes();
             for (RouteNode rnode : rnodes) {
                 nodes.add(rnode.getNode());
             }
@@ -1228,11 +1324,11 @@ public class RWRoute{
      * Rips up a connection.
      * @param connection The connection to be ripped up.
      */
-    private void ripUp(Connection connection) {
+    protected void ripUp(Connection connection) {
         List<RouteNode> rnodes = connection.getRnodes();
         if (rnodes.isEmpty()) {
             assert(!connection.getSink().isRouted());
-            if (connection.getAltSinkRnode() == null) {
+            if (connection.getAltSinkRnodes().isEmpty()) {
                 // If there is no alternate sink, decrement this one-and-only sink node
                 RouteNode sinkRnode = connection.getSinkRnode();
                 rnodes = Collections.singletonList(sinkRnode);
@@ -1341,8 +1437,8 @@ public class RWRoute{
             assert(connection.getRnodes().isEmpty());
             assert(!connection.getSink().isRouted());
 
-            // Undo what ripUp() did for the one-and-only sink node
-            if (connection.getAltSinkRnode() == null) {
+            if (connection.getAltSinkRnodes().isEmpty()) {
+                // Undo what ripUp() did for this connection which has a single exclusive sink
                 RouteNode sinkRnode = connection.getSinkRnode();
                 sinkRnode.incrementUser(connection.getNetWrapper());
                 sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
@@ -1402,18 +1498,6 @@ public class RWRoute{
     }
 
     /**
-     * Checks if a NODE_PINBOUNCE is suitable to be used for routing to a target.
-     * @param pinBounce The PINBOUNCE rnode in question.
-     * @param target The target rnode to reach.
-     * @return true, if the PINBOUNCE rnode is in the same column as the target and within one INT tile of the target.
-     */
-    private boolean usablePINBounce(RouteNode pinBounce, RouteNode target) {
-        Tile bounce = pinBounce.getTile();
-        Tile sink = target.getTile();
-        return bounce.getTileXCoordinate() == sink.getTileXCoordinate() && Math.abs(bounce.getTileYCoordinate() - sink.getTileYCoordinate()) <= 1;
-    }
-
-    /**
      * Completes the routing process of a connection.
      * @param connection The routed target connection.
      */
@@ -1435,8 +1519,8 @@ public class RWRoute{
      */
     private boolean saveRouting(Connection connection, RouteNode rnode) {
         RouteNode sinkRnode = connection.getSinkRnode();
-        RouteNode altSinkRnode = connection.getAltSinkRnode();
-        if (rnode != sinkRnode && rnode != altSinkRnode) {
+        List<RouteNode> altSinkRnodes = connection.getAltSinkRnodes();
+        if (rnode != sinkRnode && !altSinkRnodes.contains(rnode)) {
             List<RouteNode> prevRouting = connection.getRnodes();
             // Check that this is the sink path marked by prepareRouteConnection()
             if (!connection.getSink().isRouted() || prevRouting.isEmpty() || !rnode.isTarget()) {
@@ -1522,12 +1606,19 @@ public class RWRoute{
             }
 
             if (childRNode.isTarget()) {
-                // Despite the limitation above, on encountering a target only terminate immediately
-                // by clearing the queue if childRnode is the one and only sink on this connection,
-                // otherwise terminate if this target will not be overused since we may find that
-                // the alternate sink is less congested
-                if ((childRNode == connection.getSinkRnode() && connection.getAltSinkRnode() == null) ||
-                        !childRNode.willOverUse(connection.getNetWrapper())) {
+                boolean earlyTermination = false;
+                if (childRNode == connection.getSinkRnode() && connection.getAltSinkRnodes().isEmpty()) {
+                    // This sink must be exclusively reserved for this connection already
+                    assert(childRNode.getOccupancy() == 0 ||
+                            childRNode.getNode().getIntentCode() == IntentCode.NODE_PINBOUNCE);
+                    earlyTermination = true;
+                } else {
+                    // Target is not an exclusive sink, only early terminate if this net will not
+                    // (further) overuse this node
+                    earlyTermination = !childRNode.willOverUse(connection.getNetWrapper());
+                }
+
+                if (earlyTermination) {
                     assert(!childRNode.isVisited(connectionsRouted));
                     nodesPushed += queue.size();
                     queue.clear();
@@ -1538,6 +1629,9 @@ public class RWRoute{
                 }
                 switch (childRNode.getType()) {
                     case WIRE:
+                        if (!routingGraph.isAccessible(childRNode, connection)) {
+                            continue;
+                        }
                         if (!config.isUseUTurnNodes() && childRNode.getDelay() > 10000) {
                             // To filter out those nodes that are considered to be excluded with the masking resource approach,
                             // such as U-turn shape nodes near the boundary
@@ -1545,8 +1639,9 @@ public class RWRoute{
                         }
                         break;
                     case PINBOUNCE:
-                        assert(!childRNode.isTarget());
-                        if (!usablePINBounce(childRNode, connection.getSinkRnode())) {
+                        // A PINBOUNCE can only be a target if this connection has an alternate sink
+                        assert(!childRNode.isTarget() || connection.getAltSinkRnodes().isEmpty());
+                        if (!isAccessiblePinbounce(childRNode, connection)) {
                             continue;
                         }
                         break;
@@ -1590,8 +1685,21 @@ public class RWRoute{
         return !config.isUseBoundingBox() || child.isInConnectionBoundingBox(connection);
     }
 
+    /**
+     * Checks if a NODE_PINBOUNCE is suitable to be used for routing to a target.
+     * @param child The PINBOUNCE rnode in question.
+     * @param connection The connection to route.
+     * @return true, if the PINBOUNCE rnode is in the same column as the target and within one INT tile of the target.
+     */
+    protected boolean isAccessiblePinbounce(RouteNode child, Connection connection) {
+        assert(child.getType() == RouteNodeType.PINBOUNCE);
+
+        return routingGraph.isAccessible(child, connection);
+    }
+
     protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection) {
-        return isAccessiblePinfeedI(child, connection, true);
+        // When LUT pin swapping is enabled, PINFEED_I are not exclusive anymore
+        return isAccessiblePinfeedI(child, connection, !lutPinSwapping);
     }
 
     protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection, boolean assertOnOveruse) {
@@ -1765,7 +1873,7 @@ public class RWRoute{
         assert(queue.isEmpty());
 
         // Sets the sink rnode(s) of the connection as the target(s)
-        connectionToRoute.setTarget(true);
+        connectionToRoute.setAllTargets(true);
 
         // Adds the source rnode to the queue
         RouteNode sourceRnode = connectionToRoute.getSourceRnode();

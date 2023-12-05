@@ -38,6 +38,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -46,6 +47,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.tools.TestLUTTools;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
@@ -92,7 +94,7 @@ public class TestRWRoute {
         Assertions.assertTrue(rrs.isFullyRouted());
     }
 
-    private static void assertAllPinsRouted(Design design) {
+    public static void assertAllPinsRouted(Design design) {
         for (Net net : design.getNets()) {
             if (net.getSource() == null && !net.isStaticNet()) {
                 // Source-less nets may exist in out-of-context design
@@ -102,7 +104,7 @@ public class TestRWRoute {
         }
     }
 
-    private static void assertAllSourcesRoutedFlagSet(Design design) {
+    public static void assertAllSourcesRoutedFlagSet(Design design) {
         for (Net net : design.getNets()) {
             if (net.getSource() == null) {
                 // Source-less nets may exist in out-of-context design
@@ -142,7 +144,22 @@ public class TestRWRoute {
         assertVivadoFullyRouted(design);
     }
 
-
+    /**
+     * Tests the non-timing driven full routing with LUT pin swapping enabled.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "bnn.dcp",
+            "optical-flow.dcp"
+    })
+    @LargeTest(max_memory_gb = 8)
+    public void testNonTimingDrivenFullRoutingWithLutPinSwapping(String path) {
+        Design design = RapidWrightDCP.loadDCP(path);
+        RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--lutPinSwapping"});
+        assertAllSourcesRoutedFlagSet(design);
+        assertAllPinsRouted(design);
+        assertVivadoFullyRouted(design);
+    }
 
     /**
      * Tests the timing driven full routing, i.e., RWRoute running in timing-driven mode.
@@ -258,37 +275,37 @@ public class TestRWRoute {
     @CsvSource({
             // One SLR crossing
             // (Too) Close
-            "SLICE_X9Y299,SLICE_X9Y300,400",    // On Laguna column
-            "SLICE_X9Y300,SLICE_X9Y299,500",
-            "SLICE_X0Y299,SLICE_X0Y300,300",    // Far from Laguna column
-            "SLICE_X0Y300,SLICE_X0Y299,100",
-            "SLICE_X53Y299,SLICE_X53Y300,400",  // Equidistant from two Laguna columns
-            "SLICE_X53Y300,SLICE_X53Y299,1100",
+            "SLICE_X9Y299,SLICE_X9Y300,500",    // On Laguna column
+            "SLICE_X9Y300,SLICE_X9Y299,400",
+            "SLICE_X0Y299,SLICE_X0Y300,200",    // Far from Laguna column
+            "SLICE_X0Y300,SLICE_X0Y299,200",
+            "SLICE_X53Y299,SLICE_X53Y300,200",  // Equidistant from two Laguna columns
+            "SLICE_X53Y300,SLICE_X53Y299,700",
             // Perfect
             "SLICE_X9Y241,SLICE_X9Y300,200",
-            "SLICE_X9Y300,SLICE_X9Y241,200",
+            "SLICE_X9Y300,SLICE_X9Y241,100",
             "SLICE_X9Y358,SLICE_X9Y299,100",
             "SLICE_X9Y299,SLICE_X9Y358,200",
-            "SLICE_X53Y241,SLICE_X69Y300,400",
-            "SLICE_X53Y358,SLICE_X69Y299,600",
+            "SLICE_X53Y241,SLICE_X69Y300,500",
+            "SLICE_X53Y358,SLICE_X69Y299,500",
             // Far
             "SLICE_X9Y240,SLICE_X9Y359,100",    // On Laguna
-            "SLICE_X9Y359,SLICE_X9Y240,100",
+            "SLICE_X9Y359,SLICE_X9Y240,200",
             "SLICE_X162Y240,SLICE_X162Y430,200",
-            "SLICE_X162Y430,SLICE_X162Y240,200",
-            "SLICE_X0Y240,SLICE_X12Y430,300",   // Far from Laguna
+            "SLICE_X162Y430,SLICE_X162Y240,300",
+            "SLICE_X0Y240,SLICE_X12Y430,400",   // Far from Laguna
             "SLICE_X0Y430,SLICE_X12Y240,200",
 
             // Two SLR crossings
-            "SLICE_X162Y299,SLICE_X162Y599,400",
+            "SLICE_X162Y299,SLICE_X162Y599,200",
             "SLICE_X162Y599,SLICE_X162Y299,100",
 
             // Three SLR crossings
-            "SLICE_X79Y0,SLICE_X79Y899,300",    // Straight up: next to Laguna column
-            "SLICE_X0Y0,SLICE_X0Y899,300",      // Straight up: far from Laguna column
-            "SLICE_X168Y0,SLICE_X168Y899,700",  // Straight up: far from Laguna column
-            "SLICE_X9Y0,SLICE_X162Y899,1600",   // Up and right
-            "SLICE_X168Y162,SLICE_X9Y899,1800", // Up and left
+            "SLICE_X79Y0,SLICE_X79Y899,200",    // Straight up: next to Laguna column
+            "SLICE_X0Y0,SLICE_X0Y899,600",      // Straight up: far from Laguna column
+            "SLICE_X168Y0,SLICE_X168Y899,400",  // Straight up: far from Laguna column
+            "SLICE_X9Y0,SLICE_X162Y899,1000",   // Up and right
+            "SLICE_X168Y162,SLICE_X9Y899,600",  // Up and left
     })
     public void testSLRCrossingNonTimingDriven(String srcSiteName, String dstSiteName, long nodesPoppedLimit) {
         testSingleConnectionHelper(Device.AWS_F1, srcSiteName, "AQ", dstSiteName, "A1", nodesPoppedLimit);

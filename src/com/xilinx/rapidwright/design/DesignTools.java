@@ -2000,7 +2000,7 @@ public class DesignTools {
     /**
      * Looks in the site instance for BEL pins connected to this site pin.
      * @param pin The SitePinInst to examine for connected BEL pins
-     * param action Perform this action on each conncted BELPin
+     * @param action Perform this action on each connected BELPin.
      */
     private static void foreachConnectedBELPin(SitePinInst pin, Consumer<BELPin> action) {
         SiteInst si = pin.getSiteInst();
@@ -2167,10 +2167,9 @@ public class DesignTools {
                     if (sitePinName == null) continue;
                     SitePinInst newPin = si.getSitePinInst(sitePinName);
                     if (newPin != null) continue;
-                    int wireIndex = si.getSite().getTileWireIndexFromPinName(sitePinName);
-                    if (Node.getNode(si.getTile(), wireIndex) == null) {
-                        // It's possible that the discovered site pin (e.g. as for some IOB tiles)
-                        // is not actually connected to the global routing fabric; skip those
+                    if (sitePinName.equals("IO") && Utils.isIOB(si)) {
+                        // Do not create a SitePinInst for the "IO" input site pin of any IOB site,
+                        // since the sitewire it drives is assumed to be driven by the IO PAD.
                         continue;
                     }
                     newPin = net.createPin(sitePinName, si);
@@ -2281,9 +2280,21 @@ public class DesignTools {
      * @param design The current design
      */
     public static void createMissingSitePinInsts(Design design) {
+        EDIFNetlist netlist = design.getNetlist();
         for (Net net : design.getNets()) {
             if (net.isUsedNet()) {
                 continue;
+            }
+            EDIFHierNet ehn = net.getLogicalHierNet();
+            EDIFHierNet parentEhn = (ehn != null) ? netlist.getParentNet(ehn) : null;
+            if (parentEhn != null && !parentEhn.equals(ehn)) {
+                Net parentNet = design.getNet(parentEhn.getHierarchicalNetName());
+                if (parentNet != null) {
+                    // 'net' is not a parent net (which normally causes createMissingSitePinInsts(Design, Net)
+                    // to analyze its parent net) but that parent net also exist in the design and has been/
+                    // will be analyzed in due course, so skip doing so here
+                    continue;
+                }
             }
             createMissingSitePinInsts(design,net);
         }

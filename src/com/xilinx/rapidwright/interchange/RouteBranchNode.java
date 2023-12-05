@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.interchange;
 
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
@@ -32,6 +33,7 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.util.Utils;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -146,7 +148,7 @@ public class RouteBranchNode {
         routeBranch.setParent(this);
     }
 
-    public List<String> getDrivers() {
+    public List<String> getDrivers(boolean simulateSwappedLutPins) {
         ArrayList<String> drivers = new ArrayList<String>();
 
         switch(type) {
@@ -179,10 +181,30 @@ public class RouteBranchNode {
                     BELPin belPin = spi.getBELPin();
                     drivers.add(spi.getSite().getName() + "/" + belPin.toString());
                 } else {
-                    Node node = getSitePin().getConnectedNode();
-                    for (Wire w : node.getAllWiresInNode()) {
-                        for (PIP p : w.getBackwardPIPs()) {
-                            drivers.add(p.toString());
+                    List<Node> nodes;
+                    if (simulateSwappedLutPins && spi.isLUTInputPin()) {
+                        char lutLetter = spi.getName().charAt(0);
+                        int originalInput = spi.getName().charAt(1) - '0';
+                        Site site = spi.getSite();
+                        assert(Utils.isSLICE(site.getSiteTypeEnum()));
+                        nodes = new ArrayList<>(LUTTools.MAX_LUT_SIZE);
+                        // Prioritize the original input node without pin swapping
+                        nodes.add(spi.getConnectedNode());
+                        for (int i = 1; i <= LUTTools.MAX_LUT_SIZE; i++) {
+                            if (i == originalInput) {
+                                // Ignore original input node, as it was prioritized above
+                                continue;
+                            }
+                            nodes.add(site.getConnectedNode(lutLetter + Integer.toString(i)));
+                        }
+                    } else {
+                        nodes = Collections.singletonList(spi.getConnectedNode());
+                    }
+                    for (Node node : nodes) {
+                        for (Wire w : node.getAllWiresInNode()) {
+                            for (PIP p : w.getBackwardPIPs()) {
+                                drivers.add(p.toString());
+                            }
                         }
                     }
                 }
@@ -207,11 +229,15 @@ public class RouteBranchNode {
                 } else {
                     String site = belPin.site.getName() + "/";
                     if (belPin.belPin.isInput()) {
-                        drivers.add(site + belPin.belPin.getSourcePin().toString());
+                        for (BELPin bp : belPin.belPin.getSiteConns()) {
+                            if (bp.isOutput() || bp.isBidir()) {
+                                drivers.add(site + bp);
+                            }
+                        }
                     } else if (routethru) {
                         for (BELPin bp : belPin.belPin.getBEL().getPins()) {
                             if (bp.isInput()) {
-                                drivers.add(site + bp.toString());
+                                drivers.add(site + bp);
                             }
                         }
                     }
