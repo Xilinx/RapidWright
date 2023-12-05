@@ -36,7 +36,7 @@ public interface WireInterface {
      * @return The tile of this wire/base wire.
      * @since 2023.2.1
      */
-    public Tile getTile();
+    Tile getTile();
 
     /**
      * Gets the tile name corresponding to this wire/base wire.
@@ -44,7 +44,9 @@ public interface WireInterface {
      * @return The tile name of this wire/base wire.
      * @since 2023.2.1
      */
-    public String getTileName();
+    default String getTileName() {
+        return getTile().getName();
+    }
 
     /**
      * Gets the wire index corresponding to this wire/base wire.
@@ -52,7 +54,7 @@ public interface WireInterface {
      * @return The wire index of this wire/base wire.
      * @since 2023.2.1
      */
-    public int getWireIndex();
+    int getWireIndex();
 
     /**
      * Gets the wire name corresponding to this wire/base wire.
@@ -60,7 +62,9 @@ public interface WireInterface {
      * @return The wire name of this wire/base wire.
      * @since 2023.2.1
      */
-    public String getWireName();
+    default String getWireName() {
+        return getTile().getWireName(getWireIndex());
+    }
 
     /**
      * Gets the intent code corresponding to this wire/base wire.
@@ -68,7 +72,7 @@ public interface WireInterface {
      * @return The intent code of this wire/base wire.
      * @since 2023.2.1
      */
-    public IntentCode getIntentCode();
+    IntentCode getIntentCode();
 
     /**
      * Gets the corresponding site pin (if any) to this wire/base wire.
@@ -77,7 +81,7 @@ public interface WireInterface {
      *         present.
      * @since 2023.2.1
      */
-    public SitePin getSitePin();
+    SitePin getSitePin();
 
     /**
      * Produces a hash code based on the tile and wire of the object.
@@ -85,7 +89,7 @@ public interface WireInterface {
      * @return A hash code derived from the tile and wire.
      * @since 2023.2.1
      */
-    public int hashCode();
+    int hashCode();
 
     /**
      * Checks equality (based on tile and wire values) between this and another
@@ -96,5 +100,5 @@ public interface WireInterface {
      *         otherwise.
      * @since 2023.2.1
      */
-    public boolean equals(WireInterface w);
+    boolean equals(WireInterface w);
 }
