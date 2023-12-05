@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2018-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -32,6 +32,7 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -335,7 +336,7 @@ public class PerformanceExplorer {
                         String roundedC = printNS(c);
                         String uniqueID = p.name() + "_" + r.name() + "_" + roundedC;
                         if (pblock != null) {
-                            uniqueID = uniqueID + "_pblock" + pb;
+                            uniqueID = uniqueID + "_pblock" + pb + "_" + pblock.get(0).getLowerLeftSite() +"-";
                         }
                         System.out.println(uniqueID);
                         String instDir = runDirectory + File.separator + uniqueID;
@@ -470,7 +471,7 @@ public class PerformanceExplorer {
 
         if (opts.hasArgument(PBLOCK_FILE_OPT)) {
             String fileName = (String) opts.valueOf(PBLOCK_FILE_OPT);
-            Map<PBlock,String> pblocks = new HashMap<>();
+            Map<PBlock,String> pblocks = new LinkedHashMap<>();
             for (String line : FileTools.getLinesFromTextFile(fileName)) {
                 if (line.trim().startsWith("#")) continue;
                 if (line.trim().length()==0) continue;

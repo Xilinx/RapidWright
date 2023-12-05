@@ -27,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Wed May 17 23:03:43 2023
+ * Generated on: Fri Oct 20 23:25:44 2023
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  *
  * Enumeration of TileTypeEnum type for all valid devices within Vivado.
@@ -806,6 +806,7 @@ public enum TileTypeEnum {
     HPIO_CFG_TERM_L_TOP_FT,
     HPIO_CFG_TOP_TERM_R,
     HPIO_CFG_TOP_TERM_R_GTH,
+    HPIO_GTH_QUAD_RIGHT_RBRK_FT,
     HPIO_HPIO_LEFT_TERM_B_L_FT,
     HPIO_HPIO_LEFT_TERM_P_FT,
     HPIO_HPIO_LEFT_TERM_T_L_FT,
@@ -837,6 +838,7 @@ public enum TileTypeEnum {
     HPIO_TERM_L_TERM_T_FT,
     HPIO_TERM_R_GTH_RBRK,
     HPIO_TERM_R_GTH_TERM_B,
+    HPIO_TERM_R_GTH_TERM_T_FT,
     HPIO_TERM_R_RBRK,
     HPIO_TERM_R_TERM_B,
     HPIO_TERM_R_TERM_T,

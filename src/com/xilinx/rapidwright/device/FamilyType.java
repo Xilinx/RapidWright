@@ -27,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Wed May 17 22:32:37 2023
+ * Generated on: Fri Oct 20 21:29:57 2023
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  *
  * Set of all Supported Xilinx families in RapidWright
@@ -54,6 +54,7 @@ public enum FamilyType {
         QRKINTEXU,
         QRVERSALAICORE,
         QVERSALAICORE,
+        QVERSALPREMIUM,
         QVERSALPRIME,
         QVIRTEX7,
         QVIRTEXUPLUS,
