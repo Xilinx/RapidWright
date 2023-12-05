@@ -111,7 +111,7 @@ public class RouteNode implements Comparable<RouteNode> {
 
     public RouteNode(SitePinInst p) {
         setTile(p.getTile());
-        setWire(p.getConnectedTileWire());
+        setWire(p.getConnectedWireIndex());
     }
 
     public RouteNode(Node n) {
