@@ -77,8 +77,12 @@ public class PartialRouter extends RWRoute {
         }
 
         @Override
-        protected boolean mustInclude(Node parent, Node child) {
-            return isPartOfExistingRoute(parent, child);
+        protected boolean isExcluded(Node parent, Node child) {
+            // Routing part of an existing (preserved) route are never excluded
+            if (isPartOfExistingRoute(parent, child)) {
+                return false;
+            }
+            return super.isExcluded(parent, child);
         }
     }
 
@@ -88,8 +92,11 @@ public class PartialRouter extends RWRoute {
         }
 
         @Override
-        protected boolean mustInclude(Node parent, Node child) {
-            return isPartOfExistingRoute(parent, child);
+        protected boolean isExcluded(Node parent, Node child) {
+            if (isPartOfExistingRoute(parent, child)) {
+                return false;
+            }
+            return super.isExcluded(parent, child);
         }
     }
 
@@ -131,7 +138,7 @@ public class PartialRouter extends RWRoute {
      * @param end End Node of arc.
      * @return True if arc is part of an existing route.
      */
-    private boolean isPartOfExistingRoute(Node start, Node end) {
+    protected boolean isPartOfExistingRoute(Node start, Node end) {
         // End node can only be part of existing route if it is in the graph already
         RouteNode endRnode = routingGraph.getNode(end);
         if (endRnode == null)

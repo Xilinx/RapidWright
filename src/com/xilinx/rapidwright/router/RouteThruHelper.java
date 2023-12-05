@@ -163,7 +163,10 @@ public class RouteThruHelper {
         return isRouteThruPIPAvailable(design, routethru.getStartWire(), routethru.getEndWire());
     }
 
-    private static boolean isRouteThruSitePinAvailable(Design design, SitePin sitePin) {
+    /**
+     * Given a SitePin object, check that it is available for use as part of a route-through.
+     */
+    public static boolean isRouteThruSitePinAvailable(Design design, SitePin sitePin) {
         if (sitePin == null) {
             return false;
         }

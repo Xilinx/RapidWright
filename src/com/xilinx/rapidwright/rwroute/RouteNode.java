@@ -130,9 +130,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         List<Node> allDownHillNodes = node.getAllDownhillNodes();
         List<RouteNode> childrenList = new ArrayList<>(allDownHillNodes.size());
         for (Node downhill: allDownHillNodes) {
-            if (!mustInclude(node, downhill)) {
-                if (isPreserved(downhill) || isExcluded(node, downhill))
-                    continue;
+            if (isExcluded(downhill)) {
+                continue;
             }
 
             RouteNode child = getOrCreate(downhill, null);
@@ -629,7 +628,6 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return true, if a RouteNode instance has been visited before.
      */
     public boolean isVisited(int id) {
-        assert(id > 0);
         return visited == id;
     }
 
@@ -668,27 +666,11 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     }
 
     /**
-     * Checks if a routing arc must be included.
-     * @param parent The routing arc's parent node.
-     * @param child The routing arc's parent node.
-     * @return True, if the arc should be included in the routing resource graph.
-     */
-    abstract public boolean mustInclude(Node parent, Node child);
-
-    /**
-     * Checks if a node has been preserved and thus cannot be used.
-     * @param node The node in question.
+     * Checks if a downhill node has been excluded should not be present in the routing graph.
+     * @param child The downhill node.
      * @return True, if the arc should be excluded from the routing resource graph.
      */
-    abstract public boolean isPreserved(Node node);
-
-    /**
-     * Checks if a routing arc has been excluded thus cannot be used.
-     * @param parent The routing arc's parent node.
-     * @param child The routing arc's parent node.
-     * @return True, if the arc should be excluded from the routing resource graph.
-     */
-    abstract public boolean isExcluded(Node parent, Node child);
+    abstract public boolean isExcluded(Node child);
 
     abstract public int getSLRIndex();
 
