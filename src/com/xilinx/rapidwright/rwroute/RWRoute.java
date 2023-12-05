@@ -920,7 +920,7 @@ public class RWRoute{
                     }
                     connection.setSinkRnode(newSinkRnode);
 
-                    SitePin newSitePin = newSinkRnode.getNode().getSitePin();
+                    SitePin newSitePin = newSinkRnode.getSitePin();
                     String existing = pinSwaps.put(oldSinkSpi, newSitePin.getPinName());
                     assert(existing == null);
                 }
@@ -1073,7 +1073,7 @@ public class RWRoute{
             RouteNode sinkRnode = connection.getSinkRnode();
             List<RouteNode> rnodes = connection.getRnodes();
             if (sinkRnode == rnodes.get(0)) {
-                List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(sinkRnode.getNode(), connection.getSink().getConnectedNode());
+                List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(sinkRnode, connection.getSink().getConnectedNode());
                 if (switchBoxToSink.size() >= 2) {
                     for (int i = 0; i < switchBoxToSink.size() - 1; i++) {
                         nodes.add(switchBoxToSink.get(i));
@@ -1085,7 +1085,7 @@ public class RWRoute{
 
                 // Assume that it doesn't need unprojecting back to the sink pin
                 // since the sink node is a site pin
-                assert(rnodes.get(0).getNode().getSitePin() != null);
+                assert(rnodes.get(0).getSitePin() != null);
             }
 
             for (RouteNode rnode : rnodes) {
@@ -1610,7 +1610,7 @@ public class RWRoute{
                 if (childRNode == connection.getSinkRnode() && connection.getAltSinkRnodes().isEmpty()) {
                     // This sink must be exclusively reserved for this connection already
                     assert(childRNode.getOccupancy() == 0 ||
-                            childRNode.getNode().getIntentCode() == IntentCode.NODE_PINBOUNCE);
+                            childRNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
                     earlyTermination = true;
                 } else {
                     // Target is not an exclusive sink, only early terminate if this net will not
