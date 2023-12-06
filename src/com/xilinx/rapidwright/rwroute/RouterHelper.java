@@ -28,6 +28,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -53,6 +54,7 @@ import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.Utils;
 
 /**
  * A collection of supportive methods for the router.
@@ -121,29 +123,34 @@ public class RouterHelper {
      * @return A node that connects to an INT tile from an output pin.
      */
     public static Node projectOutputPinToINTNode(SitePinInst output) {
-        Node intNode = output.getConnectedNode();
         int watchdog = 5;
 
-        List<Node> downhillNodes = intNode.getAllDownhillNodes();
-        if (downhillNodes.isEmpty()) {
-            return null;
-        }
-        while (downhillNodes.get(0).getTile().getTileTypeEnum() != TileTypeEnum.INT) {
-            intNode = downhillNodes.get(0);
-            if (downhillNodes.size() > 1) {
-                int i = 1;
-                while (intNode.getAllDownhillNodes().size() == 0) {
-                    intNode = downhillNodes.get(i);
-                    i++;
-                }
-            }
+        // Starting from the SPI's connected node, for each node in queue
+        // return the first downhill node that is in an Interconnect tile.
+        // Otherwise, restart the queue with all such downhill nodes and repeat.
+        // No backtracking.
+        Queue<Node> queue = new ArrayDeque<>();
+        queue.add(output.getConnectedNode());
+        while (!queue.isEmpty() && watchdog >= 0) {
+            Node node = queue.poll();
             watchdog--;
-            if (intNode.getAllDownhillNodes().size() == 0 || watchdog < 0) {
-                return null;
+            assert(!Utils.isInterConnect(node.getTile().getTileTypeEnum()));
+
+            List<Node> downhillNodes = node.getAllDownhillNodes();
+            if (downhillNodes.isEmpty()) {
+                continue;
             }
-            downhillNodes = intNode.getAllDownhillNodes();
+
+            queue.clear();
+            for (Node downhill : downhillNodes) {
+                if (Utils.isInterConnect(downhill.getTile().getTileTypeEnum())) {
+                    return node;
+                }
+                queue.add(downhill);
+            }
         }
-        return intNode;
+
+        return null;
     }
 
     /**
@@ -372,14 +379,15 @@ public class RouterHelper {
             if (belPins.length == 2) {
                 for (BELPin belPin : belPins) {
                     if (belPin.isSitePort())    continue;
-                    // DO NOT invert CLK_OPTINV_CLKB_L and CLK_OPTINV_CLKB_U
-                    if (belPin.getBEL().getName().contains("CLKB")) continue;
-                    if (currSitePinInst.toString().contains("RAM")) {
-                        if (belPin.getBEL().canInvert()) {
-                            // SRST2 of SLICE also has an inverter, but should not be invertible
-                            toInvertPins.add(currSitePinInst);
+                    if (currSitePinInst.getSite().getName().startsWith("RAM")) {
+                        if (!belPin.getBEL().canInvert()) {
+                            continue;
                         }
-                    } else if (currSitePinInst.toString().contains("DSP")) {
+                        if (belPin.getBELName().startsWith("CLK")) {
+                            continue;
+                        }
+                        toInvertPins.add(currSitePinInst);
+                    } else if (currSitePinInst.getSite().getName().startsWith("DSP")) {
                         if (isInvertibleDSPBELPin(belPin)) {
                             toInvertPins.add(currSitePinInst);
                         }

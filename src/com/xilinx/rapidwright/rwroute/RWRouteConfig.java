@@ -84,6 +84,12 @@ public class RWRouteConfig {
     private boolean verbose;
     /** true to display connection span statistics */
     private boolean printConnectionSpan;
+    /** Flag indicating if RWRoute exports a DCP, to flag it as out of context */
+    private boolean exportOutOfContext;
+    /** Maximum presentCongestionFactor value that should prevent accuracy loss **/
+    private float maxPresentCongestionFactor;
+    /* true to enable LUT pin swapping */
+    private boolean lutPinSwapping;
 
     /** Constructs a Configuration Object */
     public RWRouteConfig(String[] arguments) {
@@ -94,7 +100,7 @@ public class RWRouteConfig {
         enlargeBoundingBox = false;
         extensionYIncrement = 2;
         extensionXIncrement = 1;
-        wirelengthWeight = 0.8f;
+        setWirelengthWeight(0.8f);
         timingWeight = 0.35f;
         timingMultiplier = 1f;
         shareExponent = 2;
@@ -207,6 +213,12 @@ public class RWRouteConfig {
                 break;
             case "--printConnectionSpan":
                 setPrintConnectionSpan(true);
+                break;
+            case "--outOfContext":
+                setExportDesignOutOfContext(true);
+                break;
+            case "--lutPinSwapping":
+                setLutPinSwapping(true);
                 break;
             default:
                 throw new IllegalArgumentException("ERROR: RWRoute argument '" + arg + "' not recognized.");
@@ -368,6 +380,16 @@ public class RWRouteConfig {
         if (wirelengthWeight < 0 || wirelengthWeight > 1)
             throw new IllegalArgumentException("ERROR: wirelength-driven weighting factor wirelengthWeight should be within [0, 1].");
         this.wirelengthWeight = wirelengthWeight;
+
+        // Assume that the minimum unit we want to observe is 1/8th of the wirelengthWeight
+        // (since during RWRoute.evaluateCostAndPush(), distanceToSink is scaled by wirelengthWeight)
+        // compute the largest floating-point value that results in this Units-in-the-Last-Place value.
+        final float maxUlp = wirelengthWeight / 8;
+        float maxPresentCongestionFactor = Float.MAX_VALUE;
+        while (Math.ulp(maxPresentCongestionFactor) >= maxUlp) {
+            maxPresentCongestionFactor /= 2;
+        }
+        this.maxPresentCongestionFactor = maxPresentCongestionFactor;
     }
 
     /**
@@ -550,6 +572,15 @@ public class RWRouteConfig {
     }
 
     /**
+     * Gets the max present congestion factor that should prevent accuracy loss.
+     * This value is computed by {@link #setWirelengthWeight(float)}.
+     * @return
+     */
+    public float getMaxPresentCongestionFactor() {
+        return maxPresentCongestionFactor;
+    }
+
+    /**
      * Gets the historical congestion cost penalty factor.
      * It should be greater than 0. Default: 1.
      * Can be modified by using "--historicalCongestionFactor" option, e.g. "--historicalCongestionFactor 2".
@@ -670,9 +701,30 @@ public class RWRouteConfig {
     }
 
     /**
-     * Sets critical path delay pessimism factor b.
-     * It should be greater than 0. Default: 100.
-     * Can be modified by using "--pessimismB" option, e.g. "--pessimismB 50".
+     * Gets the flag indicating if the design returned after routing should be
+     * marked out of context. Default: false.
+     * 
+     * @return True if the flag is set, false otherwise.
+     */
+    public boolean getExportOutOfContext() {
+        return exportOutOfContext;
+    }
+
+    /**
+     * Gets the flag indicating if LUT pin swapping is enabled.
+     * Default: false.
+     *
+     * @return True if the flag is set, false otherwise.
+     */
+    public boolean getLutPinSwapping() {
+        return lutPinSwapping;
+    }
+
+    /**
+     * Sets critical path delay pessimism factor b. It should be greater than 0.
+     * Default: 100. Can be modified by using "--pessimismB" option, e.g.
+     * "--pessimismB 50".
+     * 
      * @param pessimismB
      */
     public void setPessimismB(short pessimismB) {
@@ -749,6 +801,26 @@ public class RWRouteConfig {
      */
     public void setPrintConnectionSpan(boolean printConnectionSpan) {
         this.printConnectionSpan = printConnectionSpan;
+    }
+
+    /**
+     * Sets a flag indicating the design should be exported as out of context.
+     * Default: false.
+     * 
+     * @param exportOutOfContext true to export design as out of context.
+     */
+    public void setExportDesignOutOfContext(boolean exportOutOfContext) {
+        this.exportOutOfContext = exportOutOfContext;
+    }
+
+    /**
+     * Sets a flag indicating LUT pins can be swapped.
+     * Default: false.
+     *
+     * @param lutPinSwapping true to enable LUT pin swapping.
+     */
+    public void setLutPinSwapping(boolean lutPinSwapping) {
+        this.lutPinSwapping = lutPinSwapping;
     }
 
     /**

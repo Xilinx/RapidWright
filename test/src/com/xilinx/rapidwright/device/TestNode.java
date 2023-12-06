@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Advanced Micro Devices, Inc.
@@ -22,10 +22,14 @@
 
 package com.xilinx.rapidwright.device;
 
+import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Queue;
+import java.util.Set;
 
+import com.xilinx.rapidwright.util.Utils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -74,6 +78,79 @@ public class TestNode {
         Node n = d.getNode("INT_INT_INTERFACE_XIPHY_FT_X157Y688/LOGIC_OUTS_R0");
         Assertions.assertNotNull(n);
         Assertions.assertTrue(n.getAllUphillNodes().isEmpty());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            // UltraScale+ part
+            "xcvu3p,INT_X37Y220,BOUNCE_",
+            "xcvu3p,INT_X37Y220,BYPASS_",
+            "xcvu3p,INT_X37Y220,INT_NODE_GLOBAL_",
+            "xcvu3p,INT_X37Y220,INT_NODE_IMUX_",
+            "xcvu3p,INT_X37Y220,INODE_",
+            // These nodes fanout to NESW nodes in the tile above or below
+            // "xcvu3p,INT_X37Y220,SDQNODE_",
+
+            // UltraScale part
+            "xcvu065,INT_X38Y220,BOUNCE_",
+            "xcvu065,INT_X38Y220,BYPASS_",
+            "xcvu065,INT_X38Y220,INT_NODE_GLOBAL_",
+            "xcvu065,INT_X38Y220,INT_NODE_IMUX_",
+            "xcvu065,INT_X38Y220,INODE_",
+            // "xcvu065,INT_X38Y220,QLND",
+            // "xcvu065,INT_X38Y220,SDND",
+    })
+    public void testNodeReachabilityUltraScale(String partName, String tileName, String wirePrefix) {
+        Device device = Device.getDevice(partName);
+        Tile baseTile = device.getTile(tileName);
+        Queue<Node> queue = new ArrayDeque<>();
+        for (String wireName : baseTile.getWireNames()) {
+            if (!wireName.startsWith(wirePrefix)) {
+                continue;
+            }
+            queue.add(Node.getNode(baseTile, wireName));
+        }
+        System.out.println("Initial queue.size() = " + queue.size());
+
+        // Print out the prefixes of nodes that are immediately uphill of these wire prefixes
+        // (i.e. "BOUNCE_E_0_FT1" -> "BOUNCE_")
+        System.out.println("Immediately uphill:");
+        queue.stream().map(Node::getAllUphillNodes).flatMap(List::stream).map(Node::getWireName)
+                .map(s -> s.replaceFirst("((BOUNCE|BYPASS|CTRL|INT_NODE_[^_]+|INODE)_).*", "$1"))
+                .map(s -> s.replaceFirst(
+                                                   // UltraScale+
+                        (partName.endsWith("p")) ? "((CLE_CLE_[LM]_SITE_0|CLK_LEAF_SITES|EE[124]|INT_INT_SDQ|NN[12]|SS[12]|WW[124])_).*"
+                                                   // UltraScale
+                                                 : "((CLE_CLE_[LM]_SITE_0|CLK_BUFCE_LEAF_X16_1_CLK|EE[124]|INT_INT_SINGLE|NN[12]|SS[12]|WW[124])_).*",
+                        "$1"))
+                .distinct()
+                .sorted()
+                .forEachOrdered(s -> System.out.println("\t" + s));
+
+        // Print out the prefixes of nodes that are immediately downhill of these wire prefixes
+        System.out.println("Immediately downhill:");
+        queue.stream().map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getWireName)
+                .map(s -> s.replaceFirst("((BOUNCE|BYPASS|CTRL|IMUX|INT_NODE_[^_]+|INODE)_).*", "$1"))
+                .distinct()
+                .sorted()
+                .forEachOrdered(s -> System.out.println("\t" + s));
+
+        Set<Node> visited = new HashSet<>();
+        while (!queue.isEmpty()) {
+            Node node = queue.poll();
+            for (Node downhill : node.getAllDownhillNodes()) {
+                if (!visited.add(downhill)) {
+                    continue;
+                }
+                if (!Utils.isInterConnect(downhill.getTile().getTileTypeEnum())) {
+                    continue;
+                }
+                Assertions.assertEquals(baseTile.getTileXCoordinate(),
+                        downhill.getTile().getTileXCoordinate());
+                queue.add(downhill);
+            }
+        }
+        System.out.println("visited.size() = " + visited.size());
     }
 }
 

@@ -32,6 +32,7 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +53,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     /** The associated {@link Node} instance */
     protected Node node;
     /** The type of a rnode*/
-    private final RouteNodeType type;
+    private RouteNodeType type;
     /** The tileXCoordinate and tileYCoordinate of the INT tile that the associated node stops at */
     private final short endTileXCoordinate;
     private final short endTileYCoordinate;
@@ -94,10 +95,10 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      */
     private Map<RouteNode, Integer> driversCounts;
 
-    protected RouteNode(Node node, RouteNodeType type) {
+    protected RouteNode(Node node, RouteNodeType type, Map<Tile, BitSet> lagunaI) {
         this.node = node;
-        RouteNodeInfo nodeInfo = RouteNodeInfo.get(node);
-        this.type = (type == RouteNodeType.WIRE) ? nodeInfo.type : type;
+        RouteNodeInfo nodeInfo = RouteNodeInfo.get(node, lagunaI);
+        this.type = (type == null) ? nodeInfo.type : type;
         endTileXCoordinate = nodeInfo.endTileXCoordinate;
         endTileYCoordinate = nodeInfo.endTileYCoordinate;
         length = nodeInfo.length;
@@ -129,13 +130,11 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         List<Node> allDownHillNodes = node.getAllDownhillNodes();
         List<RouteNode> childrenList = new ArrayList<>(allDownHillNodes.size());
         for (Node downhill: allDownHillNodes) {
-            if (!mustInclude(node, downhill)) {
-                if (isPreserved(downhill) || isExcluded(node, downhill))
-                    continue;
+            if (isExcluded(downhill)) {
+                continue;
             }
 
-            final RouteNodeType type = RouteNodeType.WIRE;
-            RouteNode child = getOrCreate(downhill, type);
+            RouteNode child = getOrCreate(downhill, null);
             childrenList.add(child);//the sink rnode of a target connection has been created up-front
         }
         if (!childrenList.isEmpty()) {
@@ -251,7 +250,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     }
 
     public static short getLength(Node node) {
-        return RouteNodeInfo.get(node).length;
+        return RouteNodeInfo.get(node, null).length;
     }
 
     /**
@@ -337,11 +336,22 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     }
 
     /**
-     * Gets the type of a RouteNode Object.
+     * Gets the type of a RouteNode object.
      * @return The RouteNodeType of a RouteNode Object.
      */
     public RouteNodeType getType() {
         return type;
+    }
+
+    /**
+     * Sets the type of a RouteNode object.
+     * @param type New RouteNodeType value.
+     */
+    public void setType(RouteNodeType type) {
+        // Only support demotion from PINFEED_I to WIRE or PINBOUNCE since they have the same base cost
+        assert(this.type == RouteNodeType.PINFEED_I
+                && (type == RouteNodeType.WIRE || type == RouteNodeType.PINBOUNCE));
+        this.type = type;
     }
 
     /**
@@ -618,7 +628,6 @@ abstract public class RouteNode implements Comparable<RouteNode> {
      * @return true, if a RouteNode instance has been visited before.
      */
     public boolean isVisited(int id) {
-        assert(id > 0);
         return visited == id;
     }
 
@@ -657,27 +666,11 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     }
 
     /**
-     * Checks if a routing arc must be included.
-     * @param parent The routing arc's parent node.
-     * @param child The routing arc's parent node.
-     * @return True, if the arc should be included in the routing resource graph.
-     */
-    abstract public boolean mustInclude(Node parent, Node child);
-
-    /**
-     * Checks if a node has been preserved and thus cannot be used.
-     * @param node The node in question.
+     * Checks if a downhill node has been excluded should not be present in the routing graph.
+     * @param child The downhill node.
      * @return True, if the arc should be excluded from the routing resource graph.
      */
-    abstract public boolean isPreserved(Node node);
-
-    /**
-     * Checks if a routing arc has been excluded thus cannot be used.
-     * @param parent The routing arc's parent node.
-     * @param child The routing arc's parent node.
-     * @return True, if the arc should be excluded from the routing resource graph.
-     */
-    abstract public boolean isExcluded(Node parent, Node child);
+    abstract public boolean isExcluded(Node child);
 
     abstract public int getSLRIndex();
 

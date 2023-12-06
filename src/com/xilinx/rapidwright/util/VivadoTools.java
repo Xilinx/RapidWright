@@ -103,6 +103,10 @@ public class VivadoTools {
      * @return the contents of the log file as a list of strings
      */
     public static List<String> runTcl(Path outputLog, Path tclScript, boolean verbose, String[] environ, File runDir) {
+        if (!FileTools.isVivadoOnPath()) {
+            throw new RuntimeException(
+                    "ERROR: Could not find vivado executable, current PATH=" + System.getenv("PATH"));
+        }
         final String vivadoCmd = "vivado -log " + outputLog.toString() + " -nojournal -mode batch -source "
                 + tclScript.toString();
         Integer exitCode = FileTools.runCommand(vivadoCmd, verbose, environ, runDir);
@@ -127,6 +131,23 @@ public class VivadoTools {
         FileTools.deleteFolder(dcp.getParent().toString());
 
         return rrs;
+    }
+
+    /**
+     * Run Vivado's `report_route_status` command on the named net inside the
+     * provided Design object and return its specific route status (e.g. ROUTED).
+     *
+     * @param design Design object to report on.
+     * @return String containing net's specific route status.
+     */
+    public static String reportRouteStatus(Design design, String netName) {
+        final Path dcp = writeCheckpoint(design);
+        try {
+            boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
+            return reportRouteStatus(netName, dcp, dcp.getParent(), encrypted);
+        } finally {
+            FileTools.deleteFolder(dcp.getParent().toString());
+        }
     }
 
     private static Path writeCheckpoint(Design design) {
@@ -224,6 +245,31 @@ public class VivadoTools {
 
         List<String> log = VivadoTools.runTcl(outputLog, sb.toString(), true);
         return new ReportRouteStatusResult(log);
+    }
+
+    /**
+     * Run Vivado's `report_route_status` command on the named net inside the
+     * provided DCP path and return its route status.
+     *
+     * @param netName Net name.
+     * @param dcp Path to DCP to report on.
+     * @param workdir Directory to work within.
+     * @param encrypted Indicates whether DCP contains encrypted EDIF cells.
+     * @return True if net was fully routed.
+     */
+    public static String reportRouteStatus(String netName, Path dcp, Path workdir, boolean encrypted) {
+        final Path outputLog = workdir.resolve("outputLog.log");
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(createTclDCPLoadCommand(dcp, encrypted));
+        sb.append(REPORT_ROUTE_STATUS + " -of [get_nets {" + netName + "}]");
+
+        List<String> log = VivadoTools.runTcl(outputLog, sb.toString(), true);
+        List<String> matchingLines = VivadoTools.searchVivadoLog(log, "Route status: ");
+        if (matchingLines.isEmpty()) {
+            return null;
+        }
+        return matchingLines.get(0).trim().split("\\s+", 3)[2];
     }
 
     private static String createTclDCPLoadCommand(Path dcp, boolean encrypted) {

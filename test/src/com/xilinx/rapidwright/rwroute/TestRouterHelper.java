@@ -22,24 +22,65 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+
+import java.util.Set;
 
 public class TestRouterHelper {
     @ParameterizedTest
     @CsvSource({
             "SLICE_X0Y0,COUT,null",
             "SLICE_X0Y299,COUT,null",
-            "SLICE_X0Y0,A_O,CLEL_R_X0Y0/CLE_CLE_L_SITE_0_A_O"
+            "SLICE_X0Y0,A_O,CLEL_R_X0Y0/CLE_CLE_L_SITE_0_A_O",
+            "GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,null",
+            "IOB_X1Y95,I,INT_INTF_L_IO_X72Y109/LOGIC_OUTS_R23"
     })
     public void testProjectOutputPinToINTNode(String siteName, String pinName, String nodeAsString) {
         Design design = new Design("design", "xcvu3p");
         SiteInst si = design.createSiteInst(siteName);
         SitePinInst spi = new SitePinInst(pinName, si);
         Assertions.assertEquals(nodeAsString, String.valueOf(RouterHelper.projectOutputPinToINTNode(spi)));
+    }
+
+    @Test
+    public void testInvertPossibleGndPinsToVccPinsBramClock() {
+        Design design = new Design("design", "xcvu3p");
+        SiteInst si = design.createSiteInst("RAMB36_X0Y0");
+        Cell cell = new Cell("ram", si.getBEL("RAMBFIFO36E2"));
+        cell.setSiteInst(si);
+        SitePinInst[] gndPins = new SitePinInst[] {
+                new SitePinInst("CLKAL", si),
+                new SitePinInst("CLKAU", si),
+                new SitePinInst("CLKBL", si),
+                new SitePinInst("CLKBU", si),
+                new SitePinInst("ENAL", si),
+                new SitePinInst("ENAU", si),
+                new SitePinInst("ENBL", si),
+                new SitePinInst("ENBU", si),
+        };
+        Net gndNet = design.getGndNet();
+        for (SitePinInst spi : gndPins) {
+            gndNet.addPin(spi);
+        }
+
+        Set<SitePinInst> invertedPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndNet.getPins());
+        Assertions.assertEquals(4, invertedPins.size());
+
+        Net vccNet = design.getVccNet();
+        for (SitePinInst spi : gndPins) {
+            if (spi.getName().startsWith("CLK")) {
+                Assertions.assertSame(gndNet, spi.getNet());
+            } else {
+                Assertions.assertSame(vccNet, spi.getNet());
+            }
+        }
     }
 }

@@ -22,16 +22,18 @@
 
 package com.xilinx.rapidwright.util;
 
-import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.PIP;
-
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.PIP;
 
 /**
  * This utility class is used to create RapidWright code from a DCP file that is tedious to create by hand.
@@ -39,6 +41,23 @@ import java.util.Map;
  * Created on: August 16, 2023
  */
 public class CodeGenerator {
+
+    /**
+     * Convenience method to take a net and return a String the generates the routed
+     * net for an example test case in RapidWright code
+     * 
+     * @param net The net to extract routing and SiteInst from
+     * @return The RapidWright code string
+     */
+    public static String testNetGenerator(Net net) {
+        Collection<String> nets = new ArrayList<>();
+        nets.add(net.getName());
+        Collection<String> siteInsts = new ArrayList<>();
+        for (SiteInst si : net.getSiteInsts()) {
+            siteInsts.add(si.getSiteName());
+        }
+        return testNetGenerator(net.getDesign(), nets, siteInsts);
+    }
 
     /**
      * Generates RapidWright test code from a provided checkpoint that instantiates the provided nets and siteInsts,
@@ -112,16 +131,23 @@ public class CodeGenerator {
                 if (siteInstIdx == null) {
                     siteIdx++;
                     code.append(createSiteInstCode(siteIdx, siteName));
+                    siteInstsCreated.put(siteName, siteIdx);
+                    siteInstIdx = siteIdx;
                 }
-                code.append(varName + ".createPin(\"" + pin.getName() + "\", " + getSiteInstVarName(siteIdx) + ");\n");
+                code.append(
+                        varName + ".createPin(\"" + pin.getName() + "\", " + getSiteInstVarName(siteInstIdx) + ");\n");
             }
             netIdx++;
         }
         code.append("\n");
 
         for (String siteName : siteInsts) {
+            if (siteInstsCreated.containsKey(siteName)) {
+                continue;
+            }
             siteIdx++;
             code.append(createSiteInstCode(siteIdx, siteName));
+            siteInstsCreated.put(siteName, siteIdx);
         }
 
         return code.toString();

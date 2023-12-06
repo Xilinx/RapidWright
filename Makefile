@@ -1,7 +1,7 @@
 
 BIN = bin
-CLASSPATH = $(shell find `pwd`/jars -name '*.jar' 2>/dev/null | egrep -v 'javadoc|win64' | tr '\n' ':')
-JARFILES = $(shell find `pwd`/jars -name '*.jar' 2>/dev/null | egrep -v 'javadoc|win64' | tr '\n' ' ')
+JARFILES = $(wildcard jars/*.jar)
+CLASSPATH = $(subst $(eval ) ,:,$(JARFILES))
 
 
 SOURCES := $(shell find ./src -name '*.java'  )
