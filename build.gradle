@@ -76,6 +76,7 @@ task cleanupScripts(type: Delete) {
 }
 
 task restoreScripts(type: Copy) {
+    dependsOn(tasks.named("jar"))
     from preserveDir
     into 'bin'
     finalizedBy(cleanupScripts)
