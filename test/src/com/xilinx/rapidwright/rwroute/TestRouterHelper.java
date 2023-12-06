@@ -27,6 +27,8 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.tools.LUTTools;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -82,5 +84,26 @@ public class TestRouterHelper {
                 Assertions.assertSame(vccNet, spi.getNet());
             }
         }
+    }
+
+    @Test
+    public void testInvertPossibleGndPinsToVccPinsLutInput() {
+        Design design = new Design("design", "xcvu3p");
+        Cell cell = design.createAndPlaceCell("lut", Unisim.LUT1, "SLICE_X0Y0/A6LUT");
+        LUTTools.configureLUT(cell, "O=!I0");
+        Assertions.assertEquals("O=!I0", LUTTools.getLUTEquation(cell));
+
+        Net gndNet = design.getGndNet();
+        gndNet.createPin("A6", cell.getSiteInst());
+
+        // Check A6 was inverted, and it was moved off gndNet
+        Set<SitePinInst> invertedPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndNet.getPins());
+        Assertions.assertEquals("[IN SLICE_X0Y0.A6]", invertedPins.toString());
+        Assertions.assertTrue(gndNet.getPins().isEmpty());
+
+        // Must have moved onto vccNet, and the LUT mask inverted
+        Net vccNet = design.getVccNet();
+        Assertions.assertEquals("[IN SLICE_X0Y0.A6]", vccNet.getPins().toString());
+        Assertions.assertEquals("O=I0", LUTTools.getLUTEquation(cell));
     }
 }
