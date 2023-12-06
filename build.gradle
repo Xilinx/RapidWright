@@ -82,6 +82,8 @@ task restoreScripts(type: Copy) {
     finalizedBy(cleanupScripts)
 }
 
+run.dependsOn(restoreScripts)
+
 task mainJar(type: Jar, dependsOn: classes) {
     archiveBaseName = 'main'
     from sourceSets.main.output include mainClassName
