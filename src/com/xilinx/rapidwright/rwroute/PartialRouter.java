@@ -743,19 +743,6 @@ public class PartialRouter extends RWRoute {
     }
 
     /**
-     * Calls {@link RWRoute#preprocess(Design)} to preprocess the design, and furthermore
-     * update the SitePinInst.isRouted() result for all pins in the design.
-     * @param design Design to preprocess
-     */
-    public static void preprocess(Design design) {
-        RWRoute.preprocess(design);
-
-        for (Net net : design.getNets()) {
-            DesignTools.updatePinsIsRouted(net);
-        }
-    }
-
-    /**
      * Partially routes a {@link Design} instance; specifically, all nets with no routing PIPs already present.
      * @param design The {@link Design} instance to be routed.
      * @param args An array of string arguments, can be null.
