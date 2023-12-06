@@ -199,6 +199,7 @@ public class RWRoute{
             throw new RuntimeException(getUnsupportedSeriesMessage(design.getPart()));
         }
 
+        // Pre-processing of the design regarding physical net names pins
         DesignTools.makePhysNetNamesConsistent(design);
         DesignTools.createPossiblePinsToStaticNets(design);
         DesignTools.createMissingSitePinInsts(design);
