@@ -373,15 +373,20 @@ public class RouterHelper {
     public static Set<SitePinInst> invertPossibleGndPinsToVccPins(Design design, List<SitePinInst> pins) {
         Net staticNet = design.getGndNet();
         Set<SitePinInst> toInvertPins = new HashSet<>();
-        for (SitePinInst currSitePinInst : pins) {
+        nextSitePin: for (SitePinInst currSitePinInst : pins) {
             if (!currSitePinInst.getNet().equals(staticNet))
                 throw new RuntimeException(currSitePinInst.toString());
             if (currSitePinInst.isLUTInputPin()) {
-                for (Cell cell : DesignTools.getConnectedCells(currSitePinInst)) {
+                Collection<Cell> connectedCells = DesignTools.getConnectedCells(currSitePinInst);
+                for (Cell cell : connectedCells) {
                     if (!LUTTools.isCellALUT(cell)) {
-                        continue;
+                        continue nextSitePin;
                     }
+                }
 
+                toInvertPins.add(currSitePinInst);
+
+                for (Cell cell : connectedCells) {
                     // Find the logical pin name
                     String physicalPinName = "A" + currSitePinInst.getName().charAt(1);
                     String logicalPinName = cell.getLogicalPinMapping(physicalPinName);
@@ -397,8 +402,6 @@ public class RouterHelper {
                     // TODO: This may modify an folded EDIFCellInst!!!
                     LUTTools.configureLUT(cell, newLutEquation);
                 }
-
-                toInvertPins.add(currSitePinInst);
             } else {
                 BELPin[] belPins = currSitePinInst.getSiteInst().getSiteWirePins(currSitePinInst.getName());
                 // DSP or BRAM
