@@ -166,7 +166,9 @@ public class TestRouterHelper {
                         "CKEN1,false",
                         "CKEN2,false",
                         "CKEN3,false",
-                        "CKEN4,false"
+                        "CKEN4,false",
+                        "WCKEN,false",
+                        "CIN,false"
                 ))
         );
     }
