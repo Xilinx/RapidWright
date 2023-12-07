@@ -90,7 +90,7 @@ public class TestRouterHelper {
     public void testInvertPossibleGndPinsToVccPinsLutInput() {
         Design design = new Design("design", "xcvu3p");
         Cell cell = design.createAndPlaceCell("lut", Unisim.LUT1, "SLICE_X0Y0/A6LUT");
-        LUTTools.configureLUT(cell, "O=!I0");
+        LUTTools.configureLUT(cell, "O=~I0");
         Assertions.assertEquals("O=!I0", LUTTools.getLUTEquation(cell));
 
         Net gndNet = design.getGndNet();

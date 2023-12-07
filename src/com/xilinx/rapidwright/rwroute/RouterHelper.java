@@ -398,6 +398,7 @@ public class RouterHelper {
                     // Compute a new LUT equation with that logical input inverted
                     String newLutEquation = lutEquation.replace(logicalPinName, "!" + logicalPinName)
                             // Cancel out double inversions
+                            // (Note: LUTTools.getLUTEquation() produces equations with '!' instead of '~')
                             .replace("!!", "");
                     // TODO: This may modify an folded EDIFCellInst!!!
                     LUTTools.configureLUT(cell, newLutEquation);
