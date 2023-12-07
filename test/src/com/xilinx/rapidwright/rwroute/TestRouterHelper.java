@@ -155,6 +155,18 @@ public class TestRouterHelper {
                         "ADDR_A0,false",
                         "ADDR_A1,false",
                         "ADDR_A2,false"
+                )),
+                Arguments.of("xcvu3p", "SLICE_X1Y0", Arrays.asList(
+                        "CLK1,true",
+                        "CLK2,true",
+                        "SRST1,true",
+                        "SRST2,true",
+                        "LCLK,true",
+
+                        "CKEN1,false",
+                        "CKEN2,false",
+                        "CKEN3,false",
+                        "CKEN4,false"
                 ))
         );
     }
