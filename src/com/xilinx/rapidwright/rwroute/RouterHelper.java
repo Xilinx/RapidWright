@@ -43,8 +43,10 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
@@ -371,24 +373,46 @@ public class RouterHelper {
      * @param pins The static net pins.
      */
     public static Set<SitePinInst> invertPossibleGndPinsToVccPins(Design design, List<SitePinInst> pins) {
-        Net staticNet = design.getGndNet();
+        Net gndNet = design.getGndNet();
         Set<SitePinInst> toInvertPins = new HashSet<>();
-        nextSitePin: for (SitePinInst currSitePinInst : pins) {
-            if (!currSitePinInst.getNet().equals(staticNet))
-                throw new RuntimeException(currSitePinInst.toString());
-            if (currSitePinInst.isLUTInputPin()) {
-                Collection<Cell> connectedCells = DesignTools.getConnectedCells(currSitePinInst);
+        nextSitePin: for (SitePinInst spi : pins) {
+            if (!spi.getNet().equals(gndNet))
+                throw new RuntimeException(spi.toString());
+            SiteInst si = spi.getSiteInst();
+            String siteWireName = spi.getSiteWireName();
+            if (spi.isLUTInputPin()) {
+                Collection<Cell> connectedCells = DesignTools.getConnectedCells(spi);
+                if (connectedCells.isEmpty()) {
+                    for (BELPin belPin : si.getSiteWirePins(siteWireName)) {
+                        if (belPin.isSitePort()) {
+                            continue;
+                        }
+                        BEL bel = belPin.getBEL();
+                        Cell cell = si.getCell(bel);
+                        if (cell == null) {
+                            continue;
+                        }
+                        if (cell.getType().equals("SRL16E") && siteWireName.endsWith("6")) {
+                            // SRL16Es that have been transformed from SRLC32E (assume so here,
+                            // since we don't always have the logical netlist to check)
+                            // require GND on their A6 pin
+                            // See DesignTools.createMissingStaticSitePins(BELPin, SiteInst, Cell)
+                            continue nextSitePin;
+                        }
+                    }
+                    throw new RuntimeException("ERROR: " + gndNet.getName() + " not connected to any Cells");
+                }
                 for (Cell cell : connectedCells) {
                     if (!LUTTools.isCellALUT(cell)) {
                         continue nextSitePin;
                     }
                 }
 
-                toInvertPins.add(currSitePinInst);
+                toInvertPins.add(spi);
 
                 for (Cell cell : connectedCells) {
                     // Find the logical pin name
-                    String physicalPinName = "A" + currSitePinInst.getName().charAt(1);
+                    String physicalPinName = "A" + spi.getName().charAt(1);
                     String logicalPinName = cell.getLogicalPinMapping(physicalPinName);
 
                     // Get the LUT equation
@@ -404,7 +428,7 @@ public class RouterHelper {
                     LUTTools.configureLUT(cell, newLutEquation);
                 }
             } else {
-                BELPin[] belPins = currSitePinInst.getSiteInst().getSiteWirePins(currSitePinInst.getName());
+                BELPin[] belPins = si.getSiteWirePins(siteWireName);
                 if (belPins.length != 2) {
                     continue;
                 }
@@ -415,25 +439,27 @@ public class RouterHelper {
                     if (!belPin.getBEL().canInvert()) {
                         continue;
                     }
-                    if (currSitePinInst.getSite().getName().startsWith("RAM")) {
+                    if (spi.getSite().getName().startsWith("RAM")) {
                         if (belPin.getBELName().startsWith("CLK")) {
                             continue;
                         }
                     }
-                    toInvertPins.add(currSitePinInst);
+                    toInvertPins.add(spi);
                 }
             }
         }
 
         // Unroute all pins in a batch fashion
-        DesignTools.unroutePins(staticNet, toInvertPins);
+        DesignTools.unroutePins(gndNet, toInvertPins);
         // Manually remove pins from net, because using DesignTools.batchRemoveSitePins()
         // will cause SitePinInst.detachSiteInst() to be called, which we do not want
         // as we are simply moving the SPI from one net to another
-        staticNet.getPins().removeAll(toInvertPins);
+        gndNet.getPins().removeAll(toInvertPins);
+
+        Net vccNet = design.getVccNet();
         for (SitePinInst toinvert:toInvertPins) {
             assert(toinvert.getSiteInst() != null);
-            if (!design.getVccNet().addPin(toinvert)) {
+            if (!vccNet.addPin(toinvert)) {
                   throw new RuntimeException("ERROR: Couldn't invert site pin " +
                           toinvert);
             }
