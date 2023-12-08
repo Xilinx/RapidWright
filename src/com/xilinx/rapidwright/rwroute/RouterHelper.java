@@ -405,24 +405,22 @@ public class RouterHelper {
                 }
             } else {
                 BELPin[] belPins = currSitePinInst.getSiteInst().getSiteWirePins(currSitePinInst.getName());
-                // DSP or BRAM
-                if (belPins.length == 2) {
-                    for (BELPin belPin : belPins) {
-                        if (belPin.isSitePort()) continue;
-                        if (currSitePinInst.getSite().getName().startsWith("RAM")) {
-                            if (!belPin.getBEL().canInvert()) {
-                                continue;
-                            }
-                            if (belPin.getBELName().startsWith("CLK")) {
-                                continue;
-                            }
-                            toInvertPins.add(currSitePinInst);
-                        } else if (currSitePinInst.getSite().getName().startsWith("DSP")) {
-                            if (isInvertibleDSPBELPin(belPin)) {
-                                toInvertPins.add(currSitePinInst);
-                            }
+                if (belPins.length != 2) {
+                    continue;
+                }
+                for (BELPin belPin : belPins) {
+                    if (belPin.isSitePort()) {
+                        continue;
+                    }
+                    if (!belPin.getBEL().canInvert()) {
+                        continue;
+                    }
+                    if (currSitePinInst.getSite().getName().startsWith("RAM")) {
+                        if (belPin.getBELName().startsWith("CLK")) {
+                            continue;
                         }
                     }
+                    toInvertPins.add(currSitePinInst);
                 }
             }
         }

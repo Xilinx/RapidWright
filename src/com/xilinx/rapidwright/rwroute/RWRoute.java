@@ -1069,9 +1069,14 @@ public class RWRoute{
     protected void assignNodesToConnections() {
         for (Connection connection : indirectConnections) {
             List<Node> nodes = new ArrayList<>();
+            connection.setNodes(nodes);
 
             RouteNode sinkRnode = connection.getSinkRnode();
             List<RouteNode> rnodes = connection.getRnodes();
+            if (rnodes.isEmpty()) {
+                continue;
+            }
+
             if (sinkRnode == rnodes.get(0)) {
                 List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(sinkRnode.getNode(), connection.getSink().getConnectedNode());
                 if (switchBoxToSink.size() >= 2) {
@@ -1098,8 +1103,6 @@ public class RWRoute{
                     nodes.add(sourceToSwitchBox.get(i));
                 }
             }
-
-            connection.setNodes(nodes);
         }
     }
 
