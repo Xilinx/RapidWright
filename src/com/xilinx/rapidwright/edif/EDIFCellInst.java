@@ -153,6 +153,22 @@ public class EDIFCellInst extends EDIFPropertyObject {
     }
 
     /**
+     * Gets the named EDIFPortInst or creates it (if it correctly named) and returns
+     * it. If the port instance is to be created, it will not be connected to an
+     * EDIFNet.
+     * 
+     * @param name Name of the port instance to get.
+     * @return The existing or created port instance.
+     */
+    public EDIFPortInst getOrCreatePortInst(String name) {
+        EDIFPortInst portInst = portInsts == null ? null : portInsts.get(this, name);
+        if (portInsts == null || portInst == null) {
+            portInst = EDIFPortInst.createPortInstFromPortInstName(name, this);
+        }
+        return portInst;
+    }
+
+    /**
      * Gets the port on the underlying cell type.  It is the same as
      * calling getCellType().getPort(name).
      * @param name Name of the port to get.

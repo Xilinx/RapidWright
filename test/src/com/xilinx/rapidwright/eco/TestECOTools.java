@@ -26,7 +26,12 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.PinType;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
@@ -34,11 +39,13 @@ import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.router.Router;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
 import com.xilinx.rapidwright.util.VivadoTools;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
@@ -414,6 +421,53 @@ public class TestECOTools {
             Assertions.assertEquals(2, rrs.netsWithRoutingErrors);
             Assertions.assertEquals(2, rrs.netsWithSomeUnplacedPins);
         }
+    }
+
+    @Test
+    public void testCreateInlineCellOnInputPin() {
+        Design d = new Design("Test", Device.KCU105);
+
+        Cell and2 = d.createAndPlaceCell("and2", Unisim.AND2, "SLICE_X100Y100/A6LUT");
+        Cell button0 = d.createAndPlaceIOB("button0", PinType.IN, "AE10", "LVCMOS18");
+        Cell button1 = d.createAndPlaceIOB("button1", PinType.IN, "AF9", "LVCMOS18");
+        Cell led0 = d.createAndPlaceIOB("led0", PinType.OUT, "AP8", "LVCMOS18");
+
+        // Connect Button 0 to the LUT2 input I0
+        EDIFHierCellInst hierButton0 = button0.getEDIFHierCellInst().getParent();
+        Net net0 = d.createNet(new EDIFHierNet(hierButton0, hierButton0.getCellType().getNet("O")));
+        ECOTools.connectNet(d, and2, "I0", net0);
+
+        // Connect Button 1 to the LUT2 input I1
+        EDIFHierCellInst hierButton1 = button1.getEDIFHierCellInst().getParent();
+        Net net1 = d.createNet(new EDIFHierNet(hierButton1, hierButton1.getCellType().getNet("O")));
+        ECOTools.connectNet(d, and2, "I1", net1);
+
+        // Connect the LUT2 (AND2) to the LED IO
+        Net net2 = d.createNet("and2");
+        net2.connect(and2, "O");
+        net2.connect(led0, "I");
+
+        // Route site internal nets
+        d.routeSites();
+
+        // Insert a LUT1 in between 'and2.I0' and its source, 'button0.O'
+        EDIFHierPortInst input = and2.getEDIFHierCellInst().getPortInst("I0");
+        Site site = d.getDevice().getSite("SLICE_X100Y101");
+        BEL bel = site.getBEL("A6LUT");
+        Unisim lut1Type = Unisim.LUT1;
+        ECOTools.createInlineCellOnInputPin(d, input, lut1Type, site, bel, "I0", "O");
+
+        // Route nets between sites
+        new Router(d).routeDesign();
+
+        Cell lut1 = d.getSiteInstFromSite(site).getCell(bel);
+        Assertions.assertNotNull(lut1);
+        Assertions.assertEquals(lut1Type.name(), lut1.getEDIFHierCellInst().getCellType().getName());
+        Assertions.assertEquals(net0, lut1.getSitePinFromLogicalPin("I0", null).getNet());
+        Assertions.assertNotEquals(net0, lut1.getSitePinFromLogicalPin("O", null).getNet());
+
+        Assumptions.assumeTrue(FileTools.isVivadoOnPath());
+        Assertions.assertTrue(VivadoTools.reportRouteStatus(d).isFullyRouted());
     }
 
     @Test
