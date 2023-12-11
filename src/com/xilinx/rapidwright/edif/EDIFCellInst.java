@@ -69,7 +69,7 @@ public class EDIFCellInst extends EDIFPropertyObject {
     public EDIFCellInst(EDIFCellInst inst, EDIFCell parentCell) {
         super((EDIFPropertyObject)inst);
         this.parentCell = parentCell;
-        this.cellType = inst.cellType;
+        setCellType(inst.cellType);
         setViewref(new EDIFName(inst.viewref));
     }
 
@@ -205,7 +205,11 @@ public class EDIFCellInst extends EDIFPropertyObject {
      * @param cellType the cellType to set
      */
     public void setCellTypeRaw(EDIFCell cellType) {
+        if (this.cellType != null) {
+            this.cellType.decrementInstanceCount();
+        }
         this.cellType = cellType;
+        this.cellType.incrementInstanceCount();
         setViewref(cellType != null ? cellType.getEDIFView() : null);
     }
 

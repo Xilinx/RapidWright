@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Queue;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 /**
  * Represent a logical cell in an EDIF netlist.  Can
@@ -61,6 +62,11 @@ public class EDIFCell extends EDIFPropertyObject {
     private Map<String, EDIFNet> internalPortMap;
 
     private EDIFName view = DEFAULT_VIEW;
+
+    private volatile int instanceCount = 0;
+
+    private static final AtomicIntegerFieldUpdater<EDIFCell> instanceCountUpdater =
+            AtomicIntegerFieldUpdater.newUpdater(EDIFCell.class, "instanceCount");
 
     public EDIFCell(EDIFLibrary lib, String name) {
         super(name);
@@ -655,6 +661,34 @@ public class EDIFCell extends EDIFPropertyObject {
     @Override
     public int hashCode() {
         return Objects.hash(super.hashCode(), library);
+    }
+
+    /**
+     * Atomically increment instance count of this cell.
+     */
+    public void incrementInstanceCount() {
+        instanceCountUpdater.incrementAndGet(this);
+    }
+
+    /**
+     * Atomically decrement instance count of this cell.
+     */
+    public void decrementInstanceCount() {
+        instanceCountUpdater.getAndDecrement(this);
+    }
+
+    /**
+     * Atomically decrement instance count of this cell.
+     */
+    public int getInstanceCount() {
+        return instanceCountUpdater.get(this);
+    }
+
+    /**
+     * True if this cell is instantiated no more than once.
+     */
+    public boolean isUniquified() {
+        return getInstanceCount() <= 1;
     }
 }
 
