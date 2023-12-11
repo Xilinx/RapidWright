@@ -678,7 +678,7 @@ public class EDIFCell extends EDIFPropertyObject {
     }
 
     /**
-     * Atomically decrement instance count of this cell.
+     * @return The number of times this cell has been instantiated.
      */
     public int getInstanceCount() {
         return instanceCountUpdater.get(this);
