@@ -40,6 +40,7 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.router.Router;
+import com.xilinx.rapidwright.rwroute.TestRWRoute;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
@@ -455,7 +456,7 @@ public class TestECOTools {
         Site site = d.getDevice().getSite("SLICE_X100Y101");
         BEL bel = site.getBEL("A6LUT");
         Unisim lut1Type = Unisim.LUT1;
-        ECOTools.createInlineCellOnInputPin(d, input, lut1Type, site, bel, "I0", "O");
+        ECOTools.createAndPlaceInlineCellOnInputPin(d, input, lut1Type, site, bel, "I0", "O");
 
         // Route nets between sites
         new Router(d).routeDesign();
@@ -466,8 +467,7 @@ public class TestECOTools {
         Assertions.assertEquals(net0, lut1.getSitePinFromLogicalPin("I0", null).getNet());
         Assertions.assertNotEquals(net0, lut1.getSitePinFromLogicalPin("O", null).getNet());
 
-        Assumptions.assumeTrue(FileTools.isVivadoOnPath());
-        Assertions.assertTrue(VivadoTools.reportRouteStatus(d).isFullyRouted());
+        TestRWRoute.assertVivadoFullyRouted(d);
     }
 
     @Test

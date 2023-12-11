@@ -1108,16 +1108,17 @@ public class ECOTools {
 
     /**
      * Creates and places a new primitive cell inline from the existing net driving
-     * the input pin provided and connects its output to the existing input. For
-     * example, if input is 'FF/D' and reference is a LUT1, this will create a new
-     * cell instance of type LUT1 where its input 'I0' will replace the connection
-     * 'D' on 'FF' and a new net will be created that will connect 'LUT1/O' to
-     * 'FF/D'.
+     * the input pin provided and connects its output to the existing input. The
+     * cell will be created as a sibling to the instance of the provided input pin
+     * and will be named with the prefix 'inline_insertion_'. For example, if input
+     * is 'FF/D' and reference is a LUT1, this will create a new cell instance of
+     * type LUT1 where its input 'I0' will replace the connection 'D' on 'FF' and a
+     * new net will be created that will connect 'LUT1/O' to 'FF/D'.
      * 
      * This is useful for scenarios like inserting a LUT1 inline when routethru
      * instances are not possible.
      * 
-     * @param design    The existing design
+     * @param design    The existing design.
      * @param input     The reference logical input pin on which the new inline cell
      *                  should be created and connected.
      * @param reference The primitive cell type to create.
@@ -1125,12 +1126,12 @@ public class ECOTools {
      * @param bel       The BEL within the provided site onto which the cell should
      *                  be placed.
      * @param logInput  The logical cell's input pin that should connect to the
-     *                  existing input's net
+     *                  existing input's net.
      * @param logOutput The logical cell's output pin that should connect to the
-     *                  existing input
+     *                  existing input.
      * @return A hierarchical reference to the newly created cell instance.
      */
-    public static Cell createInlineCellOnInputPin(Design design, EDIFHierPortInst input,
+    public static Cell createAndPlaceInlineCellOnInputPin(Design design, EDIFHierPortInst input,
             Unisim reference, Site site, BEL bel, String logInput, String logOutput) {
         if (!input.isInput()) return null;
         EDIFHierNet net = input.getHierarchicalNet();

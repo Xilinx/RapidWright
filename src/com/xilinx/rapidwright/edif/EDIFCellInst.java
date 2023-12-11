@@ -153,7 +153,7 @@ public class EDIFCellInst extends EDIFPropertyObject {
     }
 
     /**
-     * Gets the named EDIFPortInst or creates it (if it correctly named) and returns
+     * Gets the named EDIFPortInst or creates it (if correctly named) and returns
      * it. If the port instance is to be created, it will not be connected to an
      * EDIFNet.
      * 
