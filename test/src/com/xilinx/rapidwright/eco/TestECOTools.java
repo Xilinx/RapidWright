@@ -425,7 +425,7 @@ public class TestECOTools {
     }
 
     @Test
-    public void testCreateInlineCellOnInputPin() {
+    public void testCreateAndPlaceInlineCellOnInputPin() {
         Design d = new Design("Test", Device.KCU105);
 
         Cell and2 = d.createAndPlaceCell("and2", Unisim.AND2, "SLICE_X100Y100/A6LUT");
