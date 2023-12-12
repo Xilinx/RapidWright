@@ -68,6 +68,7 @@ import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.eco.ECOTools;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
@@ -1817,10 +1818,10 @@ public class DesignTools {
         Set<String> netsToKeep = new HashSet<>();
         for (Entry<Net, String> e : netsToUpdate.entrySet()) {
             EDIFHierNet newSource = d.getNetlist().getHierNetFromName(e.getValue());
-            Net updatedNet = DesignTools.updateNetName(d, e.getKey(), newSource.getNet(), e.getValue());
-            if (updatedNet != null) {
-                netsToKeep.add(updatedNet.getName());
+            if (!e.getKey().rename(e.getValue())) {
+                throw new RuntimeException("ERROR: Failed to rename net '" + e.getKey().getName() + "'");
             }
+            netsToKeep.add(e.getKey().getName());
         }
 
         t.stop().start("cleanup siteinsts");
@@ -3913,11 +3914,22 @@ public class DesignTools {
     public static void prohibitPartialHalfSlices(Design design) {
         List<String> bels = new ArrayList<>();
 
+        // Keep track of used nodes to detect unroutable situations
+        Set<Node> used = new HashSet<>();
+        Set<Tile> routedTiles = new HashSet<Tile>();
+        for (Net net : design.getNets()) {
+            for (PIP p : net.getPIPs()) {
+                routedTiles.add(p.getTile());
+                used.add(p.getStartNode());
+                used.add(p.getEndNode());
+            }
+        }
+
         for (SiteInst si : design.getSiteInsts()) {
             if (!Utils.isSLICE(si)) continue;
             boolean bottomUsed = false;
             boolean topUsed = false;
-            for (Cell c : si.getCells()) {
+            for (Cell c : new ArrayList<>(si.getCells())) {
                 Boolean sliceHalf = isUltraScaleSliceTop(c.getBEL());
                 if (sliceHalf != null) {
                     if (sliceHalf) {
@@ -3926,7 +3938,44 @@ public class DesignTools {
                         bottomUsed = true;
                     }
                 }
+                if (c.getBEL().isFF()) {
+                    String belName = c.getBELName();
+                    char letter = belName.charAt(0);
+                    if (si.getCell(letter + "6LUT") == null && si.getCell(letter + "5LUT") == null) {
+                        boolean isFF2 = belName.charAt(belName.length() - 1) == '2';
+                        String sitePinName = letter + (isFF2 ? "_I" : "X");
+                        Node n = si.getSite().getConnectedNode(sitePinName);
+                        if (used.contains(n)) {
+                            // Add a routethru cell to make input path available
+                            BELPin input = c.getBEL().getPin("D");
+                            Net net = si.getNetFromSiteWire(input.getSiteWireName());
+                            if (net == null) {
+                                EDIFHierCellInst inst = c.getEDIFHierCellInst();
+                                if (inst != null) {
+                                    EDIFHierPortInst portInst = inst.getPortInst("D");
+                                    if (portInst != null) {
+                                        EDIFHierNet logNet = portInst.getHierarchicalNet();
+                                        if (logNet != null) {
+                                            net = design.createNet(logNet);
+                                        }
+                                    }
+
+                                }
+                            }
+                            if (net != null) {
+                                SitePinInst spi = si.getSitePinInst(sitePinName);
+                                if (spi == null || (spi != null && !spi.getNet().equals(net))) {
+                                    BELPin lutInput = si.getBEL(letter + "6LUT").getPin("A6");
+                                    EDIFHierPortInst ffInput = c.getEDIFHierCellInst().getPortInst("D");
+                                    ECOTools.createAndPlaceInlineCellOnInputPin(design, ffInput, Unisim.LUT1,
+                                            si.getSite(), lutInput.getBEL(), "I0", "O");
+                                }
+                            }
+                        }
+                    }
+                }
             }
+
 
             for (BEL bel : si.getSite().getBELs()) {
                 if (bel.getBELClass() == BELClass.BEL && si.getCell(bel) == null) {
@@ -3936,10 +3985,49 @@ public class DesignTools {
                             bels.add(si.getSiteName() + "/" + bel.getName());
                         }
                     }
+                    if (bel.isFF()) {
+                        // check if the FF BEL output is routable, if not prohibit it from being used
+                        if (isFFQOutputBlocked(si.getSite(), bel, used)) {
+                            bels.add(si.getSiteName() + "/" + bel.getName());
+                        }
+                    }
                 }
             }
         }
+
+        // Check unused SLICEs FF outputs for unroutable situations and prohibit if
+        // needed
+        for (Tile tile : routedTiles) {
+            Tile left = tile.getTileNeighbor(-1, 0);
+            Tile right = tile.getTileNeighbor(1, 0);
+            for (Tile neighbor : Arrays.asList(left, right)) {
+                if (neighbor != null && Utils.isCLB(neighbor.getTileTypeEnum())) {
+                    Site slice = neighbor.getSites()[0];
+                    if (design.getSiteInstFromSite(slice) == null) {
+                        for (BEL bel : slice.getBELs()) {
+                            if (bel.isFF() && isFFQOutputBlocked(slice, bel, used)) {
+                                bels.add(slice.getName() + "/" + bel.getName());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         addProhibitConstraint(design, bels);
+    }
+
+    private static boolean isFFQOutputBlocked(Site site, BEL bel, Set<Node> used) {
+        String sitePinName = bel.getPin("Q").getConnectedSitePinName();
+        Node n = site.getConnectedNode(sitePinName);
+        boolean blocked = true;
+        for (Node n2 : n.getAllDownhillNodes()) {
+            if (!used.contains(n2)) {
+                blocked = false;
+                break;
+            }
+        }
+        return blocked;
     }
 
     /**
