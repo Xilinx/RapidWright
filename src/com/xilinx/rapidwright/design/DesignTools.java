@@ -3946,7 +3946,7 @@ public class DesignTools {
                         String sitePinName = letter + (isFF2 ? "_I" : "X");
                         Node n = si.getSite().getConnectedNode(sitePinName);
                         if (used.contains(n)) {
-                            // Add a routethru cell to make input path available
+                            // Add a 'user-routethru' cell to make input path available
                             BELPin input = c.getBEL().getPin("D");
                             Net net = si.getNetFromSiteWire(input.getSiteWireName());
                             if (net == null) {
