@@ -36,6 +36,10 @@ public class RapidWrightDCP {
         return Design.readCheckpoint(getPath(name));
     }
 
+    public static Design loadDCP(String name, boolean skipXdef) {
+        return Design.readCheckpoint(getPath(name), skipXdef);
+    }
+
     public static Path getPath(String name) {
         return dirPath.resolve(name);
     }

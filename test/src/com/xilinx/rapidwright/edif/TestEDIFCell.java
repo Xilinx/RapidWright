@@ -37,7 +37,7 @@ public class TestEDIFCell {
             "bnn.dcp",
     })
     public void testIsUniquified(String path) {
-        Design design = RapidWrightDCP.loadDCP(path);
+        Design design = RapidWrightDCP.loadDCP(path, true);
         EDIFNetlist netlist = design.getNetlist();
 
         for (EDIFLibrary library : netlist.getLibraries()) {
@@ -58,6 +58,5 @@ public class TestEDIFCell {
         EDIFCell picoblazeTop = netlist.getCell("picoblaze_top");
         Assertions.assertFalse(picoblazeTop.isUniquified());
         Assertions.assertEquals(4, picoblazeTop.getInstanceCount());
-
     }
 }
