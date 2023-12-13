@@ -54,6 +54,9 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
@@ -406,6 +409,17 @@ public class RouterHelper {
                     if (!LUTTools.isCellALUT(cell)) {
                         continue nextSitePin;
                     }
+
+                    EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
+                    if (ehci == null) {
+                        // No logical cell (likely encrypted)
+                        continue nextSitePin;
+                    }
+
+                    if (!ehci.getParent().isUniquified()) {
+                        // Parent cell (instantiating this LUT) is not unique
+                        continue nextSitePin;
+                    }
                 }
 
                 toInvertPins.add(spi);
@@ -422,7 +436,7 @@ public class RouterHelper {
                     // Compute a new LUT equation with that logical input inverted
                     String newLutEquation = lutEquation.replace(logicalPinName, "!" + logicalPinName)
                             // Cancel out double inversions
-                            // (Note: LUTTools.getLUTEquation() produces equations with '!' instead of '~')
+                            // (Note: LUTTools.getLUTEquation() only produces equations with '!' instead of '~')
                             .replace("!!", "");
                     // TODO: This may modify an folded EDIFCellInst!!!
                     LUTTools.configureLUT(cell, newLutEquation);

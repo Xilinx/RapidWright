@@ -198,4 +198,9 @@ public class TestRouterHelper {
         Assertions.assertEquals("[IN SLICE_X0Y0.A6]", vccNet.getPins().toString());
         Assertions.assertEquals("O=I0", LUTTools.getLUTEquation(cell));
     }
+
+    @Test
+    public void testInvertPossibleGndPinsToVccPinsLutInputNotUniquified() {
+        // TODO
+    }
 }
