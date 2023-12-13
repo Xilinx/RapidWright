@@ -3904,14 +3904,16 @@ public class DesignTools {
     /**
      * This adds PROHIBIT constraints to the design (via .XDC) that will prohibit
      * the use of BEL sites in the same half SLICE if there are any other cells
-     * placed in it. This is used for shell creation when an existing placed and
-     * routed implementation is desired to be preserved but to allow additional
-     * logic to be placed and routed on top of it without an area (pblock)
-     * constraint.
+     * placed in it. It also detects unroutable situations on flip flop inputs and
+     * inserts LUT1-routethrus into the netlist. It will also add PROHIBIT
+     * constraints onto flip flop sites that are unroutable. This is used for shell
+     * creation when an existing placed and routed implementation is desired to be
+     * preserved but to allow additional logic to be placed and routed on top of it
+     * without an area (pblock) constraint.
      * 
      * @param design The design to which the constraints are added.
      */
-    public static void prohibitPartialHalfSlices(Design design) {
+    public static void prepareShellBlackBoxForRouting(Design design) {
         List<String> bels = new ArrayList<>();
 
         // Keep track of used nodes to detect unroutable situations
