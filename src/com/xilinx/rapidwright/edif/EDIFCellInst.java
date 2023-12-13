@@ -209,7 +209,12 @@ public class EDIFCellInst extends EDIFPropertyObject {
             this.cellType.decrementInstanceCount();
         }
         this.cellType = cellType;
-        this.cellType.incrementInstanceCount();
+        if (parentCell != null) {
+            // Since this instance already belongs to a parent cell,
+            // (and won't undergo EDIFCell.addCellInst() again)
+            // increment the instance count
+            cellType.incrementInstanceCount();
+        }
         setViewref(cellType != null ? cellType.getEDIFView() : null);
     }
 

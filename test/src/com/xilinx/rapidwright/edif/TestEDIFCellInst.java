@@ -83,5 +83,12 @@ public class TestEDIFCellInst {
             // unique --- use EDIFHierCellInst.isUniquified() for that
             Assertions.assertTrue(eci.isUniquified());
         }
+
+        // Test that removing all but one instance makes the remaining one unique
+        EDIFCell topCell = netlist.getTopCell();
+        Assertions.assertNotNull(topCell.removeCellInst("picoblaze_0_13"));
+        Assertions.assertNotNull(topCell.removeCellInst("picoblaze_1_12"));
+        Assertions.assertNotNull(topCell.removeCellInst("picoblaze_1_13"));
+        Assertions.assertTrue(topCell.getCellInst("picoblaze_0_12").isUniquified());
     }
 }
