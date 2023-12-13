@@ -3959,7 +3959,6 @@ public class DesignTools {
                                             net = design.createNet(logNet);
                                         }
                                     }
-
                                 }
                             }
                             if (net != null) {
@@ -3983,6 +3982,7 @@ public class DesignTools {
                     if (isTop != null) {
                         if ((isTop && topUsed) || (!isTop && bottomUsed)) {
                             bels.add(si.getSiteName() + "/" + bel.getName());
+                            continue;
                         }
                     }
                     if (bel.isFF()) {
