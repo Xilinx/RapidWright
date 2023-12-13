@@ -168,7 +168,10 @@ public class EDIFCell extends EDIFPropertyObject {
                     getName() + ", trying to add instance " + instance.getName() +
                     " which already exists inside this cell.");
         }
-        instance.getCellType().incrementInstanceCount();
+        EDIFCell cellType = instance.getCellType();
+        if (cellType != null) {
+            cellType.incrementInstanceCount();
+        }
         return instance;
     }
 
