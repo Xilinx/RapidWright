@@ -107,11 +107,18 @@ public class TestEDIFHierCellInst {
                 "picoblaze_1_12",
                 "picoblaze_1_13",
                 "picoblaze_1_13/processor",
-                "picoblaze_1_13/processor/active_interrupt_lut",
-                "picoblaze_1_13/processor/active_interrupt_lut/LUT5"
+                "picoblaze_1_13/processor/active_interrupt_lut",        // This is a LUT6_2 macro
+                "picoblaze_1_13/processor/active_interrupt_lut/LUT5"    // This is a LUT5 primitive
         )) {
             EDIFHierCellInst ehci = netlist.getHierCellInstFromName(path);
             Assertions.assertFalse(ehci.isUniquified());
         }
+
+        // Test that removing all but one instance makes the remaining one unique
+        EDIFCell topCell = netlist.getTopCell();
+        Assertions.assertNotNull(topCell.removeCellInst("picoblaze_0_12"));
+        Assertions.assertNotNull(topCell.removeCellInst("picoblaze_0_13"));
+        Assertions.assertNotNull(topCell.removeCellInst("picoblaze_1_12"));
+        Assertions.assertTrue(netlist.getHierCellInstFromName("picoblaze_1_13/processor").isUniquified());
     }
 }
