@@ -81,6 +81,7 @@ import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.interchange.PhysNetlistWriter;
 import com.xilinx.rapidwright.placer.blockplacer.BlockPlacer2Impls;
 import com.xilinx.rapidwright.placer.blockplacer.ImplsInstancePort;
 import com.xilinx.rapidwright.placer.blockplacer.ImplsPath;
@@ -3941,6 +3942,7 @@ public class DesignTools {
                     }
                 }
                 if (c.getBEL().isFF()) {
+                    if(c.getName().equals(PhysNetlistWriter.LOCKED)) continue;
                     String belName = c.getBELName();
                     char letter = belName.charAt(0);
                     boolean isFF2 = belName.charAt(belName.length() - 1) == '2';
@@ -3968,14 +3970,20 @@ public class DesignTools {
                                 if (spi == null || (spi != null && !spi.getNet().equals(net))) {
                                     BELPin lutInput = si.getBEL(letter + "6LUT").getPin("A6");
                                     EDIFHierPortInst ffInput = c.getEDIFHierCellInst().getPortInst("D");
-                                    ECOTools.createAndPlaceInlineCellOnInputPin(design, ffInput, Unisim.LUT1,
+                                    Cell lut1 = ECOTools.createAndPlaceInlineCellOnInputPin(design, ffInput,
+                                            Unisim.LUT1,
                                             si.getSite(), lutInput.getBEL(), "I0", "O");
+                                    lut1.addProperty("INIT", "2'h1");
                                 }
                             }
                         } else {
-                            throw new RuntimeException(
-                                    "ERROR: Unable to insert a LUT1 routethru to route an input path for the FF "
-                                            + c.getName() + " placed on " + si.getSiteName() + "/" + belName);
+                            BELPin muxOutput = c.getBEL().getPin("D").getSourcePin();
+                            SitePIP sitePIP = si.getUsedSitePIP(muxOutput);
+                            if (sitePIP == null) {
+                                System.err.println(
+                                        "ERROR: Unable to insert a LUT1 routethru to route an input path for the FF "
+                                                + c.getName() + " placed on " + si.getSiteName() + "/" + belName);
+                            }
                         }
                     }
                 }

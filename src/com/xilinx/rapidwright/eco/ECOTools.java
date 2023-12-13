@@ -1156,7 +1156,6 @@ public class ECOTools {
             throw new RuntimeException("ERROR: Unable to create new inline cell to be placed on " 
                 + site + "/" + bel);
         }
-        cell.addProperty("INIT", "O=I0");
 
         EDIFPortInst newInput = new EDIFPortInst(refCell.getPort(logInput), null, newInst);
         EDIFPortInst newOutput = new EDIFPortInst(refCell.getPort(logOutput), null, newInst);
