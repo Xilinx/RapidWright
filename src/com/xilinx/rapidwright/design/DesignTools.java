@@ -3943,11 +3943,11 @@ public class DesignTools {
                 if (c.getBEL().isFF()) {
                     String belName = c.getBELName();
                     char letter = belName.charAt(0);
-                    if (si.getCell(letter + "6LUT") == null && si.getCell(letter + "5LUT") == null) {
-                        boolean isFF2 = belName.charAt(belName.length() - 1) == '2';
-                        String sitePinName = letter + (isFF2 ? "_I" : "X");
-                        Node n = si.getSite().getConnectedNode(sitePinName);
-                        if (used.contains(n)) {
+                    boolean isFF2 = belName.charAt(belName.length() - 1) == '2';
+                    String sitePinName = letter + (isFF2 ? "_I" : "X");
+                    Node n = si.getSite().getConnectedNode(sitePinName);
+                    if (used.contains(n)) {
+                        if (si.getCell(letter + "6LUT") == null && si.getCell(letter + "5LUT") == null) {
                             // Add a 'user-routethru' cell to make input path available
                             BELPin input = c.getBEL().getPin("D");
                             Net net = si.getNetFromSiteWire(input.getSiteWireName());
@@ -3972,6 +3972,10 @@ public class DesignTools {
                                             si.getSite(), lutInput.getBEL(), "I0", "O");
                                 }
                             }
+                        } else {
+                            throw new RuntimeException(
+                                    "ERROR: Unable to insert a LUT1 routethru to route an input path for the FF "
+                                            + c.getName() + " placed on " + si.getSiteName() + "/" + belName);
                         }
                     }
                 }
