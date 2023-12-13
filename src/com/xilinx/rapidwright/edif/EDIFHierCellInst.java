@@ -330,4 +330,16 @@ public class EDIFHierCellInst {
         }
         return new EDIFHierCellInst(copyInsts);
     }
+
+    /**
+     * True if all cells on this path are the only instantiations of its cell.
+     */
+    public boolean isUniquified() {
+        for (EDIFCellInst eci : cellInsts) {
+            if (!eci.isUniquified()) {
+                return false;
+            }
+        }
+        return true;
+    }
 }

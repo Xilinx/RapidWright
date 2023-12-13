@@ -23,11 +23,14 @@
 
 package com.xilinx.rapidwright.edif;
 
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.Queue;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.python.google.common.base.Strings;
 
 import com.xilinx.rapidwright.design.Design;
@@ -75,5 +78,40 @@ public class TestEDIFHierCellInst {
         EDIFHierCellInst inst2 = netlist.getHierCellInstFromName(name2);
         commonAncestor = inst1.getCommonAncestor(inst2);
         Assertions.assertEquals(commonAncestor, netlist.getTopHierCellInst());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "picoblaze_ooc_X10Y235.dcp",
+            "optical-flow.dcp",
+            "bnn.dcp",
+    })
+    public void testIsUniquified(String path) {
+        Design design = RapidWrightDCP.loadDCP(path, true);
+        EDIFNetlist netlist = design.getNetlist();
+
+        for (EDIFHierCellInst ehci : netlist.getAllDescendants("", null, false)) {
+            Assertions.assertTrue(ehci.isUniquified() || ehci.getCellType().getLibrary().isHDIPrimitivesLibrary());
+        }
+    }
+
+    @Test
+    public void testIsUniquifiedFalse() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+        Assertions.assertTrue(netlist.getTopCell().isUniquified());
+
+        for (String path : Arrays.asList(
+                "picoblaze_0_12",
+                "picoblaze_0_13",
+                "picoblaze_1_12",
+                "picoblaze_1_13",
+                "picoblaze_1_13/processor",
+                "picoblaze_1_13/processor/active_interrupt_lut",
+                "picoblaze_1_13/processor/active_interrupt_lut/LUT5"
+        )) {
+            EDIFHierCellInst ehci = netlist.getHierCellInstFromName(path);
+            Assertions.assertFalse(ehci.isUniquified());
+        }
     }
 }
