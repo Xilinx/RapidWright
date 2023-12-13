@@ -291,4 +291,12 @@ public class EDIFCellInst extends EDIFPropertyObject {
 
         return true;
     }
+
+
+    /**
+     * True if this is the only instantiation of its cell.
+     */
+    public boolean isUniquified() {
+        return cellType.isUniquified();
+    }
 }
