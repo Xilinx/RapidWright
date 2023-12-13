@@ -30,16 +30,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestEDIFCell {
-    @ParameterizedTest
-    @ValueSource(strings = {
-            "picoblaze_ooc_X10Y235.dcp",
-            "optical-flow.dcp",
-            "bnn.dcp",
-    })
-    public void testIsUniquified(String path) {
-        Design design = RapidWrightDCP.loadDCP(path, true);
-        EDIFNetlist netlist = design.getNetlist();
-
+    private static void assertAllCellsAreUniquified(EDIFNetlist netlist) {
         for (EDIFLibrary library : netlist.getLibraries()) {
             if (library.isHDIPrimitivesLibrary()) {
                 continue;
@@ -50,13 +41,36 @@ public class TestEDIFCell {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "picoblaze_ooc_X10Y235.dcp",
+            "optical-flow.dcp",
+            "bnn.dcp",
+    })
+    public void testIsUniquified(String path) {
+        Design design = RapidWrightDCP.loadDCP(path, true);
+        EDIFNetlist netlist = design.getNetlist();
+
+        assertAllCellsAreUniquified(netlist);
+    }
+
     @Test
     public void testIsUniquifiedFalse() {
         Design design = RapidWrightDCP.loadDCP("picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp");
         EDIFNetlist netlist = design.getNetlist();
-        Assertions.assertTrue(netlist.getTopCell().isUniquified());
+        EDIFCell topCell = netlist.getTopCell();
+        Assertions.assertTrue(topCell.isUniquified());
         EDIFCell picoblazeTop = netlist.getCell("picoblaze_top");
         Assertions.assertFalse(picoblazeTop.isUniquified());
+
+        // Test that removing a EDIFCellInst reduces the instance count
         Assertions.assertEquals(4, picoblazeTop.getInstanceCount());
+        Assertions.assertNotNull(topCell.removeCellInst("picoblaze_0_13"));
+        Assertions.assertEquals(3, picoblazeTop.getInstanceCount());
+        Assertions.assertNotNull(topCell.removeCellInst("picoblaze_1_12"));
+        Assertions.assertNotNull(topCell.removeCellInst("picoblaze_1_13"));
+        Assertions.assertTrue(picoblazeTop.isUniquified());
+
+        assertAllCellsAreUniquified(netlist);
     }
 }
