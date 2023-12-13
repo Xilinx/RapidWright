@@ -436,7 +436,6 @@ public class RouterHelper {
                             // Cancel out double inversions
                             // (Note: LUTTools.getLUTEquation() only produces equations with '!' instead of '~')
                             .replace("!!", "");
-                    // TODO: This may modify an folded EDIFCellInst!!!
                     LUTTools.configureLUT(cell, newLutEquation);
                 }
             } else {
