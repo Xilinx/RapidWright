@@ -298,10 +298,9 @@ public class EDIFCell extends EDIFPropertyObject {
 
     public EDIFCellInst removeCellInst(String name) {
         if (instances == null) return null;
-        trackChange(EDIFChangeType.CELL_INST_REMOVE, name);
         EDIFCellInst removedInstance = instances.remove(name);
         if (removedInstance != null) {
-            removedInstance.getCellType().decrementInstanceCount();
+            removedInstance.setParentCell(null);
         }
         return removedInstance;
     }
