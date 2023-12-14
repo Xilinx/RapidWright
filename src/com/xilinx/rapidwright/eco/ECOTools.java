@@ -342,7 +342,7 @@ public class ECOTools {
         // Modify the physical netlist
         EDIFCell ecGnd = netlist.getHDIPrimitive(Unisim.GND);
         EDIFCell ecVcc = netlist.getHDIPrimitive(Unisim.VCC);
-        for (EDIFHierNet ehn : netToPortInsts.keySet()) {
+        nextNet: for (EDIFHierNet ehn : netToPortInsts.keySet()) {
             Net newPhysNet = null;
 
             // Find the one and only source pin
@@ -366,6 +366,9 @@ public class ECOTools {
                         newPhysNet = design.getGndNet();
                     } else if (eci.equals(ecVcc)) {
                         newPhysNet = design.getVccNet();
+                    } else if (!eci.isPrimitive() && eci.isLeafCellOrBlackBox()) {
+                        // It's a black box or possibly an encrypted cell
+                        continue nextNet;
                     } else {
                         throw new RuntimeException("ERROR: Cell corresponding to pin '" + sourceEhpi + "' not found.");
                     }
