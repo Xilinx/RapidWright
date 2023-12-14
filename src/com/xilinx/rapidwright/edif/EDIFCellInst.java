@@ -188,14 +188,14 @@ public class EDIFCellInst extends EDIFPropertyObject {
         if (!oldParentCellWasNull) {
             this.parentCell.trackChange(EDIFChangeType.CELL_INST_REMOVE, getName());
             if (cellType != null) {
-                cellType.decrementInstanceCount();
+                cellType.decrementNonHierInstantiationCount();
             }
         }
         this.parentCell = parent;
         if (parent != null) {
             parent.trackChange(EDIFChangeType.CELL_INST_ADD, getName());
             if (oldParentCellWasNull && cellType != null) {
-                cellType.incrementInstanceCount();
+                cellType.incrementNonHierInstantiationCount();
             }
         }
     }
@@ -221,11 +221,11 @@ public class EDIFCellInst extends EDIFPropertyObject {
      */
     public void setCellTypeRaw(EDIFCell cellType) {
         if (parentCell != null && this.cellType != null) {
-            this.cellType.decrementInstanceCount();
+            this.cellType.decrementNonHierInstantiationCount();
         }
         this.cellType = cellType;
         if (parentCell != null && cellType != null) {
-            cellType.incrementInstanceCount();
+            cellType.incrementNonHierInstantiationCount();
         }
         setViewref(cellType != null ? cellType.getEDIFView() : null);
     }
