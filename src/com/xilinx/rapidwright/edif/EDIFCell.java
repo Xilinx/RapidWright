@@ -168,10 +168,6 @@ public class EDIFCell extends EDIFPropertyObject {
                     getName() + ", trying to add instance " + instance.getName() +
                     " which already exists inside this cell.");
         }
-        EDIFCell cellType = instance.getCellType();
-        if (cellType != null) {
-            cellType.incrementInstanceCount();
-        }
         return instance;
     }
 
@@ -189,7 +185,6 @@ public class EDIFCell extends EDIFPropertyObject {
             instance.setName(instance.getName() + "_" + getLibrary().getNetlist().nameSpaceUniqueCount++);
         }
         instances.put(instance.getName(), instance);
-        instance.getCellType().incrementInstanceCount();
         return instance;
     }
 
@@ -303,10 +298,9 @@ public class EDIFCell extends EDIFPropertyObject {
 
     public EDIFCellInst removeCellInst(String name) {
         if (instances == null) return null;
-        trackChange(EDIFChangeType.CELL_INST_REMOVE, name);
         EDIFCellInst removedInstance = instances.remove(name);
         if (removedInstance != null) {
-            removedInstance.getCellType().decrementInstanceCount();
+            removedInstance.setParentCell(null);
         }
         return removedInstance;
     }

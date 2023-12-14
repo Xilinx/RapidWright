@@ -120,5 +120,14 @@ public class TestEDIFHierCellInst {
         Assertions.assertNotNull(topCell.removeCellInst("picoblaze_0_13"));
         Assertions.assertNotNull(topCell.removeCellInst("picoblaze_1_12"));
         Assertions.assertTrue(netlist.getHierCellInstFromName("picoblaze_1_13/processor").isUniquified());
+
+        // Check that creating an EDIFCellInst *with* a parent cell *does* increment instance count
+        EDIFCell picoblazeTop = netlist.getCell("picoblaze_top");
+        new EDIFCellInst("picoblaze_0_12", picoblazeTop, topCell);
+        EDIFHierCellInst ehci = netlist.getHierCellInstFromName("picoblaze_0_12/processor");
+        Assertions.assertFalse(ehci.isUniquified());
+        // ... and removing the other cell instantiation makes this one unique
+        Assertions.assertNotNull(topCell.removeCellInst("picoblaze_1_13"));
+        Assertions.assertTrue(ehci.isUniquified());
     }
 }
