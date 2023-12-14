@@ -70,7 +70,24 @@ public class TestEDIFCell {
         Assertions.assertNotNull(topCell.removeCellInst("picoblaze_1_12"));
         Assertions.assertNotNull(topCell.removeCellInst("picoblaze_1_13"));
         Assertions.assertTrue(picoblazeTop.isUniquified());
-
         assertAllCellsAreUniquified(netlist);
+
+        // Check that creating an EDIFCellInst without a parent cell does not increment instance count
+        new EDIFCellInst("picoblaze_1_13", picoblazeTop, null);
+        Assertions.assertTrue(picoblazeTop.isUniquified());
+
+        // Check that creating an EDIFCellInst *with* a parent cell *does* increment instance count
+        new EDIFCellInst("picoblaze_1_13", picoblazeTop, topCell);
+        Assertions.assertFalse(picoblazeTop.isUniquified());
+
+        // Remove all remaining instances
+        Assertions.assertNotNull(topCell.removeCellInst("picoblaze_0_12"));
+        Assertions.assertNotNull(topCell.removeCellInst("picoblaze_1_13"));
+        Assertions.assertEquals(0, picoblazeTop.getInstanceCount());
+        // Even though the "picoblaze_top" cell is no longer instantiated,
+        // should we expect its cell instances to also not increment the
+        // instance count of its cells?
+        EDIFCell kcpsm6 = netlist.getCell("kcpsm6"); // Cell type of "processor" instance
+        Assertions.assertEquals(0, kcpsm6.getInstanceCount());
     }
 }
