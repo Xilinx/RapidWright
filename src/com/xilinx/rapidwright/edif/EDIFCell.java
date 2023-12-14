@@ -690,6 +690,13 @@ public class EDIFCell extends EDIFPropertyObject {
      */
     public void decrementInstanceCount() {
         instanceCountUpdater.getAndDecrement(this);
+        if (getInstanceCount() == 0) {
+            // Since this cell is no longer instantiated, decrement the count of all the cells
+            // that gets instantiated within
+            for (EDIFCellInst instance : getCellInsts()) {
+                instance.getCellType().decrementInstanceCount();
+            }
+        }
     }
 
     /**
