@@ -181,8 +181,23 @@ public class EDIFCellInst extends EDIFPropertyObject {
      * @param parent the parentCell to set
      */
     public void setParentCell(EDIFCell parent) {
+        if (this.parentCell == parent) {
+            return;
+        }
+        boolean oldParentCellWasNull = (this.parentCell == null);
+        if (!oldParentCellWasNull) {
+            this.parentCell.trackChange(EDIFChangeType.CELL_INST_REMOVE, getName());
+            if (cellType != null) {
+                cellType.decrementInstanceCount();
+            }
+        }
         this.parentCell = parent;
-        parent.trackChange(EDIFChangeType.CELL_INST_ADD, getName());
+        if (parent != null) {
+            parent.trackChange(EDIFChangeType.CELL_INST_ADD, getName());
+            if (oldParentCellWasNull && cellType != null) {
+                cellType.incrementInstanceCount();
+            }
+        }
     }
 
     /**
@@ -205,14 +220,11 @@ public class EDIFCellInst extends EDIFPropertyObject {
      * @param cellType the cellType to set
      */
     public void setCellTypeRaw(EDIFCell cellType) {
-        if (this.cellType != null) {
+        if (parentCell != null && this.cellType != null) {
             this.cellType.decrementInstanceCount();
         }
         this.cellType = cellType;
-        if (parentCell != null) {
-            // Since this instance already belongs to a parent cell,
-            // (and won't undergo EDIFCell.addCellInst() again)
-            // increment the instance count
+        if (parentCell != null && cellType != null) {
             cellType.incrementInstanceCount();
         }
         setViewref(cellType != null ? cellType.getEDIFView() : null);
