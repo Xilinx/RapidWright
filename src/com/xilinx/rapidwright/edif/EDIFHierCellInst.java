@@ -336,7 +336,7 @@ public class EDIFHierCellInst {
      */
     public boolean isUniquified() {
         assert(isToplevelInst(cellInsts[0]));
-        for (int i = 1; i < cellInsts.length; i++) {
+        for (int i = cellInsts.length - 1; i > 0; i--) {
             if (!cellInsts[i].isUniquified()) {
                 return false;
             }
