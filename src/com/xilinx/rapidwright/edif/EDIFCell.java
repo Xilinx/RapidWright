@@ -63,8 +63,11 @@ public class EDIFCell extends EDIFPropertyObject {
 
     private EDIFName view = DEFAULT_VIEW;
 
+    /**
+     * An atomically updated variable to track the number of `EDIFCellInst`
+     * objects (attached to a parent cell) that instantiate this cell.
+     */
     private volatile int instanceCount = 0;
-
     private static final AtomicIntegerFieldUpdater<EDIFCell> instanceCountUpdater =
             AtomicIntegerFieldUpdater.newUpdater(EDIFCell.class, "instanceCount");
 
