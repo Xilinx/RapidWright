@@ -189,7 +189,10 @@ public class EDIFCell extends EDIFPropertyObject {
             instance.setName(instance.getName() + "_" + getLibrary().getNetlist().nameSpaceUniqueCount++);
         }
         instances.put(instance.getName(), instance);
-        instance.getCellType().incrementInstanceCount();
+        EDIFCell cellType = instance.getCellType();
+        if (cellType != null) {
+            cellType.incrementInstanceCount();
+        }
         return instance;
     }
 
