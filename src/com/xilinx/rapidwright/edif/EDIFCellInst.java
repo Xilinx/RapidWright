@@ -299,9 +299,9 @@ public class EDIFCellInst extends EDIFPropertyObject {
 
 
     /**
-     * True if this is the only instantiation of its cell.
+     * True if this cell instance is attached to a parent cell, and is the only instantiation of its cell.
      */
     public boolean isUniquified() {
-        return cellType.isUniquified();
+        return parentCell != null && cellType.isUniquified();
     }
 }
