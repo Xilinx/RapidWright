@@ -335,8 +335,9 @@ public class EDIFHierCellInst {
      * True if all cells on this path are the only instantiations of its cell.
      */
     public boolean isUniquified() {
-        for (EDIFCellInst eci : cellInsts) {
-            if (!eci.isUniquified()) {
+        assert(isToplevelInst(cellInsts[0]));
+        for (int i = 1; i < cellInsts.length; i++) {
+            if (!cellInsts[i].isUniquified()) {
                 return false;
             }
         }
