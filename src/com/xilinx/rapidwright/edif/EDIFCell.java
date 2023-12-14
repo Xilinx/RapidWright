@@ -305,6 +305,7 @@ public class EDIFCell extends EDIFPropertyObject {
         if (instances == null) return null;
         EDIFCellInst removedInstance = instances.remove(name);
         if (removedInstance != null) {
+            assert(removedInstance.getParentCell() == this);
             removedInstance.setParentCell(null);
         }
         return removedInstance;
