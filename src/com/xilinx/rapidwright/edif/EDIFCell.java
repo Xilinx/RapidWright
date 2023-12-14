@@ -675,16 +675,6 @@ public class EDIFCell extends EDIFPropertyObject {
      */
     public void incrementInstanceCount() {
         instanceCountUpdater.incrementAndGet(this);
-
-        if (getInstanceCount() == 1) {
-            // This is the first instantiation of its cell -- increment the count all the cells
-            // that are instantiated within
-
-            // TODO: How to do this without conflicting with the initial parsers?
-
-            // TODO: How can we determine that the added instance is actually
-            //       connected to the top cell?
-        }
     }
 
     /**
@@ -692,16 +682,6 @@ public class EDIFCell extends EDIFPropertyObject {
      */
     public void decrementInstanceCount() {
         instanceCountUpdater.getAndDecrement(this);
-        if (getInstanceCount() == 0) {
-            // Since this cell is no longer instantiated, decrement the count of all the cells
-            // that gets instantiated within
-            for (EDIFCellInst instance : getCellInsts()) {
-                instance.getCellType().decrementInstanceCount();
-            }
-
-            // TODO: How can we determine that the removed instance was actually
-            // connected to the top cell to begin with?
-        }
     }
 
     /**
