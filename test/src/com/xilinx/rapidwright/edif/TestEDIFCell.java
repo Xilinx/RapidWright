@@ -22,12 +22,16 @@
 
 package com.xilinx.rapidwright.edif;
 
-import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestEDIFCell {
     private static void assertAllCellsAreUniquified(EDIFNetlist netlist) {
@@ -116,5 +120,64 @@ public class TestEDIFCell {
         Assertions.assertFalse(picoblazeTop.isUniquified());
         Assertions.assertEquals(2, picoblazeTop.getInstanceCount());
         Assertions.assertEquals(1, kcpsm6.getInstanceCount());
+    }
+
+    private void testInstanceCountAgainstTraversalCount(EDIFNetlist n) {
+        // Traverse all instances in the netlist from the top instance
+        Map<EDIFCell, Integer> counts = new HashMap<>();
+        for (EDIFHierCellInst inst : n.getAllDescendants("", "*", false)) {
+            Integer count = counts.getOrDefault(inst.getCellType(), 0);
+            counts.put(inst.getCellType(), ++count);
+        }
+
+        for (EDIFCell cell : n.getWorkLibrary().getCells()) {
+            if (cell == n.getTopCell())
+                continue;
+            int traversalCount = counts.getOrDefault(cell, 0);
+
+            // TODO Remove after debug
+            if (traversalCount != cell.getInstanceCount()) {
+                System.out.println("Cell " + cell + " getInstanceCount()=" + cell.getInstanceCount()
+                        + ", traversalCount=" + traversalCount);
+            } // END TODO
+
+            Assertions.assertEquals(cell.getInstanceCount(), traversalCount);
+        }
+
+    }
+
+    @Test
+    public void testEDIFCellInstanceCounts() {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
+        EDIFCell top = netlist.getTopCell();
+        EDIFCell a = new EDIFCell(netlist.getWorkLibrary(), "a");
+        EDIFCell b = new EDIFCell(netlist.getWorkLibrary(), "b");
+        EDIFCell c = new EDIFCell(netlist.getWorkLibrary(), "c");
+
+        testInstanceCountAgainstTraversalCount(netlist);
+
+        a.createCellInst("a1", top);
+
+        testInstanceCountAgainstTraversalCount(netlist);
+
+        b.createCellInst("b1", a);
+
+        testInstanceCountAgainstTraversalCount(netlist);
+
+        c.createCellInst("c1", b);
+
+        testInstanceCountAgainstTraversalCount(netlist);
+
+        a.createCellInst("a2", top);
+
+        testInstanceCountAgainstTraversalCount(netlist);
+
+        b.createCellInst("b2", a);
+
+        testInstanceCountAgainstTraversalCount(netlist);
+
+        a.removeCellInst("b1");
+
+        testInstanceCountAgainstTraversalCount(netlist);
     }
 }
