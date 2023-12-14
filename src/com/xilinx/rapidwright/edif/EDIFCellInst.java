@@ -68,7 +68,7 @@ public class EDIFCellInst extends EDIFPropertyObject {
      */
     public EDIFCellInst(EDIFCellInst inst, EDIFCell parentCell) {
         super((EDIFPropertyObject)inst);
-        this.parentCell = parentCell;
+        setParentCell(parentCell);
         setCellType(inst.cellType);
         setViewref(new EDIFName(inst.viewref));
     }
