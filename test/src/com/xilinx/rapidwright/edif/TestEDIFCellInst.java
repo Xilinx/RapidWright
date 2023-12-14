@@ -95,8 +95,8 @@ public class TestEDIFCellInst {
         EDIFCellInst eci = new EDIFCellInst("picoblaze_1_13", picoblazeTop, null);
         Assertions.assertFalse(eci.isUniquified());
 
-        // Check that creating an EDIFCellInst *with* a parent cell *does* increment instance count
-        eci = new EDIFCellInst("picoblaze_1_13", picoblazeTop, topCell);
+        // But adding it to a parent cell *does* increment instance count
+        topCell.addCellInst(eci);
         Assertions.assertFalse(eci.isUniquified());
         Assertions.assertSame(eci, topCell.getCellInst("picoblaze_1_13"));
         // ... and removing the other cell instantiation makes this one unique

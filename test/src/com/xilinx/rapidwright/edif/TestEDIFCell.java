@@ -85,11 +85,11 @@ public class TestEDIFCell {
         Assertions.assertNotNull(topCell.removeCellInst("picoblaze_1_13"));
 
         // Check that creating an EDIFCellInst without a parent cell does not increment instance count
-        new EDIFCellInst("picoblaze_1_13", picoblazeTop, null);
+        EDIFCellInst eci = new EDIFCellInst("picoblaze_1_13", picoblazeTop, null);
         Assertions.assertTrue(picoblazeTop.isUniquified());
 
-        // Check that creating an EDIFCellInst *with* a parent cell *does* increment instance count
-        new EDIFCellInst("picoblaze_1_13", picoblazeTop, topCell);
+        // But adding it to a parent cell *does* increment instance count
+        topCell.addCellInst(eci);
         Assertions.assertFalse(picoblazeTop.isUniquified());
 
         // Establish that the "processor" instance's cell type is only instantiated once
@@ -101,7 +101,9 @@ public class TestEDIFCell {
         Assertions.assertEquals(1, kcpsm6.getInstanceCount());
         Assertions.assertNotNull(topCell.removeCellInst("picoblaze_1_13"));
         Assertions.assertEquals(0, picoblazeTop.getInstanceCount());
-        Assertions.assertEquals(0, kcpsm6.getInstanceCount());
+        // Note that the "processor" cellType is still instantiated once, even though its parent
+        // "picoblaze_top" is no longer attached to the netlist
+        Assertions.assertEquals(1, kcpsm6.getInstanceCount());
 
         // Add one back again
         new EDIFCellInst("picoblaze_0_12", picoblazeTop, topCell);
