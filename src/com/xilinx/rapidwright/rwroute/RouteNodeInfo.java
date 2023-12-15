@@ -135,7 +135,10 @@ public class RouteNodeInfo {
 
             case NODE_PINFEED:
                 BitSet bs = (lagunaI != null) ? lagunaI.get(node.getTile()) : null;
-                return (bs != null && bs.get(node.getWire())) ? RouteNodeType.LAGUNA_I : RouteNodeType.PINFEED_I;
+                if (bs != null && bs.get(node.getWire())) {
+                    return RouteNodeType.LAGUNA_I;
+                }
+                break;
 
             case NODE_LAGUNA_OUTPUT: // UltraScale+ only
                 assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);
