@@ -161,6 +161,20 @@ public class TestRWRoute {
         assertVivadoFullyRouted(design);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "bnn.dcp",
+            "optical-flow.dcp"
+    })
+    @LargeTest(max_memory_gb = 8)
+    public void testNonTimingDrivenFullRoutingWithLutRoutethru(String path) {
+        Design design = RapidWrightDCP.loadDCP(path);
+        RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--lutRoutethru"});
+        assertAllSourcesRoutedFlagSet(design);
+        assertAllPinsRouted(design);
+        assertVivadoFullyRouted(design);
+    }
+
     /**
      * Tests the timing driven full routing, i.e., RWRoute running in timing-driven mode.
      * The bnn design from Rosetta benchmarks is used.
