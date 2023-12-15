@@ -231,10 +231,11 @@ public class RouteThruHelper {
             return false;
         }
         SitePin inPin = start.getSitePin();
-        assert(inPin.getSite() == outPin.getSite());
         if (!isRouteThruSitePinAvailable(design, inPin)) {
             return false;
         }
+        assert(inPin.getSite() == outPin.getSite());
+
         SiteInst siteInst = design.getSiteInstFromSite(inPin.getSite());
         if (siteInst != null) {
             for (BELPin sink : inPin.getBELPin().getSiteConns()) {
