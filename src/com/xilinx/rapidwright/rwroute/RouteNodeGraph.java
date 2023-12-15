@@ -33,6 +33,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
+import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.RuntimeTracker;
@@ -58,6 +59,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Encapsulation of RWRoute's routing resource graph.
  */
 public class RouteNodeGraph {
+
+    protected final Design design;
 
     /**
      * A map of nodes to created rnodes
@@ -103,6 +106,10 @@ public class RouteNodeGraph {
      */
     protected final Map<TileTypeEnum, BitSet> accessibleWireOnlySameColumnAsTarget;
 
+    /** Flag for whether LUT routethrus are to be considered
+     */
+    protected final boolean lutRoutethru;
+
     protected class RouteNodeImpl extends RouteNode {
         protected RouteNodeImpl(Node node, RouteNodeType type) {
             super(node, type, lagunaI);
@@ -139,7 +146,10 @@ public class RouteNodeGraph {
         }
     }
 
-    public RouteNodeGraph(RuntimeTracker setChildrenTimer, Design design) {
+    public RouteNodeGraph(RuntimeTracker setChildrenTimer, Design design, RWRouteConfig config) {
+        this.design = design;
+        lutRoutethru = config.getLutRoutethru();
+
         nodesMap = new HashMap<>();
         nodesMapSize = 0;
         preservedMap = new ConcurrentHashMap<>();
@@ -383,7 +393,9 @@ public class RouteNodeGraph {
         }
 
         if (isExcludedTile(child)) {
-            return true;
+            if (!allowRoutethru(parent, child)) {
+                return true;
+            }
         }
 
         if (child.getIntentCode() == IntentCode.NODE_PINFEED) {
@@ -391,12 +403,13 @@ public class RouteNodeGraph {
             RouteNode childRnode = getNode(child);
             if (childRnode != null) {
                 assert(childRnode.getType() == RouteNodeType.PINFEED_I ||
-                       childRnode.getType() == RouteNodeType.LAGUNA_I);
-            } else {
-                // child does not already exist in our routing graph, meaning it's not a sink pin
+                       childRnode.getType() == RouteNodeType.LAGUNA_I ||
+                        (lutRoutethru && childRnode.getType() == RouteNodeType.WIRE));
+            } else if (!lutRoutethru) {
+                // child does not already exist in our routing graph, meaning it's not a used site pin
                 // in our design, but it could be a LAGUNA_I
                 if (lagunaI == null) {
-                    // No LAGUNA_Is -- must be a site pin
+                    // No LAGUNA_Is
                     return true;
                 }
                 BitSet bs = lagunaI.get(child.getTile());
@@ -536,4 +549,17 @@ public class RouteNodeGraph {
         return Math.abs(childTile.getTileYCoordinate() - sinkTile.getTileYCoordinate()) <= 1;
     }
 
+    protected boolean allowRoutethru(Node head, Node tail) {
+        if (Utils.isCLB(tail.getTile().getTileTypeEnum()) &&
+                RouteThruHelper.isRouteThruPIPAvailable(design, head, tail)) {
+            assert(PIP.getArbitraryPIP(head, tail).isRouteThru());
+
+            if (tail.getWireName().endsWith("MUX")) {
+                return false;
+            }
+
+            return true;
+        }
+        return false;
+    }
 }
