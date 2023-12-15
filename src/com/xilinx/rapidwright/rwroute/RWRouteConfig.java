@@ -90,6 +90,8 @@ public class RWRouteConfig {
     private float maxPresentCongestionFactor;
     /* true to enable LUT pin swapping */
     private boolean lutPinSwapping;
+    /* true to enable LUT routethru */
+    private boolean lutRoutethru;
 
     /** Constructs a Configuration Object */
     public RWRouteConfig(String[] arguments) {
@@ -118,6 +120,8 @@ public class RWRouteConfig {
         useUTurnNodes = false;
         verbose = false;
         printConnectionSpan = false;
+        lutPinSwapping = false;
+        lutRoutethru = false;
         if (arguments != null) {
             parseArguments(arguments);
         }
@@ -219,6 +223,9 @@ public class RWRouteConfig {
                 break;
             case "--lutPinSwapping":
                 setLutPinSwapping(true);
+                break;
+            case "--lutRoutethru":
+                setLutRoutethru(true);
                 break;
             default:
                 throw new IllegalArgumentException("ERROR: RWRoute argument '" + arg + "' not recognized.");
@@ -721,6 +728,16 @@ public class RWRouteConfig {
     }
 
     /**
+     * Gets the flag indicating if LUT routethrus are enabled.
+     * Default: false.
+     *
+     * @return True if the flag is set, false otherwise.
+     */
+    public boolean getLutRoutethru() {
+        return lutRoutethru;
+    }
+
+    /**
      * Sets critical path delay pessimism factor b. It should be greater than 0.
      * Default: 100. Can be modified by using "--pessimismB" option, e.g.
      * "--pessimismB 50".
@@ -821,6 +838,16 @@ public class RWRouteConfig {
      */
     public void setLutPinSwapping(boolean lutPinSwapping) {
         this.lutPinSwapping = lutPinSwapping;
+    }
+
+    /**
+     * Sets a flag indicating LUT routethrus will be considered.
+     * Default: false.
+     *
+     * @param lutRoutethru true to enable LUT pin swapping.
+     */
+    public void setLutRoutethru(boolean lutRoutethru) {
+        this.lutRoutethru = lutRoutethru;
     }
 
     /**
