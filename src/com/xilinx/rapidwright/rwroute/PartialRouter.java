@@ -72,8 +72,8 @@ public class PartialRouter extends RWRoute {
 
     protected class RouteNodeGraphPartial extends RouteNodeGraph {
 
-        public RouteNodeGraphPartial(RuntimeTracker setChildrenTimer, Design design) {
-            super(setChildrenTimer, design);
+        public RouteNodeGraphPartial(RuntimeTracker setChildrenTimer, Design design, RWRouteConfig config) {
+            super(setChildrenTimer, design, config);
         }
 
         @Override
@@ -87,8 +87,11 @@ public class PartialRouter extends RWRoute {
     }
 
     protected class RouteNodeGraphPartialTimingDriven extends RouteNodeGraphTimingDriven {
-        public RouteNodeGraphPartialTimingDriven(RuntimeTracker rnodesTimer, Design design, DelayEstimatorBase delayEstimator, boolean maskNodesCrossRCLK) {
-            super(rnodesTimer, design, delayEstimator, maskNodesCrossRCLK);
+        public RouteNodeGraphPartialTimingDriven(RuntimeTracker rnodesTimer,
+                                                 Design design,
+                                                 RWRouteConfig config,
+                                                 DelayEstimatorBase delayEstimator) {
+            super(rnodesTimer, design, config, delayEstimator);
         }
 
         @Override
@@ -173,9 +176,9 @@ public class PartialRouter extends RWRoute {
         if (config.isTimingDriven()) {
             /* An instantiated delay estimator that is used to calculate delay of routing resources */
             DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
-            return new RouteNodeGraphPartialTimingDriven(rnodesTimer, design, estimator, config.isMaskNodesCrossRCLK());
+            return new RouteNodeGraphPartialTimingDriven(rnodesTimer, design, config, estimator);
         } else {
-            return new RouteNodeGraphPartial(rnodesTimer, design);
+            return new RouteNodeGraphPartial(rnodesTimer, design, config);
         }
     }
 
