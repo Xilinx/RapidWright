@@ -174,6 +174,9 @@ public class RouteNodeGraph {
         accessibleWireOnlyIfAboveBelowTarget = new EnumMap<>(TileTypeEnum.class);
         BitSet wires = new BitSet();
         Tile intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
+        // Device.getArbitraryTileOfType() typically gives you the North-Eastern-most
+        // tile (with minimum X, maximum Y). Analyze the tile just below that.
+        intTile = intTile.getTileNeighbor(0, -1);
         for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
             Node baseNode = Node.getNode(intTile, wireIndex);
             if (baseNode == null) {
@@ -206,9 +209,6 @@ public class RouteNodeGraph {
             } else if (wireName.startsWith("INODE_")) {
                 assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
                 assert(baseTile.getTileXCoordinate() == intTile.getTileXCoordinate());
-                if (baseTile == intTile) {
-                    continue;
-                }
                 // Uphill from nodes in above/target or below/target tiles
                 // Downhill to BOUNCE_*/BYPASS_*/IMUX_* in above/target or below/target tiles
             } else {
