@@ -104,7 +104,7 @@ public class RouteNodeGraph {
      * accessible only if it is within the same column (same X tile coordinate) as
      * the target tile.
      */
-    protected final Map<TileTypeEnum, BitSet> accessibleWireOnlySameColumnAsTarget;
+    protected final Map<TileTypeEnum, BitSet> accessibleWireOnlyIfAboveBelowTarget;
 
     /** Flag for whether LUT routethrus are to be considered
      */
@@ -171,7 +171,7 @@ public class RouteNodeGraph {
             }
         }
 
-        accessibleWireOnlySameColumnAsTarget = new EnumMap<>(TileTypeEnum.class);
+        accessibleWireOnlyIfAboveBelowTarget = new EnumMap<>(TileTypeEnum.class);
         BitSet wires = new BitSet();
         Tile intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
         for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
@@ -196,7 +196,9 @@ public class RouteNodeGraph {
                 assert(baseTile == intTile);
                 assert(wireIndex == baseNode.getWire());
                 // Downhill to CTRL_* in the target tile, INODE_* to above/below tile, INT_NODE_IMUX_* in target tile
-            } else if (wireName.startsWith("INT_NODE_IMUX_")) {
+            } else if (wireName.startsWith("INT_NODE_IMUX_") &&
+                    // Do not block INT_NODE_IMUX nodes accessibility when LUT routethrus are considered
+                    !lutRoutethru) {
                 assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
                 assert(baseTile == intTile);
                 assert(wireIndex == baseNode.getWire());
@@ -214,7 +216,7 @@ public class RouteNodeGraph {
             }
             wires.set(baseNode.getWire());
         }
-        accessibleWireOnlySameColumnAsTarget.put(intTile.getTileTypeEnum(), wires);
+        accessibleWireOnlyIfAboveBelowTarget.put(intTile.getTileTypeEnum(), wires);
 
         Tile[][] lagunaTiles;
         if (device.getSeries() == Series.UltraScalePlus) {
@@ -530,7 +532,7 @@ public class RouteNodeGraph {
         Node childNode = child.getNode();
         Tile childTile = childNode.getTile();
         TileTypeEnum childTileType = childTile.getTileTypeEnum();
-        BitSet bs = accessibleWireOnlySameColumnAsTarget.get(childTileType);
+        BitSet bs = accessibleWireOnlyIfAboveBelowTarget.get(childTileType);
         if (bs == null || !bs.get(childNode.getWire())) {
             return true;
         }
