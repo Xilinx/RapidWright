@@ -1017,9 +1017,6 @@ public class RWRoute{
                         continue;
                     }
 
-                    // Only expect GND net to use SLICE outputs
-                    assert(staticNet.getType() == NetType.GND);
-
                     String pinName = spi.getName();
                     if (!pinName.endsWith("MUX")) {
                         continue;
@@ -1036,6 +1033,9 @@ public class RWRoute{
                         // No LUT6 routethru, nothing to be done
                        continue;
                     }
+
+                    // Only expect GND net to use SLICE outputs
+                    assert(staticNet.getType() == NetType.GND);
 
                     // Perform intra-site routing back to the LUT5 to not conflict with LUT6 routethru
                     BEL outmux = si.getBEL("OUTMUX" + lutLetter);

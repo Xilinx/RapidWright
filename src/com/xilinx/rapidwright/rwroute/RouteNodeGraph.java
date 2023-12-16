@@ -229,7 +229,8 @@ public class RouteNodeGraph {
                 // Downhill to BOUNCE_*/BYPASS_*/IMUX_* in above/target or below/target tiles
                 accessibleWires.set(baseNode.getWire());
             } else if (wireName.endsWith("MUX") && lutRoutethru) {
-                assert(baseNode.getIntentCode() == IntentCode.NODE_CLE_OUTPUT);
+                assert(baseNode.getIntentCode() == IntentCode.NODE_CLE_OUTPUT ||    // US+
+                        baseNode.getIntentCode() == IntentCode.NODE_OUTPUT);        // US
                 assert(baseTile.getTileXCoordinate() == intTile.getTileXCoordinate());
                 muxWires.computeIfAbsent(baseTile.getTileTypeEnum(), (k) -> new BitSet()).set(baseNode.getWire());
             }
