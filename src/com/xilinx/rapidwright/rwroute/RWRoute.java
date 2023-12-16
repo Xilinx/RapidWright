@@ -933,6 +933,59 @@ public class RWRoute{
             LUTTools.swapMultipleLutPins(pinSwaps);
         }
 
+        if (lutRoutethru) {
+            // When LUT routethru-s are considered, examine both static nets to find
+            // any cases where the *MUX output pin is used as a static source alongside
+            // the *_O output being used as a routethru. In such cases, configure the
+            // OUTMUX* site PIP to source from the 5LUT rather than the default 6LUT
+            // so that no conflict occurs
+            for (Net staticNet : Arrays.asList(design.getGndNet(), design.getVccNet())) {
+                for (SitePinInst spi : staticNet.getPins()) {
+                    if (!spi.isOutPin()) {
+                        continue;
+                    }
+                    SiteInst si = spi.getSiteInst();
+                    if (!Utils.isSLICE(si)) {
+                        continue;
+                    }
+
+                    if (si.getSiteName().equals("SLICE_X84Y140"))
+                        System.err.print("");
+
+                    String pinName = spi.getName();
+                    if (!pinName.endsWith("MUX")) {
+                        continue;
+                    }
+
+                    Node muxNode = spi.getConnectedNode();
+                    assert(routingGraph.getPreservedNet(muxNode) == staticNet);
+
+                    Site site = si.getSite();
+                    char lutLetter = pinName.charAt(0);
+                    Node oNode = site.getConnectedNode(lutLetter + "_O");
+                    RouteNode rnode = routingGraph.getNode(oNode);
+                    if (rnode == null || rnode.getOccupancy() == 0) {
+                        // No LUT6 routethru, nothing to be done
+                        continue;
+                    }
+
+                    // Only expect GND net to use SLICE outputs
+                    assert(staticNet.getType() == NetType.GND);
+
+                    // Perform intra-site routing back to the LUT5 to not conflict with LUT6 routethru
+                    BEL outmux = si.getBEL("OUTMUX" + lutLetter);
+                    si.routeIntraSiteNet(staticNet, outmux.getPin("D5"), outmux.getPin("OUT"));
+
+                    if (si.getDesign() == null) {
+                        // Rename SiteInst (away from "STATIC_SOURCE_<siteName>") and
+                        // attach it to the design so that intra-site routing updates take effect
+                        si.setName(site.getName());
+                        design.addSiteInst(si);
+                    }
+                }
+            }
+        }
+
         assignNodesToConnections();
 
         // fix routes with cycles and / or multi-driver nodes
@@ -997,56 +1050,6 @@ public class RWRoute{
                 if (altSource.getName().endsWith("_O") && source.getName().endsWith("MUX") && source.isRouted()) {
                     // Add site routing back if we are keeping the MUX pin
                     source.getSiteInst().routeIntraSiteNet(net, altSource.getBELPin(), altSource.getBELPin());
-                }
-            }
-        }
-
-        if (lutRoutethru) {
-            // When LUT routethru-s are considered, examine both static nets to find
-            // any cases where the *MUX output pin is used as a static source alongside
-            // the *_O output being used as a routethru. In such cases, configure the
-            // OUTMUX* site PIP to source from the 5LUT rather than the default 6LUT
-            // so that no conflict occurs
-            for (Net staticNet : Arrays.asList(design.getGndNet(), design.getVccNet())) {
-                for (SitePinInst spi : staticNet.getPins()) {
-                    if (!spi.isOutPin()) {
-                        continue;
-                    }
-                    SiteInst si = spi.getSiteInst();
-                    if (!Utils.isSLICE(si)) {
-                        continue;
-                    }
-
-                    String pinName = spi.getName();
-                    if (!pinName.endsWith("MUX")) {
-                        continue;
-                    }
-
-                    Node muxNode = spi.getConnectedNode();
-                    assert(routingGraph.getPreservedNet(muxNode) == staticNet);
-
-                    Site site = si.getSite();
-                    char lutLetter = pinName.charAt(0);
-                    Node oNode = site.getConnectedNode(lutLetter + "_O");
-                    RouteNode rnode = routingGraph.getNode(oNode);
-                    if (rnode == null || rnode.getOccupancy() == 0) {
-                        // No LUT6 routethru, nothing to be done
-                       continue;
-                    }
-
-                    // Only expect GND net to use SLICE outputs
-                    assert(staticNet.getType() == NetType.GND);
-
-                    // Perform intra-site routing back to the LUT5 to not conflict with LUT6 routethru
-                    BEL outmux = si.getBEL("OUTMUX" + lutLetter);
-                    si.routeIntraSiteNet(staticNet, outmux.getPin("D5"), outmux.getPin("OUT"));
-
-                    if (si.getDesign() == null) {
-                        // Rename SiteInst (away from "STATIC_SOURCE_<siteName>") and
-                        // attach it to the design so that intra-site routing updates take effect
-                        si.setName(site.getName());
-                        design.addSiteInst(si);
-                    }
                 }
             }
         }
