@@ -723,7 +723,7 @@ public class RWRouteConfig {
      *
      * @return True if the flag is set, false otherwise.
      */
-    public boolean getLutPinSwapping() {
+    public boolean isLutPinSwapping() {
         return lutPinSwapping;
     }
 
@@ -733,7 +733,7 @@ public class RWRouteConfig {
      *
      * @return True if the flag is set, false otherwise.
      */
-    public boolean getLutRoutethru() {
+    public boolean isLutRoutethru() {
         return lutRoutethru;
     }
 
@@ -894,6 +894,8 @@ public class RWRouteConfig {
         s.append(MessageGenerator.formatString("Initial present congestion factor: ", initialPresentCongestionFactor));
         s.append(MessageGenerator.formatString("Present congestion multiplier: ", presentCongestionMultiplier));
         s.append(MessageGenerator.formatString("Historical congestion factor ", historicalCongestionFactor));
+        s.append(MessageGenerator.formatString("LUT pin swapping ", isLutPinSwapping()));
+        s.append(MessageGenerator.formatString("LUT routethrus ", isLutRoutethru()));
 
         return s.toString();
     }

@@ -229,8 +229,8 @@ public class RWRoute{
         rnodesCreatedThisIteration = 0;
         routethruHelper = new RouteThruHelper(design.getDevice());
         presentCongestionFactor = config.getInitialPresentCongestionFactor();
-        lutPinSwapping = config.getLutPinSwapping();
-        lutRoutethru = config.getLutRoutethru();
+        lutPinSwapping = config.isLutPinSwapping();
+        lutRoutethru = config.isLutRoutethru();
 
         routerTimer.createRuntimeTracker("determine route targets", "Initialization").start();
         determineRoutingTargets();
@@ -1020,6 +1020,7 @@ public class RWRoute{
                     // Only expect GND net to use SLICE outputs
                     assert(staticNet.getType() == NetType.GND);
 
+                    // TODO: Check wire index not wire name
                     String pinName = spi.getName();
                     if (!pinName.endsWith("MUX")) {
                         continue;

@@ -148,7 +148,7 @@ public class RouteNodeGraph {
 
     public RouteNodeGraph(RuntimeTracker setChildrenTimer, Design design, RWRouteConfig config) {
         this.design = design;
-        lutRoutethru = config.getLutRoutethru();
+        lutRoutethru = config.isLutRoutethru();
 
         nodesMap = new HashMap<>();
         nodesMapSize = 0;
