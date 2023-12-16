@@ -1020,7 +1020,6 @@ public class RWRoute{
                     // Only expect GND net to use SLICE outputs
                     assert(staticNet.getType() == NetType.GND);
 
-                    // TODO: Check wire index not wire name
                     String pinName = spi.getName();
                     if (!pinName.endsWith("MUX")) {
                         continue;
