@@ -175,20 +175,11 @@ public class RouteNodeGraph {
         }
 
         accessibleWireOnlyIfAboveBelowTarget = new EnumMap<>(TileTypeEnum.class);
-        BitSet accessibleWires = new BitSet();
-        muxWires = new EnumMap<>(TileTypeEnum.class);
+        BitSet wires = new BitSet();
         Tile intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
         // Device.getArbitraryTileOfType() typically gives you the North-Eastern-most
         // tile (with minimum X, maximum Y). Analyze the tile just below that.
         intTile = intTile.getTileXYNeighbor(0, -1);
-        // Now find an INT tile with CLBs on left and right sides
-        Tile leftTile = intTile.getTileNeighbor(-1, 0);
-        Tile rightTile = intTile.getTileNeighbor(1, 0);
-        while (!Utils.isCLB(leftTile.getTileTypeEnum()) || !Utils.isCLB(rightTile.getTileTypeEnum())) {
-            intTile = intTile.getTileXYNeighbor(1, 0);
-            leftTile = intTile.getTileNeighbor(-1, 0);
-            rightTile = intTile.getTileNeighbor(1, 0);
-        }
         for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
             Node baseNode = Node.getNode(intTile, wireIndex);
             if (baseNode == null) {
@@ -201,19 +192,19 @@ public class RouteNodeGraph {
                 assert(baseTile.getTileXCoordinate() == intTile.getTileXCoordinate());
                 // Uphill from INT_NODE_IMUX_* in tile above/below and INODE_* in above/target or below/target tiles
                 // Downhill to INT_NODE_IMUX_* and INODE_* to above/below tile
-                accessibleWires.set(baseNode.getWire());
+                wires.set(baseNode.getWire());
             } else if (wireName.startsWith("BYPASS_")) {
                 assert(baseNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
                 assert(baseTile == intTile);
                 assert(wireIndex == baseNode.getWire());
                 // Uphill and downhill are INT_NODE_IMUX_* in the target tile and INODE_* to above/below tiles
-                accessibleWires.set(baseNode.getWire());
+                wires.set(baseNode.getWire());
             } else if (wireName.startsWith("INT_NODE_GLOBAL_")) {
                 assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
                 assert(baseTile == intTile);
                 assert(wireIndex == baseNode.getWire());
                 // Downhill to CTRL_* in the target tile, INODE_* to above/below tile, INT_NODE_IMUX_* in target tile
-                accessibleWires.set(baseNode.getWire());
+                wires.set(baseNode.getWire());
             } else if (wireName.startsWith("INT_NODE_IMUX_") &&
                     // Do not block INT_NODE_IMUX nodes accessibility when LUT routethrus are considered
                     !lutRoutethru) {
@@ -221,21 +212,41 @@ public class RouteNodeGraph {
                 assert(baseTile == intTile);
                 assert(wireIndex == baseNode.getWire());
                 // Downhill to BOUNCE_* in the above/below/target tile, BYPASS_* in the base tile, IMUX_* in target tile
-                accessibleWires.set(baseNode.getWire());
+                wires.set(baseNode.getWire());
             } else if (wireName.startsWith("INODE_")) {
                 assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
                 assert(baseTile.getTileXCoordinate() == intTile.getTileXCoordinate());
                 // Uphill from nodes in above/target or below/target tiles
                 // Downhill to BOUNCE_*/BYPASS_*/IMUX_* in above/target or below/target tiles
-                accessibleWires.set(baseNode.getWire());
-            } else if (wireName.endsWith("MUX") && lutRoutethru) {
-                assert(baseNode.getIntentCode() == IntentCode.NODE_CLE_OUTPUT ||    // US+
-                        baseNode.getIntentCode() == IntentCode.NODE_OUTPUT);        // US
-                assert(baseTile.getTileXCoordinate() == intTile.getTileXCoordinate());
-                muxWires.computeIfAbsent(baseTile.getTileTypeEnum(), (k) -> new BitSet()).set(baseNode.getWire());
+                wires.set(baseNode.getWire());
             }
         }
-        accessibleWireOnlyIfAboveBelowTarget.put(intTile.getTileTypeEnum(), accessibleWires);
+        accessibleWireOnlyIfAboveBelowTarget.put(intTile.getTileTypeEnum(), wires);
+
+        if (lutRoutethru) {
+            muxWires = new EnumMap<>(TileTypeEnum.class);
+            for (TileTypeEnum tileTypeEnum : Utils.getCLBTileTypes()) {
+                Tile clbTile = device.getArbitraryTileOfType(tileTypeEnum);
+                if (clbTile == null) {
+                    continue;
+                }
+                wires = new BitSet();
+                for (int wireIndex = 0; wireIndex < clbTile.getWireCount(); wireIndex++) {
+                    String wireName = clbTile.getWireName(wireIndex);
+                    if (wireName.endsWith("MUX")) {
+                        assert(Node.getNode(clbTile, wireIndex).getTile() == clbTile &&
+                               Node.getNode(clbTile, wireIndex).getWire() == wireIndex);
+                        wires.set(wireIndex);
+                    }
+                }
+                if (wires.isEmpty()) {
+                    continue;
+                }
+                muxWires.put(tileTypeEnum, wires);
+            }
+        } else {
+            muxWires = null;
+        }
 
         Tile[][] lagunaTiles;
         if (device.getSeries() == Series.UltraScalePlus) {
