@@ -206,7 +206,7 @@ public class RouteNodeGraph {
                 // Downhill to CTRL_* in the target tile, INODE_* to above/below tile, INT_NODE_IMUX_* in target tile
                 wires.set(baseNode.getWire());
             } else if (wireName.startsWith("INT_NODE_IMUX_") &&
-                    // Do not block INT_NODE_IMUX nodes accessibility when LUT routethrus are considered
+                    // Do not block INT_NODE_IMUX node accessibility when LUT routethrus are considered
                     !lutRoutethru) {
                 assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
                 assert(baseTile == intTile);
