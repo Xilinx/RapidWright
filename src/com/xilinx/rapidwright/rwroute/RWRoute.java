@@ -949,9 +949,6 @@ public class RWRoute{
                         continue;
                     }
 
-                    if (si.getSiteName().equals("SLICE_X84Y140"))
-                        System.err.print("");
-
                     String pinName = spi.getName();
                     if (!pinName.endsWith("MUX")) {
                         continue;
