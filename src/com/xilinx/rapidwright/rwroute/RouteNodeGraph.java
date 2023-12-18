@@ -403,14 +403,8 @@ public class RouteNodeGraph {
 
     private static final Set<TileTypeEnum> allowedTileEnums;
     static {
-        Set<TileTypeEnum> tempAllowedTileEnums = new HashSet<>();
-        tempAllowedTileEnums.add(TileTypeEnum.INT);
-        for (TileTypeEnum e : TileTypeEnum.values()) {
-            if (e.toString().startsWith("LAG")) {
-                tempAllowedTileEnums.add(e);
-            }
-        }
-        allowedTileEnums = EnumSet.copyOf(tempAllowedTileEnums);
+        allowedTileEnums = EnumSet.of(TileTypeEnum.INT);
+        allowedTileEnums.addAll(Utils.getLagunaTileTypes());
     }
 
     protected boolean isExcludedTile(Node child) {
