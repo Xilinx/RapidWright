@@ -134,10 +134,13 @@ public class TestLUTTools {
     @ParameterizedTest
     @CsvSource({
             "bnn.dcp,false,false",
-            "bnn.dcp,false,false",
+            "bnn.dcp,false,true",
             "bnn.dcp,true,false",
             "bnn.dcp,true,true",
-            "optical-flow.dcp",
+            "optical-flow.dcp,false,false",
+            "optical-flow.dcp,false,true",
+            "optical-flow.dcp,true,false",
+            "optical-flow.dcp,true,true",
     })
     @LargeTest(max_memory_gb = 8)
     public void testUpdateLutPinSwapsFromPIPsWithRWRoute(String path, boolean lutPinSwapping, boolean lutRoutethru) {
