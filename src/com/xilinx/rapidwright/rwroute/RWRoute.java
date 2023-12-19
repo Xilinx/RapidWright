@@ -582,6 +582,12 @@ public class RWRoute{
                             numberOfSwappablePins = 0;
                             break;
                         }
+                        if (bel.getName().startsWith("H") && cell.getType().startsWith("RAM")) {
+                            // Similarly, disallow swapping of any RAMs on the "H" BELs since their
+                            // "A" and "WA" inputs are shared and require extra care to keep in sync
+                            numberOfSwappablePins = 0;
+                            break;
+                        }
                         if (belName.charAt(1) == '5') {
                             // Since a 5LUT cell exists, only allow bottom 5 pins to be swapped
                             numberOfSwappablePins = 5;
