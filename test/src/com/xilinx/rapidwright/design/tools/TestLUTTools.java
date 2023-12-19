@@ -130,6 +130,15 @@ public class TestLUTTools {
         Assertions.assertEquals("I0", cell5.getLogicalPinMapping("A3"));
     }
 
+    private static void testUpdateLutPinSwapsFromPIPsHelper(Design design) {
+        int numPinsSwapped = LUTTools.swapLutPinsFromPIPs(design);
+        System.out.println("numPinsSwapped = " + numPinsSwapped);
+        Assertions.assertTrue(numPinsSwapped > 0);
+        TestRWRoute.assertAllSourcesRoutedFlagSet(design);
+        TestRWRoute.assertAllPinsRouted(design);
+        TestRWRoute.assertVivadoFullyRouted(design);
+    }
+
     @ParameterizedTest
     @CsvSource({
             "bnn.dcp",
@@ -141,11 +150,24 @@ public class TestLUTTools {
         try {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "true");
             RWRoute.routeDesignWithUserDefinedArguments(design, new String[]{"--nonTimingDriven", "--lutPinSwapping"});
-            int numPinsSwapped = LUTTools.swapLutPinsFromPIPs(design);
-            Assertions.assertTrue(numPinsSwapped > 0);
-            TestRWRoute.assertAllSourcesRoutedFlagSet(design);
-            TestRWRoute.assertAllPinsRouted(design);
-            TestRWRoute.assertVivadoFullyRouted(design);
+            testUpdateLutPinSwapsFromPIPsHelper(design);
+        } finally {
+            System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "false");
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "bnn.dcp",
+            "optical-flow.dcp",
+    })
+    @LargeTest(max_memory_gb = 8)
+    public void testUpdateLutPinSwapsFromPIPsWithRWRouteAndLutRoutethrus(String path) {
+        Design design = RapidWrightDCP.loadDCP(path);
+        try {
+            System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "true");
+            RWRoute.routeDesignWithUserDefinedArguments(design, new String[]{"--nonTimingDriven", "--lutPinSwapping", "--lutRoutethru"});
+            testUpdateLutPinSwapsFromPIPsHelper(design);
         } finally {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "false");
         }
