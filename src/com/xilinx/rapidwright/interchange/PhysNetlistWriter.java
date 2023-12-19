@@ -396,15 +396,20 @@ public class PhysNetlistWriter {
                 } else {
                     if (bel.getBELClass() == BELClass.BEL) {
                         if (cell == null) {
-                            // Skip if nothing placed here
-                            continue;
-                        }
+                            if (!net.isStaticNet()) {
+                                // Skip if nothing placed here and not driving a static net
+                                continue;
+                            }
+                            assert(bel.isLUT() || // LUTs can be a GND or VCC source
+                                    (net.isGNDNet() && bel.isGndSource()) ||
+                                    (net.isVCCNet() && bel.isVccSource()));
+                        } else {
+                            if (cell.getType().equals(PORT)) {
+                                continue;
+                            }
 
-                        if (cell.getType().equals(PORT)) {
-                            continue;
+                            routethru = cell.isRoutethru();
                         }
-
-                        routethru = cell.isRoutethru();
 
                         // Fall through
                     } else if (bel.getBELClass() == BELClass.RBEL) {
