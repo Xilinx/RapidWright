@@ -201,13 +201,6 @@ public class RouteThruHelper {
 
         SiteInst siteInst = design.getSiteInstFromSite(inPin.getSite());
         if (siteInst != null) {
-            for (BELPin sink : outPin.getBELPin().getSourcePin().getSiteConns()) {
-                BEL sinkBEL = sink.getBEL();
-                Cell cellCollision = siteInst.getCell(sinkBEL);
-                if (cellCollision != null) {
-                    return false;
-                }
-            }
             for (BELPin sink : inPin.getBELPin().getSiteConns()) {
                 BEL sinkBEL = sink.getBEL();
                 if (sinkBEL.getName().charAt(0) != inPin.getPinName().charAt(0)) {
@@ -245,13 +238,6 @@ public class RouteThruHelper {
 
         SiteInst siteInst = design.getSiteInstFromSite(inPin.getSite());
         if (siteInst != null) {
-            for (BELPin sink : outPin.getBELPin().getSourcePin().getSiteConns()) {
-                BEL sinkBEL = sink.getBEL();
-                Cell cellCollision = siteInst.getCell(sinkBEL);
-                if (cellCollision != null) {
-                    return false;
-                }
-            }
             for (BELPin sink : inPin.getBELPin().getSiteConns()) {
                 BEL sinkBEL = sink.getBEL();
                 if (sinkBEL.getName().charAt(0) != inPin.getPinName().charAt(0)) {
