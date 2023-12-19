@@ -503,6 +503,12 @@ public class LUTTools {
                     continue;
                 }
 
+                // Either this is a LUT cell or a routethru ...
+                assert(cell.getType().startsWith("LUT") ||
+                       cell.isRoutethru() ||
+                       // ... or a distributed RAM cell not on a "H" BEL
+                       cell.getType().startsWith("RAM") && !bel.getName().startsWith("H"));
+
                 String oldPhysicalPinName = "A" + oldSinkSpi.getName().charAt(1);
                 String oldLogicalPinName = cell.getLogicalPinMapping(oldPhysicalPinName);
                 if (ps == null) {
@@ -626,12 +632,12 @@ public class LUTTools {
             Cell cell = ps.getCell();
             String oldSitePinName = cell.getSiteWireNameFromPhysicalPin(ps.getOldPhysicalName());
             SiteInst si = cell.getSiteInst();
-            SitePinInst p = si.getSitePinInst(oldSitePinName);
-            q.add(p);
-            if (p == null) {
+            SitePinInst pinToMove = si.getSitePinInst(oldSitePinName);
+            q.add(pinToMove);
+            if (pinToMove == null) {
                 continue;
             }
-            p.setSiteInst(null,true);
+            pinToMove.setSiteInst(null,true);
             // Removes pin mappings to prepare for new pin mappings
             cell.removePinMapping(ps.getOldPhysicalName());
             if (ps.getCompanionCell() != null) {
@@ -654,6 +660,8 @@ public class LUTTools {
             pinToMove.setPinName(ps.getNewNetPinName());
             pinToMove.setSiteInst(ps.getCell().getSiteInst());
         }
+
+        assert(q.isEmpty());
     }
 
     /**
