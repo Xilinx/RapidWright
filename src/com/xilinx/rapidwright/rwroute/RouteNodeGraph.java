@@ -191,19 +191,16 @@ public class RouteNodeGraph {
                 assert(baseTile.getTileXCoordinate() == intTile.getTileXCoordinate());
                 // Uphill from INT_NODE_IMUX_* in tile above/below and INODE_* in above/target or below/target tiles
                 // Downhill to INT_NODE_IMUX_* and INODE_* to above/below tile
-                wires.set(baseNode.getWire());
             } else if (wireName.startsWith("BYPASS_")) {
                 assert(baseNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
                 assert(baseTile == intTile);
                 assert(wireIndex == baseNode.getWire());
                 // Uphill and downhill are INT_NODE_IMUX_* in the target tile and INODE_* to above/below tiles
-                wires.set(baseNode.getWire());
             } else if (wireName.startsWith("INT_NODE_GLOBAL_")) {
                 assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
                 assert(baseTile == intTile);
                 assert(wireIndex == baseNode.getWire());
                 // Downhill to CTRL_* in the target tile, INODE_* to above/below tile, INT_NODE_IMUX_* in target tile
-                wires.set(baseNode.getWire());
             } else if (wireName.startsWith("INT_NODE_IMUX_") &&
                     // Do not block INT_NODE_IMUX node accessibility when LUT routethrus are considered
                     !lutRoutethru) {
@@ -211,14 +208,16 @@ public class RouteNodeGraph {
                 assert(baseTile == intTile);
                 assert(wireIndex == baseNode.getWire());
                 // Downhill to BOUNCE_* in the above/below/target tile, BYPASS_* in the base tile, IMUX_* in target tile
-                wires.set(baseNode.getWire());
             } else if (wireName.startsWith("INODE_")) {
                 assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
                 assert(baseTile.getTileXCoordinate() == intTile.getTileXCoordinate());
                 // Uphill from nodes in above/target or below/target tiles
                 // Downhill to BOUNCE_*/BYPASS_*/IMUX_* in above/target or below/target tiles
-                wires.set(baseNode.getWire());
+            } else {
+                continue;
             }
+
+            wires.set(baseNode.getWire());
         }
         accessibleWireOnlyIfAboveBelowTarget.put(intTile.getTileTypeEnum(), wires);
 

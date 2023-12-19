@@ -504,7 +504,7 @@ public class LUTTools {
                     continue;
                 }
 
-                // Either this is LUT cell or a routethru ...
+                // Either this is a LUT cell or a routethru ...
                 assert(cell.getType().startsWith("LUT") ||
                        cell.isRoutethru() ||
                        // ... or a distributed RAM cell not on a "H" BEL
