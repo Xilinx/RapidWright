@@ -23,7 +23,9 @@
 
 package com.xilinx.rapidwright.design.tools;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.Cell;
@@ -38,7 +40,6 @@ import com.xilinx.rapidwright.rwroute.RWRoute;
 import com.xilinx.rapidwright.rwroute.TestRWRoute;
 import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.util.Utils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -130,44 +131,38 @@ public class TestLUTTools {
         Assertions.assertEquals("I0", cell5.getLogicalPinMapping("A3"));
     }
 
-    private static void testUpdateLutPinSwapsFromPIPsHelper(Design design) {
-        int numPinsSwapped = LUTTools.swapLutPinsFromPIPs(design);
-        System.out.println("numPinsSwapped = " + numPinsSwapped);
-        Assertions.assertTrue(numPinsSwapped > 0);
-        TestRWRoute.assertAllSourcesRoutedFlagSet(design);
-        TestRWRoute.assertAllPinsRouted(design);
-        TestRWRoute.assertVivadoFullyRouted(design);
-    }
-
     @ParameterizedTest
     @CsvSource({
-            "bnn.dcp",
+            "bnn.dcp,false,false",
+            "bnn.dcp,false,false",
+            "bnn.dcp,true,false",
+            "bnn.dcp,true,true",
             "optical-flow.dcp",
     })
     @LargeTest(max_memory_gb = 8)
-    public void testUpdateLutPinSwapsFromPIPsWithRWRoute(String path) {
+    public void testUpdateLutPinSwapsFromPIPsWithRWRoute(String path, boolean lutPinSwapping, boolean lutRoutethru) {
         Design design = RapidWrightDCP.loadDCP(path);
         try {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "true");
-            RWRoute.routeDesignWithUserDefinedArguments(design, new String[]{"--nonTimingDriven", "--lutPinSwapping"});
-            testUpdateLutPinSwapsFromPIPsHelper(design);
-        } finally {
-            System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "false");
-        }
-    }
-
-    @ParameterizedTest
-    @CsvSource({
-            "bnn.dcp",
-            "optical-flow.dcp",
-    })
-    @LargeTest(max_memory_gb = 8)
-    public void testUpdateLutPinSwapsFromPIPsWithRWRouteAndLutRoutethrus(String path) {
-        Design design = RapidWrightDCP.loadDCP(path);
-        try {
-            System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "true");
-            RWRoute.routeDesignWithUserDefinedArguments(design, new String[]{"--nonTimingDriven", "--lutPinSwapping", "--lutRoutethru"});
-            testUpdateLutPinSwapsFromPIPsHelper(design);
+            List<String> args = new ArrayList<>();
+            args.add("--nonTimingDriven");
+            if (lutPinSwapping) {
+                args.add("--lutPinSwapping");
+            }
+            if (lutRoutethru) {
+                args.add("--lutRoutethru");
+            }
+            RWRoute.routeDesignWithUserDefinedArguments(design, args.toArray(new String[0]));
+            int numPinsSwapped = LUTTools.swapLutPinsFromPIPs(design);
+            System.out.println("numPinsSwapped = " + numPinsSwapped);
+            if (lutPinSwapping) {
+                Assertions.assertTrue(numPinsSwapped > 0);
+            } else {
+                Assertions.assertEquals(0, numPinsSwapped);
+            }
+            TestRWRoute.assertAllSourcesRoutedFlagSet(design);
+            TestRWRoute.assertAllPinsRouted(design);
+            TestRWRoute.assertVivadoFullyRouted(design);
         } finally {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "false");
         }
