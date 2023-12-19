@@ -80,9 +80,18 @@ public class TestRouteThruHelper {
             "CLEM_X1Y0/CLEM.CLE_CLE_M_SITE_0_H1->>CLE_CLE_M_SITE_0_H_O,true",
             "CLEM_X1Y0/CLEM.CLE_CLE_M_SITE_0_H6->>CLE_CLE_M_SITE_0_H_O,true",
 
-            // SiteInst (CLEM) with H{5,6}LUT free, but others LUTs occupied
-            "CLEM_X9Y238/CLEM.CLE_CLE_M_SITE_0_H1->>CLE_CLE_M_SITE_0_H_O,true",
-            "CLEM_X9Y238/CLEM.CLE_CLE_M_SITE_0_H6->>CLE_CLE_M_SITE_0_H_O,true",
+            // SiteInst (CLEM) with [FGH]{5,6}LUTs free, but others LUTs occupied
+            "CLEM_X9Y238/CLEM.CLE_CLE_M_SITE_0_H1->>CLE_CLE_M_SITE_0_H_O,true", // Technically, the H6LUT and G6LUT are used as GND sources
+            "CLEM_X9Y238/CLEM.CLE_CLE_M_SITE_0_H6->>CLE_CLE_M_SITE_0_H_O,true", // for sinks outside the site, so while the PIP may be
+                                                                                // available, its end node will not be
+            "CLEM_X9Y238/CLEM.CLE_CLE_M_SITE_0_F1->>CLE_CLE_M_SITE_0_F_O,true", // F6LUT is unoccupied and is also not used as a static
+            "CLEM_X9Y238/CLEM.CLE_CLE_M_SITE_0_F6->>CLE_CLE_M_SITE_0_F_O,true", // source for the CARRY8
+
+            // SiteInst (CLEL) with a CARRY8
+            "CLEL_R_X10Y239/CLEL_R.CLE_CLE_L_SITE_0_A2->>CLE_CLE_L_SITE_0_A_O,false", // A6LUT is used as a GND source for CARRY8.S0
+            "CLEL_R_X10Y239/CLEL_R.CLE_CLE_L_SITE_0_A3->>CLE_CLE_L_SITE_0_A_O,false",
+            "CLEL_R_X10Y239/CLEL_R.CLE_CLE_L_SITE_0_B4->>CLE_CLE_L_SITE_0_B_O,true",  // B6LUT is not needed by CARRY8.S1
+            "CLEL_R_X10Y239/CLEL_R.CLE_CLE_L_SITE_0_B5->>CLE_CLE_L_SITE_0_B_O,true",
     })
     public void testRouteThruPIPAvailable(String pipName, boolean expected) {
         Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
