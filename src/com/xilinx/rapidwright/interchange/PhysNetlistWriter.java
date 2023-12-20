@@ -361,29 +361,26 @@ public class PhysNetlistWriter {
                         assert(bel.isLUT() || // LUTs can be a GND or VCC source
                                 (net.isGNDNet() && bel.isGndSource()) ||
                                 (net.isVCCNet() && bel.isVccSource()));
-                    }
-
-                    if (cell.getType().equals(PORT)) {
+                    } else if (cell.getType().equals(PORT)) {
                         assert(belPin.isBidir());
                         assert(bel.getName().equals("PAD"));
                         assert(Utils.isIOB(siteInst));
 
                         Series series = siteInst.getDesign().getDevice().getSeries();
+                        SitePIP sitePIP;
                         if (series == Series.UltraScalePlus || series == Series.UltraScale) {
                             BEL padout = siteInst.getBEL("PADOUT");
-                            SitePIP sitePIP = siteInst.getSitePIP(padout.getPin("IN"));
-                            SitePIPStatus sitePIPStatus = siteInst.getSitePIPStatus(sitePIP);
-                            bidirPinIsOutput = sitePIPStatus.isUsed();
-                            bidirPinIsInput = !bidirPinIsOutput;
+                            sitePIP = siteInst.getSitePIP(padout.getPin("IN"));
                         } else if (series == Series.Series7) {
-                            BEL oused = siteInst.getBEL("OUSED");
-                            SitePIP sitePIP = siteInst.getSitePIP(oused.getPin("0"));
-                            SitePIPStatus sitePIPStatus = siteInst.getSitePIPStatus(sitePIP);
-                            bidirPinIsInput = sitePIPStatus.isUsed();
-                            bidirPinIsOutput = !bidirPinIsInput;
+                            BEL oused = siteInst.getBEL("IUSED");
+                            sitePIP = siteInst.getSitePIP(oused.getPin("0"));
                         } else {
                             throw new RuntimeException("Unsupported series " + series);
                         }
+
+                        SitePIPStatus sitePIPStatus = siteInst.getSitePIPStatus(sitePIP);
+                        bidirPinIsOutput = sitePIPStatus.isUsed();
+                        bidirPinIsInput = !bidirPinIsOutput;
                     }
                 }
 
@@ -432,7 +429,7 @@ public class PhysNetlistWriter {
                     assert(belPin.isOutput() || bidirPinIsOutput);
 
                     if (bel.getBELClass() == BELClass.BEL) {
-                        routethru = cell.isRoutethru();
+                        routethru = cell != null && cell.isRoutethru();
 
                         // Fall through
                     } else if (bel.getBELClass() == BELClass.RBEL) {
