@@ -369,11 +369,9 @@ public class PhysNetlistWriter {
                         Series series = siteInst.getDesign().getDevice().getSeries();
                         SitePIP sitePIP;
                         if (series == Series.UltraScalePlus || series == Series.UltraScale) {
-                            BEL padout = siteInst.getBEL("PADOUT");
-                            sitePIP = siteInst.getSitePIP(padout.getPin("IN"));
+                            sitePIP = siteInst.getSitePIP("PADOUT", "IN");
                         } else if (series == Series.Series7) {
-                            BEL oused = siteInst.getBEL("IUSED");
-                            sitePIP = siteInst.getSitePIP(oused.getPin("0"));
+                            sitePIP = siteInst.getSitePIP("IUSED", "0");
                         } else {
                             throw new RuntimeException("Unsupported series " + series);
                         }
