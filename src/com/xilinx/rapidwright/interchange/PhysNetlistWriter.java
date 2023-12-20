@@ -34,6 +34,7 @@ import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SitePIPStatus;
@@ -55,6 +56,7 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranc
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.SiteInstance;
 import com.xilinx.rapidwright.interchange.RouteBranchNode.RouteSegmentType;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.Utils;
 import org.capnproto.MessageBuilder;
 import org.capnproto.PrimitiveList;
 import org.capnproto.StructList;
@@ -348,13 +350,46 @@ public class PhysNetlistWriter {
             for (BELPin belPin : belPins) {
                 BEL bel = belPin.getBEL();
                 Cell cell = siteInst.getCell(bel);
-                boolean routethru = false;
-                if (belPin.isInput()) {
-                    if (bel.getBELClass() == BELClass.BEL) {
-                        if (cell == null) {
-                            // Skip if nothing placed here
+                boolean bidirPinIsInput = false;
+                boolean bidirPinIsOutput = false;
+                if (bel.getBELClass() == BELClass.BEL) {
+                    if (cell == null) {
+                        if (belPin.isInput() || !net.isStaticNet()) {
+                            // Skip if nothing placed here and cannot be driving a static net
                             continue;
                         }
+                        assert(bel.isLUT() || // LUTs can be a GND or VCC source
+                                (net.isGNDNet() && bel.isGndSource()) ||
+                                (net.isVCCNet() && bel.isVccSource()));
+                    }
+
+                    if (cell.getType().equals(PORT)) {
+                        assert(belPin.isBidir());
+                        assert(bel.getName().equals("PAD"));
+                        assert(Utils.isIOB(siteInst));
+
+                        Series series = siteInst.getDesign().getDevice().getSeries();
+                        if (series == Series.UltraScalePlus || series == Series.UltraScale) {
+                            BEL padout = siteInst.getBEL("PADOUT");
+                            SitePIP sitePIP = siteInst.getSitePIP(padout.getPin("IN"));
+                            SitePIPStatus sitePIPStatus = siteInst.getSitePIPStatus(sitePIP);
+                            bidirPinIsOutput = sitePIPStatus.isUsed();
+                            bidirPinIsInput = !bidirPinIsOutput;
+                        } else if (series == Series.Series7) {
+                            BEL oused = siteInst.getBEL("OUSED");
+                            SitePIP sitePIP = siteInst.getSitePIP(oused.getPin("0"));
+                            SitePIPStatus sitePIPStatus = siteInst.getSitePIPStatus(sitePIP);
+                            bidirPinIsInput = sitePIPStatus.isUsed();
+                            bidirPinIsOutput = !bidirPinIsInput;
+                        } else {
+                            throw new RuntimeException("Unsupported series " + series);
+                        }
+                    }
+                }
+
+                boolean routethru = false;
+                if (belPin.isInput() || bidirPinIsInput) {
+                    if (bel.getBELClass() == BELClass.BEL) {
                         if (!VERBOSE_PHYSICAL_NET_ROUTING && !cell.isRoutethru()) {
                             // Skip if cell is not a routethru
                             continue;
@@ -394,22 +429,10 @@ public class PhysNetlistWriter {
                         }
                     }
                 } else {
-                    if (bel.getBELClass() == BELClass.BEL) {
-                        if (cell == null) {
-                            if (!net.isStaticNet()) {
-                                // Skip if nothing placed here and not driving a static net
-                                continue;
-                            }
-                            assert(bel.isLUT() || // LUTs can be a GND or VCC source
-                                    (net.isGNDNet() && bel.isGndSource()) ||
-                                    (net.isVCCNet() && bel.isVccSource()));
-                        } else {
-                            if (cell.getType().equals(PORT)) {
-                                continue;
-                            }
+                    assert(belPin.isOutput() || bidirPinIsOutput);
 
-                            routethru = cell.isRoutethru();
-                        }
+                    if (bel.getBELClass() == BELClass.BEL) {
+                        routethru = cell.isRoutethru();
 
                         // Fall through
                     } else if (bel.getBELClass() == BELClass.RBEL) {
