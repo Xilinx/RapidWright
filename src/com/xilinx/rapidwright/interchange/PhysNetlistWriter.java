@@ -369,7 +369,12 @@ public class PhysNetlistWriter {
                         Series series = siteInst.getDesign().getDevice().getSeries();
                         SitePIP sitePIP;
                         if (series == Series.UltraScalePlus || series == Series.UltraScale) {
-                            sitePIP = siteInst.getSitePIP("PADOUT", "IN");
+                            BEL padout = siteInst.getBEL("PADOUT");
+                            if (padout == null) {
+                                // HPIOB_SNGL site types do not contain this SitePIP; ignore
+                                continue;
+                            }
+                            sitePIP = siteInst.getSitePIP(padout.getPin("IN"));
                         } else if (series == Series.Series7) {
                             sitePIP = siteInst.getSitePIP("IUSED", "0");
                         } else {
