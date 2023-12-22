@@ -343,6 +343,7 @@ public class PhysNetlistWriter {
 
     public static void extractIntraSiteRouting(Net net, List<RouteBranchNode> nodes, SiteInst siteInst) {
         Site site = siteInst.getSite();
+        final boolean isStaticNet = net.isStaticNet();
         for (String siteWire : siteInst.getSiteWiresFromNet(net)) {
             BELPin[] belPins = siteInst.getSiteWirePins(siteWire);
             for (BELPin belPin : belPins) {
@@ -413,6 +414,11 @@ public class PhysNetlistWriter {
 
                         // Fall through
                     } else if (bel.getBELClass() == BELClass.RBEL) {
+                        if (isStaticNet && bel.isStaticSource()) {
+                            assert(belPin.isOutput());
+                            // Skip output pins on static source BELs (e.g. SLICE.HARD0GND)
+                            continue;
+                        }
                         if (siteInst.getUsedSitePIP(belPin) != null) {
                             if (!VERBOSE_PHYSICAL_NET_ROUTING) {
                                 // Skip output pins on SitePIPs
@@ -455,6 +461,8 @@ public class PhysNetlistWriter {
 
         List<RouteBranchNode> sources;
         List<RouteBranchNode> stubs;
+        PhysNetlist.NetType type = physNet.getType();
+        final boolean isStaticNet = (type == PhysNetlist.NetType.GND || type == PhysNetlist.NetType.VCC);
 
         if (BUILD_ROUTING_GRAPH_ON_EXPORT) {
             sources = new ArrayList<>();
@@ -535,9 +543,18 @@ public class PhysNetlistWriter {
                 queue.addAll(curr.getBranches());
             }
             for (RouteBranchNode rb : map.values()) {
-                if (rb.getParent() == null) {
-                    stubs.add(rb);
+                if (rb.getParent() != null) {
+                    // Not a stub if it's connected to something
+                    continue;
                 }
+
+                if (isStaticNet && rb.getType() == RouteSegmentType.SITE_PIN && rb.getSitePin().isOutPin()) {
+                    // Assume that output site pin stubs on static nets are static sources
+                    // (e.g. LUT outputs)
+                    continue;
+                }
+
+                stubs.add(rb);
             }
         } else {
             sources = null;
