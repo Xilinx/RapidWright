@@ -356,7 +356,7 @@ public class TestPhysNetlistWriter {
     }
 
     @Test
-    public void testStaticSourceRBEL(@TempDir Path tempDir) throws IOException {
+    public void testStaticNets(@TempDir Path tempDir) throws IOException {
         Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
 
         String interchangePath = tempDir.resolve("design.phys").toString();
@@ -385,6 +385,8 @@ public class TestPhysNetlistWriter {
             }
         }
 
+        // Gnd net of this design has some stubs because its intra-site routing is a little
+        // out of sync due to the use of inverters (VCC -> GND) on BRAM control pins
         for (RouteBranch.Reader rb : gndNet.getStubs()) {
             RouteSegment.Reader rs = rb.getRouteSegment();
             if (rs.isBelPin()) {
@@ -396,5 +398,7 @@ public class TestPhysNetlistWriter {
             }
             Assertions.assertTrue(rb.hasBranches());
         }
+
+        Assertions.assertEquals(0, vccNet.getStubs().size());
     }
 }
