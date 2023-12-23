@@ -41,6 +41,7 @@ import com.xilinx.rapidwright.device.SitePIPStatus;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.CellPlacement;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.MultiCellPinMapping;
+import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.NetType;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysBelPin;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysCell;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysCellType;
@@ -293,13 +294,13 @@ public class PhysNetlistWriter {
         physNet.setName(strings.getIndex(net.getName()));
         switch (net.getType()) {
         case GND:
-            physNet.setType(PhysNetlist.NetType.GND);
+            physNet.setType(NetType.GND);
             break;
         case VCC:
-            physNet.setType(PhysNetlist.NetType.VCC);
+            physNet.setType(NetType.VCC);
             break;
         default:
-            physNet.setType(PhysNetlist.NetType.SIGNAL);
+            physNet.setType(NetType.SIGNAL);
         }
 
         // We need to traverse the net inside sites to fully populate routing spec
@@ -345,6 +346,7 @@ public class PhysNetlistWriter {
 
     public static void extractIntraSiteRouting(Net net, List<RouteBranchNode> nodes, SiteInst siteInst) {
         Site site = siteInst.getSite();
+        final boolean isStaticNet = net.isStaticNet();
         for (String siteWire : siteInst.getSiteWiresFromNet(net)) {
             BELPin[] belPins = siteInst.getSiteWirePins(siteWire);
             for (BELPin belPin : belPins) {
@@ -436,6 +438,11 @@ public class PhysNetlistWriter {
 
                         // Fall through
                     } else if (bel.getBELClass() == BELClass.RBEL) {
+                        if (isStaticNet && bel.isStaticSource()) {
+                            assert(belPin.isOutput());
+                            // Skip output pins on static source BELs (e.g. SLICE.HARD0GND)
+                            continue;
+                        }
                         if (siteInst.getUsedSitePIP(belPin) != null) {
                             if (!VERBOSE_PHYSICAL_NET_ROUTING) {
                                 // Skip output pins on SitePIPs
@@ -557,10 +564,23 @@ public class PhysNetlistWriter {
                 map.remove(curr.toString());
                 queue.addAll(curr.getBranches());
             }
+
+            NetType type = physNet.getType();
+            final boolean isStaticNet = (type == NetType.GND || type == NetType.VCC);
             for (RouteBranchNode rb : map.values()) {
-                if (rb.getParent() == null) {
-                    stubs.add(rb);
+                if (rb.getParent() != null) {
+                    // Not a stub if it's connected to something
+                    continue;
                 }
+
+                if (isStaticNet && rb.getType() == RouteSegmentType.SITE_PIN && rb.getSitePin().isOutPin()) {
+                    // Assume that output site pin stubs on static nets are static sources
+                    // (e.g. LUT outputs)
+                    sources.add(rb);
+                    continue;
+                }
+
+                stubs.add(rb);
             }
         } else {
             sources = null;
