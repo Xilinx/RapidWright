@@ -573,8 +573,10 @@ public class PhysNetlistWriter {
                     continue;
                 }
 
-                if (isStaticNet && rb.getType() == RouteSegmentType.SITE_PIN && rb.getSitePin().isOutPin()) {
-                    // Assume that output site pin stubs on static nets are static sources
+                if (isStaticNet &&
+                        ((rb.getType() == RouteSegmentType.SITE_PIN && rb.getSitePin().isOutPin()) ||
+                         (rb.getType() == RouteSegmentType.BEL_PIN && rb.getBELPin().belPin.isOutput()))) {
+                    // Assume that output site/bel pin stubs on static nets are static sources
                     // (e.g. LUT outputs)
                     sources.add(rb);
                     continue;
