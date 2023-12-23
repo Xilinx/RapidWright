@@ -385,20 +385,7 @@ public class TestPhysNetlistWriter {
             }
         }
 
-        // Gnd net of this design has some stubs because its intra-site routing is a little
-        // out of sync due to the use of inverters (VCC -> GND) on BRAM control pins
-        for (RouteBranch.Reader rb : gndNet.getStubs()) {
-            RouteSegment.Reader rs = rb.getRouteSegment();
-            if (rs.isBelPin()) {
-                PhysBelPin.Reader bp = rs.getBelPin();
-                SiteInst si = design.getSiteInstFromSiteName(allStrings.get(bp.getSite()));
-                BELPin belPin = si.getBELPin(allStrings.get(bp.getBel()), allStrings.get(bp.getPin()));
-                Assertions.assertTrue(belPin.isOutput());
-                Assertions.assertFalse(belPin.getBEL().isStaticSource());
-            }
-            Assertions.assertTrue(rb.hasBranches());
-        }
-
+        Assertions.assertEquals(0, gndNet.getStubs().size());
         Assertions.assertEquals(0, vccNet.getStubs().size());
     }
 }
