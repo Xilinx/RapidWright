@@ -364,28 +364,40 @@ public class PhysNetlistWriter {
                                 (net.isGNDNet() && bel.isGndSource()) ||
                                 (net.isVCCNet() && bel.isVccSource()));
                     } else if (cell.getType().equals(PORT)) {
-                        assert(belPin.isBidir());
-                        assert(bel.getName().equals("PAD"));
-                        assert(Utils.isIOB(siteInst));
+                        if (Utils.isIOB(siteInst)) {
+                            assert(belPin.isBidir());
+                            assert(bel.getName().equals("PAD"));
 
-                        Series series = siteInst.getDesign().getDevice().getSeries();
-                        SitePIP sitePIP;
-                        if (series == Series.UltraScalePlus || series == Series.UltraScale) {
-                            BEL padout = siteInst.getBEL("PADOUT");
-                            if (padout == null) {
-                                // HPIOB_SNGL site types do not contain this SitePIP; ignore
-                                continue;
+                            Series series = siteInst.getDesign().getDevice().getSeries();
+                            SitePIP sitePIP;
+                            if (series == Series.UltraScalePlus || series == Series.UltraScale) {
+                                BEL padout = siteInst.getBEL("PADOUT");
+                                if (padout == null) {
+                                    // HPIOB_SNGL site types do not contain this SitePIP; ignore
+                                    continue;
+                                }
+                                sitePIP = siteInst.getSitePIP(padout.getPin("IN"));
+                            } else if (series == Series.Series7) {
+                                sitePIP = siteInst.getSitePIP("IUSED", "0");
+                            } else {
+                                throw new RuntimeException("Unsupported series " + series);
                             }
-                            sitePIP = siteInst.getSitePIP(padout.getPin("IN"));
-                        } else if (series == Series.Series7) {
-                            sitePIP = siteInst.getSitePIP("IUSED", "0");
-                        } else {
-                            throw new RuntimeException("Unsupported series " + series);
-                        }
 
-                        SitePIPStatus sitePIPStatus = siteInst.getSitePIPStatus(sitePIP);
-                        bidirPinIsOutput = sitePIPStatus.isUsed();
-                        bidirPinIsInput = !bidirPinIsOutput;
+                            SitePIPStatus sitePIPStatus = siteInst.getSitePIPStatus(sitePIP);
+                            bidirPinIsOutput = sitePIPStatus.isUsed();
+                            bidirPinIsInput = !bidirPinIsOutput;
+                        } else if (siteInst.getSiteName().startsWith("GTY")) {
+                            if (belPin.isBidir()) {
+                                assert(bel.getName().startsWith("REFCLK"));
+                                BEL obufdsBel = siteInst.getBEL("OBUFDS" + bel.getName().charAt(6) + "_GTYE4");
+                                assert(obufdsBel != null);
+                                Cell obufdsCell = siteInst.getCell(obufdsBel);
+                                bidirPinIsInput = (obufdsCell == null);
+                                bidirPinIsOutput = (obufdsCell != null);
+                            }
+                        } else {
+                            throw new RuntimeException("Unable to process PORT cell at site " + siteInst.getSiteName());
+                        }
                     }
                 }
 
