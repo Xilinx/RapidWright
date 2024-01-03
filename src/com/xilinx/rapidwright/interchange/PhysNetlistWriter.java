@@ -392,8 +392,8 @@ public class PhysNetlistWriter {
                                 BEL obufdsBel = siteInst.getBEL("OBUFDS" + bel.getName().charAt(6) + "_GTYE4");
                                 assert(obufdsBel != null);
                                 Cell obufdsCell = siteInst.getCell(obufdsBel);
-                                bidirPinIsInput = (obufdsCell == null);
-                                bidirPinIsOutput = (obufdsCell != null);
+                                bidirPinIsInput = (obufdsCell != null);
+                                bidirPinIsOutput = (obufdsCell == null);
                             }
                         } else {
                             throw new RuntimeException("Unable to process PORT cell at site " + siteInst.getSiteName());
