@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.design.compare;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,10 +38,14 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.SitePIP;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.compare.EDIFNetlistComparator;
 
 /**
  * A physical design comparison helper class that will compare two designs'
- * placement and routing information and keep track of the differences.
+ * placement and routing information and keep track of the differences. Please
+ * see {@link EDIFNetlistComparator} to compare logical netlists
+ * ({@link EDIFNetlist}).
  */
 public class DesignComparator {
 
@@ -153,7 +158,7 @@ public class DesignComparator {
 
     public void resetDiffCount() {
         diffCount = 0;
-        diffMap = new HashMap<>();
+        diffMap = new EnumMap<>(DesignDiffType.class);
     }
 
     /**

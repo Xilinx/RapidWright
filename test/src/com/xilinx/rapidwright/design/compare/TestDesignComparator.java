@@ -35,7 +35,6 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.util.Utils;
 
 /**
  * Tests various design diffs using DesignComparator.
@@ -46,8 +45,6 @@ public class TestDesignComparator {
     private void compareDesign(int expectedTotalDiffs, int specificDiff, DesignDiffType type, 
             DesignComparator dc, Design gold, Design test) {
         int diffs = dc.compareDesigns(gold, test);
-        if (expectedTotalDiffs == 10)
-            dc.printDiffReport(System.out);
         Assertions.assertEquals(expectedTotalDiffs, diffs);
         Assertions.assertEquals(specificDiff, dc.getDiffList(type).size());
     }
@@ -72,10 +69,11 @@ public class TestDesignComparator {
         SiteInst siteInst = null;
         for (SiteInst si : test.getSiteInsts()) {
             test2.addSiteInst(si);
-            if (Utils.isSLICE(si)) {
+            if (si.getSiteName().equals("SLICE_X142Y0")) {
                 siteInst = si;
             }
         }
+        Assertions.assertNotNull(siteInst);
 
         for (Net net : test.getNets()) {
             test2.addNet(net);
