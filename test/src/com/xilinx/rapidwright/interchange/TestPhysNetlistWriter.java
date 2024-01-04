@@ -31,6 +31,7 @@ import java.util.List;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
@@ -352,5 +353,39 @@ public class TestPhysNetlistWriter {
         inputDesign = null;
         Assertions.assertEquals(outputDesign.getGndNet(),
                 outputDesign.getSiteInst("SLICE_X15Y239").getNetFromSiteWire("A_O"));
+    }
+
+    @Test
+    public void testStaticNets(@TempDir Path tempDir) throws IOException {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+
+        String interchangePath = tempDir.resolve("design.phys").toString();
+        PhysNetlistWriter.writePhysNetlist(design, interchangePath);
+
+        ReaderOptions rdOptions =
+                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
+                        ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
+        MessageReader readMsg = Interchange.readInterchangeFile(interchangePath, rdOptions);
+
+        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
+
+        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
+
+        PhysNet.Reader gndNet = null;
+        PhysNet.Reader vccNet = null;
+        for (PhysNet.Reader n : physNetlist.getPhysNets()) {
+            String netName = allStrings.get(n.getName());
+            if (netName.equals(Net.GND_NET)) {
+                gndNet = n;
+            } else if (netName.equals(Net.VCC_NET)) {
+                vccNet = n;
+            }
+            if (gndNet != null && vccNet != null) {
+                break;
+            }
+        }
+
+        Assertions.assertEquals(0, gndNet.getStubs().size());
+        Assertions.assertEquals(0, vccNet.getStubs().size());
     }
 }
