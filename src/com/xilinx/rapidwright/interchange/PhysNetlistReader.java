@@ -573,7 +573,7 @@ public class PhysNetlistReader {
                     String wire0 = strings.get(pReader.getWire0());
                     String wire1 = strings.get(pReader.getWire1());
                     System.err.println("WARNING: PIP for tile " + strings.get(pReader.getTile()) +
-                            " from wire " + wire0 + " to wire " + wire1 + " not found; " +
+                            " from wire " + wire0 + " to wire " + wire1 + " not found;" +
                             " omitting from net " + net.getName());
                 } else {
                     pip.setIsPIPFixed(pReader.getIsFixed());
