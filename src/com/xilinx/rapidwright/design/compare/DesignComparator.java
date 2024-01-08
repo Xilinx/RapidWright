@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.function.Predicate;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -55,8 +56,8 @@ public class DesignComparator {
     private int diffCount;
     /** Flag indicating if PIP flags should be compared (default: false) */
     private boolean comparePIPFlags = false;
-    /** Flag indicating if routing (PIPs) should be compared (default: true) */
-    private boolean comparePIPs = true;
+    /** Predicate indicating if routing (PIPs) should be compared for given Net (default: true) */
+    private Predicate<Net> comparePIPs = (net) -> true;
     /**
      * Flag indicating if placement information should be compared (default: true)
      */
@@ -182,23 +183,21 @@ public class DesignComparator {
     }
 
     /**
-     * Gets the comparePIPs flag indicating if a design's PIPs should be compared by
-     * DesignComparator.
-     * 
-     * @return True if the flag is set, false otherwise (default: true).
-     */
-    public boolean comparePIPs() {
-        return comparePIPs;
-    }
-
-    /**
-     * Sets a flag to tell the design comparator if PIP flags should also be
-     * compared.
+     * Sets a flag to tell the design comparator if PIP should be compared.
      * 
      * @param comparePIPs Desired flag value (default: true).
      */
     public void setComparePIPs(boolean comparePIPs) {
-        this.comparePIPs = comparePIPs;
+        this.comparePIPs = (net) -> comparePIPs;
+    }
+
+    /**
+     * Set the predicate for the design comparator if PIPs should be compared for the given Net.
+     *
+     * @param predicate Predicate.
+     */
+    public void setComparePIPs(Predicate<Net> predicate) {
+        this.comparePIPs = predicate;
     }
 
     /**
@@ -207,7 +206,7 @@ public class DesignComparator {
      * 
      * @return True if the flag is set, false otherwise (default: true).
      */
-    public boolean comparePlacement() {
+    public boolean getComparePlacement() {
         return comparePlacement;
     }
 
@@ -352,7 +351,7 @@ public class DesignComparator {
     public int compareNets(Net gold, Net test) {
         int init = getDiffCount();
 
-        if (!comparePIPs) {
+        if (!comparePIPs.test(gold) && !comparePIPs.test(test)) {
             return getDiffCount() - init;
         }
 
