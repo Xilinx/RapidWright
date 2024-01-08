@@ -732,7 +732,11 @@ public class LUTTools {
                     continue;
                 }
                 SitePinInst newSpi = si.getSitePinInst(newSitePinName);
-                if (!lutSpis.remove(newSpi)) {
+                List<SitePinInst> spis = siteToLutSpis.get(site);
+                if (spis == null) {
+                    System.out.println("WARNING: SitePin " + newSitePin + " visited by PIP " + pip +
+                            " is not a SitePinInst on net " + net + ". Ignoring.");
+                } else if (!spis.remove(newSpi)) {
                     // spi is not already on this net -- could require pin swapping,
                     // or could be a routethru
                     unmatchedSitePins.add(newSitePin);
