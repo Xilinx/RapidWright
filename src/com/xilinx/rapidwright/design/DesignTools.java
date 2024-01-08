@@ -2139,13 +2139,34 @@ public class DesignTools {
             for (SiteInst siteInst : new ArrayList<>(net.getSiteInsts())) {
                 for (String siteWire : new ArrayList<>(siteInst.getSiteWiresFromNet(net))) {
                     for (BELPin pin : siteInst.getSiteWirePins(siteWire)) {
-                        if (pin.isSitePort()) {
-                            SitePinInst currPin = siteInst.getSitePinInst(pin.getName());
-                            if (currPin == null) {
-                                currPin = net.createPin(pin.getName(), siteInst);
-                                newPins.add(currPin);
+                        if (!pin.isSitePort()) {
+                            continue;
+                        }
+
+                        SitePinInst currPin = siteInst.getSitePinInst(pin.getName());
+                        if (currPin != null) {
+                            // SitePinInst already exists
+                            continue;
+                        }
+
+                        if (pin.isInput()) {
+                            // Input BELPin means output site port; check that this site port is driven
+                            // by a cell, rather than coming from an input site port
+                            boolean foundOutputPin = false;
+                            for (BELPin connectedBELPin : getConnectedBELPins(pin, siteInst)) {
+                                if (connectedBELPin.isInput()) {
+                                    continue;
+                                }
+                                foundOutputPin = true;
+                                break;
+                            }
+                            if (!foundOutputPin) {
+                                continue;
                             }
                         }
+
+                        currPin = net.createPin(pin.getName(), siteInst);
+                        newPins.add(currPin);
                     }
                 }
             }
