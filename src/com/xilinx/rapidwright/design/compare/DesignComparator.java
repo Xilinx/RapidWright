@@ -351,7 +351,7 @@ public class DesignComparator {
     public int compareNets(Net gold, Net test) {
         int init = getDiffCount();
 
-        if (comparePIPs.test(gold) || comparePIPs.test(test)) {
+        if (!comparePIPs.test(gold) && !comparePIPs.test(test)) {
             return getDiffCount() - init;
         }
 
