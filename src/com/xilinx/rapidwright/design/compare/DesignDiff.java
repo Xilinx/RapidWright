@@ -94,8 +94,9 @@ public class DesignDiff {
         } else if (type.isNonNullMismatch()) {
             sb.append("Mismatch found ");
             if (!notEqualString.isEmpty()) {
-                sb.append("(" + notEqualString + "), expected ");
+                sb.append("(" + notEqualString + ")");
             }
+            sb.append(", expected ");
             sb.append(gold);
             sb.append(", but found ");
             sb.append(test);
