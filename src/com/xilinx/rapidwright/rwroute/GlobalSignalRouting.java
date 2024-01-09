@@ -66,6 +66,7 @@ public class GlobalSignalRouting {
         for (String cle : new String[]{"L", "M"}) {
             for (String pin : new String[]{"A", "B", "C", "D", "E", "F", "G", "H"}) {
                 lutOutputPinNames.add("CLE_CLE_" + cle + "_SITE_0_" + pin + "_O");
+                lutOutputPinNames.add("CLE_CLE_" + cle + "_SITE_0_" + pin + "MUX");
             }
         }
     }
@@ -513,17 +514,35 @@ public class GlobalSignalRouting {
         // (1) GND_WIRE
         // (2) VCC_WIRE
         // (3) Unused LUT Outputs (A_0, B_0,...,H_0)
-        String pinName = type == NetType.VCC ? Net.VCC_WIRE_NAME : Net.GND_WIRE_NAME;
-        if (node.getWireName().startsWith(pinName)) {
+        if ((type == NetType.VCC && node.isTiedToVcc()) ||
+                (type == NetType.GND && node.isTiedToGnd())) {
             return true;
-        } else if (lutOutputPinNames.contains(node.getWireName())) {
+        }
+        String wireName = node.getWireName();
+        if (lutOutputPinNames.contains(wireName)) {
             Site slice = node.getTile().getSites()[0];
-            SiteInst i = design.getSiteInstFromSite(slice);
-            if (i == null) return true; // Site is not used
-            char uniqueId = node.getWireName().charAt(node.getWireName().length()-3);
-            Net currNet = i.getNetFromSiteWire(uniqueId + "_O");
-            if (currNet == null) return true;
-            return currNet.getType() == type;
+            SiteInst si = design.getSiteInstFromSite(slice);
+            if (si == null) {
+                // Site is not used
+                return true;
+            }
+
+            String sitePinName;
+            if (wireName.endsWith("_O")) {
+                sitePinName = wireName.substring(wireName.length() - 3);
+            } else if (wireName.endsWith("MUX")) {
+                char lutLetter = wireName.charAt(wireName.length() - 4);
+                Net currNet = si.getNetFromSiteWire(lutLetter + "5LUT_O5");
+                if (currNet != null && currNet.getType() != type) {
+                    return false;
+                }
+                sitePinName = wireName.substring(wireName.length() - 4);
+            } else {
+                throw new RuntimeException(wireName);
+            }
+
+            Net sitePinNet = si.getNetFromSiteWire(sitePinName);
+            return sitePinNet == null || sitePinNet.getType() == type;
         }
         return false;
     }
