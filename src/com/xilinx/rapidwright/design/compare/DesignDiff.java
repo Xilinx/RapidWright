@@ -62,11 +62,11 @@ public class DesignDiff {
             return "";
         if (type.isSiteInstParentContext()) {
             SiteInst si = (SiteInst) contextParent;
-            return " in SiteInst placed at : " + si.getSiteName();
+            return " in SiteInst placed at " + si.getSiteName();
         }
         if (type.isNetParentContext()) {
             Net net = (Net) contextParent;
-            return " in Net called " + net.getName();
+            return " in Net " + net.getName();
         }
         if (contextParent instanceof Design) {
             return " in Design " + ((Design) contextParent).getName();
@@ -82,7 +82,7 @@ public class DesignDiff {
             sb.append(" ");
             sb.append(gold);
             if (notEqualString.length() > 0) {
-                sb.append("(");
+                sb.append(" (");
                 sb.append(notEqualString);
                 sb.append(")");
             }
@@ -92,7 +92,10 @@ public class DesignDiff {
             sb.append(" ");
             sb.append(test);
         } else if (type.isNonNullMismatch()) {
-            sb.append("Mismatch found (" + notEqualString + "), expected ");
+            sb.append("Mismatch found ");
+            if (!notEqualString.isEmpty()) {
+                sb.append("(" + notEqualString + "), expected ");
+            }
             sb.append(gold);
             sb.append(", but found ");
             sb.append(test);
