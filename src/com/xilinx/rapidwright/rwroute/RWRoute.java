@@ -582,6 +582,12 @@ public class RWRoute{
                             numberOfSwappablePins = 0;
                             break;
                         }
+                        if (bel.getName().startsWith("H") && cell.getType().startsWith("RAM")) {
+                            // Similarly, disallow swapping of any RAMs on the "H" BELs since their
+                            // "A" and "WA" inputs are shared and require extra care to keep in sync
+                            numberOfSwappablePins = 0;
+                            break;
+                        }
                         if (belName.charAt(1) == '5') {
                             // Since a 5LUT cell exists, only allow bottom 5 pins to be swapped
                             numberOfSwappablePins = 5;
@@ -1069,9 +1075,14 @@ public class RWRoute{
     protected void assignNodesToConnections() {
         for (Connection connection : indirectConnections) {
             List<Node> nodes = new ArrayList<>();
+            connection.setNodes(nodes);
 
             RouteNode sinkRnode = connection.getSinkRnode();
             List<RouteNode> rnodes = connection.getRnodes();
+            if (rnodes.isEmpty()) {
+                continue;
+            }
+
             if (sinkRnode == rnodes.get(0)) {
                 List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(sinkRnode.getNode(), connection.getSink().getConnectedNode());
                 if (switchBoxToSink.size() >= 2) {
@@ -1098,8 +1109,6 @@ public class RWRoute{
                     nodes.add(sourceToSwitchBox.get(i));
                 }
             }
-
-            connection.setNodes(nodes);
         }
     }
 

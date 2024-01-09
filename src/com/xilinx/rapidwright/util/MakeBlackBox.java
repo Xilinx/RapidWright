@@ -50,7 +50,7 @@ public class MakeBlackBox {
         }
 
         // Necessary to make the design place-able by Vivado later
-        DesignTools.prohibitPartialHalfSlices(input);
+        DesignTools.prepareShellBlackBoxForRouting(input);
 
         t.stop().start("Write DCP");
         input.writeCheckpoint(args[1], CodePerfTracker.SILENT);
