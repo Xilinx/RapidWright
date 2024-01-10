@@ -569,14 +569,22 @@ public class PhysNetlistReader {
                 }
 
                 PIP pip = getPIP(tile, pReader.getWire0(), pReader.getWire1());
-                pip.setIsPIPFixed(pReader.getIsFixed());
-                pip.setIsReversed(!pReader.getForward());
+                if (pip == null) {
+                    String wire0 = strings.get(pReader.getWire0());
+                    String wire1 = strings.get(pReader.getWire1());
+                    System.err.println("WARNING: PIP for tile " + strings.get(pReader.getTile()) +
+                            " from wire " + wire0 + " to wire " + wire1 + " not found;" +
+                            " omitting from net " + net.getName());
+                } else {
+                    pip.setIsPIPFixed(pReader.getIsFixed());
+                    pip.setIsReversed(!pReader.getForward());
 
-                if (stubWires.remove(pip.getEndWire())) {
-                    pip.setIsStub(true);
+                    if (stubWires.remove(pip.getEndWire())) {
+                        pip.setIsStub(true);
+                    }
+
+                    net.addPIP(pip);
                 }
-
-                net.addPIP(pip);
                 break;
             }
             case BEL_PIN:{

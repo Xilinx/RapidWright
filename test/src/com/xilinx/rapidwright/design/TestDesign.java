@@ -29,7 +29,6 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
 
-import com.xilinx.rapidwright.device.Series;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -40,13 +39,18 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -407,5 +411,33 @@ public class TestDesign {
         } else {
             Assertions.assertNull(si);
         }
+    }
+
+    @ParameterizedTest
+    @CsvSource({ 
+        "xcvu3p-ffvc1517-1-i,N28", 
+        "xcku040-ffva1156-2-e,AE10",
+        })
+    public void testPlaceIOB(String partName, String pkgPin) {
+        Design design = new Design("testPlaceIOB", partName);
+        EDIFCell top = design.getNetlist().getTopCell();
+        EDIFCell ibuf = Design.getMacroPrimitives(design.getDevice().getSeries()).getCell("IBUF");
+        EDIFCellInst ibufInst = ibuf.createCellInst("iobInst", top);
+        EDIFNet inNet = top.createNet("inNet");
+        EDIFNet outNet = top.createNet("outNet");
+        EDIFPort input = top.createPort("in0", EDIFDirection.INPUT, 1);
+        inNet.createPortInst(input);
+        inNet.createPortInst("I", ibufInst);
+        outNet.createPortInst("O", ibufInst);
+        Cell iob = design.placeIOB(ibufInst, pkgPin, null);
+        SiteInst siteInst = iob.getSiteInst();
+        SitePIP sitePIP = siteInst.getUsedSitePIP("INPUTMUX");
+        Assertions.assertEquals("IN1", sitePIP.getInputPinName());
+        String netName = ibufInst.getName() + "/OUT";
+        Net net = design.getNet(netName);
+        Assertions.assertEquals(net.getName(), netName);
+        Net dout = design.getDevice().getSeries().equals(Series.UltraScalePlus) ? net
+                : design.getNet(ibufInst.getName() + "/O");
+        Assertions.assertEquals(siteInst.getNetFromSiteWire("DOUT"), dout);
     }
 }

@@ -192,7 +192,9 @@ public class EDIFPropertyValue {
         return Long.parseUnsignedLong(value);
     }
 
-
+    public boolean getBooleanValue() {
+        return !(value == null || value.length() == 0 || value == "0" || value.toLowerCase().equals("false"));
+    }
 
     /**
      * @param value the value to set
