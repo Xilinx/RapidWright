@@ -42,7 +42,7 @@ import java.util.Map;
  * Each RouteNode instance is associated with a {@link Node} instance. It is denoted as "rnode".
  * The routing resource graph is built "lazily", i.e., RouteNode Objects (rnodes) are created when needed.
  */
-abstract public class RouteNode implements Comparable<RouteNode> {
+abstract public class RouteNode extends Node implements Comparable<RouteNode> {
     /** Each RouteNode Object can be legally used by one net only */
     public static final short capacity = 1;
     /** Memoized static array for use by Collection.toArray() or similar */
@@ -50,8 +50,6 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     public static final int initialPresentCongestionCost = 1;
     public static final int initialHistoricalCongestionCost = 1;
 
-    /** The associated {@link Node} instance */
-    protected Node node;
     /** The type of a rnode*/
     private RouteNodeType type;
     /** The tileXCoordinate and tileYCoordinate of the INT tile that the associated node stops at */
@@ -96,8 +94,8 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     private Map<RouteNode, Integer> driversCounts;
 
     protected RouteNode(Node node, RouteNodeType type, Map<Tile, BitSet> lagunaI) {
-        this.node = node;
-        RouteNodeInfo nodeInfo = RouteNodeInfo.get(node, lagunaI);
+        super(node);
+        RouteNodeInfo nodeInfo = RouteNodeInfo.get(this, lagunaI);
         this.type = (type == null) ? nodeInfo.type : type;
         endTileXCoordinate = nodeInfo.endTileXCoordinate;
         endTileYCoordinate = nodeInfo.endTileYCoordinate;
@@ -127,7 +125,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         if (children != null)
             return;
         setChildrenTimer.start();
-        List<Node> allDownHillNodes = node.getAllDownhillNodes();
+        List<Node> allDownHillNodes = getAllDownhillNodes();
         List<RouteNode> childrenList = new ArrayList<>(allDownHillNodes.size());
         for (Node downhill: allDownHillNodes) {
             if (isExcluded(downhill)) {
@@ -161,7 +159,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                 break;
             case WIRE:
                 // NOTE: IntentCode is device-dependent
-                IntentCode ic = node.getIntentCode();
+                IntentCode ic = getIntentCode();
                 switch(ic) {
                     case NODE_OUTPUT:       // LUT route-thru
                     case NODE_CLE_OUTPUT:
@@ -178,7 +176,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                         if (length == 2) baseCost *= length;
                         break;
                     case NODE_DOUBLE:
-                        if (endTileXCoordinate != node.getTile().getTileXCoordinate()) {
+                        if (endTileXCoordinate != getTile().getTileXCoordinate()) {
                             assert(length <= 2);
                             // Typically, length = 1 (since tile X is not equal)
                             // In US, have seen length = 2, e.g. VU440's INT_X171Y827/EE2_E_BEG7.
@@ -191,7 +189,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                         }
                         break;
                     case NODE_HQUAD:
-                        assert (length != 0 || node.getAllDownhillNodes().isEmpty());
+                        assert (length != 0 || getAllDownhillNodes().isEmpty());
                         baseCost = 0.35f * length;
                         break;
                     case NODE_VQUAD:
@@ -199,7 +197,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
                         if (length != 0) baseCost = 0.15f * length;// VQUADs have length 4 and 5
                         break;
                     case NODE_HLONG:
-                        assert (length != 0 || node.getAllDownhillNodes().isEmpty());
+                        assert (length != 0 || getAllDownhillNodes().isEmpty());
                         baseCost = 0.15f * length;// HLONGs have length 6 and 7
                         break;
                     case NODE_VLONG:
@@ -271,13 +269,13 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     @Override
     public String toString() {
         StringBuilder s = new StringBuilder();
-        s.append("node " + node.toString());
+        s.append("node " + super.toString());
         s.append(", ");
         s.append("(" + endTileXCoordinate + "," + getEndTileYCoordinate() + ")");
         s.append(", ");
         s.append(String.format("type = %s", type));
         s.append(", ");
-        s.append(String.format("ic = %s", node.getIntentCode()));
+        s.append(String.format("ic = %s", getIntentCode()));
         s.append(", ");
         s.append(String.format("user = %s", getOccupancy()));
         s.append(", ");
@@ -287,7 +285,15 @@ abstract public class RouteNode implements Comparable<RouteNode> {
 
     @Override
     public int hashCode() {
-        return node.hashCode();
+        return super.hashCode();
+    }
+
+    public boolean equals(Node obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        return super.equals(obj);
     }
 
     @Override
@@ -296,10 +302,9 @@ abstract public class RouteNode implements Comparable<RouteNode> {
             return true;
         if (obj == null)
             return false;
-        if (getClass() != obj.getClass())
-            return false;
-        RouteNode that = (RouteNode) obj;
-        return node.equals(that.node);
+        // This method requires that object is Node or a subclass of one, otherwise exception will be thrown.
+        // If so, explicitly call the Node.equals(Node) overload, rather than the general-purpose Node.equals(Object).
+        return super.equals((Node) obj);
     }
 
     /**
@@ -312,11 +317,11 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     }
 
     /**
-     * Gets the associated Node of a RouteNode Object.
-     * @return The associated Node of a RouteNode Object.
+     * Returns a deep copy of the Node associated with this RouteNode Object.
+     * @return New Node deep copy.
      */
     public Node getNode() {
-        return node;
+        return new Node(this);
     }
 
     /**
@@ -365,13 +370,13 @@ abstract public class RouteNode implements Comparable<RouteNode> {
     public short getBeginTileXCoordinate() {
         // For US+ Laguna tiles, use end tile coordinate as that's already been corrected
         // (see RouteNodeInfo.getEndTileXCoordinate())
-        Tile tile = node.getTile();
+        Tile tile = getTile();
         return (tile.getTileTypeEnum() == TileTypeEnum.LAG_LAG) ? getEndTileXCoordinate()
                 : (short) tile.getTileXCoordinate();
     }
 
     public short getBeginTileYCoordinate() {
-        return (short) node.getTile().getTileYCoordinate();
+        return (short) getTile().getTileYCoordinate();
     }
 
     /**
@@ -393,7 +398,7 @@ abstract public class RouteNode implements Comparable<RouteNode> {
         boolean reverseSLL = (getType() == RouteNodeType.SUPER_LONG_LINE &&
                 prev != null &&
                 prev.endTileYCoordinate == endTileYCoordinate);
-        return reverseSLL ? (short) node.getTile().getTileYCoordinate() : endTileYCoordinate;
+        return reverseSLL ? (short) getTile().getTileYCoordinate() : endTileYCoordinate;
     }
 
     /**
