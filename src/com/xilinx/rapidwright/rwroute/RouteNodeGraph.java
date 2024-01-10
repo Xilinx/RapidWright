@@ -115,7 +115,7 @@ public class RouteNodeGraph {
 
         @Override
         public boolean isExcluded(Node child) {
-            return RouteNodeGraph.this.isExcluded(node, child);
+            return RouteNodeGraph.this.isExcluded(this, child);
         }
 
         @Override
@@ -513,12 +513,11 @@ public class RouteNodeGraph {
         return Math.round((float) sum / numNodes());
     }
 
-    public boolean isAccessible(RouteNode child, Connection connection) {
-        Node childNode = child.getNode();
-        Tile childTile = childNode.getTile();
+    public boolean isAccessible(RouteNode childRnode, Connection connection) {
+        Tile childTile = childRnode.getTile();
         TileTypeEnum childTileType = childTile.getTileTypeEnum();
         BitSet bs = accessibleWireOnlySameColumnAsTarget.get(childTileType);
-        if (bs == null || !bs.get(childNode.getWire())) {
+        if (bs == null || !bs.get(childRnode.getWire())) {
             return true;
         }
 
@@ -528,7 +527,7 @@ public class RouteNodeGraph {
             return true;
         }
 
-        Tile sinkTile = connection.getSinkRnode().getNode().getTile();
+        Tile sinkTile = connection.getSinkRnode().getTile();
         if (childX != sinkTile.getTileXCoordinate()) {
             return false;
         }

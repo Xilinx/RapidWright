@@ -254,7 +254,7 @@ public class Connection implements Comparable<Connection>{
             RouteNode rnode = getRnodes().get(i);
             RouteNode parent = getRnodes().get(i+1);
             routeDelay += rnode.getDelay() +
-                    DelayEstimatorBase.getExtraDelay(rnode.getNode(), DelayEstimatorBase.isLong(parent.getNode()));
+                    DelayEstimatorBase.getExtraDelay(rnode, DelayEstimatorBase.isLong(parent));
         }
         return routeDelay;
     }
@@ -483,7 +483,7 @@ public class Connection implements Comparable<Connection>{
 
     public void setAllTargets(boolean target) {
         if (sinkRnode.countConnectionsOfUser(netWrapper) == 0 ||
-            sinkRnode.getNode().getIntentCode() == IntentCode.NODE_PINBOUNCE) {
+            sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE) {
             // Since this connection will have been ripped up, only mark a node
             // as a target if it's not already used by this net.
             // This prevents -- for the case where the same net needs to be routed
@@ -501,7 +501,7 @@ public class Connection implements Comparable<Connection>{
                 if (rnode.countConnectionsOfUser(netWrapper) == 0 ||
                     // Except if it is not a PINFEED_I
                     rnode.getType() != RouteNodeType.PINFEED_I) {
-                    assert(rnode.getNode().getIntentCode() != IntentCode.NODE_PINBOUNCE);
+                    assert(rnode.getIntentCode() != IntentCode.NODE_PINBOUNCE);
                     rnode.setTarget(target);
                 }
             }

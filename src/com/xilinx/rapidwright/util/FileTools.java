@@ -254,23 +254,6 @@ public class FileTools {
     }
 
     /**
-     * Use {@link #getKryoGzipOutputStream(String)} instead.
-     * @deprecated To be removed in 2023.2.0
-     */
-    public static Output getKryoOutputStream(String fileName) {
-        return getKryoGzipOutputStream(fileName);
-    }
-
-
-    /**
-     * Use {@link #getKryoGzipOutputStream(OutputStream)} instead.
-     * @deprecated To be removed in 2023.2.0
-     */
-    public static Output getKryoOutputStream(OutputStream os) {
-        return getKryoGzipOutputStream(os);
-    }
-
-    /**
      * Wraps the provided output stream with a kryo stream. Will call
      * {@link #useUnsafeStreams()} to decide on using unsafe or not.
      * 
@@ -344,22 +327,6 @@ public class FileTools {
      */
     public static Input getKryoGzipInputStream(InputStream is) {
         return getKryoInputStreamWithoutInflater(new InflaterInputStream(is));
-    }
-
-    /**
-     * Please use {@link #getKryoGzipInputStream(String)} instead.
-     * @deprecated - To be removed in 2023.2.0
-     */
-    public static Input getKryoInputStream(String fileName) {
-        return getKryoGzipInputStream(fileName);
-    }
-
-    /**
-     * Please use {@link #getKryoGzipInputStream(InputStream)} instead.
-     * @deprecated - To be removed in 2023.2.0
-     */
-    public static Input getKryoInputStream(InputStream in) {
-        return getKryoGzipInputStream(in);
     }
 
     /**
