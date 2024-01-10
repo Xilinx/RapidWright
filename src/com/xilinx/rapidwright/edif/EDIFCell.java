@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Queue;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 /**
  * Represent a logical cell in an EDIF netlist.  Can
@@ -61,6 +62,16 @@ public class EDIFCell extends EDIFPropertyObject {
     private Map<String, EDIFNet> internalPortMap;
 
     private EDIFName view = DEFAULT_VIEW;
+
+    /**
+     * An atomically updated variable to track the number of `EDIFCellInst`
+     * objects (attached to a parent cell) that instantiate this cell.
+     * Note: this does not track the number of `EDIFHierCellInst` objects
+     *       that would exist if the netlist was traversed from the top cell.
+     */
+    private volatile int nonHierInstantiationCount = 0;
+    private static final AtomicIntegerFieldUpdater<EDIFCell> nonHierInstantiationCountUpdater =
+            AtomicIntegerFieldUpdater.newUpdater(EDIFCell.class, "nonHierInstantiationCount");
 
     public EDIFCell(EDIFLibrary lib, String name) {
         super(name);
@@ -292,8 +303,12 @@ public class EDIFCell extends EDIFPropertyObject {
 
     public EDIFCellInst removeCellInst(String name) {
         if (instances == null) return null;
-        trackChange(EDIFChangeType.CELL_INST_REMOVE, name);
-        return instances.remove(name);
+        EDIFCellInst removedInstance = instances.remove(name);
+        if (removedInstance != null) {
+            assert(removedInstance.getParentCell() == this);
+            removedInstance.setParentCell(null);
+        }
+        return removedInstance;
     }
 
     public EDIFNet createNet(String name) {
@@ -514,6 +529,9 @@ public class EDIFCell extends EDIFPropertyObject {
                 netlist.trackChange(this, EDIFChangeType.NET_REMOVE, net.getName());
             }
         }
+        for (EDIFCellInst instance : getCellInsts()) {
+            instance.getCellType().decrementNonHierInstantiationCount();
+        }
         instances = null;
         nets = null;
         internalPortMap = null;
@@ -655,6 +673,34 @@ public class EDIFCell extends EDIFPropertyObject {
     @Override
     public int hashCode() {
         return Objects.hash(super.hashCode(), library);
+    }
+
+    /**
+     * Atomically increment instance count of this cell.
+     */
+    public void incrementNonHierInstantiationCount() {
+        nonHierInstantiationCountUpdater.incrementAndGet(this);
+    }
+
+    /**
+     * Atomically decrement instance count of this cell.
+     */
+    public void decrementNonHierInstantiationCount() {
+        nonHierInstantiationCountUpdater.getAndDecrement(this);
+    }
+
+    /**
+     * @return The number of times this cell has been instantiated.
+     */
+    public int getNonHierInstantiationCount() {
+        return nonHierInstantiationCountUpdater.get(this);
+    }
+
+    /**
+     * True if this cell is instantiated no more than once.
+     */
+    public boolean isUniquified() {
+        return getNonHierInstantiationCount() <= 1;
     }
 }
 

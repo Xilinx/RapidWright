@@ -284,7 +284,7 @@ public class DesignComparator {
         for (Entry<String, Net> e : goldSiteWireMap.entrySet()) {
             Net testNet = testSiteWireMap.remove(e.getKey());
             if (testNet == null) {
-                addDiff(DesignDiffType.SITEWIRE_NET_MISSING, e.getKey(), null, gold, " should be Net " + e.getValue());
+                addDiff(DesignDiffType.SITEWIRE_NET_MISSING, e.getKey(), null, gold, "should be Net " + e.getValue());
                 continue;
             }
             if (!e.getValue().getName().equals(testNet.getName())) {
