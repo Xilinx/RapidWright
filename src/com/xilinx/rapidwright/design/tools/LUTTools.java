@@ -503,11 +503,14 @@ public class LUTTools {
                     continue;
                 }
 
-                // Either this is a LUT cell or a routethru ...
-                assert(cell.getType().startsWith("LUT") ||
-                       cell.isRoutethru() ||
-                       // ... or a distributed RAM cell not on a "H" BEL
-                       cell.getType().startsWith("RAM") && !bel.getName().startsWith("H"));
+                // Only consider LUT cell or a routethru ...
+                if (!cell.getType().startsWith("LUT") && !cell.isRoutethru() &&
+                        // ... or distributed RAM cells not on a "H" BEL
+                        (!cell.getType().startsWith("RAM") || bel.getName().startsWith("H"))) {
+                    // SRL cells do not support pin swapping
+                    assert(cell.getType().startsWith("SRL"));
+                    continue;
+                }
 
                 String oldPhysicalPinName = "A" + oldSinkSpi.getName().charAt(1);
                 String oldLogicalPinName = cell.getLogicalPinMapping(oldPhysicalPinName);
