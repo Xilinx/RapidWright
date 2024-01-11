@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -574,17 +574,23 @@ public class RWRoute{
                         BEL bel = cell.getBEL();
                         assert(bel.isLUT());
                         String belName = bel.getName();
+                        String cellType = cell.getType();
                         if (belName.charAt(0) != lutLetter) {
-                            assert(cell.getType().startsWith("RAM"));
+                            assert(cellType.startsWith("RAM"));
                             // This pin connects to other LUTs! (e.g. SLICEM.H[1-6] also serves
                             // as the WA for A-G LUTs used as distributed RAM) -- do not allow any swapping
                             // TODO: Relax this when https://github.com/Xilinx/RapidWright/issues/901 is fixed
                             numberOfSwappablePins = 0;
                             break;
                         }
-                        if (bel.getName().startsWith("H") && cell.getType().startsWith("RAM")) {
+                        if (bel.getName().startsWith("H") && cellType.startsWith("RAM")) {
                             // Similarly, disallow swapping of any RAMs on the "H" BELs since their
                             // "A" and "WA" inputs are shared and require extra care to keep in sync
+                            numberOfSwappablePins = 0;
+                            break;
+                        }
+                        if (cellType.startsWith("SRL")) {
+                            // SRL* cells cannot support any pin swaps
                             numberOfSwappablePins = 0;
                             break;
                         }
