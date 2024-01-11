@@ -22,6 +22,7 @@
 
 package com.xilinx.rapidwright.util;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.management.ManagementFactory;
@@ -65,8 +66,10 @@ public class TestFileTools {
         pb.command("java", "-cp", classpath, Jython.class.getCanonicalName(), "-c",
                 "from com.xilinx.rapidwright.util import FileTools;"
                 + "FileTools.ensureDataFilesAreStaticInstallFriendly("+devicesString+")");
-        pb.redirectErrorStream(true);
-        pb.inheritIO();
+        // pb.redirectErrorStream(true);
+        // pb.inheritIO();
+        pb.redirectOutput(new File(FileTools.getRapidWrightPath() + "/data/" + FileTools.getUniqueProcessAndHostID() + "_testStaticInstallDataFiles.output"));
+        pb.redirectError(new File(FileTools.getRapidWrightPath() + "/data/" + FileTools.getUniqueProcessAndHostID() + "_testStaticInstallDataFiles.output"));
         try {
             Process p = pb.start();
             Assertions.assertEquals(0, p.waitFor());
