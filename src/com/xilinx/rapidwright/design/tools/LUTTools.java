@@ -36,6 +36,7 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
 
+import com.xilinx.rapidwright.design.AltPinMapping;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
@@ -652,7 +653,15 @@ public class LUTTools {
 
         // Perform the actual swap on cell pin mappings
         for (PinSwap ps : copyOnWritePinSwaps) {
-            ps.getCell().addPinMapping(ps.getNewPhysicalName(), ps.getLogicalName());
+            Cell cell = ps.getCell();
+            cell.addPinMapping(ps.getNewPhysicalName(), ps.getLogicalName());
+            if (cell.isRoutethru() && cell.hasAltPinMappings()) {
+                Map<String, AltPinMapping> altPinMappings = cell.getAltPinMappings();
+                assert(altPinMappings.size() == 1);
+                AltPinMapping apm = altPinMappings.remove(ps.getOldPhysicalName());
+                assert(apm != null);
+                cell.addAltPinMapping(ps.getNewPhysicalName(), apm);
+            }
             if (ps.getCompanionCell() != null) {
                 ps.getCompanionCell().addPinMapping(ps.getNewPhysicalName(), ps.getCompanionLogicalName());
             }
@@ -661,7 +670,7 @@ public class LUTTools {
                 continue;
             }
             pinToMove.setPinName(ps.getNewNetPinName());
-            pinToMove.setSiteInst(ps.getCell().getSiteInst());
+            pinToMove.setSiteInst(cell.getSiteInst());
         }
 
         assert(q.isEmpty());
