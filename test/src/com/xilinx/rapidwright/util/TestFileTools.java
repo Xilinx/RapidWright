@@ -68,6 +68,7 @@ public class TestFileTools {
                 + "FileTools.ensureDataFilesAreStaticInstallFriendly("+devicesString+")");
         // pb.redirectErrorStream(true);
         // pb.inheritIO();
+
         pb.redirectOutput(new File(FileTools.getRapidWrightPath() + "/data/" + FileTools.getUniqueProcessAndHostID() + "_testStaticInstallDataFiles.output"));
         pb.redirectError(new File(FileTools.getRapidWrightPath() + "/data/" + FileTools.getUniqueProcessAndHostID() + "_testStaticInstallDataFiles.output"));
         try {
