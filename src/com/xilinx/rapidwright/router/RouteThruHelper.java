@@ -44,6 +44,7 @@ import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.device.WireInterface;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
@@ -182,59 +183,21 @@ public class RouteThruHelper {
     }
 
     /**
-     * Given two Wire objects (assumed to make up a routethru PIP) check that this
+     * Given two WireInterface objects (assumed to make up a routethru PIP) check that this
      * PIP is available for use by checking for net and cell collisions within the site
      * it is routing through.
-     * Note that this method is identical to the {@link #isRouteThruPIPAvailable(Design, Node, Node)}
-     * overload, kept separate to minimize unnecessary calling Node.getSitePin().
      */
-    public static boolean isRouteThruPIPAvailable(Design design, Wire start, Wire end) {
+    public static boolean isRouteThruPIPAvailable(Design design, WireInterface start, WireInterface end) {
         SitePin outPin = end.getSitePin();
         if (!isRouteThruSitePinAvailable(design, outPin)) {
             return false;
         }
         SitePin inPin = start.getSitePin();
-        assert(inPin.getSite() == outPin.getSite());
         if (!isRouteThruSitePinAvailable(design, inPin)) {
             return false;
         }
-
-        SiteInst siteInst = design.getSiteInstFromSite(inPin.getSite());
-        if (siteInst != null) {
-            for (BELPin sink : inPin.getBELPin().getSiteConns()) {
-                BEL sinkBEL = sink.getBEL();
-                if (sinkBEL.getName().charAt(0) != inPin.getPinName().charAt(0)) {
-                    continue;
-                }
-                Cell cellCollision = siteInst.getCell(sinkBEL);
-                if (cellCollision != null) {
-                    // Ignore BELs that don't share the same LUT letter
-                    // Specifically, this is to prevent H[1-6] inputs on SLICEM sites
-                    // -- which also drive [A-G].WA[1-6] -- from considering [A-G]LUT[56]
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Given two Node objects (assumed to make up a routethru PIP) check that this
-     * PIP is available for use by checking for net and cell collisions within the site
-     * it is routing through.
-     * Note that this method is identical to the {@link #isRouteThruPIPAvailable(Design, Wire, Wire)}
-     * overload, kept separate to minimize unnecessary calling Node.getSitePin().
-     */
-    public static boolean isRouteThruPIPAvailable(Design design, Node start, Node end) {
-        SitePin outPin = end.getSitePin();
-        if (!isRouteThruSitePinAvailable(design, outPin)) {
-            return false;
-        }
-        SitePin inPin = start.getSitePin();
         assert(inPin.getSite() == outPin.getSite());
-        if (!isRouteThruSitePinAvailable(design, inPin)) {
-            return false;
-        }
+
         SiteInst siteInst = design.getSiteInstFromSite(inPin.getSite());
         if (siteInst != null) {
             for (BELPin sink : inPin.getBELPin().getSiteConns()) {

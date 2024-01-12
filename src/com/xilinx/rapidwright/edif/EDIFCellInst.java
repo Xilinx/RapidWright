@@ -153,6 +153,22 @@ public class EDIFCellInst extends EDIFPropertyObject {
     }
 
     /**
+     * Gets the named EDIFPortInst or creates it (if correctly named) and returns
+     * it. If the port instance is to be created, it will not be connected to an
+     * EDIFNet.
+     * 
+     * @param name Name of the port instance to get.
+     * @return The existing or created port instance.
+     */
+    public EDIFPortInst getOrCreatePortInst(String name) {
+        EDIFPortInst portInst = portInsts == null ? null : portInsts.get(this, name);
+        if (portInsts == null || portInst == null) {
+            portInst = EDIFPortInst.createPortInstFromPortInstName(name, this);
+        }
+        return portInst;
+    }
+
+    /**
      * Gets the port on the underlying cell type.  It is the same as
      * calling getCellType().getPort(name).
      * @param name Name of the port to get.
@@ -188,14 +204,14 @@ public class EDIFCellInst extends EDIFPropertyObject {
         if (!oldParentCellWasNull) {
             this.parentCell.trackChange(EDIFChangeType.CELL_INST_REMOVE, getName());
             if (cellType != null) {
-                cellType.decrementInstanceCount();
+                cellType.decrementNonHierInstantiationCount();
             }
         }
         this.parentCell = parent;
         if (parent != null) {
             parent.trackChange(EDIFChangeType.CELL_INST_ADD, getName());
             if (oldParentCellWasNull && cellType != null) {
-                cellType.incrementInstanceCount();
+                cellType.incrementNonHierInstantiationCount();
             }
         }
     }
@@ -221,11 +237,11 @@ public class EDIFCellInst extends EDIFPropertyObject {
      */
     public void setCellTypeRaw(EDIFCell cellType) {
         if (parentCell != null && this.cellType != null) {
-            this.cellType.decrementInstanceCount();
+            this.cellType.decrementNonHierInstantiationCount();
         }
         this.cellType = cellType;
         if (parentCell != null && cellType != null) {
-            cellType.incrementInstanceCount();
+            cellType.incrementNonHierInstantiationCount();
         }
         setViewref(cellType != null ? cellType.getEDIFView() : null);
     }

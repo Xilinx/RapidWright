@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -336,7 +336,7 @@ public class EDIFHierCellInst {
      */
     public boolean isUniquified() {
         assert(isToplevelInst(cellInsts[0]));
-        for (int i = 1; i < cellInsts.length; i++) {
+        for (int i = cellInsts.length - 1; i > 0; i--) {
             if (!cellInsts[i].isUniquified()) {
                 return false;
             }

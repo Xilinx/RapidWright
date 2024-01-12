@@ -63,7 +63,7 @@ public class TimingAndWirelengthReport{
         this.design = design;
         timingManager = new TimingManager(design, null, config, RWRoute.createClkTimingData(config), design.getNets(), isPartialRouting);
         estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
-        routingGraph = new RouteNodeGraphTimingDriven(null, design, estimator, config.isMaskNodesCrossRCLK());
+        routingGraph = new RouteNodeGraphTimingDriven(null, design, config, estimator);
         wirelength = 0;
         usedNodes = 0;
         nodeTypeUsage = new HashMap<>();
@@ -169,8 +169,8 @@ public class TimingAndWirelengthReport{
 
         for (Connection connection : netWrapper.getConnections()) {
             if (connection.isDirect()) continue;
-            Node sinkNode = connection.getSinkRnode().getNode();
-            LightweightRouteNode sinkrn = nodeRoutingNodeMap.get(sinkNode);
+            RouteNode sinkRnode = connection.getSinkRnode();
+            LightweightRouteNode sinkrn = nodeRoutingNodeMap.get(sinkRnode);
             if (sinkrn == null) continue;
             float connectionDelay = sinkrn.getDelayFromSource();
             if (connection.getTimingEdges() == null) continue;

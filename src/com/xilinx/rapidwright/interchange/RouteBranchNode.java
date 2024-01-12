@@ -134,6 +134,10 @@ public class RouteBranchNode {
                 return !routethru;
             }
         }
+        if (type == RouteSegmentType.PIP) {
+            PIP pip = getPIP();
+            return pip.getStartNode().isTied();
+        }
         return false;
     }
 

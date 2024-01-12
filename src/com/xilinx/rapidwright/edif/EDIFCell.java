@@ -63,10 +63,15 @@ public class EDIFCell extends EDIFPropertyObject {
 
     private EDIFName view = DEFAULT_VIEW;
 
-    private volatile int instanceCount = 0;
-
-    private static final AtomicIntegerFieldUpdater<EDIFCell> instanceCountUpdater =
-            AtomicIntegerFieldUpdater.newUpdater(EDIFCell.class, "instanceCount");
+    /**
+     * An atomically updated variable to track the number of `EDIFCellInst`
+     * objects (attached to a parent cell) that instantiate this cell.
+     * Note: this does not track the number of `EDIFHierCellInst` objects
+     *       that would exist if the netlist was traversed from the top cell.
+     */
+    private volatile int nonHierInstantiationCount = 0;
+    private static final AtomicIntegerFieldUpdater<EDIFCell> nonHierInstantiationCountUpdater =
+            AtomicIntegerFieldUpdater.newUpdater(EDIFCell.class, "nonHierInstantiationCount");
 
     public EDIFCell(EDIFLibrary lib, String name) {
         super(name);
@@ -300,6 +305,7 @@ public class EDIFCell extends EDIFPropertyObject {
         if (instances == null) return null;
         EDIFCellInst removedInstance = instances.remove(name);
         if (removedInstance != null) {
+            assert(removedInstance.getParentCell() == this);
             removedInstance.setParentCell(null);
         }
         return removedInstance;
@@ -524,7 +530,7 @@ public class EDIFCell extends EDIFPropertyObject {
             }
         }
         for (EDIFCellInst instance : getCellInsts()) {
-            instance.getCellType().decrementInstanceCount();
+            instance.getCellType().decrementNonHierInstantiationCount();
         }
         instances = null;
         nets = null;
@@ -672,29 +678,29 @@ public class EDIFCell extends EDIFPropertyObject {
     /**
      * Atomically increment instance count of this cell.
      */
-    public void incrementInstanceCount() {
-        instanceCountUpdater.incrementAndGet(this);
+    public void incrementNonHierInstantiationCount() {
+        nonHierInstantiationCountUpdater.incrementAndGet(this);
     }
 
     /**
      * Atomically decrement instance count of this cell.
      */
-    public void decrementInstanceCount() {
-        instanceCountUpdater.getAndDecrement(this);
+    public void decrementNonHierInstantiationCount() {
+        nonHierInstantiationCountUpdater.getAndDecrement(this);
     }
 
     /**
      * @return The number of times this cell has been instantiated.
      */
-    public int getInstanceCount() {
-        return instanceCountUpdater.get(this);
+    public int getNonHierInstantiationCount() {
+        return nonHierInstantiationCountUpdater.get(this);
     }
 
     /**
      * True if this cell is instantiated no more than once.
      */
     public boolean isUniquified() {
-        return getInstanceCount() <= 1;
+        return getNonHierInstantiationCount() <= 1;
     }
 }
 

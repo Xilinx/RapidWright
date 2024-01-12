@@ -64,9 +64,9 @@ public class TestEDIFCell {
         Assertions.assertFalse(picoblazeTop.isUniquified());
 
         // Test that removing a EDIFCellInst reduces the instance count
-        Assertions.assertEquals(4, picoblazeTop.getInstanceCount());
+        Assertions.assertEquals(4, picoblazeTop.getNonHierInstantiationCount());
         Assertions.assertNotNull(topCell.removeCellInst("picoblaze_0_13"));
-        Assertions.assertEquals(3, picoblazeTop.getInstanceCount());
+        Assertions.assertEquals(3, picoblazeTop.getNonHierInstantiationCount());
         Assertions.assertNotNull(topCell.removeCellInst("picoblaze_1_12"));
         Assertions.assertNotNull(topCell.removeCellInst("picoblaze_1_13"));
         Assertions.assertTrue(picoblazeTop.isUniquified());
@@ -94,27 +94,27 @@ public class TestEDIFCell {
 
         // Establish that the "processor" instance's cell type is only instantiated once
         EDIFCell kcpsm6 = netlist.getCell("kcpsm6"); // Cell type of "processor" instance
-        Assertions.assertEquals(1, kcpsm6.getInstanceCount());
+        Assertions.assertEquals(1, kcpsm6.getNonHierInstantiationCount());
 
         // Remove all remaining instances
         Assertions.assertNotNull(topCell.removeCellInst("picoblaze_0_12"));
-        Assertions.assertEquals(1, kcpsm6.getInstanceCount());
+        Assertions.assertEquals(1, kcpsm6.getNonHierInstantiationCount());
         Assertions.assertNotNull(topCell.removeCellInst("picoblaze_1_13"));
-        Assertions.assertEquals(0, picoblazeTop.getInstanceCount());
+        Assertions.assertEquals(0, picoblazeTop.getNonHierInstantiationCount());
         // Note that the "processor" cellType is still instantiated once, even though its parent
         // "picoblaze_top" is no longer attached to the netlist
-        Assertions.assertEquals(1, kcpsm6.getInstanceCount());
+        Assertions.assertEquals(1, kcpsm6.getNonHierInstantiationCount());
 
         // Add one back again
         new EDIFCellInst("picoblaze_0_12", picoblazeTop, topCell);
         Assertions.assertTrue(picoblazeTop.isUniquified());
-        Assertions.assertEquals(1, picoblazeTop.getInstanceCount());
-        Assertions.assertEquals(1, kcpsm6.getInstanceCount());
+        Assertions.assertEquals(1, picoblazeTop.getNonHierInstantiationCount());
+        Assertions.assertEquals(1, kcpsm6.getNonHierInstantiationCount());
 
         // And another
         new EDIFCellInst("picoblaze_0_13", picoblazeTop, topCell);
         Assertions.assertFalse(picoblazeTop.isUniquified());
-        Assertions.assertEquals(2, picoblazeTop.getInstanceCount());
-        Assertions.assertEquals(1, kcpsm6.getInstanceCount());
+        Assertions.assertEquals(2, picoblazeTop.getNonHierInstantiationCount());
+        Assertions.assertEquals(1, kcpsm6.getNonHierInstantiationCount());
     }
 }

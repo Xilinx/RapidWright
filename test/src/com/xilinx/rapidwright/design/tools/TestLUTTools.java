@@ -23,7 +23,9 @@
 
 package com.xilinx.rapidwright.design.tools;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.Cell;
@@ -38,7 +40,6 @@ import com.xilinx.rapidwright.rwroute.RWRoute;
 import com.xilinx.rapidwright.rwroute.TestRWRoute;
 import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.util.Utils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -132,17 +133,36 @@ public class TestLUTTools {
 
     @ParameterizedTest
     @CsvSource({
-            "bnn.dcp",
-            "optical-flow.dcp",
+            "bnn.dcp,false,false",
+            "bnn.dcp,false,true",
+            "bnn.dcp,true,false",
+            "bnn.dcp,true,true",
+            "optical-flow.dcp,false,false",
+            "optical-flow.dcp,false,true",
+            "optical-flow.dcp,true,false",
+            "optical-flow.dcp,true,true",
     })
     @LargeTest(max_memory_gb = 8)
-    public void testUpdateLutPinSwapsFromPIPsWithRWRoute(String path) {
+    public void testUpdateLutPinSwapsFromPIPsWithRWRoute(String path, boolean lutPinSwapping, boolean lutRoutethru) {
         Design design = RapidWrightDCP.loadDCP(path);
         try {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "true");
-            RWRoute.routeDesignWithUserDefinedArguments(design, new String[]{"--nonTimingDriven", "--lutPinSwapping"});
+            List<String> args = new ArrayList<>();
+            args.add("--nonTimingDriven");
+            if (lutPinSwapping) {
+                args.add("--lutPinSwapping");
+            }
+            if (lutRoutethru) {
+                args.add("--lutRoutethru");
+            }
+            RWRoute.routeDesignWithUserDefinedArguments(design, args.toArray(new String[0]));
             int numPinsSwapped = LUTTools.swapLutPinsFromPIPs(design);
-            Assertions.assertTrue(numPinsSwapped > 0);
+            System.out.println("numPinsSwapped = " + numPinsSwapped);
+            if (lutPinSwapping) {
+                Assertions.assertTrue(numPinsSwapped > 0);
+            } else {
+                Assertions.assertEquals(0, numPinsSwapped);
+            }
             TestRWRoute.assertAllSourcesRoutedFlagSet(design);
             TestRWRoute.assertAllPinsRouted(design);
             TestRWRoute.assertVivadoFullyRouted(design);

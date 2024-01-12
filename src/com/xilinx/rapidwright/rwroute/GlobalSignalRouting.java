@@ -513,7 +513,7 @@ public class GlobalSignalRouting {
         // before we stop:
         // (1) GND_WIRE
         // (2) VCC_WIRE
-        // (3) Unused LUT Outputs (A_0, B_0,...,H_0)
+        // (3) Unused LUT Outputs ([A-H]_O, [A-H]MUX)
         if ((type == NetType.VCC && node.isTiedToVcc()) ||
                 (type == NetType.GND && node.isTiedToGnd())) {
             return true;
