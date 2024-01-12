@@ -585,7 +585,8 @@ public class RouteNodeGraph {
 
         BitSet bs = muxWires.get(tail.getTile().getTileTypeEnum());
         if (bs != null && bs.get(tail.getWire())) {
-            // Disallow * -> [A-H]MUX routethrus
+            // Disallow * -> [A-H]MUX routethrus since Vivado does not support the LUT
+            // being fractured to support more than one routethru net
             return false;
         }
         return true;

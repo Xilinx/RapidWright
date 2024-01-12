@@ -940,6 +940,8 @@ public class RWRoute{
         }
 
         if (lutRoutethru) {
+            // It is possible for RWRoute to routethru a LUT that is already being used as a
+            // static source through its *MUX output. By default, the 6LUT is used for this supply.
             // When LUT routethru-s are considered, examine both static nets to find
             // any cases where the *MUX output pin is used as a static source alongside
             // the *_O output being used as a routethru. In such cases, configure the
@@ -972,8 +974,10 @@ public class RWRoute{
                         continue;
                     }
 
-                    // Only expect GND net to use SLICE outputs
-                    assert(staticNet.getType() == NetType.GND);
+                    if (pinName.charAt(1) == '6') {
+                        throw new RuntimeException("ERROR: Illegal LUT routethru on " + site + "/" + pinName +
+                                " since 5LUT is being as a static source");
+                    }
 
                     // Perform intra-site routing back to the LUT5 to not conflict with LUT6 routethru
                     BEL outmux = si.getBEL("OUTMUX" + lutLetter);
