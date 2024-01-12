@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -92,6 +92,8 @@ public class RWRouteConfig {
     private boolean lutPinSwapping;
     /* true to enable LUT routethru */
     private boolean lutRoutethru;
+    /* true to enable GND -> VCC optimization for LUT inputs */
+    private boolean invertGndToVccForLutInputs;
 
     /** Constructs a Configuration Object */
     public RWRouteConfig(String[] arguments) {
@@ -122,6 +124,7 @@ public class RWRouteConfig {
         printConnectionSpan = false;
         lutPinSwapping = false;
         lutRoutethru = false;
+        invertGndToVccForLutInputs = true;
         if (arguments != null) {
             parseArguments(arguments);
         }
@@ -226,6 +229,9 @@ public class RWRouteConfig {
                 break;
             case "--lutRoutethru":
                 setLutRoutethru(true);
+                break;
+            case "--noInvertGndToVccForLutInputs":
+                setInvertGndToVccForLutInputs(false);
                 break;
             default:
                 throw new IllegalArgumentException("ERROR: RWRoute argument '" + arg + "' not recognized.");
@@ -738,6 +744,16 @@ public class RWRouteConfig {
     }
 
     /**
+     * Gets the flag indicating if GND to VCC inversion for LUT inputs is enabled.
+     * Default: true.
+     *
+     * @return True if the flag is set, false otherwise.
+     */
+    public boolean isInvertGndToVccForLutInputs() {
+        return invertGndToVccForLutInputs;
+    }
+
+    /**
      * Sets critical path delay pessimism factor b. It should be greater than 0.
      * Default: 100. Can be modified by using "--pessimismB" option, e.g.
      * "--pessimismB 50".
@@ -848,6 +864,16 @@ public class RWRouteConfig {
      */
     public void setLutRoutethru(boolean lutRoutethru) {
         this.lutRoutethru = lutRoutethru;
+    }
+
+    /**
+     * Sets the flag for enabling GND to VCC inversion for LUT inputs.
+     * Default: true.
+     *
+     * @param invertGndToVccForLutInputs true to enableGND to VCC inversion for LUT inputs.
+     */
+    public void setInvertGndToVccForLutInputs(boolean invertGndToVccForLutInputs) {
+        this.invertGndToVccForLutInputs = invertGndToVccForLutInputs;
     }
 
     /**

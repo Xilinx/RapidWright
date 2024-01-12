@@ -482,7 +482,8 @@ public class RWRoute{
 
         List<SitePinInst> gndPins = staticNetAndRoutingTargets.get(design.getGndNet());
         if (gndPins != null) {
-            Set<SitePinInst> newVccPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins);
+            boolean invertGndToVccForLutInputs = config.isInvertGndToVccForLutInputs();
+            Set<SitePinInst> newVccPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins, invertGndToVccForLutInputs);
             if (!newVccPins.isEmpty()) {
                 gndPins.removeAll(newVccPins);
                 staticNetAndRoutingTargets.computeIfAbsent(design.getVccNet(), (net) -> new ArrayList<>())
