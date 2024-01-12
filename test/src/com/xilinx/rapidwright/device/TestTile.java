@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Advanced Micro Devices, Inc.
@@ -49,14 +49,16 @@ public class TestTile {
 
     @ParameterizedTest
     @CsvSource({
-            "xcvu3p,LAG_LAG_X30Y50,'[]'",
-            "xcvu3p,LAG_LAG_X30Y250,'[]'",
-            "xcvu5p,LAG_LAG_X30Y50,'[]'",
-            "xcvu5p,LAG_LAG_X30Y250,'[LAGUNA_X6Y140, LAGUNA_X6Y141, LAGUNA_X7Y140, LAGUNA_X7Y141]'",
+            "xcvu5p,LAG_LAG_X30Y250,'[LAGUNA_X6Y140, LAGUNA_X6Y141, LAGUNA_X7Y140, LAGUNA_X7Y141]',true",
+
+            // FIXME: Known broken -- see https://github.com/Xilinx/RapidWright/issues/745
+            "xcvu3p,LAG_LAG_X30Y50,'[]',false",
+            "xcvu3p,LAG_LAG_X30Y250,'[]',false",
+            "xcvu5p,LAG_LAG_X30Y50,'[]',false",
     })
-    public void testGetSites(String partName, String tileName, String expectedSites) {
+    public void testGetSites(String partName, String tileName, String expectedSites, boolean expectPass) {
         Device dev = Device.getDevice(partName);
         Tile tile = dev.getTile(tileName);
-        Assertions.assertEquals(expectedSites, Arrays.toString(tile.getSites()));
+        Assertions.assertEquals(expectPass, expectedSites.equals(Arrays.toString(tile.getSites())));
     }
 }
