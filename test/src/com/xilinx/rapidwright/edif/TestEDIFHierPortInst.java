@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Advanced Micro Devices, Inc.
@@ -24,12 +24,18 @@ package com.xilinx.rapidwright.edif;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Series;
 
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+
+import java.util.Objects;
 
 public class TestEDIFHierPortInst {
     @Test
@@ -70,5 +76,33 @@ public class TestEDIFHierPortInst {
 
         EDIFHierPortInst portInst = new EDIFHierPortInst(leafInst.getParent(), leafInst.getInst().getPortInst("O"));
         Assertions.assertEquals(c, portInst.getPhysicalCell(design));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            // Cell pin placed onto a D6LUT/O6 -- its net does exit the site
+            "processor/address_loop[8].output_data.pc_vector_mux_lut/LUT6/O,D_O,true",
+            // Cell pin placed onto a D5LUT/O5 -- its net does exit the site
+            "processor/address_loop[8].output_data.pc_vector_mux_lut/LUT5/O,DMUX,true",
+
+            // Cell pin placed onto a E6LUT/O6 -- its net does not exit the site
+            "processor/stack_loop[4].upper_stack.stack_pointer_lut/LUT6/O,null,true",
+
+            // Cell pin placed onto a D5LUT/O5 -- its net does not exit the site and
+            // nothing is using DMUX
+            "processor/stack_loop[3].upper_stack.stack_pointer_lut/LUT5/O,null,true",
+
+            // FIXME: Known broken -- see https://github.com/Xilinx/RapidWright/pull/577
+            // Cell pin placed onto a E5LUT/O5 -- its net does not exit the site but
+            // another net is using EMUX
+            "processor/stack_loop[4].upper_stack.stack_pointer_lut/LUT5/O,null,false",
+
+    })
+    void testGetRoutedSitePinInst(String hierPortInstName, String expected, boolean expectPass) {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        EDIFNetlist netlist = d.getNetlist();
+        EDIFHierPortInst ehpi = netlist.getHierPortInstFromName(hierPortInstName);
+        SitePinInst spi = ehpi.getRoutedSitePinInst(d);
+        Assertions.assertEquals(expectPass, Objects.equals(expected, spi == null ? "null" : spi.getName()));
     }
 }

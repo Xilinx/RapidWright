@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -35,6 +35,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -1370,5 +1371,32 @@ public class TestDesignTools {
             Assertions.assertEquals("[EFF.CLK, EFF2.CLK, FFF.CLK, FFF2.CLK, GFF.CLK, GFF2.CLK, HFF.CLK, HFF2.CLK]",
                     DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
         }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            // Cell pin placed onto a D6LUT/O6 -- its net does exit the site
+            "processor/address_loop[8].output_data.pc_vector_mux_lut/LUT6/O,D_O",
+            // Cell pin placed onto a D5LUT/O5 -- its net does exit the site
+            "processor/address_loop[8].output_data.pc_vector_mux_lut/LUT5/O,DMUX",
+
+            // Cell pin placed onto a E6LUT/O6 -- its net does not exit the site
+            // but can if it wishes to
+            "processor/stack_loop[4].upper_stack.stack_pointer_lut/LUT6/O,E_O",
+
+            // Cell pin placed onto a D5LUT/O5 -- its net does not exit the site
+            "processor/stack_loop[3].upper_stack.stack_pointer_lut/LUT5/O,null",
+            // Cell pin placed onto a E5LUT/O5 -- its net does not exit the site
+            "processor/stack_loop[4].upper_stack.stack_pointer_lut/LUT5/O,null",
+
+    })
+    void testGetRoutedSitePin(String hierPortInstName, String expected) {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        EDIFNetlist netlist = d.getNetlist();
+        EDIFHierPortInst ehpi = netlist.getHierPortInstFromName(hierPortInstName);
+        Cell cell = ehpi.getPhysicalCell(d);
+        Net net = d.getNet(ehpi.getHierarchicalNetName());
+        String sitePinName = DesignTools.getRoutedSitePin(cell, net, ehpi.getPortInst().getName());
+        Assertions.assertEquals(expected, sitePinName == null ? "null" : sitePinName);
     }
 }
