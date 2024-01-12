@@ -33,6 +33,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
+import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.RuntimeTracker;
@@ -45,7 +46,6 @@ import java.util.Collection;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -58,6 +58,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Encapsulation of RWRoute's routing resource graph.
  */
 public class RouteNodeGraph {
+
+    protected final Design design;
 
     /**
      * A map of nodes to created rnodes
@@ -101,7 +103,14 @@ public class RouteNodeGraph {
      * accessible only if it is within the same column (same X tile coordinate) as
      * the target tile.
      */
-    protected final Map<TileTypeEnum, BitSet> accessibleWireOnlySameColumnAsTarget;
+    protected final Map<TileTypeEnum, BitSet> accessibleWireOnlyIfAboveBelowTarget;
+
+    /** Map indicating the wire indices corresponding to the [A-H]MUX output */
+    protected final Map<TileTypeEnum, BitSet> muxWires;
+
+    /** Flag for whether LUT routethrus are to be considered
+     */
+    protected final boolean lutRoutethru;
 
     protected class RouteNodeImpl extends RouteNode {
         protected RouteNodeImpl(Node node, RouteNodeType type) {
@@ -139,7 +148,10 @@ public class RouteNodeGraph {
         }
     }
 
-    public RouteNodeGraph(RuntimeTracker setChildrenTimer, Design design) {
+    public RouteNodeGraph(RuntimeTracker setChildrenTimer, Design design, RWRouteConfig config) {
+        this.design = design;
+        lutRoutethru = config.isLutRoutethru();
+
         nodesMap = new HashMap<>();
         nodesMapSize = 0;
         preservedMap = new ConcurrentHashMap<>();
@@ -161,12 +173,12 @@ public class RouteNodeGraph {
             }
         }
 
-        accessibleWireOnlySameColumnAsTarget = new EnumMap<>(TileTypeEnum.class);
+        accessibleWireOnlyIfAboveBelowTarget = new EnumMap<>(TileTypeEnum.class);
         BitSet wires = new BitSet();
         Tile intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
         // Device.getArbitraryTileOfType() typically gives you the North-Eastern-most
         // tile (with minimum X, maximum Y). Analyze the tile just below that.
-        intTile = intTile.getTileNeighbor(0, -1);
+        intTile = intTile.getTileXYNeighbor(0, -1);
         for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
             Node baseNode = Node.getNode(intTile, wireIndex);
             if (baseNode == null) {
@@ -189,7 +201,9 @@ public class RouteNodeGraph {
                 assert(baseTile == intTile);
                 assert(wireIndex == baseNode.getWire());
                 // Downhill to CTRL_* in the target tile, INODE_* to above/below tile, INT_NODE_IMUX_* in target tile
-            } else if (wireName.startsWith("INT_NODE_IMUX_")) {
+            } else if (wireName.startsWith("INT_NODE_IMUX_") &&
+                    // Do not block INT_NODE_IMUX node accessibility when LUT routethrus are considered
+                    !lutRoutethru) {
                 assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
                 assert(baseTile == intTile);
                 assert(wireIndex == baseNode.getWire());
@@ -202,9 +216,35 @@ public class RouteNodeGraph {
             } else {
                 continue;
             }
+
             wires.set(baseNode.getWire());
         }
-        accessibleWireOnlySameColumnAsTarget.put(intTile.getTileTypeEnum(), wires);
+        accessibleWireOnlyIfAboveBelowTarget.put(intTile.getTileTypeEnum(), wires);
+
+        if (lutRoutethru) {
+            muxWires = new EnumMap<>(TileTypeEnum.class);
+            for (TileTypeEnum tileTypeEnum : Utils.getCLBTileTypes()) {
+                Tile clbTile = device.getArbitraryTileOfType(tileTypeEnum);
+                if (clbTile == null) {
+                    continue;
+                }
+                wires = new BitSet();
+                for (int wireIndex = 0; wireIndex < clbTile.getWireCount(); wireIndex++) {
+                    String wireName = clbTile.getWireName(wireIndex);
+                    if (wireName.endsWith("MUX")) {
+                        assert(Node.getNode(clbTile, wireIndex).getTile() == clbTile &&
+                               Node.getNode(clbTile, wireIndex).getWire() == wireIndex);
+                        wires.set(wireIndex);
+                    }
+                }
+                if (wires.isEmpty()) {
+                    continue;
+                }
+                muxWires.put(tileTypeEnum, wires);
+            }
+        } else {
+            muxWires = null;
+        }
 
         Tile[][] lagunaTiles;
         if (device.getSeries() == Series.UltraScalePlus) {
@@ -361,14 +401,8 @@ public class RouteNodeGraph {
 
     private static final Set<TileTypeEnum> allowedTileEnums;
     static {
-        Set<TileTypeEnum> tempAllowedTileEnums = new HashSet<>();
-        tempAllowedTileEnums.add(TileTypeEnum.INT);
-        for (TileTypeEnum e : TileTypeEnum.values()) {
-            if (e.toString().startsWith("LAG")) {
-                tempAllowedTileEnums.add(e);
-            }
-        }
-        allowedTileEnums = EnumSet.copyOf(tempAllowedTileEnums);
+        allowedTileEnums = EnumSet.of(TileTypeEnum.INT);
+        allowedTileEnums.addAll(Utils.getLagunaTileTypes());
     }
 
     protected boolean isExcludedTile(Node child) {
@@ -383,7 +417,9 @@ public class RouteNodeGraph {
         }
 
         if (isExcludedTile(child)) {
-            return true;
+            if (!allowRoutethru(parent, child)) {
+                return true;
+            }
         }
 
         if (child.getIntentCode() == IntentCode.NODE_PINFEED) {
@@ -391,12 +427,13 @@ public class RouteNodeGraph {
             RouteNode childRnode = getNode(child);
             if (childRnode != null) {
                 assert(childRnode.getType() == RouteNodeType.PINFEED_I ||
-                       childRnode.getType() == RouteNodeType.LAGUNA_I);
-            } else {
-                // child does not already exist in our routing graph, meaning it's not a sink pin
+                       childRnode.getType() == RouteNodeType.LAGUNA_I ||
+                        (lutRoutethru && childRnode.getType() == RouteNodeType.WIRE));
+            } else if (!lutRoutethru) {
+                // child does not already exist in our routing graph, meaning it's not a used site pin
                 // in our design, but it could be a LAGUNA_I
                 if (lagunaI == null) {
-                    // No LAGUNA_Is -- must be a site pin
+                    // No LAGUNA_Is
                     return true;
                 }
                 BitSet bs = lagunaI.get(child.getTile());
@@ -516,7 +553,7 @@ public class RouteNodeGraph {
     public boolean isAccessible(RouteNode childRnode, Connection connection) {
         Tile childTile = childRnode.getTile();
         TileTypeEnum childTileType = childTile.getTileTypeEnum();
-        BitSet bs = accessibleWireOnlySameColumnAsTarget.get(childTileType);
+        BitSet bs = accessibleWireOnlyIfAboveBelowTarget.get(childTileType);
         if (bs == null || !bs.get(childRnode.getWire())) {
             return true;
         }
@@ -535,4 +572,22 @@ public class RouteNodeGraph {
         return Math.abs(childTile.getTileYCoordinate() - sinkTile.getTileYCoordinate()) <= 1;
     }
 
+    protected boolean allowRoutethru(Node head, Node tail) {
+        if (!Utils.isCLB(tail.getTile().getTileTypeEnum())) {
+            return false;
+        }
+
+        if (!RouteThruHelper.isRouteThruPIPAvailable(design, head, tail)) {
+            return false;
+        }
+        assert(PIP.getArbitraryPIP(head, tail).isRouteThru());
+
+        BitSet bs = muxWires.get(tail.getTile().getTileTypeEnum());
+        if (bs != null && bs.get(tail.getWire())) {
+            // Disallow * -> [A-H]MUX routethrus since Vivado does not support the LUT
+            // being fractured to support more than one routethru net
+            return false;
+        }
+        return true;
+    }
 }

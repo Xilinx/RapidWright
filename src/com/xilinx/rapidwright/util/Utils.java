@@ -200,6 +200,10 @@ public class Utils{
         return urams;
     }
 
+    public static Set<TileTypeEnum> getLagunaTileTypes() {
+        return lagunas;
+    }
+
     public static Set<SiteTypeEnum> getLockedSiteTypes() {
         return lockedSiteTypes;
     }

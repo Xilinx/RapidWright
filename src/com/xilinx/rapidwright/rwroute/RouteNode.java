@@ -165,6 +165,7 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_CLE_OUTPUT:
                     case NODE_LAGUNA_OUTPUT:
                     case NODE_LAGUNA_DATA:  // US+: U-turn SLL at the boundary of the device
+                    case NODE_PINFEED:
                         assert(length == 0);
                         break;
                     case NODE_LOCAL:

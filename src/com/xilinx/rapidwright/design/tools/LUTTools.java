@@ -27,6 +27,7 @@ package com.xilinx.rapidwright.design.tools;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -687,6 +688,7 @@ public class LUTTools {
         Map<SitePinInst, String> oldPinToNewPins = new HashMap<>();
         Map<Site, List<SitePinInst>> siteToLutSpis = new HashMap<>();
         List<SitePin> unmatchedSitePins = new ArrayList<>();
+        Set<SitePin> routethruSitePins = new HashSet<>();
         for (Net net : design.getNets()) {
             if (net.isClockNet()) {
                 continue;
@@ -713,6 +715,14 @@ public class LUTTools {
             }
 
             for (PIP pip : net.getPIPs()) {
+                if (pip.isRouteThru()) {
+                    Node startNode = pip.getStartNode();
+                    SitePin newSitePin = startNode.getSitePin();
+                    assert(newSitePin != null);
+                    routethruSitePins.add(newSitePin);
+                    continue;
+                }
+
                 Node endNode = pip.getEndNode();
                 SitePin newSitePin = (endNode != null) ? endNode.getSitePin() : null;
                 if (newSitePin == null) {
@@ -720,10 +730,15 @@ public class LUTTools {
                 }
 
                 Site site = newSitePin.getSite();
-                SiteInst si = design.getSiteInstFromSite(site);
-                if (si == null) {
+                List<SitePinInst> lutSpis = siteToLutSpis.get(site);
+                if (lutSpis == null) {
+                    // No sink pins from this net exist on this site
+                    // (e.g. this pin is used as routethru)
                     continue;
                 }
+                SiteInst si = design.getSiteInstFromSite(site);
+                assert(si != null);
+
                 String newSitePinName = newSitePin.getPinName();
                 if (!SitePinInst.isLUTInputPin(si, newSitePinName)) {
                     continue;
@@ -734,12 +749,17 @@ public class LUTTools {
                     System.out.println("WARNING: SitePin " + newSitePin + " visited by PIP " + pip +
                             " is not a SitePinInst on net " + net + ". Ignoring.");
                 } else if (!spis.remove(newSpi)) {
-                    // spi is not already on this net
+                    // spi is not already on this net -- could require pin swapping,
+                    // or could be a routethru
                     unmatchedSitePins.add(newSitePin);
                 }
             }
 
             for (SitePin newSitePin : unmatchedSitePins) {
+                if (routethruSitePins.contains(newSitePin)) {
+                    // Pin is part of a routethru, ignore it
+                    continue;
+                }
                 Site site = newSitePin.getSite();
                 List<SitePinInst> unmatchedSpis = siteToLutSpis.get(site);
                 Iterator<SitePinInst> it = unmatchedSpis.iterator();
@@ -764,6 +784,7 @@ public class LUTTools {
 
             siteToLutSpis.clear();
             unmatchedSitePins.clear();
+            routethruSitePins.clear();
         }
 
         return swapMultipleLutPins(oldPinToNewPins);

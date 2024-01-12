@@ -118,6 +118,8 @@ public class RWRoute{
     private float oneMinusTimingWeight;
     /** Flag for whether LUT pin swaps are to be considered */
     protected boolean lutPinSwapping;
+    /** Flag for whether LUT routethrus are to be considered */
+    protected boolean lutRoutethru;
 
     /** The current routing iteration */
     protected int routeIteration;
@@ -227,7 +229,8 @@ public class RWRoute{
         rnodesCreatedThisIteration = 0;
         routethruHelper = new RouteThruHelper(design.getDevice());
         presentCongestionFactor = config.getInitialPresentCongestionFactor();
-        lutPinSwapping = config.getLutPinSwapping();
+        lutPinSwapping = config.isLutPinSwapping();
+        lutRoutethru = config.isLutRoutethru();
 
         routerTimer.createRuntimeTracker("determine route targets", "Initialization").start();
         determineRoutingTargets();
@@ -267,9 +270,9 @@ public class RWRoute{
         if (config.isTimingDriven()) {
             /* An instantiated delay estimator that is used to calculate delay of routing resources */
             DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
-            return new RouteNodeGraphTimingDriven(rnodesTimer, design, estimator, config.isMaskNodesCrossRCLK());
+            return new RouteNodeGraphTimingDriven(rnodesTimer, design, config, estimator);
         } else {
-            return new RouteNodeGraph(rnodesTimer, design);
+            return new RouteNodeGraph(rnodesTimer, design, config);
         }
     }
 
@@ -914,96 +917,152 @@ public class RWRoute{
      * Assigns a list of nodes to each connection and fix net routes if there are cycles and / or multi-driver nodes.
      */
     protected void postRouteProcess() {
-        if (routeIteration <= config.getMaxIterations()) {
-            // perform LUT pin mapping updates
-            if (lutPinSwapping &&
-                    !Boolean.getBoolean("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates")) {
-                Map<SitePinInst, String> pinSwaps = new HashMap<>();
-                for (Connection connection: indirectConnections) {
-                    SitePinInst oldSinkSpi = connection.getSink();
-                    if (!oldSinkSpi.isLUTInputPin() || !oldSinkSpi.isRouted()) {
-                        continue;
-                    }
+        if (routeIteration > config.getMaxIterations()) {
+            return;
+        }
 
-                    List<RouteNode> rnodes = connection.getRnodes();
-                    RouteNode newSinkRnode = rnodes.get(0);
-                    if (newSinkRnode == connection.getSinkRnode()) {
-                        continue;
-                    }
-                    connection.setSinkRnode(newSinkRnode);
-
-                    SitePin newSitePin = newSinkRnode.getSitePin();
-                    String existing = pinSwaps.put(oldSinkSpi, newSitePin.getPinName());
-                    assert(existing == null);
+        // perform LUT pin mapping updates
+        if (lutPinSwapping &&
+                !Boolean.getBoolean("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates")) {
+            Map<SitePinInst, String> pinSwaps = new HashMap<>();
+            for (Connection connection: indirectConnections) {
+                SitePinInst oldSinkSpi = connection.getSink();
+                if (!oldSinkSpi.isLUTInputPin() || !oldSinkSpi.isRouted()) {
+                    continue;
                 }
-                LUTTools.swapMultipleLutPins(pinSwaps);
+
+                List<RouteNode> rnodes = connection.getRnodes();
+                RouteNode newSinkRnode = rnodes.get(0);
+                if (newSinkRnode == connection.getSinkRnode()) {
+                    continue;
+                }
+                connection.setSinkRnode(newSinkRnode);
+
+                SitePin newSitePin = newSinkRnode.getNode().getSitePin();
+                String existing = pinSwaps.put(oldSinkSpi, newSitePin.getPinName());
+                assert(existing == null);
+            }
+            LUTTools.swapMultipleLutPins(pinSwaps);
+        }
+
+        if (lutRoutethru) {
+            // It is possible for RWRoute to routethru a LUT that is already being used as a
+            // static source through its *MUX output. By default, the 6LUT is used for this supply.
+            // When LUT routethru-s are considered, examine both static nets to find
+            // any cases where the *MUX output pin is used as a static source alongside
+            // the *_O output being used as a routethru. In such cases, configure the
+            // OUTMUX* site PIP to source from the 5LUT rather than the default 6LUT
+            // so that no conflict occurs
+            for (Net staticNet : Arrays.asList(design.getGndNet(), design.getVccNet())) {
+                for (SitePinInst spi : staticNet.getPins()) {
+                    if (!spi.isOutPin()) {
+                        continue;
+                    }
+                    SiteInst si = spi.getSiteInst();
+                    if (!Utils.isSLICE(si)) {
+                        continue;
+                    }
+
+                    String pinName = spi.getName();
+                    if (!pinName.endsWith("MUX")) {
+                        continue;
+                    }
+
+                    Node muxNode = spi.getConnectedNode();
+                    assert(routingGraph.getPreservedNet(muxNode) == staticNet);
+
+                    Site site = si.getSite();
+                    char lutLetter = pinName.charAt(0);
+                    Node oNode = site.getConnectedNode(lutLetter + "_O");
+                    RouteNode rnode = routingGraph.getNode(oNode);
+                    if (rnode == null || rnode.getOccupancy() == 0) {
+                        // No LUT6 routethru, nothing to be done
+                        continue;
+                    }
+
+                    if (pinName.charAt(1) == '6') {
+                        throw new RuntimeException("ERROR: Illegal LUT routethru on " + site + "/" + pinName +
+                                " since the 5LUT is being used as a static source");
+                    }
+
+                    // Perform intra-site routing back to the LUT5 to not conflict with LUT6 routethru
+                    BEL outmux = si.getBEL("OUTMUX" + lutLetter);
+                    si.routeIntraSiteNet(staticNet, outmux.getPin("D5"), outmux.getPin("OUT"));
+
+                    if (si.getDesign() == null) {
+                        // Rename SiteInst (away from "STATIC_SOURCE_<siteName>") and
+                        // attach it to the design so that intra-site routing updates take effect
+                        si.setName(site.getName());
+                        design.addSiteInst(si);
+                    }
+                }
+            }
+        }
+
+        assignNodesToConnections();
+
+        // fix routes with cycles and / or multi-driver nodes
+        Set<NetWrapper> routes = fixRoutes();
+        if (config.isTimingDriven()) updateTimingAfterFixingRoutes(routes);
+
+        // Unset the routed state of all source pins
+        for (Map.Entry<Net, NetWrapper> e : nets.entrySet()) {
+            Net net = e.getKey();
+            SitePinInst source = net.getSource();
+            SitePinInst altSource = net.getAlternateSource();
+            SiteInst si = source.getSiteInst();
+            boolean altSourcePreviouslyRouted = altSource != null ? altSource.isRouted() : false;
+            for (SitePinInst spi : Arrays.asList(source, altSource)) {
+                if (spi != null) {
+                    spi.setRouted(false);
+                    assert(spi.getSiteInst() == si);
+                }
             }
 
-            assignNodesToConnections();
+            // Set the routed state on those source pins that were actually used
+            NetWrapper netWrapper = e.getValue();
+            for (Connection connection : netWrapper.getConnections()) {
+                // Examine getNodes() because connection.getRnodes() is empty for direct connections
+                List<Node> nodes = connection.getNodes();
+                if (nodes.isEmpty()) {
+                    // Unroutable connection
+                    continue;
+                }
 
-            // fix routes with cycles and / or multi-driver nodes
-            Set<NetWrapper> routes = fixRoutes();
-            if (config.isTimingDriven()) updateTimingAfterFixingRoutes(routes);
-
-            // Unset the routed state of all source pins
-            for (Map.Entry<Net, NetWrapper> e : nets.entrySet()) {
-                Net net = e.getKey();
-                SitePinInst source = net.getSource();
-                SitePinInst altSource = net.getAlternateSource();
-                SiteInst si = source.getSiteInst();
-                boolean altSourcePreviouslyRouted = altSource != null ? altSource.isRouted() : false;
+                // Set the routed state of the used source node
+                // and if used and not already present, add it to the SiteInst
+                Node sourceNode = nodes.get(nodes.size() - 1);
+                SitePinInst usedSpi = null;
                 for (SitePinInst spi : Arrays.asList(source, altSource)) {
-                    if (spi != null) {
-                        spi.setRouted(false);
-                        assert(spi.getSiteInst() == si);
+                    if (spi != null && sourceNode.equals(spi.getConnectedNode())) {
+                        usedSpi = spi;
                     }
                 }
-
-                // Set the routed state on those source pins that were actually used
-                NetWrapper netWrapper = e.getValue();
-                for (Connection connection : netWrapper.getConnections()) {
-                    // Examine getNodes() because connection.getRnodes() is empty for direct connections
-                    List<Node> nodes = connection.getNodes();
-                    if (nodes.isEmpty()) {
-                        // Unroutable connection
-                        continue;
-                    }
-
-                    // Set the routed state of the used source node
-                    // and if used and not already present, add it to the SiteInst
-                    Node sourceNode = nodes.get(nodes.size() - 1);
-                    SitePinInst usedSpi = null;
-                    for (SitePinInst spi : Arrays.asList(source, altSource)) {
-                        if (spi != null && sourceNode.equals(spi.getConnectedNode())) {
-                            usedSpi = spi;
-                        }
-                    }
-                    if (usedSpi == null) {
-                        throw new RuntimeException("ERROR: Unknown source node " + sourceNode + " on net " + net.getName());
-                    }
-
-                    // Now that we know this SitePinInst is used, make sure it exists in
-                    // the SiteInst
-                    usedSpi.setRouted(true);
-                    if (si.getSitePinInst(usedSpi.getName()) == null) {
-                        si.addPin(usedSpi);
-                    }
-
-                    if (source.isRouted() && (altSource == null || altSource.isRouted())) {
-                        // Break if all sources have been set to be routed
-                        break;
-                    }
+                if (usedSpi == null) {
+                    throw new RuntimeException("ERROR: Unknown source node " + sourceNode + " on net " + net.getName());
                 }
-                // If the alt source was previously routed, and is no longer, let's remove it
-                if (altSource != null && altSourcePreviouslyRouted && !altSource.isRouted()) {
-                    boolean sourceRouted = source.isRouted();
-                    altSource.getSiteInst().removePin(altSource);
-                    net.removePin(altSource);
-                    source.setRouted(sourceRouted);
-                    if (altSource.getName().endsWith("_O") && source.getName().endsWith("MUX") && source.isRouted()) {
-                        // Add site routing back if we are keeping the MUX pin
-                        source.getSiteInst().routeIntraSiteNet(net, altSource.getBELPin(), altSource.getBELPin());
-                    }
+
+                // Now that we know this SitePinInst is used, make sure it exists in
+                // the SiteInst
+                usedSpi.setRouted(true);
+                if (si.getSitePinInst(usedSpi.getName()) == null) {
+                    si.addPin(usedSpi);
+                }
+
+                if (source.isRouted() && (altSource == null || altSource.isRouted())) {
+                    // Break if all sources have been set to be routed
+                    break;
+                }
+            }
+            // If the alt source was previously routed, and is no longer, let's remove it
+            if (altSource != null && altSourcePreviouslyRouted && !altSource.isRouted()) {
+                boolean sourceRouted = source.isRouted();
+                altSource.getSiteInst().removePin(altSource);
+                net.removePin(altSource);
+                source.setRouted(sourceRouted);
+                if (altSource.getName().endsWith("_O") && source.getName().endsWith("MUX") && source.isRouted()) {
+                    // Add site routing back if we are keeping the MUX pin
+                    source.getSiteInst().routeIntraSiteNet(net, altSource.getBELPin(), altSource.getBELPin());
                 }
             }
         }

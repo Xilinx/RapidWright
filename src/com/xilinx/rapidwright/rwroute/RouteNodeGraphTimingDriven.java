@@ -69,10 +69,13 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
         }};
     }
 
-    public RouteNodeGraphTimingDriven(RuntimeTracker rnodesTimer, Design design, DelayEstimatorBase delayEstimator, boolean maskNodesCrossRCLK) {
-        super(rnodesTimer, design);
+    public RouteNodeGraphTimingDriven(RuntimeTracker rnodesTimer,
+                                      Design design,
+                                      RWRouteConfig config,
+                                      DelayEstimatorBase delayEstimator) {
+        super(rnodesTimer, design, config);
         this.delayEstimator = delayEstimator;
-        this.maskNodesCrossRCLK = maskNodesCrossRCLK;
+        this.maskNodesCrossRCLK = config.isMaskNodesCrossRCLK();
 
         excludeAboveRclk = new HashSet<>();
         excludeBelowRclk = new HashSet<>();

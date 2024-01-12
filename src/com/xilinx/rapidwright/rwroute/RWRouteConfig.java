@@ -90,6 +90,8 @@ public class RWRouteConfig {
     private float maxPresentCongestionFactor;
     /* true to enable LUT pin swapping */
     private boolean lutPinSwapping;
+    /* true to enable LUT routethru */
+    private boolean lutRoutethru;
 
     /** Constructs a Configuration Object */
     public RWRouteConfig(String[] arguments) {
@@ -118,6 +120,8 @@ public class RWRouteConfig {
         useUTurnNodes = false;
         verbose = false;
         printConnectionSpan = false;
+        lutPinSwapping = false;
+        lutRoutethru = false;
         if (arguments != null) {
             parseArguments(arguments);
         }
@@ -219,6 +223,9 @@ public class RWRouteConfig {
                 break;
             case "--lutPinSwapping":
                 setLutPinSwapping(true);
+                break;
+            case "--lutRoutethru":
+                setLutRoutethru(true);
                 break;
             default:
                 throw new IllegalArgumentException("ERROR: RWRoute argument '" + arg + "' not recognized.");
@@ -716,8 +723,18 @@ public class RWRouteConfig {
      *
      * @return True if the flag is set, false otherwise.
      */
-    public boolean getLutPinSwapping() {
+    public boolean isLutPinSwapping() {
         return lutPinSwapping;
+    }
+
+    /**
+     * Gets the flag indicating if LUT routethrus are enabled.
+     * Default: false.
+     *
+     * @return True if the flag is set, false otherwise.
+     */
+    public boolean isLutRoutethru() {
+        return lutRoutethru;
     }
 
     /**
@@ -824,6 +841,16 @@ public class RWRouteConfig {
     }
 
     /**
+     * Sets a flag indicating LUT routethrus will be considered.
+     * Default: false.
+     *
+     * @param lutRoutethru true to enable LUT pin swapping.
+     */
+    public void setLutRoutethru(boolean lutRoutethru) {
+        this.lutRoutethru = lutRoutethru;
+    }
+
+    /**
      * Sets verbose.
      * If true, there will be more info in the routing log file regarding design netlist, routing statistics, and timing report.
      * Default: false. Can be modified by adding "--verbose" to the arguments.
@@ -867,6 +894,8 @@ public class RWRouteConfig {
         s.append(MessageGenerator.formatString("Initial present congestion factor: ", initialPresentCongestionFactor));
         s.append(MessageGenerator.formatString("Present congestion multiplier: ", presentCongestionMultiplier));
         s.append(MessageGenerator.formatString("Historical congestion factor ", historicalCongestionFactor));
+        s.append(MessageGenerator.formatString("LUT pin swapping ", isLutPinSwapping()));
+        s.append(MessageGenerator.formatString("LUT routethrus ", isLutRoutethru()));
 
         return s.toString();
     }

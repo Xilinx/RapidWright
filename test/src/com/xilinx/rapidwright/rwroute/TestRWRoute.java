@@ -47,7 +47,6 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
-import com.xilinx.rapidwright.design.tools.TestLUTTools;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
@@ -156,6 +155,20 @@ public class TestRWRoute {
     public void testNonTimingDrivenFullRoutingWithLutPinSwapping(String path) {
         Design design = RapidWrightDCP.loadDCP(path);
         RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--lutPinSwapping"});
+        assertAllSourcesRoutedFlagSet(design);
+        assertAllPinsRouted(design);
+        assertVivadoFullyRouted(design);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "bnn.dcp",
+            "optical-flow.dcp"
+    })
+    @LargeTest(max_memory_gb = 8)
+    public void testNonTimingDrivenFullRoutingWithLutRoutethru(String path) {
+        Design design = RapidWrightDCP.loadDCP(path);
+        RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--lutRoutethru"});
         assertAllSourcesRoutedFlagSet(design);
         assertAllPinsRouted(design);
         assertVivadoFullyRouted(design);
