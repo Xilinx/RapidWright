@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2018-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -37,6 +37,7 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
 
+import com.xilinx.rapidwright.design.AltPinMapping;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
@@ -504,11 +505,14 @@ public class LUTTools {
                     continue;
                 }
 
-                // Either this is a LUT cell or a routethru ...
-                assert(cell.getType().startsWith("LUT") ||
-                       cell.isRoutethru() ||
-                       // ... or a distributed RAM cell not on a "H" BEL
-                       cell.getType().startsWith("RAM") && !bel.getName().startsWith("H"));
+                // Only consider LUT cell or a routethru ...
+                if (!cell.getType().startsWith("LUT") && !cell.isRoutethru() &&
+                        // ... or distributed RAM cells not on a "H" BEL
+                        (!cell.getType().startsWith("RAM") || bel.getName().startsWith("H"))) {
+                    // SRL cells do not support pin swapping
+                    assert(cell.getType().startsWith("SRL"));
+                    continue;
+                }
 
                 String oldPhysicalPinName = "A" + oldSinkSpi.getName().charAt(1);
                 String oldLogicalPinName = cell.getLogicalPinMapping(oldPhysicalPinName);
@@ -650,7 +654,15 @@ public class LUTTools {
 
         // Perform the actual swap on cell pin mappings
         for (PinSwap ps : copyOnWritePinSwaps) {
-            ps.getCell().addPinMapping(ps.getNewPhysicalName(), ps.getLogicalName());
+            Cell cell = ps.getCell();
+            cell.addPinMapping(ps.getNewPhysicalName(), ps.getLogicalName());
+            if (cell.isRoutethru() && cell.hasAltPinMappings()) {
+                Map<String, AltPinMapping> altPinMappings = cell.getAltPinMappings();
+                assert(altPinMappings.size() == 1);
+                AltPinMapping apm = altPinMappings.remove(ps.getOldPhysicalName());
+                assert(apm != null);
+                cell.addAltPinMapping(ps.getNewPhysicalName(), apm);
+            }
             if (ps.getCompanionCell() != null) {
                 ps.getCompanionCell().addPinMapping(ps.getNewPhysicalName(), ps.getCompanionLogicalName());
             }
@@ -659,7 +671,7 @@ public class LUTTools {
                 continue;
             }
             pinToMove.setPinName(ps.getNewNetPinName());
-            pinToMove.setSiteInst(ps.getCell().getSiteInst());
+            pinToMove.setSiteInst(cell.getSiteInst());
         }
 
         assert(q.isEmpty());

@@ -1,3 +1,42 @@
+============= RapidWright 2023.2.1-beta released on 2023-01-10 ================
+Notes:
+  - Add EDIFHierCellInst.isUniquified() (#918)
+  - [RWRoute] RouteNode to extend Node (#916)
+  - [DesignComparator] Fix whitespace (#937)
+  - RouteThruHelper.isRouteThruPIPAvailable(Design, WireInterface, WireIn (#915)
+  - Create a common interface for Node and Wire Objects (#892)
+  - DesignComparator - compares place and route data (#931)
+  - DesignTools.createMissingSitePinInsts() to infer SitePinInsts more smartly (#936)
+  - LUTTools.swapLutPinsFromPIPs() to warn when site pin not found (#934)
+  - [PhysNetlistReader] Warn and omit if PIP not found (#933)
+  - [PhysNetlistWriter] Handle PORT cells in GTY tiles (#930)
+  - [PhysNetlistWriter] Assume static net output BELPins to be sources too (#929)
+  - [PhysNetlistWriter] Fix stubs on static nets (#928)
+  - Get a Boolean from EDIFPropertyValue (#926)
+  - [PhysNetlistWriter] Infer direction of IOB's PAD.PAD BEL pin (#927)
+  - [RouteThruHelper] Move assertions, improve tests (#925)
+  - [RWRoute] Don't swap dist RAMs on 'H' BELs since A and WA are shared (#924)
+  - [PhysNetlistWriter] Recognize static source BELPins (e.g. LUT outputs) (#923)
+  - [RWRoute] Analyze a tile below the topmost arbitrary one (#921)
+  - Adding test for IOB placement (#903)
+  - [DesignTools.makeBlackBox()] Fixes routing issues in makeBlackBox() (#919)
+  - [ECOTools] Inline cell insertion (#917)
+  - RouterHelper.invertPossibleGndPinsToVccPins() to work on all invertible pins (#911)
+  - [RWRoute] GlobalSignalRouting static net router to use [A-H]MUX outputs (#914)
+  - [RWRoute] Fix exception for unrouteable connections (#913)
+  - Declare gradle dependency explicitly (#909)
+  - Fixes [Versal BELAttr] Parsing issue #912
+  - Add site pins when site routing through inverter BELs
+  - Fix UltraScale+ IBUF site routing
+  - Fix DSP pin mapping removals during site routing
+  - Adds support for special clock Node flag present in Versal designs
+  
+API Additions:
+  - com.xilinx.rapidwright.device.Node "public Node(Node node)"
+  - com.xilinx.rapidwright.device.Package "public synchronized PackagePin getPackagePin(Site site)"
+  - com.xilinx.rapidwright.device.Package "public String getPackagePinName(Site site)"
+
+
 ============= RapidWright 2023.2.0-beta released on 2023-11-20 ================
 Notes:
   - SLR Corner updates in device models and handling (#886)

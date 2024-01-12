@@ -169,8 +169,8 @@ public class TimingAndWirelengthReport{
 
         for (Connection connection : netWrapper.getConnections()) {
             if (connection.isDirect()) continue;
-            Node sinkNode = connection.getSinkRnode().getNode();
-            LightweightRouteNode sinkrn = nodeRoutingNodeMap.get(sinkNode);
+            RouteNode sinkRnode = connection.getSinkRnode();
+            LightweightRouteNode sinkrn = nodeRoutingNodeMap.get(sinkRnode);
             if (sinkrn == null) continue;
             float connectionDelay = sinkrn.getDelayFromSource();
             if (connection.getTimingEdges() == null) continue;

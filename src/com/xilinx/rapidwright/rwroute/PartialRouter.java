@@ -157,8 +157,7 @@ public class PartialRouter extends RWRoute {
         // Presence of a prev pointer means that only that arc is allowed to enter this end node
         RouteNode prev = endRnode.getPrev();
         if (prev != null) {
-            assert((prev.getNode() == start) == prev.getNode().equals(start));
-            if (prev.getNode() == start && routingGraph.isPreserved(end)) {
+            if (prev.equals(start) && routingGraph.isPreserved(end)) {
                 // Arc matches start node and end node is preserved
                 // This implies that both start and end nodes must be preserved for the same net
                 // (which assumedly is the net we're currently routing, and is asserted upstream)
@@ -528,17 +527,17 @@ public class PartialRouter extends RWRoute {
     protected Collection<Net> pickNetsToUnpreserve(Connection connection) {
         Set<Net> unpreserveNets = new HashSet<>();
 
-        Node sourceNode = connection.getSourceRnode().getNode();
-        Node sinkNode = connection.getSinkRnode().getNode();
+        RouteNode sourceRnode = connection.getSourceRnode();
+        RouteNode sinkRnode = connection.getSinkRnode();
 
         List<Node> candidateNodes = new ArrayList<>();
         // Consider the cases of [A-H](X|_I) site pins which are accessed through a bounce node,
         // meaning this connection may be unroutable because another net is preserving this node
-        candidateNodes.add(sinkNode);
+        candidateNodes.add(sinkRnode);
         // Find those reserved signals that are using uphill nodes of the target pin node
-        candidateNodes.addAll(sinkNode.getAllUphillNodes());
+        candidateNodes.addAll(sinkRnode.getAllUphillNodes());
         // Find those preserved nets that are using downhill nodes of the source pin node
-        candidateNodes.addAll(sourceNode.getAllDownhillNodes());
+        candidateNodes.addAll(sourceRnode.getAllDownhillNodes());
 
         for(Node node : candidateNodes) {
             Net toRoute = routingGraph.getPreservedNet(node);
@@ -688,13 +687,12 @@ public class PartialRouter extends RWRoute {
         routingGraph.resetExpansion();
 
         for (RouteNode rnode : rnodes) {
-            Node toBuild = rnode.getNode();
             // Check already unpreserved above
-            assert(!routingGraph.isPreserved(toBuild));
+            assert(!routingGraph.isPreserved(rnode));
 
             // Each rnode should be added as a child to all of its parents
             // that already exist
-            for (Node uphill : toBuild.getAllUphillNodes()) {
+            for (Node uphill : rnode.getAllUphillNodes()) {
                 RouteNode parent = routingGraph.getNode(uphill);
                 if (parent == null)
                     continue;

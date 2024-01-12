@@ -2001,15 +2001,15 @@ public class DesignTools {
 
     /**
      * Looks in the site instance for BEL pins connected to this site pin.
-     * @param pin The SitePinInst to examine for connected BEL pins
+     * @param pin The BELPin to examine for connected BEL pins.
+     * @param si The SiteInst to examine for connected cells.
      * @param action Perform this action on each connected BELPin.
      */
-    private static void foreachConnectedBELPin(SitePinInst pin, Consumer<BELPin> action) {
-        SiteInst si = pin.getSiteInst();
+    private static void foreachConnectedBELPin(BELPin pin, SiteInst si, Consumer<BELPin> action) {
         if (si == null) {
             return;
         }
-        for (BELPin p : pin.getBELPin().getSiteConns()) {
+        for (BELPin p : pin.getSiteConns()) {
             if (p.getBEL().getBELClass() == BELClass.RBEL) {
                 SitePIP pip = si.getUsedSitePIP(p.getBELName());
                 if (pip == null) continue;
@@ -2031,14 +2031,14 @@ public class DesignTools {
     }
 
     /**
-     * Looks in the site instance for cells connected to this site pin.
-     * @param pin The SitePinInst to examine for connected cells
-     * @return Set of connected cells to this pin
+     * Looks in the site instance for cells connected to this BEL pin and SiteInst.
+     * @param pin The BELPin to examine for connected cells.
+     * @param si The SiteInst to examine for connected cells.
+     * @return Set of connected cells to this pin.
      */
-    public static Set<Cell> getConnectedCells(SitePinInst pin) {
+    public static Set<Cell> getConnectedCells(BELPin pin, SiteInst si) {
         final Set<Cell> cells = new HashSet<>();
-        SiteInst si = pin.getSiteInst();
-        foreachConnectedBELPin(pin, (p) -> {
+        foreachConnectedBELPin(pin, si, (p) -> {
             Cell c = si.getCell(p.getBELName());
             if (c != null) {
                 cells.add(c);
@@ -2048,14 +2048,33 @@ public class DesignTools {
     }
 
     /**
+     * Looks in the site instance for cells connected to this site pin.
+     * @param pin The SitePinInst to examine for connected cells.
+     * @return Set of connected cells to this pin.
+     */
+    public static Set<Cell> getConnectedCells(SitePinInst pin) {
+        return getConnectedCells(pin.getBELPin(), pin.getSiteInst());
+    }
+
+    /**
+     * Looks in the site instance for BEL pins connected to this BEL pin and SiteInst.
+     * @param pin The SitePinInst to examine for connected BEL pins.
+     * @param si The SiteInst to examine for connected cells.
+     * @return Set of BEL pins to this site pin.
+     */
+    public static Set<BELPin> getConnectedBELPins(BELPin pin, SiteInst si) {
+        final Set<BELPin> pins = new HashSet<>();
+        foreachConnectedBELPin(pin, si, pins::add);
+        return pins;
+    }
+
+    /**
      * Looks in the site instance for BEL pins connected to this site pin.
-     * @param pin The SitePinInst to examine for connected BEL pins
-     * @return Set of BEL pins to this site pin
+     * @param pin The SitePinInst to examine for connected BEL pins.
+     * @return Set of BEL pins to this site pin.
      */
     public static Set<BELPin> getConnectedBELPins(SitePinInst pin) {
-        Set<BELPin> pins = new HashSet<>();
-        foreachConnectedBELPin(pin, pins::add);
-        return pins;
+        return getConnectedBELPins(pin.getBELPin(), pin.getSiteInst());
     }
 
     /**
@@ -2120,13 +2139,34 @@ public class DesignTools {
             for (SiteInst siteInst : new ArrayList<>(net.getSiteInsts())) {
                 for (String siteWire : new ArrayList<>(siteInst.getSiteWiresFromNet(net))) {
                     for (BELPin pin : siteInst.getSiteWirePins(siteWire)) {
-                        if (pin.isSitePort()) {
-                            SitePinInst currPin = siteInst.getSitePinInst(pin.getName());
-                            if (currPin == null) {
-                                currPin = net.createPin(pin.getName(), siteInst);
-                                newPins.add(currPin);
+                        if (!pin.isSitePort()) {
+                            continue;
+                        }
+
+                        SitePinInst currPin = siteInst.getSitePinInst(pin.getName());
+                        if (currPin != null) {
+                            // SitePinInst already exists
+                            continue;
+                        }
+
+                        if (pin.isInput()) {
+                            // Input BELPin means output site port; check that this site port is driven
+                            // by a cell, rather than coming from an input site port
+                            boolean foundOutputPin = false;
+                            for (BELPin connectedBELPin : getConnectedBELPins(pin, siteInst)) {
+                                if (connectedBELPin.isInput()) {
+                                    continue;
+                                }
+                                foundOutputPin = true;
+                                break;
+                            }
+                            if (!foundOutputPin) {
+                                continue;
                             }
                         }
+
+                        currPin = net.createPin(pin.getName(), siteInst);
+                        newPins.add(currPin);
                     }
                 }
             }

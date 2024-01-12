@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -577,17 +577,23 @@ public class RWRoute{
                         BEL bel = cell.getBEL();
                         assert(bel.isLUT());
                         String belName = bel.getName();
+                        String cellType = cell.getType();
                         if (belName.charAt(0) != lutLetter) {
-                            assert(cell.getType().startsWith("RAM"));
+                            assert(cellType.startsWith("RAM"));
                             // This pin connects to other LUTs! (e.g. SLICEM.H[1-6] also serves
                             // as the WA for A-G LUTs used as distributed RAM) -- do not allow any swapping
                             // TODO: Relax this when https://github.com/Xilinx/RapidWright/issues/901 is fixed
                             numberOfSwappablePins = 0;
                             break;
                         }
-                        if (bel.getName().startsWith("H") && cell.getType().startsWith("RAM")) {
+                        if (bel.getName().startsWith("H") && cellType.startsWith("RAM")) {
                             // Similarly, disallow swapping of any RAMs on the "H" BELs since their
                             // "A" and "WA" inputs are shared and require extra care to keep in sync
+                            numberOfSwappablePins = 0;
+                            break;
+                        }
+                        if (cellType.startsWith("SRL")) {
+                            // SRL* cells cannot support any pin swaps
                             numberOfSwappablePins = 0;
                             break;
                         }
@@ -1143,7 +1149,7 @@ public class RWRoute{
             }
 
             if (sinkRnode == rnodes.get(0)) {
-                List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(sinkRnode.getNode(), connection.getSink().getConnectedNode());
+                List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(sinkRnode, connection.getSink().getConnectedNode());
                 if (switchBoxToSink.size() >= 2) {
                     for (int i = 0; i < switchBoxToSink.size() - 1; i++) {
                         nodes.add(switchBoxToSink.get(i));
@@ -1155,14 +1161,14 @@ public class RWRoute{
 
                 // Assume that it doesn't need unprojecting back to the sink pin
                 // since the sink node is a site pin
-                assert(rnodes.get(0).getNode().getSitePin() != null);
+                assert(rnodes.get(0).getSitePin() != null);
             }
 
             for (RouteNode rnode : rnodes) {
                 nodes.add(rnode.getNode());
             }
 
-            List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(connection.getSource().getConnectedNode(), connection.getSourceRnode().getNode());
+            List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(connection.getSource().getConnectedNode(), connection.getSourceRnode());
             if (sourceToSwitchBox.size() >= 2) {
                 for (int i = 1; i <= sourceToSwitchBox.size() - 1; i++) {
                     nodes.add(sourceToSwitchBox.get(i));
@@ -1374,7 +1380,7 @@ public class RWRoute{
     private void addNodesDelays(NetWrapper net) {
         for (Connection connection:net.getConnections()) {
             for (RouteNode rnode : connection.getRnodes()) {
-                nodesDelays.put(rnode.getNode(), rnode.getDelay());
+                nodesDelays.put(rnode, rnode.getDelay());
             }
         }
     }
@@ -1654,14 +1660,14 @@ public class RWRoute{
     private void exploreAndExpand(RouteNode rnode, Connection connection, float shareWeight, float rnodeCostWeight,
                                   float rnodeLengthWeight, float rnodeEstWlWeight,
                                   float rnodeDelayWeight, float rnodeEstDlyWeight) {
-        boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(rnode.getNode());
+        boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(rnode);
         for (RouteNode childRNode:rnode.getChildren()) {
             // Targets that are visited more than once must be overused
             assert(!childRNode.isTarget() || !childRNode.isVisited(connectionsRouted) || childRNode.willOverUse(connection.getNetWrapper()));
 
             // If childRnode is preserved, then it must be preserved for the current net we're routing
             Net preservedNet;
-            assert((preservedNet = routingGraph.getPreservedNet(childRNode.getNode())) == null ||
+            assert((preservedNet = routingGraph.getPreservedNet(childRNode)) == null ||
                     preservedNet == connection.getNetWrapper().getNet());
 
             if (childRNode.isVisited(connectionsRouted)) {
@@ -1678,7 +1684,7 @@ public class RWRoute{
                 if (childRNode == connection.getSinkRnode() && connection.getAltSinkRnodes().isEmpty()) {
                     // This sink must be exclusively reserved for this connection already
                     assert(childRNode.getOccupancy() == 0 ||
-                            childRNode.getNode().getIntentCode() == IntentCode.NODE_PINBOUNCE);
+                            childRNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
                     earlyTermination = true;
                 } else {
                     // Target is not an exclusive sink, only early terminate if this net will not
@@ -1779,7 +1785,7 @@ public class RWRoute{
         }
 
         if (child.countConnectionsOfUser(connection.getNetWrapper()) == 0 ||
-                child.getNode().getIntentCode() != IntentCode.NODE_PINBOUNCE) {
+            child.getIntentCode() != IntentCode.NODE_PINBOUNCE) {
             // Inaccessible if child is not a sink pin of another connection on the same
             // net, or it is not a PINBOUNCE node
             return false;
@@ -1814,7 +1820,7 @@ public class RWRoute{
         float newPartialPathCost = rnode.getUpstreamPathCost() + rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor)
                                 + rnodeLengthWeight * childRnode.getLength() / sharingFactor;
         if (config.isTimingDriven()) {
-            newPartialPathCost += rnodeDelayWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode.getNode(), longParent));
+            newPartialPathCost += rnodeDelayWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode, longParent));
         }
 
         int childX = childRnode.getEndTileXCoordinate();
