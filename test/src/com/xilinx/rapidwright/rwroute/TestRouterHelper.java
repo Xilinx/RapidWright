@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Advanced Micro Devices, Inc.
@@ -35,6 +35,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -178,8 +179,9 @@ public class TestRouterHelper {
         );
     }
 
-    @Test
-    public void testInvertPossibleGndPinsToVccPinsLutInput() {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testInvertPossibleGndPinsToVccPinsLutInput(boolean invertLutInputs) {
         Design design = new Design("design", "xcvu3p");
         Cell cell = design.createAndPlaceCell("lut", Unisim.LUT1, "SLICE_X0Y0/A6LUT");
         LUTTools.configureLUT(cell, "O=~I0");
@@ -189,14 +191,22 @@ public class TestRouterHelper {
         gndNet.createPin("A6", cell.getSiteInst());
 
         // Check A6 was inverted, and it was moved off gndNet
-        Set<SitePinInst> invertedPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndNet.getPins());
-        Assertions.assertEquals("[IN SLICE_X0Y0.A6]", invertedPins.toString());
-        Assertions.assertTrue(gndNet.getPins().isEmpty());
+        Set<SitePinInst> invertedPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndNet.getPins(), invertLutInputs);
+        if (invertLutInputs) {
+            Assertions.assertEquals("[IN SLICE_X0Y0.A6]", invertedPins.toString());
+        } else {
+            Assertions.assertTrue(invertedPins.isEmpty());
+        }
+        Assertions.assertEquals(invertLutInputs, gndNet.getPins().isEmpty());
 
-        // Must have moved onto vccNet, and the LUT mask inverted
-        Net vccNet = design.getVccNet();
-        Assertions.assertEquals("[IN SLICE_X0Y0.A6]", vccNet.getPins().toString());
-        Assertions.assertEquals("O=I0", LUTTools.getLUTEquation(cell));
+        Net staticNet = invertLutInputs ? design.getVccNet() : design.getGndNet();
+        Assertions.assertEquals("[IN SLICE_X0Y0.A6]", staticNet.getPins().toString());
+        if (invertLutInputs) {
+            // Must have moved onto vccNet, and the LUT mask inverted
+            Assertions.assertEquals("O=I0", LUTTools.getLUTEquation(cell));
+        } else {
+            Assertions.assertEquals("O=!I0", LUTTools.getLUTEquation(cell));
+        }
     }
 
     @Test

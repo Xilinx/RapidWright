@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -344,7 +344,7 @@ public class TestRWRoute {
     public void testBug701() {
         Design design = RapidWrightDCP.loadDCP("bug701.dcp");
 
-        RWRoute.routeDesignFullNonTimingDriven(design);
+        RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--noInvertGndToVccForLutInputs"});
 
         Net vcc = design.getVccNet();
         Assertions.assertEquals(1, vcc.getPins().size());
