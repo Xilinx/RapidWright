@@ -200,6 +200,10 @@ public class Utils{
         return urams;
     }
 
+    public static Set<TileTypeEnum> getLagunaTileTypes() {
+        return lagunas;
+    }
+
     public static Set<SiteTypeEnum> getLockedSiteTypes() {
         return lockedSiteTypes;
     }
@@ -349,7 +353,8 @@ public class Utils{
             SiteTypeEnum.DSP48E2,
             SiteTypeEnum.DSP58,
             SiteTypeEnum.DSP58_CPLX,
-            SiteTypeEnum.DSPFP
+            SiteTypeEnum.DSPFP,
+            SiteTypeEnum.DSP58_PRIMARY
         );
 
         bramTypes = EnumSet.of(

@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2018-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -25,19 +25,34 @@
 package com.xilinx.rapidwright.design.tools;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Queue;
 import java.util.Set;
 
+import com.xilinx.rapidwright.design.AltPinMapping;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.PinSwap;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
@@ -454,6 +469,325 @@ public class LUTTools {
             }
 
         }
+    }
+
+    /**
+     * Given a mapping from old SitePinInsts to new site pin name, update all state
+     * necessary to reflect these LUT pin swaps. This includes updating cells'
+     * logical-to-physical pin mappings, updating intra-site routing, moving
+     * the SitePinInst objects, etc.
+     * @param oldPinToNewPins Mapping from old pins to new pins.
+     */
+    public static int swapMultipleLutPins(Map<SitePinInst, String> oldPinToNewPins) {
+        Map<String,Map<String,PinSwap>> pinSwaps = new HashMap<>();
+
+        for (Map.Entry<SitePinInst, String> e : oldPinToNewPins.entrySet()) {
+            SitePinInst oldSinkSpi = e.getKey();
+            String newSitePinName = e.getValue();
+
+            if (oldSinkSpi.getName().equals(newSitePinName)) {
+                continue;
+            }
+
+            SiteInst si = oldSinkSpi.getSiteInst();
+            if (!SitePinInst.isLUTInputPin(si, newSitePinName)) {
+                continue;
+            }
+
+            Set<Cell> cells = DesignTools.getConnectedCells(oldSinkSpi);
+            if (cells.isEmpty()) {
+                continue;
+            }
+            PinSwap ps = null;
+            for (Cell cell : cells) {
+                BEL bel = cell.getBEL();
+                if (!bel.isLUT()) {
+                    continue;
+                }
+
+                // Only consider LUT cell or a routethru ...
+                if (!cell.getType().startsWith("LUT") && !cell.isRoutethru() &&
+                        // ... or distributed RAM cells not on a "H" BEL
+                        (!cell.getType().startsWith("RAM") || bel.getName().startsWith("H"))) {
+                    // SRL cells do not support pin swapping
+                    assert(cell.getType().startsWith("SRL"));
+                    continue;
+                }
+
+                String oldPhysicalPinName = "A" + oldSinkSpi.getName().charAt(1);
+                String oldLogicalPinName = cell.getLogicalPinMapping(oldPhysicalPinName);
+                if (ps == null) {
+                    String newPhysicalPinName = "A" + newSitePinName.charAt(1);
+                    String depopulatedLogicalPinName = cell.getLogicalPinMapping(newPhysicalPinName);
+                    ps = new PinSwap(cell, oldLogicalPinName, oldPhysicalPinName,
+                            newPhysicalPinName, depopulatedLogicalPinName, newSitePinName);
+
+                    String siteAndLut = cell.getSiteName() + "/" + bel.getName().charAt(0);
+                    String oldToNewPhysicalPin = oldPhysicalPinName + ">" + newPhysicalPinName;
+                    pinSwaps.computeIfAbsent(siteAndLut, (k) -> new HashMap<>())
+                            .put(oldToNewPhysicalPin, ps);
+                } else {
+                    if (bel.getName().charAt(1) == '6') {
+                        // Unpredictable set ordering can mean that x5LUT appears before x6LUT; swap them back here
+                        assert(ps.getCell().getBELName().charAt(1) == '5');
+                        ps.setCompanionCell(ps.getCell(), ps.getLogicalName());
+
+                        ps.setCell(cell);
+                        String newPhysicalPinName = "A" + newSitePinName.charAt(1);
+                        ps.setLogicalName(oldLogicalPinName);
+                        assert(ps.getOldPhysicalName().equals(oldPhysicalPinName));
+                        assert(ps.getNewPhysicalName().equals(newPhysicalPinName));
+                        String depopulatedLogicalPinName = cell.getLogicalPinMapping(newPhysicalPinName);
+                        ps.setDepopulatedLogicalName(depopulatedLogicalPinName);
+                        assert(ps.getNewNetPinName().equals(newSitePinName));
+                    } else {
+                        assert(bel.getName().charAt(1) == '5');
+                        ps.setCompanionCell(cell, oldLogicalPinName);
+                    }
+                }
+            }
+        }
+
+        // Make all pin swaps per LUT site simultaneously
+        int numPinSwaps = 0;
+        for (Map.Entry<String,Map<String,PinSwap>> e : pinSwaps.entrySet()) {
+            Collection<PinSwap> swaps = e.getValue().values();
+            swapSingleLutPins(e.getKey(), swaps);
+            numPinSwaps += swaps.size();
+        }
+
+        return numPinSwaps;
+    }
+
+    /**
+     * For each pair of LUT sites (5LUT/6LUT), perform pin swapping.
+     * @param key The name of the site and letter of LUT pair (ex: SLICE_X54Y44/D)
+     * @param pinSwaps The list of pin swaps to be performed on the pair of LUT sites
+     */
+    public static void swapSingleLutPins(String key, Collection<PinSwap> pinSwaps) {
+        Collection<PinSwap> copyOnWritePinSwaps = pinSwaps;
+        LinkedHashMap<String,PinSwap> overwrittenPins = new LinkedHashMap<>();
+        LinkedHashMap<String,PinSwap> emptySlots = new LinkedHashMap<>();
+        for (PinSwap ps : copyOnWritePinSwaps) {
+            overwrittenPins.put(ps.getNewPhysicalName(),ps);
+            emptySlots.put(ps.getOldPhysicalName(),ps);
+        }
+        for (PinSwap ps : copyOnWritePinSwaps) {
+            String oldPin = ps.getOldPhysicalName();
+            String newPin = ps.getNewPhysicalName();
+            if (emptySlots.containsKey(newPin) && overwrittenPins.containsKey(newPin)) {
+                overwrittenPins.remove(newPin);
+                emptySlots.remove(newPin);
+            }
+            if (emptySlots.containsKey(oldPin) && overwrittenPins.containsKey(oldPin)) {
+                overwrittenPins.remove(oldPin);
+                emptySlots.remove(oldPin);
+            }
+        }
+
+        if (overwrittenPins.size() != emptySlots.size()) {
+            throw new RuntimeException("ERROR: Couldn't identify proper pin swap for BEL(s) " + key + "LUT");
+        }
+        String[] oPins = overwrittenPins.keySet().toArray(new String[overwrittenPins.size()]);
+        String[] ePins = emptySlots.keySet().toArray(new String[emptySlots.size()]);
+        for (int i=0; i < oPins.length; i++) {
+            String oldPhysicalPin = oPins[i];
+            String newPhysicalPin = ePins[i];
+            Cell c = emptySlots.get(newPhysicalPin).getCell();
+            String newNetPinName = c.getSiteWireNameFromPhysicalPin(newPhysicalPin);
+            // Handles special cases
+            if (c.getLogicalPinMapping(oldPhysicalPin) == null) {
+                Cell neighborLUT = emptySlots.get(newPhysicalPin).checkForCompanionCell();
+                if (neighborLUT != null && emptySlots.get(newPhysicalPin).getCompanionCell() == null) {
+                    String neighborLogicalPinMapping = neighborLUT.getLogicalPinMapping(oldPhysicalPin);
+                    // Makes sure if both LUT sites are occupied, that pin movements
+                    // are lock-step
+                    if (neighborLogicalPinMapping != null) {
+                        PinSwap ps = new PinSwap(neighborLUT, neighborLUT.getLogicalPinMapping(oldPhysicalPin),oldPhysicalPin,newPhysicalPin,
+                                neighborLUT.getLogicalPinMapping(newPhysicalPin),newNetPinName);
+
+                        if (copyOnWritePinSwaps == pinSwaps) {
+                            copyOnWritePinSwaps = new ArrayList<>(pinSwaps);
+                        }
+                        copyOnWritePinSwaps.add(ps);
+                        continue;
+                    }
+                }
+                continue;
+            }
+            // Make implicit swaps when one of the pins is not being routed
+            // or is unconnected for one or both of the cells
+            PinSwap ps = new PinSwap(c, c.getLogicalPinMapping(oldPhysicalPin),oldPhysicalPin,newPhysicalPin,
+                    c.getLogicalPinMapping(newPhysicalPin),newNetPinName);
+            Cell neighborLUT = ps.checkForCompanionCell();
+            if (neighborLUT != null) {
+                if (neighborLUT.getLogicalPinMapping(oldPhysicalPin) != null) {
+                    ps.setCompanionCell(neighborLUT, neighborLUT.getLogicalPinMapping(oldPhysicalPin));
+                }
+            }
+            if (copyOnWritePinSwaps == pinSwaps) {
+                copyOnWritePinSwaps = new ArrayList<>(pinSwaps);
+            }
+            copyOnWritePinSwaps.add(ps);
+        }
+
+        // Prepares pins for swapping by removing them
+        Queue<SitePinInst> q = new LinkedList<>();
+        for (PinSwap ps : copyOnWritePinSwaps) {
+            Cell cell = ps.getCell();
+            String oldSitePinName = cell.getSiteWireNameFromPhysicalPin(ps.getOldPhysicalName());
+            SiteInst si = cell.getSiteInst();
+            SitePinInst pinToMove = si.getSitePinInst(oldSitePinName);
+            q.add(pinToMove);
+            if (pinToMove == null) {
+                continue;
+            }
+            pinToMove.setSiteInst(null,true);
+            // Removes pin mappings to prepare for new pin mappings
+            cell.removePinMapping(ps.getOldPhysicalName());
+            if (ps.getCompanionCell() != null) {
+                ps.getCompanionCell().removePinMapping(ps.getOldPhysicalName());
+            }
+        }
+
+        assert(q.size() == copyOnWritePinSwaps.size());
+
+        // Perform the actual swap on cell pin mappings
+        for (PinSwap ps : copyOnWritePinSwaps) {
+            Cell cell = ps.getCell();
+            cell.addPinMapping(ps.getNewPhysicalName(), ps.getLogicalName());
+            if (cell.isRoutethru() && cell.hasAltPinMappings()) {
+                Map<String, AltPinMapping> altPinMappings = cell.getAltPinMappings();
+                assert(altPinMappings.size() == 1);
+                AltPinMapping apm = altPinMappings.remove(ps.getOldPhysicalName());
+                assert(apm != null);
+                cell.addAltPinMapping(ps.getNewPhysicalName(), apm);
+            }
+            if (ps.getCompanionCell() != null) {
+                ps.getCompanionCell().addPinMapping(ps.getNewPhysicalName(), ps.getCompanionLogicalName());
+            }
+            SitePinInst pinToMove = q.poll();
+            if (pinToMove == null) {
+                continue;
+            }
+            pinToMove.setPinName(ps.getNewNetPinName());
+            pinToMove.setSiteInst(cell.getSiteInst());
+        }
+
+        assert(q.isEmpty());
+    }
+
+    /**
+     * Analyze the routing PIPs of a design to identify (based on whether a PIP existing
+     * on a Net drives the expected SitePin based on Net.getPins()) and perform any necessary
+     * LUT pin swapping.
+     * @param design Design object to analyze and fix.
+     * @return Number of pin swaps processed.
+     */
+    public static int swapLutPinsFromPIPs(Design design) {
+        Map<SitePinInst, String> oldPinToNewPins = new HashMap<>();
+        Map<Site, List<SitePinInst>> siteToLutSpis = new HashMap<>();
+        List<SitePin> unmatchedSitePins = new ArrayList<>();
+        Set<SitePin> routethruSitePins = new HashSet<>();
+        for (Net net : design.getNets()) {
+            if (net.isClockNet()) {
+                continue;
+            }
+            if (net.isVCCNet()) {
+                // All LUT inputs have a direct PIP to VCC
+                continue;
+            }
+            if (net.isGNDNet()) {
+                // TODO:
+                continue;
+            }
+            if (!net.hasPIPs()) {
+                continue;
+            }
+
+            for (SitePinInst spi : net.getPins()) {
+                if (spi.isOutPin() || !spi.isLUTInputPin()) {
+                    continue;
+                }
+                assert(spi.getSiteInst().getSitePinInst(spi.getName()) == spi);
+                siteToLutSpis.computeIfAbsent(spi.getSite(), (k) -> new ArrayList<>(1))
+                        .add(spi);
+            }
+
+            for (PIP pip : net.getPIPs()) {
+                if (pip.isRouteThru()) {
+                    Node startNode = pip.getStartNode();
+                    SitePin newSitePin = startNode.getSitePin();
+                    assert(newSitePin != null);
+                    routethruSitePins.add(newSitePin);
+                    continue;
+                }
+
+                Node endNode = pip.getEndNode();
+                SitePin newSitePin = (endNode != null) ? endNode.getSitePin() : null;
+                if (newSitePin == null) {
+                    continue;
+                }
+
+                Site site = newSitePin.getSite();
+                List<SitePinInst> lutSpis = siteToLutSpis.get(site);
+                if (lutSpis == null) {
+                    // No sink pins from this net exist on this site
+                    // (e.g. this pin is used as routethru)
+                    continue;
+                }
+                SiteInst si = design.getSiteInstFromSite(site);
+                assert(si != null);
+
+                String newSitePinName = newSitePin.getPinName();
+                if (!SitePinInst.isLUTInputPin(si, newSitePinName)) {
+                    continue;
+                }
+                SitePinInst newSpi = si.getSitePinInst(newSitePinName);
+                List<SitePinInst> spis = siteToLutSpis.get(site);
+                if (spis == null) {
+                    System.out.println("WARNING: SitePin " + newSitePin + " visited by PIP " + pip +
+                            " is not a SitePinInst on net " + net + ". Ignoring.");
+                } else if (!spis.remove(newSpi)) {
+                    // spi is not already on this net -- could require pin swapping,
+                    // or could be a routethru
+                    unmatchedSitePins.add(newSitePin);
+                }
+            }
+
+            for (SitePin newSitePin : unmatchedSitePins) {
+                if (routethruSitePins.contains(newSitePin)) {
+                    // Pin is part of a routethru, ignore it
+                    continue;
+                }
+                Site site = newSitePin.getSite();
+                List<SitePinInst> unmatchedSpis = siteToLutSpis.get(site);
+                Iterator<SitePinInst> it = unmatchedSpis.iterator();
+                assert(it.hasNext());
+                String newSitePinName = newSitePin.getPinName();
+                char lutLetter = newSitePinName.charAt(0);
+                // Assume that unmatchedSpis is generally a small ArrayList
+                // such that O(N) operations are not unwieldy
+                boolean found = false;
+                while (it.hasNext()) {
+                    SitePinInst oldSpi = it.next();
+                    if (oldSpi.getName().charAt(0) != lutLetter) {
+                        continue;
+                    }
+                    oldPinToNewPins.put(oldSpi, newSitePinName);
+                    it.remove();
+                    found = true;
+                    break;
+                }
+                assert(found);
+            }
+
+            siteToLutSpis.clear();
+            unmatchedSitePins.clear();
+            routethruSitePins.clear();
+        }
+
+        return swapMultipleLutPins(oldPinToNewPins);
     }
 
     public static void main(String[] args) {

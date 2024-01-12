@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2018-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -29,15 +29,14 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.ModuleInst;
-import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.blocks.PBlock;
-import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
@@ -49,7 +48,8 @@ import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.router.Router;
+import com.xilinx.rapidwright.placer.handplacer.HandPlacer;
+import com.xilinx.rapidwright.rwroute.RWRoute;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.StringTools;
 
@@ -67,7 +67,7 @@ public class PolynomialGenerator {
     public static int slicex = 101;
     public static int slicey = 180;
 
-    public static String partName = Device.AWS_F1;
+    public static String partName = "xcvu3p-ffvc1517-2-e";
 
     public static void buildOperatorTree(String[] tokens, Design d, EDIFPortInst[] resultPortInsts) {
         int width = resultPortInsts.length;
@@ -81,7 +81,7 @@ public class PolynomialGenerator {
                 for (int i=0; i < width; i++) {
                     int bit = (value >> i) & 0x1;
                     EDIFNet src = bit == 1 ? vcc : gnd;
-                    src.addPortInst(resultPortInsts[i]);
+                    src.addPortInst(resultPortInsts[width - 1 - i]);
                 }
                 return;
             }
@@ -115,7 +115,7 @@ public class PolynomialGenerator {
         String[] left = Arrays.copyOfRange(tokens, 0, middleOp);
         String[] right = Arrays.copyOfRange(tokens, middleOp+1, tokens.length);
 
-        ModuleInst mi = instantiateOperator(d, tokens[middleOp]);
+        ModuleInst mi = instantiateOperator(d, tokens[middleOp], width);
         boolean isMult = tokens[middleOp].equals("*");
         String inA = isMult ? MultGenerator.INPUT_A_NAME : AddSubGenerator.INPUT_A_NAME;
         String inB = isMult ? MultGenerator.INPUT_B_NAME : AddSubGenerator.INPUT_B_NAME;
@@ -124,7 +124,8 @@ public class PolynomialGenerator {
         EDIFPortInst[] inputA = EDIFTools.createPortInsts(inA, EDIFDirection.INPUT, width, mi.getCellInst());
         EDIFPortInst[] inputB = EDIFTools.createPortInsts(inB, EDIFDirection.INPUT, width, mi.getCellInst());
         for (int i=0; i < width; i++) {
-            String netName = RESULT_NAME + "_" + (instanceCount++) + "[" + i + "]";
+            int ii = width - 1 - i;
+            String netName = RESULT_NAME + "_" + (instanceCount++) + "[" + ii + "]";
             EDIFNet net = top.createNet(netName);
             net.addPortInst(resultPortInsts[i]);
             net.createPortInst(outResult, i, mi.getCellInst());
@@ -140,6 +141,17 @@ public class PolynomialGenerator {
         buildOperatorTree(right,d,inputB);
     }
 
+    private static void ensureCellTypesSet(Module module) {
+        for (SiteInst si : module.getSiteInsts()) {
+            for (Cell c : si.getCells()) {
+                if (c.isRoutethru())
+                    continue;
+                c.setType(c.getType());
+            }
+        }
+    }
+
+
     public static Map<String,Module> initializeOperators(Design d, int width) {
         operators = new HashMap<>();
         CodePerfTracker silent = new CodePerfTracker("", false, false);
@@ -150,6 +162,7 @@ public class PolynomialGenerator {
         MultGenerator.createMult(multDesign, origin, width, MULT_NAME, CLK_NAME);
 
         Module mult = new Module(multDesign);
+        ensureCellTypesSet(mult);
         mult.setNetlist(multDesign.getNetlist());
 
         operators.put("*", mult);
@@ -158,6 +171,7 @@ public class PolynomialGenerator {
         origin = d.getDevice().getSite("DSP48E2_X" + dspx + "Y" + (dspy+1));
         MultGenerator.createMult(multDesign2, origin, width, MULT_NAME, CLK_NAME);
         Module mult2 = new Module(multDesign2);
+        ensureCellTypesSet(mult2);
         mult2.setNetlist(multDesign.getNetlist());
 
         operators.put("*o", mult2);
@@ -204,7 +218,8 @@ public class PolynomialGenerator {
 
     public static int sliceyOther;
     public static boolean setSliceY = false;
-    private static void placeModuleInst(ModuleInst mi, String type) {
+
+    private static void placeModuleInst(ModuleInst mi, String type, int bitWidth) {
         if (!setSliceY) {
             sliceyOther = slicey;
             setSliceY = true;
@@ -227,19 +242,21 @@ public class PolynomialGenerator {
         } else {
             siteName = "SLICE_X" + slicex + "Y" + (type.endsWith("o") ? sliceyOther : slicey);
             if (type.endsWith("o"))
-                sliceyOther +=5;
+                sliceyOther += sliceHeights[bitWidth];
             else
-                slicey +=5;
+                slicey += sliceHeights[bitWidth];
             sType = SiteTypeEnum.SLICEL;
         }
         Site site = mi.getDesign().getDevice().getSite(siteName);
         mi.placeMINearTile(site.getTile(), sType);
     }
 
+    private static int[] sliceHeights = new int[] { 0, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6 };
+
     public static boolean oddDSP = true;
     public static boolean oddAddSub = true;
 
-    private static ModuleInst instantiateOperator(Design d, String type) {
+    private static ModuleInst instantiateOperator(Design d, String type, int width) {
         if (type.equals("*")) {
             oddDSP = !oddDSP;
             type = type + (oddDSP ? "o" : "");
@@ -253,7 +270,7 @@ public class PolynomialGenerator {
         EDIFCellInst ci = top.createChildCellInst(name, m.getNetlist().getTopCell());
         ModuleInst mi = d.createModuleInst(name, m);
         mi.setCellInst(ci);
-        placeModuleInst(mi, type);
+        placeModuleInst(mi, type, width);
         instanceCount++;
 
 
@@ -332,10 +349,11 @@ public class PolynomialGenerator {
     }
 
     public static Design generatePolynomial(String polynomial, int width, boolean route) {
-        return generatePolynomial(polynomial, "polygen", width, route, "out.dcp", null);
+        return generatePolynomial(polynomial, "polygen", width, route, "out.dcp", null, false);
     }
 
-    public static Design generatePolynomial(String polynomial, String name, int width, boolean route, String outputDCP, PBlock pblock) {
+    public static Design generatePolynomial(String polynomial, String name, int width, boolean route, String outputDCP,
+            PBlock pblock, boolean invokeHandPlacer) {
         int init_dspx = dspx;
         int init_dspy = dspy;
         int init_slicex = slicex;
@@ -362,21 +380,6 @@ public class PolynomialGenerator {
 
         EDIFPortInst[] results = EDIFTools.createPortInsts(top, RESULT_NAME, EDIFDirection.OUTPUT, width);
 
-
-        // Create BUFGCE in netlist and connect it
-        /*UnisimManager uMgr = UnisimManager.getInstance();
-
-        EDIFCellInst bufgce = uMgr.createUnisimInstance(top, "bufgceInst", Unisim.BUFGCE);
-        EDIFNet clkInNet = top.createNet(CLK_NAME +"_in");
-        clkInNet.createPortInst(top.createPort(CLK_NAME +"_in", EDIFDirection.INPUT, 1));
-
-        clkInNet.createPortInst("I", bufgce);
-        EDIFNet clkNet = top.createNet(CLK_NAME);
-        clkNet.createPortInst("O", bufgce);
-        EDIFNet vccNet = EDIFTools.getStaticNet(NetType.VCC, top, n);
-        vccNet.createPortInst("CE", bufgce);*/
-
-
         t.stop().start("Build Operator Tree");
 
         buildOperatorTree(p, d, results);
@@ -384,70 +387,15 @@ public class PolynomialGenerator {
         d.addXDCConstraint(ConstraintGroup.LATE, "create_clock -name "+CLK_NAME+" -period 1.291 [get_ports "+CLK_NAME+"]");
         d.addXDCConstraint(ConstraintGroup.LATE, "set_property HD.CLK_SRC BUFGCE_X0Y18 [get_ports "+CLK_NAME+"]");
 
-        t.stop().start("Final Route");
-
-
-        Map<String,String> parentNetMap = n.getParentNetMapNames();
-        for (Net net : new ArrayList<>(d.getNets())) {
-            if (net.getPins().size() > 0 && net.getSource() == null) {
-                if (net.isStaticNet()) continue;
-                String parentNet = parentNetMap.get(net.getName());
-                if (parentNet.equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
-                    d.movePinsToNewNetDeleteOldNet(net, d.getVccNet(), true);
-                    continue;
-                } else if (parentNet.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
-                    d.movePinsToNewNetDeleteOldNet(net, d.getGndNet(), true);
-                    continue;
-                }
-                Net parent = d.getNet(parentNet);
-                if (parent == null) {
-                    continue;
-                }
-                d.movePinsToNewNetDeleteOldNet(net, parent, true);
-
-            }
+        if (invokeHandPlacer) {
+            t.stop().start("Hand Placer");
+            HandPlacer.openDesign(d);
         }
 
-        //SLRCrosserDCPCreator.placeBUFGCE(d, d.getDevice().getSite("BUFGCE_X0Y218"), "bufgceInst");
-
         if (route) {
-            Router r = new Router(d);
-            r.setSupressWarningsErrors(true);
-            /*int xmin = Integer.MAX_VALUE;
-            int xmax = 0;
-            int ymin = Integer.MAX_VALUE;
-            int ymax = 0;
-            for (SiteInstance si : d.getSiteInstances()) {
-                if (si.getSiteName().startsWith("SLICE")) {
-                    if (si.getSite().getInstanceX() < xmin) xmin = si.getSite().getInstanceX();
-                    if (si.getSite().getInstanceX() > xmax) xmax = si.getSite().getInstanceX();
-                    if (si.getSite().getInstanceY() < ymin) ymin = si.getSite().getInstanceY();
-                    if (si.getSite().getInstanceY() > ymax) ymax = si.getSite().getInstanceY();
-                }
-            }
-
-            int[] minoffset = new int[] {-1, 0, -2};
-            int[] maxoffset = new int[] { 1, 2,  0};
-            String lowerLeft = null;
-            String upperRight = null;
-            for (int i=0; i < 3; i++) {
-                lowerLeft = "SLICE_X" + (xmin+minoffset[i]) + "Y" + (ymin+minoffset[i]);
-                upperRight = "SLICE_X" + (xmax+maxoffset[i]) + "Y" + (ymax+maxoffset[i]);
-                if (d.getDevice().getSite(lowerLeft) != null && d.getDevice().getSite(upperRight) != null) {
-                    break;
-                } else {
-                    lowerLeft = null;
-                    upperRight = null;
-                }
-            }
-            if (lowerLeft == null || upperRight == null) {
-                System.err.println("ERROR: Couldn't find appropriate routing containment Pblock ");
-            } else {
-                r.setRoutingPblock(new PBlock(d.getDevice(),lowerLeft+":"+upperRight));
-            }*/
-            //r.setRoutingPblock(new PBlock(d.getDevice(), "SLICE_X"+(slicex-3)+"Y"+(slicey-25)+":SLICE_X"+(slicex+1)+"Y"+(slicey+29-25)));
-            r.setRoutingPblock(pblock);
-            r.routeDesign();
+            t.stop().start("RWRoute");
+            d.flattenDesign();
+            RWRoute.routeDesignFullNonTimingDriven(d);
         }
 
         t.stop();
@@ -468,14 +416,28 @@ public class PolynomialGenerator {
         return d;
     }
 
+    private static final String HAND_PLACER_OPT = "--hand-placer";
+
     public static void main(String[] args) {
-        if (args.length != 2) {
-            System.out.println("USAGE: <polynomial> <bit width>");
+        if (args.length < 2 || args.length > 3) {
+            System.out.println("USAGE: <polynomial> <bit width 1 to 18> [" + HAND_PLACER_OPT + "]");
             return;
         }
         String polynomial = args[0];
         int bitWidth = Integer.parseInt(args[1]);
+        boolean invokeHandPlacer = false;
+        if (args.length == 3) {
+            if (args[2].equals(HAND_PLACER_OPT)) {
+                invokeHandPlacer = true;
+            } else {
+                throw new RuntimeException("Unrecognized option: " + args[2]);
+            }
+        }
+        if (bitWidth < 1 || bitWidth > 18) {
+            throw new RuntimeException("ERROR: Bit width " + bitWidth
+                    + " is unsupported, please choose a bit width between 1 and 18 bits.");
+        }
 
-        generatePolynomial(polynomial, "polynomial", bitWidth, false,"polynomial.dcp", null);
+        generatePolynomial(polynomial, "polynomial", bitWidth, true, "polynomial.dcp", null, invokeHandPlacer);
     }
 }

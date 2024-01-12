@@ -30,6 +30,7 @@ components["java"].withVariantsFromConfiguration(configurations["testFixturesRun
 
 dependencies {
     api 'com.xilinx.rapidwright:rapidwright-api-lib:' + rapidwright_version
+    api 'com.xilinx.rapidwright:rapidwright-api-lib:' + rapidwright_version + ':javadoc'
 }
 
 sourceSets {
@@ -75,10 +76,13 @@ task cleanupScripts(type: Delete) {
 }
 
 task restoreScripts(type: Copy) {
+    dependsOn(tasks.named("jar"))
     from preserveDir
     into 'bin'
     finalizedBy(cleanupScripts)
 }
+
+run.dependsOn(restoreScripts)
 
 task mainJar(type: Jar, dependsOn: classes) {
     archiveBaseName = 'main'

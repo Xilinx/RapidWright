@@ -69,10 +69,13 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
         }};
     }
 
-    public RouteNodeGraphTimingDriven(RuntimeTracker rnodesTimer, Design design, DelayEstimatorBase delayEstimator, boolean maskNodesCrossRCLK) {
-        super(rnodesTimer, design);
+    public RouteNodeGraphTimingDriven(RuntimeTracker rnodesTimer,
+                                      Design design,
+                                      RWRouteConfig config,
+                                      DelayEstimatorBase delayEstimator) {
+        super(rnodesTimer, design, config);
         this.delayEstimator = delayEstimator;
-        this.maskNodesCrossRCLK = maskNodesCrossRCLK;
+        this.maskNodesCrossRCLK = config.isMaskNodesCrossRCLK();
 
         excludeAboveRclk = new HashSet<>();
         excludeBelowRclk = new HashSet<>();
@@ -111,13 +114,13 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
         @Override
         public String toString() {
             StringBuilder s = new StringBuilder();
-            s.append("node " + node.toString());
+            s.append("node " + super.toString());
             s.append(", ");
             s.append("(" + getEndTileXCoordinate() + "," + getEndTileYCoordinate() + ")");
             s.append(", ");
             s.append(String.format("type = %s", getType()));
             s.append(", ");
-            s.append(String.format("ic = %s", node.getIntentCode()));
+            s.append(String.format("ic = %s", getIntentCode()));
             s.append(", ");
             s.append(String.format("dly = %f", delay));
             s.append(", ");

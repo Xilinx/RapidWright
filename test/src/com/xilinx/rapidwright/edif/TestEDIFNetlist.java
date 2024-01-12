@@ -580,4 +580,25 @@ class TestEDIFNetlist {
         // Assert no property exists on unsupported macros either
         Assertions.assertNull(inst.getProperty("IS_CLK_INVERTED"));
     }
+
+    @Test
+    public void testGetPhysicalPinsInout() {
+        Design design = RapidWrightDCP.loadDCP("inout.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+
+        {
+            Assertions.assertEquals("[i_IBUF_inst/INBUF_INST/PAD]", netlist.getPhysicalPins("i").toString());
+            Assertions.assertEquals(null, netlist.getPhysicalPins("i_IBUF"));
+            Assertions.assertEquals("[o_OBUF_inst/O]", netlist.getPhysicalPins("o").toString());
+            Assertions.assertEquals(null, netlist.getPhysicalPins("o_IBUF"));
+        }
+        {
+            Assertions.assertEquals("[ib/DIFFINBUF_INST/DIFF_IN_P]", netlist.getPhysicalPins("i2_p").toString());
+            Assertions.assertEquals("[ib/DIFFINBUF_INST/DIFF_IN_N]", netlist.getPhysicalPins("i2_n").toString());
+            Assertions.assertEquals(null, netlist.getPhysicalPins("o2_p"));
+            Assertions.assertEquals("[ob/N/O]", netlist.getPhysicalPins("ob/OB").toString());
+            Assertions.assertEquals(null, netlist.getPhysicalPins("o2_n"));
+            Assertions.assertEquals("[ob/P/O]", netlist.getPhysicalPins("ob/O").toString());
+        }
+    }
 }

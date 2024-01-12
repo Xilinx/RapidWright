@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -34,6 +34,10 @@ public class RapidWrightDCP {
 
     public static Design loadDCP(String name) {
         return Design.readCheckpoint(getPath(name));
+    }
+
+    public static Design loadDCP(String name, boolean skipXdef) {
+        return Design.readCheckpoint(getPath(name), skipXdef);
     }
 
     public static Path getPath(String name) {

@@ -33,12 +33,24 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 
 /**
- * Generated on: Wed May 17 23:03:43 2023
+ * Generated on: Fri Oct 20 23:25:44 2023
  * by: com.xilinx.rapidwright.release.UnisimParser
  *
  * Enumerates supported Unisim primitives that map to Xilinx devices.
  */
 public enum Unisim {
+    AIE_ML_NOC_M_AXI,
+    AIE_ML_NOC_M_AXIS,
+    AIE_ML_NOC_S_AXI,
+    AIE_ML_NOC_S_AXIS,
+    AIE_ML_PL_M_AXIS128,
+    AIE_ML_PL_M_AXIS32,
+    AIE_ML_PL_M_AXIS64,
+    AIE_ML_PL_M_EVENTS,
+    AIE_ML_PL_S_AXIS128,
+    AIE_ML_PL_S_AXIS32,
+    AIE_ML_PL_S_AXIS64,
+    AIE_ML_PL_S_EVENTS,
     AIE_NOC_M_AXI,
     AIE_NOC_M_AXIS,
     AIE_NOC_S_AXI,
@@ -144,6 +156,7 @@ public enum Unisim {
     DCM_SP,
     DDRMC,
     DDRMC5,
+    DDRMC5C,
     DDRMC_RIU,
     DFE_CFR,
     DFE_DUC_DDC,
@@ -761,6 +774,7 @@ public enum Unisim {
     NOC2_XBR2X4,
     NOC2_XBR4X2,
     NOC_NCRB,
+    NOC_NCRB_SSIT,
     NOC_NIDB,
     NOC_NMU128,
     NOC_NMU256,
@@ -1275,9 +1289,6 @@ public enum Unisim {
     RAMS64E5,
     RFADC,
     RFADC_13B4W_M0,
-    RFADC_13B4W_M1,
-    RFADC_14B2W_M0,
-    RFADC_14B2W_M1,
     RFDAC,
     RIU_OR,
     ROM128X1,
@@ -1323,6 +1334,7 @@ public enum Unisim {
     USR_ACCESS_VIRTEX6,
     VCC,
     VCU,
+    VDU,
     X5PHIO_CMUIF,
     X5PHIO_CMU_X32,
     X5PHIO_DCCINVBUF,

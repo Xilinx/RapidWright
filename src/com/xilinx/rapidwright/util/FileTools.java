@@ -254,23 +254,6 @@ public class FileTools {
     }
 
     /**
-     * Use {@link #getKryoGzipOutputStream(String)} instead.
-     * @deprecated To be removed in 2023.2.0
-     */
-    public static Output getKryoOutputStream(String fileName) {
-        return getKryoGzipOutputStream(fileName);
-    }
-
-
-    /**
-     * Use {@link #getKryoGzipOutputStream(OutputStream)} instead.
-     * @deprecated To be removed in 2023.2.0
-     */
-    public static Output getKryoOutputStream(OutputStream os) {
-        return getKryoGzipOutputStream(os);
-    }
-
-    /**
      * Wraps the provided output stream with a kryo stream. Will call
      * {@link #useUnsafeStreams()} to decide on using unsafe or not.
      * 
@@ -344,22 +327,6 @@ public class FileTools {
      */
     public static Input getKryoGzipInputStream(InputStream is) {
         return getKryoInputStreamWithoutInflater(new InflaterInputStream(is));
-    }
-
-    /**
-     * Please use {@link #getKryoGzipInputStream(String)} instead.
-     * @deprecated - To be removed in 2023.2.0
-     */
-    public static Input getKryoInputStream(String fileName) {
-        return getKryoGzipInputStream(fileName);
-    }
-
-    /**
-     * Please use {@link #getKryoGzipInputStream(InputStream)} instead.
-     * @deprecated - To be removed in 2023.2.0
-     */
-    public static Input getKryoInputStream(InputStream in) {
-        return getKryoGzipInputStream(in);
     }
 
     /**
@@ -1369,14 +1336,25 @@ public class FileTools {
     }
 
     /**
-     * This method will get and return the current time as a string
-     * formatted in the same way used in most Xilinx report and XDL
-     * files.  The format used in the using the same syntax as SimpleDateFormat
-     * which is "EEE MMM dd HH:mm:ss yyyy".
+     * This method will get and return the current time as a string formatted in the
+     * same way used in most Xilinx report and XDL files. The format used in the
+     * using the same syntax as SimpleDateFormat which is "EEE MMM dd HH:mm:ss z
+     * yyyy".
+     * 
      * @return Current date and time as a formatted string.
      */
     public static String getTimeString() {
-        SimpleDateFormat formatter = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy");
+        SimpleDateFormat formatter = new SimpleDateFormat("EEE MMM dd HH:mm:ss z yyyy");
+        return formatter.format(new java.util.Date());
+    }
+
+    /**
+     * Creates a formatted string of the current time in a sortable format ("yyyy mm dd HH mm ss").
+     * 
+     * @return The time stamp as a sortable string.
+     */
+    public static String getTimeStamp() {
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
         return formatter.format(new java.util.Date());
     }
 
@@ -1827,7 +1805,7 @@ public class FileTools {
         if (isVivadoOnPath()) {
             List<String> lines = execCommandGetOutput(true, "vivado", "-version");
             for (String line : lines) {
-                if (line.startsWith("Vivado ")) {
+                if (line.toLowerCase().startsWith("vivado ")) {
                     String[] tokens = line.split("\\s+");
                     return tokens[1];
                 }
@@ -1997,7 +1975,15 @@ public class FileTools {
         return path.resolveSibling(path.getFileName().toString()+extension);
     }
 
-
+    /**
+     * Replaces the file extension of the provided file name. The current extension
+     * includes the final period '.' and all characters following it. If the file
+     * has no extension, it will add it as a suffix to the filename.
+     * 
+     * @param path         Name of the file to receive the updated extension.
+     * @param newExtension The new extension (should include starting period '.')
+     * @return The newly updated file path.
+     */
     public static Path replaceExtension(Path path, String newExtension) {
         String fn = path.getFileName().toString();
         int idx = fn.lastIndexOf('.');

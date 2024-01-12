@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Advanced Micro Devices, Inc.
@@ -24,10 +24,18 @@ package com.xilinx.rapidwright.edif;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Series;
+
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+
+import java.util.Objects;
 
 public class TestEDIFHierPortInst {
     @Test
@@ -45,5 +53,56 @@ public class TestEDIFHierPortInst {
 
         // Check that we can still find it in this case
         Assertions.assertEquals(c, ehpi.getPhysicalCell(d));
+    }
+
+    @Test
+    public void testGetPhysicalCellMacroHierarchy() {
+        Design design = new Design("design", "xcvc1902-vsvd1760-2MP-e-S");
+        EDIFNetlist n = design.getNetlist();
+        
+        EDIFCell macro = n.getHDIPrimitive(Unisim.RAM64X1D);
+        Assertions.assertSame(n.getHDIPrimitivesLibrary(), macro.getLibrary());
+        n.getTopCell().createChildCellInst("inst", macro);
+        n.expandMacroUnisims(Series.Versal);
+
+        String cellName = "inst/DP/RAMD64_INST";
+
+        // We can't instantiate RAM64X1D since it's a transformed prim, so we'll update
+        // the type after creation
+        Cell c = design.createAndPlaceCell(cellName, Unisim.LUT6, "SLICE_X235Y138/B6LUT");
+        c.setType(Unisim.RAM64X1D.toString());
+
+        EDIFHierCellInst leafInst = n.getHierCellInstFromName("inst/DP/RAMD64_INST");
+
+        EDIFHierPortInst portInst = new EDIFHierPortInst(leafInst.getParent(), leafInst.getInst().getPortInst("O"));
+        Assertions.assertEquals(c, portInst.getPhysicalCell(design));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            // Cell pin placed onto a D6LUT/O6 -- its net does exit the site
+            "processor/address_loop[8].output_data.pc_vector_mux_lut/LUT6/O,D_O,true",
+            // Cell pin placed onto a D5LUT/O5 -- its net does exit the site
+            "processor/address_loop[8].output_data.pc_vector_mux_lut/LUT5/O,DMUX,true",
+
+            // Cell pin placed onto a E6LUT/O6 -- its net does not exit the site
+            "processor/stack_loop[4].upper_stack.stack_pointer_lut/LUT6/O,null,true",
+
+            // Cell pin placed onto a D5LUT/O5 -- its net does not exit the site and
+            // nothing is using DMUX
+            "processor/stack_loop[3].upper_stack.stack_pointer_lut/LUT5/O,null,true",
+
+            // FIXME: Known broken -- see https://github.com/Xilinx/RapidWright/pull/577
+            // Cell pin placed onto a E5LUT/O5 -- its net does not exit the site but
+            // another net is using EMUX
+            "processor/stack_loop[4].upper_stack.stack_pointer_lut/LUT5/O,null,false",
+
+    })
+    void testGetRoutedSitePinInst(String hierPortInstName, String expected, boolean expectPass) {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        EDIFNetlist netlist = d.getNetlist();
+        EDIFHierPortInst ehpi = netlist.getHierPortInstFromName(hierPortInstName);
+        SitePinInst spi = ehpi.getRoutedSitePinInst(d);
+        Assertions.assertEquals(expectPass, Objects.equals(expected, spi == null ? "null" : spi.getName()));
     }
 }

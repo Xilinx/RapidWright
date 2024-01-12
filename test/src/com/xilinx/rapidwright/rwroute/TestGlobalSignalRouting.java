@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Advanced Micro Devices, Inc.
@@ -32,6 +32,7 @@ import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -41,19 +42,26 @@ import java.util.function.Function;
 public class TestGlobalSignalRouting {
     @ParameterizedTest
     @CsvSource({
-            "CLKBWRCLK",
-            "RSTRAMB"
+            "CLKBWRCLK,",
+            "RSTRAMB,",
+            "WEBWE[0],WEBL0",
+            "ADDRENA,ADDRENAL",
+            "ADDRENB,ADDRENBU"
     })
-    public void testRAMB36(String logicalPinName) {
+    public void testRAMB36(String logicalPinName, String erroringSitePinName) throws Throwable {
         Design design = new Design("design", "xcvu3p");
         Cell bufg = design.createAndPlaceCell("test_bufg", Unisim.BUFGCE, "BUFGCE_X0Y0/BUFCE");
-        Net globalNet = design.createNet("global");
+        Net globalNet = design.createNet("clk");
         globalNet.connect(bufg,"O");
 
         Cell target = design.createAndPlaceCell("test_ram", Unisim.RAMB36E2, "RAMB36_X0Y0/RAMB36E2");
-        if (logicalPinName.equals("CLKBWRCLK") || logicalPinName.equals("RSTRAMB")) {
+        if (logicalPinName.equals("CLKBWRCLK") || logicalPinName.equals("RSTRAMB") ||
+                logicalPinName.equals("ADDRENA") || logicalPinName.equals("ADDRENB")) {
             target.addPinMapping(logicalPinName + "L", logicalPinName);
             target.addPinMapping(logicalPinName + "U", logicalPinName);
+        } else if (logicalPinName.equals("WEBWE[0]")) {
+            target.addPinMapping("WEBWEL0", logicalPinName);
+            target.addPinMapping("WEBWEU0", logicalPinName);
         }
         globalNet.connect(target, logicalPinName);
 
@@ -61,7 +69,15 @@ public class TestGlobalSignalRouting {
         //        This is a canary assertion that will light up when this gets fixed.
         Assertions.assertEquals(2 /* 3 */, globalNet.getPins().size());
 
-        GlobalSignalRouting.symmetricClkRouting(globalNet, design.getDevice(), (n) -> NodeStatus.AVAILABLE);
+        Executable e = () -> GlobalSignalRouting.symmetricClkRouting(globalNet, design.getDevice(), (n) -> NodeStatus.AVAILABLE);
+        if (erroringSitePinName == null) {
+            e.execute();
+        } else {
+            // FIXME: Known broken -- see https://github.com/Xilinx/RapidWright/issues/756
+            RuntimeException ex = Assertions.assertThrows(RuntimeException.class, e, "true");
+            Assertions.assertEquals("ERROR: No mapped LCB to SitePinInst IN RAMB36_X0Y0." + erroringSitePinName,
+                    ex.getMessage());
+        }
     }
 
     @Test
@@ -82,7 +98,7 @@ public class TestGlobalSignalRouting {
 
         GlobalSignalRouting.routeStaticNet(design.getGndNet(), gns, design, routeThruHelper);
         gndPins = design.getGndNet().getPins();
-        Assertions.assertEquals(1781, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
+        Assertions.assertEquals(1952, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
         Assertions.assertEquals(22760, gndPins.stream().filter((spi) -> !spi.isOutPin()).count());
 
         GlobalSignalRouting.routeStaticNet(design.getVccNet(), gns, design, routeThruHelper);

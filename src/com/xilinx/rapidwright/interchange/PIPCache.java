@@ -101,6 +101,10 @@ public class PIPCache {
 
             return tile.getPIP(wire0Idx, wire1Idx);
         });
+
+        if (pip == null) {
+            return null;
+        }
         PIP newPIP = new PIP(pip);
         newPIP.setTile(tile);
         return newPIP;

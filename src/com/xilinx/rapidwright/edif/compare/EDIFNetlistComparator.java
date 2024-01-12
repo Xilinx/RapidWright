@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 
+import com.xilinx.rapidwright.design.compare.DesignComparator;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.edif.EDIFCell;
@@ -55,7 +56,8 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
  * This is a helper class designed to compare two EDIFNetlists for differences.
  * It can filter out differences introduced by Vivado by reading in the EDIF and
  * writing out as a DCP. It can also generate a report file describing all the
- * differences found.
+ * differences found. Please see @link {@link DesignComparator} to compare the
+ * placement and routing information of a design.
  */
 public class EDIFNetlistComparator {
 

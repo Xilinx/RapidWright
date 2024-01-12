@@ -30,7 +30,10 @@ import java.util.List;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist;
@@ -41,6 +44,9 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysNet;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PinMapping;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.RouteSegment;
+import com.xilinx.rapidwright.rwroute.RWRoute;
+import com.xilinx.rapidwright.rwroute.TestRWRoute;
+import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -48,6 +54,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.capnproto.MessageReader;
 import org.capnproto.ReaderOptions;
 import org.capnproto.StructList;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestPhysNetlistWriter {
     private void testAllRouteSegmentsEndInBELInputPins(Design design, RouteBranch.Reader routeBranch, List<String> strings) {
@@ -301,5 +309,83 @@ public class TestPhysNetlistWriter {
         PhysNetlist.PhysSitePin.Reader HMUX = HMUX_branch.getRouteSegment().getSitePin();
         Assertions.assertEquals("SLICE_X13Y239", allStrings.get(HMUX.getSite()));
         Assertions.assertEquals("HMUX", allStrings.get(HMUX.getPin()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "bnn.dcp",
+            "optical-flow.dcp"
+    })
+    @LargeTest(max_memory_gb = 8)
+    public void testSimulateSwappedLutPinsWithRWRoute(String path, @TempDir Path tempDir) throws IOException {
+        Design inputDesign = RapidWrightDCP.loadDCP(path);
+        try {
+            System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "true");
+            RWRoute.routeDesignWithUserDefinedArguments(inputDesign, new String[]{"--nonTimingDriven", "--lutPinSwapping"});
+
+            System.setProperty("rapidwright.physNetlistWriter.simulateSwappedLutPins", "true");
+            String interchangePath = tempDir.resolve("testSimulateSwappedLutPinsWithRWRoute.phys").toString();
+            PhysNetlistWriter.writePhysNetlist(inputDesign, interchangePath);
+            Design outputDesign = PhysNetlistReader.readPhysNetlist(interchangePath.toString(), inputDesign.getNetlist());
+            inputDesign = null;
+
+            Assertions.assertTrue(LUTTools.swapLutPinsFromPIPs(outputDesign) > 0);
+            DesignTools.updatePinsIsRouted(outputDesign);
+            TestRWRoute.assertAllSourcesRoutedFlagSet(outputDesign);
+            TestRWRoute.assertAllPinsRouted(outputDesign);
+            TestRWRoute.assertVivadoFullyRouted(outputDesign);
+        } finally {
+            System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "false");
+            System.setProperty("rapidwright.physNetlistWriter.simulateSwappedLutPins", "false");
+        }
+    }
+
+    @Test
+    public void testStaticSourceBELPin(@TempDir Path tempDir) throws IOException {
+        Design inputDesign = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        Assertions.assertEquals(inputDesign.getGndNet(),
+                inputDesign.getSiteInst("SLICE_X15Y239").getNetFromSiteWire("A_O"));
+
+        String interchangePath = tempDir.resolve("design.phys").toString();
+        PhysNetlistWriter.writePhysNetlist(inputDesign, interchangePath);
+
+        Design outputDesign = PhysNetlistReader.readPhysNetlist(interchangePath.toString(), inputDesign.getNetlist());
+        inputDesign = null;
+        Assertions.assertEquals(outputDesign.getGndNet(),
+                outputDesign.getSiteInst("SLICE_X15Y239").getNetFromSiteWire("A_O"));
+    }
+
+    @Test
+    public void testStaticNets(@TempDir Path tempDir) throws IOException {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+
+        String interchangePath = tempDir.resolve("design.phys").toString();
+        PhysNetlistWriter.writePhysNetlist(design, interchangePath);
+
+        ReaderOptions rdOptions =
+                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
+                        ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
+        MessageReader readMsg = Interchange.readInterchangeFile(interchangePath, rdOptions);
+
+        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
+
+        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
+
+        PhysNet.Reader gndNet = null;
+        PhysNet.Reader vccNet = null;
+        for (PhysNet.Reader n : physNetlist.getPhysNets()) {
+            String netName = allStrings.get(n.getName());
+            if (netName.equals(Net.GND_NET)) {
+                gndNet = n;
+            } else if (netName.equals(Net.VCC_NET)) {
+                vccNet = n;
+            }
+            if (gndNet != null && vccNet != null) {
+                break;
+            }
+        }
+
+        Assertions.assertEquals(0, gndNet.getStubs().size());
+        Assertions.assertEquals(0, vccNet.getStubs().size());
     }
 }

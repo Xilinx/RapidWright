@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -329,5 +329,18 @@ public class EDIFHierCellInst {
             copyInsts[i] = copy;
         }
         return new EDIFHierCellInst(copyInsts);
+    }
+
+    /**
+     * True if all cells on this path are the only instantiations of its cell.
+     */
+    public boolean isUniquified() {
+        assert(isToplevelInst(cellInsts[0]));
+        for (int i = cellInsts.length - 1; i > 0; i--) {
+            if (!cellInsts[i].isUniquified()) {
+                return false;
+            }
+        }
+        return true;
     }
 }

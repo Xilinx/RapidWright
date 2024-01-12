@@ -34,12 +34,14 @@ import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SitePIPStatus;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.CellPlacement;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.MultiCellPinMapping;
+import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.NetType;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysBelPin;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysCell;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.PhysCellType;
@@ -55,6 +57,7 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranc
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.SiteInstance;
 import com.xilinx.rapidwright.interchange.RouteBranchNode.RouteSegmentType;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.Utils;
 import org.capnproto.MessageBuilder;
 import org.capnproto.PrimitiveList;
 import org.capnproto.StructList;
@@ -136,7 +139,11 @@ public class PhysNetlistWriter {
                 if (!cell.isPlaced()) continue;
                 String cellName = cell.getName();
                 if (cellName.equals(PhysNetlistWriter.LOCKED)) continue;
-                if (!design.getCell(cellName).getBELName().equals(cell.getBELName())) {
+                Cell multiCell = design.getCell(cellName);
+                if (multiCell == null) {
+                    assert(cell.isFFRoutethruCell());
+                }
+                else if (!multiCell.getBELName().equals(cell.getBELName())) {
                     multiBelCells.computeIfAbsent(cellName, (k) -> new ArrayList<>())
                             .add(cell);
                     // Don't add multi-bel cells, store relevant info in pin placements
@@ -287,13 +294,13 @@ public class PhysNetlistWriter {
         physNet.setName(strings.getIndex(net.getName()));
         switch (net.getType()) {
         case GND:
-            physNet.setType(PhysNetlist.NetType.GND);
+            physNet.setType(NetType.GND);
             break;
         case VCC:
-            physNet.setType(PhysNetlist.NetType.VCC);
+            physNet.setType(NetType.VCC);
             break;
         default:
-            physNet.setType(PhysNetlist.NetType.SIGNAL);
+            physNet.setType(NetType.SIGNAL);
         }
 
         // We need to traverse the net inside sites to fully populate routing spec
@@ -339,18 +346,64 @@ public class PhysNetlistWriter {
 
     public static void extractIntraSiteRouting(Net net, List<RouteBranchNode> nodes, SiteInst siteInst) {
         Site site = siteInst.getSite();
+        final boolean isStaticNet = net.isStaticNet();
         for (String siteWire : siteInst.getSiteWiresFromNet(net)) {
             BELPin[] belPins = siteInst.getSiteWirePins(siteWire);
             for (BELPin belPin : belPins) {
                 BEL bel = belPin.getBEL();
                 Cell cell = siteInst.getCell(bel);
-                boolean routethru = false;
-                if (belPin.isInput()) {
-                    if (bel.getBELClass() == BELClass.BEL) {
-                        if (cell == null) {
-                            // Skip if nothing placed here
+                boolean bidirPinIsInput = false;
+                boolean bidirPinIsOutput = false;
+                if (bel.getBELClass() == BELClass.BEL) {
+                    if (cell == null) {
+                        if (belPin.isInput() || !net.isStaticNet()) {
+                            // Skip if nothing placed here and cannot be driving a static net
                             continue;
                         }
+                        assert(bel.isLUT() || // LUTs can be a GND or VCC source
+                                (net.isGNDNet() && bel.isGndSource()) ||
+                                (net.isVCCNet() && bel.isVccSource()));
+                    } else if (cell.getType().equals(PORT)) {
+                        if (Utils.isIOB(siteInst)) {
+                            assert(belPin.isBidir());
+                            assert(bel.getName().equals("PAD"));
+
+                            Series series = siteInst.getDesign().getDevice().getSeries();
+                            SitePIP sitePIP;
+                            if (series == Series.UltraScalePlus || series == Series.UltraScale) {
+                                BEL padout = siteInst.getBEL("PADOUT");
+                                if (padout == null) {
+                                    // HPIOB_SNGL site types do not contain this SitePIP; ignore
+                                    continue;
+                                }
+                                sitePIP = siteInst.getSitePIP(padout.getPin("IN"));
+                            } else if (series == Series.Series7) {
+                                sitePIP = siteInst.getSitePIP("IUSED", "0");
+                            } else {
+                                throw new RuntimeException("Unsupported series " + series);
+                            }
+
+                            SitePIPStatus sitePIPStatus = siteInst.getSitePIPStatus(sitePIP);
+                            bidirPinIsOutput = sitePIPStatus.isUsed();
+                            bidirPinIsInput = !bidirPinIsOutput;
+                        } else if (siteInst.getSiteName().startsWith("GTY")) {
+                            if (belPin.isBidir()) {
+                                assert(bel.getName().startsWith("REFCLK"));
+                                BEL obufdsBel = siteInst.getBEL("OBUFDS" + bel.getName().charAt(6) + "_GTYE4");
+                                assert(obufdsBel != null);
+                                Cell obufdsCell = siteInst.getCell(obufdsBel);
+                                bidirPinIsInput = (obufdsCell != null);
+                                bidirPinIsOutput = (obufdsCell == null);
+                            }
+                        } else {
+                            throw new RuntimeException("Unable to process PORT cell at site " + siteInst.getSiteName());
+                        }
+                    }
+                }
+
+                boolean routethru = false;
+                if (belPin.isInput() || bidirPinIsInput) {
+                    if (bel.getBELClass() == BELClass.BEL) {
                         if (!VERBOSE_PHYSICAL_NET_ROUTING && !cell.isRoutethru()) {
                             // Skip if cell is not a routethru
                             continue;
@@ -390,18 +443,25 @@ public class PhysNetlistWriter {
                         }
                     }
                 } else {
+                    assert(belPin.isOutput() || bidirPinIsOutput);
+
                     if (bel.getBELClass() == BELClass.BEL) {
                         routethru = cell != null && cell.isRoutethru();
 
                         // Fall through
                     } else if (bel.getBELClass() == BELClass.RBEL) {
+                        if (isStaticNet && bel.isStaticSource()) {
+                            assert(belPin.isOutput());
+                            // Skip output pins on static source BELs (e.g. SLICE.HARD0GND)
+                            continue;
+                        }
                         if (siteInst.getUsedSitePIP(belPin) != null) {
                             if (!VERBOSE_PHYSICAL_NET_ROUTING) {
                                 // Skip output pins on SitePIPs
                                 continue;
                             }
                         } else {
-                            assert(bel.isStaticSource() || net.getName().equals(Net.USED_NET));
+                            assert(net.isStaticNet() || net.isUsedNet());
                         }
                     } else {
                         assert(bel.getBELClass() == BELClass.PORT);
@@ -409,6 +469,11 @@ public class PhysNetlistWriter {
                         if (!VERBOSE_PHYSICAL_NET_ROUTING) {
                             // Skip output pins on site ports (will be set when site pin is added
                             // onto site instance)
+                            continue;
+                        }
+
+                        if (bel.getName().equals("IO") && siteInst.getSitePinInst(belPin.getName()) == null) {
+                            // Skip IO site ports without a site pin
                             continue;
                         }
                     }
@@ -437,6 +502,20 @@ public class PhysNetlistWriter {
             sources = new ArrayList<>();
             stubs = new ArrayList<>();
 
+            // To be used in conjunction with the "rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates"
+            // property (which allows RWRoute to perform LUT pin swapping but not move the swapped SitePinInst nor
+            // perform any intra-site routing updates). With the aforementioned RWRoute option, for swapped LUT pins
+            // default PhysNetlistWriter would not be able to identify the site pin that the routing services, thus
+            // causing any deferred site pin updates to appear as unconnected stubs.
+            // Enabling this following option allows the PhysNetlistWriter to simulate LUT pin swapping such that
+            // any routes that service an incorrect LUT input site pin are allowed to have a fake branch to the
+            // correct site pin on the same LUT for the purposes of simulating (prior to applying deferred updates)
+            // a fully routed net.
+            // This feature -- despite intra-site routing updates being deferred -- enables a stub-free physical
+            // netlist to be output. In addition, when reading this netlist back into RapidWright using PhysNetlistReader,
+            // any simulated branches will be discarded allowing deferred updates to continue as before.
+            final boolean simulateSwappedLutPins = Boolean.getBoolean("rapidwright.physNetlistWriter.simulateSwappedLutPins");
+
             Map<String, RouteBranchNode> map = new HashMap<>();
             for (RouteBranchNode rb : routingBranches) {
                 map.put(rb.toString(), rb);
@@ -447,7 +526,11 @@ public class PhysNetlistWriter {
                 if (rb.isSource()) {
                     sources.add(rb);
                 } else {
-                    for (String driver : rb.getDrivers()) {
+                    boolean simulateThisSwappedLutPin = simulateSwappedLutPins &&
+                        rb.getType() == RouteSegmentType.SITE_PIN &&
+                        rb.getSitePin().isLUTInputPin();
+
+                    for (String driver : rb.getDrivers(simulateSwappedLutPins)) {
                         RouteBranchNode driverBranch = map.get(driver);
                         if (driverBranch == null) continue;
                         if (driverBranch.getType() == RouteSegmentType.PIP) {
@@ -463,7 +546,21 @@ public class PhysNetlistWriter {
                                 }
                             }
                         }
+                        if (simulateThisSwappedLutPin) {
+                            List<RouteBranchNode> branches = driverBranch.getBranches();
+                            if (!branches.isEmpty()) {
+                                // driver is already driving something, which must be a (LUT) site pin
+                                // that can't be the current site pin. Since it's already servicing a LUT
+                                // input, it can't be used to service this one so skip it.
+                                assert(branches.get(0).getType() == RouteSegmentType.SITE_PIN);
+                                assert(branches.get(0) != rb);
+                                continue;
+                            }
+                        }
+
                         driverBranch.addBranch(rb);
+                        // Assume this must be the only driver
+                        break;
                     }
                 }
             }
@@ -479,10 +576,25 @@ public class PhysNetlistWriter {
                 map.remove(curr.toString());
                 queue.addAll(curr.getBranches());
             }
+
+            NetType type = physNet.getType();
+            final boolean isStaticNet = (type == NetType.GND || type == NetType.VCC);
             for (RouteBranchNode rb : map.values()) {
-                if (rb.getParent() == null) {
-                    stubs.add(rb);
+                if (rb.getParent() != null) {
+                    // Not a stub if it's connected to something
+                    continue;
                 }
+
+                if (isStaticNet &&
+                        ((rb.getType() == RouteSegmentType.SITE_PIN && rb.getSitePin().isOutPin()) ||
+                         (rb.getType() == RouteSegmentType.BEL_PIN && rb.getBELPin().belPin.isOutput()))) {
+                    // Assume that output site/bel pin stubs on static nets are static sources
+                    // (e.g. LUT outputs, VCC -> GND inverters, etc.)
+                    sources.add(rb);
+                    continue;
+                }
+
+                stubs.add(rb);
             }
         } else {
             sources = null;
@@ -521,9 +633,7 @@ public class PhysNetlistWriter {
                 physPIP.setWire0(strings.getIndex(pip.getStartWireName()));
                 physPIP.setWire1(strings.getIndex(pip.getEndWireName()));
                 physPIP.setIsFixed(pip.isPIPFixed());
-                if (pip.isBidirectional()) {
-                    physPIP.setForward(!pip.isReversed());
-                }
+                physPIP.setForward(!pip.isReversed());
                 break;
             }
             case BEL_PIN:{

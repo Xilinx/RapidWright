@@ -1,3 +1,198 @@
+============= RapidWright 2023.2.1-beta released on 2023-01-10 ================
+Notes:
+  - Add EDIFHierCellInst.isUniquified() (#918)
+  - [RWRoute] RouteNode to extend Node (#916)
+  - [DesignComparator] Fix whitespace (#937)
+  - RouteThruHelper.isRouteThruPIPAvailable(Design, WireInterface, WireIn (#915)
+  - Create a common interface for Node and Wire Objects (#892)
+  - DesignComparator - compares place and route data (#931)
+  - DesignTools.createMissingSitePinInsts() to infer SitePinInsts more smartly (#936)
+  - LUTTools.swapLutPinsFromPIPs() to warn when site pin not found (#934)
+  - [PhysNetlistReader] Warn and omit if PIP not found (#933)
+  - [PhysNetlistWriter] Handle PORT cells in GTY tiles (#930)
+  - [PhysNetlistWriter] Assume static net output BELPins to be sources too (#929)
+  - [PhysNetlistWriter] Fix stubs on static nets (#928)
+  - Get a Boolean from EDIFPropertyValue (#926)
+  - [PhysNetlistWriter] Infer direction of IOB's PAD.PAD BEL pin (#927)
+  - [RouteThruHelper] Move assertions, improve tests (#925)
+  - [RWRoute] Don't swap dist RAMs on 'H' BELs since A and WA are shared (#924)
+  - [PhysNetlistWriter] Recognize static source BELPins (e.g. LUT outputs) (#923)
+  - [RWRoute] Analyze a tile below the topmost arbitrary one (#921)
+  - Adding test for IOB placement (#903)
+  - [DesignTools.makeBlackBox()] Fixes routing issues in makeBlackBox() (#919)
+  - [ECOTools] Inline cell insertion (#917)
+  - RouterHelper.invertPossibleGndPinsToVccPins() to work on all invertible pins (#911)
+  - [RWRoute] GlobalSignalRouting static net router to use [A-H]MUX outputs (#914)
+  - [RWRoute] Fix exception for unrouteable connections (#913)
+  - Declare gradle dependency explicitly (#909)
+  - Fixes [Versal BELAttr] Parsing issue #912
+  - Add site pins when site routing through inverter BELs
+  - Fix UltraScale+ IBUF site routing
+  - Fix DSP pin mapping removals during site routing
+  - Adds support for special clock Node flag present in Versal designs
+  
+API Additions:
+  - com.xilinx.rapidwright.device.Node "public Node(Node node)"
+  - com.xilinx.rapidwright.device.Package "public synchronized PackagePin getPackagePin(Site site)"
+  - com.xilinx.rapidwright.device.Package "public String getPackagePinName(Site site)"
+
+
+============= RapidWright 2023.2.0-beta released on 2023-11-20 ================
+Notes:
+  - SLR Corner updates in device models and handling (#886)
+  - Updates Protobuf to 3.25.0 (#882)
+  - Updates/adds timestamp APIs (#883)
+  - Refactor PROHIBIT constraint for faster Tcl interpretation (#881)
+  - [PerformanceExplorer] Number pblocks by order in file, add first site in dir name (#867)
+  - DesignTools.createMissingSitePinInsts(Design) to ignore GLOBAL_USEDNET (#880)
+  - [RWRoute] Check source & sink pin reaches INT tile for dedicated connections (#878)
+  - ECOTools.createExitSitePinInst() to detect net aliases (#871)
+  - Rewrite RouterHelper.projectOutputPinToINTNode() with fixes (#877)
+  - EDIFNetlist.{generateParentNetMap,getNetAliases}() to be inout-aware (#876)
+  - DesignTools.createMissingSitePinInsts() to cope with net aliases (#875)
+  - Improve TestECOPlacementHelper (#874)
+  - Add com.xilinx.rapidwright.eco.ECOPlacementHelper (#870)
+  - RouteThruHelper to handle SiteInst == null (#866)
+  - Add RouteThruHelper.isRouteThruPIPAvailable(Design, Node, Node) overload (#865)
+  - Add DesignTools.getConnectedBELPins() (#864)
+  - RelocationTools fixes and more robust testing (#863)
+  - Fix TimingAndWirelengthReport.main() (#860)
+  - [Tests] Symlinks to absolute paths (#862)
+  - added check to see if Cell.getLogicalPinMapping() is null (#783)
+  - [DCP] Update tests to infer SitePinInsts (#857)
+  - Replace $(shell ...) with $(wildcard) and $(subst) in Makefile (#856)
+  - Undpreccate Design.createCell()
+  - Special clock flag fix for Versal DCPs
+  - More conservative SitePinInst creation upon DCP load
+  
+API Additions:
+  - com.xilinx.rapidwright.design.SitePinInst "public int getConnectedTileWire()"
+  - com.xilinx.rapidwright.device.Device "public int getSiteIndex(String siteName)"
+  - com.xilinx.rapidwright.device.Device "public int getSiteIndex(Site site)"
+  - com.xilinx.rapidwright.device.Device "public Site getSiteByIndex(int siteIndex)"
+  - com.xilinx.rapidwright.device.Device "public Site[] getAllSites()"
+  
+API Removals:
+  - com.xilinx.rapidwright.bitstream.ConfigRow "public ConfigRow()"  
+
+============= RapidWright 2023.1.4-beta released on 2023-10-20 ================
+Notes:
+  - Include RapidWright API Lib Javadoc in Gradle Build (#855)
+  - Add com.xilinx.rapidwright.eco.ECOTools package (#850)
+  - More Polynomial Generator improvements (#854)
+  - ReportRouteStatusResult.isFullyRouted() to check >0 logical net found (#852)
+  - Fixes for the PolynomialGenerator (tutorial) (#846)
+  - Test that Design.createModuleInst() copies static sources (#839)
+  - ModuleInst.place() to check both RAMB36/RAMB18 sites for overlap (#841)
+  - PartialRouter preprocessing and clock routing improvements (#843)
+  - Updates to Interchange README.md (#832)
+  - Simplify and make DesignTools.updatePinsIsRouted() more robust (#844)
+  - RouterHelper.invertPossibleGndPinsToVccPins() to not invert BRAM CLKs (#840)
+  - ModuleInst.connect() to leave physical Net alone for pass-thrus (#722)
+  - Unroute site routing when removing a cell (#729)
+  - PartialRouter's global router to not unpreserve sink nodes (#736)
+  - DesignTools.makePhysNetNamesConsistent() to use hier name (#735)
+  - DesignTools.makePhysNetNamesConsistent() to consider */<const{0,1}> (#734)
+  - Add DcpToInterchange class (#704)
+  - Add compile step (#733)
+  - Add EdifToLogicalNetlist to MainEntrypoint (#731)
+  - [PhysNetlistReader] Set Cell type for routethru cells (#727)
+  - Fix Javadoc warnings (#723)
+  - Fixes an issue with makeBlackBox trying to remove pins from renamed nets (#728)
+  - Multilevel macro expansion (#726)
+  - TestReplaceEDIFInDCP to copy DCP before replacing in-place (#725)
+  - DesignTools.createMissingSitePinInsts() to skip node-less site pins (#724)
+  - Add missing Versal DSP SiteTypeEnum (#842)
+  - [RWRoute] Further fix/cleanup around alternate source pins (#830)
+  - Adding out-of-context flag to RWRoute (#836)
+  - fix a bug in PipelineGeneratorWithRouting.createPipeline() (#837)
+  - Fix verb tense in RWRoute INFO msg (#835)
+  - Enable RWRoute to load Interchange designs from main() (#834)
+  - [VivadoTools] Check for Vivado on PATH first (#831)
+  - [EDIFNetlist] - Ensure Macro Expansion Deep Copies Children  (#828)
+  - Minor RWRoute and UltraScaleClockRouting fixes (#829)
+  - Properly add/remove dual-output pins (#825)
+  - [TestRouteNode] Update comment; swap east and west (#827)
+  - Add VivadoTools.reportRouteStatus() overload for specific net status (#823)
+  - Update link to Discussions forum (#824)
+  - [RWRoute] Only add alternative sources to SiteInst if used (#821)
+  - RouteNode.getPIPsBackToSource() to recognize reversed PIPs (#822)
+  - [PhysNetlistReader] Create FFRoutethruCell-s correctly (#817)
+  - Add test for Design.movePinsToNewNetDeleteOldNet() (#796)
+  - Test Cell.getAllCorrespondingSitePinNames() works for multi-outputs (#792)
+  - [PhysNetlistWriter] No IO site port output BELPins without SitePinInst (#820)
+  - [PhysNetlistWriter] Set PhysPip.setForward() even if not bidir (#819)
+  - [PhysNetlistWriter] Skip output BELPins without cells, and port cells (#818)
+  - Test that Design.createModuleInst() copies static sources (#839)
+  - Design.createModuleInst() to copy STATIC_SOURCE_ SiteInsts properly
+  - Store partname in netlist for new designs
+  - SiteInst.addPin() to trackChanges() when ?_O or ?MUX pin added
+  - Method parameter names preserved in API lib jar
+- API Additions:
+  - com.xilinx.rapidwright.design.Module "public Cell getCell(String cellName)"
+  - com.xilinx.rapidwright.design.Net "public boolean isVCCNet()"
+  - com.xilinx.rapidwright.design.Net "public boolean isGNDNet()"
+  - com.xilinx.rapidwright.design.Net "public boolean isUsedNet()"
+
+============= RapidWright 2023.1.3-beta released on 2023-09-13 ================
+Notes:
+  - Fix DesignTools.getConnectionPIPs() (#809) 
+  - [PhysNetlistWriter] RouteBranchNode.getDrivers() to return input BelPin (#800)
+  - Adds site pins to example code generation for nets. (#807)
+  - Update to fixed microblazeAndILA_3pblocks.dcp (#808)
+  - [LogNetlistWriter] Refactor writeStrings method to be public static (#804)
+  - [VivadoTools] ReportRouteStatusResult to parse more stats (#805) 
+  - EDIF improvements (#806)
+  - RWRoute improvements (#803)
+  - Adds a createBitstream() method to VivadoTools (#801)
+  - Small DesignTools improvements (#797)
+  - added static function that helps produce test nets (including PIPs) (#784)
+  - Add reference copy methods (#794)
+  - [RWRoute] Add alternate source pins and set source routed flags (#787)
+  - Adds support for RouteThru LUT equations and makes LUTEquationEvaluator public (#795)
+  - Fix TestDCPLoad to prevent issues with parallel testing (#793)
+  - [PhysNetlistWriter] Fix route tree construction for bidir PIPs (#791)
+  - VivadoTools.reportRouteStatus() to handle encrypted cells (#777)
+  - [PhysNetlistWriter] Insert site port BELPin before site pin (#790)
+  - fixed null pointer exception in getPhysicalNetFromPin() (#775)
+  - LUT cell companion helper methods (#764) 
+  - Check for error situation RAPIDWRIGHT_PATH set but not CLASSPATH (#772) 
+  - Set reversed flag on bi-directional PIPs used from end->start (#774)
+  - Fix RouterHelper.projectOutputPinToINTNode() for depop pins (#779)
+  - Make PartialRouter.getUnroutedPins() public (#778)
+  - FileTools.runCommand() - Adds ability to choose run directory (#769)
+  - [GlobalSignalRouting] Static router to not create site pin if exists (#768)
+  - RouteThru support for FFs in UltraScale architecture
+  - Fixes minor SitePinInst creation when reading a DCP
+  - Improvements to Net.rename() when tracking changes 
+  - Design.detachNetlist() to detach routethru cells
+  - Adds reference copy APIs and ability to keep copies of modified
+  SiteInsts and Nets
+  - Improvements to DCP reading compatibility for different flows
+    within Vivado
+- API Additions:
+  - com.xilinx.rapidwright.bitstream.BitLocation "public int hashCode()"
+  - com.xilinx.rapidwright.bitstream.BitLocation "public boolean equals(Object obj)"
+  - com.xilinx.rapidwright.bitstream.Bitstream "public static Bitstream readBitstream(Path fileName)"
+  - com.xilinx.rapidwright.bitstream.Block "public int getBit(BitLocation bit, Tile tile)"
+  - com.xilinx.rapidwright.bitstream.Block "public boolean updateBit(BitLocation bit, Tile tile, int value, Block golden)"
+  - com.xilinx.rapidwright.bitstream.ConfigRow "public ConfigRow(int configRowIdx)"
+  - com.xilinx.rapidwright.bitstream.FAR "public Block getConfigBlock(int slrCfgOrder)"
+  - com.xilinx.rapidwright.bitstream.Packet "public int hashCode()"
+  - com.xilinx.rapidwright.bitstream.Packet "public boolean equals(Object obj)"
+  - com.xilinx.rapidwright.design.Cell "public static final String FF_ROUTETHRU_TYPE"
+  - com.xilinx.rapidwright.design.Cell "public Cell getReferenceCopy()"
+  - com.xilinx.rapidwright.design.Cell "public boolean isFFRoutethruCell()"
+  - com.xilinx.rapidwright.design.Design "public boolean isCopyingOriginalNetsRouting()"
+  - com.xilinx.rapidwright.design.Design "public void setCopyingOriginalNetsRouting(boolean copyOrigNets)"
+  - com.xilinx.rapidwright.design.Design "public Map<String, List<PIP>> getOriginalNetRouting()"
+  - com.xilinx.rapidwright.design.Design "public boolean isCopyingOriginalSiteInsts()"
+  - com.xilinx.rapidwright.design.Design "public void setCopyingOriginalSiteInsts(boolean copyOrigSiteInsts)"
+  - com.xilinx.rapidwright.design.Design "public Map<String, SiteInst> getOriginalSiteInsts()"
+  - com.xilinx.rapidwright.design.Net "public List<PIP> getCopyOfPIPs()"
+  - com.xilinx.rapidwright.design.SiteInst "public void addPin(SitePinInst sitePinInst)"
+  - com.xilinx.rapidwright.design.SiteInst "public SiteInst getReferenceCopy()"
+
 ============= RapidWright 2023.1.2-beta released on 2023-07-24 ================
 Notes:
   - Shell creation improvements to enable lock_design and timing closure preservation (#760)

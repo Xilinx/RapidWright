@@ -23,6 +23,8 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -32,21 +34,27 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
@@ -85,7 +93,7 @@ public class TestRWRoute {
         Assertions.assertTrue(rrs.isFullyRouted());
     }
 
-    private static void assertAllPinsRouted(Design design) {
+    public static void assertAllPinsRouted(Design design) {
         for (Net net : design.getNets()) {
             if (net.getSource() == null && !net.isStaticNet()) {
                 // Source-less nets may exist in out-of-context design
@@ -95,7 +103,7 @@ public class TestRWRoute {
         }
     }
 
-    private static void assertAllSourcesRoutedFlagSet(Design design) {
+    public static void assertAllSourcesRoutedFlagSet(Design design) {
         for (Net net : design.getNets()) {
             if (net.getSource() == null) {
                 // Source-less nets may exist in out-of-context design
@@ -135,7 +143,36 @@ public class TestRWRoute {
         assertVivadoFullyRouted(design);
     }
 
+    /**
+     * Tests the non-timing driven full routing with LUT pin swapping enabled.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "bnn.dcp",
+            "optical-flow.dcp"
+    })
+    @LargeTest(max_memory_gb = 8)
+    public void testNonTimingDrivenFullRoutingWithLutPinSwapping(String path) {
+        Design design = RapidWrightDCP.loadDCP(path);
+        RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--lutPinSwapping"});
+        assertAllSourcesRoutedFlagSet(design);
+        assertAllPinsRouted(design);
+        assertVivadoFullyRouted(design);
+    }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "bnn.dcp",
+            "optical-flow.dcp"
+    })
+    @LargeTest(max_memory_gb = 8)
+    public void testNonTimingDrivenFullRoutingWithLutRoutethru(String path) {
+        Design design = RapidWrightDCP.loadDCP(path);
+        RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--lutRoutethru"});
+        assertAllSourcesRoutedFlagSet(design);
+        assertAllPinsRouted(design);
+        assertVivadoFullyRouted(design);
+    }
 
     /**
      * Tests the timing driven full routing, i.e., RWRoute running in timing-driven mode.
@@ -224,6 +261,29 @@ public class TestRWRoute {
         assertVivadoFullyRouted(design);
     }
 
+    void testSingleConnectionHelper(String partName,
+                                    String srcSiteName, String srcPinName,
+                                    String dstSiteName, String dstPinName,
+                                    long nodesPoppedLimit) {
+        Design design = new Design("top", partName);
+
+        Net net = design.createNet("net");
+        SiteInst srcSi = design.createSiteInst(srcSiteName);
+        SitePinInst srcSpi = net.createPin(srcPinName, srcSi);
+
+        SiteInst dstSi = design.createSiteInst(dstSiteName);
+        SitePinInst dstSpi = net.createPin(dstPinName, dstSi);
+
+        List<SitePinInst> pinsToRoute = new ArrayList<>();
+        pinsToRoute.add(dstSpi);
+        boolean softPreserve = false;
+        PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute, softPreserve);
+
+        Assertions.assertTrue(srcSpi.isRouted());
+        Assertions.assertTrue(dstSpi.isRouted());
+        Assertions.assertTrue(Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped")) <= nodesPoppedLimit);
+    }
+
     @ParameterizedTest
     @CsvSource({
             // One SLR crossing
@@ -232,51 +292,36 @@ public class TestRWRoute {
             "SLICE_X9Y300,SLICE_X9Y299,400",
             "SLICE_X0Y299,SLICE_X0Y300,200",    // Far from Laguna column
             "SLICE_X0Y300,SLICE_X0Y299,200",
-            "SLICE_X53Y299,SLICE_X53Y300,300",  // Equidistant from two Laguna columns
-            "SLICE_X53Y300,SLICE_X53Y299,600",
+            "SLICE_X53Y299,SLICE_X53Y300,200",  // Equidistant from two Laguna columns
+            "SLICE_X53Y300,SLICE_X53Y299,700",
             // Perfect
             "SLICE_X9Y241,SLICE_X9Y300,200",
-            "SLICE_X9Y300,SLICE_X9Y241,200",
+            "SLICE_X9Y300,SLICE_X9Y241,100",
             "SLICE_X9Y358,SLICE_X9Y299,100",
             "SLICE_X9Y299,SLICE_X9Y358,200",
             "SLICE_X53Y241,SLICE_X69Y300,500",
-            "SLICE_X53Y358,SLICE_X69Y299,1000",
+            "SLICE_X53Y358,SLICE_X69Y299,500",
             // Far
             "SLICE_X9Y240,SLICE_X9Y359,100",    // On Laguna
-            "SLICE_X9Y359,SLICE_X9Y240,100",
-            "SLICE_X162Y240,SLICE_X162Y430,300",
-            "SLICE_X162Y430,SLICE_X162Y240,100",
-            "SLICE_X0Y240,SLICE_X12Y430,1400",  // Far from Laguna
-            "SLICE_X0Y430,SLICE_X12Y240,300",
+            "SLICE_X9Y359,SLICE_X9Y240,200",
+            "SLICE_X162Y240,SLICE_X162Y430,200",
+            "SLICE_X162Y430,SLICE_X162Y240,300",
+            "SLICE_X0Y240,SLICE_X12Y430,400",   // Far from Laguna
+            "SLICE_X0Y430,SLICE_X12Y240,200",
 
             // Two SLR crossings
-            "SLICE_X162Y299,SLICE_X162Y599,300",
+            "SLICE_X162Y299,SLICE_X162Y599,200",
             "SLICE_X162Y599,SLICE_X162Y299,100",
 
             // Three SLR crossings
-            "SLICE_X79Y0,SLICE_X79Y899,300",    // Straight up: next to Laguna column
-            "SLICE_X0Y0,SLICE_X0Y899,300",      // Straight up: far from Laguna column
-            "SLICE_X168Y0,SLICE_X168Y899,300",  // Straight up: far from Laguna column
-            "SLICE_X9Y0,SLICE_X162Y899,500",    // Up and right
-            "SLICE_X168Y162,SLICE_X9Y899,1900", // Up and left
+            "SLICE_X79Y0,SLICE_X79Y899,200",    // Straight up: next to Laguna column
+            "SLICE_X0Y0,SLICE_X0Y899,600",      // Straight up: far from Laguna column
+            "SLICE_X168Y0,SLICE_X168Y899,400",  // Straight up: far from Laguna column
+            "SLICE_X9Y0,SLICE_X162Y899,1000",   // Up and right
+            "SLICE_X168Y162,SLICE_X9Y899,600",  // Up and left
     })
     public void testSLRCrossingNonTimingDriven(String srcSiteName, String dstSiteName, long nodesPoppedLimit) {
-        Design design = new Design("top", Device.AWS_F1);
-
-        Net net = design.createNet("net");
-        SiteInst srcSi = design.createSiteInst(srcSiteName);
-        net.createPin("AQ", srcSi);
-
-        SiteInst dstSi = design.createSiteInst(dstSiteName);
-        SitePinInst dstSpi = net.createPin("A1", dstSi);
-
-        List<SitePinInst> pinsToRoute = new ArrayList<>();
-        pinsToRoute.add(dstSpi);
-        boolean softPreserve = false;
-        PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute, softPreserve);
-
-        Assertions.assertTrue(pinsToRoute.stream().allMatch(SitePinInst::isRouted));
-        Assertions.assertTrue(Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped")) <= nodesPoppedLimit);
+        testSingleConnectionHelper(Device.AWS_F1, srcSiteName, "AQ", dstSiteName, "A1", nodesPoppedLimit);
     }
 
     @ParameterizedTest
@@ -315,5 +360,57 @@ public class TestRWRoute {
             ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
             Assertions.assertEquals(0, rrs.unroutedNets);
         }
+    }
+
+    private Design generateSmallPlacedDesign() {
+        Design d = new Design("HelloWorld", Device.KCU105);
+        Cell and2 = d.createAndPlaceCell("and2", Unisim.AND2, "SLICE_X100Y100/A6LUT");
+        Net net0 = d.createNet("button0_IBUF");
+        net0.connect(and2, "O");
+        net0.connect(and2, "I0");
+        net0.connect(and2, "I1");
+
+        // Route site internal nets
+        d.routeSites();
+
+        EDIFTools.ensureCorrectPartInEDIF(d.getNetlist(), d.getPartName());
+        return d;
+    }
+
+    @Test
+    public void testRWRouteInterchange(@TempDir Path dir) {
+        Path rootFile = dir.resolve("interchange-design");
+        Interchange.writeDesignToInterchange(generateSmallPlacedDesign(), rootFile.toString());
+        Path outputFile = dir.resolve("output.dcp");
+        RWRoute.main(new String[] { 
+                rootFile.toString() + Interchange.PHYS_NETLIST_EXT, 
+                outputFile.toString(),
+                "--nonTimingDriven"
+                });
+        Assertions.assertTrue(Files.exists(outputFile));
+    }
+
+    @Test
+    public void testTimingAndWirelengthReport() {
+        String dcp = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.dcp");
+        TimingAndWirelengthReport.main(new String[]{dcp});
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            // Dedicated connections, hence no nodes popped
+            "GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,BUFG_GT_SYNC_X0Y46,CLK_IN,0",
+            "GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,BUFG_GT_X0Y78,CLK_IN,0", // (dst pin can be projected to INT but not src pin)
+
+            // Non-dedicated connections
+            "IOB_X0Y47,I,SLICE_X77Y122,FX,600",
+    })
+    public void testSingleConnection(String srcSiteName, String srcPinName,
+                                     String dstSiteName, String dstPinName,
+                                     int nodesPoppedLimit) {
+        testSingleConnectionHelper("xcvu3p",
+                srcSiteName, srcPinName,
+                dstSiteName, dstPinName,
+                nodesPoppedLimit);
     }
 }

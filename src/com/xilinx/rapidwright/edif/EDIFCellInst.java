@@ -68,8 +68,8 @@ public class EDIFCellInst extends EDIFPropertyObject {
      */
     public EDIFCellInst(EDIFCellInst inst, EDIFCell parentCell) {
         super((EDIFPropertyObject)inst);
-        this.parentCell = parentCell;
-        this.cellType = inst.cellType;
+        setParentCell(parentCell);
+        setCellType(inst.cellType);
         setViewref(new EDIFName(inst.viewref));
     }
 
@@ -153,6 +153,22 @@ public class EDIFCellInst extends EDIFPropertyObject {
     }
 
     /**
+     * Gets the named EDIFPortInst or creates it (if correctly named) and returns
+     * it. If the port instance is to be created, it will not be connected to an
+     * EDIFNet.
+     * 
+     * @param name Name of the port instance to get.
+     * @return The existing or created port instance.
+     */
+    public EDIFPortInst getOrCreatePortInst(String name) {
+        EDIFPortInst portInst = portInsts == null ? null : portInsts.get(this, name);
+        if (portInsts == null || portInst == null) {
+            portInst = EDIFPortInst.createPortInstFromPortInstName(name, this);
+        }
+        return portInst;
+    }
+
+    /**
      * Gets the port on the underlying cell type.  It is the same as
      * calling getCellType().getPort(name).
      * @param name Name of the port to get.
@@ -181,8 +197,23 @@ public class EDIFCellInst extends EDIFPropertyObject {
      * @param parent the parentCell to set
      */
     public void setParentCell(EDIFCell parent) {
+        if (this.parentCell == parent) {
+            return;
+        }
+        boolean oldParentCellWasNull = (this.parentCell == null);
+        if (!oldParentCellWasNull) {
+            this.parentCell.trackChange(EDIFChangeType.CELL_INST_REMOVE, getName());
+            if (cellType != null) {
+                cellType.decrementNonHierInstantiationCount();
+            }
+        }
         this.parentCell = parent;
-        parent.trackChange(EDIFChangeType.CELL_INST_ADD, getName());
+        if (parent != null) {
+            parent.trackChange(EDIFChangeType.CELL_INST_ADD, getName());
+            if (oldParentCellWasNull && cellType != null) {
+                cellType.incrementNonHierInstantiationCount();
+            }
+        }
     }
 
     /**
@@ -205,7 +236,13 @@ public class EDIFCellInst extends EDIFPropertyObject {
      * @param cellType the cellType to set
      */
     public void setCellTypeRaw(EDIFCell cellType) {
+        if (parentCell != null && this.cellType != null) {
+            this.cellType.decrementNonHierInstantiationCount();
+        }
         this.cellType = cellType;
+        if (parentCell != null && cellType != null) {
+            cellType.incrementNonHierInstantiationCount();
+        }
         setViewref(cellType != null ? cellType.getEDIFView() : null);
     }
 
@@ -286,5 +323,13 @@ public class EDIFCellInst extends EDIFPropertyObject {
             return false;
 
         return true;
+    }
+
+
+    /**
+     * True if this cell instance is attached to a parent cell, and is the only instantiation of its cell.
+     */
+    public boolean isUniquified() {
+        return parentCell != null && cellType.isUniquified();
     }
 }

@@ -125,17 +125,6 @@ public class MessageGenerator{
     }
 
     /**
-     * Creates a whitespace string with length number of spaces.
-     * 
-     * @param length Number of spaces in the string.
-     * @return The newly created whitespace string.
-     * @deprecated to be removed in 2023.2.0
-     */
-    public static String makeWhiteSpace(int length) {
-        return StringTools.makeWhiteSpace(length);
-    }
-
-    /**
      * This will prompt the user to type y or n to either continue
      * with a process or to exit.
      */

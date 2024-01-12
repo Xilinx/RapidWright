@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -39,13 +39,18 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -324,5 +329,115 @@ public class TestDesign {
             Assertions.assertNotNull(net.getSource());
             Assertions.assertNotNull(net.getAlternateSource());
         }
+    }
+
+    @Test
+    public void testMovePinsToNewNetDeleteOldNet() {
+        Design d = new Design("testMovePinsToNewNetDeleteOldNet", "xcvu3p");
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
+        Unisim unisim = Unisim.CARRY8;
+        d.createAndPlaceCell("carry", unisim, si.getSiteName() + "/" + unisim);
+
+        Net oldNet = d.createNet("oldNet");
+        oldNet.createPin("A1", si);
+        oldNet.createPin("HQ", si);
+        Assertions.assertTrue(si.routeIntraSiteNet(oldNet, si.getBELPin("A1", "A1"),
+                si.getBELPin(unisim.toString(), "DI0")));
+        Assertions.assertEquals("[IN SLICE_X32Y73.A1, OUT SLICE_X32Y73.HQ]", oldNet.getPins().toString());
+        Assertions.assertEquals("[A1, HQ, A5LUT_O5]", si.getSiteWiresFromNet(oldNet).toString());
+
+        Net newNet = d.createNet("newNet");
+        SitePinInst h6 = newNet.createPin("H6", si);
+        newNet.addPIP(h6.getConnectedNode().getAllUphillPIPs().get(0));
+        Assertions.assertEquals("[IN SLICE_X32Y73.H6]", newNet.getPins().toString());
+        Assertions.assertEquals("[H6]", si.getSiteWiresFromNet(newNet).toString());
+        Assertions.assertEquals("[INT_X21Y73/INT.VCC_WIRE->>IMUX_E47]", newNet.getPIPs().toString());
+
+        d.movePinsToNewNetDeleteOldNet(oldNet, newNet, true);
+
+        Assertions.assertNull(d.getNet(oldNet.getName()));
+        Assertions.assertSame(newNet, d.getNet(newNet.getName()));
+        Assertions.assertEquals("[IN SLICE_X32Y73.H6, IN SLICE_X32Y73.A1, OUT SLICE_X32Y73.HQ]", newNet.getPins().toString());
+        Assertions.assertEquals("[H6, A1, HQ, A5LUT_O5]", si.getSiteWiresFromNet(newNet).toString());
+        Assertions.assertEquals("[INT_X21Y73/INT.VCC_WIRE->>IMUX_E47]", newNet.getPIPs().toString());
+    }
+
+    @Test
+    public void testMovePinsToNewNetDeleteOldNetIntraSiteOnly() {
+        Design d = new Design("testMovePinsToNewNetDeleteOldNetIntraSiteOnly", "xcvu3p");
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
+
+        Net oldNet = d.createNet("oldNet");
+        // Note that oldNet has no site pins or inter-site routing
+        Assertions.assertTrue(si.routeIntraSiteNet(oldNet, si.getBELPin("B6LUT", "O6"),
+                si.getBELPin("BFF", "D")));
+        Assertions.assertEquals("[B_O, FFMUXB1_OUT1]", si.getSiteWiresFromNet(oldNet).toString());
+
+        Net newNet = d.createNet("newNet");
+        SitePinInst h6 = newNet.createPin("H6", si);
+        newNet.addPIP(h6.getConnectedNode().getAllUphillPIPs().get(0));
+        Assertions.assertEquals("[IN SLICE_X32Y73.H6]", newNet.getPins().toString());
+        Assertions.assertEquals("[H6]", si.getSiteWiresFromNet(newNet).toString());
+        Assertions.assertEquals("[INT_X21Y73/INT.VCC_WIRE->>IMUX_E47]", newNet.getPIPs().toString());
+
+        d.movePinsToNewNetDeleteOldNet(oldNet, newNet, false);
+
+        Assertions.assertNull(d.getNet(oldNet.getName()));
+        Assertions.assertSame(newNet, d.getNet(newNet.getName()));
+        Assertions.assertEquals("[IN SLICE_X32Y73.H6]", newNet.getPins().toString());
+        Assertions.assertEquals("[H6, B_O, FFMUXB1_OUT1]", si.getSiteWiresFromNet(newNet).toString());
+        Assertions.assertTrue(newNet.getPIPs().isEmpty());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testCreateModuleInstCopiesStaticSource(boolean unrouteStaticNets) {
+        Design design = new Design("testCreateModuleInstCopiesStaticSource", "xcku035");
+
+        Design microblaze = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
+        final String siteName = "SLICE_X60Y116";
+        Assertions.assertNotNull(microblaze.getSiteInstFromSiteName(siteName));
+
+        Module module = new Module(microblaze, unrouteStaticNets);
+        ModuleInst mi = design.createModuleInst("inst", module);
+        SiteInst si = design.getSiteInstFromSiteName(siteName);
+        Assertions.assertNull(si);
+
+        mi.placeOnOriginalAnchor();
+        si = design.getSiteInstFromSiteName(siteName);
+        if (!unrouteStaticNets) {
+            Assertions.assertNotNull(si);
+            Assertions.assertEquals(mi.getName() + "/STATIC_SOURCE_" + si.getSiteName(), si.getName());
+        } else {
+            Assertions.assertNull(si);
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({ 
+        "xcvu3p-ffvc1517-1-i,N28", 
+        "xcku040-ffva1156-2-e,AE10",
+        })
+    public void testPlaceIOB(String partName, String pkgPin) {
+        Design design = new Design("testPlaceIOB", partName);
+        EDIFCell top = design.getNetlist().getTopCell();
+        EDIFCell ibuf = Design.getMacroPrimitives(design.getDevice().getSeries()).getCell("IBUF");
+        EDIFCellInst ibufInst = ibuf.createCellInst("iobInst", top);
+        EDIFNet inNet = top.createNet("inNet");
+        EDIFNet outNet = top.createNet("outNet");
+        EDIFPort input = top.createPort("in0", EDIFDirection.INPUT, 1);
+        inNet.createPortInst(input);
+        inNet.createPortInst("I", ibufInst);
+        outNet.createPortInst("O", ibufInst);
+        Cell iob = design.placeIOB(ibufInst, pkgPin, null);
+        SiteInst siteInst = iob.getSiteInst();
+        SitePIP sitePIP = siteInst.getUsedSitePIP("INPUTMUX");
+        Assertions.assertEquals("IN1", sitePIP.getInputPinName());
+        String netName = ibufInst.getName() + "/OUT";
+        Net net = design.getNet(netName);
+        Assertions.assertEquals(net.getName(), netName);
+        Net dout = design.getDevice().getSeries().equals(Series.UltraScalePlus) ? net
+                : design.getNet(ibufInst.getName() + "/O");
+        Assertions.assertEquals(siteInst.getNetFromSiteWire("DOUT"), dout);
     }
 }

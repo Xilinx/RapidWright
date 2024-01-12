@@ -149,6 +149,25 @@ public class EDIFPortInst implements Comparable<EDIFPortInst> {
 
     }
 
+    /**
+     * Creates a new port instance without connecting it to a net.
+     * 
+     * @param portInstName Name of the port instance
+     * @param inst         The instance on which to create the new port instance
+     * @return The new port instance.
+     */
+    public static EDIFPortInst createPortInstFromPortInstName(String portInstName, EDIFCellInst inst) {
+        EDIFPort port = inst.getCellType().getPortByPortInstName(portInstName);
+        if (port == null)
+            return null;
+        int portIdx = -1;
+        if (port.isBus()) {
+            int idx = EDIFTools.getPortIndexFromName(portInstName);
+            portIdx = port.getPortIndexFromNameIndex(idx);
+        }
+        return new EDIFPortInst(port, null, portIdx, inst, false);
+    }
+
     public String getPortInstNameFromPort() {
         return port.getPortInstNameFromPort(index);
     }
