@@ -179,6 +179,10 @@ public class TestRouterHelper {
         );
     }
 
+    public static void invertVccLutPinsToGndPins(Set<SitePinInst> pins) {
+        // TODO
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void testInvertPossibleGndPinsToVccPinsLutInput(boolean invertLutInputs) {
@@ -199,14 +203,24 @@ public class TestRouterHelper {
         }
         Assertions.assertEquals(invertLutInputs, gndNet.getPins().isEmpty());
 
-        Net staticNet = invertLutInputs ? design.getVccNet() : design.getGndNet();
-        Assertions.assertEquals("[IN SLICE_X0Y0.A6]", staticNet.getPins().toString());
+        Net targetNet = invertLutInputs ? design.getVccNet() : design.getGndNet();
+        Net sourceNet = !invertLutInputs ? design.getVccNet() : design.getGndNet();
+        Assertions.assertEquals("[IN SLICE_X0Y0.A6]", targetNet.getPins().toString());
+        Assertions.assertTrue(sourceNet.getPins().isEmpty());
         if (invertLutInputs) {
             // Must have moved onto vccNet, and the LUT mask inverted
             Assertions.assertEquals("O=I0", LUTTools.getLUTEquation(cell));
-        } else {
-            Assertions.assertEquals("O=!I0", LUTTools.getLUTEquation(cell));
+
+            // Now undo this optimization by going from VCC pin back to GND pin
+            invertVccLutPinsToGndPins(invertedPins);
+
+            // Check that pin is back on the original VCC net
+            Assertions.assertTrue(targetNet.getPins().isEmpty());
+            Assertions.assertEquals("[IN SLICE_X0Y0.A6]", sourceNet.getPins().toString());
         }
+
+        // Check that LUT equation is back to normal
+        Assertions.assertEquals("O=!I0", LUTTools.getLUTEquation(cell));
     }
 
     @Test
