@@ -982,7 +982,7 @@ public class RWRoute{
 
                     if (pinName.charAt(1) == '6') {
                         throw new RuntimeException("ERROR: Illegal LUT routethru on " + site + "/" + pinName +
-                                " since 5LUT is being as a static source");
+                                " since the 5LUT is being used as a static source");
                     }
 
                     // Perform intra-site routing back to the LUT5 to not conflict with LUT6 routethru
