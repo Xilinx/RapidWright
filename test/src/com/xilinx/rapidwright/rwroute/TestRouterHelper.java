@@ -29,6 +29,8 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.device.BELPin;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -179,8 +181,25 @@ public class TestRouterHelper {
         );
     }
 
-    public static void invertVccLutPinsToGndPins(Set<SitePinInst> pins) {
-        // TODO
+    public static void invertVccLutPinsToGndPins(Set<SitePinInst> pins, Design design) {
+        for (SitePinInst spi : pins) { 
+            assert (spi.getNet() == design.getVccNet());
+            SiteInst si = spi.getSiteInst();
+            for (BELPin bp : spi.getSiteWireBELPins()) {
+                if (bp.isSitePort() || bp.getName().charAt(0) != 'A')
+                    continue;
+                if (bp.getBEL().isLUT()) {
+                    Cell lut = si.getCell(bp.getBEL());
+                    if (lut != null) {
+                        String eq = LUTTools.getLUTEquation(lut);
+                        String logInput = lut.getLogicalPinMapping(bp.getName());
+                        LUTTools.configureLUT(lut, eq.replace(logInput, "(~" + logInput + ")"));
+                    }
+                }
+            }
+            spi.getNet().removePin(spi, true);
+            design.getGndNet().addPin(spi, true);
+        }
     }
 
     @ParameterizedTest
@@ -212,7 +231,7 @@ public class TestRouterHelper {
             Assertions.assertEquals("O=I0", LUTTools.getLUTEquation(cell));
 
             // Now undo this optimization by going from VCC pin back to GND pin
-            invertVccLutPinsToGndPins(invertedPins);
+            invertVccLutPinsToGndPins(invertedPins, design);
 
             // Check that pin is back on the original VCC net
             Assertions.assertTrue(targetNet.getPins().isEmpty());
