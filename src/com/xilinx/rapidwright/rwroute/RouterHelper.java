@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -371,9 +371,21 @@ public class RouterHelper {
     /**
      * Inverts all possible GND sink pins to VCC pins.
      * @param design The target design.
-     * @param pins The static net pins.
+     * @param pins The GND net pins.
      */
     public static Set<SitePinInst> invertPossibleGndPinsToVccPins(Design design, List<SitePinInst> pins) {
+        return invertPossibleGndPinsToVccPins(design, pins, true);
+    }
+
+    /**
+     * Inverts all possible GND sink pins to VCC pins.
+     * @param design The target design.
+     * @param pins The GND net pins.
+     * @param invertLutInputs True to invert LUT inputs.
+     */
+    public static Set<SitePinInst> invertPossibleGndPinsToVccPins(Design design,
+                                                                  List<SitePinInst> pins,
+                                                                  boolean invertLutInputs) {
         Net gndNet = design.getGndNet();
         Set<SitePinInst> toInvertPins = new HashSet<>();
         nextSitePin: for (SitePinInst spi : pins) {
@@ -381,7 +393,7 @@ public class RouterHelper {
                 throw new RuntimeException(spi.toString());
             SiteInst si = spi.getSiteInst();
             String siteWireName = spi.getSiteWireName();
-            if (spi.isLUTInputPin()) {
+            if (invertLutInputs && spi.isLUTInputPin()) {
                 Collection<Cell> connectedCells = DesignTools.getConnectedCells(spi);
                 if (connectedCells.isEmpty()) {
                     for (BELPin belPin : si.getSiteWirePins(siteWireName)) {
