@@ -1819,10 +1819,13 @@ public class DesignTools {
         Set<String> netsToKeep = new HashSet<>();
         for (Entry<Net, String> e : netsToUpdate.entrySet()) {
             EDIFHierNet newSource = d.getNetlist().getHierNetFromName(e.getValue());
-            if (!e.getKey().rename(e.getValue())) {
-                throw new RuntimeException("ERROR: Failed to rename net '" + e.getKey().getName() + "'");
+            Net net = e.getKey();
+            if (!net.rename(e.getValue())) {
+                throw new RuntimeException("ERROR: Failed to rename net '" + net.getName() + "'");
             }
-            netsToKeep.add(e.getKey().getName());
+            // TODO: Remove workaround below when >2023.2.1
+            net.setLogicalHierNet(null);
+            netsToKeep.add(net.getName());
         }
 
         t.stop().start("cleanup siteinsts");
@@ -3139,7 +3142,10 @@ public class DesignTools {
 
                     if (parentPhysNet != null) {
                         // Fall through
-                    } else if (!net.rename(parentHierNet.getHierarchicalNetName())) {
+                    } else if (net.rename(parentHierNet.getHierarchicalNetName())) {
+                        // TODO: Remove workaround below when >2023.2.1
+                        net.setLogicalHierNet(null);
+                    } else {
                         System.out.println("WARNING: Failed to adjust physical net name " + net.getName());
                     }
                 }
