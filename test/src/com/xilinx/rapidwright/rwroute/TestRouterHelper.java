@@ -182,7 +182,6 @@ public class TestRouterHelper {
         );
     }
 
-    @Test
     public static void invertVccLutPinsToGndPins(Design design, Set<SitePinInst> pins) {
         for (SitePinInst spi : pins) { 
             assert (spi.getNet() == design.getVccNet());
