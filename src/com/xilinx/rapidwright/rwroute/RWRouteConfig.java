@@ -919,9 +919,9 @@ public class RWRouteConfig {
         s.append(MessageGenerator.formatString("Include U-turn nodes: ", useUTurnNodes));
         s.append(MessageGenerator.formatString("Initial present congestion factor: ", initialPresentCongestionFactor));
         s.append(MessageGenerator.formatString("Present congestion multiplier: ", presentCongestionMultiplier));
-        s.append(MessageGenerator.formatString("Historical congestion factor ", historicalCongestionFactor));
-        s.append(MessageGenerator.formatString("LUT pin swapping ", isLutPinSwapping()));
-        s.append(MessageGenerator.formatString("LUT routethrus ", isLutRoutethru()));
+        s.append(MessageGenerator.formatString("Historical congestion factor: ", historicalCongestionFactor));
+        s.append(MessageGenerator.formatString("LUT pin swapping: ", isLutPinSwapping()));
+        s.append(MessageGenerator.formatString("LUT routethrus: ", isLutRoutethru()));
 
         return s.toString();
     }

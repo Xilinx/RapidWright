@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Advanced Micro Devices, Inc.
@@ -27,6 +27,8 @@ import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
+import java.util.Arrays;
+
 public class TestTile {
     @ParameterizedTest
     @CsvSource({
@@ -43,5 +45,20 @@ public class TestTile {
         } else {
             Assertions.assertDoesNotThrow(e);
         }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvu5p,LAG_LAG_X30Y250,'[LAGUNA_X6Y140, LAGUNA_X6Y141, LAGUNA_X7Y140, LAGUNA_X7Y141]',true",
+
+            // FIXME: Known broken -- see https://github.com/Xilinx/RapidWright/issues/745
+            "xcvu3p,LAG_LAG_X30Y50,'[]',false",
+            "xcvu3p,LAG_LAG_X30Y250,'[]',false",
+            "xcvu5p,LAG_LAG_X30Y50,'[]',false",
+    })
+    public void testGetSites(String partName, String tileName, String expectedSites, boolean expectPass) {
+        Device dev = Device.getDevice(partName);
+        Tile tile = dev.getTile(tileName);
+        Assertions.assertEquals(expectPass, expectedSites.equals(Arrays.toString(tile.getSites())));
     }
 }

@@ -30,7 +30,7 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BELPin;
-
+import com.xilinx.rapidwright.device.Node;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -43,6 +43,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -181,6 +182,7 @@ public class TestRouterHelper {
         );
     }
 
+    @Test
     public static void invertVccLutPinsToGndPins(Design design, Set<SitePinInst> pins) {
         for (SitePinInst spi : pins) { 
             assert (spi.getNet() == design.getVccNet());
@@ -205,6 +207,33 @@ public class TestRouterHelper {
             spi.getNet().removePin(spi, true);
             design.getGndNet().addPin(spi, true);
         }
+    }
+
+    @Test
+    public void testProjectOutputPinToINTNodeBitslice() {
+        Design d = new Design("test", "xcvu19p-fsva3824-1-e");
+
+        String[] testSites = { "SLICE_X0Y1199", "SLICE_X1Y1199" };
+        for (String siteName : testSites) {
+            SiteInst si = d.createSiteInst(siteName);
+            for (String pinName : si.getSitePinNames()) {
+                SitePinInst pin = new SitePinInst(pinName, si);
+                // Only test output pins to project
+                if (!pin.isOutPin() || pin.getName().equals("COUT")) {
+                    continue;
+                }
+
+                Node intNode = RouterHelper.projectOutputPinToINTNode(pin);
+                Assertions.assertNotNull(intNode);
+            }
+        }
+
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("BITSLICE_RX_TX_X1Y78"));
+        SitePinInst p = new SitePinInst("TX_T_OUT", si);
+        Node intNode = RouterHelper.projectOutputPinToINTNode(p);
+
+        // FIXME: Known broken --  https://github.com/Xilinx/RapidWright/issues/558
+        Assertions.assertNotEquals(Objects.toString(intNode), "INT_INTF_L_CMT_X182Y90/LOGIC_OUTS_R19");
     }
 
     @ParameterizedTest
