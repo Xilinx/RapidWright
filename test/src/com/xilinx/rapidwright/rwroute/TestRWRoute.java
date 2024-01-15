@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -203,9 +202,6 @@ public class TestRWRoute {
     @Test
     @LargeTest(max_memory_gb = 8)
     public void testNonTimingDrivenFullRoutingWithGlobalNet() {
-        // Sporadically failing due to OutOfMemoryException (see #439)
-        long maxMemoryNeeded = 1024L*1024L*1024L*8L;
-        Assumptions.assumeTrue(Runtime.getRuntime().maxMemory() >= maxMemoryNeeded);
         Design design = RapidWrightDCP.loadDCP("optical-flow.dcp");
         RWRoute.routeDesignFullNonTimingDriven(design);
         assertAllSourcesRoutedFlagSet(design);
@@ -222,10 +218,6 @@ public class TestRWRoute {
     @Test
     @LargeTest(max_memory_gb = 8)
     public void testNonTimingDrivenPartialRouting() {
-        // Sporadically failing due to OutOfMemoryException (see #439)
-        long maxMemoryNeeded = 1024L*1024L*1024L*8L;
-        Assumptions.assumeTrue(Runtime.getRuntime().maxMemory() >= maxMemoryNeeded);
-
         Design design = RapidWrightDCP.loadDCP("picoblaze_partial.dcp");
         design.setTrackNetChanges(true);
 
