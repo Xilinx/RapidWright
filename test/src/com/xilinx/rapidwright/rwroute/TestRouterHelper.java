@@ -29,8 +29,8 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.tools.LUTTools;
-import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.support.rwroute.RouterHelperSupport;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -182,32 +182,6 @@ public class TestRouterHelper {
         );
     }
 
-    public static void invertVccLutPinsToGndPins(Design design, Set<SitePinInst> pins) {
-        for (SitePinInst spi : pins) { 
-            assert (spi.getNet() == design.getVccNet());
-            SiteInst si = spi.getSiteInst();
-            for (BELPin bp : spi.getSiteWireBELPins()) {
-                if (bp.isSitePort() || bp.getName().charAt(0) != 'A')
-                    continue;
-                if (bp.getBEL().isLUT()) {
-                    Cell lut = si.getCell(bp.getBEL());
-                    if (lut != null) {
-                        String eq = LUTTools.getLUTEquation(lut);
-                        String logInput = lut.getLogicalPinMapping(bp.getName());
-                        if (logInput != null) {
-                            LUTTools.configureLUT(lut, eq.replace(logInput, "(~" + logInput + ")"));
-                        } else {
-                            // Doesn't look like this pin is used by this [65]LUT,
-                            // could be used by the other [56]LUT
-                        }
-                    }
-                }
-            }
-            spi.getNet().removePin(spi, true);
-            design.getGndNet().addPin(spi, true);
-        }
-    }
-
     @Test
     public void testProjectOutputPinToINTNodeBitslice() {
         Design d = new Design("test", "xcvu19p-fsva3824-1-e");
@@ -264,7 +238,7 @@ public class TestRouterHelper {
             Assertions.assertEquals("O=I0", LUTTools.getLUTEquation(cell));
 
             // Now undo this optimization by going from VCC pin back to GND pin
-            invertVccLutPinsToGndPins(design, invertedPins);
+            RouterHelperSupport.invertVccLutPinsToGndPins(design, invertedPins);
 
             // Check that pin is back on the original VCC net
             Assertions.assertTrue(targetNet.getPins().isEmpty());
