@@ -78,7 +78,7 @@ public class TestEDIFCellInst {
         )) {
             EDIFCellInst eci = picoblazeTop.getCellInst(name);
             // Only checks that this cell instance is unique (e.g. that there is only
-            // one instantiation) but does not check that any parents on a full
+            // one instantiation) but does not check that all parents on a full
             // hierarchical path (e.g. "picoblaze_{0,1}_{12,13}/processor") is also
             // unique --- use EDIFHierCellInst.isUniquified() for that
             Assertions.assertTrue(eci.isUniquified());
