@@ -428,6 +428,9 @@ public class RouterHelper {
 
                     if (!ehci.getParent().isUniquified()) {
                         // Parent cell (instantiating this LUT) is not unique
+                        // This parent may be a LUT6_2 macro cell that has been expanded into LUT6+LUT5,
+                        // and which does not get uniquified by EDIFTools.uniqueifyNetlist().
+                        // Thus, LUT6/LUT5 inside expanded LUT6_2 macros are not eligible for inversion.
                         continue nextSitePin;
                     }
                 }
