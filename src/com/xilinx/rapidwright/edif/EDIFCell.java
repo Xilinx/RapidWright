@@ -492,6 +492,10 @@ public class EDIFCell extends EDIFPropertyObject {
         return (instances == null || instances.size() == 0) && (nets == null || nets.size() == 0);
     }
 
+    public boolean isStaticSource() {
+        return getName().equals("VCC") || getName().equals("GND");
+    }
+
     /**
      * Checks if all the port on the provided cell match and are equal to the ports on this cell.
      * @param cell The other cell to check against.

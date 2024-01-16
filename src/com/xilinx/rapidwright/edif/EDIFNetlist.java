@@ -1093,6 +1093,7 @@ public class EDIFNetlist extends EDIFName {
     public List<EDIFHierCellInst> getAllLeafDescendants(String instanceName) {
         return getAllLeafDescendants(getHierCellInstFromName(instanceName));
     }
+
     /**
      * Searches all lower levels of hierarchy to find all leaf descendants.  It returns a
      * list of all leaf cells that fall under the hierarchy of the provided instance name.
@@ -1100,15 +1101,30 @@ public class EDIFNetlist extends EDIFName {
      * @return A list of all leaf cell instances or null if the instanceName was not found.
      */
     public List<EDIFHierCellInst> getAllLeafDescendants(EDIFHierCellInst instance) {
-        List<EDIFHierCellInst> leafCells = new ArrayList<>();
+        return getAllLeafDescendants(instance, false);
+    }
 
+    /**
+     * Searches all lower levels of hierarchy to find all leaf descendants. It
+     * returns a list of all leaf cells that fall under the hierarchy of the
+     * provided instance name.
+     * 
+     * @param instance             The instance to start searching from.
+     * @param includeStaticSources If true, results returned will include all cell
+     *                             instances that instantiated the VCC and GND
+     *                             primitives
+     * @return A list of all leaf cell instances or null if the instanceName was not
+     *         found.
+     */
+    public List<EDIFHierCellInst> getAllLeafDescendants(EDIFHierCellInst instance, boolean includeStaticSources) {
+        List<EDIFHierCellInst> leafCells = new ArrayList<>();
 
         Queue<EDIFHierCellInst> toProcess = new LinkedList<EDIFHierCellInst>();
         toProcess.add(instance);
 
         while (!toProcess.isEmpty()) {
             EDIFHierCellInst curr = toProcess.poll();
-            if (curr.getCellType().isPrimitive()) {
+            if (curr.getCellType().isPrimitive() && (includeStaticSources || !curr.getCellType().isStaticSource())) {
                 leafCells.add(curr);
             } else {
                 curr.addChildren(toProcess);
@@ -1454,10 +1470,35 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
-     * Get the physical pins all parent nets (as returned by {@link #getParentNet(EDIFHierNet)}).
+     * Traverses the netlist and produces a list of all primitive leaf cell
+     * instances.
+     * 
+     * @return A list of all primitive leaf cell instances.
+     */
+    public List<EDIFCellInst> getAllLeafCellInstances(boolean includeStaticSources) {
+        List<EDIFCellInst> insts = new ArrayList<>();
+        Queue<EDIFCellInst> q = new LinkedList<>();
+        q.add(getTopCellInst());
+        while (!q.isEmpty()) {
+            EDIFCellInst curr = q.poll();
+            for (EDIFCellInst eci : curr.getCellType().getCellInsts()) {
+                if (eci.getCellType().isPrimitive() && (includeStaticSources || !eci.getCellType().isStaticSource()))
+                    insts.add(eci);
+                else
+                    q.add(eci);
+            }
+        }
+        return insts;
+    }
+
+    /**
+     * Get the physical pins all parent nets (as returned by
+     * {@link #getParentNet(EDIFHierNet)}).
      *
-     * No special handling for static nets is performed. Therefore, only the local connectivity is visible. To see
-     * all globally connected static pins, use {@link #getPhysicalVccPins()} and {@link #getPhysicalGndPins()}.
+     * No special handling for static nets is performed. Therefore, only the local
+     * connectivity is visible. To see all globally connected static pins, use
+     * {@link #getPhysicalVccPins()} and {@link #getPhysicalGndPins()}.
+     * 
      * @return the physicalNetPinMap
      */
     public Map<EDIFHierNet, List<EDIFHierPortInst>> getPhysicalNetPinMap() {
