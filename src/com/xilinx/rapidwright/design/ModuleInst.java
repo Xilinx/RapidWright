@@ -780,12 +780,14 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                             + getName() + "/" + port.getName() + " skipping...");
                 }
                 if (pin != null && (pin.getNet() == null || pin.getNet().getSource() == null)) {
-                    boolean useVccInverter = pin.getName().contains("RST");
+                    // If a port has a RST inverter, drive it with VCC to get GND
+                    boolean connectToVCC = pin.getName().contains("RST");
                     if (verbose) {
                         System.out.println(getName() + "/" + port.getName() + " SitePinInst=[" + pin
-                                + "] has no source, connecting to " + (useVccInverter ? "VCC" : "GND"));
+                                + "] has no source, connecting to " + (connectToVCC ? "VCC" : "GND"));
                     }
-                    connectToStaticNet(port.getName(), useVccInverter);
+
+                    connectToStaticNet(port.getName(), connectToVCC);
                 }
                 break;
             }
