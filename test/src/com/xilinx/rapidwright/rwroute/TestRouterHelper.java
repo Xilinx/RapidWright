@@ -30,6 +30,8 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.support.rwroute.RouterHelperSupport;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -39,6 +41,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -249,8 +252,54 @@ public class TestRouterHelper {
         Assertions.assertEquals("O=!I0", LUTTools.getLUTEquation(cell));
     }
 
-    @Test
-    public void testInvertPossibleGndPinsToVccPinsLutInputNotUniquified() {
-        // TODO
+    @ParameterizedTest
+    @CsvSource({"" +
+            "false,false",
+            // "false,true", // Skipped: cannot uniquify without flattening
+            "true,false",
+            "true,true"
+    })
+    public void testInvertPossibleGndPinsToVccPinsLutInputOnlyIfFlattenedAndUniquified(boolean flatten, boolean uniquify) {
+        Design design = RapidWrightDCP.loadDCP("picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp");
+
+        Assertions.assertEquals(1, design.getModules().size());
+        Assertions.assertEquals(4, design.getModuleInsts().size());
+
+        if (flatten) {
+            // Since ModuleInst-s (and indeed Vivado's write_edif) can create folded netlists,
+            // completely flatten the design (required for ModuleInst designs) as well as uniqueify
+            // all leaf cells so that modifying a LUT's INIT mask does not inadvertently modify
+            // masks for other leaf cells
+            design.flattenDesign();
+
+            Assertions.assertEquals(0, design.getModules().size());
+            Assertions.assertEquals(0, design.getModuleInsts().size());
+        } else {
+            // Not flattening nor uniquifying means that less/no opportunities exist for making
+            // GND -> VCC transformations as they are only applied to uniquified LUTs.
+            // It's assumed/expected that Vivado will pick up at least one error when RWRoute
+            // incorrectly inverts a non-uniquified LUT
+        }
+
+        if (uniquify) {
+            Assertions.assertTrue(EDIFTools.uniqueifyNetlist(design));
+        }
+
+        RWRoute.preprocess(design);
+
+        Net gndNet = design.getGndNet();
+        List<SitePinInst> gndLutPins = new ArrayList<>();
+        for (SitePinInst spi : gndNet.getPins()) {
+            if (!spi.isLUTInputPin()) {
+                continue;
+            }
+            gndLutPins.add(spi);
+        }
+        Assertions.assertFalse(gndLutPins.isEmpty());
+
+        Set<SitePinInst> invertedPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndLutPins);
+
+        // If not flattening/uniquifying, there must be no inverted pins
+        Assertions.assertEquals(!flatten || !uniquify, invertedPins.isEmpty());
     }
 }
