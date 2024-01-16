@@ -34,6 +34,7 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.support.rwroute.RouterHelperSupport;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -255,7 +256,7 @@ public class TestRouterHelper {
     @ParameterizedTest
     @CsvSource({"" +
             "false,false",
-            // "false,true", // Skipped: cannot uniquify without flattening
+            "false,true",
             "true,false",
             "true,true"
     })
@@ -282,7 +283,12 @@ public class TestRouterHelper {
         }
 
         if (uniquify) {
-            Assertions.assertTrue(EDIFTools.uniqueifyNetlist(design));
+            Boolean result = EDIFTools.uniqueifyNetlist(design);
+            if (!flatten && uniquify) {
+                // Cannot uniqueify without flattening -- skip test if this is the case
+                Assumptions.assumeTrue(result != null);
+            }
+            Assertions.assertTrue(result);
         }
 
         RWRoute.preprocess(design);
