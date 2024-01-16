@@ -766,8 +766,8 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
 
     /**
      * Connects unconnected SitePinInst inputs on the module instance to either GND
-     * or VCC (some reset input use VCC as an input and use the inverter to drive
-     * GND).
+     * or VCC (some reset inputs can accept VCC as an input and use its built-in
+     * inverter to drive GND).
      */
     public void tieOffUnconnectedInputs(boolean verbose) {
         for (Port port : getModule().getPorts()) {
