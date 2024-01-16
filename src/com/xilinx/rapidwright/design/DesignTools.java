@@ -3973,13 +3973,12 @@ public class DesignTools {
         // Iterate through all canonical nets
         Map<EDIFHierNet, EDIFHierNet> parentNetMap = d.getNetlist().getParentNetMap();
         for (EDIFHierNet n : parentNetMap.values()) {
-//            if (n.getNet().equals(gnd) || n.getNet().equals(vcc)) continue; // Static nets do not have physical equivalents
             createPhysNetFromLogical(d, n);
         }
     }
 
     /**
-     * Creates a physical nets from the provided logical EDIF net. Assumes that the EDIF netlist is finalized.
+     * Creates a physical net from the provided logical EDIF net. Assumes that the EDIF netlist is finalized.
      * @param d The design that contains the complete logical netlist and where the physical net will be created.
      * @param edifNet The EDIF Net to create into a physical net.
      * @return A list of the SitePinInsts added to the newly created physical net
@@ -3989,12 +3988,13 @@ public class DesignTools {
         if (d.getNet(edifNet.getHierarchicalNetName()) != null) return null;
 
         Net net;  //create physical net
-        if(edifNet.getNet().equals(EDIFTools.getStaticNet(NetType.GND, d.getTopEDIFCell(), d.getNetlist())))
+        if (edifNet.getNet().equals(EDIFTools.getStaticNet(NetType.GND, d.getTopEDIFCell(), d.getNetlist()))) {
             net = d.getGndNet();
-        else if(edifNet.getNet().equals(EDIFTools.getStaticNet(NetType.VCC, d.getTopEDIFCell(), d.getNetlist())))
+        } else if (edifNet.getNet().equals(EDIFTools.getStaticNet(NetType.VCC, d.getTopEDIFCell(), d.getNetlist()))) {
             net = d.getVccNet();
-        else 
+        } else {
             net = d.createNet(edifNet);
+        }
 
         // Get source EDIF port inst
         EDIFHierPortInst srcPort = null;
@@ -4011,7 +4011,7 @@ public class DesignTools {
 
         // Connect physical net to the physical cell pins corresponding to the logical ports
         List<SitePinInst> sitePins = new ArrayList<>();
-        for(EDIFHierPortInst hierPortInst: d.getNetlist().getPhysicalPins(edifNet)) {
+        for (EDIFHierPortInst hierPortInst: d.getNetlist().getPhysicalPins(edifNet)) {
             EDIFPortInst portInst = hierPortInst.getPortInst();
             if (portInst.equals(srcPort)) continue;
 
