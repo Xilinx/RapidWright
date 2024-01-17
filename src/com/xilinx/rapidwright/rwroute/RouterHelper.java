@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -39,10 +39,14 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
@@ -50,6 +54,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
@@ -366,43 +371,121 @@ public class RouterHelper {
     /**
      * Inverts all possible GND sink pins to VCC pins.
      * @param design The target design.
-     * @param pins The static net pins.
+     * @param pins The GND net pins.
      */
     public static Set<SitePinInst> invertPossibleGndPinsToVccPins(Design design, List<SitePinInst> pins) {
-        Net staticNet = design.getGndNet();
+        return invertPossibleGndPinsToVccPins(design, pins, true);
+    }
+
+    /**
+     * Inverts all possible GND sink pins to VCC pins.
+     * @param design The target design.
+     * @param pins The GND net pins.
+     * @param invertLutInputs True to invert LUT inputs.
+     */
+    public static Set<SitePinInst> invertPossibleGndPinsToVccPins(Design design,
+                                                                  List<SitePinInst> pins,
+                                                                  boolean invertLutInputs) {
+        Net gndNet = design.getGndNet();
         Set<SitePinInst> toInvertPins = new HashSet<>();
-        for (SitePinInst currSitePinInst : pins) {
-            if (!currSitePinInst.getNet().equals(staticNet))
-                throw new RuntimeException(currSitePinInst.toString());
-            BELPin[] belPins = currSitePinInst.getSiteInst().getSiteWirePins(currSitePinInst.getName());
-            if (belPins.length != 2) {
-                continue;
-            }
-            for (BELPin belPin : belPins) {
-                if (belPin.isSitePort()) {
-                    continue;
+        nextSitePin: for (SitePinInst spi : pins) {
+            if (!spi.getNet().equals(gndNet))
+                throw new RuntimeException(spi.toString());
+            SiteInst si = spi.getSiteInst();
+            String siteWireName = spi.getSiteWireName();
+            if (invertLutInputs && spi.isLUTInputPin()) {
+                Collection<Cell> connectedCells = DesignTools.getConnectedCells(spi);
+                if (connectedCells.isEmpty()) {
+                    for (BELPin belPin : si.getSiteWirePins(siteWireName)) {
+                        if (belPin.isSitePort()) {
+                            continue;
+                        }
+                        BEL bel = belPin.getBEL();
+                        Cell cell = si.getCell(bel);
+                        if (cell == null) {
+                            continue;
+                        }
+                        if (cell.getType().equals("SRL16E") && siteWireName.endsWith("6")) {
+                            // SRL16Es that have been transformed from SRLC32E (assume so here,
+                            // since we don't always have the logical netlist to check)
+                            // require GND on their A6 pin
+                            // See DesignTools.createMissingStaticSitePins(BELPin, SiteInst, Cell)
+                            continue nextSitePin;
+                        }
+                    }
+                    throw new RuntimeException("ERROR: " + gndNet.getName() + " not connected to any Cells");
                 }
-                if (!belPin.getBEL().canInvert()) {
-                    continue;
-                }
-                if (currSitePinInst.getSite().getName().startsWith("RAM")) {
-                    if (belPin.getBELName().startsWith("CLK")) {
-                        continue;
+                for (Cell cell : connectedCells) {
+                    if (!LUTTools.isCellALUT(cell)) {
+                        continue nextSitePin;
+                    }
+
+                    EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
+                    if (ehci == null) {
+                        // No logical cell (likely encrypted)
+                        continue nextSitePin;
+                    }
+
+                    if (!ehci.getParent().isUniquified()) {
+                        // Parent cell (instantiating this LUT) is not unique
+                        // This parent may be a LUT6_2 macro cell that has been expanded into LUT6+LUT5,
+                        // and which does not get uniquified by EDIFTools.uniqueifyNetlist().
+                        // Thus, LUT6/LUT5 inside expanded LUT6_2 macros are not eligible for inversion.
+                        continue nextSitePin;
                     }
                 }
-                toInvertPins.add(currSitePinInst);
-           }
+
+                toInvertPins.add(spi);
+
+                for (Cell cell : connectedCells) {
+                    // Find the logical pin name
+                    String physicalPinName = "A" + spi.getName().charAt(1);
+                    String logicalPinName = cell.getLogicalPinMapping(physicalPinName);
+
+                    // Get the LUT equation
+                    String lutEquation = LUTTools.getLUTEquation(cell);
+                    assert(lutEquation.contains(logicalPinName));
+
+                    // Compute a new LUT equation with that logical input inverted
+                    String newLutEquation = lutEquation.replace(logicalPinName, "!" + logicalPinName)
+                            // Cancel out double inversions
+                            // (Note: LUTTools.getLUTEquation() only produces equations with '!' instead of '~')
+                            .replace("!!", "");
+                    LUTTools.configureLUT(cell, newLutEquation);
+                }
+            } else {
+                BELPin[] belPins = si.getSiteWirePins(siteWireName);
+                if (belPins.length != 2) {
+                    continue;
+                }
+                for (BELPin belPin : belPins) {
+                    if (belPin.isSitePort()) {
+                        continue;
+                    }
+                    if (!belPin.getBEL().canInvert()) {
+                        continue;
+                    }
+                    if (spi.getSite().getName().startsWith("RAM")) {
+                        if (belPin.getBELName().startsWith("CLK")) {
+                            continue;
+                        }
+                    }
+                    toInvertPins.add(spi);
+                }
+            }
         }
 
         // Unroute all pins in a batch fashion
-        DesignTools.unroutePins(staticNet, toInvertPins);
+        DesignTools.unroutePins(gndNet, toInvertPins);
         // Manually remove pins from net, because using DesignTools.batchRemoveSitePins()
         // will cause SitePinInst.detachSiteInst() to be called, which we do not want
         // as we are simply moving the SPI from one net to another
-        staticNet.getPins().removeAll(toInvertPins);
+        gndNet.getPins().removeAll(toInvertPins);
+
+        Net vccNet = design.getVccNet();
         for (SitePinInst toinvert:toInvertPins) {
             assert(toinvert.getSiteInst() != null);
-            if (!design.getVccNet().addPin(toinvert)) {
+            if (!vccNet.addPin(toinvert)) {
                   throw new RuntimeException("ERROR: Couldn't invert site pin " +
                           toinvert);
             }

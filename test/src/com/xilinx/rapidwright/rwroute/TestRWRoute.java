@@ -336,7 +336,7 @@ public class TestRWRoute {
     public void testBug701() {
         Design design = RapidWrightDCP.loadDCP("bug701.dcp");
 
-        RWRoute.routeDesignFullNonTimingDriven(design);
+        RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--noInvertGndToVccForLutInputs"});
 
         Net vcc = design.getVccNet();
         Assertions.assertEquals(1, vcc.getPins().size());

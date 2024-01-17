@@ -22,23 +22,33 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.support.rwroute.RouterHelperSupport;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Stream;
 
 public class TestRouterHelper {
@@ -199,7 +209,103 @@ public class TestRouterHelper {
         SitePinInst p = new SitePinInst("TX_T_OUT", si);
         Node intNode = RouterHelper.projectOutputPinToINTNode(p);
 
-        // FIXME:Known broken --  https://github.com/Xilinx/RapidWright/issues/558
+        // FIXME: Known broken --  https://github.com/Xilinx/RapidWright/issues/558
         Assertions.assertNotEquals(Objects.toString(intNode), "INT_INTF_L_CMT_X182Y90/LOGIC_OUTS_R19");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testInvertPossibleGndPinsToVccPinsLutInput(boolean invertLutInputs) {
+        Design design = new Design("design", "xcvu3p");
+        Cell cell = design.createAndPlaceCell("lut", Unisim.LUT1, "SLICE_X0Y0/A6LUT");
+        LUTTools.configureLUT(cell, "O=~I0");
+        Assertions.assertEquals("O=!I0", LUTTools.getLUTEquation(cell));
+
+        Net gndNet = design.getGndNet();
+        gndNet.createPin("A6", cell.getSiteInst());
+
+        // Check A6 was inverted, and it was moved off gndNet
+        Set<SitePinInst> invertedPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndNet.getPins(), invertLutInputs);
+        if (invertLutInputs) {
+            Assertions.assertEquals("[IN SLICE_X0Y0.A6]", invertedPins.toString());
+        } else {
+            Assertions.assertTrue(invertedPins.isEmpty());
+        }
+        Assertions.assertEquals(invertLutInputs, gndNet.getPins().isEmpty());
+
+        Net targetNet = invertLutInputs ? design.getVccNet() : design.getGndNet();
+        Net sourceNet = !invertLutInputs ? design.getVccNet() : design.getGndNet();
+        Assertions.assertEquals("[IN SLICE_X0Y0.A6]", targetNet.getPins().toString());
+        Assertions.assertTrue(sourceNet.getPins().isEmpty());
+        if (invertLutInputs) {
+            // Must have moved onto vccNet, and the LUT mask inverted
+            Assertions.assertEquals("O=I0", LUTTools.getLUTEquation(cell));
+
+            // Now undo this optimization by going from VCC pin back to GND pin
+            RouterHelperSupport.invertVccLutPinsToGndPins(design, invertedPins);
+
+            // Check that pin is back on the original VCC net
+            Assertions.assertTrue(targetNet.getPins().isEmpty());
+            Assertions.assertEquals("[IN SLICE_X0Y0.A6]", sourceNet.getPins().toString());
+        }
+
+        // Check that LUT equation is back to normal
+        Assertions.assertEquals("O=!I0", LUTTools.getLUTEquation(cell));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"" +
+            "false,false",
+            "false,true",
+            "true,false",
+            "true,true"
+    })
+    public void testInvertPossibleGndPinsToVccPinsLutInputOnlyIfFlattenedAndUniquified(boolean flatten, boolean uniquify) {
+        Design design = RapidWrightDCP.loadDCP("picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp");
+
+        Assertions.assertEquals(1, design.getModules().size());
+        Assertions.assertEquals(4, design.getModuleInsts().size());
+
+        if (flatten) {
+            // Since ModuleInst-s (and indeed Vivado's write_edif) can create folded netlists,
+            // completely flatten the design (required for ModuleInst designs) as well as uniqueify
+            // all leaf cells so that modifying a LUT's INIT mask does not inadvertently modify
+            // masks for other leaf cells
+            design.flattenDesign();
+
+            Assertions.assertEquals(0, design.getModules().size());
+            Assertions.assertEquals(0, design.getModuleInsts().size());
+        } else {
+            // Not flattening nor uniquifying means that less/no opportunities exist for making
+            // GND -> VCC transformations as they are only applied to uniquified LUTs.
+            // It's assumed/expected that Vivado will pick up at least one error when RWRoute
+            // incorrectly inverts a non-uniquified LUT
+        }
+
+        if (uniquify) {
+            Boolean result = EDIFTools.uniqueifyNetlist(design);
+            if (!flatten && uniquify) {
+                // Cannot uniqueify without flattening -- skip test if this is the case
+                Assumptions.assumeTrue(result != null);
+            }
+            Assertions.assertTrue(result);
+        }
+
+        RWRoute.preprocess(design);
+
+        Net gndNet = design.getGndNet();
+        List<SitePinInst> gndLutPins = new ArrayList<>();
+        for (SitePinInst spi : gndNet.getPins()) {
+            if (!spi.isLUTInputPin()) {
+                continue;
+            }
+            gndLutPins.add(spi);
+        }
+        Assertions.assertFalse(gndLutPins.isEmpty());
+
+        Set<SitePinInst> invertedPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndLutPins);
+
+        // If not flattening/uniquifying, there must be no inverted pins
+        Assertions.assertEquals(!flatten || !uniquify, invertedPins.isEmpty());
     }
 }
