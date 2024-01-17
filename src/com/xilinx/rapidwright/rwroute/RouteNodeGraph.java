@@ -176,7 +176,7 @@ public class RouteNodeGraph {
         accessibleWireOnlyIfAboveBelowTarget = new EnumMap<>(TileTypeEnum.class);
         BitSet wires = new BitSet();
         Tile intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
-        // Device.getArbitraryTileOfType() typically gives you the North-Eastern-most
+        // Device.getArbitraryTileOfType() typically gives you the North-Western-most
         // tile (with minimum X, maximum Y). Analyze the tile just below that.
         intTile = intTile.getTileXYNeighbor(0, -1);
         for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
