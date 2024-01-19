@@ -1013,6 +1013,8 @@ public class RWRoute{
             SitePinInst altSource = net.getAlternateSource();
             SiteInst si = source.getSiteInst();
             boolean altSourcePreviouslyRouted = altSource != null ? altSource.isRouted() : false;
+            assert(source != null);
+            boolean sourcePreviouslyRouted = source.isRouted();
             for (SitePinInst spi : Arrays.asList(source, altSource)) {
                 if (spi != null) {
                     spi.setRouted(false);
@@ -1065,6 +1067,15 @@ public class RWRoute{
                     // Add site routing back if we are keeping the MUX pin
                     source.getSiteInst().routeIntraSiteNet(net, altSource.getBELPin(), altSource.getBELPin());
                 }
+            }
+            // If the original source was routed and is now no longer used, it must
+            // mean that the alternate source is used instead. Let's remove the main
+            // source which will promote the alternate to main.
+            if (sourcePreviouslyRouted && !source.isRouted()) {
+                assert(altSource != null && altSource.isRouted());
+                net.removePin(source, true);
+                assert(net.getSource() == altSource);
+                assert(net.getAlternateSource() == null);
             }
         }
     }
