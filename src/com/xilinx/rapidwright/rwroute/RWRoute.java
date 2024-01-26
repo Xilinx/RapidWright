@@ -528,14 +528,12 @@ public class RWRoute{
      * @return A {@link NetWrapper} instance.
      */
     protected NetWrapper createNetWrapperAndConnections(Net net) {
+        List<SitePinInst> sinkPins = net.getSinkPins();
+        assert(!sinkPins.isEmpty());
+
         NetWrapper netWrapper = new NetWrapper(numWireNetsToRoute++, net);
         NetWrapper existingNetWrapper = nets.put(net, netWrapper);
         assert(existingNetWrapper == null);
-
-        List<SitePinInst> sinkPins = net.getSinkPins();
-        if (sinkPins.isEmpty()) {
-            return netWrapper;
-        }
 
         SitePinInst source = net.getSource();
         Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
