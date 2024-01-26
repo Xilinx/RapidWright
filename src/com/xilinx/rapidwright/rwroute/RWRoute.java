@@ -1064,6 +1064,7 @@ public class RWRoute{
                 assert(source.isRouted());
                 altSource.getSiteInst().removePin(altSource);
                 net.removePin(altSource); // TODO: Check why this doesn't have preserveOtherRoutes=true
+                if (true) throw new RuntimeException();
                 assert(source.isRouted());
                 if (source.getName().endsWith("MUX")) {
                     assert(altSource.getName().endsWith("_O"));
