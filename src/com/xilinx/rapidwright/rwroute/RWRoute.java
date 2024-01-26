@@ -1076,6 +1076,8 @@ public class RWRoute{
                 net.removePin(source, true);
                 assert(net.getSource() == altSource);
                 assert(net.getAlternateSource() == null);
+                // Restore the intra-site routing on the *_O site wire removed by removePin()
+                altSource.getSiteInst().routeIntraSiteNet(net, source.getBELPin(), source.getBELPin());
             }
         }
     }
