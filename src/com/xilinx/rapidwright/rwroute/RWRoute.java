@@ -565,16 +565,6 @@ public class RWRoute{
                 directConnections.add(connection);
                 connection.setDirect(true);
             } else {
-                if (sourceINTNode == null && altSourceINTNode == null) {
-                    throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
-                }
-                if (sourceINTRnode == null && sourceINTNode != null) {
-                    sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
-                }
-                if (altSourceINTRnode == null && altSource != null) {
-                    altSourceINTRnode = getOrCreateRouteNode(altSourceINTNode, RouteNodeType.PINFEED_O);
-                }
-
                 Node sinkINTNode = nodes.get(0);
                 indirectConnections.add(connection);
                 checkSinkRoutability(net, sinkINTNode);
@@ -638,6 +628,16 @@ public class RWRoute{
                     // its usage here immediately
                     sinkRnode.incrementUser(netWrapper);
                     sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
+                }
+
+                if (sourceINTNode == null && altSourceINTNode == null) {
+                    throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
+                }
+                if (sourceINTRnode == null && sourceINTNode != null) {
+                    sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
+                }
+                if (altSourceINTRnode == null && altSource != null) {
+                    altSourceINTRnode = getOrCreateRouteNode(altSourceINTNode, RouteNodeType.PINFEED_O);
                 }
 
                 if (sourceINTRnode != null) {
