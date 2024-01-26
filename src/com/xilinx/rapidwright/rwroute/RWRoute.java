@@ -528,35 +528,38 @@ public class RWRoute{
      * @return A {@link NetWrapper} instance.
      */
     protected NetWrapper createNetWrapperAndConnections(Net net) {
+        List<SitePinInst> sinkPins = net.getSinkPins();
+        assert(!sinkPins.isEmpty());
+
         NetWrapper netWrapper = new NetWrapper(numWireNetsToRoute++, net);
         NetWrapper existingNetWrapper = nets.put(net, netWrapper);
         assert(existingNetWrapper == null);
+
         SitePinInst source = net.getSource();
-        int indirect = 0;
+        Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
+
+        // Pre-emptively set up alternate source since we may expand from both sources
+        SitePinInst altSource = net.getAlternateSource();
+        Node altSourceINTNode = null;
+        if (altSource == null) {
+            altSource = DesignTools.getLegalAlternativeOutputPin(net);
+            if (altSource != null) {
+                // Add this SitePinInst to the net, but not to the SiteInst since it's not yet clear we'll be using it
+                net.addPin(altSource);
+                DesignTools.routeAlternativeOutputSitePin(net, altSource);
+            }
+        }
+        if (altSource != null) {
+            assert(!altSource.equals(source));
+            altSourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
+        }
+
         RouteNode sourceINTRnode = null;
         RouteNode altSourceINTRnode = null;
-
-        for (SitePinInst sink : net.getSinkPins()) {
+        int indirect = 0;
+        for (SitePinInst sink : sinkPins) {
             Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
-
             List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
-            Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
-            // Pre-emptively set up alternate source since we may expand from both sources
-            SitePinInst altSource = net.getAlternateSource();
-            if (altSource == null) {
-                altSource = DesignTools.getLegalAlternativeOutputPin(net);
-                if (altSource != null) {
-                    // Add this SitePinInst to the net, but not to the SiteInst
-                    net.addPin(altSource);
-                    DesignTools.routeAlternativeOutputSitePin(net, altSource);
-                }
-            }
-
-            Node altSourceINTNode = null;
-            if (altSource != null) {
-                assert(!altSource.equals(source));
-                altSourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-            }
 
             if (nodes.isEmpty() || (sourceINTNode == null && altSourceINTNode == null)) {
                 directConnections.add(connection);
@@ -627,18 +630,16 @@ public class RWRoute{
                     sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
                 }
 
-                if (sourceINTRnode == null && altSourceINTRnode == null) {
-                    if (sourceINTNode != null) {
-                        sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
-                    }
-                    if (altSourceINTNode != null) {
-                        altSourceINTRnode = getOrCreateRouteNode(altSourceINTNode, RouteNodeType.PINFEED_O);
-                    }
-
-                    if (sourceINTRnode == null && altSourceINTRnode == null) {
-                        throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
-                    }
+                if (sourceINTNode == null && altSourceINTNode == null) {
+                    throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
                 }
+                if (sourceINTRnode == null && sourceINTNode != null) {
+                    sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
+                }
+                if (altSourceINTRnode == null && altSourceINTNode != null) {
+                    altSourceINTRnode = getOrCreateRouteNode(altSourceINTNode, RouteNodeType.PINFEED_O);
+                }
+
                 if (sourceINTRnode != null) {
                     connection.setSourceRnode(sourceINTRnode);
                     connection.setAltSourceRnode(altSourceINTRnode);
