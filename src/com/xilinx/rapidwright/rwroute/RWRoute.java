@@ -1057,15 +1057,18 @@ public class RWRoute{
                     break;
                 }
             }
+
             // If the alt source was previously routed, and is no longer, let's remove it
             if (altSource != null && altSourcePreviouslyRouted && !altSource.isRouted()) {
-                boolean sourceRouted = source.isRouted();
+                // If altSource is not routed, then source must be routed
+                assert(source.isRouted());
                 altSource.getSiteInst().removePin(altSource);
-                net.removePin(altSource);
-                source.setRouted(sourceRouted);
-                if (altSource.getName().endsWith("_O") && source.getName().endsWith("MUX") && source.isRouted()) {
+                net.removePin(altSource); // TODO: Check why this doesn't have preserveOtherRoutes=true
+                assert(source.isRouted());
+                if (source.getName().endsWith("MUX")) {
+                    assert(altSource.getName().endsWith("_O"));
                     // Add site routing back if we are keeping the MUX pin
-                    source.getSiteInst().routeIntraSiteNet(net, altSource.getBELPin(), altSource.getBELPin());
+                    si.routeIntraSiteNet(net, altSource.getBELPin(), altSource.getBELPin());
                 }
             }
             // If the original source was routed and is now no longer used, it must
@@ -1076,8 +1079,11 @@ public class RWRoute{
                 net.removePin(source, true);
                 assert(net.getSource() == altSource);
                 assert(net.getAlternateSource() == null);
-                // Restore the intra-site routing on the *_O site wire removed by removePin()
-                altSource.getSiteInst().routeIntraSiteNet(net, source.getBELPin(), source.getBELPin());
+                if (source.getName().endsWith("_O")) {
+                    assert(altSource.getName().endsWith("MUX"));
+                    // Add site routing back if we are keeping the MUX pin
+                    si.routeIntraSiteNet(net, source.getBELPin(), source.getBELPin());
+                }
             }
         }
     }
