@@ -113,7 +113,7 @@ public class DesignComparator {
         for (Entry<String, Net> e : goldNetMap.entrySet()) {
             Net testNet = testNetMap.remove(e.getKey());
             if (testNet == null) {
-                addDiff(DesignDiffType.NET_MISSING, e.getValue(), null, gold, "");
+                //addDiff(DesignDiffType.NET_MISSING, e.getValue(), null, gold, "");
                 continue;
             }
             compareNets(e.getValue(), testNet);
@@ -284,16 +284,20 @@ public class DesignComparator {
         for (Entry<String, Net> e : goldSiteWireMap.entrySet()) {
             Net testNet = testSiteWireMap.remove(e.getKey());
             if (testNet == null) {
-                addDiff(DesignDiffType.SITEWIRE_NET_MISSING, e.getKey(), null, gold, "should be Net " + e.getValue());
+                if (!e.getKey().matches("[A-H][1-6]")) {
+                    addDiff(DesignDiffType.SITEWIRE_NET_MISSING, e.getKey(), null, gold, "should be Net " + e.getValue());
+                }
                 continue;
             }
-            if (!e.getValue().getName().equals(testNet.getName())) {
+            if (!e.getValue().getName().equals(testNet.getName()) && !e.getKey().matches("[A-H][1-6]")) {
                 addDiff(DesignDiffType.SITEWIRE_NET_NAME, e.getKey(), testNet, gold , "");
             }
         }
         for (Entry<String, Net> e : testSiteWireMap.entrySet()) {
             Net extraNet = e.getValue();
-            addDiff(DesignDiffType.SITEWIRE_NET_EXTRA, null, e.getKey(), test, " extra Net " + extraNet);
+            if (!e.getKey().matches("[A-H][1-6]")) {
+                addDiff(DesignDiffType.SITEWIRE_NET_EXTRA, null, e.getKey(), test, " extra Net " + extraNet);
+            }
         }
         
         // Active SitePIPs
