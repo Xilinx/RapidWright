@@ -43,6 +43,8 @@ import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
@@ -730,7 +732,9 @@ public class PhysNetlistReader {
         return pipCache.getPIP(tile, wire0StringIdx, wire1StringIdx);
     }
 
-    private static void checkNetTypeFromCellNet(Map<String, PhysNet.Reader> cellPinToPhysicalNet, EDIFNet net, List<String> strings) {
+    private static void checkNetTypeFromCellNet(Map<String, PhysNet.Reader> cellPinToPhysicalNet,
+                                                EDIFHierNet net,
+                                                List<String> strings) {
         // Expand EDIFNet and make sure sink cell pins that are part of a
         // physical net are annotated as a VCC or GND net.
         //
@@ -741,12 +745,13 @@ public class PhysNetlistReader {
         // If the full physical net is present and the inverting site pips are
         // labelled, then it would be possible to confirm if the NetType was
         // always correct.
-        Queue<EDIFNet> netsToExpand = new ArrayDeque<>();
+        Queue<EDIFHierNet> netsToExpand = new ArrayDeque<>();
         netsToExpand.add(net);
 
         while (!netsToExpand.isEmpty()) {
             net = netsToExpand.remove();
-            for (EDIFPortInst portInst : net.getPortInsts()) {
+            for (EDIFHierPortInst hierPortInst : net.getPortInsts()) {
+                EDIFPortInst portInst = hierPortInst.getPortInst();
                 if (portInst.isOutput() && !portInst.isTopLevelPort()) {
                     // Only following downstream connections.
                     continue;
@@ -759,24 +764,27 @@ public class PhysNetlistReader {
 
                 if (portInst.isTopLevelPort()) {
                     // Follow net to parent cell (if any)
-                    EDIFCell parent = portInst.getParentCell();
+                    EDIFCell parent = hierPortInst.getParentCell();
                     if (parent != null) {
                         EDIFNet outerNet = parent.getInternalNet(portInst);
-                        if (outerNet != null && outerNet != net) {
-                            netsToExpand.add(outerNet);
+                        EDIFHierNet outerHierNet = new EDIFHierNet(hierPortInst.getHierarchicalInst(), outerNet);
+                        if (outerNet != null && !outerHierNet.equals(net)) {
+                            netsToExpand.add(outerHierNet);
                         }
                     }
                 } else {
                     // Follow net to child cell (if any) or add to sink port
                     // list.
-                    EDIFNet innerNet = portInst.getInternalNet();
+                    EDIFHierNet innerNet = hierPortInst.getInternalNet();
                     if (innerNet != null) {
                         netsToExpand.add(innerNet);
                     } else {
-                        PhysNet.Reader physNet = cellPinToPhysicalNet.get(portInst.getFullName());
+                        String fullName = hierPortInst.toString();
+                        PhysNet.Reader physNet = cellPinToPhysicalNet.get(fullName);
                         if (physNet != null) {
                             if (physNet.getType() != PhysNetlist.NetType.VCC && physNet.getType() != PhysNetlist.NetType.GND) {
-                                throw new RuntimeException(String.format("ERROR: Net %s connected to cell pin %s should be VCC or GND but is %s", strings.get(physNet.getName()), portInst.getFullName(), physNet.getType().name()));
+                                throw new RuntimeException(String.format("ERROR: Net %s connected to cell pin %s should be VCC or GND but is %s",
+                                        strings.get(physNet.getName()), fullName, physNet.getType().name()));
                             }
                         }
                     }
@@ -874,7 +882,8 @@ public class PhysNetlistReader {
                 String key = strings.get(placement.getSite()) + "/" + strings.get(pinMap.getBel()) + "/" + strings.get(pinMap.getBelPin());
                 PhysNet.Reader net = belPinToPhysicalNet.get(key);
                 if (net != null) {
-                    cellPinToPhysicalNet.put(strings.get(placement.getCellName()) + "/"  + strings.get(pinMap.getCellPin()), net);
+                    PhysNet.Reader oldNet = cellPinToPhysicalNet.put(strings.get(placement.getCellName()) + "/"  + strings.get(pinMap.getCellPin()), net);
+                    assert(oldNet == null || oldNet == net);
                 }
             }
         }
@@ -891,11 +900,11 @@ public class PhysNetlistReader {
         // run through a site local inverter.  Modelling these site local
         // inverters is not done here, hence why the requirement is only that
         // the net type be either VCC or GND.
-        for (EDIFCellInst leafEdifCellInst : netlist.getAllLeafCellInstances()) {
+        for (EDIFHierCellInst leafEdifCellInst : netlist.getAllLeafHierCellInstances()) {
             EDIFCell leafEdifCell = leafEdifCellInst.getCellType();
             String leafEdifCellName = leafEdifCell.getName();
 
-            EDIFPortInst portInst;
+            EDIFHierPortInst portInst;
             if (leafEdifCellName.equals("VCC")) {
                 portInst = leafEdifCellInst.getPortInst("P");
             } else if (leafEdifCellName.equals("GND")) {
@@ -908,7 +917,7 @@ public class PhysNetlistReader {
                 // Cell must be unplaced and/or unconnected
                 continue;
             }
-            EDIFNet net = portInst.getNet();
+            EDIFHierNet net = portInst.getHierarchicalNet();
             checkNetTypeFromCellNet(cellPinToPhysicalNet, net, strings);
         }
     }
