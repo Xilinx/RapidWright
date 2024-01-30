@@ -253,7 +253,7 @@ public class EDIFHierPortInst {
     }
 
     /**
-     * FOr Ports that represent connections to inner cells, get the connected Net that is connected within the cell
+     * For ports that represent connections to inner cells, get the connected Net that is connected within the cell
      */
     public EDIFHierNet getInternalNet() {
 
@@ -263,5 +263,9 @@ public class EDIFHierPortInst {
         }
         return new EDIFHierNet(hierarchicalInst.getChild(portInst.getCellInst()), internalNet);
 
+    }
+
+    public EDIFCell getParentCell() {
+        return hierarchicalInst.getCellType();
     }
 }
