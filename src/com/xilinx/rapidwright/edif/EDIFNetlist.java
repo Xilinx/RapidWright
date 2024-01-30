@@ -1454,6 +1454,14 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
+     * Traverses the netlist and produces a list of all primitive leaf hierarchical cell instances.
+     * @return A list of all primitive leaf hierarchical cell instances.
+     */
+    public List<EDIFHierCellInst> getAllLeafHierCellInstances() {
+        return getAllLeafDescendants(getTopHierCellInst());
+    }
+
+    /**
      * Get the physical pins all parent nets (as returned by {@link #getParentNet(EDIFHierNet)}).
      *
      * No special handling for static nets is performed. Therefore, only the local connectivity is visible. To see
