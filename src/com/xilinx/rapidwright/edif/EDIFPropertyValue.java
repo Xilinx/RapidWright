@@ -96,48 +96,56 @@ public class EDIFPropertyValue {
         if (type != EDIFValueType.INTEGER) {
             return null;
         }
+        return parseIntValue();
+    }
+
+    private Integer parseIntValue() {
         int radix = 10;
         boolean lastCharWasTick = false;
         boolean isSigned = value.contains("-");
-        for (int i=0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            if (lastCharWasTick) {
-                switch (c) {
-                    case 'b':
-                    case 'B':
-                        radix = 2;
-                        break;
-                    case 'o':
-                    case 'O':
-                        radix = 8;
-                        break;
-                    case 'd':
-                    case 'D':
-                        radix = 10;
-                        break;
-                    case 'h':
-                    case 'H':
-                        radix = 16;
-                        break;
-                    case 's':
-                    case 'S':
-                        isSigned = true;
-                        continue;
-                }
-                if (isSigned) {
-                    return Integer.parseInt(value.substring(i+1), radix);
-                }
-                return Integer.parseUnsignedInt(value.substring(i+1), radix);
+        try {
+            for (int i = 0; i < value.length(); i++) {
+                char c = value.charAt(i);
+                if (lastCharWasTick) {
+                    switch (c) {
+                        case 'b':
+                        case 'B':
+                            radix = 2;
+                            break;
+                        case 'o':
+                        case 'O':
+                            radix = 8;
+                            break;
+                        case 'd':
+                        case 'D':
+                            radix = 10;
+                            break;
+                        case 'h':
+                        case 'H':
+                            radix = 16;
+                            break;
+                        case 's':
+                        case 'S':
+                            isSigned = true;
+                            continue;
+                    }
+                    if (isSigned) {
+                        return Integer.parseInt(value.substring(i + 1), radix);
+                    }
+                    return Integer.parseUnsignedInt(value.substring(i + 1), radix);
 
+                }
+                if (c == '\'') {
+                    lastCharWasTick = true;
+                }
             }
-            if (c == '\'') {
-                lastCharWasTick = true;
+            if (isSigned) {
+                return Integer.parseInt(value);
             }
+            return Integer.parseUnsignedInt(value);
+        } catch (NumberFormatException e) {
+            return null;
         }
-        if (isSigned) {
-            return Integer.parseInt(value);
-        }
-        return Integer.parseUnsignedInt(value);
     }
 
     /**
@@ -193,7 +201,10 @@ public class EDIFPropertyValue {
     }
 
     public boolean getBooleanValue() {
-        return !(value == null || value.length() == 0 || getIntValue() == 0 || value.toLowerCase().equals("false"));
+        Integer intValue;
+        return !(value == null || value.length() == 0 ||
+                ((intValue = parseIntValue()) != null && intValue == 0) ||
+                value.toLowerCase().equals("false"));
     }
 
     /**
