@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -1451,6 +1451,14 @@ public class EDIFNetlist extends EDIFName {
             }
         }
         return insts;
+    }
+
+    /**
+     * Traverses the netlist and produces a list of all primitive leaf hierarchical cell instances.
+     * @return A list of all primitive leaf hierarchical cell instances.
+     */
+    public List<EDIFHierCellInst> getAllLeafHierCellInstances() {
+        return getAllLeafDescendants(getTopHierCellInst());
     }
 
     /**
