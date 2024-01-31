@@ -96,10 +96,14 @@ public class EDIFPropertyValue {
         if (type != EDIFValueType.INTEGER) {
             return null;
         }
+        return parseIntValue();
+    }
+
+    private int parseIntValue() {
         int radix = 10;
         boolean lastCharWasTick = false;
         boolean isSigned = value.contains("-");
-        for (int i=0; i < value.length(); i++) {
+        for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
             if (lastCharWasTick) {
                 switch (c) {
@@ -125,9 +129,9 @@ public class EDIFPropertyValue {
                         continue;
                 }
                 if (isSigned) {
-                    return Integer.parseInt(value.substring(i+1), radix);
+                    return Integer.parseInt(value.substring(i + 1), radix);
                 }
-                return Integer.parseUnsignedInt(value.substring(i+1), radix);
+                return Integer.parseUnsignedInt(value.substring(i + 1), radix);
 
             }
             if (c == '\'') {
@@ -193,7 +197,17 @@ public class EDIFPropertyValue {
     }
 
     public boolean getBooleanValue() {
-        return !(value == null || value.length() == 0 || getIntValue() == 0 || value.toLowerCase().equals("false"));
+        if (value == null || value.length() == 0) {
+            return false;
+        }
+
+        try {
+            return parseIntValue() != 0;
+        } catch (NumberFormatException e) {
+            // Fall through
+        }
+
+        return !value.toLowerCase().equals("false");
     }
 
     /**
