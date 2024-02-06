@@ -442,7 +442,9 @@ public class GlobalSignalRouting {
                             "net '" + spi.getNet().getName() + "'");
                 }
             }
-            SitePinInst spi = currNet.createPin(sitePin.getPinName(), si);
+            SitePinInst spi = new SitePinInst(sitePin.getPinName(), si);
+            boolean updateSiteRouting = false;
+            currNet.addPin(spi, updateSiteRouting);
             spi.setRouted(true);
         }
 
