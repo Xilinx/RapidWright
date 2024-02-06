@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -24,13 +24,11 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
