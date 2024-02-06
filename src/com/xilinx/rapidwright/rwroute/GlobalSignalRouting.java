@@ -532,7 +532,6 @@ public class GlobalSignalRouting {
 
             String sitePinName;
             if (wireName.endsWith("_O")) {
-                // Fall through
                 sitePinName = wireName.substring(wireName.length() - 3);
             } else if (wireName.endsWith("MUX")) {
                 char lutLetter = wireName.charAt(wireName.length() - 4);
