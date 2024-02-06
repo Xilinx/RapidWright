@@ -449,16 +449,6 @@ public class GlobalSignalRouting {
             boolean updateSiteRouting = false;
             currNet.addPin(spi, updateSiteRouting);
             spi.setRouted(true);
-
-            if (pinName.endsWith("MUX")) {
-                char lutLetter = pinName.charAt(0);
-                Net oNet = si.getNetFromSiteWire(lutLetter + "_O");
-                if (oNet != null && oNet.getType() != currNet.getType()) {
-                    // Perform intra-site routing back to the LUT5 to not conflict with LUT6
-                    BEL outmux = si.getBEL("OUTMUX" + lutLetter);
-                    si.routeIntraSiteNet(currNet, outmux.getPin("D5"), outmux.getPin("OUT"));
-                }
-            }
         }
 
         currNet.setPIPs(netPIPs);
@@ -544,27 +534,20 @@ public class GlobalSignalRouting {
 
             String sitePinName;
             if (wireName.endsWith("_O")) {
+                // Fall through
                 sitePinName = wireName.substring(wireName.length() - 3);
             } else if (wireName.endsWith("MUX")) {
                 char lutLetter = wireName.charAt(wireName.length() - 4);
-                Net o5Net = si.getNetFromSiteWire(lutLetter + "5LUT_O5");
-                if (o5Net != null && o5Net.getType() != type) {
+                Net o6Net = si.getNetFromSiteWire(lutLetter + "_O");
+                if (o6Net != null && o6Net.getType() != type) {
+                    // 6LUT is occupied; play it safe and do not consider fracturing as that can require modifying the intra-site routing
                     return false;
                 }
 
-                Cell lut6 = si.getCell(lutLetter + "6LUT");
-                if (lut6 != null) {
-                    String lut6Type = lut6.getType();
-                    if (!lut6Type.startsWith("LUT") || lut6Type.equals("LUT6")) {
-                        // Only LUT1-5 can be fractured to serve as a static source
-                        return false;
-                    }
-
-                    Net a6Net = si.getNetFromSiteWire(lutLetter + "6");
-                    if (a6Net != null && !a6Net.isVCCNet()) {
-                        // LUT fracturing requires A6 to be free or already tied to VCC
-                        return false;
-                    }
+                Net o5Net = si.getNetFromSiteWire(lutLetter + "5LUT_O5");
+                if (o5Net != null && o5Net.getType() != type) {
+                    // 5LUT is occupied
+                    return false;
                 }
 
                 sitePinName = wireName.substring(wireName.length() - 4);
