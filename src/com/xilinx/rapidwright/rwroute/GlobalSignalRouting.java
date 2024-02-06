@@ -24,11 +24,13 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
@@ -424,6 +426,7 @@ public class GlobalSignalRouting {
         for (SitePin sitePin : sitePinsToCreate) {
             Site site = sitePin.getSite();
             SiteInst si = design.getSiteInstFromSite(site);
+            String pinName = sitePin.getPinName();
             if (si == null) {
                 // Create a dummy TIEOFF SiteInst
                 String name = SiteInst.STATIC_SOURCE + "_" + site.getName();
@@ -432,7 +435,7 @@ public class GlobalSignalRouting {
                 // Ensure it is not attached to the design
                 assert (si.getDesign() == null);
             } else {
-                SitePinInst spi = si.getSitePinInst(sitePin.getPinName());
+                SitePinInst spi = si.getSitePinInst(pinName);
                 if (spi != null) {
                     if (spi.getNet() == currNet) {
                         continue;
@@ -442,10 +445,20 @@ public class GlobalSignalRouting {
                             "net '" + spi.getNet().getName() + "'");
                 }
             }
-            SitePinInst spi = new SitePinInst(sitePin.getPinName(), si);
+            SitePinInst spi = new SitePinInst(pinName, si);
             boolean updateSiteRouting = false;
             currNet.addPin(spi, updateSiteRouting);
             spi.setRouted(true);
+
+            if (pinName.endsWith("MUX")) {
+                char lutLetter = pinName.charAt(0);
+                Net oNet = si.getNetFromSiteWire(lutLetter + "_O");
+                if (oNet != null && oNet.getType() != currNet.getType()) {
+                    // Perform intra-site routing back to the LUT5 to not conflict with LUT6
+                    BEL outmux = si.getBEL("OUTMUX" + lutLetter);
+                    si.routeIntraSiteNet(currNet, outmux.getPin("D5"), outmux.getPin("OUT"));
+                }
+            }
         }
 
         currNet.setPIPs(netPIPs);
@@ -534,10 +547,26 @@ public class GlobalSignalRouting {
                 sitePinName = wireName.substring(wireName.length() - 3);
             } else if (wireName.endsWith("MUX")) {
                 char lutLetter = wireName.charAt(wireName.length() - 4);
-                Net currNet = si.getNetFromSiteWire(lutLetter + "5LUT_O5");
-                if (currNet != null && currNet.getType() != type) {
+                Net o5Net = si.getNetFromSiteWire(lutLetter + "5LUT_O5");
+                if (o5Net != null && o5Net.getType() != type) {
                     return false;
                 }
+
+                Cell lut6 = si.getCell(lutLetter + "6LUT");
+                if (lut6 != null) {
+                    String lut6Type = lut6.getType();
+                    if (!lut6Type.startsWith("LUT") || lut6Type.equals("LUT6")) {
+                        // Only LUT1-5 can be fractured to serve as a static source
+                        return false;
+                    }
+
+                    Net a6Net = si.getNetFromSiteWire(lutLetter + "6");
+                    if (a6Net != null && !a6Net.isVCCNet()) {
+                        // LUT fracturing requires A6 to be free or already tied to VCC
+                        return false;
+                    }
+                }
+
                 sitePinName = wireName.substring(wireName.length() - 4);
             } else {
                 throw new RuntimeException(wireName);
