@@ -505,6 +505,28 @@ public class RWRoute{
             GlobalSignalRouting.routeStaticNet(staticNet, gns, design, routethruHelper);
 
             preserveNet(staticNet, false);
+
+            // When a [A-H]MUX pin is used as a static source, also preserve the [A-H]_O pin
+            // so that it can't be used by other static nets, nor as a LUT routethru
+            for (SitePinInst spi : staticNet.getPins()) {
+                if (!spi.isOutPin()) {
+                    continue;
+                }
+
+                SiteInst si = spi.getSiteInst();
+                if (!Utils.isSLICE((si))) {
+                    continue;
+                }
+
+                String pinName = spi.getName();
+                if (pinName.endsWith("MUX")) {
+                    char lutLetter = pinName.charAt(0);
+                    Node oNode = si.getSite().getConnectedNode(lutLetter + "_O");
+                    routingGraph.preserve(oNode, staticNet);
+                } else {
+                    assert(pinName.endsWith("_O"));
+                }
+            }
         }
     }
 
@@ -945,60 +967,6 @@ public class RWRoute{
                 assert(existing == null);
             }
             LUTTools.swapMultipleLutPins(pinSwaps);
-        }
-
-        if (lutRoutethru) {
-            // It is possible for RWRoute to routethru a LUT that is already being used as a
-            // static source through its *MUX output. By default, the 6LUT is used for this supply.
-            // When LUT routethru-s are considered, examine both static nets to find
-            // any cases where the *MUX output pin is used as a static source alongside
-            // the *_O output being used as a routethru. In such cases, configure the
-            // OUTMUX* site PIP to source from the 5LUT rather than the default 6LUT
-            // so that no conflict occurs
-            for (Net staticNet : Arrays.asList(design.getGndNet(), design.getVccNet())) {
-                for (SitePinInst spi : staticNet.getPins()) {
-                    if (!spi.isOutPin()) {
-                        continue;
-                    }
-                    SiteInst si = spi.getSiteInst();
-                    if (!Utils.isSLICE(si)) {
-                        continue;
-                    }
-
-                    String pinName = spi.getName();
-                    if (!pinName.endsWith("MUX")) {
-                        continue;
-                    }
-
-                    Node muxNode = spi.getConnectedNode();
-                    assert(routingGraph.getPreservedNet(muxNode) == staticNet);
-
-                    Site site = si.getSite();
-                    char lutLetter = pinName.charAt(0);
-                    Node oNode = site.getConnectedNode(lutLetter + "_O");
-                    RouteNode rnode = routingGraph.getNode(oNode);
-                    if (rnode == null || rnode.getOccupancy() == 0) {
-                        // No LUT6 routethru, nothing to be done
-                        continue;
-                    }
-
-                    if (pinName.charAt(1) == '6') {
-                        throw new RuntimeException("ERROR: Illegal LUT routethru on " + site + "/" + pinName +
-                                " since the 5LUT is being used as a static source");
-                    }
-
-                    // Perform intra-site routing back to the LUT5 to not conflict with LUT6 routethru
-                    BEL outmux = si.getBEL("OUTMUX" + lutLetter);
-                    si.routeIntraSiteNet(staticNet, outmux.getPin("D5"), outmux.getPin("OUT"));
-
-                    if (si.getDesign() == null) {
-                        // Rename SiteInst (away from "STATIC_SOURCE_<siteName>") and
-                        // attach it to the design so that intra-site routing updates take effect
-                        si.setName(site.getName());
-                        design.addSiteInst(si);
-                    }
-                }
-            }
         }
 
         assignNodesToConnections();
