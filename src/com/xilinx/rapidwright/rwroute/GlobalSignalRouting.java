@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -424,6 +424,7 @@ public class GlobalSignalRouting {
         for (SitePin sitePin : sitePinsToCreate) {
             Site site = sitePin.getSite();
             SiteInst si = design.getSiteInstFromSite(site);
+            String pinName = sitePin.getPinName();
             if (si == null) {
                 // Create a dummy TIEOFF SiteInst
                 String name = SiteInst.STATIC_SOURCE + "_" + site.getName();
@@ -432,7 +433,7 @@ public class GlobalSignalRouting {
                 // Ensure it is not attached to the design
                 assert (si.getDesign() == null);
             } else {
-                SitePinInst spi = si.getSitePinInst(sitePin.getPinName());
+                SitePinInst spi = si.getSitePinInst(pinName);
                 if (spi != null) {
                     if (spi.getNet() == currNet) {
                         continue;
@@ -442,7 +443,9 @@ public class GlobalSignalRouting {
                             "net '" + spi.getNet().getName() + "'");
                 }
             }
-            SitePinInst spi = currNet.createPin(sitePin.getPinName(), si);
+            SitePinInst spi = new SitePinInst(pinName, si);
+            boolean updateSiteRouting = false;
+            currNet.addPin(spi, updateSiteRouting);
             spi.setRouted(true);
         }
 
@@ -532,10 +535,18 @@ public class GlobalSignalRouting {
                 sitePinName = wireName.substring(wireName.length() - 3);
             } else if (wireName.endsWith("MUX")) {
                 char lutLetter = wireName.charAt(wireName.length() - 4);
-                Net currNet = si.getNetFromSiteWire(lutLetter + "5LUT_O5");
-                if (currNet != null && currNet.getType() != type) {
+                Net o6Net = si.getNetFromSiteWire(lutLetter + "_O");
+                if (o6Net != null && o6Net.getType() != type) {
+                    // 6LUT is occupied; play it safe and do not consider fracturing as that can require modifying the intra-site routing
                     return false;
                 }
+
+                Net o5Net = si.getNetFromSiteWire(lutLetter + "5LUT_O5");
+                if (o5Net != null && o5Net.getType() != type) {
+                    // 5LUT is occupied
+                    return false;
+                }
+
                 sitePinName = wireName.substring(wireName.length() - 4);
             } else {
                 throw new RuntimeException(wireName);

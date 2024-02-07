@@ -86,8 +86,10 @@ public class TestGlobalSignalRouting {
 
         RWRoute.preprocess(design);
 
-        List<SitePinInst> gndPins = design.getGndNet().getPins();
-        List<SitePinInst> vccPins = design.getVccNet().getPins();
+        Net gndNet = design.getGndNet();
+        Net vccNet = design.getVccNet();
+        List<SitePinInst> gndPins = gndNet.getPins();
+        List<SitePinInst> vccPins = vccNet.getPins();
         // Note: these numbers are slightly different from RWRoute since RWRoute.routeStaticNets()
         //       uses RouterHelper.invertPossibleGndPinsToVccPins()
         Assertions.assertEquals(22760, gndPins.size());
@@ -96,14 +98,16 @@ public class TestGlobalSignalRouting {
         Function<Node, NodeStatus> gns = (n) -> NodeStatus.AVAILABLE;
         RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
 
-        GlobalSignalRouting.routeStaticNet(design.getGndNet(), gns, design, routeThruHelper);
-        gndPins = design.getGndNet().getPins();
-        Assertions.assertEquals(1952, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
+        GlobalSignalRouting.routeStaticNet(gndNet, gns, design, routeThruHelper);
+        gndPins = gndNet.getPins();
+        Assertions.assertEquals(1858, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
         Assertions.assertEquals(22760, gndPins.stream().filter((spi) -> !spi.isOutPin()).count());
+        Assertions.assertEquals(39827, gndNet.getPIPs().size());
 
-        GlobalSignalRouting.routeStaticNet(design.getVccNet(), gns, design, routeThruHelper);
-        vccPins = design.getVccNet().getPins();
+        GlobalSignalRouting.routeStaticNet(vccNet, gns, design, routeThruHelper);
+        vccPins = vccNet.getPins();
         Assertions.assertEquals(0, vccPins.stream().filter((spi) -> spi.isOutPin()).count());
         Assertions.assertEquals(19402, vccPins.stream().filter((spi) -> !spi.isOutPin()).count());
+        Assertions.assertEquals(23280, vccNet.getPIPs().size());
     }
 }
