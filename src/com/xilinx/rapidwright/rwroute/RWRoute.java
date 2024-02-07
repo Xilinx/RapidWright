@@ -514,7 +514,7 @@ public class RWRoute{
                 }
 
                 SiteInst si = spi.getSiteInst();
-                if (!Utils.isSLICE((si))) {
+                if (!Utils.isSLICE(si)) {
                     continue;
                 }
 
