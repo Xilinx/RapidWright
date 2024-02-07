@@ -506,8 +506,9 @@ public class RWRoute{
 
             preserveNet(staticNet, false);
 
-            // When a [A-H]MUX pin is used as a static source, also preserve the [A-H]_O pin
+            // When a [B-H]MUX pin is used as a static source, also preserve the [B-H]_O pin
             // so that it can't be used by other static nets, nor as a LUT routethru
+            // Assume that AMUX can always supply GND
             for (SitePinInst spi : staticNet.getPins()) {
                 if (!spi.isOutPin()) {
                     continue;
@@ -521,8 +522,10 @@ public class RWRoute{
                 String pinName = spi.getName();
                 if (pinName.endsWith("MUX")) {
                     char lutLetter = pinName.charAt(0);
-                    Node oNode = si.getSite().getConnectedNode(lutLetter + "_O");
-                    routingGraph.preserve(oNode, staticNet);
+                    if (lutLetter != 'A') {
+                        Node oNode = si.getSite().getConnectedNode(lutLetter + "_O");
+                        routingGraph.preserve(oNode, staticNet);
+                    }
                 } else {
                     assert(pinName.endsWith("_O"));
                 }
