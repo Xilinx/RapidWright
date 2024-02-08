@@ -169,11 +169,11 @@ public class VivadoTools {
      * @param hasEncryptedIP Flag indicating if the provided DCP contains encrypted
      *                       IP and was written by RapidWright such that it needs to
      *                       be loaded with a Tcl script.
-     * @param preamble       String of Tcl commands to run before write_bitstream
+     * @param tclPremable       String of Tcl commands to run before write_bitstream
      *                       (null for no preamble).
      * @return The output of Vivado as a list of Strings
      */
-    public static List<String> writeBitstream(Path dcp, Path bitFile, boolean hasEncryptedIP, String preamble) {
+    public static List<String> writeBitstream(Path dcp, Path bitFile, boolean hasEncryptedIP, String tclPremable) {
         final Path workdir = FileSystems.getDefault()
                 .getPath("vivadoToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
         File workdirHandle = new File(workdir.toString());
@@ -182,8 +182,8 @@ public class VivadoTools {
         final Path outputLog = workdir.resolve("outputLog.log");
         StringBuilder sb = new StringBuilder();
         sb.append(createTclDCPLoadCommand(dcp, hasEncryptedIP));
-        if (preamble != null) {
-            sb.append(preamble);
+        if (tclPremable != null) {
+            sb.append(tclPremable);
             sb.append("; ");
         }
         sb.append("write_bitstream " + bitFile.toString());
