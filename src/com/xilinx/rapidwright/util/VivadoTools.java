@@ -169,16 +169,44 @@ public class VivadoTools {
      * @param hasEncryptedIP Flag indicating if the provided DCP contains encrypted
      *                       IP and was written by RapidWright such that it needs to
      *                       be loaded with a Tcl script.
+     * @param tclPremable    String of Tcl commands to run before write_bitstream
+     *                       (null for no preamble).
+     * @return The output of Vivado as a list of Strings
+     */
+    public static List<String> writeBitstream(Path dcp, Path bitFile, boolean hasEncryptedIP, String tclPremable) {
+        final Path workdir = FileSystems.getDefault()
+                .getPath("vivadoToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
+        File workdirHandle = new File(workdir.toString());
+        workdirHandle.mkdirs();
+
+        final Path outputLog = workdir.resolve("outputLog.log");
+        StringBuilder sb = new StringBuilder();
+        sb.append(createTclDCPLoadCommand(dcp, hasEncryptedIP));
+        if (tclPremable != null) {
+            sb.append(tclPremable);
+            sb.append("; ");
+        }
+        sb.append("write_bitstream " + bitFile.toString());
+        List<String> log = VivadoTools.runTcl(outputLog, sb.toString(), true);
+
+        FileTools.deleteFolder(workdir.toString());
+
+        return log;
+    }
+
+    /**
+     * Run Vivado's `write_bitstream` on the provided DCP file to generate a bit
+     * file at the specified location.
+     *
+     * @param dcp            The DCP file from which to generate a bitstream.
+     * @param bitFile        The location of the bit file to generate
+     * @param hasEncryptedIP Flag indicating if the provided DCP contains encrypted
+     *                       IP and was written by RapidWright such that it needs to
+     *                       be loaded with a Tcl script.
      * @return The output of Vivado as a list of Strings
      */
     public static List<String> writeBitstream(Path dcp, Path bitFile, boolean hasEncryptedIP) {
-        final Path outputLog = dcp.getParent().resolve("outputLog.log");
-        StringBuilder sb = new StringBuilder();
-        sb.append(createTclDCPLoadCommand(dcp, hasEncryptedIP));
-        sb.append("write_bitstream " + bitFile.toString());
-        List<String> log = VivadoTools.runTcl(outputLog, sb.toString(), true);
-        FileTools.deleteFolder(dcp.getParent().toString());
-        return log;
+        return writeBitstream(dcp, bitFile, hasEncryptedIP, null);
     }
 
     /**
