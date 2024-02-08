@@ -169,7 +169,7 @@ public class VivadoTools {
      * @param hasEncryptedIP Flag indicating if the provided DCP contains encrypted
      *                       IP and was written by RapidWright such that it needs to
      *                       be loaded with a Tcl script.
-     * @param tclPremable       String of Tcl commands to run before write_bitstream
+     * @param tclPremable    String of Tcl commands to run before write_bitstream
      *                       (null for no preamble).
      * @return The output of Vivado as a list of Strings
      */
