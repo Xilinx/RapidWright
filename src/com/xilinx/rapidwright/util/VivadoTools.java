@@ -172,12 +172,19 @@ public class VivadoTools {
      * @return The output of Vivado as a list of Strings
      */
     public static List<String> writeBitstream(Path dcp, Path bitFile, boolean hasEncryptedIP) {
-        final Path outputLog = dcp.getParent().resolve("outputLog.log");
+        final Path workdir = FileSystems.getDefault()
+                .getPath("vivadoToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
+        File workdirHandle = new File(workdir.toString());
+        workdirHandle.mkdirs();
+
+        final Path outputLog = workdir.resolve("outputLog.log");
         StringBuilder sb = new StringBuilder();
         sb.append(createTclDCPLoadCommand(dcp, hasEncryptedIP));
         sb.append("write_bitstream " + bitFile.toString());
         List<String> log = VivadoTools.runTcl(outputLog, sb.toString(), true);
-        FileTools.deleteFolder(dcp.getParent().toString());
+
+        FileTools.deleteFolder(workdir.toString());
+
         return log;
     }
 
