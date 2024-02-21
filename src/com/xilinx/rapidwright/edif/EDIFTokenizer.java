@@ -84,9 +84,16 @@ public class EDIFTokenizer implements AutoCloseable {
             return;
         }
 
-        int fillStart = (offset+available)&bufferAddressMask;
+        // For every fill() after the first (indicated by byteOffset > 0)
+        // remember to fill that last one byte (that was a placeholder for EOF)
+        // so that any token that wraps from the end of the buffer back to the
+        // beginning is read correctly
+        int fillLastByte  = (byteOffset > 0) ? 1 : 0;
+        int fillStart = (offset+available-fillLastByte)&bufferAddressMask;
         int fillEnd = (offset-1) & bufferAddressMask;
 
+        // Set the last byte of the buffer to be 0 as a placeholder for EOF
+        // which will get overwritten on next fill()
         buffer[fillEnd] = 0;
 
         if (fillStart>fillEnd) {
