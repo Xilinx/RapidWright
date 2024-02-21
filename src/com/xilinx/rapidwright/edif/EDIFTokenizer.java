@@ -199,9 +199,10 @@ public class EDIFTokenizer implements AutoCloseable {
         return token;
     }
 
-    private IOException tokenTooLong(int bufferOffset) {
+    private IOException tokenTooLong(int startOffset) {
         final long byteOffsetAtStart = this.byteOffset;
-        final String failingToken = getUniqueToken(bufferOffset, bufferOffset + 150, true);
+        final int endOffset = bufferAddressMask & (startOffset + 150);
+        final String failingToken = getUniqueToken(startOffset, endOffset, true);
         throw new TokenTooLongException("ERROR: String buffer overflow on byte offset " +
                 byteOffsetAtStart + " parsing token starting with "+ failingToken +"...\n\t Please revisit why this EDIF token "
                 + "is so long or increase the buffer in " + this.getClass().getCanonicalName());
