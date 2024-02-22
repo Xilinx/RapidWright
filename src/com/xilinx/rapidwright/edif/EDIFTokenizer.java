@@ -87,6 +87,12 @@ public class EDIFTokenizer implements AutoCloseable {
         int fillStart = (offset+available)&bufferAddressMask;
         int fillEnd = (offset-1) & bufferAddressMask;
 
+        // Make sure that we're overwriting the '0' that exists on initialization or the
+        // placeholder EOF character that was inserted on the last call to fill()
+        assert(buffer[fillStart] == 0);
+
+        // Set the last byte of the buffer to be 0 as a placeholder for EOF
+        // which will get overwritten on next fill()
         buffer[fillEnd] = 0;
 
         if (fillStart>fillEnd) {
@@ -146,16 +152,21 @@ public class EDIFTokenizer implements AutoCloseable {
      */
     protected String getUniqueToken(int startOffset, int endOffset, boolean isShortLived) {
         String token;
+        int length;
         if (endOffset >= startOffset) {
-            token = new String(buffer, startOffset, endOffset-startOffset, charset);
+            length = endOffset - startOffset;
+            token = new String(buffer, startOffset, length, charset);
         } else {
-            token = byteArrayToStringMulti(buffer, startOffset, buffer.length-startOffset, 0, endOffset);
+            int length1 = buffer.length - startOffset;
+            length = length1 + endOffset;
+            token = byteArrayToStringMulti(buffer, startOffset, length1, 0, endOffset);
+
         }
         if (!isShortLived) {
             token = uniquifier.uniquifyName(token);
         }
-        byteOffset+= token.length();
-        available-= token.length();
+        byteOffset+= length;
+        available-= length;
         if (available<0) {
             throw new EDIFParseException("Token probably too long or failed to fetch data in time: "+ token +" at "+byteOffset);
         }
