@@ -69,10 +69,10 @@ public class TestEDIFParser {
      * List of byte offsets that cause interesting behaviour if we start parsing there
      */
     private static final List<ParseStart> interestingOffsets = Arrays.asList(
-      new ParseStart("Mismatch in First Evil Cell", 517L, false),
-      new ParseStart("Mismatch in Second Evil Cell", 849L, false),
-      new ParseStart("Totally Misaligned", 1045L, false),
-      new ParseStart("After Evil", 1111L, true),
+      new ParseStart("Mismatch in First Evil Cell", 577L, false),
+      new ParseStart("Mismatch in Second Evil Cell", 919L, false),
+      new ParseStart("Totally Misaligned", 1115L, false),
+      new ParseStart("After Evil", 1181L, true),
       new ParseStart("At EOF", FILE_SIZE-2, false)
     );
 
