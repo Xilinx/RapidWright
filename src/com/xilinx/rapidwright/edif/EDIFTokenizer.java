@@ -165,8 +165,8 @@ public class EDIFTokenizer implements AutoCloseable {
         if (!isShortLived) {
             token = uniquifier.uniquifyName(token);
         }
-        byteOffset+= length;
-        available-= length;
+        byteOffset += length;
+        available -= length;
         if (available<0) {
             throw new EDIFParseException("Token probably too long or failed to fetch data in time: "+ token +" at "+byteOffset);
         }
