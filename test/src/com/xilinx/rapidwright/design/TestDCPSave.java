@@ -84,7 +84,7 @@ public class TestDCPSave {
         if (detachNetlist) {
             EDIFTools.writeEDIFFile(tempDir.resolve("tmp.edf"), n, d.getPartName());
             d.detachNetlist();
-            d.writeCheckpoint(tempDir.resolve("tmp.dcp"), tempDir.resolve("tmp.edf"));
+            d.writeCheckpoint(tempDir.resolve("tmp.dcp"), tempDir.resolve("tmp.edf"), null);
         } else {
             d.writeCheckpoint(tempDir.resolve("tmp.dcp"));
         }
@@ -98,7 +98,7 @@ public class TestDCPSave {
         EDIFTools.writeEDIFFile(edfPath, design.getNetlist(), design.getPartName());
         design.detachNetlist();
         Path dcpPath = tempDir.resolve("tmp.dcp");
-        design.writeCheckpoint(dcpPath, edfPath);
+        design.writeCheckpoint(dcpPath, edfPath, null);
 
         Assertions.assertTrue(VivadoTools.reportRouteStatus(dcpPath).isFullyRouted());
     }
