@@ -85,10 +85,12 @@ public class TestEDIFParser {
     @ParameterizedTest(name="{0}")
     @MethodSource("testParallelArgs")
     public void testParallel(String ignoredDescription, List<ParseStart> offsets, int expectedSuccessfulThreads) throws IOException {
+        EDIFNetlist netlist;
         try (ParallelEDIFParserTestSpecificOffsets parser = new ParallelEDIFParserTestSpecificOffsets(input, 128, offsets)) {
-            parser.parseEDIFNetlist(new CodePerfTracker("parse edif"));
+            netlist = parser.parseEDIFNetlist(new CodePerfTracker("parse edif"));
             Assertions.assertEquals(expectedSuccessfulThreads, parser.getSuccessfulThreads());
         }
+        Assertions.assertTrue(netlist.getComments().contains("Here's some Unicode: àâæçéèêëœîïôùûÜüÿ"));
     }
 
     /**
@@ -125,10 +127,11 @@ public class TestEDIFParser {
 
     @Test
     public void loadEDIFSingleThreaded() throws IOException {
+        EDIFNetlist netlist;
         try (EDIFParser parser = new EDIFParser(input)) {
-            parser.parseEDIFNetlist();
+            netlist = parser.parseEDIFNetlist();
         }
-
+        Assertions.assertTrue(netlist.getComments().contains("Here's some Unicode: àâæçéèêëœîïôùûÜüÿ"));
     }
 
     @ParameterizedTest
