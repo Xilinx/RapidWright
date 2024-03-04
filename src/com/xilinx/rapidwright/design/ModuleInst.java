@@ -39,6 +39,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
@@ -501,7 +502,11 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         if (newSiteInst == null) {
             throw new RuntimeException("Did not find corresponding Site Inst for "+modulePin.getSiteInst().getName()+" in "+getName());
         }
-        return newSiteInst.getSitePinInst(modulePin.getName());
+        SitePinInst pin = newSiteInst.getSitePinInst(modulePin.getName());
+        if (pin == null) {
+            pin = new SitePinInst(modulePin.getName(), newSiteInst);
+        }
+        return pin;
     }
 
     /**
@@ -756,6 +761,80 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                 oldPhysicalNet.removePin(inPin, true);
             }
             physicalNet.addPin(inPin);
+        }
+    }
+
+    /**
+     * Connects unconnected SitePinInst inputs on the module instance to either GND
+     * or VCC (some reset inputs can accept VCC as an input and use its built-in
+     * inverter to drive GND).
+     */
+    public void tieOffUnconnectedInputs(boolean verbose) {
+        for (Port port : getModule().getPorts()) {
+            if (port.isOutPort())
+                continue;
+
+            for (SitePinInst pin : getCorrespondingPins(port)) {
+                if (pin == null) {
+                    System.err.println("ERROR: Problem encountered with finding corresponding SitePinInst on port "
+                            + getName() + "/" + port.getName() + " skipping...");
+                }
+                if (pin != null && (pin.getNet() == null || pin.getNet().getSource() == null)) {
+                    // If a port has a RST inverter, drive it with VCC to get GND
+                    boolean connectToVCC = pin.getName().contains("RST");
+                    if (verbose) {
+                        System.out.println(getName() + "/" + port.getName() + " SitePinInst=[" + pin
+                                + "] has no source, connecting to " + (connectToVCC ? "VCC" : "GND"));
+                    }
+
+                    connectToStaticNet(port.getName(), connectToVCC);
+                }
+                break;
+            }
+        }
+    }
+
+    /**
+     * Connects a port (all of its corresponding SitePinInsts) to either the GND or
+     * VCC net.
+     * 
+     * @param portName     Name of the port to connect to GND or VCC
+     * @param connectToVCC True to connect to VCC, False for GND
+     */
+    public void connectToStaticNet(String portName, boolean connectToVCC) {
+        NetType type = connectToVCC ? NetType.VCC : NetType.GND;
+        Net staticNet = getDesign().getStaticNet(type);
+
+        Port inPort = getPort(portName);
+        if (inPort.isOutPort()) {
+            throw new RuntimeException("ERROR: Attempting to connnect output port " 
+                    + getName() + "/" + portName + " to " + staticNet);
+        }
+            
+        // Connect logically
+        EDIFCell parent = getCellInst().getParentCell();
+        EDIFNet logicalStaticNet = EDIFTools.getStaticNet(type, parent, getDesign().getNetlist());
+        EDIFPortInst portInst = getCellInst().getPortInst(portName);
+        if (portInst == null) {
+            logicalStaticNet.createPortInst(portName, getCellInst());
+        } else {
+            portInst.getNet().removePortInst(portInst);
+            logicalStaticNet.addPortInst(portInst);
+        }
+        
+        // Connect physically
+        for (SitePinInst inPin : getCorrespondingPins(inPort)) {
+            if (inPin == null) {
+                System.err.println("ERROR: Problem encountered with finding corresponding SitePinInst on port "
+                        + getName() + "/" + inPort.getName() + " skipping...");
+                continue;
+            }
+
+            Net oldPhysicalNet = inPin.getNet();
+            if (oldPhysicalNet != null) {
+                oldPhysicalNet.removePin(inPin, true);
+            }
+            staticNet.addPin(inPin);
         }
     }
 
