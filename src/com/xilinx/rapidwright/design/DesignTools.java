@@ -4169,6 +4169,105 @@ public class DesignTools {
     }
 
     /**
+     * Creates physical nets from all the logical EDIF nets. Assumes that the EDIF netlist is finalized.
+     * @param d The design that contains the complete logical netlist and where the physical nets will be created.
+     */
+    public static void createPhysNetsFromLogical(Design d) {
+        // Iterate through all canonical nets
+        Map<EDIFHierNet, EDIFHierNet> parentNetMap = d.getNetlist().getParentNetMap();
+        for (EDIFHierNet n : parentNetMap.values()) {
+            createPhysNetFromLogical(d, n);
+        }
+    }
+
+    /**
+     * Creates a physical net from the provided logical EDIF net. Assumes that the EDIF netlist is finalized.
+     * @param d The design that contains the complete logical netlist and where the physical net will be created.
+     * @param edifNet The EDIF Net to create into a physical net.
+     * @return A list of the SitePinInsts added to the newly created physical net
+     */
+    public static List<SitePinInst> createPhysNetFromLogical(Design d, EDIFHierNet edifNet) {
+        //check whether net already exists
+        if (d.getNet(edifNet.getHierarchicalNetName()) != null) return null;
+
+        Net net;  //create physical net
+        if (edifNet.getNet().isGND()) {
+            net = d.getGndNet();
+        } else if (edifNet.getNet().isVCC()) {
+            net = d.getVccNet();
+        } else {
+            net = d.createNet(edifNet);
+        }
+
+        // Get source EDIF port inst
+        EDIFHierPortInst srcPort = null;
+        for (EDIFHierPortInst hierPortInst : d.getNetlist().getPhysicalPins(edifNet)) {
+            EDIFPortInst portInst = hierPortInst.getPortInst();
+            if (portInst.isOutput() && portInst.getCellInst() != null) {
+                srcPort = hierPortInst;
+                break;
+            }
+        }
+        assert(srcPort != null);
+        
+        // Get cell connected to port inst
+        Cell srcCell = d.getCell(srcPort.getFullHierarchicalInstName());
+
+        // Connect physical net to the physical cell pins corresponding to the logical ports
+        List<SitePinInst> sitePins = new ArrayList<>();
+        for (EDIFHierPortInst hierPortInst: d.getNetlist().getPhysicalPins(edifNet)) {
+            EDIFPortInst portInst = hierPortInst.getPortInst();
+            if (portInst.equals(srcPort.getPortInst())) continue;
+
+            EDIFCellInst cellInst = portInst.getCellInst();
+            Cell cell = cellInst == null ? null : d.getCell(cellInst.getName());
+            if (cell == null) continue;
+
+            // Only create connection if the net goes outside the site. This prevents sitePins instances from
+            // erroneously being created.
+            if (!isIntraSiteConnection(srcCell, srcPort.getPortInst(), cell, portInst))
+                sitePins.add(net.connect(cell, portInst.getName()));
+        }
+
+        if (srcCell != null && sitePins.size() > 0) {
+            net.connect(srcCell, srcPort.getPortInst().getName());
+        }
+
+        return sitePins;
+    }
+
+    /**
+     * Checks if the two provided ports of two cells can be connected without leaving the site.
+     * @param srcCell source cell
+     * @param srcPort port of source Cell
+     * @param dstCell destination cell
+     * @param dstPort port of destination cell
+     * @return true if the ports can be connected without leaving the site. False otherwise.
+     */
+    public static boolean isIntraSiteConnection(Cell srcCell, EDIFPortInst srcPort, Cell dstCell, EDIFPortInst dstPort) {
+        if (dstCell.getSite().equals(srcCell.getSite())) {
+            Queue<BELPin> queue = new LinkedList<>();
+            queue.add(srcCell.getBELPin(srcPort));
+            BELPin dstPin = dstCell.getBELPin(dstPort);
+            while (!queue.isEmpty()) {
+                for (BELPin pin : queue.poll().getSiteConns()) {
+                    if (pin.equals(dstPin)) {
+                        return true;
+                    }
+                    else if (pin.isInput() && pin.getBEL().getBELClass() == BELClass.RBEL) {
+                        for (BELPin nextPin : pin.getBEL().getPins()) {
+                            if (nextPin.isOutput()) {
+                                queue.add(nextPin);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+  
+    /*
      * Update the SitePinInst.isRouted() value of all sink pins in the given
      * Design. See {@link #updatePinsIsRouted(Net)}.
      * @param design Design in which pins are to be updated.
