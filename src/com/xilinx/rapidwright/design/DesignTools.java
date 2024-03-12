@@ -979,6 +979,10 @@ public class DesignTools {
             EDIFNet net = portInst.getNet();
             EDIFHierNet netName = new EDIFHierNet(parentInst, net);
             EDIFHierNet parentNetName = netlist.getParentNet(netName);
+            if (parentNetName == null) {
+                System.out.println("WARNING: Skipping net " + netName);
+                continue;
+            }
             Net parentNet = design.getNet(parentNetName.getHierarchicalNetName());
             if (parentNet == null) {
                 parentNet = new Net(parentNetName);
@@ -988,13 +992,18 @@ public class DesignTools {
                 Net alias = design.getNet(netAlias.getHierarchicalNetName());
                 if (alias != null) {
                     // Move this non-parent net physical information to the parent
-                    for (SiteInst si : alias.getSiteInsts()) {
+                    for (SiteInst si : new ArrayList<>(alias.getSiteInsts())) {
                         List<String> siteWires = si.getSiteWiresFromNet(alias);
                         if (siteWires != null) {
                             for (String siteWire : new ArrayList<>(siteWires)) {
-                                BELPin belPin = si.getSite().getBELPins(siteWire)[0];
-                                si.unrouteIntraSiteNet(belPin, belPin);
-                                si.routeIntraSiteNet(parentNet, belPin, belPin);
+                                BELPin[] pins = si.getSite().getBELPins(siteWire);
+                                if (pins.length == 0) {
+                                    // TODO IOB_X0Y199.OUTBUF_O
+                                } else {
+                                    BELPin belPin = si.getSite().getBELPins(siteWire)[0];
+                                    si.unrouteIntraSiteNet(belPin, belPin);
+                                    si.routeIntraSiteNet(parentNet, belPin, belPin);
+                                }
                             }
                         }
                     }

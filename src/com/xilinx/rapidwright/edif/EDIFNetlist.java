@@ -780,12 +780,12 @@ public class EDIFNetlist extends EDIFName {
             }
             os.write(EXPORT_CONST_DOUBLE_CLOSE);
 
-            List<EDIFLibrary> librariesToWrite = new ArrayList<>();
-            librariesToWrite.add(getHDIPrimitivesLibrary());
-            for (EDIFLibrary lib : EDIFTools.sortIfStable(getLibrariesMap().values(), stable)) {
-                if (lib.getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) continue;
-                librariesToWrite.add(lib);
-            }
+            List<EDIFLibrary> librariesToWrite = getLibrariesInExportOrder();
+//            librariesToWrite.add(getHDIPrimitivesLibrary());
+//            for (EDIFLibrary lib : EDIFTools.sortIfStable(getLibrariesMap().values(), stable)) {
+//                if (lib.getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) continue;
+//                librariesToWrite.add(lib);
+//            }
 
             if (dos != null) {
                 Deque<Future<ParallelDCPInput>> streamFutures = new ArrayDeque<>();
