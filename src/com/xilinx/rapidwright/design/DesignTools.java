@@ -968,7 +968,7 @@ public class DesignTools {
         // Rectify boundary nets
         netlist.resetParentNetMap();
 
-        postBlackBoxCleanup(hierarchicalCellName, design, true);
+        postBlackBoxCleanup(hierarchicalCellName, design, keepRouting);
 
         List<String> encryptedCells = cell.getNetlist().getEncryptedCells();
         if (encryptedCells != null && encryptedCells.size() > 0) {
