@@ -119,11 +119,18 @@ public abstract class AbstractEDIFParserWorker {
         if (currToken.equals(EDIFParser.LEFT_PAREN)) {
             expect(EDIFParser.RENAME, getNextToken(true));
             String rename = getNextToken(false);
-            // Handle issue with names beginning with '[]'
             String name = getNextToken(false);
-            if (name.charAt(0) == '[' && name.length() >= 2 &&  name.charAt(1) == ']') {
-                String tmpName = name.substring(2);
-                name = tokenizer.getUniquifier().uniquifyName(tmpName);
+            if (name.charAt(0) == '[') {
+                int idx = name.indexOf(']');
+                if (idx == 1) {
+                    // Handle issue with names beginning with '[]'
+                    String tmpName = name.substring(2);
+                    name = tokenizer.getUniquifier().uniquifyName(tmpName);
+                } else if (idx > 1) {
+                    // Handle issue with names beginning with '[a]' or '[a:b]'
+                    // by transforming this prefix into its suffix
+                    name = name.substring(idx + 1) + name.substring(0, idx + 1);
+                }
             }
             o.setName(name);
             cache.setRename(o, rename);
