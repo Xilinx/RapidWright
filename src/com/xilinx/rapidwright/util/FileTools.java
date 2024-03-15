@@ -1664,15 +1664,12 @@ public class FileTools {
     }
 
     public static final int BINARY_CHECK_LENGTH = 8192;
-    private static byte[] binaryCheckData;
 
     public static boolean isDataBinary(InputStream is) {
         if (!is.markSupported()) {
             throw new RuntimeException("ERROR: Cannot determine if input stream is binary without mark support.");
         }
-        if (binaryCheckData == null) {
-            binaryCheckData = new byte[BINARY_CHECK_LENGTH];
-        }
+        byte[] binaryCheckData = new byte[BINARY_CHECK_LENGTH];
         boolean isBinary = false;
         try {
             is.mark(BINARY_CHECK_LENGTH+1);
