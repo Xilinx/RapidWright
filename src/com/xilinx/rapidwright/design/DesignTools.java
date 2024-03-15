@@ -42,6 +42,7 @@ import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -900,6 +901,21 @@ public class DesignTools {
      * @param cell The 'guts' to be inserted into the black box
      */
     public static void populateBlackBox(Design design, String hierarchicalCellName, Design cell) {
+        populateBlackBox(design, hierarchicalCellName, cell, false);
+    }
+
+    /**
+     * NOTE: This method is not fully tested. Populates a black box in a netlist
+     * with the provided design. This method most closely resembles the Vivado
+     * command {@code read_checkpoint -cell <cell name> <DCP Name>}
+     * 
+     * @param design               The top level design
+     * @param hierarchicalCellName Name of the black box in the design netlist.
+     * @param cell                 The 'guts' to be inserted into the black box
+     * @param keepRouting          Preserves the routing on the ports of the black
+     *                             box.
+     */
+    public static void populateBlackBox(Design design, String hierarchicalCellName, Design cell, boolean keepRouting) {
         EDIFNetlist netlist = design.getNetlist();
 
         // Populate Logical Netlist into cell
@@ -952,7 +968,7 @@ public class DesignTools {
         // Rectify boundary nets
         netlist.resetParentNetMap();
 
-        postBlackBoxCleanup(hierarchicalCellName, design);
+        postBlackBoxCleanup(hierarchicalCellName, design, true);
 
         List<String> encryptedCells = cell.getNetlist().getEncryptedCells();
         if (encryptedCells != null && encryptedCells.size() > 0) {
@@ -961,16 +977,19 @@ public class DesignTools {
     }
 
     /**
-     * Attempts to rename boundary nets around the previous blackbox to follow naming convention
-     * (net is named after source).
-     * @param hierCellName The hierarchical cell instance that was previously a black box
-     * @param design The current design.
+     * Attempts to rename boundary nets around the previous black box to follow
+     * naming convention (net is named after source).
+     * 
+     * @param hierCellName The hierarchical cell instance that was previously a
+     *                     black box
+     * @param design       The current design.
+     * @param keepRouting  Preserves the routing on the ports of the black box.
      */
-    public static void postBlackBoxCleanup(String hierCellName, Design design) {
+    public static void postBlackBoxCleanup(String hierCellName, Design design, boolean keepRouting) {
         EDIFNetlist netlist = design.getNetlist();
         EDIFHierCellInst inst = netlist.getHierCellInstFromName(hierCellName);
         final EDIFHierCellInst parentInst = inst.getParent();
-
+        Set<Net> modifiedRouting = new HashSet<>();
         // for each port on the black box,
         //   iterate over all the nets and regularize on the proper net name for the physical
         //   net.  Put all physical pins on the correct physical net once the black box has been
@@ -985,7 +1004,7 @@ public class DesignTools {
             }
             Net parentNet = design.getNet(parentNetName.getHierarchicalNetName());
             if (parentNet == null) {
-                parentNet = new Net(parentNetName);
+                parentNet = design.createNet(parentNetName);
             }
             for (EDIFHierNet netAlias : netlist.getNetAliases(netName)) {
                 if (parentNet.getName().equals(netAlias.getHierarchicalNetName())) continue;
@@ -998,7 +1017,11 @@ public class DesignTools {
                             for (String siteWire : new ArrayList<>(siteWires)) {
                                 BELPin[] pins = si.getSite().getBELPins(siteWire);
                                 if (pins.length == 0) {
-                                    // TODO IOB_X0Y199.OUTBUF_O
+                                    // Work-around for IOB where OUTBUF_O/PULL_PAD are not a true site wire
+                                    si.getSiteWireToNetMap().put(siteWire, parentNet);
+                                    List<String> siteWireEntries = si.getNetToSiteWiresMap().get(alias);
+                                    si.getNetToSiteWiresMap().remove(alias);
+                                    si.getNetToSiteWiresMap().put(parentNet, siteWireEntries);
                                 } else {
                                     BELPin belPin = si.getSite().getBELPins(siteWire)[0];
                                     si.unrouteIntraSiteNet(belPin, belPin);
@@ -1007,6 +1030,10 @@ public class DesignTools {
                             }
                         }
                     }
+                    if (keepRouting) {
+                        modifiedRouting.add(parentNet);
+                        parentNet.getPIPs().addAll(alias.getPIPs());
+                    }
                     for (SitePinInst pin : new ArrayList<SitePinInst>(alias.getPins())) {
                         alias.removePin(pin);
                         parentNet.addPin(pin);
@@ -1014,7 +1041,27 @@ public class DesignTools {
                     alias.unroute();
                 }
             }
-            parentNet.unroute();
+            if (!keepRouting) {
+                parentNet.unroute();
+            }
+        }
+
+        if (keepRouting) {
+            for (Net n : modifiedRouting) {
+                Set<PIP> pips = new LinkedHashSet<>(n.getPIPs().size());
+                // Remove instances of double logical drivers on combined nets
+                boolean logicalDriverFound = false;
+                for (PIP p : n.getPIPs()) {
+                    if (p.isLogicalDriver()) {
+                        if (logicalDriverFound) {
+                            p.setIsLogicalDriver(false);
+                        }
+                        logicalDriverFound = true;
+                    }
+                    pips.add(p);
+                }
+                n.setPIPs(pips);
+            }
         }
     }
 
