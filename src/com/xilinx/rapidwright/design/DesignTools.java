@@ -3231,6 +3231,10 @@ public class DesignTools {
             }
 
             if (parentPhysNet != null) {
+                for (PIP pip : net.getPIPs()) {
+                    parentPhysNet.addPIP(pip);
+                }
+                net.getPIPs().clear();
                 design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
             }
         }
