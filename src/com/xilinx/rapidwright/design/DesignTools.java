@@ -1440,7 +1440,7 @@ public class DesignTools {
         // Check and remove routethrus that exist that point to removed cell
         List<BEL> belsToRemove = null;
         for (Cell otherCell : siteInst.getCells()) {
-            if (otherCell.hasAltPinMappings() && otherCell.getName().equals(cell.getName())) {
+            if (otherCell.hasAltPinMappings() || otherCell.getName().equals(cell.getName())) {
                 if (belsToRemove == null) belsToRemove = new ArrayList<>();
                 belsToRemove.add(otherCell.getBEL());
             }
