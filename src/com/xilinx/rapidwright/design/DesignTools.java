@@ -959,7 +959,26 @@ public class DesignTools {
             if (net.getName().equals(Net.USED_NET)) continue;
             if (net.isStaticNet()) {
                 Net staticNet = design.getStaticNet(net.getType());
-                staticNet.addPins((ArrayList<SitePinInst>)net.getPins());
+                // No need to update static site routing
+                for (SitePinInst spi : net.getPins()) {
+                    SiteInst si = spi.getSiteInst();
+                    boolean updateSiteRouting = false;
+                    staticNet.addPin(spi, updateSiteRouting);
+
+                    // Only update site routing if it was routed to begin with
+                    String siteWireName = spi.getSiteWireName();
+                    Net existingSiteRouting = si.getNetFromSiteWire(siteWireName);
+                    if (existingSiteRouting != null) {
+                        Net newSiteRouting;
+                        if (existingSiteRouting.getType() == staticNet.getType()) {
+                            newSiteRouting = staticNet;
+                        } else {
+                            // Static net must be inverted
+                            newSiteRouting = design.getStaticNet(existingSiteRouting.getType());
+                        }
+                        si.routeIntraSiteNet(newSiteRouting, spi.getBELPin(), spi.getBELPin());
+                    }
+                }
                 HashSet<PIP> uniquePIPs = new HashSet<PIP>(net.getPIPs());
                 uniquePIPs.addAll(staticNet.getPIPs());
                 staticNet.setPIPs(uniquePIPs);
