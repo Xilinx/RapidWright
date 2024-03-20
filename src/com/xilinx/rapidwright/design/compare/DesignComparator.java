@@ -288,12 +288,12 @@ public class DesignComparator {
                 continue;
             }
             if (!e.getValue().getName().equals(testNet.getName())) {
-                addDiff(DesignDiffType.SITEWIRE_NET_NAME, e.getKey(), testNet, gold , "");
+                addDiff(DesignDiffType.SITEWIRE_NET_NAME, e.getValue(), testNet, gold , "SiteWire " + e.getKey());
             }
         }
         for (Entry<String, Net> e : testSiteWireMap.entrySet()) {
             Net extraNet = e.getValue();
-            addDiff(DesignDiffType.SITEWIRE_NET_EXTRA, null, e.getKey(), test, " extra Net " + extraNet);
+            addDiff(DesignDiffType.SITEWIRE_NET_EXTRA, null, e.getKey(), test, "extra Net " + extraNet);
         }
         
         // Active SitePIPs

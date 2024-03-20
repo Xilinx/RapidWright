@@ -91,6 +91,11 @@ public class DesignDiff {
             sb.append(getClassName());
             sb.append(" ");
             sb.append(test);
+            if (notEqualString.length() > 0) {
+                sb.append(" (");
+                sb.append(notEqualString);
+                sb.append(")");
+            }
         } else if (type.isNonNullMismatch()) {
             sb.append("Mismatch found");
             if (!notEqualString.isEmpty()) {
