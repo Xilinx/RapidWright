@@ -938,10 +938,14 @@ public class DesignTools {
         // We need to prefix all cell and net names with the hierarchicalCellName as a prefix
         for (SiteInst si : cell.getSiteInsts()) {
             for (Cell c : new ArrayList<Cell>(si.getCells())) {
-                c.updateName(hierarchicalCellName + "/" + c.getName());
-                if (!c.isRoutethru())
+                // Do not rename port cells
+                if (!c.isPortCell()) {
+                    c.updateName(hierarchicalCellName + "/" + c.getName());
+                }
+                if (!c.isRoutethru()) {
                     design.addCell(c);
-                else {
+                } else {
+                    assert(!c.isPortCell());
                     for (Entry<String, AltPinMapping> p : c.getAltPinMappings().entrySet()) {
                         p.getValue().setAltCellName(hierarchicalCellName + "/" + p.getValue().getAltCellName());
                     }
