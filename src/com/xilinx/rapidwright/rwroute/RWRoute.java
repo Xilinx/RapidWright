@@ -1423,10 +1423,25 @@ public class RWRoute{
         for (Entry<Net,NetWrapper> e : nets.entrySet()) {
             NetWrapper netWrapper = e.getValue();
             Net net = netWrapper.getNet();
+
+            SitePinInst source = net.getSource();
+            SitePinInst altSource = net.getAlternateSource();
+            boolean setLogicalDriver = altSource != null && source.isRouted() && altSource.isRouted();
+
             Set<PIP> newPIPs = new HashSet<>();
             for (Connection connection:netWrapper.getConnections()) {
-                newPIPs.addAll(RouterHelper.getConnectionPIPs(connection));
+                List<PIP> pips = RouterHelper.getConnectionPIPs(connection);
+                if (setLogicalDriver) {
+                    // When multiple sources are used (e.g. A_O and AMUX) then
+                    // mark the first source as a logical driver
+                    PIP pipFromSource = pips.get(pips.size() - 1);
+                    assert(!pipFromSource.getStartNode().getSitePin().isInput());
+                    pipFromSource.setIsLogicalDriver(true);
+                    setLogicalDriver = false;
+                }
+                newPIPs.addAll(pips);
             }
+
             net.setPIPs(newPIPs);
         }
 
