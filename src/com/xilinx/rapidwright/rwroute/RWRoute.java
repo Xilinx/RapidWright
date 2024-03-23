@@ -1451,7 +1451,7 @@ public class RWRoute{
     /**
      * Checks if there are PIP overlaps among routed nets.
      */
-    private void checkPIPsUsage() {
+    protected void checkPIPsUsage() {
         Map<PIP, Set<Net>> pipsUsage = new HashMap<>();
         for (Net net : design.getNets()) {
             for (PIP pip:net.getPIPs()) {
