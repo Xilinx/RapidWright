@@ -26,6 +26,7 @@ package com.xilinx.rapidwright.interchange;
 import com.xilinx.rapidwright.design.AltPinMapping;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
@@ -37,6 +38,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
@@ -521,6 +523,32 @@ public class PhysNetlistReader {
                 net.addPIP(pip);
             }
             stubWires.clear();
+
+            // Nets with more than one routed source (e.g. A_O and AMUX) should have
+            // the first primary source PIP marked as a logical driver
+            SitePinInst altSource = net.getAlternateSource();
+            if (altSource != null) {
+                SitePinInst source = net.getSource();
+                assert(source.getTile() == altSource.getTile());
+
+                DesignTools.updatePinsIsRouted(net);
+                if (source.isRouted() && altSource.isRouted()) {
+                    Tile sourceTile = altSource.getTile();
+                    for (PIP pip : net.getPIPs()) {
+                        if (pip.getTile() != sourceTile) {
+                            continue;
+                        }
+                        if (pip.isRouteThru()) {
+                            continue;
+                        }
+                        SitePin sp = pip.getStartNode().getSitePin();
+                        if (sp.getPinName().equals(source.getName())) {
+                            pip.setIsLogicalDriver(true);
+                            break;
+                        }
+                    }
+                }
+            }
         }
     }
 
