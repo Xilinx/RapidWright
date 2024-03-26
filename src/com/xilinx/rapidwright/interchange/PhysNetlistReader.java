@@ -526,25 +526,29 @@ public class PhysNetlistReader {
 
             // Nets with more than one routed source (e.g. A_O and AMUX) should have
             // the first primary source PIP marked as a logical driver
-            SitePinInst altSource = net.getAlternateSource();
-            if (altSource != null) {
-                SitePinInst source = net.getSource();
-                assert(source.getTile() == altSource.getTile());
+            if (net.getType() == NetType.WIRE) {
+                SitePinInst altSource = net.getAlternateSource();
+                if (altSource != null) {
+                    assert(!net.isClockNet());
 
-                DesignTools.updatePinsIsRouted(net);
-                if (source.isRouted() && altSource.isRouted()) {
-                    Tile sourceTile = altSource.getTile();
-                    for (PIP pip : net.getPIPs()) {
-                        if (pip.getTile() != sourceTile) {
-                            continue;
-                        }
-                        if (pip.isRouteThru()) {
-                            continue;
-                        }
-                        SitePin sp = pip.getStartNode().getSitePin();
-                        if (sp.getPinName().equals(source.getName())) {
-                            pip.setIsLogicalDriver(true);
-                            break;
+                    SitePinInst source = net.getSource();
+                    assert(source.getTile() == altSource.getTile());
+
+                    DesignTools.updatePinsIsRouted(net);
+                    if (source.isRouted() && altSource.isRouted()) {
+                        Tile sourceTile = altSource.getTile();
+                        for (PIP pip : net.getPIPs()) {
+                            if (pip.getTile() != sourceTile) {
+                                continue;
+                            }
+                            if (pip.isRouteThru()) {
+                                continue;
+                            }
+                            SitePin sp = pip.getStartNode().getSitePin();
+                            if (sp.getPinName().equals(source.getName())) {
+                                pip.setIsLogicalDriver(true);
+                                break;
+                            }
                         }
                     }
                 }
