@@ -653,6 +653,10 @@ public class SLRCrosserGenerator {
                     + "limitations: total bus width = " + busWidth
                     + ", each LAGUNA column can only support a width of " + lagunaColumnCrossingWidth);
         }
+        if (northBusWidth < 0 || southBusWidth < 0) {
+            throw new RuntimeException("ERROR: Cannot have a negative bus width: North=" 
+                    + northBusWidth + ", South=" + southBusWidth); 
+        }
 
         Double clkPeriodConstraint = null;
         if (opts.hasArgument(CLK_CONSTRAINT_OPT)) {
