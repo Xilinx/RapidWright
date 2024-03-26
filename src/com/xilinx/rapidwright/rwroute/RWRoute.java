@@ -1423,6 +1423,7 @@ public class RWRoute{
         for (Entry<Net,NetWrapper> e : nets.entrySet()) {
             NetWrapper netWrapper = e.getValue();
             Net net = netWrapper.getNet();
+            assert(net.getType() == NetType.WIRE && !net.isClockNet());
 
             SitePinInst source = net.getSource();
             SitePinInst altSource = net.getAlternateSource();
