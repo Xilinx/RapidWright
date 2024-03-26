@@ -436,7 +436,7 @@ public class SLRCrosserGenerator {
      * 
      * @param d              Current design
      * @param northBusWidth  Width of the North buses to create
-     * @param sorthBusWidth  Width of the South buses to create
+     * @param southBusWidth  Width of the South buses to create
      * @param busPrefixes    Prefixes to use for bus names
      * @param clkName        Name of the clock net
      * @param clkInName      Name of the clock in port
@@ -463,6 +463,7 @@ public class SLRCrosserGenerator {
             String[] parts = busPrefix.split(",");
             EDIFPort input = null;
             EDIFPort output = null;
+            isNorth = !isNorth;
             if (busWidth > 1) {
                 input = parent.createPort(parts[0]+busSuffix, EDIFDirection.INPUT, busWidth);
                 output = parent.createPort(parts[1]+busSuffix, EDIFDirection.OUTPUT, busWidth);                
@@ -508,7 +509,6 @@ public class SLRCrosserGenerator {
                 connNet.createPortInst("Q",reg0);
                 connNet.createPortInst("D",reg1);
             }
-            isNorth = !isNorth;
         }
     }
 
@@ -547,9 +547,8 @@ public class SLRCrosserGenerator {
         String clkName = "clk";
         String clkInName = "clk_in";
         String clkOutName = "clk_out";
-        double clkPeriodConstraint = 1.333;
         int northBusWidth = 256;
-        int sorthBusWidth = 256;
+        int southBusWidth = 256;
         String inputPrefix = "input";
         String outputPrefix= "output";
         String northSuffix = "_north";
@@ -574,8 +573,8 @@ public class SLRCrosserGenerator {
                         .describedAs("SLR crossing bus width");
                 accepts(NORTH_BUS_WIDTH_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(northBusWidth)
                         .describedAs("SLR crossing North bus width");
-                accepts(SOUTH_BUS_WIDTH_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(sorthBusWidth)
-                        .describedAs("SLR crossing Sorth bus width");
+                accepts(SOUTH_BUS_WIDTH_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(southBusWidth)
+                        .describedAs("SLR crossing South bus width");
             accepts(INPUT_PREFIX_OPT).withOptionalArg().defaultsTo(inputPrefix).describedAs("Input bus name prefix");
             accepts(OUTPUT_PREFIX_OPT).withOptionalArg().defaultsTo(outputPrefix).describedAs("Output bus name prefix");
             accepts(NORTH_SUFFIX_OPT).withOptionalArg().defaultsTo(northSuffix).describedAs("North bus name suffix");
