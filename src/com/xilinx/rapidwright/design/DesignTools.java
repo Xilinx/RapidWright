@@ -4014,6 +4014,10 @@ public class DesignTools {
                             if (net != null) {
                                 SitePinInst spi = si.getSitePinInst(sitePinName);
                                 if (spi == null || (spi != null && !spi.getNet().equals(net))) {
+                                    // Check for rare instance of FF driven by GND post inside SLICE
+                                    if (letter == 'A' && net.isGNDNet() && isUsingSLICEGND(input, si)) {
+                                        continue;
+                                    }
                                     BELPin lutInput = si.getBEL(letter + "6LUT").getPin("A6");
                                     EDIFHierPortInst ffInput = c.getEDIFHierCellInst().getPortInst("D");
                                     Cell lut1 = ECOTools.createAndPlaceInlineCellOnInputPin(design, ffInput,
@@ -4075,6 +4079,12 @@ public class DesignTools {
         }
 
         addProhibitConstraint(design, bels);
+    }
+
+    private static boolean isUsingSLICEGND(BELPin input, SiteInst si) {
+        BEL bel = input != null ? input.getSourcePin().getBEL() : null;
+        SitePIP usedSitePIP = bel == null ? null : si.getUsedSitePIP(bel.getName());
+        return usedSitePIP != null && usedSitePIP.getInputPinName().equals("F7F8");
     }
 
     private static boolean isFFQOutputBlocked(Site site, BEL bel, Set<Node> used) {
