@@ -554,7 +554,7 @@ public class DeviceResourcesWriter {
                 }
                 belBuilder.setCategory(getBELCategory(bel));
 
-                if (bel.canInvert()) {
+                if (bel.canInvert() && !bel.getName().equals("SRCMXINV") && !bel.getName().equals("SRCFPMXINV")) {
                     BELInverter.Builder belInverter = belBuilder.initInverting();
                     belInverter.setNonInvertingPin(allBELPins.getIndex(bel.getNonInvertingPin()));
                     belInverter.setInvertingPin(allBELPins.getIndex(bel.getInvertingPin()));
