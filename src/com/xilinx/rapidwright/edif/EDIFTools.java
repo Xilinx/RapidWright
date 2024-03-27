@@ -613,46 +613,83 @@ public class EDIFTools {
         EDIFHierCellInst netInst = net.getHierarchicalInst();
         EDIFCell cellType = netInst.getCellType();
 
-        // FIXME: This method always punches a new port upwards
-        //  -- what if the src/snk was in a lower part of the hierarchy?
-
-        if (pin.isOutput()) {
-            src = pin;
-
-            // Find an input portInst to use
-            snk = null;
-            for (EDIFHierPortInst pi : net.getPortInsts()) {
-                if (pi.isInput()) {
-                    snk = pi;
-                    break;
+        EDIFHierCellInst pinInst = pin.getHierarchicalInst();
+        if (pinInst.isDescendantOf(netInst)) {
+            EDIFHierPortInst tmpPin = pin;
+            EDIFHierNet pinNet = tmpPin.getHierarchicalNet();
+            EDIFHierPortInst nextPin = null;
+            while (tmpPin.getHierarchicalInst().isDescendantOf(netInst)) {
+                // Attempt to traverse towards top
+                for (EDIFHierPortInst portInst : pinNet.getPortInsts()) {
+                    if (portInst.getPortInst().isTopLevelPort()) {
+                        if (pin.getPortInst().getDirection() == portInst.getPortInst().getDirection()) {
+                            nextPin = portInst.getPortInParent();
+                            if (nextPin == null) {
+                                String name = portInst.getPortInst().getName();
+                                EDIFPortInst newPortInst = portInst.getHierarchicalInst().getInst()
+                                        .getOrCreatePortInst(name);
+                                nextPin = new EDIFHierPortInst(portInst.getHierarchicalInst().getParent(), newPortInst);
+                                if (nextPin.getHierarchicalInst().equals(netInst)) {
+                                    net.getNet().addPortInst(nextPin.getPortInst());
+                                    // We've made the connection
+                                    return;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (nextPin == null) {
+                    throw new RuntimeException("Unhandled case");
+                } else {
+                    tmpPin = nextPin;
                 }
             }
-            if (snk == null) {
-                // Create one if one doesn't exist
-                EDIFPort port = createUniquePort(cellType, newName, EDIFDirection.INPUT, 1);
-                net.getNet().createPortInst(port);
-
-                // EDIFTools.connectPortInstsThruHier() does not support top-level portInsts;
-                // need to create a port inst in the parent cell too
-                EDIFNet upperNet = createUniqueNet(netInst.getParent().getCellType(), port.getName());
-                snk = new EDIFHierPortInst(netInst.getParent(), upperNet.createPortInst(port, netInst.getInst()));
+            if (tmpPin.isInput()) {
+                src = pin;
+                snk = tmpPin;
+            } else {
+                src = tmpPin;
+                snk = pin;
             }
         } else {
-            List<EDIFHierPortInst> sources = net.getSourcePortInsts(false);
-            if (!sources.isEmpty()) {
-                src = sources.get(0);
+            if (pin.isOutput()) {
+                src = pin;
+                // Find an input portInst to use
+                snk = null;
+                for (EDIFHierPortInst pi : net.getPortInsts()) {
+                    if (pi.isInput()) {
+                        snk = pi;
+                        break;
+                    }
+                }
+                if (snk == null) {
+                    // Create one if one doesn't exist
+                    EDIFPort port = createUniquePort(cellType, newName, EDIFDirection.INPUT, 1);
+                    net.getNet().createPortInst(port);
+
+                    // EDIFTools.connectPortInstsThruHier() does not support top-level portInsts;
+                    // need to create a port inst in the parent cell too
+                    EDIFNet upperNet = createUniqueNet(netInst.getParent().getCellType(), port.getName());
+                    snk = new EDIFHierPortInst(netInst.getParent(), upperNet.createPortInst(port, netInst.getInst()));
+                }
             } else {
-                EDIFPort port = createUniquePort(cellType, newName, EDIFDirection.OUTPUT, 1);
-                net.getNet().createPortInst(port);
+                List<EDIFHierPortInst> sources = net.getSourcePortInsts(false);
+                if (!sources.isEmpty()) {
+                    src = sources.get(0);
+                } else {
+                    EDIFPort port = createUniquePort(cellType, newName, EDIFDirection.OUTPUT, 1);
+                    net.getNet().createPortInst(port);
 
-                // EDIFTools.connectPortInstsThruHier() does not support top-level portInsts;
-                // need to create a port inst in the parent cell too
-                EDIFNet upperNet = createUniqueNet(netInst.getParent().getCellType(), port.getName());
-                src = new EDIFHierPortInst(netInst.getParent(), upperNet.createPortInst(port, netInst.getInst()));
+                    // EDIFTools.connectPortInstsThruHier() does not support top-level portInsts;
+                    // need to create a port inst in the parent cell too
+                    EDIFNet upperNet = createUniqueNet(netInst.getParent().getCellType(), port.getName());
+                    src = new EDIFHierPortInst(netInst.getParent(), upperNet.createPortInst(port, netInst.getInst()));
+                }
+                snk = pin;
             }
-
-            snk = pin;
         }
+
 
         connectPortInstsThruHier(src, snk, newName);
     }
