@@ -1423,10 +1423,26 @@ public class RWRoute{
         for (Entry<Net,NetWrapper> e : nets.entrySet()) {
             NetWrapper netWrapper = e.getValue();
             Net net = netWrapper.getNet();
+            assert(net.getType() == NetType.WIRE && !net.isClockNet());
+
+            SitePinInst source = net.getSource();
+            SitePinInst altSource = net.getAlternateSource();
+            boolean setLogicalDriver = altSource != null && source.isRouted() && altSource.isRouted();
+
             Set<PIP> newPIPs = new HashSet<>();
             for (Connection connection:netWrapper.getConnections()) {
-                newPIPs.addAll(RouterHelper.getConnectionPIPs(connection));
+                List<PIP> pips = RouterHelper.getConnectionPIPs(connection);
+                if (setLogicalDriver && connection.getSource() == source) {
+                    // When multiple sources are used (e.g. A_O and AMUX) then
+                    // mark the first primary source PIP as a logical driver
+                    PIP pipFromSource = pips.get(pips.size() - 1);
+                    assert(!pipFromSource.getStartNode().getSitePin().isInput());
+                    pipFromSource.setIsLogicalDriver(true);
+                    setLogicalDriver = false;
+                }
+                newPIPs.addAll(pips);
             }
+
             net.setPIPs(newPIPs);
         }
 
@@ -1436,7 +1452,7 @@ public class RWRoute{
     /**
      * Checks if there are PIP overlaps among routed nets.
      */
-    private void checkPIPsUsage() {
+    protected void checkPIPsUsage() {
         Map<PIP, Set<Net>> pipsUsage = new HashMap<>();
         for (Net net : design.getNets()) {
             for (PIP pip:net.getPIPs()) {
