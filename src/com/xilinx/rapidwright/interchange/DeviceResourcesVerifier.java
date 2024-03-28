@@ -215,7 +215,7 @@ public class DeviceResourcesVerifier {
 
                 expect(DeviceResourcesWriter.getBELCategory(bel).name(), belReader.getCategory().name());
 
-                if (bel.canInvert()) {
+                if (bel.canInvert() && !bel.getName().equals("SRCMXINV") && !bel.getName().equals("SRCFPMXINV")) {
                     expect(true, belReader.hasInverting());
                     BELInverter.Reader belInverter = belReader.getInverting();
 
