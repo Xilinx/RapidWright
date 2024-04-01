@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -69,10 +69,10 @@ public class TestEDIFParser {
      * List of byte offsets that cause interesting behaviour if we start parsing there
      */
     private static final List<ParseStart> interestingOffsets = Arrays.asList(
-      new ParseStart("Mismatch in First Evil Cell", 517L, false),
-      new ParseStart("Mismatch in Second Evil Cell", 849L, false),
-      new ParseStart("Totally Misaligned", 1045L, false),
-      new ParseStart("After Evil", 1111L, true),
+      new ParseStart("Mismatch in First Evil Cell", 577L, false),
+      new ParseStart("Mismatch in Second Evil Cell", 919L, false),
+      new ParseStart("Totally Misaligned", 1115L, false),
+      new ParseStart("After Evil", 1181L, true),
       new ParseStart("At EOF", FILE_SIZE-2, false)
     );
 
@@ -85,10 +85,12 @@ public class TestEDIFParser {
     @ParameterizedTest(name="{0}")
     @MethodSource("testParallelArgs")
     public void testParallel(String ignoredDescription, List<ParseStart> offsets, int expectedSuccessfulThreads) throws IOException {
+        EDIFNetlist netlist;
         try (ParallelEDIFParserTestSpecificOffsets parser = new ParallelEDIFParserTestSpecificOffsets(input, 128, offsets)) {
-            parser.parseEDIFNetlist(new CodePerfTracker("parse edif"));
+            netlist = parser.parseEDIFNetlist(new CodePerfTracker("parse edif"));
             Assertions.assertEquals(expectedSuccessfulThreads, parser.getSuccessfulThreads());
         }
+        Assertions.assertTrue(netlist.getComments().contains("Here's some Unicode: àâæçéèêëœîïôùûÜüÿ"));
     }
 
     /**
@@ -125,10 +127,11 @@ public class TestEDIFParser {
 
     @Test
     public void loadEDIFSingleThreaded() throws IOException {
+        EDIFNetlist netlist;
         try (EDIFParser parser = new EDIFParser(input)) {
-            parser.parseEDIFNetlist();
+            netlist = parser.parseEDIFNetlist();
         }
-
+        Assertions.assertTrue(netlist.getComments().contains("Here's some Unicode: àâæçéèêëœîïôùûÜüÿ"));
     }
 
     @ParameterizedTest

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2024 Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -25,7 +25,11 @@ package com.xilinx.rapidwright.interchange;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
@@ -34,7 +38,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
 public class TestPhysNetlistReader {
     private void testRoutethruLUTsHelper(Design d) {
@@ -68,7 +71,35 @@ public class TestPhysNetlistReader {
         Path physPath = RapidWrightDCP.getPath("interchange/bug546.phys");
 
         EDIFNetlist netlist = LogNetlistReader.readLogNetlist(netlistPath.toString());
-        PhysNetlistReader.readPhysNetlist(physPath.toString(), netlist);
+        Design design = PhysNetlistReader.readPhysNetlist(physPath.toString(), netlist);
+
+        // Check that dual source nets are marked with a single logical driver
+        int numDualSourceNets = 0;
+        for (Net net : design.getNets()) {
+            SitePinInst altSource = net.getAlternateSource();
+            if (altSource == null) {
+                continue;
+            }
+            SitePinInst source = net.getSource();
+            if (!source.isRouted() || !altSource.isRouted()) {
+                continue;
+            }
+
+            Node sourceNode = source.getConnectedNode();
+            int numLogicalDrivers = 0;
+            for (PIP pip : net.getPIPs()) {
+                if (!pip.getStartNode().equals(sourceNode)) {
+                    continue;
+                }
+                if (pip.isLogicalDriver()) {
+                    Assertions.assertEquals(0, numLogicalDrivers);
+                    numLogicalDrivers++;
+                }
+            }
+            Assertions.assertEquals(1, numLogicalDrivers);
+            numDualSourceNets++;
+        }
+        Assertions.assertEquals(181, numDualSourceNets);
     }
 
     @Test
