@@ -28,6 +28,7 @@ import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.VivadoTools;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -100,6 +101,6 @@ public class TestDCPSave {
         Path dcpPath = tempDir.resolve("tmp.dcp");
         design.writeCheckpoint(dcpPath, edfPath, null);
 
-        Assertions.assertTrue(VivadoTools.reportRouteStatus(dcpPath).isFullyRouted());
+        VivadoToolsHelper.assertFullyRouted(design);
     }
 }
