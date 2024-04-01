@@ -277,7 +277,7 @@ public class RWRoute{
     }
 
     protected Collection<Net> getTimingNets() {
-        return indirectConnections.stream().map((c) -> c.getNetWrapper().getNet()).collect(Collectors.toSet());
+        return design.getNets();
     }
 
     protected TimingManager createTimingManager(ClkRouteTiming clkTiming, Collection<Net> timingNets) {
