@@ -25,6 +25,8 @@ package com.xilinx.rapidwright.util;
 import com.xilinx.rapidwright.design.Design;
 import org.junit.jupiter.api.Assertions;
 
+import java.nio.file.Path;
+
 public class VivadoToolsHelper {
     public static void assertFullyRouted(Design design) {
         if (!FileTools.isVivadoOnPath()) {
@@ -32,6 +34,15 @@ public class VivadoToolsHelper {
         }
 
         ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+        Assertions.assertTrue(rrs.isFullyRouted());
+    }
+
+    public static void assertFullyRouted(Path dcp) {
+        if (!FileTools.isVivadoOnPath()) {
+            return;
+        }
+
+        ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(dcp);
         Assertions.assertTrue(rrs.isFullyRouted());
     }
 }
