@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -83,15 +84,6 @@ public class TestRWRoute {
         }
     }
 
-    public static void assertVivadoFullyRouted(Design design) {
-        if (!FileTools.isVivadoOnPath()) {
-            return;
-        }
-
-        ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
-        Assertions.assertTrue(rrs.isFullyRouted());
-    }
-
     public static void assertAllPinsRouted(Design design) {
         for (Net net : design.getNets()) {
             if (net.getSource() == null && !net.isStaticNet()) {
@@ -139,7 +131,7 @@ public class TestRWRoute {
         RWRoute.routeDesignFullNonTimingDriven(design);
         assertAllSourcesRoutedFlagSet(design);
         assertAllPinsRouted(design);
-        assertVivadoFullyRouted(design);
+        VivadoToolsHelper.assertFullyRouted(design);
     }
 
     /**
@@ -156,7 +148,7 @@ public class TestRWRoute {
         RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--lutPinSwapping"});
         assertAllSourcesRoutedFlagSet(design);
         assertAllPinsRouted(design);
-        assertVivadoFullyRouted(design);
+        VivadoToolsHelper.assertFullyRouted(design);
     }
 
     @ParameterizedTest
@@ -170,7 +162,7 @@ public class TestRWRoute {
         RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--lutRoutethru"});
         assertAllSourcesRoutedFlagSet(design);
         assertAllPinsRouted(design);
-        assertVivadoFullyRouted(design);
+        VivadoToolsHelper.assertFullyRouted(design);
     }
 
     /**
@@ -189,7 +181,7 @@ public class TestRWRoute {
         RWRoute.routeDesignFullTimingDriven(design);
         assertAllSourcesRoutedFlagSet(design);
         assertAllPinsRouted(design);
-        assertVivadoFullyRouted(design);
+        VivadoToolsHelper.assertFullyRouted(design);
     }
 
     /**
@@ -206,7 +198,7 @@ public class TestRWRoute {
         RWRoute.routeDesignFullNonTimingDriven(design);
         assertAllSourcesRoutedFlagSet(design);
         assertAllPinsRouted(design);
-        assertVivadoFullyRouted(design);
+        VivadoToolsHelper.assertFullyRouted(design);
     }
 
     /**
@@ -228,7 +220,7 @@ public class TestRWRoute {
         for (Net net : routed.getModifiedNets()) {
             assertAllPinsRouted(net);
         }
-        assertVivadoFullyRouted(design);
+        VivadoToolsHelper.assertFullyRouted(design);
     }
 
     /**
@@ -250,7 +242,7 @@ public class TestRWRoute {
         for (Net net : routed.getModifiedNets()) {
             assertAllPinsRouted(net);
         }
-        assertVivadoFullyRouted(design);
+        VivadoToolsHelper.assertFullyRouted(design);
     }
 
     void testSingleConnectionHelper(String partName,
