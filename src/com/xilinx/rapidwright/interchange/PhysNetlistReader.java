@@ -525,7 +525,7 @@ public class PhysNetlistReader {
             stubWires.clear();
 
             // Nets with more than one routed source (e.g. A_O and AMUX) should have
-            // the first primary source PIP marked as a logical driver
+            // the first PIP driven by either source marked as a logical driver
             if (net.getType() == NetType.WIRE) {
                 SitePinInst altSource = net.getAlternateSource();
                 if (altSource != null) {

@@ -57,6 +57,7 @@ import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.interchange.Interchange;
@@ -277,7 +278,7 @@ public class RWRoute{
     }
 
     protected Collection<Net> getTimingNets() {
-        return indirectConnections.stream().map((c) -> c.getNetWrapper().getNet()).collect(Collectors.toSet());
+        return design.getNets();
     }
 
     protected TimingManager createTimingManager(ClkRouteTiming clkTiming, Collection<Net> timingNets) {
@@ -1425,25 +1426,34 @@ public class RWRoute{
             Net net = netWrapper.getNet();
             assert(net.getType() == NetType.WIRE && !net.isClockNet());
 
-            SitePinInst source = net.getSource();
-            SitePinInst altSource = net.getAlternateSource();
-            boolean setLogicalDriver = altSource != null && source.isRouted() && altSource.isRouted();
-
             Set<PIP> newPIPs = new HashSet<>();
             for (Connection connection:netWrapper.getConnections()) {
                 List<PIP> pips = RouterHelper.getConnectionPIPs(connection);
-                if (setLogicalDriver && connection.getSource() == source) {
-                    // When multiple sources are used (e.g. A_O and AMUX) then
-                    // mark the first primary source PIP as a logical driver
-                    PIP pipFromSource = pips.get(pips.size() - 1);
-                    assert(!pipFromSource.getStartNode().getSitePin().isInput());
-                    pipFromSource.setIsLogicalDriver(true);
-                    setLogicalDriver = false;
-                }
                 newPIPs.addAll(pips);
             }
 
             net.setPIPs(newPIPs);
+
+            // When multiple sources are used (e.g. A_O and AMUX) then
+            // mark the first PIP driven by either source as a logical driver
+            SitePinInst source = net.getSource();
+            SitePinInst altSource = net.getAlternateSource();
+            if (altSource != null && source.isRouted() && altSource.isRouted()) {
+                Tile sourceTile = altSource.getTile();
+                for (PIP pip : net.getPIPs()) {
+                    if (pip.getTile() != sourceTile) {
+                        continue;
+                    }
+                    if (pip.isRouteThru()) {
+                        continue;
+                    }
+                    SitePin sp = pip.getStartNode().getSitePin();
+                    if (sp.getPinName().equals(source.getName())) {
+                        pip.setIsLogicalDriver(true);
+                        break;
+                    }
+                }
+            }
         }
 
         checkPIPsUsage();

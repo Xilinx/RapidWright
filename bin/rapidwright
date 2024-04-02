@@ -35,6 +35,7 @@ if [ $# -eq 0 -o "$1" = "--help" -o "$1" = "-h" -o "$1" = "/?" ]; then
     echo "rapidwright <application>                      -- to execute a specific application"
     echo "rapidwright --list-apps                        -- to list all available applications"
     echo "rapidwright jython                             -- to enter interactive Jython shell"
+    echo "rapidwright jython <script.py>                 -- to execute a provided Jython script"
     echo "rapidwright jython -c \"...\"                    -- to execute specific Jython command"
     exit
 fi
