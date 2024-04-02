@@ -57,6 +57,7 @@ import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.interchange.Interchange;
@@ -1425,10 +1426,6 @@ public class RWRoute{
             Net net = netWrapper.getNet();
             assert(net.getType() == NetType.WIRE && !net.isClockNet());
 
-            SitePinInst source = net.getSource();
-            SitePinInst altSource = net.getAlternateSource();
-            boolean setLogicalDriver = altSource != null && source.isRouted() && altSource.isRouted();
-
             Set<PIP> newPIPs = new HashSet<>();
             for (Connection connection:netWrapper.getConnections()) {
                 List<PIP> pips = RouterHelper.getConnectionPIPs(connection);
@@ -1436,18 +1433,24 @@ public class RWRoute{
             }
 
             net.setPIPs(newPIPs);
-            if (setLogicalDriver) {
+
+            // When multiple sources are used (e.g. A_O and AMUX) then
+            // mark the first PIP driven by either source as a logical driver
+            SitePinInst source = net.getSource();
+            SitePinInst altSource = net.getAlternateSource();
+            if (altSource != null && source.isRouted() && altSource.isRouted()) {
+                Tile sourceTile = altSource.getTile();
                 for (PIP pip : net.getPIPs()) {
-                    // When multiple sources are used (e.g. A_O and AMUX) then
-                    // mark the first primary source PIP as a logical driver
-                    Node startNode = pip.getStartNode();
-                    if (startNode != null) {
-                        SitePin sp = startNode.getSitePin();
-                        if (sp != null && !sp.isInput()) {
-                            pip.setIsLogicalDriver(true);
-                            setLogicalDriver = false;
-                            break;
-                        }
+                    if (pip.getTile() != sourceTile) {
+                        continue;
+                    }
+                    if (pip.isRouteThru()) {
+                        continue;
+                    }
+                    SitePin sp = pip.getStartNode().getSitePin();
+                    if (sp.getPinName().equals(source.getName())) {
+                        pip.setIsLogicalDriver(true);
+                        break;
                     }
                 }
             }
