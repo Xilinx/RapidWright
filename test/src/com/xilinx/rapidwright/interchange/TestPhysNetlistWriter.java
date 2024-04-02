@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -48,6 +48,7 @@ import com.xilinx.rapidwright.rwroute.RWRoute;
 import com.xilinx.rapidwright.rwroute.TestRWRoute;
 import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -333,7 +334,7 @@ public class TestPhysNetlistWriter {
             DesignTools.updatePinsIsRouted(outputDesign);
             TestRWRoute.assertAllSourcesRoutedFlagSet(outputDesign);
             TestRWRoute.assertAllPinsRouted(outputDesign);
-            TestRWRoute.assertVivadoFullyRouted(outputDesign);
+            VivadoToolsHelper.assertFullyRouted(outputDesign);
         } finally {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "false");
             System.setProperty("rapidwright.physNetlistWriter.simulateSwappedLutPins", "false");
