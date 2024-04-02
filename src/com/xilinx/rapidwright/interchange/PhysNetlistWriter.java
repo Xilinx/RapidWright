@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -94,10 +94,6 @@ public class PhysNetlistWriter {
      */
     public static boolean VERBOSE_PHYSICAL_NET_ROUTING = true;
 
-    public static final String LOCKED = "<LOCKED>";
-    public static final String PORT = "<PORT>";
-
-
     protected static void writeSiteInsts(PhysNetlist.Builder physNetlist, Design design,
                                          StringEnumerator strings) {
         Builder<SiteInstance.Builder> siteInsts = physNetlist.initSiteInsts(design.getSiteInsts().size());
@@ -112,10 +108,10 @@ public class PhysNetlistWriter {
 
     protected static String getUniqueLockedCellName(Cell cell, Map<String,PhysCellType> physCells) {
         String cellName = cell.getName();
-        if (cellName.equals(LOCKED)) {
-            cellName = cell.getSiteName() + "_" + cell.getBELName() + "_" + LOCKED;
+        if (cellName.equals(Cell.LOCKED)) {
+            cellName = cell.getSiteName() + "_" + cell.getBELName() + "_" + Cell.LOCKED;
             physCells.put(cellName,PhysCellType.LOCKED);
-        } else if (cell.getType().equals(PORT)) {
+        } else if (cell.isPortCell()) {
             physCells.put(cellName,PhysCellType.PORT);
         }
         return cellName;
@@ -138,7 +134,7 @@ public class PhysNetlistWriter {
                 allCells.add(cell);
                 if (!cell.isPlaced()) continue;
                 String cellName = cell.getName();
-                if (cellName.equals(PhysNetlistWriter.LOCKED)) continue;
+                if (cellName.equals(Cell.LOCKED)) continue;
                 Cell multiCell = design.getCell(cellName);
                 if (multiCell == null) {
                     assert(cell.isFFRoutethruCell());
@@ -363,7 +359,7 @@ public class PhysNetlistWriter {
                         assert(bel.isLUT() || // LUTs can be a GND or VCC source
                                 (net.isGNDNet() && bel.isGndSource()) ||
                                 (net.isVCCNet() && bel.isVccSource()));
-                    } else if (cell.getType().equals(PORT)) {
+                    } else if (cell.isPortCell()) {
                         if (Utils.isIOB(siteInst)) {
                             assert(belPin.isBidir());
                             assert(bel.getName().equals("PAD"));

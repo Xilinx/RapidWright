@@ -247,7 +247,7 @@ public class PhysNetlistReader {
                 Cell c = siteInst.getCell(belName);
                 if (c == null) {
                     BEL bel = siteInst.getBEL(belName);
-                    c = new Cell(PhysNetlistWriter.LOCKED, bel);
+                    c = new Cell(Cell.LOCKED, bel);
                     c.setType(strings.get(placement.getType()));
                     c.setBELFixed(placement.getIsBelFixed());
                     c.setNullBEL(bel == null);
@@ -258,7 +258,7 @@ public class PhysNetlistReader {
                 // c Alternative Blocked Site Type // TODO
             } else if (physType == PhysCellType.PORT) {
                 Cell portCell = new Cell(cellName,siteInst.getBEL(belName));
-                portCell.setType(PhysNetlistWriter.PORT);
+                portCell.setType(Cell.PORT_TYPE);
                 siteInst.addCell(portCell);
                 portCell.setBELFixed(placement.getIsBelFixed());
                 portCell.setSiteFixed(placement.getIsSiteFixed());
