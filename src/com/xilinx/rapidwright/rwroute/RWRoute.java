@@ -1432,18 +1432,25 @@ public class RWRoute{
             Set<PIP> newPIPs = new HashSet<>();
             for (Connection connection:netWrapper.getConnections()) {
                 List<PIP> pips = RouterHelper.getConnectionPIPs(connection);
-                if (setLogicalDriver && connection.getSource() == source) {
-                    // When multiple sources are used (e.g. A_O and AMUX) then
-                    // mark the first primary source PIP as a logical driver
-                    PIP pipFromSource = pips.get(pips.size() - 1);
-                    assert(!pipFromSource.getStartNode().getSitePin().isInput());
-                    pipFromSource.setIsLogicalDriver(true);
-                    setLogicalDriver = false;
-                }
                 newPIPs.addAll(pips);
             }
 
             net.setPIPs(newPIPs);
+            if (setLogicalDriver) {
+                for (PIP pip : net.getPIPs()) {
+                    // When multiple sources are used (e.g. A_O and AMUX) then
+                    // mark the first primary source PIP as a logical driver
+                    Node startNode = pip.getStartNode();
+                    if (startNode != null) {
+                        SitePin sp = startNode.getSitePin();
+                        if (sp != null && !sp.isInput()) {
+                            pip.setIsLogicalDriver(true);
+                            setLogicalDriver = false;
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
         checkPIPsUsage();
