@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Advanced Micro Devices, Inc.
@@ -27,8 +27,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.VivadoTools;
-import org.junit.jupiter.api.Assertions;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -54,8 +53,6 @@ public class TestSATRouter {
 
         satRouter.applyRoutingResult();
 
-        if (FileTools.isVivadoOnPath()) {
-            Assertions.assertTrue(VivadoTools.reportRouteStatus(design).isFullyRouted());
-        }
+        VivadoToolsHelper.assertFullyRouted(design);
     }
 }

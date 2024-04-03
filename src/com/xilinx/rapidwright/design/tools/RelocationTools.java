@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -35,7 +35,6 @@ import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
-import com.xilinx.rapidwright.interchange.PhysNetlistWriter;
 import com.xilinx.rapidwright.util.Utils;
 
 import java.util.ArrayList;
@@ -130,7 +129,7 @@ public class RelocationTools {
         for (SiteInst si : siteInsts) {
             for (Cell c : si.getCells()) {
                 if (!c.isLocked() && !c.isRoutethru() && !cells.contains(c)
-                        && !c.getType().equals(PhysNetlistWriter.PORT)) {
+                        && !c.isPortCell()) {
                     System.out.println("ERROR: Failed to relocate SiteInst '" + si.getName()
                             + "' as it contains Cells both inside and outside of '" + instanceName + "'");
                     error = true;

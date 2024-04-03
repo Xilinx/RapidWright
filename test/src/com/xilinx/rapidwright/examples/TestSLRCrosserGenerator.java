@@ -25,13 +25,10 @@ package com.xilinx.rapidwright.examples;
 
 import java.nio.file.Path;
 
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.VivadoTools;
 
 /**
  * Created on: Mar 25, 2024
@@ -52,7 +49,7 @@ public class TestSLRCrosserGenerator {
 
         String[] args = new String[] { "-j", "512", "-k", "256", "-o", outputDCP.toString() };
         SLRCrosserGenerator.main(args);
-        Assumptions.assumeTrue(FileTools.isVivadoOnPath());
-        Assertions.assertTrue(VivadoTools.reportRouteStatus(outputDCP).isFullyRouted());
+
+        VivadoToolsHelper.assertFullyRouted(outputDCP);
     }
 }

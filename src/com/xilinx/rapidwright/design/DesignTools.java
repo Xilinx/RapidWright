@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -81,7 +81,6 @@ import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.interchange.PhysNetlistWriter;
 import com.xilinx.rapidwright.placer.blockplacer.BlockPlacer2Impls;
 import com.xilinx.rapidwright.placer.blockplacer.ImplsInstancePort;
 import com.xilinx.rapidwright.placer.blockplacer.ImplsPath;
@@ -1823,8 +1822,6 @@ public class DesignTools {
             if (!net.rename(e.getValue())) {
                 throw new RuntimeException("ERROR: Failed to rename net '" + net.getName() + "'");
             }
-            // TODO: Remove workaround below when >2023.2.1
-            net.setLogicalHierNet(null);
             netsToKeep.add(net.getName());
         }
 
@@ -3143,8 +3140,7 @@ public class DesignTools {
                     if (parentPhysNet != null) {
                         // Fall through
                     } else if (net.rename(parentHierNet.getHierarchicalNetName())) {
-                        // TODO: Remove workaround below when >2023.2.1
-                        net.setLogicalHierNet(null);
+                        // Fall through
                     } else {
                         System.out.println("WARNING: Failed to adjust physical net name " + net.getName());
                     }
@@ -3988,7 +3984,7 @@ public class DesignTools {
                     }
                 }
                 if (c.getBEL().isFF()) {
-                    if(c.getName().equals(PhysNetlistWriter.LOCKED)) continue;
+                    if(c.getName().equals(Cell.LOCKED)) continue;
                     String belName = c.getBELName();
                     char letter = belName.charAt(0);
                     boolean isFF2 = belName.charAt(belName.length() - 1) == '2';
