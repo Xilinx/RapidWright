@@ -163,8 +163,9 @@ public class LaunchTestsOnLsf {
                 }
             });
             StaticReportGenerator.writeMasterXmlLog(sb.toString(), perTestMessages, testPlan);
-        }
 
+            System.exit(1);
+        }
     }
 
     private static Optional<Integer> sourceToMem(TestSource ts) {
