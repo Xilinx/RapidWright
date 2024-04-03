@@ -1,4 +1,4 @@
-============= RapidWright 2023.2.2-beta released on 2023-04-02 ================
+============= RapidWright 2023.2.2-beta released on 2023-04-03 ================
 Notes:
   - Use new Cell.{LOCKED,PORT_TYPE,isPortCell()} (#977)
   - Remove some pre-2023.2.2 workarounds (#978)
