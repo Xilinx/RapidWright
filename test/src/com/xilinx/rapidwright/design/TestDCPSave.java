@@ -101,6 +101,6 @@ public class TestDCPSave {
         Path dcpPath = tempDir.resolve("tmp.dcp");
         design.writeCheckpoint(dcpPath, edfPath, null);
 
-        VivadoToolsHelper.assertFullyRouted(design);
+        VivadoToolsHelper.assertFullyRouted(dcpPath);
     }
 }
