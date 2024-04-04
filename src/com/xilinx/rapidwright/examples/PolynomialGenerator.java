@@ -216,6 +216,10 @@ public class PolynomialGenerator {
         return operators;
     }
 
+    public static void releaseOperators() {
+        operators = null;
+    }
+
     public static int sliceyOther;
     public static boolean setSliceY = false;
 
@@ -383,6 +387,8 @@ public class PolynomialGenerator {
         t.stop().start("Build Operator Tree");
 
         buildOperatorTree(p, d, results);
+
+        releaseOperators();
 
         d.addXDCConstraint(ConstraintGroup.LATE, "create_clock -name "+CLK_NAME+" -period 1.291 [get_ports "+CLK_NAME+"]");
         d.addXDCConstraint(ConstraintGroup.LATE, "set_property HD.CLK_SRC BUFGCE_X0Y18 [get_ports "+CLK_NAME+"]");
