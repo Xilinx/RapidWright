@@ -57,6 +57,7 @@ import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.interchange.Interchange;
@@ -277,7 +278,7 @@ public class RWRoute{
     }
 
     protected Collection<Net> getTimingNets() {
-        return indirectConnections.stream().map((c) -> c.getNetWrapper().getNet()).collect(Collectors.toSet());
+        return design.getNets();
     }
 
     protected TimingManager createTimingManager(ClkRouteTiming clkTiming, Collection<Net> timingNets) {
@@ -1423,11 +1424,36 @@ public class RWRoute{
         for (Entry<Net,NetWrapper> e : nets.entrySet()) {
             NetWrapper netWrapper = e.getValue();
             Net net = netWrapper.getNet();
+            assert(net.getType() == NetType.WIRE && !net.isClockNet());
+
             Set<PIP> newPIPs = new HashSet<>();
             for (Connection connection:netWrapper.getConnections()) {
-                newPIPs.addAll(RouterHelper.getConnectionPIPs(connection));
+                List<PIP> pips = RouterHelper.getConnectionPIPs(connection);
+                newPIPs.addAll(pips);
             }
+
             net.setPIPs(newPIPs);
+
+            // When multiple sources are used (e.g. A_O and AMUX) then
+            // mark the first PIP driven by either source as a logical driver
+            SitePinInst source = net.getSource();
+            SitePinInst altSource = net.getAlternateSource();
+            if (altSource != null && source.isRouted() && altSource.isRouted()) {
+                Tile sourceTile = altSource.getTile();
+                for (PIP pip : net.getPIPs()) {
+                    if (pip.getTile() != sourceTile) {
+                        continue;
+                    }
+                    if (pip.isRouteThru()) {
+                        continue;
+                    }
+                    SitePin sp = pip.getStartNode().getSitePin();
+                    if (sp.getPinName().equals(source.getName())) {
+                        pip.setIsLogicalDriver(true);
+                        break;
+                    }
+                }
+            }
         }
 
         checkPIPsUsage();
@@ -1436,7 +1462,7 @@ public class RWRoute{
     /**
      * Checks if there are PIP overlaps among routed nets.
      */
-    private void checkPIPsUsage() {
+    protected void checkPIPsUsage() {
         Map<PIP, Set<Net>> pipsUsage = new HashMap<>();
         for (Net net : design.getNets()) {
             for (PIP pip:net.getPIPs()) {

@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -24,6 +24,12 @@ package com.xilinx.rapidwright.design;
 
 import java.nio.file.Path;
 
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.VivadoTools;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -32,15 +38,19 @@ import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestDCPSave {
 
-    @Test
-    public void testDCPSave(@TempDir Path tempDir) {
+    @ParameterizedTest
+    @ValueSource(booleans = { true, false })
+    public void testDCPSave(boolean detachNetlist, @TempDir Path tempDir) {
         // Taken from example provided by https://github.com/nqdtan in #548
         Design d = new Design("test", "xcvc1902-vsvd1760-2MP-e-S");
-        EDIFLibrary plib = d.getNetlist().getHDIPrimitivesLibrary();
-        EDIFCell top = d.getNetlist().getTopCell();
+        EDIFNetlist n = d.getNetlist();
+        EDIFLibrary plib = n.getHDIPrimitivesLibrary();
+        EDIFCell top = n.getTopCell();
         EDIFCell ec0 = new EDIFCell(plib, "LUT6CY");
         EDIFCell ec1 = new EDIFCell(plib, "LUTCY1");
         EDIFCell ec2 = new EDIFCell(plib, "LUTCY2");
@@ -71,7 +81,26 @@ public class TestDCPSave {
         c2.addPinMapping("A4", "I3");
         c2.addPinMapping("A5", "I4");
         c2.addPinMapping("O5", "O");
-        
-        d.writeCheckpoint(tempDir.resolve("tmp.dcp"));        
+
+        if (detachNetlist) {
+            EDIFTools.writeEDIFFile(tempDir.resolve("tmp.edf"), n, d.getPartName());
+            d.detachNetlist();
+            d.writeCheckpoint(tempDir.resolve("tmp.dcp"), tempDir.resolve("tmp.edf"), null);
+        } else {
+            d.writeCheckpoint(tempDir.resolve("tmp.dcp"));
+        }
+    }
+
+    @Test
+    public void testWriteCheckpointPreWrittenEDIF(@TempDir Path tempDir) {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+
+        Path edfPath = tempDir.resolve("tmp.edf");
+        EDIFTools.writeEDIFFile(edfPath, design.getNetlist(), design.getPartName());
+        design.detachNetlist();
+        Path dcpPath = tempDir.resolve("tmp.dcp");
+        design.writeCheckpoint(dcpPath, edfPath, null);
+
+        VivadoToolsHelper.assertFullyRouted(dcpPath);
     }
 }

@@ -26,6 +26,7 @@ package com.xilinx.rapidwright.interchange;
 import com.xilinx.rapidwright.design.AltPinMapping;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
@@ -37,6 +38,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
@@ -245,7 +247,7 @@ public class PhysNetlistReader {
                 Cell c = siteInst.getCell(belName);
                 if (c == null) {
                     BEL bel = siteInst.getBEL(belName);
-                    c = new Cell(PhysNetlistWriter.LOCKED, bel);
+                    c = new Cell(Cell.LOCKED, bel);
                     c.setType(strings.get(placement.getType()));
                     c.setBELFixed(placement.getIsBelFixed());
                     c.setNullBEL(bel == null);
@@ -256,7 +258,7 @@ public class PhysNetlistReader {
                 // c Alternative Blocked Site Type // TODO
             } else if (physType == PhysCellType.PORT) {
                 Cell portCell = new Cell(cellName,siteInst.getBEL(belName));
-                portCell.setType(PhysNetlistWriter.PORT);
+                portCell.setType(Cell.PORT_TYPE);
                 siteInst.addCell(portCell);
                 portCell.setBELFixed(placement.getIsBelFixed());
                 portCell.setSiteFixed(placement.getIsSiteFixed());
@@ -521,6 +523,36 @@ public class PhysNetlistReader {
                 net.addPIP(pip);
             }
             stubWires.clear();
+
+            // Nets with more than one routed source (e.g. A_O and AMUX) should have
+            // the first PIP driven by either source marked as a logical driver
+            if (net.getType() == NetType.WIRE) {
+                SitePinInst altSource = net.getAlternateSource();
+                if (altSource != null) {
+                    assert(!net.isClockNet());
+
+                    SitePinInst source = net.getSource();
+                    assert(source.getTile() == altSource.getTile());
+
+                    DesignTools.updatePinsIsRouted(net);
+                    if (source.isRouted() && altSource.isRouted()) {
+                        Tile sourceTile = altSource.getTile();
+                        for (PIP pip : net.getPIPs()) {
+                            if (pip.getTile() != sourceTile) {
+                                continue;
+                            }
+                            if (pip.isRouteThru()) {
+                                continue;
+                            }
+                            SitePin sp = pip.getStartNode().getSitePin();
+                            if (sp.getPinName().equals(source.getName())) {
+                                pip.setIsLogicalDriver(true);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 

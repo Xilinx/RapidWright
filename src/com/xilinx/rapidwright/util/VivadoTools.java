@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Zak Nafziger, Advanced Micro Devices, Inc.
@@ -38,6 +38,9 @@ import java.util.List;
 public class VivadoTools {
 
     public static final String REPORT_ROUTE_STATUS = "report_route_status";
+    public static final String PLACE_DESIGN = "place_design";
+    public static final String WRITE_CHECKPOINT = "write_checkpoint";
+    public static final String WRITE_EDIF = "write_edif";
 
     /**
      * method to search a vivado log for a specific key phrase
@@ -307,5 +310,54 @@ public class VivadoTools {
         } else {
             return "open_checkpoint " + dcp + "; ";
         }
+    }
+
+    /**
+     * Run Vivado's `place_design` command on the provided DCP path
+     * and return the placed result as a new Design object.
+     *
+     * @param dcp Path to DCP to report on.
+     * @param workdir Directory to work within.
+     * @param encrypted Indicates whether DCP contains encrypted EDIF cells.
+     * @return Design object.
+     */
+    public static Design placeDesign(Path dcp, Path workdir, boolean encrypted) {
+        final Path outputLog = workdir.resolve("outputLog.log");
+        final Path outputDcp = workdir.resolve("outputDcp.dcp");
+        final Path outputEdif = workdir.resolve("outputDcp.edf");
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(createTclDCPLoadCommand(dcp, encrypted));
+        sb.append(PLACE_DESIGN + "; ");
+        sb.append(WRITE_CHECKPOINT + " " + outputDcp + "; ");
+        sb.append(WRITE_EDIF + " " + outputEdif);
+
+        VivadoTools.runTcl(outputLog, sb.toString(), true);
+        return Design.readCheckpoint(outputDcp, outputEdif);
+    }
+
+    /**
+     * Run Vivado's `get_timing_paths -setup` command on the provided DCP path
+     * (to find its worst setup timing path) and return its SLACK property as a float.
+     *
+     * @param dcp Path to DCP to report on.
+     * @param workdir Directory to work within.
+     * @param encrypted Indicates whether DCP contains encrypted EDIF cells.
+     * @return Worst slack of design as float.
+     */
+    public static float getWorstSetupSlack(Path dcp, Path workdir, boolean encrypted) {
+        final Path outputLog = workdir.resolve("outputLog.log");
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(createTclDCPLoadCommand(dcp, encrypted));
+        sb.append("puts [get_property SLACK [get_timing_paths -setup]]");
+
+        List<String> log = VivadoTools.runTcl(outputLog, sb.toString(), true);
+        try {
+            return Float.parseFloat(log.get(log.size() - 2));
+        } catch (NumberFormatException e) {
+            System.err.println("ERROR: " + e);
+        }
+        return Float.NaN;
     }
 }

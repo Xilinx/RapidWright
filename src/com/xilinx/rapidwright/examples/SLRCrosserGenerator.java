@@ -261,33 +261,34 @@ public class SLRCrosserGenerator {
 
     /**
      * Places and routes an SLR crossing given a north and south bus of size width.
-     * @param d The current design
-     * @param northStart The starting Laguna site to start placement (placement moves north)
-     *     for the north traveling bus
-     * @param northBusName Full hierarchical net name of the bus to cross SLR in north direction
-     * @param southBusName Full hierarchical net name of the bus to cross SLR in south direction
-     * @param width Width of both north and south buses crossing SLR
+     * 
+     * @param d             The current design
+     * @param northStart    The starting Laguna site to start placement (placement
+     *                      moves north) for the north traveling bus
+     * @param northBusName  Full hierarchical net name of the bus to cross SLR in
+     *                      north direction
+     * @param southBusName  Full hierarchical net name of the bus to cross SLR in
+     *                      south direction
+     * @param northBusWidth Width of north buses crossing SLR
+     * @param southBusWidth Width of south buses crossing SLR
      */
-    public static void placeAndRouteSLRCrossing(Design d, Site northStart, String northBusName, String southBusName, int width) {
-        int yStart = northStart.getInstanceY() + ((LAGUNA_SITES_PER_TILE * LAGUNA_TILES_PER_FSR * 3) / 4);
-        Site southStart = d.getDevice().getSite("LAGUNA_X"+northStart.getInstanceX()+"Y" + yStart);
-
+    public static void placeAndRouteSLRCrossing(Design d, Site northStart, String northBusName, String southBusName,
+            int northBusWidth, int southBusWidth) {
         for (String busName : new String[]{northBusName,southBusName}) {
-            Site start = busName.equals(northBusName) ? northStart : southStart;
-            int lagunaStartX = start.getInstanceX();
-            int lagunaStartY = start.getInstanceY();
+            boolean isNorth = busName.equals(northBusName);
+            int width = isNorth ? northBusWidth : southBusWidth;
             for (int i=0; i < width; i++) {
+                int ii = isNorth ? i : (i + northBusWidth);
                 EDIFHierNet net = d.getNetlist().getHierNetFromName(busName + "[" + i + "]");
-                int x = ((i / 12) % 2) + lagunaStartX;
-                int y = lagunaStartY + ((i/(LAGUNA_FLOPS_PER_SITE*LAGUNA_SITES_PER_TILE))*2)
-                                     + ((i/LAGUNA_FLOPS_PER_SITE % 2) == 1 ? 1 : 0);
+                int x = ((ii / 12) % 2) + northStart.getInstanceX();
+                int y = northStart.getInstanceY() + ((ii / (LAGUNA_FLOPS_PER_SITE * LAGUNA_SITES_PER_TILE)) * 2)
+                        + ((ii / LAGUNA_FLOPS_PER_SITE % 2) == 1 ? 1 : 0);
 
                 Site txSite = d.getDevice().getSite("LAGUNA_X" + x + "Y" + y);
-                String txElementName = "TX_REG" + (i % LAGUNA_FLOPS_PER_SITE);
+                String txElementName = "TX_REG" + (ii % LAGUNA_FLOPS_PER_SITE);
                 placeAndRouteLagunaFlopPair(d, net, txSite, txElementName);
             }
         }
-
     }
 
     /**
@@ -432,15 +433,18 @@ public class SLRCrosserGenerator {
 
     /**
      * Creates the logical netlist of the SLR crosser design.
-     * @param d Current design
-     * @param busWidth Width of the buses to create
-     * @param busPrefixes Prefixes to use for bus names
-     * @param clkName Name of the clock net
-     * @param clkInName Name of the clock in port
-     * @param clkOutName Name of the clock out port
+     * 
+     * @param d              Current design
+     * @param northBusWidth  Width of the North buses to create
+     * @param southBusWidth  Width of the South buses to create
+     * @param busPrefixes    Prefixes to use for bus names
+     * @param clkName        Name of the clock net
+     * @param clkInName      Name of the clock in port
+     * @param clkOutName     Name of the clock out port
      * @param bufgceInstName Name of the BUFGCE instance
      */
-    public static void createBUFGCEAndFlops(Design d, int busWidth, List<String> busPrefixes, String clkName, String clkInName, String clkOutName, String bufgceInstName) {
+    public static void createBUFGCEAndFlops(Design d, int northBusWidth, int southBusWidth, List<String> busPrefixes,
+            String clkName, String clkInName, String clkOutName, String bufgceInstName) {
         EDIFNetlist n = d.getNetlist();
         EDIFCell parent = n.getTopCell();
 
@@ -452,22 +456,44 @@ public class SLRCrosserGenerator {
         EDIFNet gndNet = EDIFTools.getStaticNet(NetType.GND, parent, n);
 
         // Create register pairs
+        boolean isNorth = true;
         for (String busPrefix : busPrefixes) {
+            int busWidth = isNorth ? northBusWidth : southBusWidth;
             String busSuffix = "[" + (busWidth-1) + ":0]";
             String[] parts = busPrefix.split(",");
-            EDIFPort input = parent.createPort(parts[0]+busSuffix, EDIFDirection.INPUT, busWidth);
-            EDIFPort output = parent.createPort(parts[1]+busSuffix, EDIFDirection.OUTPUT, busWidth);
+            EDIFPort input = null;
+            EDIFPort output = null;
+            isNorth = !isNorth;
+            if (busWidth > 1) {
+                input = parent.createPort(parts[0]+busSuffix, EDIFDirection.INPUT, busWidth);
+                output = parent.createPort(parts[1]+busSuffix, EDIFDirection.OUTPUT, busWidth);                
+            } else if (busWidth == 1) {
+                input = parent.createPort(parts[0], EDIFDirection.INPUT, busWidth);
+                output = parent.createPort(parts[1], EDIFDirection.OUTPUT, busWidth);
+            } else if (busWidth <= 0) {
+                continue;
+            }
             for (int i=0; i < busWidth; i++) {
                 String suffix = "[" + i + "]";
                 EDIFCellInst reg0 = Design.createUnisimInst(parent, parts[0] + "_reg0" + suffix, Unisim.FDRE);
                 EDIFCellInst reg1 = Design.createUnisimInst(parent, parts[1] + "_reg1" + suffix, Unisim.FDRE);
 
                 EDIFNet inputNet = parent.createNet(parts[0] + suffix);
-                inputNet.createPortInst(input, i);
+                if (busWidth == 1) {
+                    inputNet.createPortInst(input);
+                } else {
+                    inputNet.createPortInst(input, i);
+                }
+
                 inputNet.createPortInst("D", reg0);
 
                 EDIFNet outputNet = parent.createNet(parts[1] + suffix);
-                outputNet.createPortInst(output, i);
+                if (busWidth == 1) {
+                    outputNet.createPortInst(output);
+                } else {
+                    outputNet.createPortInst(output, i);
+                }
+
                 outputNet.createPortInst("Q", reg1);
 
                 clkNet.createPortInst("C", reg0);
@@ -506,6 +532,8 @@ public class SLRCrosserGenerator {
     private static final String VERBOSE_OPT = "v";
     private static final String HELP_OPT = "h";
     private static final String COMMON_CENTROID_OPT = "z";
+    private static final String NORTH_BUS_WIDTH_OPT = "j";
+    private static final String SOUTH_BUS_WIDTH_OPT = "k";
 
     private static OptionParser createOptionParser() {
         // Defaults
@@ -519,8 +547,8 @@ public class SLRCrosserGenerator {
         String clkName = "clk";
         String clkInName = "clk_in";
         String clkOutName = "clk_out";
-        double clkPeriodConstraint = 1.333;
-        int busWidth = 512;
+        int northBusWidth = 256;
+        int southBusWidth = 256;
         String inputPrefix = "input";
         String outputPrefix= "output";
         String northSuffix = "_north";
@@ -541,7 +569,12 @@ public class SLRCrosserGenerator {
             accepts(CLK_IN_NAME_OPT).withOptionalArg().defaultsTo(clkInName).describedAs("Clk input net name");
             accepts(CLK_OUT_NAME_OPT).withOptionalArg().defaultsTo(clkOutName).describedAs("Clk output net name");
             accepts(CLK_CONSTRAINT_OPT).withRequiredArg().ofType(Double.class).describedAs("Clk period constraint (ns)");
-            accepts(BUS_WIDTH_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(busWidth).describedAs("SLR crossing bus width");
+                accepts(BUS_WIDTH_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(northBusWidth)
+                        .describedAs("SLR crossing bus width");
+                accepts(NORTH_BUS_WIDTH_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(northBusWidth)
+                        .describedAs("SLR crossing North bus width");
+                accepts(SOUTH_BUS_WIDTH_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(southBusWidth)
+                        .describedAs("SLR crossing South bus width");
             accepts(INPUT_PREFIX_OPT).withOptionalArg().defaultsTo(inputPrefix).describedAs("Input bus name prefix");
             accepts(OUTPUT_PREFIX_OPT).withOptionalArg().defaultsTo(outputPrefix).describedAs("Output bus name prefix");
             accepts(NORTH_SUFFIX_OPT).withOptionalArg().defaultsTo(northSuffix).describedAs("North bus name suffix");
@@ -578,6 +611,18 @@ public class SLRCrosserGenerator {
             printHelp(p);
             return;
         }
+        
+        boolean hasNorthBusOpt = opts.has(NORTH_BUS_WIDTH_OPT);
+        boolean hasSouthBusOpt = opts.has(SOUTH_BUS_WIDTH_OPT);
+        if ((hasNorthBusOpt && hasSouthBusOpt) != (hasNorthBusOpt || hasSouthBusOpt)) {
+            throw new RuntimeException("ERROR: Must specify both North (-"+NORTH_BUS_WIDTH_OPT+") and South (-"+SOUTH_BUS_WIDTH_OPT+") bus widths options simultaneously");
+        }
+        if (opts.has(BUS_WIDTH_OPT) && (hasNorthBusOpt || hasSouthBusOpt)) {
+            throw new RuntimeException("ERROR: Must specify bus width using (-" + BUS_WIDTH_OPT + ") or both North (-"
+                    + NORTH_BUS_WIDTH_OPT + ") and South (-" + SOUTH_BUS_WIDTH_OPT
+                    + ") bus widths options, they cannot all be used together.");
+        }
+        
         CodePerfTracker t = verbose ? new CodePerfTracker(SLRCrosserGenerator.class.getSimpleName(),true).start("Init") : null;
 
         String partName = (String) opts.valueOf(PART_OPT);
@@ -590,13 +635,28 @@ public class SLRCrosserGenerator {
         String clkName = (String) opts.valueOf(CLK_NAME_OPT);
         String clkInName = (String) opts.valueOf(CLK_IN_NAME_OPT);
         String clkOutName = (String) opts.valueOf(CLK_OUT_NAME_OPT);
-        int busWidth = (int) opts.valueOf(BUS_WIDTH_OPT);
+        int northBusWidth = (int) (opts.hasArgument(BUS_WIDTH_OPT) ? opts.valueOf(BUS_WIDTH_OPT)
+                : opts.valueOf(NORTH_BUS_WIDTH_OPT));
+        int southBusWidth = (int) (opts.hasArgument(BUS_WIDTH_OPT) ? opts.valueOf(BUS_WIDTH_OPT)
+                : opts.valueOf(SOUTH_BUS_WIDTH_OPT));
         String inputPrefix = (String) opts.valueOf(INPUT_PREFIX_OPT);
         String outputPrefix= (String) opts.valueOf(OUTPUT_PREFIX_OPT);
         String northSuffix = (String) opts.valueOf(NORTH_SUFFIX_OPT);
         String southSuffix = (String) opts.valueOf(SOUTH_SUFFIX_OPT);
         String[] lagunaNames = ((String) opts.valueOf(LAGUNA_SITES_OPT)).split(",");
         boolean commonCentroid = (boolean) opts.valueOf(COMMON_CENTROID_OPT);
+
+        int busWidth = northBusWidth + southBusWidth;
+        int lagunaColumnCrossingWidth = LAGUNA_FLOPS_PER_SITE * LAGUNA_TILES_PER_FSR * LAGUNA_SITES_PER_TILE;
+        if (busWidth > lagunaColumnCrossingWidth) {
+            throw new RuntimeException("ERROR: Bus width size request exceeds architecture "
+                    + "limitations: total bus width = " + busWidth
+                    + ", each LAGUNA column can only support a width of " + lagunaColumnCrossingWidth);
+        }
+        if (northBusWidth < 0 || southBusWidth < 0) {
+            throw new RuntimeException("ERROR: Cannot have a negative bus width: North=" 
+                    + northBusWidth + ", South=" + southBusWidth); 
+        }
 
         Double clkPeriodConstraint = null;
         if (opts.hasArgument(CLK_CONSTRAINT_OPT)) {
@@ -639,7 +699,7 @@ public class SLRCrosserGenerator {
 
 
         if (verbose) t.stop().start("Create Netlist");
-        createBUFGCEAndFlops(d, busWidth, busNames, clkName, clkInName, clkOutName, bufgceInstName);
+        createBUFGCEAndFlops(d, northBusWidth, southBusWidth, busNames, clkName, clkInName, clkOutName, bufgceInstName);
         placeBUFGCE(d,dev.getSite(bufgceSiteName),bufgceInstName);
 
         if (verbose) t.stop().start("Place SLR Crossings");
@@ -648,7 +708,7 @@ public class SLRCrosserGenerator {
             Site northLagunaStart = dev.getSite(lagunaStart);
             String northBusName = busNames.get(j+0).replace(",", "_");
             String southBusName = busNames.get(j+1).replace(",", "_");
-            placeAndRouteSLRCrossing(d, northLagunaStart, northBusName, southBusName, busWidth);
+            placeAndRouteSLRCrossing(d, northLagunaStart, northBusName, southBusName, northBusWidth, southBusWidth);
             j+=2;
         }
         if (verbose) t.stop().start("Custom Clock Route");

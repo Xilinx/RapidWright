@@ -1,3 +1,59 @@
+============= RapidWright 2023.2.2-beta released on 2023-04-03 ================
+Notes:
+  - Use new Cell.{LOCKED,PORT_TYPE,isPortCell()} (#977)
+  - Remove some pre-2023.2.2 workarounds (#978)
+  - [RWRoute] Fix logical driver flag setting for DCP write (#979)
+  - Add explicit use case for a Jython script in --help (#980)
+  - [VivadoTools] Add placeDesign() and getWorstSetupSlack() (#975)
+  - [RWRoute] Consider all nets in timing-driven routing (#976)
+  - [DCP] Test Design.writeCheckpoint() when using existing EDIF (#965)
+  - Work around for multi-inverter BEL in DSP58 (#969)
+  - [DesignTools.makeBlackBox()] Fix for #967 (#970)
+  - [RWRoute,PhysNetlistReader] Set logical driver on PIPs (#973)
+  - [SLRCrosserGenerator] Adds North/South parameterizable bus widths; some error checking (#972)
+  - [EDIFTokenizer] Account for byte size of UTF-8 characters correctly (#962)
+  - [VivadoTools] writeBitstream to not delete DCP parent dir (+more) (#955)
+  - [RWRoute] Preserve [A-H]_O node when [A-H]MUX used as static src (#954)
+  - [GlobalSignalRouter] No intra site routing for new static source pins (#953)
+  - [EDIFPropertyValue] Fix getBooleanValue() NPE (#952)
+  - [PhysNetlistReader] Fix checkConstantRoutingAndNetNaming() (#951)
+  - [RWRoute] When removing unused source SPI restore intra-site routing (#949)
+  - [RWRoute] Tidy up createNetWrapperAndConnections() (#950)
+  - Fix EDIFPropertyValue.getBooleanValue() (#948)
+  - [RWRoute] Replace main src with altsrc if main is unused (#945)
+  - [RWRoute] Fix comment Eastern -> Western (#943)
+  - RouterHelper.invertPossibleGndPinsToVccPins() to invert static LUT inputs (#910)
+  - [TestRWRoute] Stop skipping some tests when < 8GB (#941)
+  - Temporary workaround to clear logical net after Net.rename() (#942)
+  - Known failing test for EDIFHierPortInst.getRoutedSitePinInst() (#577)
+  - Known failing test for Tile.getSites() result different to Vivado (#745)
+  - Known failing test for BITSLICE_CONTROL output pin projection (#559)
+  - Add known failing testcase for #756 (#758)
+  - Update RWRouteConfig.java (#940)
+  - [RWRoute] Add --lutRoutethru option (#932)
+  - [RWRoute] Do not pin swap SRL (shift register) cells (#939)
+  - [LUTTools] LUT pin swapping fixes (#938)
+  - Net.rename() to clear logical hier net
+  - Fix regarding issue around bitstream header
+  - Fixes issue when site wire lacks GND tag 
+  
+API Additions:
+  - com.xilinx.rapidwright.bitstream.Bitstream "public boolean writeBitstream(Path path)"
+  - com.xilinx.rapidwright.bitstream.Frame "public List<BitLocation> getDiff(Frame otherFrame)"
+  - com.xilinx.rapidwright.design.Cell "public static final String LOCKED = "<LOCKED>";
+  - com.xilinx.rapidwright.design.Cell "public static final String PORT_TYPE = "<PORT>";
+  - com.xilinx.rapidwright.design.Cell "public boolean isPortCell()"
+  - com.xilinx.rapidwright.design.Cell "public String getPropertyValueString(String key)"
+  - com.xilinx.rapidwright.design.Design "public void writeCheckpoint(String dcpFileName, String edfFileName, CodePerfTracker t)"
+  - com.xilinx.rapidwright.design.Design "public void writeCheckpoint(Path dcpFileName, Path edfFileName, CodePerfTracker t)"
+  - com.xilinx.rapidwright.design.Design "public void detachNetlist(Predicate<Cell> preserveCellProperties)"
+  - com.xilinx.rapidwright.device.BEL "public static BEL getBEL(Device device, SiteTypeEnum siteTypeEnum, String belName)"
+  - com.xilinx.rapidwright.device.PIP "public boolean isArcInverted()"
+  - com.xilinx.rapidwright.device.PIP "public void setIsLogicalDriver(boolean isLogicalDriver)"
+  - com.xilinx.rapidwright.device.SitePIP "public int getIndex()"
+  - com.xilinx.rapidwright.device.SitePIP "public static SitePIP getSitePIP(Device device, SiteTypeEnum siteTypeEnum, int sitePIPIndex)"
+
+
 ============= RapidWright 2023.2.1-beta released on 2023-01-10 ================
 Notes:
   - Add EDIFHierCellInst.isUniquified() (#918)
