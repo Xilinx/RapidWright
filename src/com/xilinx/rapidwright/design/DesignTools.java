@@ -687,14 +687,13 @@ public class DesignTools {
                 RAMB18S("RAMB18s"),
                 DSPS("DSPs");
                 */
-
-                if (isBELAReg(c.getBELName())) {
+                String belName = c.getBELName();
+                if (isBELAReg(belName)) {
                     incrementUtilType(map, UtilizationType.CLB_REGS);
                     incrementUtilType(map, UtilizationType.REGS_AS_FFS);
-                } else if (c.getBELName().contains("CARRY")) {
+                } else if (belName != null && belName.contains("CARRY")) {
                     incrementUtilType(map, UtilizationType.CARRY8S);
                 }
-
             }
             for (char letter : LUTTools.lutLetters) {
                 Cell c5 = si.getCell(letter +"5LUT");
@@ -715,9 +714,6 @@ public class DesignTools {
                 }
             }
         }
-
-
-
         return map;
     }
 
