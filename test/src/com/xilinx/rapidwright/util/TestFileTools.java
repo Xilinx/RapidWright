@@ -129,8 +129,7 @@ public class TestFileTools {
         if (mode == 0) {
             // No compression
             cbuf = ubuf;
-        }
-        else if (mode == 1) {
+        } else if (mode == 1) {
             // Compress using Zstd
             cbuf = Zstd.compress(ubuf);
         } else if (mode == 2) {
