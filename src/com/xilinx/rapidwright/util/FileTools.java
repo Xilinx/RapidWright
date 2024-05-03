@@ -1,7 +1,7 @@
 /*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
  * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -43,6 +43,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.PushbackInputStream;
 import java.io.UncheckedIOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
@@ -339,6 +340,30 @@ public class FileTools {
     public static Input getKryoInputStreamWithoutInflater(InputStream in) {
         return useUnsafeStreams() ? new UnsafeInput(in)
                                   : new Input(in);
+    }
+
+    /**
+     * Creates a new BufferedInputStream that wraps a possibly-compressed input stream.
+     * The first 4 bytes of the input stream are examined for the presence of the Zstandard
+     * magic number and if found, will be decompressed prior to wrapping.
+     *
+     * @param is The input stream to wrap.
+     * @return The created BufferedInputStream.
+     * @throws IOException
+     */
+    public static BufferedInputStream getAutoBufferedInputStream(InputStream is) throws IOException {
+        PushbackInputStream pis = new PushbackInputStream(is, 4);
+        byte[] magic = new byte[4];
+        pis.read(magic);
+        pis.unread(magic);
+        is = pis;
+        if (Byte.toUnsignedInt(magic[3]) == 0xfd &&
+                Byte.toUnsignedInt(magic[2]) == 0x2f &&
+                Byte.toUnsignedInt(magic[1]) == 0xb5 &&
+                Byte.toUnsignedInt(magic[0]) == 0x28) {
+            is = new ZstdInputStream(is);
+        }
+        return new BufferedInputStream(is);
     }
 
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, AMD AEAI CTO Group.
@@ -22,14 +22,19 @@
 
 package com.xilinx.rapidwright.util;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.io.UncheckedIOException;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
+import com.github.luben.zstd.Zstd;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -40,6 +45,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import com.github.luben.zstd.ZstdOutputStream;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.support.StringArrayConverter;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestFileTools {
 
@@ -105,5 +111,51 @@ public class TestFileTools {
         Assertions.assertTrue(FileTools.isFileGzipped(gzipped));
         Assertions.assertFalse(FileTools.isFileGzipped(input));
         Assertions.assertFalse(FileTools.isFileGzipped(zstdFile));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1, 2})
+    public void testGetAutoBufferedInputStream(int mode) throws IOException {
+        byte[] ubuf = new byte[1024];
+        for (int i = 0; i < ubuf.length; i++) {
+            ubuf[i] = (byte) i;
+        }
+
+        PipedInputStream pis = new PipedInputStream(1024);
+        PipedOutputStream pos = new PipedOutputStream();
+        pos.connect(pis);
+
+        byte[] cbuf;
+        if (mode == 0) {
+            // No compression
+            cbuf = ubuf;
+        } else if (mode == 1) {
+            // Compress using Zstd
+            cbuf = Zstd.compress(ubuf);
+        } else if (mode == 2) {
+            // Compress using ZLIB
+            cbuf = new byte[ubuf.length];
+            Deflater def = new Deflater();
+            def.setInput(ubuf);
+            def.finish();
+            def.deflate(cbuf);
+            def.end();
+        } else {
+            throw new RuntimeException();
+        }
+        pos.write(cbuf);
+
+        BufferedInputStream bis = FileTools.getAutoBufferedInputStream(pis);
+        if (mode == 2) {
+            // Compressed using ZLIB -- check that stream is *not* decompressed
+            for (int i = 0; i < cbuf.length; i++) {
+                Assertions.assertEquals(cbuf[i], (byte) bis.read());
+            }
+        } else {
+            // Check that the stream is decompressed
+            for (int i = 0; i < ubuf.length; i++) {
+                Assertions.assertEquals(ubuf[i], (byte) bis.read());
+            }
+        }
     }
 }
