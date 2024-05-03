@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Advanced Micro Devices, Inc.
@@ -27,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Fri Oct 20 21:29:57 2023
+ * Generated on: Wed May 01 19:03:12 MDT 2024
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  *
  * Set of all Supported Xilinx families in RapidWright
@@ -40,6 +40,7 @@ public enum FamilyType {
         ARTIX7L,
         ARTIXUPLUS,
         ASPARTAN7,
+        AVERSALAIEDGE,
         AZYNQ,
         AZYNQUPLUS,
         KINTEX7,
@@ -74,7 +75,6 @@ public enum FamilyType {
         VIRTEXUPLUS,
         VIRTEXUPLUS58G,
         VIRTEXUPLUSHBM,
-        VIRTEXUPLUSHBMES1,
         ZYNQ,
         ZYNQUPLUS,
         ZYNQUPLUSRFSOC,
