@@ -566,8 +566,8 @@ public abstract class BlockPlacer2<ModuleT, ModuleInstT extends AbstractModuleIn
         for (int inner_iterate = 0; inner_iterate< maxInnerIteration; inner_iterate++) {
         //for (int inner_iterate = 0; inner_iterate< (10*rangeLimit); inner_iterate++) {
         //for (int inner_iterate = 0; inner_iterate< (dev.getColumns()*dev.getRows()); inner_iterate++) {
-            //ModuleInstT selectedHD = hardMacros.get(rand.nextInt(hardMacros.size()-1));
-            ModuleInstT selectedHD = weighted.get(rand.nextInt(weighted.size()-1));
+            //ModuleInstT selectedHD = hardMacros.get(rand.nextInt(hardMacros.size()));
+            ModuleInstT selectedHD = weighted.get(rand.nextInt(weighted.size()));
 
 
             if (PARANOID) {
