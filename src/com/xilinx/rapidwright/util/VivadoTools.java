@@ -110,7 +110,7 @@ public class VivadoTools {
             throw new RuntimeException(
                     "ERROR: Could not find vivado executable, current PATH=" + System.getenv("PATH"));
         }
-        final String vivadoCmd = "vivado -log " + outputLog.toString() + " -nojournal -mode batch -source "
+        final String vivadoCmd = FileTools.getVivadoPath() + " -log " + outputLog.toString() + " -nojournal -mode batch -source "
                 + tclScript.toString();
         Integer exitCode = FileTools.runCommand(vivadoCmd, verbose, environ, runDir);
         if (exitCode != 0) {
@@ -306,9 +306,9 @@ public class VivadoTools {
     private static String createTclDCPLoadCommand(Path dcp, boolean encrypted) {
         if (encrypted) {
             Path tclFileName = FileTools.replaceExtension(dcp.getFileName(), EDIFTools.LOAD_TCL_SUFFIX);
-            return "source " + tclFileName + "; ";
+            return "source {" + tclFileName + "}; ";
         } else {
-            return "open_checkpoint " + dcp + "; ";
+            return "open_checkpoint {" + dcp + "}; ";
         }
     }
 
