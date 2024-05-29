@@ -23,22 +23,23 @@
 
 package com.xilinx.rapidwright.interchange;
 
-import org.capnproto.MessageBuilder;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellBelMapping;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.CellBelPinEntry;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.ParameterCellBelPinMaps;
+import org.capnproto.MessageBuilder;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestCellBELMappings {
 
-    @Test
-    public void testCellBELPinMappings() {
+    @ParameterizedTest
+    @ValueSource(strings = {"xcau10p", "xc7a15t"})
+    public void testCellBELPinMappings(String deviceName) {
         StringEnumerator allStrings = new StringEnumerator();
         MessageBuilder message = new MessageBuilder();
-        Device device = Device.getDevice(TestDeviceResources.TEST_DEVICE);
+        Device device = Device.getDevice(deviceName);
         DeviceResources.Device.Builder devBuilder = message.initRoot(DeviceResources.Device.factory);
         EnumerateCellBelMapping.populateAllPinMappings(device.getName(), device, devBuilder, allStrings);
 
