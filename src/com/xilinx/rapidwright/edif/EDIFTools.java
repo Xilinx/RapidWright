@@ -1021,7 +1021,7 @@ public class EDIFTools {
                                                             Path dcpFileName, String partName) {
         ArrayList<String> lines = new ArrayList<String>();
         for (String cellName : edif.getEncryptedCells()) {
-            lines.add("read_edif " + cellName);
+            lines.add(EDIFNetlist.READ_EDIF_CMD + " " + cellName);
         }
         Path pathDCPFileName = dcpFileName.toAbsolutePath();
 
