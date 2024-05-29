@@ -1021,11 +1021,11 @@ public class EDIFTools {
                                                             Path dcpFileName, String partName) {
         ArrayList<String> lines = new ArrayList<String>();
         for (String cellName : edif.getEncryptedCells()) {
-            lines.add(EDIFNetlist.READ_EDIF_CMD + " " + cellName);
+            lines.add(EDIFNetlist.READ_EDIF_CMD + " {" + cellName + "}");
         }
         Path pathDCPFileName = dcpFileName.toAbsolutePath();
 
-        lines.add("read_checkpoint " + pathDCPFileName);
+        lines.add("read_checkpoint {" + pathDCPFileName + "}");
         lines.add("set_property top "+edif.getName()+" [current_fileset]");
         lines.add("link_design -part " + partName);
         Path tclFileName = FileTools.replaceExtension(pathDCPFileName.getFileName(), LOAD_TCL_SUFFIX);
