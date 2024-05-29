@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -22,30 +22,6 @@
  */
 
 package com.xilinx.rapidwright.interchange;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Queue;
-import java.util.Set;
-import java.util.TreeSet;
-
-import org.capnproto.MessageBuilder;
-import org.capnproto.PrimitiveList;
-import org.capnproto.PrimitiveList.Int;
-import org.capnproto.StructList;
-import org.capnproto.Text;
-import org.capnproto.TextList;
-import org.capnproto.Void;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
@@ -99,8 +75,34 @@ import com.xilinx.rapidwright.interchange.DeviceResources.Device.TileType;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
+import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.Pair;
+import org.capnproto.MessageBuilder;
+import org.capnproto.PrimitiveList;
+import org.capnproto.PrimitiveList.Int;
+import org.capnproto.StructList;
+import org.capnproto.Text;
+import org.capnproto.TextList;
+import org.capnproto.Void;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Queue;
+import java.util.Set;
+import java.util.TreeSet;
 
 public class DeviceResourcesWriter {
     private static StringEnumerator allStrings;
@@ -688,6 +690,9 @@ public class DeviceResourcesWriter {
         StructList.Builder<TileType.Builder> tileTypesList = devBuilder.initTileTypeList(tileTypes.size());
 
         Map<TileTypeEnum, Integer> tileTypeIndicies = new HashMap<TileTypeEnum, Integer>();
+        Map<Float, Integer> slowTypDelayIndices = new HashMap<>();
+        // Make the zero index no delay
+        slowTypDelayIndices.put(0f, 0);
 
         int i=0;
         for (Entry<TileTypeEnum,Tile> e : tileTypes.entrySet()) {
@@ -727,6 +732,12 @@ public class DeviceResourcesWriter {
 
             // pips
             ArrayList<PIP> pips = tile.getPIPs();
+            DelayEstimatorBase delayEstimator = null;
+            if (device.getSeries() == Series.UltraScalePlus) {
+                // Timing model only supports UltraScalePlus currently
+                boolean useUTurnNodes = true;
+                delayEstimator = new DelayEstimatorBase(device, new InterconnectInfo(), useUTurnNodes, 0);
+            }
             StructList.Builder<DeviceResources.Device.PIP.Builder> pipBuilders =
                     tileType.initPips(pips.size());
             for (int j=0; j < pips.size(); j++) {
@@ -772,8 +783,32 @@ public class DeviceResourcesWriter {
                         k++;
                     }
                 }
+
+                if (delayEstimator != null) {
+                    Node startNode = pip.getStartNode();
+                    if (!pip.getStartNode().isTied()) {
+                        Node endNode = pip.getEndNode();
+                        float delay = RouterHelper.computeNodeDelay(delayEstimator, endNode);
+                        delay += DelayEstimatorBase.getExtraDelay(endNode, DelayEstimatorBase.isLong(startNode));
+                        if (delay != 0) {
+                            int index = slowTypDelayIndices.computeIfAbsent(delay, (v) -> slowTypDelayIndices.size());
+                            pipBuilder.setTiming(index);
+                        }
+                    }
+                }
             }
+
             i++;
+        }
+
+        StructList.Builder<DeviceResources.Device.PIPTiming.Builder> pipTimingsBuilder = devBuilder.initPipTimings(slowTypDelayIndices.size());
+        for (Map.Entry<Float,Integer> e : slowTypDelayIndices.entrySet()) {
+            float slowTypDelay = e.getKey();
+            int index = e.getValue();
+            DeviceResources.Device.PIPTiming.Builder timingBuilder = pipTimingsBuilder.get(index);
+            DeviceResources.Device.CornerModel.Builder delayBuilder = timingBuilder.initInternalDelay();
+            DeviceResources.Device.CornerModelValues.Builder slowBuilder = delayBuilder.initSlow().initSlow();
+            slowBuilder.initTyp().setTyp(slowTypDelay);
         }
 
         return tileTypeIndicies;
@@ -847,7 +882,6 @@ public class DeviceResourcesWriter {
                 devBuilder.initNodes(allNodes.size());
         for (int i=0; i < allNodes.size(); i++) {
             DeviceResources.Device.Node.Builder nodeBuilder = nodeBuilders.get(i);
-            //Node node = allNodes.get(i);
             long nodeKey = allNodes.get(i);
             Node node = Node.getNode(device.getTile((int)(nodeKey >>> 32)), (int)(nodeKey & 0xffffffff));
             Wire[] wires = node.getAllWiresInNode();
