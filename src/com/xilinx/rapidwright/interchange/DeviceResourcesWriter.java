@@ -111,6 +111,8 @@ public class DeviceResourcesWriter {
     private static HashMap<TileTypeEnum,Tile> tileTypes;
     private static HashMap<SiteTypeEnum,Site> siteTypes;
 
+    private static DelayEstimatorBase delayEstimator;
+
     public static void populateSiteEnumerations(SiteInst siteInst, Site site) {
         if (!siteTypes.containsKey(siteInst.getSiteTypeEnum())) {
             if (site.getSiteTypeEnum() != siteInst.getSiteTypeEnum()) {
@@ -278,6 +280,13 @@ public class DeviceResourcesWriter {
         Design design = new Design();
         design.setPartName(part);
         Series series = device.getSeries();
+
+        delayEstimator = null;
+        if (series == Series.UltraScalePlus) {
+            // Timing model only supports UltraScalePlus currently
+            boolean useUTurnNodes = true;
+            delayEstimator = new DelayEstimatorBase(device, new InterconnectInfo(), useUTurnNodes, 0);
+        }
 
         t.start("populateEnums");
         populateEnumerations(design, device);
@@ -690,9 +699,9 @@ public class DeviceResourcesWriter {
         StructList.Builder<TileType.Builder> tileTypesList = devBuilder.initTileTypeList(tileTypes.size());
 
         Map<TileTypeEnum, Integer> tileTypeIndicies = new HashMap<TileTypeEnum, Integer>();
-        Map<Float, Integer> slowTypDelayIndices = new HashMap<>();
+        Map<Float, Integer> slowMaxDelayIndices = new HashMap<>();
         // Make the zero index no delay
-        slowTypDelayIndices.put(0f, 0);
+        slowMaxDelayIndices.put(0f, 0);
 
         int i=0;
         for (Entry<TileTypeEnum,Tile> e : tileTypes.entrySet()) {
@@ -732,12 +741,6 @@ public class DeviceResourcesWriter {
 
             // pips
             ArrayList<PIP> pips = tile.getPIPs();
-            DelayEstimatorBase delayEstimator = null;
-            if (device.getSeries() == Series.UltraScalePlus) {
-                // Timing model only supports UltraScalePlus currently
-                boolean useUTurnNodes = true;
-                delayEstimator = new DelayEstimatorBase(device, new InterconnectInfo(), useUTurnNodes, 0);
-            }
             StructList.Builder<DeviceResources.Device.PIP.Builder> pipBuilders =
                     tileType.initPips(pips.size());
             for (int j=0; j < pips.size(); j++) {
@@ -788,10 +791,12 @@ public class DeviceResourcesWriter {
                     Node startNode = pip.getStartNode();
                     if (!pip.getStartNode().isTied()) {
                         Node endNode = pip.getEndNode();
-                        float delay = RouterHelper.computeNodeDelay(delayEstimator, endNode);
-                        delay += DelayEstimatorBase.getExtraDelay(endNode, DelayEstimatorBase.isLong(startNode));
-                        if (delay != 0) {
-                            int index = slowTypDelayIndices.computeIfAbsent(delay, (v) -> slowTypDelayIndices.size());
+                        boolean includeSegmentation = true;
+                        boolean includeDiscontinuity = false;
+                        float delayPs = RouterHelper.computeNodeDelay(delayEstimator, endNode, includeSegmentation, includeDiscontinuity);
+                        delayPs += DelayEstimatorBase.getExtraDelay(endNode, DelayEstimatorBase.isLong(startNode));
+                        if (delayPs != 0) {
+                            int index = slowMaxDelayIndices.computeIfAbsent(delayPs, (v) -> slowMaxDelayIndices.size());
                             pipBuilder.setTiming(index);
                         }
                     }
@@ -801,14 +806,14 @@ public class DeviceResourcesWriter {
             i++;
         }
 
-        StructList.Builder<DeviceResources.Device.PIPTiming.Builder> pipTimingsBuilder = devBuilder.initPipTimings(slowTypDelayIndices.size());
-        for (Map.Entry<Float,Integer> e : slowTypDelayIndices.entrySet()) {
-            float slowTypDelay = e.getKey();
+        StructList.Builder<DeviceResources.Device.PIPTiming.Builder> pipTimingsBuilder = devBuilder.initPipTimings(slowMaxDelayIndices.size());
+        for (Map.Entry<Float,Integer> e : slowMaxDelayIndices.entrySet()) {
+            float slowMaxDelayPs = e.getKey();
             int index = e.getValue();
             DeviceResources.Device.PIPTiming.Builder timingBuilder = pipTimingsBuilder.get(index);
             DeviceResources.Device.CornerModel.Builder delayBuilder = timingBuilder.initInternalDelay();
             DeviceResources.Device.CornerModelValues.Builder slowBuilder = delayBuilder.initSlow().initSlow();
-            slowBuilder.initTyp().setTyp(slowTypDelay);
+            slowBuilder.initMax().setMax(slowMaxDelayPs * 1e-12f);
         }
 
         return tileTypeIndicies;
@@ -878,6 +883,10 @@ public class DeviceResourcesWriter {
             wireBuilder.setType(wire.getIntentCode().ordinal());
         }
 
+        Map<Float, Integer> slowMaxDelayIndices = new HashMap<>();
+        // Make the zero index no delay
+        slowMaxDelayIndices.put(0f, 0);
+
         StructList.Builder<DeviceResources.Device.Node.Builder> nodeBuilders =
                 devBuilder.initNodes(allNodes.size());
         for (int i=0; i < allNodes.size(); i++) {
@@ -889,6 +898,26 @@ public class DeviceResourcesWriter {
             for (int k=0; k < wires.length; k++) {
                 wBuilders.set(k, allWires.getIndex(makeKey(wires[k].getTile(), wires[k].getWireIndex())));
             }
+
+            if (delayEstimator != null && !node.isTied()) {
+                boolean includeSegmentation = false;
+                boolean includeDiscontinuity = true;
+                float delayPs = RouterHelper.computeNodeDelay(delayEstimator, node, includeSegmentation, includeDiscontinuity);
+                if (delayPs != 0) {
+                    int index = slowMaxDelayIndices.computeIfAbsent(delayPs, (v) -> slowMaxDelayIndices.size());
+                    nodeBuilder.setNodeTiming(index);
+                }
+            }
+        }
+
+        StructList.Builder<DeviceResources.Device.NodeTiming.Builder> nodeTimingsBuilder = devBuilder.initNodeTimings(slowMaxDelayIndices.size());
+        for (Map.Entry<Float,Integer> e : slowMaxDelayIndices.entrySet()) {
+            float slowMaxDelayPs = e.getKey();
+            int index = e.getValue();
+            DeviceResources.Device.NodeTiming.Builder timingBuilder = nodeTimingsBuilder.get(index);
+            DeviceResources.Device.CornerModel.Builder delayBuilder = timingBuilder.initResistance(); // FIXME
+            DeviceResources.Device.CornerModelValues.Builder slowBuilder = delayBuilder.initSlow().initSlow();
+            slowBuilder.initMax().setMax(slowMaxDelayPs * 1e-12f);
         }
     }
     private static void populatePackages(StringEnumerator allStrings, Device device, DeviceResources.Device.Builder devBuilder) {
