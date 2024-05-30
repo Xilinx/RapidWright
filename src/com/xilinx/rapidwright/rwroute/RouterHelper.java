@@ -580,15 +580,17 @@ public class RouterHelper {
      * @param node The node in question.
      * @return The delay of the node.
      */
-    public static short computeNodeDelay(DelayEstimatorBase estimator, Node node, boolean includeSegmentation, boolean includeDiscontinuity) {
+    public static short computeNodeDelay(DelayEstimatorBase estimator, Node node, boolean includeBase, boolean includeDiscontinuity) {
         if (RouteNode.isExitNode(node)) {
-            return estimator.getDelayOf(node, includeSegmentation, includeDiscontinuity);
+            return estimator.getDelayOf(node, includeBase, includeDiscontinuity);
         }
         return 0;
     }
 
     public static short computeNodeDelay(DelayEstimatorBase estimator, Node node) {
-        return computeNodeDelay(estimator, node, true, true);
+        boolean includeBase = true;
+        boolean includeDiscontinuity = true;
+        return computeNodeDelay(estimator, node, includeBase, includeDiscontinuity);
     }
 
     /**

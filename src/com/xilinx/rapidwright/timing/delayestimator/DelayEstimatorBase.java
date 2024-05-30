@@ -119,15 +119,15 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
         return 0;
     }
 
-    public short getDelayOf(Node exitNode, boolean includeSegmentation, boolean includeDiscontinuity) {
+    public short getDelayOf(Node exitNode, boolean includeBase, boolean includeDiscontinuity) {
         TermInfo termInfo = getTermInfo(exitNode);
 
         // Don't put this in calcTimingGroupDelay because it is called many times to estimate delay.
-        if (termInfo.ng == T.NodeGroupType.CLE_IN) {
+        if (includeBase && termInfo.ng == T.NodeGroupType.CLE_IN) {
             return inputSitePinDelay.getOrDefault(exitNode.getWireName(), (short) 0);
         }
 
-        return calcNodeGroupDelay(termInfo.ng, termInfo.begin(), termInfo.end(), includeSegmentation, includeDiscontinuity);
+        return calcNodeGroupDelay(termInfo.ng, termInfo.begin(), termInfo.end(), includeBase, includeDiscontinuity);
     }
 
 
@@ -429,13 +429,13 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
      * @return delay of the tg. When useUTurnNodes was set to false, return Short.MAX_VALUE/2 if the node graph is a U-turn.
      *         to indicate the node graph should be ignored.
      */
-    short calcNodeGroupDelay(T.NodeGroupType tg, short begLoc, short endLoc, boolean includeSegmentation, boolean includeDiscontinuity) {
-        short segDelay = (includeSegmentation) ? calcNodeSegmentationDelay(tg) : 0;
+    short calcNodeGroupDelay(T.NodeGroupType tg, short begLoc, short endLoc, boolean includeBase, boolean includeDiscontinuity) {
+        short segDelay = (includeBase) ? calcNodeBaseDelay(tg) : 0;
         short disDelay = (includeDiscontinuity) ? calcNodeDiscontinuityDelay(tg, begLoc, endLoc) : 0;
         return (short) (segDelay + disDelay);
     }
 
-    short calcNodeSegmentationDelay(T.NodeGroupType tg) {
+    short calcNodeBaseDelay(T.NodeGroupType tg) {
         float k0 = K0.get(tg.orientation()).get(tg.type());
         float k1 = K1.get(tg.orientation()).get(tg.type());
         short l  = L .get(tg.orientation()).get(tg.type());

@@ -791,9 +791,9 @@ public class DeviceResourcesWriter {
                     Node startNode = pip.getStartNode();
                     if (!pip.getStartNode().isTied()) {
                         Node endNode = pip.getEndNode();
-                        boolean includeSegmentation = true;
+                        boolean includeBase = true;
                         boolean includeDiscontinuity = false;
-                        float delayPs = RouterHelper.computeNodeDelay(delayEstimator, endNode, includeSegmentation, includeDiscontinuity);
+                        float delayPs = RouterHelper.computeNodeDelay(delayEstimator, endNode, includeBase, includeDiscontinuity);
                         delayPs += DelayEstimatorBase.getExtraDelay(endNode, DelayEstimatorBase.isLong(startNode));
                         if (delayPs != 0) {
                             int index = slowMaxDelayIndices.computeIfAbsent(delayPs, (v) -> slowMaxDelayIndices.size());
@@ -900,9 +900,9 @@ public class DeviceResourcesWriter {
             }
 
             if (delayEstimator != null && !node.isTied()) {
-                boolean includeSegmentation = false;
+                boolean incldueBase = false;
                 boolean includeDiscontinuity = true;
-                float delayPs = RouterHelper.computeNodeDelay(delayEstimator, node, includeSegmentation, includeDiscontinuity);
+                float delayPs = RouterHelper.computeNodeDelay(delayEstimator, node, incldueBase, includeDiscontinuity);
                 if (delayPs != 0) {
                     int index = slowMaxDelayIndices.computeIfAbsent(delayPs, (v) -> slowMaxDelayIndices.size());
                     nodeBuilder.setNodeTiming(index);
@@ -915,9 +915,11 @@ public class DeviceResourcesWriter {
             float slowMaxDelayPs = e.getKey();
             int index = e.getValue();
             DeviceResources.Device.NodeTiming.Builder timingBuilder = nodeTimingsBuilder.get(index);
-            DeviceResources.Device.CornerModel.Builder delayBuilder = timingBuilder.initResistance(); // FIXME
-            DeviceResources.Device.CornerModelValues.Builder slowBuilder = delayBuilder.initSlow().initSlow();
-            slowBuilder.initMax().setMax(slowMaxDelayPs * 1e-12f);
+            // Delay represented as T = R * C where R = <delay in ps> and C = 1e-12 (1 ps)
+            DeviceResources.Device.CornerModelValues.Builder resBuilder = timingBuilder.initResistance().initSlow().initSlow();
+            resBuilder.initMax().setMax(slowMaxDelayPs);
+            DeviceResources.Device.CornerModelValues.Builder capBuilder = timingBuilder.initCapacitance().initSlow().initSlow();
+            capBuilder.initMax().setMax(1e-12f);
         }
     }
     private static void populatePackages(StringEnumerator allStrings, Device device, DeviceResources.Device.Builder devBuilder) {
