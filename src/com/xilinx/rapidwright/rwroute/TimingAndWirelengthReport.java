@@ -188,6 +188,7 @@ public class TimingAndWirelengthReport{
         DesignTools.createMissingSitePinInsts(design);
         RWRouteConfig config = new RWRouteConfig(new String[0]);
         config.setTimingDriven(true);
+        config.setUseUTurnNodes(true);
         final boolean isPartialRouting = false;
         TimingAndWirelengthReport reporter = new TimingAndWirelengthReport(design, config, isPartialRouting);
         reporter.computeStatisticsAndReport();
