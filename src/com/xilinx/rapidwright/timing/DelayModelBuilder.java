@@ -37,7 +37,7 @@ import java.util.List;
  * Never construct DelayModel directly. DelayModelBuilder guarantees that there is at most one DelayModel
  * ie., DelayModelBuilder returns the existing model.
  */
-class DelayModelBuilder {
+public class DelayModelBuilder {
 
     // Adding new mode or source requires appending them to the end of valid_mode or valid_source.
     // Never change the order of existing entries.

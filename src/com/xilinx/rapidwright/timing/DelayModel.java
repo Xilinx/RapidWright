@@ -25,8 +25,6 @@
 package com.xilinx.rapidwright.timing;
 
 
-import java.util.List;
-
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 
 
@@ -79,7 +77,7 @@ public interface DelayModel {
      * @return Logic delay in ps. Return -1 if the connection does not exist.
      * @throws  IllegalArgumentException if the given bel is not recognized by the model.
      */
-    public short getLogicDelay(short belIdx, String frBelPin, String toBelPin, int encodedConfig);
+    public Short getLogicDelay(short belIdx, String frBelPin, String toBelPin, int encodedConfig);
 
     /**
      * Get the delay between input and output pins of a bel.
@@ -90,7 +88,7 @@ public interface DelayModel {
      * @return Logic delay in ps. Return -1 if the connection does not exist.
      * @throws  IllegalArgumentException if the given bel is not recognized by the model.
      */
-     public short getLogicDelay(short belIdx, String frBelPin, String toBelPin);
+     public Short getLogicDelay(short belIdx, String frBelPin, String toBelPin);
 
      /**
       * TODO - Revisit this as part of the DelayModel
@@ -105,7 +103,7 @@ public interface DelayModel {
       * @param belName Name of the BEL
       * @return The unique BEL timing model index
       */
-     public short getBELIndex(String belName);
+     public Short getBELIndex(String belName);
 }
 
 

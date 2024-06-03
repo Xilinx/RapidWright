@@ -77,6 +77,8 @@ import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.timing.DelayModel;
+import com.xilinx.rapidwright.timing.DelayModelBuilder;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.Pair;
@@ -112,6 +114,7 @@ public class DeviceResourcesWriter {
     private static HashMap<SiteTypeEnum,Site> siteTypes;
 
     private static DelayEstimatorBase delayEstimator;
+    private static DelayModel intrasiteAndLogicDelayModel;
 
     public static void populateSiteEnumerations(SiteInst siteInst, Site site) {
         if (!siteTypes.containsKey(siteInst.getSiteTypeEnum())) {
@@ -286,6 +289,8 @@ public class DeviceResourcesWriter {
             // Timing model only supports UltraScalePlus currently
             boolean useUTurnNodes = true;
             delayEstimator = new DelayEstimatorBase(device, new InterconnectInfo(), useUTurnNodes, 0);
+            String seriesName = design.getDevice().getSeries().name().toLowerCase();
+            intrasiteAndLogicDelayModel = DelayModelBuilder.getDelayModel(seriesName);
         }
 
         t.start("populateEnums");
@@ -488,7 +493,7 @@ public class DeviceResourcesWriter {
         }
 
         t.stop().start("Cell <-> BEL pin map");
-        EnumerateCellBelMapping.populateAllPinMappings(part, device, devBuilder, allStrings);
+        EnumerateCellBelMapping.populateAllPinMappings(part, device, devBuilder, allStrings, intrasiteAndLogicDelayModel);
 
         t.stop().start("Packages");
         populatePackages(allStrings, device, devBuilder);
@@ -640,8 +645,24 @@ public class DeviceResourcesWriter {
             for (int j=0; j < allSitePIPs.length; j++) {
                 DeviceResources.Device.SitePIP.Builder spBuilder = spBuilders.get(j);
                 SitePIP sitePIP = allSitePIPs[j];
-                spBuilder.setInpin(allBELPins.getIndex(sitePIP.getInputPin()));
-                spBuilder.setOutpin(allBELPins.getIndex(sitePIP.getOutputPin()));
+                BELPin inputPin = sitePIP.getInputPin();
+                spBuilder.setInpin(allBELPins.getIndex(inputPin));
+                BELPin outputPin = sitePIP.getOutputPin();
+                spBuilder.setOutpin(allBELPins.getIndex(outputPin));
+
+                // Write out delay of SitePIP
+                if (intrasiteAndLogicDelayModel != null) {
+                    BELPin frBelPin = inputPin.getSourcePin();
+                    String frBelPinString = (frBelPin.isSitePort() ? "" : frBelPin.getBELName() + "/") + frBelPin.getName();
+                    BELPin toBelPin = outputPin.getSiteConns().get(0);
+                    String toBelPinString = (toBelPin.isSitePort() ? "" : toBelPin.getBELName() + "/") + toBelPin.getName();
+                    Short delayPs = intrasiteAndLogicDelayModel.getIntraSiteDelay(siteInst.getSiteTypeEnum(), frBelPinString, toBelPinString);
+                    if (delayPs != null && delayPs > 0) {
+                        DeviceResources.Device.CornerModel.Builder delayBuilder = spBuilder.initDelay();
+                        DeviceResources.Device.CornerModelValues.Builder slowBuilder = delayBuilder.initSlow().initSlow();
+                        slowBuilder.initMax().setMax(delayPs * 1e-12f);
+                    }
+                }
             }
 
             design.removeSiteInst(siteInst);

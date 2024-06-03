@@ -58,7 +58,7 @@ public class SmallDelayModel implements DelayModel {
         return configCodeMap.getOrDefault(value, 0);
     }
 
-    public short getBELIndex(String belName) {
+    public Short getBELIndex(String belName) {
         return bel2IdxMap.get(belName);
     }
 
@@ -67,7 +67,7 @@ public class SmallDelayModel implements DelayModel {
      */
     public Short getIntraSiteDelay(SiteTypeEnum siteTypeName, String frBelPin, String toBelPin) {
         boolean verbose = false;
-        Short delay = null;
+        Short delay;
         Short idx = site2IdxMap.get(siteTypeName.name());
         if (idx == null) {
             return null;
@@ -78,7 +78,6 @@ public class SmallDelayModel implements DelayModel {
             String key = idx + frBelPin + toBelPin;
             delay = intraSiteDelays.get(key);
             if (delay == null) {
-                delay = -2;
                 if (verbose) {
                     System.out.println("WARNING in SmallDelayModel: Unknown connection to getIntraSiteDelay."
                             + "  site/belName " + siteTypeName + "  frBelPin " + frBelPin + "  toBelPin " + toBelPin);
@@ -91,15 +90,16 @@ public class SmallDelayModel implements DelayModel {
     /**
      *  Implement the method with the same signature defined in DelayModel interface.
      */
-    public short getLogicDelay(short belIdx, String frBelPin, String toBelPin) {
+    public Short getLogicDelay(short belIdx, String frBelPin, String toBelPin) {
         return getLogicDelay(belIdx, frBelPin, toBelPin, 0);
     }
 
     /**
      *  Implement the method with the same signature defined in DelayModel interface.
      */
-    public short getLogicDelay(short belIdx, String frBelPin, String toBelPin, int encodedConfig) {
-        Short delay = -2;
+    public Short getLogicDelay(short belIdx, String frBelPin, String toBelPin, int encodedConfig) {
+        boolean verbose = false;
+        Short delay = null;
 
         // Certain that the following combination do not cause duplication. Otherwise, separators must be added.
         String key = belIdx + frBelPin + toBelPin;
@@ -113,6 +113,11 @@ public class SmallDelayModel implements DelayModel {
                     delay = (short) entry[0];
                     break;
                 }
+            }
+        } else {
+            if (verbose) {
+                System.out.println("WARNING in SmallDelayModel: Unknown connection to getLogicDelay."
+                        + "  belIdx " + belIdx + "  frBelPin " + frBelPin + "  toBelPin " + toBelPin);
             }
         }
         return delay;

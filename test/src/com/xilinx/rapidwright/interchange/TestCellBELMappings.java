@@ -41,7 +41,7 @@ public class TestCellBELMappings {
         MessageBuilder message = new MessageBuilder();
         Device device = Device.getDevice(deviceName);
         DeviceResources.Device.Builder devBuilder = message.initRoot(DeviceResources.Device.factory);
-        EnumerateCellBelMapping.populateAllPinMappings(device.getName(), device, devBuilder, allStrings);
+        EnumerateCellBelMapping.populateAllPinMappings(device.getName(), device, devBuilder, allStrings, null);
 
         boolean foundIDDRS = false;
         boolean foundIDDRR = false;
