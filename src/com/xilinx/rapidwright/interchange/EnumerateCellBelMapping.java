@@ -38,7 +38,6 @@ import java.util.Set;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.timing.DelayModel;
-import com.xilinx.rapidwright.timing.DelayModelBuilder;
 import org.capnproto.MessageBuilder;
 import org.capnproto.StructList;
 

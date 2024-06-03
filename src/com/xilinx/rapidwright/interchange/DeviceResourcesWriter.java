@@ -78,7 +78,7 @@ import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.DelayModel;
-import com.xilinx.rapidwright.timing.DelayModelBuilder;
+import com.xilinx.rapidwright.timing.TimingModel;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.Pair;
@@ -116,6 +116,7 @@ public class DeviceResourcesWriter {
 
     private static DelayEstimatorBase delayEstimator;
     private static DelayModel intrasiteAndLogicDelayModel;
+    private static TimingModel timingModel;
 
     public static void populateSiteEnumerations(SiteInst siteInst, Site site) {
         if (!siteTypes.containsKey(siteInst.getSiteTypeEnum())) {
@@ -290,8 +291,9 @@ public class DeviceResourcesWriter {
             // Timing model only supports UltraScalePlus currently
             boolean useUTurnNodes = true;
             delayEstimator = new DelayEstimatorBase(device, new InterconnectInfo(), useUTurnNodes, 0);
-            String seriesName = design.getDevice().getSeries().name().toLowerCase();
-            intrasiteAndLogicDelayModel = DelayModelBuilder.getDelayModel(seriesName);
+            TimingModel timingModel = new TimingModel(design.getDevice());
+            timingModel.build();
+            intrasiteAndLogicDelayModel = timingModel.getDelayModel();
         }
 
         t.start("populateEnums");

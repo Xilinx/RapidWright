@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2019-2022, Xilinx, Inc.
- * Copyright (c) 2022, 2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Pongstorn Maidee, Xilinx Research Labs.
@@ -37,7 +37,7 @@ import java.util.List;
  * Never construct DelayModel directly. DelayModelBuilder guarantees that there is at most one DelayModel
  * ie., DelayModelBuilder returns the existing model.
  */
-public class DelayModelBuilder {
+class DelayModelBuilder {
 
     // Adding new mode or source requires appending them to the end of valid_mode or valid_source.
     // Never change the order of existing entries.
