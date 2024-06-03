@@ -876,6 +876,7 @@ public class EnumerateCellBelMapping {
                     if (e.secondPin.isInput()) {
                         type = DeviceResources.Device.PinsDelayType.SETUP;
                     } else {
+                        assert(e.secondPin.isOutput());
                         type = DeviceResources.Device.PinsDelayType.CLK2Q;
                     }
                 } else {
