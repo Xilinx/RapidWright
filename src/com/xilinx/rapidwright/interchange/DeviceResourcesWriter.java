@@ -82,6 +82,7 @@ import com.xilinx.rapidwright.timing.DelayModelBuilder;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.Utils;
 import org.capnproto.MessageBuilder;
 import org.capnproto.PrimitiveList;
 import org.capnproto.PrimitiveList.Int;
@@ -816,6 +817,25 @@ public class DeviceResourcesWriter {
                         boolean includeDiscontinuity = false;
                         float delayPs = RouterHelper.computeNodeDelay(delayEstimator, endNode, includeBase, includeDiscontinuity);
                         delayPs += DelayEstimatorBase.getExtraDelay(endNode, DelayEstimatorBase.isLong(startNode));
+                        if (pip.isRouteThru()) {
+                            if (Utils.isCLB(pip.getTile().getTileTypeEnum())) {
+                                // Site port to cell
+                                com.xilinx.rapidwright.device.SitePin fromSitePin = pip.getStartWire().getSitePin();
+                                String fromSitePinName = fromSitePin.getPinName();
+                                assert(fromSitePinName.matches("[A-H][1-6]"));
+                                char lutLetter = fromSitePinName.charAt(0);
+                                char pinNumber = fromSitePinName.charAt(1);
+                                delayPs += intrasiteAndLogicDelayModel.getIntraSiteDelay(SiteTypeEnum.SLICEL, fromSitePinName, lutLetter + "6LUT/A" + pinNumber);
+                                // Through cell
+                                short belIdx = intrasiteAndLogicDelayModel.getBELIndex(lutLetter + "6LUT");
+                                delayPs += intrasiteAndLogicDelayModel.getLogicDelay(belIdx, "A" + pinNumber, "O6");
+                                // Cell to site port
+                                com.xilinx.rapidwright.device.SitePin toSitePin = pip.getEndWire().getSitePin();
+                                String toSitePinName = toSitePin.getPinName();
+                                assert(toSitePinName.matches("[A-H](_O|MUX)"));
+                                delayPs += intrasiteAndLogicDelayModel.getIntraSiteDelay(SiteTypeEnum.SLICEL, lutLetter + "6LUT/O6", toSitePinName);
+                            }
+                        }
                         if (delayPs != 0) {
                             int index = slowMaxDelayIndices.computeIfAbsent(delayPs, (v) -> slowMaxDelayIndices.size());
                             pipBuilder.setTiming(index);
