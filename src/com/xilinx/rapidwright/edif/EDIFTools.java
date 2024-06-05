@@ -912,7 +912,7 @@ public class EDIFTools {
     }
 
     public static Path getEDIFParentDir(Path edifFileName) {
-        Path parent = edifFileName.getParent();
+        Path parent = edifFileName == null ? null : edifFileName.getParent();
         return parent == null ? Paths.get(System.getProperty("user.dir")) : parent;
     }
 
