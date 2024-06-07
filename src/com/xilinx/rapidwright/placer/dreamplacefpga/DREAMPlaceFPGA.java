@@ -34,7 +34,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.interchange.DeviceResourcesExample;
 import com.xilinx.rapidwright.interchange.DeviceResourcesWriter;
 import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.interchange.PhysNetlistReader;
@@ -121,33 +120,6 @@ public class DREAMPlaceFPGA {
 
         return map;
     }
-
-//  {
-//  "interchange_netlist" : "/group/zircon2/zhixiong/ispd2016/FPGA01/design.netlist",
-//  "interchange_device" : "/group/zircon2/zhixiong/RapidWright/device_interchange_files/xcvu095-ffva2104-2-e.device",
-//  "io_pl": "/group/zircon2/zhixiong/ispd2016/FPGA01/design.pl",
-//  "gpu" : 0,
-//  "num_bins_x" : 512,
-//  "num_bins_y" : 512,
-//  "global_place_stages" : [
-//      {"num_bins_x" : 512, "num_bins_y" : 512, "iteration" : 2000, "learning_rate" : 0.01, "wirelength" : "weighted_average", "optimizer" : "nesterov"}
-//  ],
-//  "target_density" : 1.0,
-//  "density_weight" : 8e-5,
-//  "random_seed" : 1000,
-//  "scale_factor" : 1.0,
-//  "global_place_flag" : 1,
-//  "place_sol" : "/group/zircon2/zhixiong/DREAMPlaceFPGA/results_interchange/FPGA01.final.pl",
-//  "routability_opt_flag": 1,
-//  "legalize_flag" : 1,
-//  "detailed_place_flag" : 0,
-//  "dtype" : "float32",
-//  "plot_flag" : 0,
-//  "num_threads" : 1,
-//  "deterministic_flag" : 1,
-//  "enable_if" : 1,
-//  "enable_site_routing" : 1
-//  }
 
     public static void writeJSONForDREAMPlaceFPGA(Path jsonPath, Map<String, Object> attributes) {
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(jsonPath.toFile()))) {
