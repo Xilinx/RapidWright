@@ -897,7 +897,7 @@ public class EDIFNetlist extends EDIFName {
      * @param name the hierarchical name
      * @return A pair of EdifHierCellInst and the unmatched portion of the name. The name may be null if we found a complete match
      */
-    private Pair<List<EDIFCellInst>, String> getHierObject(String name) {
+    public Pair<List<EDIFCellInst>, String> getHierObject(String name) {
         if (name.isEmpty()) return new Pair<>(Collections.singletonList(getTopCellInst()), null);
         String[] parts = name.split(EDIFTools.EDIF_HIER_SEP);
 
