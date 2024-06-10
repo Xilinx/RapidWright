@@ -1832,8 +1832,9 @@ public class FileTools {
      *         otherwise.
      */
     public static boolean isVivadoAtLeastVersion(int major, int minor) {
-        String vivadoVersion = getVivadoVersion().replace("v", "");
+        String vivadoVersion = getVivadoVersion();
         if (vivadoVersion != null) {
+            vivadoVersion = vivadoVersion.replace("v", "");
             int idx = vivadoVersion.indexOf('.');
             int availMajor = Integer.parseInt(vivadoVersion.substring(0, idx));
             int availMinor = Integer.parseInt(vivadoVersion.substring(idx + 1));
