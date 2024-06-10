@@ -84,7 +84,7 @@ public class DREAMPlaceFPGA {
     public static final int RANDOM_SEED_DEFAULT = 1000;
     public static final double SCALE_FACTOR_DEFAULT = 1.0;
     public static final boolean GLOBAL_PLACE_FLAG_DEFAULT = true;
-    public static final boolean ROUTABILITY_OPT_FLAG_DEFAULT = true;
+    public static final boolean ROUTABILITY_OPT_FLAG_DEFAULT = false;
     public static final boolean LEGALIZE_FLAG_DEFAULT = true;
     public static final boolean DETAILED_PLACE_FLAG_DEFAULT = false;
     public static final String DTYPE_DEFAULT = "float32";
