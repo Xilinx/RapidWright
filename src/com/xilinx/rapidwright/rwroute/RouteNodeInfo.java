@@ -135,7 +135,7 @@ public class RouteNodeInfo {
 
             case NODE_PINFEED:
                 BitSet bs = (lagunaI != null) ? lagunaI.get(node.getTile()) : null;
-                if (bs != null && bs.get(node.getWire())) {
+                if (bs != null && bs.get(node.getWireIndex())) {
                     return RouteNodeType.LAGUNA_I;
                 }
                 break;
