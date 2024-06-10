@@ -31,7 +31,6 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFPort;
-import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestPartitionPin {
@@ -51,7 +50,7 @@ public class TestPartitionPin {
         Assertions.assertFalse(ppin.isWireFixed());
         Assertions.assertTrue(ppin.isPort());
         Assertions.assertEquals(node.getTile(), ppin.getTile());
-        Assertions.assertEquals(node.getWire(), ppin.getWireIndex());
+        Assertions.assertEquals(node.getWireIndex(), ppin.getWireIndex());
         Assertions.assertEquals(node.getTile().getName(), ppin.getTileName());
         Assertions.assertEquals(node.getWireName(), ppin.getWireName());
     }
@@ -70,7 +69,7 @@ public class TestPartitionPin {
         ppin.setIsWireFixed(false);
         Assertions.assertFalse(ppin.isPort());
         Assertions.assertEquals(node.getTile(), ppin.getTile());
-        Assertions.assertEquals(node.getWire(), ppin.getWireIndex());
+        Assertions.assertEquals(node.getWireIndex(), ppin.getWireIndex());
         Assertions.assertEquals(node.getTile().getName(), ppin.getTileName());
         Assertions.assertEquals(node.getWireName(), ppin.getWireName());
     }

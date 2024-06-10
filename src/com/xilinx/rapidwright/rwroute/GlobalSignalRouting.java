@@ -93,7 +93,7 @@ public class GlobalSignalRouting {
             clkPIPs.addAll(RouterHelper.getPIPsFromNodes(nodes));
 
             Node hDistr = nodes.get(nodes.size() - 1);
-            RouteNode hdistr = new RouteNode(hDistr.getTile(), hDistr.getWire());
+            RouteNode hdistr = new RouteNode(hDistr.getTile(), hDistr.getWireIndex());
             horDistributionLines.put(getDominateClockRegionOfNode(hDistr), hdistr);
         }
         clk.setPIPs(clkPIPs);
@@ -292,7 +292,7 @@ public class GlobalSignalRouting {
                 throw new RuntimeException("ERROR: No mapped LCB to SitePinInst " + p);
             }
             Node n = lcbCandidates.get(0);
-            RouteNode rn = new RouteNode(n.getTile(), n.getWire());
+            RouteNode rn = new RouteNode(n.getTile(), n.getWireIndex());
             lcbMappings.computeIfAbsent(rn, (k) -> new ArrayList<>()).add(p);
             usedLcbs.add(n);
             lcbCandidates.clear();
@@ -465,7 +465,7 @@ public class GlobalSignalRouting {
                                      Set<LightweightRouteNode> visitedRoutingNodes,
                                      Set<LightweightRouteNode> usedRoutingNodes) {
         Node node = routingNode.getNode();
-        IntentCode ic = node.getTile().getWireIntentCode(node.getWire());
+        IntentCode ic = node.getTile().getWireIntentCode(node.getWireIndex());
         switch(ic) {
             case NODE_GLOBAL_VDISTR:
             case NODE_GLOBAL_HROUTE:

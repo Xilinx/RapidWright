@@ -194,19 +194,19 @@ public class RouteNodeGraph {
             } else if (wireName.startsWith("BYPASS_")) {
                 assert(baseNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
                 assert(baseTile == intTile);
-                assert(wireIndex == baseNode.getWire());
+                assert(wireIndex == baseNode.getWireIndex());
                 // Uphill and downhill are INT_NODE_IMUX_* in the target tile and INODE_* to above/below tiles
             } else if (wireName.startsWith("INT_NODE_GLOBAL_")) {
                 assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
                 assert(baseTile == intTile);
-                assert(wireIndex == baseNode.getWire());
+                assert(wireIndex == baseNode.getWireIndex());
                 // Downhill to CTRL_* in the target tile, INODE_* to above/below tile, INT_NODE_IMUX_* in target tile
             } else if (wireName.startsWith("INT_NODE_IMUX_") &&
                     // Do not block INT_NODE_IMUX node accessibility when LUT routethrus are considered
                     !lutRoutethru) {
                 assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
                 assert(baseTile == intTile);
-                assert(wireIndex == baseNode.getWire());
+                assert(wireIndex == baseNode.getWireIndex());
                 // Downhill to BOUNCE_* in the above/below/target tile, BYPASS_* in the base tile, IMUX_* in target tile
             } else if (wireName.startsWith("INODE_")) {
                 assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
@@ -217,7 +217,7 @@ public class RouteNodeGraph {
                 continue;
             }
 
-            wires.set(baseNode.getWire());
+            wires.set(baseNode.getWireIndex());
         }
         accessibleWireOnlyIfAboveBelowTarget.put(intTile.getTileTypeEnum(), wires);
 
@@ -233,7 +233,7 @@ public class RouteNodeGraph {
                     String wireName = clbTile.getWireName(wireIndex);
                     if (wireName.endsWith("MUX")) {
                         assert(Node.getNode(clbTile, wireIndex).getTile() == clbTile &&
-                               Node.getNode(clbTile, wireIndex).getWire() == wireIndex);
+                               Node.getNode(clbTile, wireIndex).getWireIndex() == wireIndex);
                         wires.set(wireIndex);
                     }
                 }
@@ -300,7 +300,7 @@ public class RouteNodeGraph {
                                     }
                                     assert(uphill2.getIntentCode() == IntentCode.NODE_PINFEED);
                                     lagunaI.computeIfAbsent(uphill2Tile, k -> new BitSet())
-                                            .set(uphill2.getWire());
+                                            .set(uphill2.getWireIndex());
                                 }
                             }
                         }
@@ -319,7 +319,7 @@ public class RouteNodeGraph {
     }
 
     protected Net preserve(Node node, Net net) {
-        Net oldNet = preserve(node.getTile(), node.getWire(), net);
+        Net oldNet = preserve(node.getTile(), node.getWireIndex(), net);
         if (oldNet == null) {
             preservedMapSize.incrementAndGet();
         }
@@ -376,7 +376,7 @@ public class RouteNodeGraph {
     }
 
     public boolean unpreserve(Node node) {
-        boolean unpreserved = unpreserve(node.getTile(), node.getWire());
+        boolean unpreserved = unpreserve(node.getTile(), node.getWireIndex());
         if (unpreserved) {
             preservedMapSize.decrementAndGet();
         }
@@ -394,7 +394,7 @@ public class RouteNodeGraph {
 
     public boolean isPreserved(Node node) {
         Tile tile = node.getTile();
-        int wireIndex = node.getWire();
+        int wireIndex = node.getWireIndex();
         Net[] nets = preservedMap.get(tile);
         return nets != null && nets[wireIndex] != null;
     }
@@ -437,7 +437,7 @@ public class RouteNodeGraph {
                     return true;
                 }
                 BitSet bs = lagunaI.get(child.getTile());
-                if (bs == null || !bs.get(child.getWire())) {
+                if (bs == null || !bs.get(child.getWireIndex())) {
                     // Not a LAGUNA_I -- skip it
                     return true;
                 }
@@ -448,7 +448,7 @@ public class RouteNodeGraph {
     }
 
     public Net getPreservedNet(Node node) {
-        return getPreservedNet(node.getTile(), node.getWire());
+        return getPreservedNet(node.getTile(), node.getWireIndex());
     }
 
     private Net getPreservedNet(Tile tile, int wireIndex) {
@@ -459,7 +459,7 @@ public class RouteNodeGraph {
 
     public RouteNode getNode(Node node) {
         Tile tile = node.getTile();
-        int wireIndex = node.getWire();
+        int wireIndex = node.getWireIndex();
         return getNode(tile, wireIndex);
     }
 
@@ -520,7 +520,7 @@ public class RouteNodeGraph {
 
     public RouteNode getOrCreate(Node node, RouteNodeType type) {
         Tile tile = node.getTile();
-        int wireIndex = node.getWire();
+        int wireIndex = node.getWireIndex();
         RouteNode[] rnodes = nodesMap.computeIfAbsent(tile, (t) -> new RouteNode[t.getWireCount()]);
         RouteNode rnode = rnodes[wireIndex];
         if (rnode == null) {
@@ -583,7 +583,7 @@ public class RouteNodeGraph {
         assert(PIP.getArbitraryPIP(head, tail).isRouteThru());
 
         BitSet bs = muxWires.get(tail.getTile().getTileTypeEnum());
-        if (bs != null && bs.get(tail.getWire())) {
+        if (bs != null && bs.get(tail.getWireIndex())) {
             // Disallow * -> [A-H]MUX routethrus since Vivado does not support the LUT
             // being fractured to support more than one routethru net
             return false;
