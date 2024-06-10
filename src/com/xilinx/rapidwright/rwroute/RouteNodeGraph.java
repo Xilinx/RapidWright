@@ -23,6 +23,21 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.BitSet;
+import java.util.Collection;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -38,21 +53,6 @@ import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 import com.xilinx.rapidwright.util.Utils;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.BitSet;
-import java.util.Collection;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Encapsulation of RWRoute's routing resource graph.
@@ -554,7 +554,7 @@ public class RouteNodeGraph {
         Tile childTile = childRnode.getTile();
         TileTypeEnum childTileType = childTile.getTileTypeEnum();
         BitSet bs = accessibleWireOnlyIfAboveBelowTarget.get(childTileType);
-        if (bs == null || !bs.get(childRnode.getWire())) {
+        if (bs == null || !bs.get(childRnode.getWireIndex())) {
             return true;
         }
 
