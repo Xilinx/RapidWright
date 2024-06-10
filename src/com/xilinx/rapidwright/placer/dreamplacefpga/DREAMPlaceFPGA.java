@@ -89,7 +89,7 @@ public class DREAMPlaceFPGA {
     public static final boolean DETAILED_PLACE_FLAG_DEFAULT = false;
     public static final String DTYPE_DEFAULT = "float32";
     public static final boolean PLOT_FLAG_DEFAULT = false;
-    public static final int NUM_THREADS_DEFAULT = 1;
+    public static final int NUM_THREADS_DEFAULT = 8;
     public static final boolean DETERMINISTIC_FLAG_DEFAULT = true;
     public static final boolean ENABLE_IF_DEFAULT = true;
     public static final boolean ENABLE_SITE_ROUTING_DEFAULT = true;
@@ -149,7 +149,7 @@ public class DREAMPlaceFPGA {
 
     }
 
-    public static Design placeDesign(Design design, Path workDir) {
+    public static Design placeDesign(Design design, Path workDir, boolean makeOutOfContext) {
         // Create interchange netlist file
         String interchangeRootFile = workDir.toString() + File.separator + "design";
         Interchange.writeDesignToInterchange(design, interchangeRootFile);
@@ -186,9 +186,14 @@ public class DREAMPlaceFPGA {
 
         // Load placed result
         Design placedDesign = null;
+        String interchangeResultFile = workDir.toString() + File.separator + "results/design/design";
         try {
-            placedDesign = PhysNetlistReader.readPhysNetlist(interchangeRootFile + Interchange.PHYS_NETLIST_EXT,
+            placedDesign = PhysNetlistReader.readPhysNetlist(interchangeResultFile + Interchange.PHYS_NETLIST_EXT,
                     design.getNetlist());
+            if (makeOutOfContext) {
+                placedDesign.setAutoIOBuffers(false);
+                placedDesign.setDesignOutOfContext(true);
+            }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -196,13 +201,27 @@ public class DREAMPlaceFPGA {
     }
 
     public static void main(String[] args) {
-        if (args.length != 2 && args.length != 3) {
-            System.out.println("USAGE: <input DCP> <output DCP> [work_directory]");
+        // Usage: <input DCP> <output DCP> [--out_of_context] [work directory]
+        String MAKE_DCP_OUT_OF_CONTEXT = "--out_of_context";
+        if (args.length != 2 && args.length != 3 && args.length != 4) {
+            System.out.println("USAGE: <input DCP> <output DCP> [" 
+                            + MAKE_DCP_OUT_OF_CONTEXT + "] [work directory]");
             return;
         }
         Design input = Design.readCheckpoint(args[0]);
-        Path workDir = args.length == 3 ? Paths.get(args[2]) : Paths.get(System.getProperty("user.dir"));
-        Design placed = placeDesign(input, workDir);
+
+        boolean makeOutOfContext = false;
+        if (args.length >= 3) {
+            if (args[2].equals(MAKE_DCP_OUT_OF_CONTEXT)) {
+                makeOutOfContext = true;
+            } else {
+                System.out.println("Unrecognized option '" + args[2] + "', did you mean '"
+                                    + MAKE_DCP_OUT_OF_CONTEXT + "'?");
+                System.exit(1);
+            }
+        }
+        Path workDir = args.length == 4 ? Paths.get(args[3]) : Paths.get(System.getProperty("user.dir"));
+        Design placed = placeDesign(input, workDir, makeOutOfContext);
         placed.writeCheckpoint(args[1]);
     }
 }
