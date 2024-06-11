@@ -47,6 +47,7 @@ public class TestDCPWrite {
         Path dcp = dir.resolve("microblazeAndILA_3pblocks_2024.1_postrw.dcp");
         Params.RW_WRITE_DCP_2024_1 = true;
         d.writeCheckpoint(dcp);
+        Params.RW_WRITE_DCP_2024_1 = false;
         Design.readCheckpoint(dcp);
         if (FileTools.isVivadoAtLeastVersion(2024, 1)) {
             VivadoToolsHelper.assertFullyRouted(dcp);
