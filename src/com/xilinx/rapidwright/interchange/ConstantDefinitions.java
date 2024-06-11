@@ -38,28 +38,28 @@ import org.capnproto.StructList.Builder;
 
 import com.xilinx.rapidwright.design.CellPinStaticDefaults;
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.SiteInst;
-import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.Tile;
-import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
-import com.xilinx.rapidwright.interchange.DeviceResources.Device.Constants;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.ConstantType;
-import com.xilinx.rapidwright.interchange.DeviceResources.Device.Constants.SiteConstantSource;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.Constants;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.Constants.CellPinValue;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.Constants.DefaultCellConnection;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.Constants.DefaultCellConnections;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.Constants.NodeConstantSource;
-import com.xilinx.rapidwright.interchange.DeviceResources.Device.WireConstantSources;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.Constants.SiteConstantSource;
 import com.xilinx.rapidwright.interchange.DeviceResources.Device.TileType;
+import com.xilinx.rapidwright.interchange.DeviceResources.Device.WireConstantSources;
 
 public class ConstantDefinitions {
     private Map<Map.Entry<SiteTypeEnum, String>, String> vccBels;
@@ -215,8 +215,8 @@ public class ConstantDefinitions {
                 Node node = Node.getNode(tile, i);
                 if (node == null)
                     continue;
-                if (node.getTile() == tile && node.getWire() == i)
-                    allNodes.add(makeKey(node.getTile(), node.getWire()));
+                if (node.getTile() == tile && node.getWireIndex() == i)
+                    allNodes.add(makeKey(node.getTile(), node.getWireIndex()));
             }
         }
         return allNodes;
@@ -229,7 +229,7 @@ public class ConstantDefinitions {
                 Node node = Node.getNode(tile, i);
                 if (node == null || !node.isTied())
                     continue;
-                if (node.getTile() == tile && node.getWire() == i)
+                if (node.getTile() == tile && node.getWireIndex() == i)
                     allNodes.add(node);
             }
         }
@@ -358,7 +358,7 @@ public class ConstantDefinitions {
         // Count GND and VCC instances
         for (Node tiedNode : allTiedNodes) {
             TileTypeEnum type = tiedNode.getTile().getTileTypeEnum();
-            int wireIdx = tiedNode.getWire();
+            int wireIdx = tiedNode.getWireIndex();
             Map<Integer,int[]> wireMap = tileTiedWires.get(type);
             if (wireMap == null) {
                 wireMap = new HashMap<Integer, int[]>();
@@ -410,7 +410,7 @@ public class ConstantDefinitions {
         for (Node tiedNode : allTiedNodes) {
             TileTypeEnum tileType = tiedNode.getTile().getTileTypeEnum();
             Map<Integer, int[]> wireMap = tileTiedWires.get(tileType);
-            int[] tiedCounters = wireMap.get(tiedNode.getWire());
+            int[] tiedCounters = wireMap.get(tiedNode.getWireIndex());
             if (tiedCounters[UNTIED] > 0) {
                 tiedNodeExceptions.add(tiedNode);
                 continue;
@@ -430,14 +430,14 @@ public class ConstantDefinitions {
                     gndWires = new HashSet<>();
                     gndTiedNodes.put(tileType, gndWires);
                 }
-                gndWires.add(tiedNode.getWire());
+                gndWires.add(tiedNode.getWireIndex());
             } else {
                 Set<Integer> vccWires = vccTiedNodes.get(tileType);
                 if (vccWires == null) {
                     vccWires = new HashSet<>();
                     vccTiedNodes.put(tileType, vccWires);
                 }
-                vccWires.add(tiedNode.getWire());
+                vccWires.add(tiedNode.getWireIndex());
             }
         }
 

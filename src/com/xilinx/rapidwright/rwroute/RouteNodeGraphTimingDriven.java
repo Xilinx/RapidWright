@@ -145,9 +145,9 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
             if (tile.getTileTypeEnum() == TileTypeEnum.INT) {
                 int y = tile.getTileYCoordinate();
                 if ((y-30)%60 == 0) { // above RCLK
-                    return excludeAboveRclk.contains(child.getWire());
+                    return excludeAboveRclk.contains(child.getWireIndex());
                 } else if ((y-29)%60 == 0) { // below RCLK
-                    return excludeBelowRclk.contains(child.getWire());
+                    return excludeBelowRclk.contains(child.getWireIndex());
                 }
             }
         }

@@ -629,7 +629,7 @@ public class UltraScaleClockRouting {
                 currNode = node;
             }
         }
-        RouteNode vrouteUp = currNode != null ? new RouteNode(currNode.getTile(), currNode.getWire()) : null;
+        RouteNode vrouteUp = currNode != null ? new RouteNode(currNode.getTile(), currNode.getWireIndex()) : null;
 
         currNode = null;
         currDelta = Integer.MAX_VALUE;
@@ -641,7 +641,7 @@ public class UltraScaleClockRouting {
                 currNode = node;
             }
         }
-        RouteNode vrouteDown = currNode != null ? new RouteNode(currNode.getTile(), currNode.getWire()) : null;
+        RouteNode vrouteDown = currNode != null ? new RouteNode(currNode.getTile(), currNode.getWireIndex()) : null;
 
         // Find the target leaf clock buffers (LCBs), route from horizontal dist lines to those
         Map<RouteNode, List<SitePinInst>> lcbMappings = GlobalSignalRouting.getLCBPinMappings(clkPins, getNodeStatus);

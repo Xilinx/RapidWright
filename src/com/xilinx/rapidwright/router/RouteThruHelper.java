@@ -125,7 +125,7 @@ public class RouteThruHelper {
 
     public boolean isRouteThru(Node start, Node end) {
         Tile tile = end.getTile();
-        int endWire = end.getWire();
+        int endWire = end.getWireIndex();
         Wire[] wiresInStartNode = start.getAllWiresInNode();
         HashSet<Integer> rtPairs = routeThrus.get(tile.getTileTypeEnum());
         if (rtPairs == null) return false;
