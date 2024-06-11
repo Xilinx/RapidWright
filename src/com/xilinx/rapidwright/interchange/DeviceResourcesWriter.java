@@ -824,8 +824,8 @@ public class DeviceResourcesWriter {
                     Node node = wire.getNode();
                     if (node == null)
                         continue;
-                    if (node.getTile() == tile && node.getWire() == i)
-                        allNodes.add(makeKey(node.getTile(), node.getWire()));
+                    if (node.getTile() == tile && node.getWireIndex() == i)
+                        allNodes.add(makeKey(node.getTile(), node.getWireIndex()));
                 }
             }
         }

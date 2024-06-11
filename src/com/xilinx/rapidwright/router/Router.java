@@ -1746,7 +1746,7 @@ public class Router extends AbstractRouter {
             }
 
             Node node = Node.getNode(t,wire);
-            RouteNode n = new RouteNode(node.getTile(),node.getWire());
+            RouteNode n = new RouteNode(node.getTile(),node.getWireIndex());
             Queue<RouteNode> q = new LinkedList<RouteNode>();
             visitedNodes = new HashSet<RouteNode>();
             q.add(n);
@@ -2136,7 +2136,7 @@ public class Router extends AbstractRouter {
         int wire = site.getTileWireIndexFromPinName(pinName);
         if (wire == -1) return null; // Pin is not connected to anything (unbonded IO)
         Node node = Node.getNode(t,wire);
-        RouteNode n = new RouteNode(node.getTile(),node.getWire());
+        RouteNode n = new RouteNode(node.getTile(), node.getWireIndex());
         Queue<RouteNode> q = new LinkedList<RouteNode>();
         q.add(n);
         while (!q.isEmpty()) {

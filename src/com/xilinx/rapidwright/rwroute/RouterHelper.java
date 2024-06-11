@@ -264,7 +264,7 @@ public class RouterHelper {
      * @return The PIP connecting the two nodes.
      */
     public static PIP findPIPbetweenNodes(Node driver, Node load) {
-        PIP pip = getPIP(load.getTile(), driver.getAllWiresInNode(), load.getWire());
+        PIP pip = getPIP(load.getTile(), driver.getAllWiresInNode(), load.getWireIndex());
         if (pip == null) {
             // for other scenarios regarding bidirectional nodes, such as LAG tile nodes, LAG_LAG_X12Y250/LAG_MUX_ATOM_0_TXOUT to node LAG_LAG_X12Y310/UBUMP0
             pip = getPIP(driver, load);
