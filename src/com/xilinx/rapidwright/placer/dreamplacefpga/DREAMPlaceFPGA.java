@@ -37,6 +37,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.interchange.DeviceResourcesWriter;
 import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.interchange.PhysNetlistReader;
+import com.xilinx.rapidwright.interchange.PhysicalNetlistToDcp;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 
@@ -84,12 +85,12 @@ public class DREAMPlaceFPGA {
     public static final int RANDOM_SEED_DEFAULT = 1000;
     public static final double SCALE_FACTOR_DEFAULT = 1.0;
     public static final boolean GLOBAL_PLACE_FLAG_DEFAULT = true;
-    public static final boolean ROUTABILITY_OPT_FLAG_DEFAULT = true;
+    public static final boolean ROUTABILITY_OPT_FLAG_DEFAULT = false;
     public static final boolean LEGALIZE_FLAG_DEFAULT = true;
     public static final boolean DETAILED_PLACE_FLAG_DEFAULT = false;
     public static final String DTYPE_DEFAULT = "float32";
     public static final boolean PLOT_FLAG_DEFAULT = false;
-    public static final int NUM_THREADS_DEFAULT = 1;
+    public static final int NUM_THREADS_DEFAULT = 8;
     public static final boolean DETERMINISTIC_FLAG_DEFAULT = true;
     public static final boolean ENABLE_IF_DEFAULT = true;
     public static final boolean ENABLE_SITE_ROUTING_DEFAULT = true;
@@ -149,7 +150,7 @@ public class DREAMPlaceFPGA {
 
     }
 
-    public static Design placeDesign(Design design, Path workDir) {
+    public static Design placeDesign(Design design, Path workDir, boolean makeOutOfContext) {
         // Create interchange netlist file
         String interchangeRootFile = workDir.toString() + File.separator + "design";
         Interchange.writeDesignToInterchange(design, interchangeRootFile);
@@ -186,9 +187,14 @@ public class DREAMPlaceFPGA {
 
         // Load placed result
         Design placedDesign = null;
+        String interchangeResultFile = workDir.toString() + File.separator + "results/design/design";
         try {
-            placedDesign = PhysNetlistReader.readPhysNetlist(interchangeRootFile + Interchange.PHYS_NETLIST_EXT,
+            placedDesign = PhysNetlistReader.readPhysNetlist(interchangeResultFile + Interchange.PHYS_NETLIST_EXT,
                     design.getNetlist());
+            if (makeOutOfContext) {
+                placedDesign.setAutoIOBuffers(false);
+                placedDesign.setDesignOutOfContext(true);
+            }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -196,13 +202,23 @@ public class DREAMPlaceFPGA {
     }
 
     public static void main(String[] args) {
-        if (args.length != 2 && args.length != 3) {
-            System.out.println("USAGE: <input DCP> <output DCP> [work_directory]");
+        // Usage: <input DCP> <output DCP> [--out_of_context] [work directory]
+        if (args.length < 2 || args.length > 4) {
+            System.out.println("USAGE: <input DCP> <output DCP> [" 
+                            + PhysicalNetlistToDcp.MAKE_DCP_OUT_OF_CONTEXT + "] [work directory]");
             return;
         }
         Design input = Design.readCheckpoint(args[0]);
-        Path workDir = args.length == 3 ? Paths.get(args[2]) : Paths.get(System.getProperty("user.dir"));
-        Design placed = placeDesign(input, workDir);
+
+        boolean makeOutOfContext = false;
+        if (args.length >= 3) {
+            if (args[2].equals(PhysicalNetlistToDcp.MAKE_DCP_OUT_OF_CONTEXT)) {
+                makeOutOfContext = true;
+            } 
+        }
+
+        Path workDir = args.length == 4 ? Paths.get(args[3]) : args.length == 3 && !makeOutOfContext ? Paths.get(args[2]) : Paths.get(System.getProperty("user.dir"));
+        Design placed = placeDesign(input, workDir, makeOutOfContext);
         placed.writeCheckpoint(args[1]);
     }
 }
