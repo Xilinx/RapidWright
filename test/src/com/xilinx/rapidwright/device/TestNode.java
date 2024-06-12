@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Advanced Micro Devices, Inc.
@@ -151,6 +151,13 @@ public class TestNode {
             }
         }
         System.out.println("visited.size() = " + visited.size());
+    }
+
+    @Test
+    public void testGetAllWiresInNode() {
+        Device device = Device.getDevice("xcau10p");
+        Node node = device.getNode("INT_IBRK_FSR2IO_X0Y140/IO_TO_CTR_FT0_3");
+        Assertions.assertEquals(22, node.getAllWiresInNode().length);
     }
 }
 
