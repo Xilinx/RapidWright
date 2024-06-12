@@ -210,7 +210,7 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
     }
 
 
-    public TermInfo getTermInfo(Node node) {
+    private TermInfo getTermInfo(Node node) {
 
         String nodeType = node.getWireName();
         // Based on its name, WW1_E should go be horizontal single. However, it go to the north like NN1_E.

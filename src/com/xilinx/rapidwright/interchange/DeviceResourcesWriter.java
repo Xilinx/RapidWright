@@ -116,7 +116,6 @@ public class DeviceResourcesWriter {
 
     private static DelayEstimatorBase delayEstimator;
     private static DelayModel intrasiteAndLogicDelayModel;
-    private static TimingModel timingModel;
 
     public static void populateSiteEnumerations(SiteInst siteInst, Site site) {
         if (!siteTypes.containsKey(siteInst.getSiteTypeEnum())) {
