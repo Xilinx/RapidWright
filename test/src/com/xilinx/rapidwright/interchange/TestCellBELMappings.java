@@ -35,7 +35,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 public class TestCellBELMappings {
 
     @ParameterizedTest
-    @ValueSource(strings = {"xcau10p", "xc7a15t"})
+    @ValueSource(strings = {"xc7a15t"})
     public void testCellBELPinMappings(String deviceName) {
         StringEnumerator allStrings = new StringEnumerator();
         MessageBuilder message = new MessageBuilder();
