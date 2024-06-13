@@ -152,5 +152,22 @@ public class TestNode {
         }
         System.out.println("visited.size() = " + visited.size());
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            // https://github.com/Xilinx/RapidWright/issues/983
+            "xcvh1782,GTYP_QUAD_SINGLE_X0Y240/GTYP_QUAD_SITE_0_APB3PRDATA_0_"
+    })
+    public void testWireNodeMismatch(String deviceName, String nodeName) {
+        Device device = Device.getDevice(deviceName);
+        Node node = device.getNode(nodeName);
+        Assertions.assertNotNull(node);
+
+        Wire[] allWiresInNode = node.getAllWiresInNode();
+        Assertions.assertNotEquals(0, allWiresInNode.length);
+        for (Wire wire : allWiresInNode) {
+            Assertions.assertEquals(node, wire.getNode());
+        }
+    }
 }
 
