@@ -53,14 +53,13 @@ public interface DelayModel {
     /**
      * Get the delay in ps between two bel pins within the given site name.
      *
-     * @param siteTypeName The name of the site type, such as SLICEL and SLICEM.
+     * @param siteType The SiteTypeEnum of BEL site, such as SLICEL and SLICEM.
      * @param frBelPin The bel pin which is the driver of the connection.  Thus, it must be a bel output pin.
      * The bel name must be included, ie., AFF2/D. An input site pin is considered a valid frBelPin.
      * @param toBelPin The bel pin which is the sink of the connection (a bel input pin, or an output site pin).
-     * @return Intra-site delay in ps. Return -1 if the connection does not exist.
-     * @throws  IllegalArgumentException if the given siteTypeName is not recognized by the model.
+     * @return Intra-site delay in ps. Return null if the connection does not exist.
      */
-    public Short getIntraSiteDelay(SiteTypeEnum siteTypeName, String frBelPin, String toBelPin);
+    public Short getIntraSiteDelay(SiteTypeEnum siteType, String frBelPin, String toBelPin);
 
     /**
      * Get the delay between input and output pins of a bel.
@@ -74,8 +73,7 @@ public interface DelayModel {
      *                Where to get the config's value from the design?
      *                There is no uniform way to find the value. It is to determined per case.
      *                For example, some configs of carry8 is from bel, while some from cell.
-     * @return Logic delay in ps. Return -1 if the connection does not exist.
-     * @throws  IllegalArgumentException if the given bel is not recognized by the model.
+     * @return Logic delay in ps. Return null if the connection does not exist.
      */
     public Short getLogicDelay(short belIdx, String frBelPin, String toBelPin, int encodedConfig);
 
@@ -85,8 +83,7 @@ public interface DelayModel {
      * @param belIdx  The unique BEL timing model index, see {@link #getBELIndex(String)}.
      * @param frBelPin An input bel pin. It must NOT include bel name.
      * @param toBelPin An output bel pin. It must NOT include bel name.
-     * @return Logic delay in ps. Return -1 if the connection does not exist.
-     * @throws  IllegalArgumentException if the given bel is not recognized by the model.
+     * @return Logic delay in ps. Return null if the connection does not exist.
      */
      public Short getLogicDelay(short belIdx, String frBelPin, String toBelPin);
 

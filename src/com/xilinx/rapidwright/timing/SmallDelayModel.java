@@ -65,10 +65,10 @@ public class SmallDelayModel implements DelayModel {
     /**
      *  Implement the method with the same signature defined in DelayModel interface.
      */
-    public Short getIntraSiteDelay(SiteTypeEnum siteTypeName, String frBelPin, String toBelPin) {
+    public Short getIntraSiteDelay(SiteTypeEnum siteType, String frBelPin, String toBelPin) {
         boolean verbose = false;
         Short delay;
-        Short idx = site2IdxMap.get(siteTypeName.name());
+        Short idx = site2IdxMap.get(siteType.name());
         if (idx == null) {
             return null;
 //            throw new IllegalArgumentException("SmallDelayModel: Unknown site/belName to getIntraSiteDelay."
@@ -80,7 +80,7 @@ public class SmallDelayModel implements DelayModel {
             if (delay == null) {
                 if (verbose) {
                     System.out.println("WARNING in SmallDelayModel: Unknown connection to getIntraSiteDelay."
-                            + "  site/belName " + siteTypeName + "  frBelPin " + frBelPin + "  toBelPin " + toBelPin);
+                            + "  site/belName " + siteType + "  frBelPin " + frBelPin + "  toBelPin " + toBelPin);
                 }
             }
         }

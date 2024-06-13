@@ -117,6 +117,8 @@ public class DeviceResourcesWriter {
     private static DelayEstimatorBase delayEstimator;
     private static DelayModel intrasiteAndLogicDelayModel;
 
+    private static final float PICSECONDS_TO_SECONDS = 1e-12f;
+
     public static void populateSiteEnumerations(SiteInst siteInst, Site site) {
         if (!siteTypes.containsKey(siteInst.getSiteTypeEnum())) {
             if (site.getSiteTypeEnum() != siteInst.getSiteTypeEnum()) {
@@ -662,7 +664,7 @@ public class DeviceResourcesWriter {
                     if (delayPs != null && delayPs > 0) {
                         DeviceResources.Device.CornerModel.Builder delayBuilder = spBuilder.initDelay();
                         DeviceResources.Device.CornerModelValues.Builder slowBuilder = delayBuilder.initSlow().initSlow();
-                        slowBuilder.initMax().setMax(delayPs * 1e-12f);
+                        slowBuilder.initMax().setMax(delayPs * PICSECONDS_TO_SECONDS);
                     }
                 }
             }
@@ -855,7 +857,7 @@ public class DeviceResourcesWriter {
             DeviceResources.Device.PIPTiming.Builder timingBuilder = pipTimingsBuilder.get(index);
             DeviceResources.Device.CornerModel.Builder delayBuilder = timingBuilder.initInternalDelay();
             DeviceResources.Device.CornerModelValues.Builder slowBuilder = delayBuilder.initSlow().initSlow();
-            slowBuilder.initMax().setMax(slowMaxDelayPs * 1e-12f);
+            slowBuilder.initMax().setMax(slowMaxDelayPs * PICSECONDS_TO_SECONDS);
         }
 
         return tileTypeIndicies;
@@ -961,7 +963,7 @@ public class DeviceResourcesWriter {
             DeviceResources.Device.CornerModelValues.Builder resBuilder = timingBuilder.initResistance().initSlow().initSlow();
             resBuilder.initMax().setMax(slowMaxDelayPs);
             DeviceResources.Device.CornerModelValues.Builder capBuilder = timingBuilder.initCapacitance().initSlow().initSlow();
-            capBuilder.initMax().setMax(1e-12f);
+            capBuilder.initMax().setMax(PICSECONDS_TO_SECONDS);
         }
     }
     private static void populatePackages(StringEnumerator allStrings, Device device, DeviceResources.Device.Builder devBuilder) {
