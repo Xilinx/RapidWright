@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, 2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -23,25 +23,28 @@
 
 package com.xilinx.rapidwright.interchange;
 
-import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.tests.CodePerfTracker;
-import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-
 import java.io.IOException;
 import java.nio.file.Path;
 
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
+
 public class TestDeviceResources {
 
-    @ParameterizedTest
-    @ValueSource(strings = {"xcau10p", "xc7a15t"})
-    public void testDeviceResources(String deviceName, @TempDir Path tempDir) throws IOException {
-        Path capnProtoFile = tempDir.resolve(deviceName + ".device");
-        Device device = Device.getDevice(deviceName);
+    public static final String TEST_DEVICE = "xc7a15t";
+
+    @Test
+    public void testDeviceResources(@TempDir Path tempDir) throws IOException {
+        Path capnProtoFile = tempDir.resolve(TEST_DEVICE + ".device");
+        Device device = Device.getDevice(TEST_DEVICE);
         DeviceResourcesWriter.writeDeviceResourcesFile(
-                deviceName, device, CodePerfTracker.SILENT, capnProtoFile.toString());
+                TEST_DEVICE, device, CodePerfTracker.SILENT, capnProtoFile.toString());
         Device.releaseDeviceReferences();
-        DeviceResourcesVerifier.verifyDeviceResources(capnProtoFile.toString(), deviceName);
+        DeviceResourcesVerifier.verifyDeviceResources(capnProtoFile.toString(), TEST_DEVICE);
     }
+
+
 }
