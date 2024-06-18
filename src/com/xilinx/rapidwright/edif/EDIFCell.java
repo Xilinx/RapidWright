@@ -489,7 +489,7 @@ public class EDIFCell extends EDIFPropertyObject {
     }
 
     public boolean isStaticSource() {
-        return isPrimitive() && isVCCSource() || isGNDSource();
+        return isPrimitive() && (isVCCSource() || isGNDSource());
     }
 
     public boolean isVCCSource() {
