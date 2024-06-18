@@ -211,4 +211,16 @@ public class TestEDIFTools {
         Assertions.assertNotEquals(newPort2, newPort1);
         Assertions.assertTrue(newPort2.matches(Pattern.quote(slicedPortName) + "_rw_created\\d+"));
     }
+
+    @Test
+    public void testCreateFlatNetlist() {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        EDIFNetlist flatNetlist = EDIFTools.createFlatNetlist(d.getNetlist(), d.getPartName());
+        Assertions.assertTrue(flatNetlist.getHierCellInstFromName("your_program").getCellType().isLeafCellOrBlackBox());
+        Assertions.assertEquals(445, flatNetlist.getAllLeafHierCellInstances().size());
+        flatNetlist.collapseMacroUnisims(d.getDevice().getSeries());
+        Assertions.assertEquals(321, flatNetlist.getAllLeafHierCellInstances().size());
+        boolean includeBlackBoxes = true;
+        Assertions.assertEquals(322, flatNetlist.getAllLeafHierCellInstances(includeBlackBoxes).size());
+    }
 }

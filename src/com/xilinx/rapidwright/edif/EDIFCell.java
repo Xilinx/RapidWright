@@ -488,6 +488,18 @@ public class EDIFCell extends EDIFPropertyObject {
         return getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME) && isLeafCellOrBlackBox();
     }
 
+    public boolean isStaticSource() {
+        return isPrimitive() && (isVCCSource() || isGNDSource());
+    }
+
+    public boolean isVCCSource() {
+        return getName().equals("VCC");
+    }
+
+    public boolean isGNDSource() {
+        return getName().equals("GND");
+    }
+
     public boolean isLeafCellOrBlackBox() {
         return (instances == null || instances.size() == 0) && (nets == null || nets.size() == 0);
     }
