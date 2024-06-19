@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Advanced Micro Devices, Inc.
@@ -33,7 +33,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 
 /**
- * Generated on: Fri Oct 20 23:25:44 2023
+ * Generated on: Wed May 01 19:57:08 MDT 2024
  * by: com.xilinx.rapidwright.release.UnisimParser
  *
  * Enumerates supported Unisim primitives that map to Xilinx devices.
@@ -653,6 +653,7 @@ public enum Unisim {
     ISERDESE2,
     ISERDESE3,
     ISERDES_NODELAY,
+    ISP2,
     JTAG_SIME2,
     KEEPER,
     KEY_CLEAR,
@@ -724,6 +725,7 @@ public enum Unisim {
     MMCME5,
     MMCM_ADV,
     MMCM_BASE,
+    MMI,
     MRMAC,
     MULT18X18,
     MULT18X18S,
@@ -1289,6 +1291,7 @@ public enum Unisim {
     RAMS64E5,
     RFADC,
     RFADC_13B4W_M0,
+    RFADC_13B4W_M1,
     RFDAC,
     RIU_OR,
     ROM128X1,
@@ -1334,6 +1337,7 @@ public enum Unisim {
     USR_ACCESS_VIRTEX6,
     VCC,
     VCU,
+    VCU2,
     VDU,
     X5PHIO_CMUIF,
     X5PHIO_CMU_X32,
