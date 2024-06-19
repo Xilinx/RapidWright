@@ -1569,7 +1569,11 @@ public class DesignTools {
                                     String otherPinName = otherCell.getPinMappingsP2L().keySet().iterator().next();
                                     otherPin = pin.getBEL().getPin(otherPinName);
                                 } else {
-                                    otherPin = LUTTools.getLUTOutputPin(pin.getBEL());
+                                    // Make sure we are coming in on the routed-thru pin
+                                    String otherPinName = otherCell.getPinMappingsP2L().keySet().iterator().next();
+                                    if (pin.getName().equals(otherPinName)) {
+                                        otherPin = LUTTools.getLUTOutputPin(pin.getBEL());
+                                    }
                                 }
                                 if (otherPin != null) {
                                     Net otherNet = siteInst.getNetFromSiteWire(otherPin.getSiteWireName());
@@ -1738,15 +1742,28 @@ public class DesignTools {
         t.stop().start("Remove p&r");
 
         List<EDIFHierCellInst> allLeafs = d.getNetlist().getAllLeafDescendants(hierarchicalCell);
-
-        // Remove all placement and routing information related to the cell to be
-        // blackboxed
+        Set<Cell> cells = new HashSet<>();
         for (EDIFHierCellInst i : allLeafs) {
             // Get the physical cell, make sure we can unplace/unroute it first
             Cell c = d.getCell(i.getFullHierarchicalInstName());
             if (c == null) {
                 continue;
             }
+            cells.add(c);
+        }
+        // Find encrypted cells that need to be removed
+        String name = hierarchicalCell.getFullHierarchicalInstName();
+        if (d.getNetlist().getEncryptedCells().size() > 0) { 
+            for (Cell c : d.getCells()) {
+                if (c.getName().startsWith(name)) {
+                    cells.add(c);
+                }
+            }
+        }
+
+        // Remove all placement and routing information related to the cell to be
+        // blackboxed
+        for (Cell c : cells) {
             BEL bel = c.getBEL();
             SiteInst si = c.getSiteInst();
 
@@ -3967,6 +3984,9 @@ public class DesignTools {
         }
 
         for (SiteInst si : design.getSiteInsts()) {
+            if (si.getSiteName().equals("SLICE_X136Y103")) {
+                System.out.println();
+            }
             if (!Utils.isSLICE(si)) continue;
             boolean bottomUsed = false;
             boolean topUsed = false;
