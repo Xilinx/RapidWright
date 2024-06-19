@@ -3984,9 +3984,6 @@ public class DesignTools {
         }
 
         for (SiteInst si : design.getSiteInsts()) {
-            if (si.getSiteName().equals("SLICE_X136Y103")) {
-                System.out.println();
-            }
             if (!Utils.isSLICE(si)) continue;
             boolean bottomUsed = false;
             boolean topUsed = false;
