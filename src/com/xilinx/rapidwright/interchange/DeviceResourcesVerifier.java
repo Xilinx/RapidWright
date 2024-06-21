@@ -501,6 +501,12 @@ public class DeviceResourcesVerifier {
             EDIFLibrary reference = lib.isHDIPrimitivesLibrary() ? Design.getPrimitivesLibrary(design.getDevice().getName()) :
                                                     Design.getMacroPrimitives(series);
 
+            if (!lib.isHDIPrimitivesLibrary()) {
+                // Remove unused macros from reference
+                EDIFLibrary prims = Design.getPrimitivesLibrary(design.getDevice().getName());
+                DeviceResourcesWriter.removeUnusedMacros(reference, prims);
+            }
+
             Set<String> cellsFound = new HashSet<String>();
             cellsFound.addAll(lib.getCellMap().keySet());
 
