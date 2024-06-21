@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -25,11 +25,15 @@ package com.xilinx.rapidwright.interchange;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.shapes.Shape;
+import com.xilinx.rapidwright.design.shapes.ShapeLocation;
 import com.xilinx.rapidwright.device.PartNameTools;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDesign;
 import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFName;
 import com.xilinx.rapidwright.edif.EDIFNet;
@@ -46,6 +50,7 @@ import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Port;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PortInstance;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PortInstance.BusIdx;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
+import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Shape.ShapeElement;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
@@ -129,6 +134,40 @@ public class LogNetlistReader {
         for (int i = 0; i < instListReader.size(); i++) {
             allInsts[i] = readEDIFCellInst(instListReader.get(i));
         }
+    }
+
+    protected void readAllShapes(StructList.Reader<LogicalNetlist.Netlist.Shape.Reader> shapesReader, EDIFNetlist n) {
+        List<Shape> shapes = new ArrayList<>(shapesReader.size());
+
+        for (int i = 0; i < shapesReader.size(); i++) {
+            com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Shape.Reader s = shapesReader.get(i);
+            Shape shape = new Shape();
+            shape.setHeight(i);
+            shape.setWidth(i);
+            Map<com.xilinx.rapidwright.design.Cell, ShapeLocation> map = shape.getCellMap();
+            StructList.Reader<ShapeElement.Reader> elements = s.getCells();
+            for (int j = 0; j < s.getCells().size(); j++) {
+                ShapeElement.Reader shapeElement = elements.get(j);
+                String cellName = allStrings[shapeElement.getCellName()];
+                String belName = allStrings[shapeElement.getBelName()];
+                int dx = shapeElement.getDx();
+                int dy = shapeElement.getDy();
+                TextList.Reader types = shapeElement.getSiteTypes();
+                List<SiteTypeEnum> siteTypes = new ArrayList<>(types.size());
+                for (int k = 0; k < types.size(); k++) {
+                    siteTypes.add(SiteTypeEnum.valueOf(types.get(k).toString()));
+                }
+                ShapeLocation loc = new ShapeLocation(siteTypes, belName, dx, dy);
+
+                com.xilinx.rapidwright.design.Cell cell = new com.xilinx.rapidwright.design.Cell(cellName);
+                EDIFHierCellInst cellInst = n.getHierCellInstFromName(cellName);
+                cell.setType(cellInst.getCellName());
+                cell.setEDIFHierCellInst(cellInst);
+                map.put(cell, loc);
+            }
+        }
+
+        n.setShapes(shapes);
     }
 
     protected EDIFCellInst getInst(int i) {
@@ -483,6 +522,15 @@ public class LogNetlistReader {
                         + " run manually with EDIFNetlist.expandMacroUnisims(Series)");
             }
         }
+        if (netlist.hasShapeList()) {
+            if (expandMacros) {
+                t.stop().start("Read Shapes");
+                readAllShapes(netlist.getShapeList(), n);
+            } else {
+                System.out.println("INFO: Not reading shapes as macros not expanded");
+            }
+        }
+
         t.stop().printSummary();
 
         return n;

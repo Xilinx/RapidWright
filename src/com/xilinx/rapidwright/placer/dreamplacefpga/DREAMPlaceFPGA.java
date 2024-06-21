@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.shapes.ShapeTools;
 import com.xilinx.rapidwright.interchange.DeviceResourcesWriter;
 import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.interchange.PhysNetlistReader;
@@ -153,6 +154,7 @@ public class DREAMPlaceFPGA {
     public static Design placeDesign(Design design, Path workDir, boolean makeOutOfContext) {
         // Create interchange netlist file
         String interchangeRootFile = workDir.toString() + File.separator + "design";
+        ShapeTools.extractShapes(design, null);
         Interchange.writeDesignToInterchange(design, interchangeRootFile);
 
         // Create device file if it doesn't already exist
