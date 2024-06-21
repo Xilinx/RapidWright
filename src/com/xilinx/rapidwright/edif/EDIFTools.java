@@ -56,6 +56,8 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.PinType;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.device.Part;
+import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
@@ -1534,5 +1536,95 @@ public class EDIFTools {
                 }
             }
         }
+    }
+
+    /**
+     * Creates a flattened version of the provided netlist.
+     * 
+     * @param netlist  The netlist to flatten.
+     * @param partName The target part of the netlist.
+     * @return A new flattened version of the provided netlist.
+     */
+    public static EDIFNetlist createFlatNetlist(EDIFNetlist netlist, String partName) {
+        Part part = PartNameTools.getPart(partName);
+        netlist.collapseMacroUnisims(part.getSeries());
+
+        EDIFNetlist flatNetlist = EDIFTools.createNewNetlist(netlist.getTopCell().getName());
+        ensureCorrectPartInEDIF(flatNetlist, part.getName());
+        EDIFCell flatTop = flatNetlist.getTopCell();
+        EDIFLibrary prims = flatNetlist.getHDIPrimitivesLibrary();
+        EDIFLibrary work = flatNetlist.getWorkLibrary();
+
+        // Copy all leaf cell instances except VCC/GND
+        boolean includeBlackBoxes = true;
+        for (EDIFHierCellInst inst : netlist.getAllLeafHierCellInstances(includeBlackBoxes)) {
+            EDIFCell type = inst.getCellType();
+            if (type.isStaticSource()) continue;
+            String name = inst.getFullHierarchicalInstName();
+            EDIFCellInst flatInst = flatTop.createChildCellInst(name, type);
+            flatInst.setPropertiesMap(inst.getInst().createDuplicatePropertiesMap());
+            EDIFLibrary lib = !type.isPrimitive() ? work : prims;
+            if (!lib.containsCell(type)) {
+                lib.addCell(type);
+            }
+        }
+
+        // Copy all physical parent nets and connect them to flattened cell instances
+        for (Entry<EDIFHierNet, List<EDIFHierPortInst>> e : netlist.getPhysicalNetPinMap().entrySet()) {
+            if (e.getKey().getNet().isGND() || e.getKey().getNet().isVCC()) {
+                continue;
+            }
+            String name = e.getKey().getHierarchicalNetName();
+            EDIFNet flatNet = flatTop.createNet(name);
+            for (EDIFHierPortInst p : e.getValue()) {
+                if (p.getCellType().isStaticSource()) continue;
+                EDIFCellInst flatInst = flatTop.getCellInst(p.getFullHierarchicalInstName());
+                flatNet.createPortInst(p.getPortInst().getName(), flatInst);
+            }
+        }
+
+        // Create a single VCC/GND net and connect up ports
+        for (NetType staticType : new NetType[] { NetType.GND, NetType.VCC }) {
+            EDIFNet staticNet = EDIFTools.getStaticNet(staticType, flatTop, flatNetlist);
+            List<EDIFHierPortInst> physPins = staticType == NetType.GND 
+                    ? netlist.getPhysicalGndPins()
+                    : netlist.getPhysicalVccPins();
+            for (EDIFHierPortInst p : physPins) {
+                if (p.getCellType().isStaticSource()) continue;
+                EDIFCellInst flatInst = flatTop.getCellInst(p.getFullHierarchicalInstName());
+                staticNet.createPortInst(p.getPortInst().getName(), flatInst);
+            }
+        }
+
+        // Copy ports and connect accordingly
+        for (EDIFPort topPort : netlist.getTopCell().getPorts()) {
+            EDIFPort flatPort = flatTop.createPort(topPort);
+            if (flatPort.isBus()) {
+                int[] indicies = flatPort.getBitBlastedIndicies();
+                int i = 0;
+                for (EDIFNet net : topPort.getInternalNets()) {
+                    if (net == null) continue;
+                    EDIFNet flatNet = flatTop.getNet(net.getName());
+                    if (flatNet == null) {
+                        flatNet = flatTop.createNet(net.getName());
+                    }
+                    flatNet.createPortInst(flatPort, indicies[i++]);
+                }
+            } else {
+                EDIFNet net = topPort.getInternalNet();
+                if (net == null) continue;
+                EDIFNet flatNet = flatTop.getNet(net.getName());
+                if (flatNet == null) {
+                    flatNet = flatTop.createNet(net.getName());
+                }
+                flatNet.createPortInst(flatPort);
+            }
+        }
+
+        // Restore netlists to expanded state
+        netlist.expandMacroUnisims(part.getSeries());
+        flatNetlist.expandMacroUnisims(part.getSeries());
+
+        return flatNetlist;
     }
 }

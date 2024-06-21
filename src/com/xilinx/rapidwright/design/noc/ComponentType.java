@@ -45,7 +45,10 @@ public enum ComponentType {
     AIE_NSU,
     DDRC,
     PCIE_NMU,
-    PCIE_NSU;
+    PCIE_NSU,
+    HBM_NMU,
+    HBM_NSU, 
+    HBMMC;
 
     private static Map<String,ComponentType> map;
 
@@ -57,6 +60,12 @@ public enum ComponentType {
     }
 
     public static ComponentType stringToValue(String s) {
-        return map.get(s);
+        ComponentType type = map.get(s);
+        if (type == null) {
+            throw new RuntimeException("Unrecognized ComponentType: '" + s 
+                    + "', please report/issue a PR to update "
+                    + ComponentType.class.getCanonicalName());
+        }
+        return type;
     }
 }
