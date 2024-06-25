@@ -45,7 +45,8 @@ public class DeviceResourcesExample {
         }
 
         CodePerfTracker t = new CodePerfTracker("Device Resources Dump: " + args[0]);
-        t.useGCToTrackMemory(true);
+        t.setReportingCurrOSMemUsage(true);
+        t.setTrackOSMemUsage(true);
 
         // Create device resource file if it doesn't exist
         String capnProtoFileName = args[0] + ".device";
@@ -56,10 +57,10 @@ public class DeviceResourcesExample {
         DeviceResourcesWriter.writeDeviceResourcesFile(args[0], device, t, capnProtoFileName, skipRouteResources);
         Device.releaseDeviceReferences();
 
-        t.start("Verify file");
         // Verify device resources
-        DeviceResourcesVerifier.verifyDeviceResources(capnProtoFileName, args[0]);
+        DeviceResourcesVerifier.verifyDeviceResources(capnProtoFileName, args[0], t);
 
-        t.stop().printSummary();
+        t.printSummary();
+        System.out.println("Device resources file '" + capnProtoFileName + "' written successfully");
     }
 }
