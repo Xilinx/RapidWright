@@ -57,6 +57,7 @@ import org.capnproto.PrimitiveList;
 import org.capnproto.ReaderOptions;
 import org.capnproto.StructList;
 import org.capnproto.TextList;
+import org.capnproto.PrimitiveList.Int;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -145,6 +146,12 @@ public class LogNetlistReader {
             Shape shape = new Shape();
             shape.setHeight(i);
             shape.setWidth(i);
+            Int.Reader shapeTags = s.getTags();
+            List<String> tags = new ArrayList<>(shapeTags.size());
+            for (int j = 0; j < shapeTags.size(); j++) {
+                tags.add(allStrings[shapeTags.get(j)]);
+            }
+            shape.setTags(tags);
             Map<com.xilinx.rapidwright.design.Cell, ShapeLocation> map = shape.getCellMap();
             StructList.Reader<ShapeElement.Reader> elements = s.getCells();
             for (int j = 0; j < s.getCells().size(); j++) {
@@ -153,10 +160,10 @@ public class LogNetlistReader {
                 String belName = allStrings[shapeElement.getBelName()];
                 int dx = shapeElement.getDx();
                 int dy = shapeElement.getDy();
-                TextList.Reader types = shapeElement.getSiteTypes();
+                Int.Reader types = shapeElement.getSiteTypes();
                 List<SiteTypeEnum> siteTypes = new ArrayList<>(types.size());
                 for (int k = 0; k < types.size(); k++) {
-                    siteTypes.add(SiteTypeEnum.valueOf(types.get(k).toString()));
+                    siteTypes.add(SiteTypeEnum.valueOf(allStrings[types.get(k)]));
                 }
                 ShapeLocation loc = new ShapeLocation(siteTypes, belName, dx, dy);
 

@@ -22,7 +22,7 @@
 package com.xilinx.rapidwright.design.shapes;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -39,12 +39,14 @@ public class Shape {
 
     private Map<Cell, ShapeLocation> map;
 
+    private List<String> tags;
+
     private int width;
 
     private int height;
 
     public Shape() {
-        map = new HashMap<>();
+        map = new LinkedHashMap<>();
     }
 
     public Set<Cell> getCells() {
@@ -107,4 +109,13 @@ public class Shape {
         map.put(cell, loc);
         return cell;
     }
+
+    public List<String> getTags() {
+        return tags;
+    }
+
+    public void setTags(List<String> tags) {
+        this.tags = tags;
+    }
+
 }

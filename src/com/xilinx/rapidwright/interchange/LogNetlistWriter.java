@@ -26,6 +26,7 @@ package com.xilinx.rapidwright.interchange;
 import com.xilinx.rapidwright.design.shapes.Shape;
 import com.xilinx.rapidwright.design.shapes.ShapeLocation;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
@@ -48,9 +49,11 @@ import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Shape.ShapeElem
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import org.capnproto.MessageBuilder;
 import org.capnproto.PrimitiveList;
+import org.capnproto.PrimitiveList.Int;
 import org.capnproto.StructList;
 import org.capnproto.Text;
 import org.capnproto.TextList;
+import org.capnproto.TextList.Builder;
 import org.capnproto.Void;
 
 import java.io.IOException;
@@ -182,6 +185,10 @@ public class LogNetlistWriter {
             Shape s = shapes.get(i);
             curr.setHeight(s.getHeight());
             curr.setWidth(s.getWidth());
+            Int.Builder tags = curr.initTags(s.getTags().size());
+            for (int k = 0; k < tags.size(); k++) {
+                tags.set(k, allStrings.getIndex(s.getTags().get(k)));
+            }
             StructList.Builder<ShapeElement.Builder> shapeElements = curr.initCells(s.getCellMap().size());
             int j = 0;
             for (Entry<com.xilinx.rapidwright.design.Cell, ShapeLocation> e : s.getCellMap().entrySet()) {
@@ -190,6 +197,11 @@ public class LogNetlistWriter {
                 shapeElement.setCellName(allStrings.getIndex(e.getKey().getName()));
                 shapeElement.setDx(e.getValue().getDx());
                 shapeElement.setDy(e.getValue().getDy());
+                List<SiteTypeEnum> types = e.getValue().getCompatibleSiteTypes();
+                Int.Builder elemSiteTypes = shapeElement.initSiteTypes(types.size());
+                for (int k = 0; k < types.size(); k++) {
+                    elemSiteTypes.set(k, allStrings.getIndex(types.get(k).name()));
+                }
                 j++;
             }
         }
