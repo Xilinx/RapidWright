@@ -24,6 +24,8 @@
 package com.xilinx.rapidwright.interchange;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -297,10 +299,17 @@ public class DeviceResourcesWriter {
         t.stop().start("Tiles");
         writeAllTilesToBuilder(device, devBuilder, tileTypeIndicies);
 
-        t.stop().start("Wires&Nodes");
-        writeAllWiresAndNodesToBuilder(device, devBuilder, skipRouteResources);
+        if (skipRouteResources) {
+            // Let's set wires and nodes to size 0
+            devBuilder.initWires(0);
+            devBuilder.initNodes(0);
+        } else {
+            // We'll add them as multiple messages after the main device message, one row of
+            // tiles' worth of wires and nodes at a time. We'll leave the wires and node
+            // field as an indicator that more messages will be present.
+        }
 
-        t.stop().start("Prims&Macros");
+        t.stop().start("Prims & Macros");
         // Create an EDIFNetlist populated with just primitive and macro libraries
         EDIFLibrary prims = Design.getPrimitivesLibrary(device.getName());
         EDIFLibrary macros = Design.getMacroPrimitives(series);
@@ -469,8 +478,15 @@ public class DeviceResourcesWriter {
         t.stop().start("Strings");
         writeAllStringsToBuilder(devBuilder);
 
-        t.stop().start("Write File");
-        Interchange.writeInterchangeFile(fileName, message);
+        t.stop().start("Write Device (single message)");
+        WritableByteChannel wbc = Interchange.getWritableByteChannel(fileName);
+        Interchange.writeMessageToChannel(wbc, message);
+
+        if (!skipRouteResources) {
+            t.stop().start("Write Wires & Nodes (multi-message)");
+            writeAllWiresAndNodesToMultipleMessages(device, wbc);
+        }
+        wbc.close();
         t.stop();
     }
 
@@ -809,10 +825,68 @@ public class DeviceResourcesWriter {
 
     }
 
-    private static long makeKey(Tile tile, int wire) {
+    protected static long makeKey(Tile tile, int wire) {
         long key = wire;
         key = (((long)tile.getUniqueAddress()) << 32) | key;
         return key;
+    }
+
+    public static void writeAllWiresAndNodesToMultipleMessages(Device device, WritableByteChannel wbc) {
+        // Write one message for each row of tiles in the device
+        int numOfMessages = device.getRows();
+
+        for (int m = 0; m < numOfMessages; m++) {
+            MessageBuilder message = new MessageBuilder();
+            DeviceResources.Device.Builder devBuilder = message.initRoot(DeviceResources.Device.factory);
+
+            LongEnumerator allWires = new LongEnumerator();
+            ArrayList<Long> allNodes = new ArrayList<>();
+
+            for (Tile tile : device.getTiles()[m]) {
+                for (int i = 0; i < tile.getWireCount(); i++) {
+                    Node node = Node.getNode(tile, i);
+                    if (node != null && node.getTile() == tile && node.getWireIndex() == i) {
+                        allNodes.add(makeKey(node.getTile(), node.getWireIndex()));
+                        Wire[] nodeWires = node.getAllWiresInNode();
+                        for (Wire w : nodeWires) {
+                            allWires.addObject(makeKey(w.getTile(), w.getWireIndex()));
+                        }
+                    }
+                }
+            }
+
+            StructList.Builder<DeviceResources.Device.Wire.Builder> wireBuilders = devBuilder
+                    .initWires(allWires.size());
+
+            for (int i = 0; i < allWires.size(); i++) {
+                DeviceResources.Device.Wire.Builder wireBuilder = wireBuilders.get(i);
+                long wireKey = allWires.get(i);
+                Wire wire = new Wire(device.getTile((int) (wireKey >>> 32)), (int) (wireKey & 0xffffffff));
+                // Wire wire = allWires.get(i);
+                wireBuilder.setTile(allStrings.getIndex(wire.getTile().getName()));
+                wireBuilder.setWire(allStrings.getIndex(wire.getWireName()));
+                wireBuilder.setType(wire.getIntentCode().ordinal());
+            }
+
+            StructList.Builder<DeviceResources.Device.Node.Builder> nodeBuilders = devBuilder
+                    .initNodes(allNodes.size());
+            for (int i = 0; i < allNodes.size(); i++) {
+                DeviceResources.Device.Node.Builder nodeBuilder = nodeBuilders.get(i);
+                long nodeKey = allNodes.get(i);
+                Node node = Node.getNode(device.getTile((int) (nodeKey >>> 32)), (int) (nodeKey & 0xffffffff));
+                Wire[] wires = node.getAllWiresInNode();
+                PrimitiveList.Int.Builder wBuilders = nodeBuilder.initWires(wires.length);
+                for (int k = 0; k < wires.length; k++) {
+                    wBuilders.set(k, allWires.maybeGetIndex(makeKey(wires[k].getTile(), wires[k].getWireIndex())));
+                }
+            }
+
+            try {
+                Interchange.writeMessageToChannel(wbc, message);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
     }
 
     public static void writeAllWiresAndNodesToBuilder(Device device, DeviceResources.Device.Builder devBuilder,
@@ -862,6 +936,7 @@ public class DeviceResourcesWriter {
             }
         }
     }
+
     private static void populatePackages(StringEnumerator allStrings, Device device, DeviceResources.Device.Builder devBuilder) {
         Set<String> packages = device.getPackages();
         List<String> packagesList = new ArrayList<String>();
