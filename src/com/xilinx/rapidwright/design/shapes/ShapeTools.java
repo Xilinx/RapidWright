@@ -102,6 +102,7 @@ public class ShapeTools {
                 shapeFile = workdir.resolve("shapes.txt");
 
                 design.writeCheckpoint(dcp);
+                design.getNetlist().expandMacroUnisims(design.getDevice().getSeries());
 
                 List<String> cmds = new ArrayList<>();
                 cmds.add("open_checkpoint " + dcp);
@@ -248,6 +249,13 @@ public class ShapeTools {
                     String cellName = line.substring(line.indexOf('\t') + 1, line.indexOf(" ("));
                     String cellType = line.substring(line.lastIndexOf('(') + 1, line.lastIndexOf(')'));
                     curr.addCell(cellName, design, dx, dy, belName, cellType);
+                } else if (line.startsWith("Tag(s): ")) {
+                    String[] tags = line.split("\\s+");
+                    List<String> tagNames = new ArrayList<>();
+                    for (int i = 1; i < tags.length; i++) {
+                        tagNames.add(tags[i]);
+                    }
+                    curr.setTags(tagNames);
                 } else if (line.startsWith("WxH: ")) {
                     int xIdx = line.lastIndexOf('x');
                     int width = Integer.parseInt(line.substring(line.indexOf(' ') + 1, xIdx));
