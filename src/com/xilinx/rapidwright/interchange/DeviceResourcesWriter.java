@@ -844,10 +844,7 @@ public class DeviceResourcesWriter {
 
             for (Tile tile : device.getTiles()[m]) {
                 for (int i = 0; i < tile.getWireCount(); i++) {
-                    Wire wire = new Wire(tile, i);
-                    allWires.addObject(makeKey(wire.getTile(), wire.getWireIndex()));
-
-                    Node node = wire.getNode();
+                    Node node = Node.getNode(tile, i);
                     if (node != null && node.getTile() == tile && node.getWireIndex() == i) {
                         allNodes.add(makeKey(node.getTile(), node.getWireIndex()));
                         Wire[] nodeWires = node.getAllWiresInNode();

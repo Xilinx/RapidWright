@@ -670,23 +670,12 @@ public class DeviceResourcesVerifier {
             int nodeIdx = 0;
             for (Tile tile : device.getTiles()[row]) {
                 for (int i = 0; i < tile.getWireCount(); i++) {
-                    Wire wire = new Wire(tile, i);
-                    long key = DeviceResourcesWriter.makeKey(wire.getTile(), wire.getWireIndex());
-                    Integer test = allWires.maybeGetIndex(key);
-                    if (test == null) {
-                        allWires.addObject(key);
-                        DeviceResources.Device.Wire.Reader readWire = wires.get(wireIdx++);
-                        expect(tile.getName(), allStrings.get(readWire.getTile()));
-                        expect(wire.getWireName(), allStrings.get(readWire.getWire()));
-                        expect(wire.getIntentCode().ordinal(), readWire.getType());                        
-                    }
-
-                    Node node = Node.getNode(wire);
+                    Node node = Node.getNode(tile, i);
                     if (node != null && node.getTile() == tile && node.getWireIndex() == i) {
                         Wire[] nodeWires = node.getAllWiresInNode();
                         for (Wire w : nodeWires) {
                             long nodeWireKey = DeviceResourcesWriter.makeKey(w.getTile(), w.getWireIndex());
-                            test = allWires.maybeGetIndex(nodeWireKey);
+                            Integer test = allWires.maybeGetIndex(nodeWireKey);
                             if (test == null) {
                                 allWires.addObject(nodeWireKey);
                                 DeviceResources.Device.Wire.Reader readWire = wires.get(wireIdx++);
