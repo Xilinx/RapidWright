@@ -338,7 +338,7 @@ public class VivadoTools {
     }
 
     /**
-     * Run Vivado's `route_design` command on the desig provided and get the
+     * Run Vivado's `route_design` command on the design provided and get the
      * `report_route_status` results. Note: this method does not preserve the routed
      * output from Vivado.
      * 
