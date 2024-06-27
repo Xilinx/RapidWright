@@ -373,6 +373,6 @@ public class TestSiteInst {
     public void testSiteRouting(@TempDir Path dir) {
         Design design = RapidWrightDCP.loadDCP("gnl_2_4_3_1.3_gnl_3000_07_3_80_80_placed.dcp");
         design.routeSites();
-        VivadoToolsHelper.assertRoutableInVivado(design, dir);
+        VivadoToolsHelper.assertRoutedSuccessfullyByVivado(design, dir);
     }
 }

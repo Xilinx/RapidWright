@@ -53,7 +53,7 @@ public class VivadoToolsHelper {
      * @param design The design to route.
      * @param dir    The directory to work within.
      */
-    public static void assertRoutableInVivado(Design design, Path dir) {
+    public static void assertRoutedSuccessfullyByVivado(Design design, Path dir) {
         if (!FileTools.isVivadoOnPath()) {
             return;
         }
