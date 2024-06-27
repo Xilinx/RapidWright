@@ -645,6 +645,7 @@ public class DeviceResourcesVerifier {
             t.stop();
         }
 
+
         rbc.close();
         return true;
     }
