@@ -1752,8 +1752,8 @@ public class DesignTools {
             cells.add(c);
         }
         // Find encrypted cells that need to be removed
-        String name = hierarchicalCell.getFullHierarchicalInstName();
         if (d.getNetlist().getEncryptedCells().size() > 0) { 
+            String name = hierarchicalCell.getFullHierarchicalInstName();
             for (Cell c : d.getCells()) {
                 if (c.getName().startsWith(name)) {
                     cells.add(c);
