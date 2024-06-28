@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -22,30 +22,6 @@
  */
 
 package com.xilinx.rapidwright.interchange;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Queue;
-import java.util.Set;
-import java.util.TreeSet;
-
-import org.capnproto.MessageBuilder;
-import org.capnproto.PrimitiveList;
-import org.capnproto.PrimitiveList.Int;
-import org.capnproto.StructList;
-import org.capnproto.Text;
-import org.capnproto.TextList;
-import org.capnproto.Void;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
@@ -99,8 +75,37 @@ import com.xilinx.rapidwright.interchange.DeviceResources.Device.TileType;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
+import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.timing.DelayModel;
+import com.xilinx.rapidwright.timing.TimingModel;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.Utils;
+import org.capnproto.MessageBuilder;
+import org.capnproto.PrimitiveList;
+import org.capnproto.PrimitiveList.Int;
+import org.capnproto.StructList;
+import org.capnproto.Text;
+import org.capnproto.TextList;
+import org.capnproto.Void;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Queue;
+import java.util.Set;
+import java.util.TreeSet;
 
 public class DeviceResourcesWriter {
     private static StringEnumerator allStrings;
@@ -108,6 +113,11 @@ public class DeviceResourcesWriter {
 
     private static HashMap<TileTypeEnum,Tile> tileTypes;
     private static HashMap<SiteTypeEnum,Site> siteTypes;
+
+    private static DelayEstimatorBase delayEstimator;
+    private static DelayModel intrasiteAndLogicDelayModel;
+
+    private static final float PICSECONDS_TO_SECONDS = 1e-12f;
 
     public static void populateSiteEnumerations(SiteInst siteInst, Site site) {
         if (!siteTypes.containsKey(siteInst.getSiteTypeEnum())) {
@@ -276,6 +286,16 @@ public class DeviceResourcesWriter {
         Design design = new Design();
         design.setPartName(part);
         Series series = device.getSeries();
+
+        delayEstimator = null;
+        if (series == Series.UltraScalePlus) {
+            // Timing model only supports UltraScalePlus currently
+            boolean useUTurnNodes = true;
+            delayEstimator = new DelayEstimatorBase(device, new InterconnectInfo(), useUTurnNodes, 0);
+            TimingModel timingModel = new TimingModel(design.getDevice());
+            timingModel.build();
+            intrasiteAndLogicDelayModel = timingModel.getDelayModel();
+        }
 
         t.start("populateEnums");
         populateEnumerations(design, device);
@@ -455,7 +475,7 @@ public class DeviceResourcesWriter {
         }
 
         t.stop().start("Cell <-> BEL pin map");
-        EnumerateCellBelMapping.populateAllPinMappings(part, device, devBuilder, allStrings);
+        EnumerateCellBelMapping.populateAllPinMappings(part, device, devBuilder, allStrings, intrasiteAndLogicDelayModel);
 
         t.stop().start("Packages");
         populatePackages(allStrings, device, devBuilder);
@@ -634,8 +654,24 @@ public class DeviceResourcesWriter {
             for (int j=0; j < allSitePIPs.length; j++) {
                 DeviceResources.Device.SitePIP.Builder spBuilder = spBuilders.get(j);
                 SitePIP sitePIP = allSitePIPs[j];
-                spBuilder.setInpin(allBELPins.getIndex(sitePIP.getInputPin()));
-                spBuilder.setOutpin(allBELPins.getIndex(sitePIP.getOutputPin()));
+                BELPin inputPin = sitePIP.getInputPin();
+                spBuilder.setInpin(allBELPins.getIndex(inputPin));
+                BELPin outputPin = sitePIP.getOutputPin();
+                spBuilder.setOutpin(allBELPins.getIndex(outputPin));
+
+                // Write out delay of SitePIP
+                if (intrasiteAndLogicDelayModel != null) {
+                    BELPin frBelPin = inputPin.getSourcePin();
+                    String frBelPinString = (frBelPin.isSitePort() ? "" : frBelPin.getBELName() + "/") + frBelPin.getName();
+                    BELPin toBelPin = outputPin.getSiteConns().get(0);
+                    String toBelPinString = (toBelPin.isSitePort() ? "" : toBelPin.getBELName() + "/") + toBelPin.getName();
+                    Short delayPs = intrasiteAndLogicDelayModel.getIntraSiteDelay(siteInst.getSiteTypeEnum(), frBelPinString, toBelPinString);
+                    if (delayPs != null && delayPs > 0) {
+                        DeviceResources.Device.CornerModel.Builder delayBuilder = spBuilder.initDelay();
+                        DeviceResources.Device.CornerModelValues.Builder slowBuilder = delayBuilder.initSlow().initSlow();
+                        slowBuilder.initMax().setMax(delayPs * PICSECONDS_TO_SECONDS);
+                    }
+                }
             }
 
             design.removeSiteInst(siteInst);
@@ -693,6 +729,9 @@ public class DeviceResourcesWriter {
         StructList.Builder<TileType.Builder> tileTypesList = devBuilder.initTileTypeList(tileTypes.size());
 
         Map<TileTypeEnum, Integer> tileTypeIndicies = new HashMap<TileTypeEnum, Integer>();
+        Map<Float, Integer> slowMaxDelayIndices = new HashMap<>();
+        // Make the zero index no delay
+        slowMaxDelayIndices.put(0f, 0);
 
         int i=0;
         for (Entry<TileTypeEnum,Tile> e : tileTypes.entrySet()) {
@@ -777,8 +816,53 @@ public class DeviceResourcesWriter {
                         k++;
                     }
                 }
+
+                if (delayEstimator != null) {
+                    Node startNode = pip.getStartNode();
+                    if (!pip.getStartNode().isTied()) {
+                        Node endNode = pip.getEndNode();
+                        boolean includeBase = true;
+                        boolean includeDiscontinuity = false;
+                        float delayPs = RouterHelper.computeNodeDelay(delayEstimator, endNode, includeBase, includeDiscontinuity);
+                        delayPs += DelayEstimatorBase.getExtraDelay(endNode, DelayEstimatorBase.isLong(startNode));
+                        if (pip.isRouteThru()) {
+                            if (Utils.isCLB(pip.getTile().getTileTypeEnum())) {
+                                // Site port to cell
+                                com.xilinx.rapidwright.device.SitePin fromSitePin = pip.getStartWire().getSitePin();
+                                String fromSitePinName = fromSitePin.getPinName();
+                                assert(fromSitePinName.matches("[A-H][1-6]"));
+                                char lutLetter = fromSitePinName.charAt(0);
+                                char pinNumber = fromSitePinName.charAt(1);
+                                delayPs += intrasiteAndLogicDelayModel.getIntraSiteDelay(SiteTypeEnum.SLICEL, fromSitePinName, lutLetter + "6LUT/A" + pinNumber);
+                                // Through cell
+                                short belIdx = intrasiteAndLogicDelayModel.getBELIndex(lutLetter + "6LUT");
+                                delayPs += intrasiteAndLogicDelayModel.getLogicDelay(belIdx, "A" + pinNumber, "O6");
+                                // Cell to site port
+                                com.xilinx.rapidwright.device.SitePin toSitePin = pip.getEndWire().getSitePin();
+                                String toSitePinName = toSitePin.getPinName();
+                                assert(toSitePinName.matches("[A-H](_O|MUX)"));
+                                delayPs += intrasiteAndLogicDelayModel.getIntraSiteDelay(SiteTypeEnum.SLICEL, lutLetter + "6LUT/O6", toSitePinName);
+                            }
+                        }
+                        if (delayPs != 0) {
+                            int index = slowMaxDelayIndices.computeIfAbsent(delayPs, (v) -> slowMaxDelayIndices.size());
+                            pipBuilder.setTiming(index);
+                        }
+                    }
+                }
             }
+
             i++;
+        }
+
+        StructList.Builder<DeviceResources.Device.PIPTiming.Builder> pipTimingsBuilder = devBuilder.initPipTimings(slowMaxDelayIndices.size());
+        for (Map.Entry<Float,Integer> e : slowMaxDelayIndices.entrySet()) {
+            float slowMaxDelayPs = e.getKey();
+            int index = e.getValue();
+            DeviceResources.Device.PIPTiming.Builder timingBuilder = pipTimingsBuilder.get(index);
+            DeviceResources.Device.CornerModel.Builder delayBuilder = timingBuilder.initInternalDelay();
+            DeviceResources.Device.CornerModelValues.Builder slowBuilder = delayBuilder.initSlow().initSlow();
+            slowBuilder.initMax().setMax(slowMaxDelayPs * PICSECONDS_TO_SECONDS);
         }
 
         return tileTypeIndicies;
@@ -848,11 +932,14 @@ public class DeviceResourcesWriter {
             wireBuilder.setType(wire.getIntentCode().ordinal());
         }
 
+        Map<Float, Integer> slowMaxDelayIndices = new HashMap<>();
+        // Make the zero index no delay
+        slowMaxDelayIndices.put(0f, 0);
+
         StructList.Builder<DeviceResources.Device.Node.Builder> nodeBuilders =
                 devBuilder.initNodes(allNodes.size());
         for (int i=0; i < allNodes.size(); i++) {
             DeviceResources.Device.Node.Builder nodeBuilder = nodeBuilders.get(i);
-            //Node node = allNodes.get(i);
             long nodeKey = allNodes.get(i);
             Node node = Node.getNode(device.getTile((int)(nodeKey >>> 32)), (int)(nodeKey & 0xffffffff));
             Wire[] wires = node.getAllWiresInNode();
@@ -860,6 +947,28 @@ public class DeviceResourcesWriter {
             for (int k=0; k < wires.length; k++) {
                 wBuilders.set(k, allWires.getIndex(makeKey(wires[k].getTile(), wires[k].getWireIndex())));
             }
+
+            if (delayEstimator != null && !node.isTied()) {
+                boolean incldueBase = false;
+                boolean includeDiscontinuity = true;
+                float delayPs = RouterHelper.computeNodeDelay(delayEstimator, node, incldueBase, includeDiscontinuity);
+                if (delayPs != 0) {
+                    int index = slowMaxDelayIndices.computeIfAbsent(delayPs, (v) -> slowMaxDelayIndices.size());
+                    nodeBuilder.setNodeTiming(index);
+                }
+            }
+        }
+
+        StructList.Builder<DeviceResources.Device.NodeTiming.Builder> nodeTimingsBuilder = devBuilder.initNodeTimings(slowMaxDelayIndices.size());
+        for (Map.Entry<Float,Integer> e : slowMaxDelayIndices.entrySet()) {
+            float slowMaxDelayPs = e.getKey();
+            int index = e.getValue();
+            DeviceResources.Device.NodeTiming.Builder timingBuilder = nodeTimingsBuilder.get(index);
+            // Delay represented as T = R * C where R = <delay in ps> and C = 1e-12 (1 ps)
+            DeviceResources.Device.CornerModelValues.Builder resBuilder = timingBuilder.initResistance().initSlow().initSlow();
+            resBuilder.initMax().setMax(slowMaxDelayPs);
+            DeviceResources.Device.CornerModelValues.Builder capBuilder = timingBuilder.initCapacitance().initSlow().initSlow();
+            capBuilder.initMax().setMax(PICSECONDS_TO_SECONDS);
         }
     }
     private static void populatePackages(StringEnumerator allStrings, Device device, DeviceResources.Device.Builder devBuilder) {

@@ -1631,9 +1631,11 @@ public class TimingModel {
             else {
                 fromPinName += sourceBELPin.getName();
             }
-            short tmpIntrasiteDelay = intrasiteAndLogicDelayModel.getIntraSiteDelay(
+            Short tmpIntrasiteDelay = intrasiteAndLogicDelayModel.getIntraSiteDelay(
                     SiteTypeEnum.SLICEL, fromPinName, startPinInst.getName());
-            intrasiteDelay += tmpIntrasiteDelay;
+            if (tmpIntrasiteDelay != null) {
+                intrasiteDelay += tmpIntrasiteDelay;
+            }
            
         } else if (startPinInst.getName().endsWith("_O")) {
             intrasiteDelay += INTRASITE_DELAY_LUT_OUTPUT_TO_O_SITEPIN;   

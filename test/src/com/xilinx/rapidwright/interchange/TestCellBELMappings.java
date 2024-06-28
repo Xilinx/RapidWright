@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -40,7 +40,8 @@ public class TestCellBELMappings {
         MessageBuilder message = new MessageBuilder();
         Device device = Device.getDevice(TestDeviceResources.TEST_DEVICE);
         DeviceResources.Device.Builder devBuilder = message.initRoot(DeviceResources.Device.factory);
-        EnumerateCellBelMapping.populateAllPinMappings(device.getName(), device, devBuilder, allStrings);
+        EnumerateCellBelMapping
+                .populateAllPinMappings(device.getName(), device, devBuilder, allStrings, null);
 
         boolean foundIDDRS = false;
         boolean foundIDDRR = false;

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -26,11 +26,17 @@ package com.xilinx.rapidwright.interchange;
 import java.io.IOException;
 import java.nio.file.Path;
 
+import org.capnproto.MessageReader;
+import org.capnproto.ReaderOptions;
+import org.capnproto.TextList;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 public class TestDeviceResources {
 
@@ -46,5 +52,54 @@ public class TestDeviceResources {
         DeviceResourcesVerifier.verifyDeviceResources(capnProtoFile.toString(), TEST_DEVICE);
     }
 
+    @ParameterizedTest
+    @CsvSource({
+            "xcau10p"
+    })
+    public void testUltraScalePlusTiming(String deviceName, @TempDir Path tempDir) throws IOException {
+        Path capnProtoFile = tempDir.resolve(deviceName + ".device");
+        Device device = Device.getDevice(deviceName);
+        DeviceResourcesWriter.writeDeviceResourcesFile(
+                deviceName, device, CodePerfTracker.SILENT, capnProtoFile.toString());
 
+        ReaderOptions readerOptions = new ReaderOptions(1024L * 1024L * 1024L * 64L, 64);
+        MessageReader readMsg = Interchange.readInterchangeFile(capnProtoFile.toString(), readerOptions);
+        DeviceResources.Device.Reader dReader = readMsg.getRoot(DeviceResources.Device.factory);
+
+        Assertions.assertTrue(dReader.getPipTimings().size() > 1);
+        Assertions.assertTrue(dReader.getNodeTimings().size() > 1);
+
+        TextList.Reader sReader = dReader.getStrList();
+
+        // Check SitePIPs have at least one delay
+        int reached = 0;
+        for (DeviceResources.Device.SiteType.Reader st : dReader.getSiteTypeList()) {
+            String name = sReader.get(st.getName()).toString();
+            if (!name.startsWith("SLICE")) {
+                continue;
+            }
+            for (DeviceResources.Device.SitePIP.Reader sp : st.getSitePIPs()) {
+                if (sp.hasDelay()) {
+                    reached++;
+                    break;
+                }
+            }
+        }
+        // {SLICEL,SLICEM}
+        Assertions.assertEquals(2, reached);
+
+        // Check Cells have at least one delay
+        reached = 0;
+        for (DeviceResources.Device.CellBelMapping.Reader cb : dReader.getCellBelMap()) {
+            String name = sReader.get(cb.getCell()).toString();
+            if (!name.startsWith("LUT")) {
+                continue;
+            }
+            if (cb.hasPinsDelay()) {
+                reached++;
+            }
+        }
+        // LUT[1-6]
+        Assertions.assertEquals(6, reached);
+    }
 }

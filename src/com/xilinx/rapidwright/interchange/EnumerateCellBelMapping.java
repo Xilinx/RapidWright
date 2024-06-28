@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Keith Rothman, Google, Inc.
@@ -27,12 +27,17 @@ import java.io.IOException;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.timing.DelayModel;
 import org.capnproto.MessageBuilder;
 import org.capnproto.StructList;
 
@@ -711,7 +716,14 @@ public class EnumerateCellBelMapping {
         return siteMap;
     }
 
-    public static void populateCellBelPin(StringEnumerator allStrings, Map<SiteTypeEnum, List<Site>> siteMap, CellBelMapping.Builder mapping, EDIFCell topLevelCell, EDIFCell cell, Design design) {
+    public static void populateCellBelPin(StringEnumerator allStrings,
+                                          Map<SiteTypeEnum, List<Site>> siteMap,
+                                          CellBelMapping.Builder mapping,
+                                          EDIFCell topLevelCell,
+                                          EDIFCell cell,
+                                          Design design,
+                                          DeviceResources.Device.Builder devBuilder,
+                                          DelayModel intrasiteAndLogicDelayModel) {
         mapping.setCell(allStrings.getIndex(cell.getName()));
         EDIFCellInst cellInst = new EDIFCellInst("test", cell, topLevelCell);
         Cell physCell = design.createCell("test", cellInst);
@@ -732,6 +744,14 @@ public class EnumerateCellBelMapping {
         cellInst = null;
 
         EnumerateCellBelMapping data = new EnumerateCellBelMapping();
+
+        class PinDelayEntry {
+            BELPin firstPin;
+            BELPin secondPin;
+            int delayPs;
+            SiteTypeEnum site;
+        }
+        List<PinDelayEntry> pinDelays = (intrasiteAndLogicDelayModel != null) ?  new ArrayList<>() : null;
 
         for (Map.Entry<SiteTypeEnum, String> possibleSite : entries) {
             SiteTypeEnum siteType = possibleSite.getKey();
@@ -774,6 +794,41 @@ public class EnumerateCellBelMapping {
                         design.removeSiteInst(siteInst);
                         topLevelCell.removeCellInst("test");
                         design.getTopEDIFCell().removeCellInst("test");
+
+                        // Extract pin-to-pin logic delays
+                        if (intrasiteAndLogicDelayModel != null) {
+                            Short belIdx = intrasiteAndLogicDelayModel.getBELIndex(bel);
+                            if (belIdx != null) {
+                                BEL belObject = physCell.getBEL();
+                                BELPin[] belPins = belObject.getPins();
+                                int highestInput = belObject.getHighestInputIndex();
+                                for (int i = 0; i <= highestInput; i++) {
+                                    BELPin ipin = belPins[i];
+                                    int o;
+                                    if (ipin.isClock()) {
+                                        // For clock pins, also check against other inputs to extract setup time
+                                        o = 0;
+                                    } else {
+                                        o = highestInput + 1;
+                                    }
+                                    for (; o < belPins.length; o++) {
+                                        if (o == i) {
+                                            continue;
+                                        }
+                                        BELPin opin = belPins[o];
+                                        Short delayPs = intrasiteAndLogicDelayModel.getLogicDelay(belIdx, ipin.getName(), opin.getName());
+                                        if (delayPs != null && delayPs != 0) {
+                                            PinDelayEntry e = new PinDelayEntry();
+                                            e.firstPin = ipin;
+                                            e.secondPin = opin;
+                                            e.delayPs = delayPs;
+                                            e.site = siteType;
+                                            pinDelays.add(e);
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     } else {
                         data.addInstance(siteType, site, bel, pinMapping, parameters);
                     }
@@ -782,9 +837,57 @@ public class EnumerateCellBelMapping {
         }
 
         data.writeMapping(allStrings, mapping);
+
+        // Write out all unique pin-pin logic delays
+        if (intrasiteAndLogicDelayModel != null) {
+            Map<SiteTypeEnum, Integer> siteType2index = new EnumMap<>(SiteTypeEnum.class);
+            Map<SiteTypeEnum, Map<BELPin, Integer>> siteType2belPin2index = new EnumMap<>(SiteTypeEnum.class);
+
+            // First, re-parse the siteTypeList to extract site-type and bel-pin indices
+            StructList.Reader<DeviceResources.Device.SiteType.Reader> siteTypesReader = devBuilder.asReader().getSiteTypeList();
+            int siteTypeIndex = 0;
+            for (DeviceResources.Device.SiteType.Reader st : siteTypesReader) {
+                SiteTypeEnum siteType = SiteTypeEnum.valueOf(allStrings.get(st.getName()));
+                siteType2index.put(siteType, siteTypeIndex++);
+                Map<BELPin, Integer> belPin2index = new HashMap<>();
+                List<Site> siteList = siteMap.get(siteType);
+                Site site = siteList.get(0);
+                int belPinIndex = 0;
+                for (DeviceResources.Device.BELPin.Reader bpr : st.getBelPins()) {
+                    String bel = allStrings.get(bpr.getBel());
+                    String pin = allStrings.get(bpr.getName());
+                    BELPin bp = site.getBELPin(bel, pin);
+                    belPin2index.put(bp, belPinIndex++);
+                }
+                siteType2belPin2index.put(siteType, belPin2index);
+            }
+
+            StructList.Builder<DeviceResources.Device.PinsDelay.Builder> pinDelaysBuilder = mapping.initPinsDelay(pinDelays.size());
+            Iterator<DeviceResources.Device.PinsDelay.Builder> pinDelaysIt = pinDelaysBuilder.iterator();
+            for (PinDelayEntry e : pinDelays) {
+                DeviceResources.Device.PinsDelay.Builder pd = pinDelaysIt.next();
+                Map<BELPin, Integer> belPin2index = siteType2belPin2index.get(e.site);
+                pd.initFirstPin().setPin(belPin2index.get(e.firstPin));
+                pd.initSecondPin().setPin(belPin2index.get(e.secondPin));
+                pd.initCornerModel().initSlow().initSlow().initMax().setMax(e.delayPs * 1e-12f);
+                DeviceResources.Device.PinsDelayType type;
+                if (e.firstPin.isClock()) {
+                    if (e.secondPin.isInput()) {
+                        type = DeviceResources.Device.PinsDelayType.SETUP;
+                    } else {
+                        assert(e.secondPin.isOutput());
+                        type = DeviceResources.Device.PinsDelayType.CLK2Q;
+                    }
+                } else {
+                    type = DeviceResources.Device.PinsDelayType.COMB;
+                }
+                pd.setPinsDelayType(type);
+                pd.setSite(siteType2index.get(e.site));
+            }
+        }
     }
 
-    public static void populateAllPinMappings(String part, Device device, DeviceResources.Device.Builder devBuilder, StringEnumerator allStrings) {
+    public static void populateAllPinMappings(String part, Device device, DeviceResources.Device.Builder devBuilder, StringEnumerator allStrings, DelayModel intrasiteAndLogicDelayModel) {
         Design design = new Design("top", part);
 
         EDIFLibrary prims = Design.getPrimitivesLibrary(design.getDevice().getName());
@@ -820,7 +923,7 @@ public class EnumerateCellBelMapping {
         StructList.Builder<CellBelMapping.Builder> cellMapping = devBuilder.initCellBelMap(count);
         for (EDIFCell cell : prims.getCells()) {
             if (!macroCells.contains(cell.getName())) {
-                populateCellBelPin(allStrings, siteMap, cellMapping.get(i), topLevelCell, cell, design);
+                populateCellBelPin(allStrings, siteMap, cellMapping.get(i), topLevelCell, cell, design, devBuilder, intrasiteAndLogicDelayModel);
                 i += 1;
             }
         }
@@ -844,7 +947,7 @@ public class EnumerateCellBelMapping {
 
         MessageBuilder message = new MessageBuilder();
         DeviceResources.Device.Builder devBuilder = message.initRoot(DeviceResources.Device.factory);
-        populateAllPinMappings(args[0], device, devBuilder, allStrings);
+        populateAllPinMappings(args[0], device, devBuilder, allStrings, null);
 
         t.stop().printSummary();
     }
