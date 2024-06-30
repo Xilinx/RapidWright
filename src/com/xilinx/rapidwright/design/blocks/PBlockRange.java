@@ -209,9 +209,14 @@ public class PBlockRange {
         // We may need to expand column to include outward facing CLB/DSP/BRAM to INT tiles
         if (isSiteRange()) {
             Tile t = getLowerLeftSite().getIntTile();
-            if (t.getColumn() < colMin) colMin = t.getColumn();
-            t = getUpperRightSite().getIntTile();
-            if (t.getColumn() > colMax) colMax = t.getColumn();
+
+            // corner case example: when pblock range is BUFG_GT_X1Y96:BUFG_GT_X1Y119
+            // t will be null
+            if ( t != null ) {
+                if (t.getColumn() < colMin) colMin = t.getColumn();
+                t = getUpperRightSite().getIntTile();
+                if (t.getColumn() > colMax) colMax = t.getColumn();    
+            }
         }
 
         for (int col=colMin; col <= colMax; col++) {
