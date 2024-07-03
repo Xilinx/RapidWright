@@ -63,8 +63,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
@@ -147,7 +149,7 @@ public class LogNetlistReader {
             shape.setHeight(i);
             shape.setWidth(i);
             Int.Reader shapeTags = s.getTags();
-            List<String> tags = new ArrayList<>(shapeTags.size());
+            Set<String> tags = new HashSet<>(shapeTags.size());
             for (int j = 0; j < shapeTags.size(); j++) {
                 tags.add(allStrings[shapeTags.get(j)]);
             }

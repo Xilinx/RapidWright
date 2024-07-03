@@ -22,6 +22,8 @@
 package com.xilinx.rapidwright.design.shapes;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +32,9 @@ import java.util.Set;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 
 /**
@@ -39,7 +44,7 @@ public class Shape {
 
     private Map<Cell, ShapeLocation> map;
 
-    private List<String> tags;
+    private Set<String> tags;
 
     private int width;
 
@@ -47,6 +52,7 @@ public class Shape {
 
     public Shape() {
         map = new LinkedHashMap<>();
+        tags = new HashSet<>();
     }
 
     public Set<Cell> getCells() {
@@ -55,6 +61,10 @@ public class Shape {
 
     public Map<Cell, ShapeLocation> getCellMap() {
         return map;
+    }
+
+    protected void setCellMap(Map<Cell, ShapeLocation> map) {
+        this.map = map;
     }
 
     /**
@@ -96,6 +106,7 @@ public class Shape {
         } else if (cell.getEDIFHierCellInst() == null) {
             cell.setEDIFHierCellInst(design.getNetlist().getHierCellInstFromName(name));
         }
+
         Map<SiteTypeEnum, Set<String>> placements = cell.getCompatiblePlacements();
 
         List<SiteTypeEnum> compatibleSiteTypes = new ArrayList<>();
@@ -110,12 +121,27 @@ public class Shape {
         return cell;
     }
 
-    public List<String> getTags() {
+    public Set<String> getTags() {
         return tags;
     }
 
-    public void setTags(List<String> tags) {
+    public void setTags(Set<String> tags) {
         this.tags = tags;
     }
 
+    public boolean addTag(String tag) {
+        return tags.add(tag);
+    }
+
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        for (Entry<Cell, ShapeLocation> e : map.entrySet()) {
+            sb.append("(" + e.getValue().getCompatibleSiteTypes() + "_X" + e.getValue().getDx() + "Y"
+                    + e.getValue().getDy() + ", " + e.getValue().getBelName() + ")\t" + e.getKey().getName() + " ("
+                    + e.getKey().getType() + ")\n");
+        }
+        sb.append("Tags(s): " + getTags() + "\n");
+        sb.append("WxH: " + getWidth() + "x" + getHeight() + "\n");
+        return sb.toString();
+    }
 }

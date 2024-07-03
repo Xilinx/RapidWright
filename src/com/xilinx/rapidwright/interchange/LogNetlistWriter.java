@@ -186,8 +186,10 @@ public class LogNetlistWriter {
             curr.setHeight(s.getHeight());
             curr.setWidth(s.getWidth());
             Int.Builder tags = curr.initTags(s.getTags().size());
-            for (int k = 0; k < tags.size(); k++) {
-                tags.set(k, allStrings.getIndex(s.getTags().get(k)));
+            int t = 0;
+            for (String tag : s.getTags()) {
+                tags.set(t, allStrings.getIndex(tag));
+                t++;
             }
             StructList.Builder<ShapeElement.Builder> shapeElements = curr.initCells(s.getCellMap().size());
             int j = 0;

@@ -32,10 +32,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.Cell;
@@ -49,6 +52,9 @@ import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.examples.PipelineGenerator;
+import com.xilinx.rapidwright.interchange.Interchange;
+import com.xilinx.rapidwright.interchange.LogNetlistWriter;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.VivadoTools;
 
@@ -60,6 +66,8 @@ public class ShapeTools {
     private static final boolean SOURCE_SHAPES_FROM_FILE = true;
 
     private static Set<String> chainPrims;
+
+    private static Map<String, String> carryPinMap;
 
     static {
         chainPrims = new HashSet<>();
@@ -80,6 +88,15 @@ public class ShapeTools {
         chainPrims.add(Unisim.RAMB18E1.name());
         chainPrims.add(Unisim.RAMB18E2.name());
         chainPrims.add(Unisim.RAMB18E5.name());
+
+        carryPinMap = new HashMap<>();
+        for (int i = 0; i < 8; i++) {
+            char letter = (char) ('A' + i);
+            carryPinMap.put("S[" + i + "]", letter + "6LUT");
+            carryPinMap.put("DI[" + i + "]", letter + "5LUT");
+            carryPinMap.put("O[" + i + "]", letter + "FF");
+            carryPinMap.put("CO[" + i + "]", letter + "FF2");
+        }
 
     }
 
@@ -115,6 +132,7 @@ public class ShapeTools {
             }
 
             List<Shape> shapes = readDebugShapeFile(design, shapeFile);
+            sortShapesByBELName(shapes);
             netlist.setShapes(shapes);
             return shapes;
         }
@@ -152,34 +170,42 @@ public class ShapeTools {
             }
         }
 
-
+        Map<EDIFHierNet, List<EDIFHierPortInst>> physicalNetPinMap = netlist.getPhysicalNetPinMap();
         for (EDIFHierCellInst i : chainInsts) {
             Unisim type = Unisim.valueOf(i.getCellName());
             Shape shape = new Shape();
+            shapes.add(shape);
             switch (type) {
             case CARRY8:
-                Cell carry8 = shape.addCell(i.toString(), design, 0, 0, "CARRY8", type.name());
-
+                shape.addCell(i.toString(), design, 0, 0, "CARRY8", type.name());
                 for (EDIFPortInst pi : i.getInst().getPortInsts()) {
-                    if (pi.getName().endsWith("X"))
-                        continue;
                     EDIFNet net = pi.getNet();
                     if (net != null) {
-                        EDIFHierNet hierNet = new EDIFHierNet(i, net);
-                        for (EDIFHierPortInst conn : netlist.getPhysicalNetPinMap().get(hierNet)) {
+                        EDIFHierNet hierNet = netlist.getParentNet(new EDIFHierNet(i.getParent(), net));
+                        for (EDIFHierPortInst conn : physicalNetPinMap.get(hierNet)) {
                             if (conn.getPortInst().equals(pi))
                                 continue;
-                            EDIFHierCellInst neighbor = conn.getHierarchicalInst();
-                            // shape.addCell(i.toString(), design, 0, 0, , neighbor.getCellName());
+                            String connType = conn.getCellType().getName();
+                            if ((pi.getName().startsWith("DI") || pi.getName().startsWith("S"))
+                                    && !connType.contains("LUT")) {
+                                continue;
+                            }
+                            String belName = carryPinMap.get(pi.getName());
+                            if (belName != null) {
+                                shape.addCell(conn.getFullHierarchicalInstName(), design, 0, 0, belName,
+                                        conn.getCellType().getName());
+
+                            }
                         }
                     }
                 }
+                shape.addTag("Carry-chain");
                 break;
             default:
                 throw new RuntimeException("ERROR: Unhandled chain-type instance: " + type);
             }
         }
-
+        sortShapesByBELName(shapes);
         return shapes;
     }
     
@@ -188,30 +214,33 @@ public class ShapeTools {
         Shape shape = new Shape();
         switch (cellType) {
         case LUT6_2:
-            shape.setHeight(0);
-            shape.setWidth(0);
+            shape.setHeight(1);
+            shape.setWidth(1);
             for (EDIFCellInst i : macro.getCellType().getCellInsts()) {
-                String belName = "A" + i.getCellName();
+                String belName = "A" + (i.getCellName().charAt(i.getCellName().length() - 1) == '6' ? "6LUT" : "5LUT");
                 shape.addCell(macro.getChild(i).toString(), design, 0, 0, belName, i.getCellName());
             }
+            shape.addTag("LUTNM");
             break;
         case RAM64M:
-            shape.setHeight(0);
-            shape.setWidth(0);
+            shape.setHeight(1);
+            shape.setWidth(1);
             for (EDIFCellInst i : macro.getCellType().getCellInsts()) {
                 String belName = i.getName().charAt(i.getName().length() - 1) + "6LUT";
                 shape.addCell(macro.getChild(i).toString(), design, 0, 0, belName, i.getCellName());
             }
+            shape.addTag("Cluster");
             break;
         case RAM32M:
-            shape.setHeight(0);
-            shape.setWidth(0);
+            shape.setHeight(1);
+            shape.setWidth(1);
             for (EDIFCellInst i : macro.getCellType().getCellInsts()) {
                 String instName = i.getName();
                 String suffix = instName.endsWith("_D1") ? "6LUT" : "5LUT";
                 String belName = instName.charAt(3) + suffix;
                 shape.addCell(macro.getChild(i).toString(), design, 0, 0, belName, i.getCellName());
             }
+            shape.addTag("Cluster");
             break;
         default:
             throw new RuntimeException("ERROR: Unsupported shape for macro " + cellType);
@@ -245,13 +274,13 @@ public class ShapeTools {
                     int yIdx = relSiteName.lastIndexOf('Y');
                     int dx = Integer.parseInt(relSiteName.substring(relSiteName.lastIndexOf("_X") + 2, yIdx));
                     int dy = Integer.parseInt(relSiteName.substring(yIdx + 1));
-                    String belName = line.substring(commaIdx + 1, line.indexOf(')')).trim();
+                    String belName = line.substring(commaIdx + 1, line.indexOf(')')).replace(", optional", "").trim();
                     String cellName = line.substring(line.indexOf('\t') + 1, line.indexOf(" ("));
                     String cellType = line.substring(line.lastIndexOf('(') + 1, line.lastIndexOf(')'));
                     curr.addCell(cellName, design, dx, dy, belName, cellType);
                 } else if (line.startsWith("Tag(s): ")) {
                     String[] tags = line.split("\\s+");
-                    List<String> tagNames = new ArrayList<>();
+                    Set<String> tagNames = new HashSet<>();
                     for (int i = 1; i < tags.length; i++) {
                         tagNames.add(tags[i]);
                     }
@@ -272,11 +301,23 @@ public class ShapeTools {
         return shapes;
     }
 
-    public static void main(String[] args) {
-        Design d = Design.readCheckpoint("/wrk/hdstaff/clavin/workspace2/RapidWright/test/RapidWrightDCP/picoblaze_ooc_X10Y235_2022_1.dcp");
-//        List<Shape> shapes = readDebugShapeFile(d,
-        // Paths.get("/wrk/hdstaff/clavin/workspace2/RapidWrightInt/picoblaze_shapes.txt"));
-        // System.out.println(shapes.size());
-        extractShapes(d, Paths.get("/wrk/hdstaff/clavin/workspace2/RapidWright/vivadoToolsWorkdir61306@xsjclavin40x_1/shapes.txt"));
+    public static void sortShapesByBELName(List<Shape> shapes) {
+        for (Shape s : shapes) {
+            Map<String, Cell> cellOrderStrings = new HashMap<>();
+            for (Entry<Cell, ShapeLocation> e : s.getCellMap().entrySet()) {
+                ShapeLocation loc = e.getValue();
+                String key = loc.getDx() + "_" + loc.getDy() + "_" + loc.getBelName();
+                cellOrderStrings.put(key, e.getKey());
+            }
+            String[] keys = cellOrderStrings.keySet().toArray(new String[cellOrderStrings.size()]);
+            Arrays.sort(keys);
+            Map<Cell, ShapeLocation> orderedMap = new LinkedHashMap<>();
+            for (String key : keys) {
+                Cell cell = cellOrderStrings.get(key);
+                orderedMap.put(cell, s.getCellMap().get(cell));
+            }
+            s.setCellMap(orderedMap);
+        }
+
     }
 }
