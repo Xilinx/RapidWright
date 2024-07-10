@@ -267,7 +267,8 @@ public class RouteNodeGraph {
                 for (int x = 0; x < lagunaTilesAtY.length; x++) {
                     Tile tile = lagunaTilesAtY[x];
                     if (tile != null) {
-                        if (y == 0) {
+                        // For LAGUNA tiles on the first SLR boundary
+                        if (nextLagunaColumn[x] == Integer.MAX_VALUE) {
                             assert(x == tile.getTileXCoordinate());
                             // Looks like (on US+) LAGUNA tiles are always on the left side of an INT tile,
                             // with tile X coordinate one smaller
