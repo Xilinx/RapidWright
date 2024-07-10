@@ -2597,7 +2597,11 @@ public class DesignTools {
         }
         String logPinName = targetCell.getLogicalPinMapping(belPin.getName());
         if (logPinName == null) return null;
-        EDIFPortInst portInst = targetCell.getEDIFCellInst().getPortInst(logPinName);
+        EDIFCellInst eci = targetCell.getEDIFCellInst();
+        if (eci == null) {
+            return null;
+        }
+        EDIFPortInst portInst = eci.getPortInst(logPinName);
         final EDIFNetlist netlist = targetCell.getSiteInst().getDesign().getNetlist();
         EDIFHierPortInst hierPortInst =
                 new EDIFHierPortInst(netlist.getHierCellInstFromName(targetCell.getParentHierarchicalInstName()), portInst);

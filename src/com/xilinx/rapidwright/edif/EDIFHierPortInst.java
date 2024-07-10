@@ -88,10 +88,13 @@ public class EDIFHierPortInst {
             return hierarchicalInst.getFullHierarchicalInstName();
         }
 
-        EDIFCellInst topCellInst = portInst.getCellInst().getCellType().getLibrary().getNetlist().getTopCellInst();
-        if (portInst.getCellInst() == topCellInst) {
-            //Outward side of top
-            return "";
+        EDIFLibrary library = portInst.getCellInst().getCellType().getLibrary();
+        if (!library.isHDIPrimitivesLibrary()) {
+            EDIFCellInst topCellInst = library.getNetlist().getTopCellInst();
+            if (portInst.getCellInst() == topCellInst) {
+                // Outward side of top
+                return "";
+            }
         }
 
         StringBuilder sb = new StringBuilder();
