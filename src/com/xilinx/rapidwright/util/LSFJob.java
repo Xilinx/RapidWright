@@ -173,6 +173,8 @@ public class LSFJob extends Job {
                     return new Pair<>(JobState.RUNNING, 0);
                 case "PEND":
                     return new Pair<>(JobState.PENDING, 0);
+                case "UNKWN":
+                    return new Pair<>(JobState.UNKNOWN, 0);
                 case "PSUSP":
                 case "USUSP":
                 case "SSUSP":
