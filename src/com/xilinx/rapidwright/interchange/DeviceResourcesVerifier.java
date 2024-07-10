@@ -147,6 +147,8 @@ public class DeviceResourcesVerifier {
 
         dReader = readMsg.getRoot(DeviceResources.Device.factory);
 
+        boolean containsRoutingResources = dReader.getNodes().size() > 0;
+        
         int strCount = dReader.getStrList().size();
         TextList.Reader reader = dReader.getStrList();
         for (int i=0; i < strCount; i++) {
@@ -371,10 +373,11 @@ public class DeviceResourcesVerifier {
 
                 PrimitiveList.Int.Reader pinToWires = siteTypeReader.getPrimaryPinsToTileWires();
                 expect(site.getSitePinCount(), pinToWires.size());
+
+                StructList.Reader<SitePin.Reader> sitePins = stReader.getPins();
                 for (int k=0; k < site.getSitePinCount(); k++) {
                     String pinName = site.getPinName(k);
-                    expect(allStrings.getIndex(pinName),
-                           stReader.getPins().get(k).getName());
+                    expect(allStrings.getIndex(pinName), sitePins.get(k).getName());
                     expect(allStrings.getIndex(site.getTileWireNameFromPinName(pinName)),
                            pinToWires.get(k));
                 }
@@ -387,23 +390,25 @@ public class DeviceResourcesVerifier {
                     expect(allStrings.getIndex(altSiteTypes[k].name()), altStReader.getName());
 
                     ParentPins.Reader parentPins = siteTypeReader.getAltPinsToPrimaryPins().get(k);
+                    Int.Reader parentPinIdxs = parentPins.getPins();
 
-                    String[] altSitePins = siteInst.getSitePinNames();
+                    String[] altSitePinNames = siteInst.getSitePinNames();
                     Set<String> altSitePinSet = new HashSet<String>();
-                    for (int l=0; l < altSitePins.length; ++l) {
-                        altSitePinSet.add(altSitePins[l]);
+                    for (int l=0; l < altSitePinNames.length; ++l) {
+                        altSitePinSet.add(altSitePinNames[l]);
                     }
-                    expect(parentPins.getPins().size(), altSitePins.length);
-                    expect(parentPins.getPins().size(), altStReader.getPins().size());
+                    expect(parentPinIdxs.size(), altSitePinNames.length);
+                    expect(parentPinIdxs.size(), altStReader.getPins().size());
 
-                    for (int l=0; l < parentPins.getPins().size(); l++) {
-                        String sitePin = allStrings.get(altStReader.getPins().get(l).getName());
+                    StructList.Reader<SitePin.Reader> altSitePins = altStReader.getPins();
+                    for (int l = 0; l < parentPinIdxs.size(); l++) {
+                        String sitePin = allStrings.get(altSitePins.get(l).getName());
                         if (!altSitePinSet.contains(sitePin)) {
                             throw new RuntimeException("Site pin " + sitePin + " not found in site.");
                         }
 
                         String primSitePin = siteInst.getPrimarySitePinName(sitePin);
-                        expect(site.getPinIndex(primSitePin), parentPins.getPins().get(l));
+                        expect(site.getPinIndex(primSitePin), parentPinIdxs.get(l));
                     }
 
                     design.removeSiteInst(siteInst);
@@ -500,6 +505,12 @@ public class DeviceResourcesVerifier {
         for (EDIFLibrary lib : primsAndMacros.getLibraries()) {
             EDIFLibrary reference = lib.isHDIPrimitivesLibrary() ? Design.getPrimitivesLibrary(design.getDevice().getName()) :
                                                     Design.getMacroPrimitives(series);
+
+            if (!lib.isHDIPrimitivesLibrary()) {
+                // Remove unused macros from reference
+                EDIFLibrary prims = Design.getPrimitivesLibrary(design.getDevice().getName());
+                DeviceResourcesWriter.removeUnusedMacros(reference, prims);
+            }
 
             Set<String> cellsFound = new HashSet<String>();
             cellsFound.addAll(lib.getCellMap().keySet());
@@ -609,7 +620,10 @@ public class DeviceResourcesVerifier {
         verifyCellBelPinMaps(allStrings, dReader, design);
         verifyPackages(allStrings, dReader, device);
 
-        ConstantDefinitions.verifyConstants(allStrings, device, design, siteTypes, dReader.getConstants(), tileTypeEnumMap);
+        if (containsRoutingResources) {
+            ConstantDefinitions.verifyConstants(allStrings, device, design, siteTypes, dReader.getConstants(), tileTypeEnumMap);            
+        }
+
 
         return true;
     }

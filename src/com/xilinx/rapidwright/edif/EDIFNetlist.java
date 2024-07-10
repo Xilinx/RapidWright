@@ -1713,6 +1713,8 @@ public class EDIFNetlist extends EDIFName {
                 if (child == null) {
                     EDIFCell childCopy = new EDIFCell(netlistPrims, inst.getCellType(), inst.getCellType().getName());
                     inst.setCellType(childCopy);
+                } else if (inst.getCellType() != child) {
+                    inst.setCellType(child);
                 }
             }
         }

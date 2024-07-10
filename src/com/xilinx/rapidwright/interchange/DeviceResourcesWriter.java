@@ -246,7 +246,7 @@ public class DeviceResourcesWriter {
     }
 
 
-    private static boolean containsUnusedMacros(EDIFCell cell, Set<EDIFCell> unusedMacros) {
+    protected static boolean containsUnusedMacros(EDIFCell cell, Set<EDIFCell> unusedMacros) {
         Queue<EDIFCell> q = new LinkedList<>();
         Set<EDIFCell> visited = new HashSet<>();
         q.add(cell);
@@ -304,7 +304,6 @@ public class DeviceResourcesWriter {
         // Create an EDIFNetlist populated with just primitive and macro libraries
         EDIFLibrary prims = Design.getPrimitivesLibrary(device.getName());
         EDIFLibrary macros = Design.getMacroPrimitives(series);
-        Set<EDIFCell> unsupportedMacros = new HashSet<>();
         EDIFNetlist netlist = new EDIFNetlist("PrimitiveLibs");
         netlist.addLibrary(prims);
         netlist.addLibrary(macros);
@@ -320,28 +319,7 @@ public class DeviceResourcesWriter {
             prims.removeCell(dupCell);
         }
 
-        for (EDIFCell cell : macros.getCells()) {
-            for (EDIFCellInst inst : cell.getCellInsts()) {
-                EDIFCell instCell = inst.getCellType();
-                if (!prims.containsCell(instCell) && !macros.containsCell(instCell)) {
-                    unsupportedMacros.add(cell);
-                    continue;
-                }
-                EDIFCell macroCell = macros.getCell(instCell.getName());
-                if (macroCell != null && !unsupportedMacros.contains(macroCell)) {
-                    // remap cell definition to macro library
-                    inst.setCellType(macroCell);
-                }
-            }
-        }
-
-        // Not all devices have all the primitives to support all macros, thus we will remove
-        // them to avoid stale references
-        for (EDIFCell macro : new ArrayList<>(macros.getCells())) {
-            if (containsUnusedMacros(macro, unsupportedMacros)) {
-                macros.removeCell(macro);
-            }
-        }
+        removeUnusedMacros(macros, prims);
 
         Map<String, Pair<String, EnumSet<IOStandard>>> macroCollapseExceptionMap =
                 EDIFNetlist.macroCollapseExceptionMap.getOrDefault(series, Collections.emptyMap());
@@ -494,6 +472,33 @@ public class DeviceResourcesWriter {
         t.stop().start("Write File");
         Interchange.writeInterchangeFile(fileName, message);
         t.stop();
+    }
+
+    public static void removeUnusedMacros(EDIFLibrary macros, EDIFLibrary prims) {
+        Set<EDIFCell> unsupportedMacros = new HashSet<>();
+        for (EDIFCell cell : macros.getCells()) {
+            for (EDIFCellInst inst : cell.getCellInsts()) {
+                EDIFCell instCell = inst.getCellType();
+                if (!prims.containsCell(instCell) && !macros.containsCell(instCell)) {
+                    unsupportedMacros.add(cell);
+                    continue;
+                }
+                EDIFCell macroCell = macros.getCell(instCell.getName());
+                if (macroCell != null && !unsupportedMacros.contains(macroCell)) {
+                    // remap cell definition to macro library
+                    inst.setCellType(macroCell);
+                }
+            }
+        }
+
+        // Not all devices have all the primitives to support all macros, thus we will
+        // remove
+        // them to avoid stale references
+        for (EDIFCell macro : new ArrayList<>(macros.getCells())) {
+            if (containsUnusedMacros(macro, unsupportedMacros)) {
+                macros.removeCell(macro);
+            }
+        }
     }
 
     public static void writeAllStringsToBuilder(DeviceResources.Device.Builder devBuilder) {
