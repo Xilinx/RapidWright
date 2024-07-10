@@ -1914,11 +1914,10 @@ public class RWRoute{
         }
 
         NetWrapper net = connection.getNetWrapper();
-        float biasFactor = (Math.abs(rnode.getEndTileXCoordinate() - net.getXCenter()) + Math.abs(rnode.getEndTileYCoordinate() - net.getYCenter())) /
-                (net.getConnections().size() * net.getDoubleHpwl());
+        float distToCenter = Math.abs(rnode.getEndTileXCoordinate() - net.getXCenter()) + Math.abs(rnode.getEndTileYCoordinate() - net.getYCenter());
         // CRoute paper states that the bias factor cannot be more than half of the wire cost
-        biasFactor = Math.min(biasFactor, 0.5f);
-        float biasCost = rnode.getBaseCost() * biasFactor;
+        // (it may exceed this here because we may not be using the minimum-sized bounding box)
+        float biasCost = rnode.getBaseCost() * Math.min(distToCenter * net.getBiasFactor(), 0.5f);
 
         return rnode.getBaseCost() * rnode.getHistoricalCongestionCost() * presentCongestionCost / sharingFactor + biasCost;
     }

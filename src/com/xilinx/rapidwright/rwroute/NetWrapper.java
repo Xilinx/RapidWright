@@ -43,7 +43,7 @@ public class NetWrapper{
     private float xCenter;
     private float yCenter;
     /** The half-perimeter wirelength */
-    private short doubleHpwl;
+    private float biasFactor;
 
     public NetWrapper(int id, Net net) {
         this.id = id;
@@ -94,9 +94,11 @@ public class NetWrapper{
             count++;
         }
 
-        doubleHpwl = (short) ((xMax - xMin + 1 + yMax - yMin + 1) * 2);
         xCenter = (float)xSum / count;
         yCenter = (float)ySum / count;
+
+        int hpwl = (xMax - xMin + 1 + yMax - yMin + 1);
+        biasFactor = 1 / (getConnections().size() + hpwl * 2);
     }
 
     public Net getNet() {
@@ -111,8 +113,8 @@ public class NetWrapper{
         return connections;
     }
 
-    public short getDoubleHpwl() {
-        return doubleHpwl;
+    public float getBiasFactor() {
+        return biasFactor;
     }
 
     public float getYCenter() {
