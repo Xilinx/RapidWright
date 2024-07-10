@@ -27,7 +27,8 @@ public enum JobState {
     RUNNING("running"),
     EXITED("exited"),
     SUSPENDED("suspended"),
-    PENDING("pending");
+    PENDING("pending"),
+    UNKNOWN("unknown");
 
     private final String name;
 
