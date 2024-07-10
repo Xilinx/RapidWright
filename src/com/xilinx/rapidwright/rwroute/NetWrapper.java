@@ -42,8 +42,6 @@ public class NetWrapper{
     /** Geometric center coordinates */
     private float xCenter;
     private float yCenter;
-    /** The half-perimeter wirelength */
-    private short doubleHpwl;
 
     public NetWrapper(int id, Net net) {
         this.id = id;
@@ -94,7 +92,6 @@ public class NetWrapper{
             count++;
         }
 
-        doubleHpwl = (short) ((xMax - xMin + 1 + yMax - yMin + 1) * 2);
         xCenter = (float)xSum / count;
         yCenter = (float)ySum / count;
     }
@@ -109,10 +106,6 @@ public class NetWrapper{
 
     public List<Connection> getConnections() {
         return connections;
-    }
-
-    public short getDoubleHpwl() {
-        return doubleHpwl;
     }
 
     public float getYCenter() {
