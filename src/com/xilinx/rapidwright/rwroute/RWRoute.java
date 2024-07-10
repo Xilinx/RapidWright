@@ -1913,12 +1913,12 @@ public class RWRoute{
             presentCongestionCost = rnode.getPresentCongestionCost();
         }
 
-        float biasCost = 0;
-        if (!rnode.isTarget() && rnode.getType() != RouteNodeType.SUPER_LONG_LINE) {
-            NetWrapper net = connection.getNetWrapper();
-            biasCost = rnode.getBaseCost() / net.getConnections().size() *
-                    (Math.abs(rnode.getEndTileXCoordinate() - net.getXCenter()) + Math.abs(rnode.getEndTileYCoordinate() - net.getYCenter())) / net.getDoubleHpwl();
-        }
+        NetWrapper net = connection.getNetWrapper();
+        float biasFactor = (Math.abs(rnode.getEndTileXCoordinate() - net.getXCenter()) + Math.abs(rnode.getEndTileYCoordinate() - net.getYCenter())) /
+                (net.getConnections().size() * net.getDoubleHpwl());
+        // CRoute paper states that the bias factor cannot be more than half of the wire cost
+        biasFactor = Math.min(biasFactor, 0.5f);
+        float biasCost = rnode.getBaseCost() * biasFactor;
 
         return rnode.getBaseCost() * rnode.getHistoricalCongestionCost() * presentCongestionCost / sharingFactor + biasCost;
     }
