@@ -302,7 +302,7 @@ public class TestRWRoute {
             "SLICE_X0Y0,SLICE_X0Y899,600",      // Straight up: far from Laguna column
             "SLICE_X168Y0,SLICE_X168Y899,400",  // Straight up: far from Laguna column
             "SLICE_X9Y0,SLICE_X162Y899,1000",   // Up and right
-            "SLICE_X168Y162,SLICE_X9Y899,600",  // Up and left
+            "SLICE_X168Y162,SLICE_X9Y899,800",  // Up and left
     })
     public void testSLRCrossingNonTimingDriven(String srcSiteName, String dstSiteName, long nodesPoppedLimit) {
         testSingleConnectionHelper(Device.AWS_F1, srcSiteName, "AQ", dstSiteName, "A1", nodesPoppedLimit);

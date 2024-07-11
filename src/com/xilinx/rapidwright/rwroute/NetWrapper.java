@@ -42,7 +42,7 @@ public class NetWrapper{
     /** Geometric center coordinates */
     private float xCenter;
     private float yCenter;
-    /** The half-perimeter wirelength */
+    /** The constant factor used to compute the bias cost */
     private float biasFactor;
 
     public NetWrapper(int id, Net net) {
@@ -97,8 +97,9 @@ public class NetWrapper{
         xCenter = (float)xSum / count;
         yCenter = (float)ySum / count;
 
+
         int hpwl = (xMax - xMin + 1 + yMax - yMin + 1);
-        biasFactor = 1 / (getConnections().size() + hpwl * 2);
+        biasFactor = 1.0f / (2 * getConnections().size() * hpwl);
     }
 
     public Net getNet() {
