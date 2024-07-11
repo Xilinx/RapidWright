@@ -1,4 +1,27 @@
-============= RapidWright 2023.2.2-beta released on 2023-04-03 ================
+============= RapidWright 2024.1.0-beta released on 2024-06-11 ================
+Notes: 
+  - Support for Vivado 2024.1 DCPs and devices
+  - Support to write DCPs with physDB components with Params.RW_WRITE_DCP_2024_1
+  - 2024.1 DCP Write Test (#997)
+  - Updates to support 2024.1 DCP writing (#995)
+  - Add FileTools.getAutoBufferedInputStream() with zstd auto-detect (#990)
+  - BlockPlacer2: Fix off by one error in selecting module instance to move (#987)
+  - Fix PolynomialGenerator and TestDCPSave tests (#982)
+  - Use exit code 1 if any LSF job failed (#981)
+  - Fixes issues around Node->Wire equivalence (#407)
+
+API Additions:
+  - com.xilinx.rapidwright.device.Device "public boolean hasModularSLRs()"
+  - com.xilinx.rapidwright.device.Wire "public boolean isConnected()"
+  - com.xilinx.rapidwright.device.Wire "public boolean isTiedToVCC()"
+  - com.xilinx.rapidwright.device.Wire "public boolean isTiedToGND()"
+  - com.xilinx.rapidwright.device.Wire "public boolean isTied()"
+
+API Removals:
+  - com.xilinx.rapidwright.device.Node "public int getWire()"
+  - com.xilinx.rapidwright.util.RapidWright "*"
+  
+============= RapidWright 2023.2.2-beta released on 2024-04-03 ================
 Notes:
   - Use new Cell.{LOCKED,PORT_TYPE,isPortCell()} (#977)
   - Remove some pre-2023.2.2 workarounds (#978)
@@ -54,7 +77,7 @@ API Additions:
   - com.xilinx.rapidwright.device.SitePIP "public static SitePIP getSitePIP(Device device, SiteTypeEnum siteTypeEnum, int sitePIPIndex)"
 
 
-============= RapidWright 2023.2.1-beta released on 2023-01-10 ================
+============= RapidWright 2023.2.1-beta released on 2024-01-10 ================
 Notes:
   - Add EDIFHierCellInst.isUniquified() (#918)
   - [RWRoute] RouteNode to extend Node (#916)

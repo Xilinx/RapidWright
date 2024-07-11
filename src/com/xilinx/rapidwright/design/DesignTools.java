@@ -983,7 +983,7 @@ public class DesignTools {
                 Net alias = design.getNet(netAlias.getHierarchicalNetName());
                 if (alias != null) {
                     // Move this non-parent net physical information to the parent
-                    for (SiteInst si : alias.getSiteInsts()) {
+                    for (SiteInst si : new ArrayList<>(alias.getSiteInsts())) {
                         List<String> siteWires = si.getSiteWiresFromNet(alias);
                         if (siteWires != null) {
                             for (String siteWire : new ArrayList<>(siteWires)) {
@@ -1569,7 +1569,11 @@ public class DesignTools {
                                     String otherPinName = otherCell.getPinMappingsP2L().keySet().iterator().next();
                                     otherPin = pin.getBEL().getPin(otherPinName);
                                 } else {
-                                    otherPin = LUTTools.getLUTOutputPin(pin.getBEL());
+                                    // Make sure we are coming in on the routed-thru pin
+                                    String otherPinName = otherCell.getPinMappingsP2L().keySet().iterator().next();
+                                    if (pin.getName().equals(otherPinName)) {
+                                        otherPin = LUTTools.getLUTOutputPin(pin.getBEL());
+                                    }
                                 }
                                 if (otherPin != null) {
                                     Net otherNet = siteInst.getNetFromSiteWire(otherPin.getSiteWireName());
@@ -1738,15 +1742,19 @@ public class DesignTools {
         t.stop().start("Remove p&r");
 
         List<EDIFHierCellInst> allLeafs = d.getNetlist().getAllLeafDescendants(hierarchicalCell);
-
-        // Remove all placement and routing information related to the cell to be
-        // blackboxed
+        Set<Cell> cells = new HashSet<>();
         for (EDIFHierCellInst i : allLeafs) {
             // Get the physical cell, make sure we can unplace/unroute it first
             Cell c = d.getCell(i.getFullHierarchicalInstName());
             if (c == null) {
                 continue;
             }
+            cells.add(c);
+        }
+
+        // Remove all placement and routing information related to the cell to be
+        // blackboxed
+        for (Cell c : cells) {
             BEL bel = c.getBEL();
             SiteInst si = c.getSiteInst();
 

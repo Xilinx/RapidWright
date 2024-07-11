@@ -1823,6 +1823,31 @@ public class FileTools {
     }
 
     /**
+     * Checks if Vivado is available and if it is available if it is at least of the
+     * version major.minor or later.
+     * 
+     * @param major The major Vivado version (generally the year)
+     * @param minor The minor Vivado version
+     * @return True if Vivado is available and meets the version requirements, false
+     *         otherwise.
+     */
+    public static boolean isVivadoAtLeastVersion(int major, int minor) {
+        String vivadoVersion = getVivadoVersion();
+        if (vivadoVersion != null) {
+            vivadoVersion = vivadoVersion.replace("v", "");
+            int idx = vivadoVersion.indexOf('.');
+            int availMajor = Integer.parseInt(vivadoVersion.substring(0, idx));
+            int availMinor = Integer.parseInt(vivadoVersion.substring(idx + 1));
+            if (availMajor > major)
+                return true;
+            if (availMajor == major) {
+                return availMinor >= minor;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Gets the current version of Vivado on the system PATH.
      * @return The string version representation of the Vivado version available on the system PATH.
      */

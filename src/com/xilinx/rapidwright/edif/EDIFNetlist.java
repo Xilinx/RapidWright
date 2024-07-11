@@ -897,7 +897,7 @@ public class EDIFNetlist extends EDIFName {
      * @param name the hierarchical name
      * @return A pair of EdifHierCellInst and the unmatched portion of the name. The name may be null if we found a complete match
      */
-    private Pair<List<EDIFCellInst>, String> getHierObject(String name) {
+    public Pair<List<EDIFCellInst>, String> getHierObject(String name) {
         if (name.isEmpty()) return new Pair<>(Collections.singletonList(getTopCellInst()), null);
         String[] parts = name.split(EDIFTools.EDIF_HIER_SEP);
 
@@ -1093,6 +1093,7 @@ public class EDIFNetlist extends EDIFName {
     public List<EDIFHierCellInst> getAllLeafDescendants(String instanceName) {
         return getAllLeafDescendants(getHierCellInstFromName(instanceName));
     }
+
     /**
      * Searches all lower levels of hierarchy to find all leaf descendants.  It returns a
      * list of all leaf cells that fall under the hierarchy of the provided instance name.
@@ -1100,6 +1101,21 @@ public class EDIFNetlist extends EDIFName {
      * @return A list of all leaf cell instances or null if the instanceName was not found.
      */
     public List<EDIFHierCellInst> getAllLeafDescendants(EDIFHierCellInst instance) {
+        return getAllLeafDescendants(instance, false);
+    }
+
+    /**
+     * Searches all lower levels of hierarchy to find all leaf descendants. It
+     * returns a list of all leaf cells that fall under the hierarchy of the
+     * provided instance name.
+     * 
+     * @param instance          The instance to start searching from.
+     * @param includeBlackBoxes Flag, if set to true, will include black box
+     *                          instances in the returned list.
+     * @return A list of all leaf cell instances or null if the instanceName was not
+     *         found.
+     */
+    public List<EDIFHierCellInst> getAllLeafDescendants(EDIFHierCellInst instance, boolean includeBlackBoxes) {
         List<EDIFHierCellInst> leafCells = new ArrayList<>();
 
 
@@ -1108,7 +1124,7 @@ public class EDIFNetlist extends EDIFName {
 
         while (!toProcess.isEmpty()) {
             EDIFHierCellInst curr = toProcess.poll();
-            if (curr.getCellType().isPrimitive()) {
+            if (curr.getCellType().isPrimitive() || (includeBlackBoxes && curr.getCellType().isLeafCellOrBlackBox())) {
                 leafCells.add(curr);
             } else {
                 curr.addChildren(toProcess);
@@ -1454,11 +1470,25 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
-     * Traverses the netlist and produces a list of all primitive leaf hierarchical cell instances.
+     * Traverses the netlist and produces a list of all primitive leaf hierarchical
+     * cell instances.
+     * 
+     * @param includeBlackBoxes Flag if set to true will also include black boxes in
+     *                          the returned list.
+     * @return A list of all primitive leaf hierarchical cell instances.
+     */
+    public List<EDIFHierCellInst> getAllLeafHierCellInstances(boolean includeBlackBoxes) {
+        return getAllLeafDescendants(getTopHierCellInst(), includeBlackBoxes);
+    }
+
+    /**
+     * Traverses the netlist and produces a list of all primitive leaf hierarchical
+     * cell instances.
+     * 
      * @return A list of all primitive leaf hierarchical cell instances.
      */
     public List<EDIFHierCellInst> getAllLeafHierCellInstances() {
-        return getAllLeafDescendants(getTopHierCellInst());
+        return getAllLeafHierCellInstances(false);
     }
 
     /**
@@ -1683,6 +1713,8 @@ public class EDIFNetlist extends EDIFName {
                 if (child == null) {
                     EDIFCell childCopy = new EDIFCell(netlistPrims, inst.getCellType(), inst.getCellType().getName());
                     inst.setCellType(childCopy);
+                } else if (inst.getCellType() != child) {
+                    inst.setCellType(child);
                 }
             }
         }

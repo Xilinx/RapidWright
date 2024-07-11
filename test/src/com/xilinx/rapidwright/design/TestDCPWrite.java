@@ -28,6 +28,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Params;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 public class TestDCPWrite {
 
@@ -36,5 +39,18 @@ public class TestDCPWrite {
         // Tests a dual-output scenario COUT and HQ2 in Versal (See Xilinx/RapidWright#572)
         Design d = RapidWrightDCP.loadDCP("versal_cout_hq2.dcp");
         d.writeCheckpoint(dir.resolve("output.dcp"));
+    }
+
+    @Test
+    public void testNewPhysDBWrite(@TempDir Path dir) {
+        Design d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks_2024.1.dcp");
+        Path dcp = dir.resolve("microblazeAndILA_3pblocks_2024.1_postrw.dcp");
+        Params.RW_WRITE_DCP_2024_1 = true;
+        d.writeCheckpoint(dcp);
+        Params.RW_WRITE_DCP_2024_1 = false;
+        Design.readCheckpoint(dcp);
+        if (FileTools.isVivadoAtLeastVersion(2024, 1)) {
+            VivadoToolsHelper.assertFullyRouted(dcp);
+        }
     }
 }

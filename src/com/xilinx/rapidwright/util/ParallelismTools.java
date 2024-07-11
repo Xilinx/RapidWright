@@ -183,6 +183,7 @@ public class ParallelismTools {
      * @param <T> Type returned by all tasks.
      * @return A Deque of Future objects corresponding to each task (in order).
      */
+    @SafeVarargs
     public static <T> Deque<Future<T>> invokeFirstSubmitRest(@NotNull Callable<T>... tasks) {
         Deque<Future<T>> futures = new ArrayDeque<>(tasks.length);
 
