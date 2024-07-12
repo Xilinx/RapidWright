@@ -172,7 +172,6 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                             baseCost = 1.2f;
                         } else {
                             // (EE|WW)2_[EW]_BEG[0-7]
-                            assert(length <= 1);
                             baseCost = 0.8f;
                         }
                         break;
