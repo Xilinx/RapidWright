@@ -144,7 +144,7 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
     }
 
     private void setBaseCost() {
-        baseCost = 0.1f;
+        baseCost = 0.2f;
         switch (type) {
             case WIRE:
                 // NOTE: IntentCode is device-dependent
@@ -163,26 +163,26 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                         break;
                     case NODE_SINGLE:
                         if (length != 0) {
-                            baseCost = 0.8f;
+                            baseCost = 1.0f;
                         }
                         break;
                     case NODE_DOUBLE:
                         if (endTileXCoordinate == getTile().getTileXCoordinate()) {
                             // (NN|SS)2_[EW]_BEG[0-7]
-                            baseCost = 1.2f;
+                            baseCost = 1.25f;
                         } else {
                             // (EE|WW)2_[EW]_BEG[0-7]
-                            baseCost = 0.8f;
+                            baseCost = 1.0f;
                         }
                         break;
                     case NODE_HQUAD:
-                        baseCost = 0.6f;
+                        baseCost = 0.8f;
                         break;
                     case NODE_VQUAD:
                         baseCost = 1.0f;
                         break;
                     case NODE_HLONG:
-                        baseCost = 0.5f;
+                        baseCost = 0.7f;
                         break;
                     case NODE_VLONG:
                         baseCost = 0.8f;
