@@ -560,8 +560,9 @@ public class RouteNodeGraph {
         }
 
         int childX = childTile.getTileXCoordinate();
-        if (connection.isCrossSLR() && nextLagunaColumn[childX] == childX) {
-            // Connection crosses SLR and this is a Laguna column
+        if (connection.getSinkRnode().getSLRIndex() != childRnode.getSLRIndex() &&
+                nextLagunaColumn[childX] == childX) {
+            // Connection needs to cross SLRs and this is a Laguna column
             return true;
         }
 
