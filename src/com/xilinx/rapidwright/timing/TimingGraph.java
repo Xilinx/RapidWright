@@ -223,15 +223,21 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             if (n.isClockNet() || n.isStaticNet() || n.hasPIPs()) continue;
             if (!RouterHelper.isRoutableNetWithSourceSinks(n)) continue;
             List<EDIFHierPortInst> ehportInsts = design.getNetlist().getPhysicalPins(n.getName());
-            for (EDIFHierPortInst eportInst : ehportInsts) {
-                keys.add(eportInst.getFullHierarchicalInstName());
+            if (ehportInsts == null) {
+                System.out.println("WARNING: Unable to find physical pins on Net '" + n.getName() + "'; possibly due to an encrypted netlist.");
+
+            } else {
+                for (EDIFHierPortInst eportInst : ehportInsts) {
+                    keys.add(eportInst.getFullHierarchicalInstName());
+                }
             }
         }
         
         for (String fullHierInstName : keys) {
             EDIFCellInst edifCellInst = myCellMap.get(fullHierInstName);
             if (edifCellInst == null) {
-                System.out.println("WARNING: Null EDIFCellInst under name " + fullHierInstName);
+                System.out.println("WARNING: Unable to find EDIFCellInst '" + fullHierInstName + "'; possibly due to an encrypted netlist.");
+
                 continue;
             }
             partialCellMap.put(fullHierInstName, edifCellInst);
