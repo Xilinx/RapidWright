@@ -144,19 +144,8 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
     }
 
     private void setBaseCost() {
-        baseCost = 0.4f;
+        baseCost = 0.2f;
         switch (type) {
-            case LAGUNA_I:
-                // Make all approaches to SLLs zero-cost to encourage exploration
-                // Assigning a base cost of zero would normally break congestion resolution
-                // (since RWroute.getNodeCost() would return zero) but doing it here should be
-                // okay because this node only leads to a SLL which will have a non-zero base cost
-                baseCost = 0.0f;
-                break;
-            case SUPER_LONG_LINE:
-                assert(length == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
-                baseCost = 0.3f * length;
-                break;
             case WIRE:
                 // NOTE: IntentCode is device-dependent
                 IntentCode ic = getIntentCode();
@@ -173,46 +162,44 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                         assert(length <= 1);
                         break;
                     case NODE_SINGLE:
-                        assert(length <= 2);
-                        if (length == 2) baseCost *= length;
+                        if (length != 0) {
+                            baseCost = 0.6f;
+                        }
                         break;
                     case NODE_DOUBLE:
-                        if (endTileXCoordinate != getTile().getTileXCoordinate()) {
-                            assert(length <= 2);
-                            // Typically, length = 1 (since tile X is not equal)
-                            // In US, have seen length = 2, e.g. VU440's INT_X171Y827/EE2_E_BEG7.
-                            if (length == 2) baseCost *= length;
+                        if (endTileXCoordinate == getTile().getTileXCoordinate()) {
+                            // (NN|SS)_[EW]_BEG[0-7]
+                            baseCost = 1.2f;
                         } else {
-                            // Typically, length = 2 except for horizontal U-turns (length = 0)
-                            // or vertical U-turns (length = 1).
-                            // In US, have seen length = 3, e.g. VU440's INT_X171Y827/NN2_E_BEG7.
-                            assert(length <= 3);
+                            // (EE|WW)_[EW]_BEG[0-7]
+                            assert(length <= 1);
+                            baseCost = 0.6f;
                         }
                         break;
                     case NODE_HQUAD:
-                        assert (length != 0 || getAllDownhillNodes().isEmpty());
-                        baseCost = 0.35f * length;
+                        baseCost = 0.7f;
                         break;
                     case NODE_VQUAD:
-                        // In case of U-turn nodes
-                        if (length != 0) baseCost = 0.15f * length;// VQUADs have length 4 and 5
+                        baseCost = 1.4f;
                         break;
                     case NODE_HLONG:
-                        assert (length != 0 || getAllDownhillNodes().isEmpty());
-                        baseCost = 0.15f * length;// HLONGs have length 6 and 7
+                        baseCost = 0.8f;
                         break;
                     case NODE_VLONG:
-                        baseCost = 0.7f;
+                        baseCost = 1.6f;
                         break;
                     default:
                         throw new RuntimeException(ic.toString());
                 }
                 break;
+            case SUPER_LONG_LINE:
+                assert(length == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
+                baseCost = 16f;
+                break;
             case PINFEED_I:
             case PINBOUNCE:
-                break;
             case PINFEED_O:
-                baseCost = 1f;
+            case LAGUNA_I:
                 break;
             default:
                 throw new RuntimeException(type.toString());
