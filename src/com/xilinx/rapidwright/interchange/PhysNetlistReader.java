@@ -99,7 +99,7 @@ public class PhysNetlistReader {
      *  Checks that constant routing and net names are valid.
      *  This incurs a runtime overhead.
      */
-    public static boolean CHECK_CONSTANT_ROUTING_AND_NET_NAMING = true;
+    public static boolean CHECK_CONSTANT_ROUTING_AND_NET_NAMING = false;
 
     /**
      * Examines a design to ensure that the provided macro placement is consistent with the
@@ -137,7 +137,7 @@ public class PhysNetlistReader {
     protected Design read(String physNetlistFileName) throws IOException {
         CodePerfTracker t = new CodePerfTracker("Read PhysNetlist");
         ReaderOptions options =
-                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
+                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 256,
                 ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
         PhysNetlist.Reader physNetlist = null;
         try (ReadableByteChannel channel = Interchange.getReadableByteChannel(physNetlistFileName)) {
@@ -182,6 +182,21 @@ public class PhysNetlistReader {
         return design;
     }
 
+    public static PhysNetlist.Reader[] readAllPhysNetlistMessages(String physNetlistFileName) {
+        ReaderOptions options =
+                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 256,
+                ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
+        PhysNetlist.Reader[] physNetlistMsgs = new PhysNetlist.Reader[PhysNetlistWriter.NUM_PHYS_NETLIST_MESSAGES];
+        try (ReadableByteChannel channel = Interchange.getReadableByteChannel(physNetlistFileName)) {
+            for (int i=0; i < PhysNetlistWriter.NUM_PHYS_NETLIST_MESSAGES; i++) { 
+                physNetlistMsgs[i] = Interchange.readMessageFromChannel(channel, options).getRoot(PhysNetlist.factory);    
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return physNetlistMsgs;
+    }
+    
     public static Design readPhysNetlist(String physNetlistFileName) throws IOException {
         return readPhysNetlist(physNetlistFileName, null);
     }

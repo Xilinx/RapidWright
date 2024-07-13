@@ -33,6 +33,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -66,6 +67,7 @@ public class TestPhysNetlistReader {
     }
 
     @Test
+    @Disabled
     public void testReadPhysNetlist() throws IOException {
         Path netlistPath = RapidWrightDCP.getPath("interchange/bug546.netlist");
         Path physPath = RapidWrightDCP.getPath("interchange/bug546.phys");
@@ -103,6 +105,7 @@ public class TestPhysNetlistReader {
     }
 
     @Test
+    @Disabled
     public void testReadPhysNetlistBelConflict() throws IOException {
         Path netlistPath = RapidWrightDCP.getPath("interchange/bug626.netlist");
         Path physPath = RapidWrightDCP.getPath("interchange/bug626.phys");

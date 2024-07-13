@@ -92,16 +92,11 @@ public class TestPhysNetlistWriter {
         final Path interchangePath = tempDir.resolve("routethru_luts.phys");
         PhysNetlistWriter.writePhysNetlist(design, interchangePath.toString());
 
-        ReaderOptions rdOptions =
-                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
-                        ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
-        MessageReader readMsg = Interchange.readInterchangeFile(interchangePath.toString(), rdOptions);
+        PhysNetlist.Reader[] physNetlist = PhysNetlistReader.readAllPhysNetlistMessages(interchangePath.toString());
 
-        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
+        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist[PhysNetlistWriter.PHYS_MSG_STRINGS]);
 
-        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
-
-        for (PhysNet.Reader physNet : physNetlist.getPhysNets()) {
+        for (PhysNet.Reader physNet : physNetlist[PhysNetlistWriter.PHYS_MSG_ROUTING].getPhysNets()) {
             if (physNet.getType() == NetType.GND || physNet.getType() == NetType.VCC) {
                 continue;
             }
@@ -125,16 +120,11 @@ public class TestPhysNetlistWriter {
         final Path interchangePath = tempDir.resolve("routethru_luts.phys");
         PhysNetlistWriter.writePhysNetlist(design, interchangePath.toString());
 
-        ReaderOptions rdOptions =
-                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
-                        ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
-        MessageReader readMsg = Interchange.readInterchangeFile(interchangePath.toString(), rdOptions);
+        PhysNetlist.Reader[] physNetlist = PhysNetlistReader.readAllPhysNetlistMessages(interchangePath.toString());
 
-        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
+        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist[PhysNetlistWriter.PHYS_MSG_STRINGS]);
 
-        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
-
-        for (CellPlacement.Reader placement : physNetlist.getPlacements()) {
+        for (CellPlacement.Reader placement : physNetlist[PhysNetlistWriter.PHYS_MSG_PLACEMENT].getPlacements()) {
             SiteInst siteInst = design.getSiteInstFromSiteName(allStrings.get(placement.getSite()));
             Assertions.assertNotNull(siteInst);
 
@@ -156,17 +146,12 @@ public class TestPhysNetlistWriter {
         String interchangePath = tempDir.resolve("design.phys").toString();
         PhysNetlistWriter.writePhysNetlist(design, interchangePath);
 
-        ReaderOptions rdOptions =
-                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
-                        ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
-        MessageReader readMsg = Interchange.readInterchangeFile(interchangePath, rdOptions);
+        PhysNetlist.Reader[] physNetlist = PhysNetlistReader.readAllPhysNetlistMessages(interchangePath);
 
-        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
-
-        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
+        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist[PhysNetlistWriter.PHYS_MSG_STRINGS]);
 
         PhysNet.Reader net = null;
-        for (PhysNet.Reader n : physNetlist.getPhysNets()) {
+        for (PhysNet.Reader n : physNetlist[PhysNetlistWriter.PHYS_MSG_ROUTING].getPhysNets()) {
             String netName = allStrings.get(n.getName());
             if (!netName.equals("processor/alu_decode1_lut/O6"))
                 continue;
@@ -207,17 +192,12 @@ public class TestPhysNetlistWriter {
         String interchangePath = tempDir.resolve("design.phys").toString();
         PhysNetlistWriter.writePhysNetlist(design, interchangePath);
 
-        ReaderOptions rdOptions =
-                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
-                        ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
-        MessageReader readMsg = Interchange.readInterchangeFile(interchangePath, rdOptions);
+        PhysNetlist.Reader[] physNetlist = PhysNetlistReader.readAllPhysNetlistMessages(interchangePath);
 
-        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
-
-        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
+        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist[PhysNetlistWriter.PHYS_MSG_STRINGS]);
 
         int numNetsFound = 0;
-        for (PhysNet.Reader net : physNetlist.getPhysNets()) {
+        for (PhysNet.Reader net : physNetlist[PhysNetlistWriter.PHYS_MSG_ROUTING].getPhysNets()) {
             String netName = allStrings.get(net.getName());
             // It's known that all these clock nets are fully routed
             if (!netName.equals("base_mb_i/clk_wiz_1/inst/clk_out1") &&
@@ -243,17 +223,12 @@ public class TestPhysNetlistWriter {
         String interchangePath = tempDir.resolve("design.phys").toString();
         PhysNetlistWriter.writePhysNetlist(design, interchangePath);
 
-        ReaderOptions rdOptions =
-                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
-                        ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
-        MessageReader readMsg = Interchange.readInterchangeFile(interchangePath, rdOptions);
+        PhysNetlist.Reader[] physNetlist = PhysNetlistReader.readAllPhysNetlistMessages(interchangePath);
 
-        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
-
-        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
+        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist[PhysNetlistWriter.PHYS_MSG_STRINGS]);
 
         PhysNet.Reader net = null;
-        for (PhysNet.Reader n : physNetlist.getPhysNets()) {
+        for (PhysNet.Reader n : physNetlist[PhysNetlistWriter.PHYS_MSG_ROUTING].getPhysNets()) {
             String netName = allStrings.get(n.getName());
             if (!netName.equals("processor/active_interrupt_lut/O5"))
                 continue;
@@ -363,18 +338,13 @@ public class TestPhysNetlistWriter {
         String interchangePath = tempDir.resolve("design.phys").toString();
         PhysNetlistWriter.writePhysNetlist(design, interchangePath);
 
-        ReaderOptions rdOptions =
-                new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
-                        ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
-        MessageReader readMsg = Interchange.readInterchangeFile(interchangePath, rdOptions);
+        PhysNetlist.Reader[] physNetlist = PhysNetlistReader.readAllPhysNetlistMessages(interchangePath);
 
-        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
-
-        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist);
+        List<String> allStrings = PhysNetlistReader.readAllStrings(physNetlist[PhysNetlistWriter.PHYS_MSG_STRINGS]);
 
         PhysNet.Reader gndNet = null;
         PhysNet.Reader vccNet = null;
-        for (PhysNet.Reader n : physNetlist.getPhysNets()) {
+        for (PhysNet.Reader n : physNetlist[PhysNetlistWriter.PHYS_MSG_ROUTING].getPhysNets()) {
             String netName = allStrings.get(n.getName());
             if (netName.equals(Net.GND_NET)) {
                 gndNet = n;
