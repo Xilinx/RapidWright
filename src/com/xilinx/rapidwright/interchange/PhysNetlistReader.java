@@ -77,6 +77,7 @@ import org.python.google.common.base.Enums;
 import org.python.google.common.base.Optional;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
