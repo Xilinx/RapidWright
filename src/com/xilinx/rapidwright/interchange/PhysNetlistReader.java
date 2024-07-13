@@ -69,7 +69,6 @@ import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranc
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.RouteBranch.RouteSegment;
 import com.xilinx.rapidwright.interchange.PhysicalNetlist.PhysNetlist.SiteInstance;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
-import org.capnproto.MessageReader;
 import org.capnproto.PrimitiveList;
 import org.capnproto.ReaderOptions;
 import org.capnproto.StructList;
@@ -78,6 +77,7 @@ import org.python.google.common.base.Enums;
 import org.python.google.common.base.Optional;
 
 import java.io.IOException;
+import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -136,46 +136,49 @@ public class PhysNetlistReader {
 
     protected Design read(String physNetlistFileName) throws IOException {
         CodePerfTracker t = new CodePerfTracker("Read PhysNetlist");
-
-        t.start("Read File");
-        ReaderOptions rdOptions =
+        ReaderOptions options =
                 new ReaderOptions(ReaderOptions.DEFAULT_READER_OPTIONS.traversalLimitInWords * 64,
                 ReaderOptions.DEFAULT_READER_OPTIONS.nestingLimit * 128);
-        MessageReader readMsg = Interchange.readInterchangeFile(physNetlistFileName, rdOptions);
+        PhysNetlist.Reader physNetlist = null;
+        try (ReadableByteChannel channel = Interchange.getReadableByteChannel(physNetlistFileName)) {
+            physNetlist = Interchange.readMessageFromChannel(channel, options).getRoot(PhysNetlist.factory);
+            design.setPartName(physNetlist.getPart().toString());
+            device = design.getDevice();
 
-        PhysNetlist.Reader physNetlist = readMsg.getRoot(PhysNetlist.factory);
+            t.start("Read Strings");
+            strings = readAllStrings(physNetlist);
 
-        design.setPartName(physNetlist.getPart().toString());
-        device = design.getDevice();
+            t.stop().start("Read SiteInsts");
+            physNetlist = Interchange.readMessageFromChannel(channel, options).getRoot(PhysNetlist.factory);
+            readSiteInsts(physNetlist);
 
-        t.stop().start("Read Strings");
-        strings = readAllStrings(physNetlist);
+            t.stop().start("Read Placement");
+            PhysNetlist.Reader placePhysNetlist = Interchange.readMessageFromChannel(channel, options)
+                    .getRoot(PhysNetlist.factory);
+            readPlacement(placePhysNetlist);
 
-        if (CHECK_CONSTANT_ROUTING_AND_NET_NAMING) {
-            t.stop().start("Check Constant Routing & Net Naming");
-            checkConstantRoutingAndNetNaming(physNetlist);
+            if (CHECK_MACROS_CONSISTENT) {
+                t.stop().start("Check Macros");
+                checkMacros();
+            }
+
+            t.stop().start("Read Routing");
+            physNetlist = Interchange.readMessageFromChannel(channel, options).getRoot(PhysNetlist.factory);
+            readNullNet(physNetlist);
+            readRouting(physNetlist);
+
+            if (CHECK_CONSTANT_ROUTING_AND_NET_NAMING) {
+                t.stop().start("Check Constant Routing & Net Naming");
+                checkConstantRoutingAndNetNaming(physNetlist, placePhysNetlist);
+            }
+
+            t.stop().start("Read Design Props");
+            physNetlist = Interchange.readMessageFromChannel(channel, options).getRoot(PhysNetlist.factory);
+            readDesignProperties(physNetlist);
+
+            t.stop().printSummary();
+
         }
-
-        t.stop().start("Read SiteInsts");
-        readSiteInsts(physNetlist);
-
-        t.stop().start("Read Placement");
-        readPlacement(physNetlist);
-
-        if (CHECK_MACROS_CONSISTENT) {
-            t.stop().start("Check Macros");
-            checkMacros();
-        }
-
-        t.stop().start("Read Routing");
-        readNullNet(physNetlist);
-        readRouting(physNetlist);
-
-        t.stop().start("Read Design Props");
-        readDesignProperties(physNetlist);
-
-        t.stop().printSummary();
-
         return design;
     }
 
@@ -202,12 +205,6 @@ public class PhysNetlistReader {
     protected void readSiteInsts(PhysNetlist.Reader physNetlist) {
         StructList.Reader<SiteInstance.Reader> siteInstsReader = physNetlist.getSiteInsts();
         int siteInstCount = siteInstsReader.size();
-        if (siteInstCount == 0 && physNetlist.getPlacements().size() > 0) {
-            System.out.println("WARNING: Missing SiteInst information in *.phys file.  RapidWright "
-                    + "will attempt to infer the proper SiteInst, however, it is recommended that "
-                    + "SiteInst information be specified to avoid SiteTypeEnum mismatch problems.");
-        }
-
         siteInsts = new HashMap<>(siteInstCount);
 
         for (int i=0; i < siteInstCount; i++) {
@@ -842,7 +839,7 @@ public class PhysNetlistReader {
         }
     }
 
-    protected void checkConstantRoutingAndNetNaming(PhysNetlist.Reader physNetlist) {
+    protected void checkConstantRoutingAndNetNaming(PhysNetlist.Reader physNetlist, PhysNetlist.Reader placePhysNetlist) {
         EDIFNetlist netlist = design.getNetlist();
         if (netlist == null) {
             throw new RuntimeException("No EDIFNetlist supplied");
@@ -909,7 +906,7 @@ public class PhysNetlistReader {
 
         // Iterate over placements and map cell pins to physical nets.
         Map<String, PhysNet.Reader> cellPinToPhysicalNet = new HashMap<>();
-        for (CellPlacement.Reader placement : physNetlist.getPlacements()) {
+        for (CellPlacement.Reader placement : placePhysNetlist.getPlacements()) {
             for (PinMapping.Reader pinMap : placement.getPinMap()) {
                 String key = strings.get(placement.getSite()) + "/" + strings.get(pinMap.getBel()) + "/" + strings.get(pinMap.getBelPin());
                 PhysNet.Reader net = belPinToPhysicalNet.get(key);

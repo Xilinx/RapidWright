@@ -495,7 +495,7 @@ public class DeviceResourcesVerifier {
                     put(LogNetlistWriter.DEVICE_PRIMITIVES_LIB, EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME);
                 }}
             );
-        EDIFNetlist primsAndMacros = netlistReader.readLogNetlist(primLibs,
+        EDIFNetlist primsAndMacros = netlistReader.readLogNetlistSingleMessage(primLibs,
                 /* skipTopStuff= */true, /* expandMacros= */false, CodePerfTracker.SILENT);
 
         Set<String> libsFound = new HashSet<String>();

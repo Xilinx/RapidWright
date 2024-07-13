@@ -372,6 +372,34 @@ public class Interchange {
         return fileSize;
     }
 
+    /**
+     * Takes an array of file names and concatenates them into a single GZIP'ed file
+     * in the order presented in the array. This is used for assembling a list of
+     * separate Interchange messages into a single compressed file of those
+     * messages. This also deletes the input files after they have been
+     * concatenated.
+     * 
+     * @param msgFileNames Ordered list of input files to be concatenated and then
+     *                     deleted
+     * @param gzipFileName The desired output GZIP file.
+     */
+    public static void concatMessagesToSingleGZIPFile(String[] msgFileNames, String gzipFileName) {
+        try (GZIPOutputStream gos = new GZIPOutputStream(new FileOutputStream(gzipFileName))) {
+            byte[] buffer = new byte[1024];
+            int len = 0;
+            for (String messageFile : msgFileNames) {
+                try (FileInputStream fis = new FileInputStream(messageFile)) {
+                    while ((len = fis.read(buffer)) > 0) {
+                        gos.write(buffer, 0, len);
+                    }
+                }
+                FileTools.deleteFile(messageFile);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     public static void main(String[] args) throws IOException {
         if (args.length < 1 || args.length > 2) {
             System.out.println("USAGE: <input DCP> [input EDIF]");

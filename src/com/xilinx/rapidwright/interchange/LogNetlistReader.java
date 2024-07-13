@@ -54,6 +54,8 @@ import org.capnproto.StructList;
 import org.capnproto.TextList;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.channels.ReadableByteChannel;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -328,15 +330,8 @@ public class LogNetlistReader {
      */
     public static EDIFNetlist readLogNetlist(String fileName, boolean expandMacros) throws IOException {
         CodePerfTracker t = new CodePerfTracker("Read LogNetlist");
-
-        t.start("Read File");
-        ReaderOptions readerOptions = new ReaderOptions(32L * 1024L * 1024L * 1024L, 64);
-        MessageReader readMsg = Interchange.readInterchangeFile(fileName, readerOptions);
-        Netlist.Reader netlist = readMsg.getRoot(Netlist.factory);
-        t.stop();
-
         LogNetlistReader reader = new LogNetlistReader();
-        return reader.readLogNetlist(netlist, false, expandMacros, t);
+        return reader.readLogNetlistMultiMessage(fileName, false, expandMacros, t);
     }
 
     private EDIFPort readEDIFPort(Port.Reader portReader) {
@@ -405,28 +400,6 @@ public class LogNetlistReader {
     }
 
     /**
-     * Reads an Interchange netlist from Cap'n Proto reader.  Will expand macros by default.
-     * @param netlist The Cap'n Proto netlist reader
-     * @param skipTopStuff If true, skips netlist design object
-     * @return The logical netlist.
-     */
-    public EDIFNetlist readLogNetlist(Netlist.Reader netlist, boolean skipTopStuff) {
-        return readLogNetlist(netlist, skipTopStuff, true);
-    }
-
-    /**
-     * Reads an Interchange netlist from Cap'n Proto reader.
-     * @param netlist The Cap'n Proto netlist reader
-     * @param skipTopStuff If true, skips netlist design object
-     * @param expandMacros If true, expands the macros in the netlist before returning it to the caller.
-     * @return The logical netlist.
-     */
-    public EDIFNetlist readLogNetlist(Netlist.Reader netlist, boolean skipTopStuff, boolean expandMacros) {
-        CodePerfTracker t = new CodePerfTracker("readLogNetlist");
-        return readLogNetlist(netlist, skipTopStuff, expandMacros, t);
-    }
-
-    /**
      * Reads an Interchange netlist from Cap'n Proto reader.
      * @param netlist The Cap'n Proto netlist reader
      * @param skipTopStuff If true, skips netlist design object
@@ -434,7 +407,7 @@ public class LogNetlistReader {
      * @param t CodePerfTracker object.
      * @return The logical netlist.
      */
-    public EDIFNetlist readLogNetlist(Netlist.Reader netlist, boolean skipTopStuff, boolean expandMacros, CodePerfTracker t) {
+    public EDIFNetlist readLogNetlistSingleMessage(Netlist.Reader netlist, boolean skipTopStuff, boolean expandMacros, CodePerfTracker t) {
         n = new EDIFNetlist(netlist.getName().toString());
 
         t.start("Read Strings");
@@ -487,4 +460,79 @@ public class LogNetlistReader {
 
         return n;
     }
+    
+    /**
+     * Reads an Interchange netlist from Cap'n Proto reader.
+     * @param netlist The Cap'n Proto netlist reader
+     * @param skipTopStuff If true, skips netlist design object
+     * @param expandMacros If true, expands the macros in the netlist before returning it to the caller.
+     * @param t CodePerfTracker object.
+     * @return The logical netlist.
+     */
+    public EDIFNetlist readLogNetlistMultiMessage(String fileName, boolean skipTopStuff, boolean expandMacros, CodePerfTracker t) {
+        try (ReadableByteChannel channel = Interchange.getReadableByteChannel(fileName)) {
+            ReaderOptions options = new ReaderOptions(32L * 1024L * 1024L * 1024L, 64);
+            Netlist.Reader netlist = null;
+
+            t.start("Read Strings");
+            netlist = Interchange.readMessageFromChannel(channel, options).getRoot(Netlist.factory);
+            readAllStrings(netlist.getStrList());
+            n = new EDIFNetlist(netlist.getName().toString());
+
+            t.stop().start("Read Ports");
+            netlist = Interchange.readMessageFromChannel(channel, options).getRoot(Netlist.factory);
+            readAllPorts(netlist.getPortList());
+
+            t.stop().start("Read CellDecls");
+            netlist = Interchange.readMessageFromChannel(channel, options).getRoot(Netlist.factory);
+            readAllCellDecls(netlist.getCellDecls());
+
+            t.stop().start("Read Insts");
+            netlist = Interchange.readMessageFromChannel(channel, options).getRoot(Netlist.factory);
+            readAllInsts(netlist.getInstList());
+
+            t.stop().start("Read Cells");
+            netlist = Interchange.readMessageFromChannel(channel, options).getRoot(Netlist.factory);
+            readAllCells(netlist.getCellList());
+
+            t.stop().start("Read Top");
+            netlist = Interchange.readMessageFromChannel(channel, options).getRoot(Netlist.factory);
+            if (!skipTopStuff) {
+                EDIFDesign design = new EDIFDesign(allCells[netlist.getTopInst().getCell()].getName());
+                design.setTopCell(allCells[netlist.getTopInst().getCell()]);
+                n.setDesign(design);
+                if (netlist.hasPropMap()) {
+                    extractPropertyMap(netlist.getPropMap(), design);
+                }
+            }
+
+            t.stop().start("Order Libraries");
+
+            // Put libraries in proper export order
+            List<EDIFLibrary> libs = n.getLibrariesInExportOrder();
+            n.getLibrariesMap().clear();
+            for (EDIFLibrary lib : libs) {
+                n.addLibrary(lib);
+            }
+
+            if (expandMacros) {
+                t.stop().start("Expand Macros");
+                String partName = EDIFTools.getPartName(n);
+                if (partName != null) {
+                    n.expandMacroUnisims(PartNameTools.getPart(partName).getSeries());
+                } else {
+                    System.err.println("WARNING: Could not determine target device from netlist.  Macro "
+                            + "unisims are not expanded.  Please add a top netlist property to indicate the "
+                            + "target part such as [part=xcvu095-ffva2104-2-e].  Macro expansion can also be"
+                            + " run manually with EDIFNetlist.expandMacroUnisims(Series)");
+                }
+            }
+            t.stop().printSummary();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+
+        return n;
+    }
+
 }

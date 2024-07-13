@@ -94,6 +94,8 @@ public class PhysNetlistWriter {
      */
     public static boolean VERBOSE_PHYSICAL_NET_ROUTING = true;
 
+    public static final int NUM_PHYS_NETLIST_MESSAGES = 5;
+
     protected static void writeSiteInsts(PhysNetlist.Builder physNetlist, Design design,
                                          StringEnumerator strings) {
         Builder<SiteInstance.Builder> siteInsts = physNetlist.initSiteInsts(design.getSiteInsts().size());
@@ -696,32 +698,58 @@ public class PhysNetlistWriter {
 
     public static void writePhysNetlist(Design design, String fileName) throws IOException {
         CodePerfTracker t = new CodePerfTracker("Write PhysNetlist");
+        String[] fileNames = new String[NUM_PHYS_NETLIST_MESSAGES];
 
         t.start("Initialize");
         MessageBuilder message = new MessageBuilder();
         PhysNetlist.Builder physNetlist = message.initRoot(PhysNetlist.factory);
         StringEnumerator strings = new StringEnumerator();
-
-        physNetlist.setPart(design.getPartName());
+        Interchange.IS_GZIPPED = false;
 
         t.stop().start("Write SiteInsts");
         writeSiteInsts(physNetlist, design, strings);
 
+        fileNames[1] = fileName + "_siteInsts";
+        Interchange.writeInterchangeFile(fileNames[1], message);
+        message = new MessageBuilder();
+        physNetlist = message.initRoot(PhysNetlist.factory);
+
         t.stop().start("Write Placement");
         writePlacement(physNetlist, design, strings);
+
+        fileNames[2] = fileName + "_place";
+        Interchange.writeInterchangeFile(fileNames[2], message);
+        message = new MessageBuilder();
+        physNetlist = message.initRoot(PhysNetlist.factory);
 
         t.stop().start("Write Routing");
         writePhysNets(physNetlist, design, strings);
 
+        fileNames[3] = fileName + "_route";
+        Interchange.writeInterchangeFile(fileNames[3], message);
+        message = new MessageBuilder();
+        physNetlist = message.initRoot(PhysNetlist.factory);
+
         t.stop().start("Write Design Props");
         writeDesignProperties(physNetlist, design, strings);
 
+        fileNames[4] = fileName + "_designProps";
+        Interchange.writeInterchangeFile(fileNames[4], message);
+        message = new MessageBuilder();
+        physNetlist = message.initRoot(PhysNetlist.factory);
+
         t.stop().start("Write Strings");
         writeStrings(physNetlist, strings);
+        physNetlist.setPart(design.getPartName());
+        fileNames[0] = fileName + "_strings";
+        Interchange.writeInterchangeFile(fileNames[0], message);
 
-        t.stop().start("Write File");
-        Interchange.writeInterchangeFile(fileName, message);
+        // Concat each individual message file into a single gzipped file (strings
+        // first)
+        t.stop().start("Write Single File");
+        Interchange.concatMessagesToSingleGZIPFile(fileNames, fileName);
 
         t.stop().printSummary();
+        Interchange.IS_GZIPPED = true;
     }
 }
