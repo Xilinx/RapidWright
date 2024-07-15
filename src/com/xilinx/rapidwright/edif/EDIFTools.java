@@ -1019,7 +1019,7 @@ public class EDIFTools {
         lines.add("read_checkpoint {" + pathDCPFileName + "}");
         lines.add("set_property top "+edif.getName()+" [current_fileset]");
         lines.add("link_design -part " + partName);
-        Path tclFileName = FileTools.replaceExtension(pathDCPFileName.getFileName(), LOAD_TCL_SUFFIX);
+        Path tclFileName = FileTools.replaceExtension(pathDCPFileName, LOAD_TCL_SUFFIX);
         try {
             Files.write(tclFileName, lines);
         } catch (IOException e) {
