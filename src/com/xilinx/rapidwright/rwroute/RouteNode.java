@@ -163,16 +163,16 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                         break;
                     case NODE_SINGLE:
                         if (length != 0) {
-                            baseCost = 0.8f; // >=0.2 penalty
+                            baseCost = 0.9f; // >=0.1 penalty
                         }
                         break;
                     case NODE_DOUBLE:
                         if (endTileXCoordinate != getTile().getTileXCoordinate()) {
                             // (EE|WW)2_[EW]_BEG[0-7]
-                            baseCost = 0.7f; // >=0.1 penalty
+                            baseCost = 0.6f; // ~ neutral
                         } else {
                             // (NN|SS)2_[EW]_BEG[0-7]
-                            baseCost = 1.3f; // >=0.1 penalty
+                            baseCost = 1.2f; // ~ neutral
                         }
                         break;
                     case NODE_HQUAD:
