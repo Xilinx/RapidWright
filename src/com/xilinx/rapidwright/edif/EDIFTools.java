@@ -1627,4 +1627,18 @@ public class EDIFTools {
 
         return flatNetlist;
     }
+
+    public static boolean connectsToTopLevelPort(EDIFNetlist netlist, EDIFHierNet net) {
+        EDIFCell top = netlist.getTopCell();
+        for (EDIFHierNet alias : netlist.getNetAliases(net)) {
+            for (EDIFHierPortInst portInst : alias.getPortInsts()) {
+                boolean isPortOnTopCell = portInst.getCellType().equals(top);
+                boolean isTopLevelPort = portInst.getPortInst().isTopLevelPort();
+                if (isPortOnTopCell && isTopLevelPort) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 }

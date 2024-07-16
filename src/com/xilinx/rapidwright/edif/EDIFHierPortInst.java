@@ -27,14 +27,14 @@ package com.xilinx.rapidwright.edif;
 import java.util.List;
 import java.util.Objects;
 
+import org.jetbrains.annotations.NotNull;
+
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.util.Pair;
-
-import org.jetbrains.annotations.NotNull;
 
 /**
  * Combines an {@link EDIFHierPortInst} with a full hierarchical
@@ -113,7 +113,10 @@ public class EDIFHierPortInst {
     }
 
     public EDIFCell getCellType() {
-        if (portInst.getCellInst() == null) return null;
+        if (portInst.getCellInst() == null) {
+            EDIFPort port = portInst.getPort();
+            return port == null ? null : port.getParentCell();
+        }
         return portInst.getCellInst().getCellType();
     }
 
