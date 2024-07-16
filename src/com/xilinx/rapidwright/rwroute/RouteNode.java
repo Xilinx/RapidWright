@@ -169,23 +169,23 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_DOUBLE:
                         if (endTileXCoordinate != getTile().getTileXCoordinate()) {
                             // (EE|WW)2_[EW]_BEG[0-7]
-                            baseCost = 0.4f; // >=0.2 discount
+                            baseCost = 0.2f; // >=0.4 discount
                         } else {
                             // (NN|SS)2_[EW]_BEG[0-7]
-                            baseCost = 1.0f; // >=0.2 discount
+                            baseCost = 0.8f; // >=0.4 discount
                         }
                         break;
                     case NODE_HQUAD:
-                        baseCost = 0.6f; // >=0.6 discount
+                        baseCost = 0.4f; // >=0.8 discount
                         break;
                     case NODE_VQUAD:
-                        baseCost = 1.8f; // >=0.6 discount
+                        baseCost = 1.6f; // >=0.8 discount
                         break;
                     case NODE_HLONG:
-                        baseCost = 2.6f; // >=1.0 discount
+                        baseCost = 2.4f; // >=1.2 discount
                         break;
                     case NODE_VLONG:
-                        baseCost = 6.2f; // >=1.0 discount
+                        baseCost = 6.0f; // >=1.2 discount
                         break;
                     default:
                         throw new RuntimeException(ic.toString());
