@@ -163,29 +163,29 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                         break;
                     case NODE_SINGLE:
                         if (length != 0) {
-                            baseCost = 0.9f; // >=0.1 penalty
+                            baseCost = 0.6f; // ~ neutral
                         }
                         break;
                     case NODE_DOUBLE:
                         if (endTileXCoordinate != getTile().getTileXCoordinate()) {
                             // (EE|WW)2_[EW]_BEG[0-7]
-                            baseCost = 0.6f; // ~ neutral
+                            baseCost = 0.4f; // >=0.2 discount
                         } else {
                             // (NN|SS)2_[EW]_BEG[0-7]
-                            baseCost = 1.2f; // ~ neutral
+                            baseCost = 1.0f; // >=0.2 discount
                         }
                         break;
                     case NODE_HQUAD:
-                        baseCost = 0.6f/ 1.5f; // >=0.6 discount (/1.5 for bias cost)
+                        baseCost = 0.6f; // >=0.6 discount
                         break;
                     case NODE_VQUAD:
-                        baseCost = 1.8f/ 1.5f; // >=0.6 discount (/1.5 for bias cost)
+                        baseCost = 1.8f; // >=0.6 discount
                         break;
                     case NODE_HLONG:
-                        baseCost = 1.0f/ 1.5f; // >=1.0 discount (/1.5 for bias cost)
+                        baseCost = 2.6f; // >=1.0 discount
                         break;
                     case NODE_VLONG:
-                        baseCost = 6.2f/ 1.5f; // >=1.0 discount (/1.5 for bias cost)
+                        baseCost = 6.2f; // >=1.0 discount
                         break;
                     default:
                         throw new RuntimeException(ic.toString());
@@ -193,7 +193,7 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                 break;
             case SUPER_LONG_LINE:
                 assert(length == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
-                baseCost = 32f / 1.5f; // 4.0 discount
+                baseCost = 32f; // 4.0 discount
                 break;
             case LAGUNA_I:
                 baseCost = 0f;
