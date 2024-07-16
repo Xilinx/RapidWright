@@ -306,7 +306,7 @@ public class VivadoTools {
 
     private static String createTclDCPLoadCommand(Path dcp, boolean encrypted) {
         if (encrypted) {
-            Path tclFileName = FileTools.replaceExtension(dcp.getFileName(), EDIFTools.LOAD_TCL_SUFFIX);
+            Path tclFileName = FileTools.replaceExtension(dcp, EDIFTools.LOAD_TCL_SUFFIX);
             return "source {" + tclFileName + "}; ";
         } else {
             return "open_checkpoint {" + dcp + "}; ";
