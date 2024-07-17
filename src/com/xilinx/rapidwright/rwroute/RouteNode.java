@@ -172,22 +172,22 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_LOCAL:
                     case INTENT_DEFAULT:
                         assert(length <= 1);
-                        // Fall through
+                        break;
                     case NODE_SINGLE:
                         if (length != 0) {
                             // NODE_SINGLE could be length == 2, e.g. INT/WW1_W_BEG7 which
                             // feeds-through to the tile above
-                            baseCost = 0.6f + 0.2f;
+                            baseCost = 0.6f - 0.1f;
                         }
                         break;
                     case NODE_DOUBLE:
                         if (endTileXCoordinate != getTile().getTileXCoordinate()) {
                             assert(length == 1);
                             // (EE|WW)2_[EW]_BEG[0-7]
-                            baseCost = 0.6f + 0.2f;
+                            baseCost = 0.6f - 0.1f;
                         } else {
                             // (NN|SS)2_[EW]_BEG[0-7]
-                            baseCost = 1.2f + 0.1f;
+                            baseCost = 1.2f - 0.2f;
                         }
                         break;
                     case NODE_HQUAD:
@@ -200,20 +200,15 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                         baseCost = 2.0f - 1.8f;
                         break;
                     case NODE_VLONG:
-                        baseCost = 7.2f - 3.6f;
+                        baseCost = 7.2f - 3.2f;
                         break;
                     default:
                         throw new RuntimeException(ic.toString());
                 }
                 assert(baseCost > 0.0f);
                 break;
-            case PINBOUNCE:
-                if (length != 0) {
-                    assert(length == 1);
-                    baseCost = 0.6f + 0.2f; // Same cost as NODE_SINGLE
-                }
-                break;
             case PINFEED_I:
+            case PINBOUNCE:
             case PINFEED_O:
                 break;
             default:
