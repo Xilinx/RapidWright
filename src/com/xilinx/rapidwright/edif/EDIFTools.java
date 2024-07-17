@@ -1011,9 +1011,11 @@ public class EDIFTools {
     public static void writeTclLoadScriptForPartialEncryptedDesigns(EDIFNetlist edif,
                                                             Path dcpFileName, String partName) {
         ArrayList<String> lines = new ArrayList<String>();
+        lines.add(EDIFNetlist.READ_EDIF_CMD + " { \\");
         for (String cellName : edif.getEncryptedCells()) {
-            lines.add(EDIFNetlist.READ_EDIF_CMD + " {" + cellName + "}");
+            lines.add(cellName + " \\");
         }
+        lines.add("}");
         Path pathDCPFileName = dcpFileName.toAbsolutePath();
 
         lines.add("read_checkpoint {" + pathDCPFileName + "}");
