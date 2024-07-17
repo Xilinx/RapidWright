@@ -146,6 +146,18 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
     private void setBaseCost() {
         baseCost = 0.4f;
         switch (type) {
+            case LAGUNA_I:
+                assert(length == 0);
+                // Make all approaches to SLLs zero-cost to encourage exploration
+                // Assigning a base cost of zero would normally break congestion resolution
+                // (since RWroute.getNodeCost() would return zero) but doing it here should be
+                // okay because this node only leads to a SLL which will have a non-zero base cost
+                baseCost = 0.0f;
+                break;
+            case SUPER_LONG_LINE:
+                assert(length == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
+                baseCost = 36f - 4f;
+                break;
             case WIRE:
                 // NOTE: IntentCode is device-dependent
                 IntentCode ic = getIntentCode();
@@ -160,14 +172,17 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_LOCAL:
                     case INTENT_DEFAULT:
                         assert(length <= 1);
-                        break;
+                        // Fall through
                     case NODE_SINGLE:
                         if (length != 0) {
+                            // NODE_SINGLE could be length == 2, e.g. INT/WW1_W_BEG7 which
+                            // feeds-through to the tile above
                             baseCost = 0.6f + 0.2f;
                         }
                         break;
                     case NODE_DOUBLE:
                         if (endTileXCoordinate != getTile().getTileXCoordinate()) {
+                            assert(length == 1);
                             // (EE|WW)2_[EW]_BEG[0-7]
                             baseCost = 0.6f + 0.2f;
                         } else {
@@ -192,20 +207,14 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                 }
                 assert(baseCost > 0.0f);
                 break;
-            case SUPER_LONG_LINE:
-                assert(length == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
-                baseCost = 36f - 4f;
-                break;
-            case LAGUNA_I:
-                baseCost = 0f;
+            case PINBOUNCE:
+                if (length != 0) {
+                    assert(length == 1);
+                    baseCost = 0.6f + 0.2f; // Same cost as NODE_SINGLE
+                }
                 break;
             case PINFEED_I:
             case PINFEED_O:
-                break;
-            case PINBOUNCE:
-                if (length != 0) {
-                    baseCost = 0.6f + 0.2f;
-                }
                 break;
             default:
                 throw new RuntimeException(type.toString());
