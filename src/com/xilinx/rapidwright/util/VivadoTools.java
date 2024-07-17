@@ -39,6 +39,7 @@ public class VivadoTools {
 
     public static final String REPORT_ROUTE_STATUS = "report_route_status";
     public static final String PLACE_DESIGN = "place_design";
+    public static final String ROUTE_DESIGN = "route_design";
     public static final String WRITE_CHECKPOINT = "write_checkpoint";
     public static final String WRITE_EDIF = "write_edif";
 
@@ -337,11 +338,49 @@ public class VivadoTools {
     }
 
     /**
-     * Run Vivado's `get_timing_paths -setup` command on the provided DCP path
-     * (to find its worst setup timing path) and return its SLACK property as a float.
-     *
-     * @param dcp Path to DCP to report on.
+     * Run Vivado's `route_design` command on the design provided and get the
+     * `report_route_status` results. Note: this method does not preserve the routed
+     * output from Vivado.
+     * 
+     * @param design  The design to route and report on.
      * @param workdir Directory to work within.
+     * @return The results of `report_route_status`.
+     */
+    public static ReportRouteStatusResult routeDesignAndGetStatus(Design design, Path workdir) {
+        boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
+        Path dcp = workdir.resolve("routeDesignAndGetStatus.dcp");
+        design.writeCheckpoint(dcp);
+        return routeDesignAndGetStatus(dcp, workdir, encrypted);
+    }
+
+    /**
+     * Run Vivado's `route_design` command on the provided DCP path and return the
+     * `report_route_status` results. Note: this method does not preserve the routed
+     * output from Vivado.
+     *
+     * @param dcp       Path to DCP to route and report on.
+     * @param workdir   Directory to work within.
+     * @param encrypted Indicates whether DCP contains encrypted EDIF cells.
+     * @return The results of `report_route_status`.
+     */
+    public static ReportRouteStatusResult routeDesignAndGetStatus(Path dcp, Path workdir, boolean encrypted) {
+        final Path outputLog = workdir.resolve("outputLog.log");
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(createTclDCPLoadCommand(dcp, encrypted));
+        sb.append(ROUTE_DESIGN + "; ");
+        sb.append(REPORT_ROUTE_STATUS + "; ");
+
+        List<String> log = VivadoTools.runTcl(outputLog, sb.toString(), true);
+        return new ReportRouteStatusResult(log);
+    }
+
+    /**
+     * Run Vivado's `get_timing_paths -setup` command on the provided DCP path (to
+     * find its worst setup timing path) and return its SLACK property as a float.
+     *
+     * @param dcp       Path to DCP to report on.
+     * @param workdir   Directory to work within.
      * @param encrypted Indicates whether DCP contains encrypted EDIF cells.
      * @return Worst slack of design as float.
      */
