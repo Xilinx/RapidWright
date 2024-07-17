@@ -163,44 +163,49 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                         break;
                     case NODE_SINGLE:
                         if (length != 0) {
-                            baseCost = 0.6f; // ~ neutral
+                            baseCost = 0.6f + 0.2f;
                         }
                         break;
                     case NODE_DOUBLE:
                         if (endTileXCoordinate != getTile().getTileXCoordinate()) {
                             // (EE|WW)2_[EW]_BEG[0-7]
-                            baseCost = 0.2f; // >=0.4 discount
+                            baseCost = 0.6f + 0.2f;
                         } else {
                             // (NN|SS)2_[EW]_BEG[0-7]
-                            baseCost = 0.8f; // >=0.4 discount
+                            baseCost = 1.2f + 0.1f;
                         }
                         break;
                     case NODE_HQUAD:
-                        baseCost = 0.4f; // >=0.8 discount
+                        baseCost = 1.2f - 0.6f;
                         break;
                     case NODE_VQUAD:
-                        baseCost = 1.6f; // >=0.8 discount
+                        baseCost = 2.4f - 1.2f;
                         break;
                     case NODE_HLONG:
-                        baseCost = 2.4f; // >=1.2 discount
+                        baseCost = 2.0f - 1.8f;
                         break;
                     case NODE_VLONG:
-                        baseCost = 6.0f; // >=1.2 discount
+                        baseCost = 7.2f - 3.6f;
                         break;
                     default:
                         throw new RuntimeException(ic.toString());
                 }
+                assert(baseCost > 0.0f);
                 break;
             case SUPER_LONG_LINE:
                 assert(length == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
-                baseCost = 32f; // 4.0 discount
+                baseCost = 36f - 4f;
                 break;
             case LAGUNA_I:
                 baseCost = 0f;
                 break;
             case PINFEED_I:
-            case PINBOUNCE:
             case PINFEED_O:
+                break;
+            case PINBOUNCE:
+                if (length != 0) {
+                    baseCost = 0.6f + 0.2f;
+                }
                 break;
             default:
                 throw new RuntimeException(type.toString());
