@@ -147,6 +147,7 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
         baseCost = 0.4f;
         switch (type) {
             case LAGUNA_I:
+                assert(length == 0);
                 // Make all approaches to SLLs zero-cost to encourage exploration
                 // Assigning a base cost of zero would normally break congestion resolution
                 // (since RWroute.getNodeCost() would return zero) but doing it here should be
@@ -155,7 +156,7 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                 break;
             case SUPER_LONG_LINE:
                 assert(length == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
-                baseCost = 0.3f * length;
+                baseCost = 36f - 4f;
                 break;
             case WIRE:
                 // NOTE: IntentCode is device-dependent
@@ -170,49 +171,54 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                         break;
                     case NODE_LOCAL:
                     case INTENT_DEFAULT:
-                        assert(length <= 1);
+                        if (length != 0) {
+                            assert(length == 1);
+                            baseCost = 0.6f; // 0.8 if staying in same tile
+                                             // 0.0 if towards target
+                        }
                         break;
                     case NODE_SINGLE:
-                        assert(length <= 2);
-                        if (length == 2) baseCost *= length;
+                        if (length != 0) {
+                            // NODE_SINGLE could be length == 2, e.g. INT/WW1_W_BEG7 which
+                            // feeds-through to the tile above
+                            baseCost = 0.6f - 0.1f;
+                        }
                         break;
                     case NODE_DOUBLE:
                         if (endTileXCoordinate != getTile().getTileXCoordinate()) {
-                            assert(length <= 2);
-                            // Typically, length = 1 (since tile X is not equal)
-                            // In US, have seen length = 2, e.g. VU440's INT_X171Y827/EE2_E_BEG7.
-                            if (length == 2) baseCost *= length;
+                            assert(length == 1);
+                            // (EE|WW)2_[EW]_BEG[0-7]
+                            baseCost = 0.6f - 0.1f;
                         } else {
-                            // Typically, length = 2 except for horizontal U-turns (length = 0)
-                            // or vertical U-turns (length = 1).
-                            // In US, have seen length = 3, e.g. VU440's INT_X171Y827/NN2_E_BEG7.
-                            assert(length <= 3);
+                            // (NN|SS)2_[EW]_BEG[0-7]
+                            baseCost = 1.2f - 0.2f; // VSINGLE (-0.1) + 0.4 + VSINGLE (-0.1) + 0.4 = +0.6 -> -0.2 (-0.8)
                         }
                         break;
                     case NODE_HQUAD:
-                        assert (length != 0 || getAllDownhillNodes().isEmpty());
-                        baseCost = 0.35f * length;
+                        baseCost = 1.2f - 0.2f; // HDOUBLE (-0.1) + 0.4 + HDOUBLE (-0.1) + 0.4 = +0.6 -> -0.2 (-0.8)
                         break;
                     case NODE_VQUAD:
-                        // In case of U-turn nodes
-                        if (length != 0) baseCost = 0.15f * length;// VQUADs have length 4 and 5
+                        baseCost = 2.4f - 1.2f; // VDOUBLE (-0.2) + 0.4 + VDOUBLE (-0.2) + 0.4 = +0.4 -> -1.2 (-1.6)
                         break;
                     case NODE_HLONG:
-                        assert (length != 0 || getAllDownhillNodes().isEmpty());
-                        baseCost = 0.15f * length;// HLONGs have length 6 and 7
+                        baseCost = 3.6f - 2.0f; // HQUAD (-0.6) + 0.4 + HQUAD (-0.6) + 0.4 = -0.4 -> -2.0 (-1.6)
                         break;
                     case NODE_VLONG:
-                        baseCost = 0.7f;
+                        baseCost = 7.2f - 4.8f; // VQUAD (-1.2) + 0.4 + VQUAD (-1.2) + 0.4 = -1.6 -> -4.8 (-3.2)
                         break;
                     default:
                         throw new RuntimeException(ic.toString());
                 }
+                assert(baseCost > 0.0f);
+                break;
+            case PINBOUNCE:
+                if (length != 0) {
+                    assert(length == 1);
+                    baseCost = 0.6f;
+                }
                 break;
             case PINFEED_I:
-            case PINBOUNCE:
-                break;
             case PINFEED_O:
-                baseCost = 1f;
                 break;
             default:
                 throw new RuntimeException(type.toString());

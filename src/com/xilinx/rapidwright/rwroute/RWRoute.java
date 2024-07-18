@@ -1911,6 +1911,7 @@ public class RWRoute{
         // CRoute paper states that the bias factor cannot be more than half of the wire cost
         // (it may exceed this here because we may not be using the minimum-sized bounding box)
         float biasCost = rnode.getBaseCost() * Math.min(distToCenter * net.getBiasFactor(), 0.5f);
+        biasCost = 0;
 
         return rnode.getBaseCost() * rnode.getHistoricalCongestionCost() * presentCongestionCost / sharingFactor + biasCost;
     }
