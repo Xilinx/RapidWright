@@ -1011,11 +1011,17 @@ public class EDIFTools {
     public static void writeTclLoadScriptForPartialEncryptedDesigns(EDIFNetlist edif,
                                                             Path dcpFileName, String partName) {
         ArrayList<String> lines = new ArrayList<String>();
-        lines.add(EDIFNetlist.READ_EDIF_CMD + " { \\");
         for (String cellName : edif.getEncryptedCells()) {
-            lines.add(cellName + " \\");
+            if (cellName.endsWith(".edn") || cellName.endsWith(".edf")) {
+                lines.add(EDIFNetlist.READ_EDIF_CMD + " {" + cellName + "}");
+            } else if (cellName.endsWith(".dcp")) {
+                lines.add("read_checkpoint {" + cellName + "}");
+            } else if (cellName.endsWith(".v")) {
+                lines.add("read_verilog {" + cellName + "}");
+            } else {
+                System.err.println("ERROR: Unrecognized or missing extension for encrypted cell file: " + cellName);
+            }
         }
-        lines.add("}");
         Path pathDCPFileName = dcpFileName.toAbsolutePath();
 
         lines.add("read_checkpoint {" + pathDCPFileName + "}");
