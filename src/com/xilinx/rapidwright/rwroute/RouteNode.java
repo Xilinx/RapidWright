@@ -191,20 +191,20 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                             baseCost = 0.6f - 0.1f;
                         } else {
                             // (NN|SS)2_[EW]_BEG[0-7]
-                            baseCost = 1.2f - 0.2f;
+                            baseCost = 1.2f - 0.2f; // VSINGLE (-0.1) + 0.4 + VSINGLE (-0.1) + 0.4 = +0.6 -> -0.2 (-0.8)
                         }
                         break;
                     case NODE_HQUAD:
-                        baseCost = 1.2f - 0.6f;
+                        baseCost = 1.2f - 0.2f; // HDOUBLE (-0.1) + 0.4 + HDOUBLE (-0.1) + 0.4 = +0.6 -> -0.2 (-0.8)
                         break;
                     case NODE_VQUAD:
-                        baseCost = 2.4f - 1.2f;
+                        baseCost = 2.4f - 1.2f; // VDOUBLE (-0.2) + 0.4 + VDOUBLE (-0.2) + 0.4 = +0.4 -> -1.2 (-1.6)
                         break;
                     case NODE_HLONG:
-                        baseCost = 3.6f - 1.8f;
+                        baseCost = 3.6f - 2.0f; // HQUAD (-0.6) + 0.4 + HQUAD (-0.6) + 0.4 = -0.4 -> -2.0 (-1.6)
                         break;
                     case NODE_VLONG:
-                        baseCost = 7.2f - 3.6f;
+                        baseCost = 7.2f - 4.8f; // VQUAD (-1.2) + 0.4 + VQUAD (-1.2) + 0.4 = -1.6 -> -4.8 (-3.2)
                         break;
                     default:
                         throw new RuntimeException(ic.toString());
