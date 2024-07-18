@@ -171,7 +171,11 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                         break;
                     case NODE_LOCAL:
                     case INTENT_DEFAULT:
-                        assert(length <= 1);
+                        if (length != 0) {
+                            assert(length == 1);
+                            baseCost = 0.6f; // 0.8 if staying in same tile
+                                             // 0.0 if towards target
+                        }
                         break;
                     case NODE_SINGLE:
                         if (length != 0) {
@@ -207,8 +211,13 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                 }
                 assert(baseCost > 0.0f);
                 break;
-            case PINFEED_I:
             case PINBOUNCE:
+                if (length != 0) {
+                    assert(length == 1);
+                    baseCost = 0.6f;
+                }
+                break;
+            case PINFEED_I:
             case PINFEED_O:
                 break;
             default:
