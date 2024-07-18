@@ -201,7 +201,7 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                         baseCost = 2.4f - 1.2f;
                         break;
                     case NODE_HLONG:
-                        baseCost = 2.0f - 1.8f;
+                        baseCost = 3.6f - 1.8f;
                         break;
                     case NODE_VLONG:
                         baseCost = 7.2f - 3.2f;
