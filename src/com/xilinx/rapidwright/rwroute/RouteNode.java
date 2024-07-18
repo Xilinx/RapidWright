@@ -204,7 +204,7 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
                         baseCost = 3.6f - 1.8f;
                         break;
                     case NODE_VLONG:
-                        baseCost = 7.2f - 3.2f;
+                        baseCost = 7.2f - 3.6f;
                         break;
                     default:
                         throw new RuntimeException(ic.toString());
