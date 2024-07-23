@@ -61,4 +61,29 @@ public class TestPIP {
         PIP pip = PIP.getArbitraryPIP(startNode, endNode);
         Assertions.assertEquals(isReversed, pip.isReversed());
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvu3p,INT_X21Y240,BYPASS_E14,INT_NODE_IMUX_18_INT_OUT0,true",
+            "xcvu3p,INT_X21Y240,INT_NODE_IMUX_18_INT_OUT0,BYPASS_E14,false"
+    })
+    public void testPIP(String deviceName, String tileName, String startWireName, String endWireName, boolean isReversed) {
+        Device d = Device.getDevice(deviceName);
+        Tile t = d.getTile(tileName);
+        int startWireIndex = t.getWireIndex(startWireName);
+        int endWireIndex = t.getWireIndex(endWireName);
+        PIP p = new PIP(t, startWireIndex, endWireIndex);
+        if (isReversed) {
+            Assertions.assertTrue(p.isReversed());
+            Assertions.assertEquals(startWireName, p.getEndWireName());
+            Assertions.assertEquals(endWireName, p.getStartWireName());
+        } else {
+            Assertions.assertFalse(p.isReversed());
+            Assertions.assertEquals(startWireName, p.getStartWireName());
+            Assertions.assertEquals(endWireName, p.getEndWireName());
+        }
+
+        Assertions.assertTrue(p.deepEquals(new PIP(t, startWireName, endWireName)));
+        Assertions.assertTrue(p.deepEquals(new PIP(d, tileName, startWireName, endWireName)));
+    }
 }
