@@ -1740,67 +1740,48 @@ public class DesignTools {
         }
 
         t.stop().start("Remove p&r");
+        String prefix = hierarchicalCell.getFullHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP;
+        for (SiteInst si : d.getSiteInsts()) {
+            for (Cell c : new ArrayList<>(si.getCells())) {
+                if (!c.getName().startsWith(prefix))
+                    continue;
 
-        List<EDIFHierCellInst> allLeafs = d.getNetlist().getAllLeafDescendants(hierarchicalCell);
-        Set<Cell> cells = new HashSet<>();
-        for (EDIFHierCellInst i : allLeafs) {
-            // Get the physical cell, make sure we can unplace/unroute it first
-            Cell c = d.getCell(i.getFullHierarchicalInstName());
-            if (c == null) {
-                continue;
-            }
-            cells.add(c);
-        }
+                // Remove all placement and routing information related to the cell to be
+                // blackboxed
+                BEL bel = c.getBEL();
 
-        // Remove all placement and routing information related to the cell to be
-        // blackboxed
-        for (Cell c : cells) {
-            BEL bel = c.getBEL();
-            SiteInst si = c.getSiteInst();
-
-            // Check for VCC on A6 and remove if needed
-            if (c.getBEL().isLUT() && c.getBELName().endsWith("5LUT")) {
-                SitePinInst vcc = c.getSiteInst().getSitePinInst(c.getBELName().charAt(0) + "6");
-                if (vcc != null && vcc.getNet().getName().equals(Net.VCC_NET)) {
-                    boolean hasOtherSink = false;
-                    for (BELPin otherSink : si.getSiteWirePins(vcc.getBELPin().getSiteWireIndex())) {
-                        if (otherSink.isOutput())
-                            continue;
-                        Cell otherCell = si.getCell(otherSink.getBEL());
-                        if (otherCell != null && otherCell.getLogicalPinMapping(otherSink.getName()) != null) {
-                            hasOtherSink = true;
-                            break;
+                // Check for VCC on A6 and remove if needed
+                if (c.getBEL().isLUT() && c.getBELName().endsWith("5LUT")) {
+                    SitePinInst vcc = c.getSiteInst().getSitePinInst(c.getBELName().charAt(0) + "6");
+                    if (vcc != null && vcc.getNet().getName().equals(Net.VCC_NET)) {
+                        boolean hasOtherSink = false;
+                        for (BELPin otherSink : si.getSiteWirePins(vcc.getBELPin().getSiteWireIndex())) {
+                            if (otherSink.isOutput())
+                                continue;
+                            Cell otherCell = si.getCell(otherSink.getBEL());
+                            if (otherCell != null && otherCell.getLogicalPinMapping(otherSink.getName()) != null) {
+                                hasOtherSink = true;
+                                break;
+                            }
+                        }
+                        if (!hasOtherSink) {
+                            pinsToRemove.computeIfAbsent(vcc.getNet(), $ -> new HashSet<>()).add(vcc);
                         }
                     }
-                    if (!hasOtherSink) {
-                        pinsToRemove.computeIfAbsent(vcc.getNet(), $ -> new HashSet<>()).add(vcc);
+                }
+
+                // Remove all physical nets first
+                for (String logPin : c.getPinMappingsP2L().values()) {
+                    List<SitePinInst> removePins = unrouteCellPinSiteRouting(c, logPin);
+                    for (SitePinInst pin : removePins) {
+                        pinsToRemove.computeIfAbsent(pin.getNet(), $ -> new HashSet<>()).add(pin);
                     }
                 }
-            }
+                touched.add(c.getSiteInst());
 
-            // Remove all physical nets first
-            for (String logPin : c.getPinMappingsP2L().values()) {
-                List<SitePinInst> removePins = unrouteCellPinSiteRouting(c, logPin);
-                for (SitePinInst pin : removePins) {
-                    pinsToRemove.computeIfAbsent(pin.getNet(), $ -> new HashSet<>()).add(pin);
-                }
-            }
-            touched.add(c.getSiteInst());
-
-            c.unplace();
-            d.removeCell(c.getName());
-            si.removeCell(bel);
-        }
-
-        t.stop().start("cleanup t-prims");
-
-        // Clean up any cells from Transformed Prims
-        String keepPrefix = hierarchicalCell.getFullHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP;
-        for (SiteInst si : d.getSiteInsts()) {
-            for (Cell c : si.getCells()) {
-                if (c.getName().startsWith(keepPrefix)) {
-                    touched.add(si);
-                }
+                c.unplace();
+                d.removeCell(c.getName());
+                si.removeCell(bel);
             }
         }
 
@@ -1816,12 +1797,9 @@ public class DesignTools {
             }
         }
 
-        batchRemoveSitePins(pinsToRemove, true);
-
         // Rename nets if source was removed
         Set<String> netsToKeep = new HashSet<>();
         for (Entry<Net, String> e : netsToUpdate.entrySet()) {
-            EDIFHierNet newSource = d.getNetlist().getHierNetFromName(e.getValue());
             Net net = e.getKey();
             if (!net.rename(e.getValue())) {
                 throw new RuntimeException("ERROR: Failed to rename net '" + net.getName() + "'");
@@ -1841,8 +1819,11 @@ public class DesignTools {
         }
 
         for (SiteInst siteInst : siteInstsToRemove) {
-            d.removeSiteInst(siteInst);
+            d.removeSiteInst(siteInst, pinsToRemove);
         }
+        t.stop().start("cleanup nets");
+
+        batchRemoveSitePins(pinsToRemove, true);
 
         // Remove any stray stubs on any remaining nets
         for (Net net : pinsToRemove.keySet()) {
@@ -1850,6 +1831,7 @@ public class DesignTools {
                 net.unroute();
             }
         }
+        pinsToRemove.clear();
 
         t.stop().start("create bbox");
 
