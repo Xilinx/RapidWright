@@ -44,11 +44,13 @@ public class Shape {
 
     private Map<Cell, ShapeLocation> map;
 
-    private Set<String> tags;
+    private Set<ShapeTag> tags;
 
     private int width;
 
     private int height;
+
+    private Shape nextChain;
 
     public Shape() {
         map = new LinkedHashMap<>();
@@ -121,15 +123,15 @@ public class Shape {
         return cell;
     }
 
-    public Set<String> getTags() {
+    public Set<ShapeTag> getTags() {
         return tags;
     }
 
-    public void setTags(Set<String> tags) {
+    public void setTags(Set<ShapeTag> tags) {
         this.tags = tags;
     }
 
-    public boolean addTag(String tag) {
+    public boolean addTag(ShapeTag tag) {
         return tags.add(tag);
     }
 
@@ -143,5 +145,33 @@ public class Shape {
         sb.append("Tags(s): " + getTags() + "\n");
         sb.append("WxH: " + getWidth() + "x" + getHeight() + "\n");
         return sb.toString();
+    }
+
+    protected Shape getNextChain() {
+        return nextChain;
+    }
+
+    protected void setNextChain(Shape nextChain) {
+        this.nextChain = nextChain;
+    }
+
+    /**
+     * Gets the highest/largest LUT letter name from the BEL names used in all the
+     * cells. Examines both 6LUT and 5LUT locations.
+     * 
+     * @return The highest LUT letter used in the shape.
+     */
+    public char getLargestLUTLetter() {
+        char c = Character.MIN_VALUE;
+        for (ShapeLocation loc : map.values()) {
+            String belName = loc.getBelName();
+            if (belName.contains("LUT")) {
+                char lutLetter = belName.charAt(0);
+                if (c < lutLetter) {
+                    c = lutLetter;
+                }
+            }
+        }
+        return c;
     }
 }

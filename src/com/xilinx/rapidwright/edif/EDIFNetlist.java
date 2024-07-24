@@ -112,7 +112,7 @@ public class EDIFNetlist extends EDIFName {
 
     private Map<EDIFCell, List<EDIFChange>> modifiedCells = null;
 
-    private List<Shape> shapes;
+    private Collection<Shape> shapes;
 
     private boolean DEBUG = false;
 
@@ -2058,11 +2058,11 @@ public class EDIFNetlist extends EDIFName {
         cellInstIOStandardFallback = null;
     }
 
-    public List<Shape> getShapes() {
+    public Collection<Shape> getShapes() {
         return shapes;
     }
 
-    public void setShapes(List<Shape> shapes) {
+    public void setShapes(Collection<Shape> shapes) {
         this.shapes = shapes;
     }
 

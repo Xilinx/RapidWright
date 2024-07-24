@@ -27,6 +27,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.shapes.Shape;
 import com.xilinx.rapidwright.design.shapes.ShapeLocation;
+import com.xilinx.rapidwright.design.shapes.ShapeTag;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
@@ -149,9 +150,9 @@ public class LogNetlistReader {
             shape.setHeight(i);
             shape.setWidth(i);
             Int.Reader shapeTags = s.getTags();
-            Set<String> tags = new HashSet<>(shapeTags.size());
+            Set<ShapeTag> tags = new HashSet<>(shapeTags.size());
             for (int j = 0; j < shapeTags.size(); j++) {
-                tags.add(allStrings[shapeTags.get(j)]);
+                tags.add(ShapeTag.valueOf(allStrings[shapeTags.get(j)]));
             }
             shape.setTags(tags);
             Map<com.xilinx.rapidwright.design.Cell, ShapeLocation> map = shape.getCellMap();

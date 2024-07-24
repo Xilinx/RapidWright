@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.interchange;
 
 import com.xilinx.rapidwright.design.shapes.Shape;
 import com.xilinx.rapidwright.design.shapes.ShapeLocation;
+import com.xilinx.rapidwright.design.shapes.ShapeTag;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
@@ -57,6 +58,7 @@ import org.capnproto.TextList.Builder;
 import org.capnproto.Void;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -176,19 +178,19 @@ public class LogNetlistWriter {
     }
 
     protected void writeShapes(EDIFNetlist n, Netlist.Builder netlist) {
-        List<Shape> shapes = n.getShapes();
+        Collection<Shape> shapes = n.getShapes();
         if (shapes == null) return;
         StructList.Builder<com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Shape.Builder> shapeList = netlist
                 .initShapeList(shapes.size());
-        for (int i = 0; i < shapes.size(); i++) {
+        int i = 0;
+        for (Shape s : shapes) {
             com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Shape.Builder curr = shapeList.get(i);
-            Shape s = shapes.get(i);
             curr.setHeight(s.getHeight());
             curr.setWidth(s.getWidth());
             Int.Builder tags = curr.initTags(s.getTags().size());
             int t = 0;
-            for (String tag : s.getTags()) {
-                tags.set(t, allStrings.getIndex(tag));
+            for (ShapeTag tag : s.getTags()) {
+                tags.set(t, allStrings.getIndex(tag.toString()));
                 t++;
             }
             StructList.Builder<ShapeElement.Builder> shapeElements = curr.initCells(s.getCellMap().size());
@@ -206,6 +208,7 @@ public class LogNetlistWriter {
                 }
                 j++;
             }
+            i++;
         }
     }
 
