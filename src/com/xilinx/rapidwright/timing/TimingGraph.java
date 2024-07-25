@@ -1034,7 +1034,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                         String s2 = ep2.getName();
 
                         // RAMB36E2 and RAMB18E2 have the same delay, only that RAMB18E2 will have less pins
-                        short delay = 0;
+                        Short delay = 0;
                         if (s1.startsWith("CLKA")) { // for DSP, we need to look up in the text file
                             // check order_a for A pin, order_b for B pin
                             if (isBramOutPortA(s2)) {
@@ -1057,7 +1057,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                             delay = intrasiteAndLogicDelayModel.getLogicDelay(belIdx, s1, s2, encodedConfig);
                         }
                         
-                        if (delay < 0) {
+                        if (delay == null) {
                             continue;
                         }
                         
@@ -1265,21 +1265,18 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                             String outputPhysPin = c.getPhysicalPinMapping(ep2.getName());
 
 
-                            float myLogicDelay;
+                            Short myLogicDelay;
                             try {
                                 myLogicDelay = intrasiteAndLogicDelayModel.getLogicDelay(belIdx, physPin, outputPhysPin);
                             } catch (IllegalArgumentException e) {
                                 continue;
                             }
-                            if (myLogicDelay < 0) {
+                            if (myLogicDelay == null) {
                                 continue;
                             }
-                            float LOGIC_DELAY = 0.0f;
-
-                            LOGIC_DELAY = myLogicDelay;
 
                             if (ep2.getName().startsWith("O")) {
-                                logicDelay = LOGIC_DELAY;
+                                logicDelay = myLogicDelay;
                                 //break;
                             }
 
@@ -1333,9 +1330,9 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                                 encodedConfig = 0; 
                             }
                             
-                            float myLogicDelay = intrasiteAndLogicDelayModel.getLogicDelay(
+                            Short myLogicDelay = intrasiteAndLogicDelayModel.getLogicDelay(
                                      belIdx, physPin, outputPhysPin, encodedConfig);
-                            if (myLogicDelay < 0) {
+                            if (myLogicDelay == null) {
                                 continue;
                             }
 
@@ -1512,10 +1509,13 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     }
     
     float getCLKtoOutputDelay(String portName, int encodedConfig) {
-        float delay = 0;
+        short delay = 0;
         short belIdx = intrasiteAndLogicDelayModel.getBELIndex("RAMB36E2");
         for (String clk : bramCLKPins) {
-            delay = Math.max(delay, intrasiteAndLogicDelayModel.getLogicDelay(belIdx, clk, portName, encodedConfig));
+            Short newDelay = intrasiteAndLogicDelayModel.getLogicDelay(belIdx, clk, portName, encodedConfig);
+            if (newDelay != null) {
+                delay = (short) Math.max(delay, newDelay);
+            }
         }
         return delay;
     }

@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -188,6 +188,7 @@ public class TimingAndWirelengthReport{
         DesignTools.createMissingSitePinInsts(design);
         RWRouteConfig config = new RWRouteConfig(new String[0]);
         config.setTimingDriven(true);
+        config.setUseUTurnNodes(true);
         final boolean isPartialRouting = false;
         TimingAndWirelengthReport reporter = new TimingAndWirelengthReport(design, config, isPartialRouting);
         reporter.computeStatisticsAndReport();

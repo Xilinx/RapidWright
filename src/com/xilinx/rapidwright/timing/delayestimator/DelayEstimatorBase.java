@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Pongstorn Maidee, Xilinx Research Labs.
@@ -119,6 +119,17 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
         return 0;
     }
 
+    public short getDelayOf(Node exitNode, boolean includeBase, boolean includeDiscontinuity) {
+        TermInfo termInfo = getTermInfo(exitNode);
+
+        // Don't put this in calcTimingGroupDelay because it is called many times to estimate delay.
+        if (includeBase && termInfo.ng == T.NodeGroupType.CLE_IN) {
+            return inputSitePinDelay.getOrDefault(exitNode.getWireName(), (short) 0);
+        }
+
+        return calcNodeGroupDelay(termInfo.ng, termInfo.begin(), termInfo.end(), includeBase, includeDiscontinuity);
+    }
+
 
     /**
      * Get delay of the node group of the given exit node.
@@ -127,14 +138,7 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
      * @return delay in ps
      */
     public short getDelayOf(Node exitNode) {
-        TermInfo termInfo = getTermInfo(exitNode);
-
-        // Don't put this in calcTimingGroupDelay because it is called many times to estimate delay.
-        if (termInfo.ng == T.NodeGroupType.CLE_IN) {
-            return inputSitePinDelay.getOrDefault(exitNode.getWireName(), (short) 0);
-        }
-
-        return calcNodeGroupDelay(termInfo.ng, termInfo.begin(), termInfo.end());
+        return getDelayOf(exitNode, true, true);
     }
 
     /**
@@ -425,7 +429,20 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
      * @return delay of the tg. When useUTurnNodes was set to false, return Short.MAX_VALUE/2 if the node graph is a U-turn.
      *         to indicate the node graph should be ignored.
      */
-    short calcNodeGroupDelay(T.NodeGroupType tg, short begLoc, short endLoc) {
+    short calcNodeGroupDelay(T.NodeGroupType tg, short begLoc, short endLoc, boolean includeBase, boolean includeDiscontinuity) {
+        short segDelay = (includeBase) ? calcNodeBaseDelay(tg) : 0;
+        short disDelay = (includeDiscontinuity) ? calcNodeDiscontinuityDelay(tg, begLoc, endLoc) : 0;
+        return (short) (segDelay + disDelay);
+    }
+
+    short calcNodeBaseDelay(T.NodeGroupType tg) {
+        float k0 = K0.get(tg.orientation()).get(tg.type());
+        float k1 = K1.get(tg.orientation()).get(tg.type());
+        short l  = L .get(tg.orientation()).get(tg.type());
+        return (short) (k0 + k1 * l);
+    }
+
+    short calcNodeDiscontinuityDelay(T.NodeGroupType tg, short begLoc, short endLoc) {
         int size = (tg.orientation() == T.Orientation.HORIZONTAL) ? numCol : numRow;
         short d = 0;
         List<Short> dArray = distArrays.get(tg.orientation()).get(tg.type());
@@ -451,11 +468,7 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
             }
         }
 
-        float k0 = K0.get(tg.orientation()).get(tg.type());
-        float k1 = K1.get(tg.orientation()).get(tg.type());
         float k2 = K2.get(tg.orientation()).get(tg.type());
-        short l  = L .get(tg.orientation()).get(tg.type());
-
-        return (short) (k0 + k1 * l + k2 * d);
+        return (short) (k2 * d);
     }
 }
