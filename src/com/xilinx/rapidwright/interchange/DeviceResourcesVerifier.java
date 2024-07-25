@@ -23,6 +23,8 @@
 
 package com.xilinx.rapidwright.interchange;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.channels.ReadableByteChannel;
@@ -671,7 +673,17 @@ public class DeviceResourcesVerifier {
             for (Tile tile : device.getTiles()[row]) {
                 for (int i = 0; i < tile.getWireCount(); i++) {
                     Node node = Node.getNode(tile, i);
-                    if (node != null && node.getTile() == tile && node.getWireIndex() == i) {
+                    if (node == null) {
+                        long nodeWireKey = DeviceResourcesWriter.makeKey(tile, i);
+                        Integer test = allWires.maybeGetIndex(nodeWireKey);
+                        if (test == null) {
+                            allWires.addObject(nodeWireKey);
+                            DeviceResources.Device.Wire.Reader readWire = wires.get(wireIdx++);
+                            expect(tile.getName(), allStrings.get(readWire.getTile()));
+                            expect(tile.getWireName(i), allStrings.get(readWire.getWire()));
+                            expect(tile.getWireIntentCode(i).ordinal(), readWire.getType());
+                        }
+                    }else if (node.getTile() == tile && node.getWireIndex() == i) {
                         Wire[] nodeWires = node.getAllWiresInNode();
                         for (Wire w : nodeWires) {
                             long nodeWireKey = DeviceResourcesWriter.makeKey(w.getTile(), w.getWireIndex());
