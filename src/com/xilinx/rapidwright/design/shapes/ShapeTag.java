@@ -29,7 +29,10 @@ public enum ShapeTag {
 
     CLUSTER("Cluster"),
     LUTNM("LUTNM"),
-    CARRY_CHAIN("Carry-chain");
+    CARRY_CHAIN("Carry-chain"),
+    MUXF7("MuxF7"),
+    MUXF8("MuxF8"),
+    MUXF9("MuxF9");
     
     private String name;
     

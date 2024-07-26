@@ -56,8 +56,10 @@ import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.placer.dreamplacefpga.DREAMPlaceFPGA;
 import com.xilinx.rapidwright.rwroute.RWRoute;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.VivadoTools;
 
@@ -109,41 +111,46 @@ public class ShapeTools {
         }
     }
 
+    public static Collection<Shape> getShapesFromFile(Design design, Path optionalShapeFile) {
+        Path shapeFile = null;
+        if (optionalShapeFile == null || !Files.exists(optionalShapeFile)) {
+            // Generate shapes file
+            final Path workdir = FileSystems.getDefault()
+                    .getPath("vivadoToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
+            File workdirHandle = new File(workdir.toString());
+            workdirHandle.mkdirs();
+
+            Path outputLog = workdir.resolve("outputLog.log");
+            Path tcl = workdir.resolve("run.tcl");
+            Path dcp = workdir.resolve("design.dcp");
+            shapeFile = workdir.resolve("shapes.txt");
+
+            design.writeCheckpoint(dcp);
+            design.getNetlist().expandMacroUnisims(design.getDevice().getSeries());
+
+            List<String> cmds = new ArrayList<>();
+            cmds.add("open_checkpoint " + dcp);
+            cmds.add("set_param place.debugShape " + shapeFile);
+            cmds.add("place_design -directive Quick");
+            FileTools.writeLinesToTextFile(cmds, tcl.toString());
+            VivadoTools.runTcl(outputLog, "source " + tcl, true);
+        } else {
+            shapeFile = optionalShapeFile;
+        }
+
+        List<Shape> shapes = readDebugShapeFile(design, shapeFile);
+        sortShapesByBELName(shapes);
+        design.getNetlist().setShapes(shapes);
+        return shapes;
+
+    }
+
     public static Collection<Shape> extractShapes(Design design, Path optionalShapeFile) {
         EDIFNetlist netlist = design.getNetlist();
 
         if (SOURCE_SHAPES_FROM_FILE) {
             // For now, we'll get the shapes from a shapes file
-            Path shapeFile = null;
-            if (optionalShapeFile == null || !Files.exists(optionalShapeFile)) {
-                // Generate shapes file
-                final Path workdir = FileSystems.getDefault()
-                        .getPath("vivadoToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
-                File workdirHandle = new File(workdir.toString());
-                workdirHandle.mkdirs();
-
-                Path outputLog = workdir.resolve("outputLog.log");
-                Path tcl = workdir.resolve("run.tcl");
-                Path dcp = workdir.resolve("design.dcp");
-                shapeFile = workdir.resolve("shapes.txt");
-
-                design.writeCheckpoint(dcp);
-                design.getNetlist().expandMacroUnisims(design.getDevice().getSeries());
-
-                List<String> cmds = new ArrayList<>();
-                cmds.add("open_checkpoint " + dcp);
-                cmds.add("set_param place.debugShape " + shapeFile);
-                cmds.add("place_design -directive Quick");
-                FileTools.writeLinesToTextFile(cmds, tcl.toString());
-                VivadoTools.runTcl(outputLog, "source " + tcl, true);
-            } else {
-                shapeFile = optionalShapeFile;
-            }
-
-            List<Shape> shapes = readDebugShapeFile(design, shapeFile);
-            sortShapesByBELName(shapes);
-            netlist.setShapes(shapes);
-            return shapes;
+            return getShapesFromFile(design, optionalShapeFile);
         }
 
         List<Shape> shapes = new ArrayList<>();
@@ -153,9 +160,19 @@ public class ShapeTools {
         EDIFLibrary macros = Design.getMacroPrimitives(design.getDevice().getSeries());
         Set<EDIFHierCellInst> macroInsts = new HashSet<>();
         Set<EDIFHierCellInst> chainInsts = new HashSet<>();
+        Map<String, EDIFHierCellInst> muxF9s = new HashMap<>();
+        Map<String, EDIFHierCellInst> muxF8s = new HashMap<>();
+        Map<String, EDIFHierCellInst> muxF7s = new HashMap<>();
         for (EDIFHierCellInst inst : design.getNetlist().getAllLeafHierCellInstances()) {
-            if (chainPrims.contains(inst.getCellName())) {
+            String instName = inst.getCellName();
+            if (chainPrims.contains(instName)) {
                 chainInsts.add(inst);
+            } else if (instName.equals("MUXF9")) {
+                muxF9s.put(inst.getFullHierarchicalInstName(), inst);
+            } else if (instName.equals("MUXF8")) {
+                muxF8s.put(inst.getFullHierarchicalInstName(), inst);
+            } else if (instName.equals("MUXF7")) {
+                muxF7s.put(inst.getFullHierarchicalInstName(), inst);
             } else {
                 EDIFHierCellInst parent = inst.getParent();
                 if (macros.containsCell(parent.getCellName())) {
@@ -371,11 +388,97 @@ public class ShapeTools {
                 }
             }
         }
+        
+        for (Entry<String, EDIFHierCellInst> e : muxF9s.entrySet()) {
+            Shape shape = new Shape();
+            shape.addCell(e.getKey(), design, 0, 0, "F9MUX", "F9MUX");
+            shape.addTag(ShapeTag.MUXF9);
+            for (int i = 0; i < 2; i++) {
+                EDIFHierPortInst f8Driver = e.getValue().getPortInstDriver("I" + Integer.toString(i));
+                assert (f8Driver.getCellType().getName().equals("F8MUX"));
+                Cell muxF8 = shape.addCell(f8Driver.getFullHierarchicalInstName(), design, 0, 0,
+                        i == 0 ? "F8MUX_TOP" : "F8MUX_BOT", "F8MUX");
+                muxF8s.remove(muxF8.getName());
+                buildMuxF8Shape(design, muxF8, shape, i == 0, muxF7s);
+            }
+            shapes.add(shape);
+        }
+
+        for (Entry<String, EDIFHierCellInst> e : muxF8s.entrySet()) {
+            Shape shape = new Shape();
+            Cell muxF8 = shape.addCell(e.getKey(), design, 0, 0, "F8MUX_BOT", "F8MUX");
+            shape.addTag(ShapeTag.MUXF8);
+            buildMuxF8Shape(design, muxF8, shape, false, muxF7s);
+            shapes.add(shape);
+        }
+
+        for (Entry<String, EDIFHierCellInst> e : muxF7s.entrySet()) {
+            Shape shape = new Shape();
+            Cell muxF7 = shape.addCell(e.getKey(), design, 0, 0, "F7MUX_AB", "F7MUX");
+            shape.addTag(ShapeTag.MUXF7);
+            buildMuxF7Shape(design, muxF7, shape, "F7MUX_AB");
+            shapes.add(shape);
+        }
 
         sortShapesByBELName(shapes);
         return shapes;
     }
     
+    private static void buildMuxF8Shape(Design design, Cell muxf8, Shape shape, boolean isTop,
+            Map<String, EDIFHierCellInst> muxf7s) {
+
+        EDIFHierPortInst ffSink = checkAndGetSingleSinkFlop(muxf8);
+        if (ffSink != null) {
+            shape.addCell(ffSink.getFullHierarchicalInstName(), design, 0, 0, isTop ? "GFF" : "CFF",
+                    ffSink.getCellType().getName());
+        }
+        for (int j = 0; j < 2; j++) {
+            EDIFHierPortInst f7Driver = muxf8.getEDIFHierCellInst().getPortInstDriver("I" + Integer.toString(j));
+            assert (f7Driver.getCellType().getName().equals("F7MUX"));
+            String belName = "MUXF7_" + (isTop ? (j == 0 ? "GH" : "EF") : (j == 0 ? "CD" : "AB"));
+            Cell muxf7 = shape.addCell(f7Driver.getFullHierarchicalInstName(), design, 0, 0, belName, "F7MUX");
+            muxf7s.remove(muxf7.getName());
+            buildMuxF7Shape(design, muxf7, shape, belName);
+        }
+    }
+
+    private static void buildMuxF7Shape(Design design, Cell muxf7, Shape shape, String f7BELName) {
+        EDIFHierPortInst ffSink = checkAndGetSingleSinkFlop(muxf7);
+        if (ffSink != null) {
+            shape.addCell(ffSink.getFullHierarchicalInstName(), design, 0, 0, f7BELName.charAt(0) + "FF",
+                    ffSink.getCellType().getName());
+        }
+        for (int k = 0; k < 2; k++) {
+            EDIFHierPortInst lutDriver = muxf7.getEDIFHierCellInst().getPortInstDriver("I" + Integer.toString(k));
+            String lutBELName = f7BELName.charAt(6 + k) + "6LUT";
+            shape.addCell(lutDriver.getFullHierarchicalInstName(), design, 0, 0, lutBELName,
+                    lutDriver.getCellType().getName());
+        }
+    }
+
+    /**
+     * Checks if the provided mux drives exactly one flip flop. If it does, it will
+     * return it, otherwise it returns null.
+     * 
+     * @return The single flip flop input driven by the provided mux, null
+     *         otherwise.
+     */
+    private static EDIFHierPortInst checkAndGetSingleSinkFlop(Cell mux) {
+        EDIFHierNet outNet = mux.getEDIFHierCellInst().getPortInst("O").getHierarchicalNet();
+
+        if (outNet != null) {
+            List<EDIFHierPortInst> portInsts = outNet.getLeafHierPortInsts(false, true);
+            if (portInsts.size() == 1) {
+                EDIFHierPortInst sink = portInsts.get(0);
+                String cellType = sink.getCellType().getName();
+                if (DesignTools.unisimFlipFlopTypes.contains(cellType)) {
+                    return sink;
+                }
+            }
+        }
+        return null;
+    }
+
     private static boolean lutPlacementCompatible(EDIFHierPortInst sum, EDIFHierPortInst di,
             Map<String, Shape> cellShapeMap) {
         String diType = di.getCellType().getName();
