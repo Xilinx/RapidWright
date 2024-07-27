@@ -25,7 +25,6 @@ package com.xilinx.rapidwright.interchange;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -694,13 +693,19 @@ public class DeviceResourcesWriter {
 
         Map<TileTypeEnum, Integer> tileTypeIndicies = new HashMap<TileTypeEnum, Integer>();
 
-        int i=0;
+        // Order tile types by their TILE_TYPE_IDX
+        TileTypeEnum[] tileTypeIndexArr = new TileTypeEnum[tileTypes.size()];
         for (Entry<TileTypeEnum,Tile> e : tileTypes.entrySet()) {
-            Tile tile = e.getValue();
+            tileTypeIndexArr[e.getValue().getTileTypeIndex()] = e.getKey();
+        }
+
+        for (int i = 0; i < tileTypes.size(); i++) {
+            TileTypeEnum type = tileTypeIndexArr[i];
+            Tile tile = tileTypes.get(type);
             TileType.Builder tileType = tileTypesList.get(i);
-            tileTypeIndicies.put(e.getKey(), i);
+            tileTypeIndicies.put(type, i);
             // name
-            tileType.setName(allStrings.getIndex(e.getKey().name()));
+            tileType.setName(allStrings.getIndex(type.name()));
 
             // siteTypes
             Site[] sites = tile.getSites();
@@ -778,33 +783,33 @@ public class DeviceResourcesWriter {
                     }
                 }
             }
-            i++;
         }
 
         return tileTypeIndicies;
     }
 
     public static void writeAllTilesToBuilder(Device device, DeviceResources.Device.Builder devBuilder, Map<TileTypeEnum, Integer> tileTypeIndicies) {
-        Collection<Tile> tiles = device.getAllTiles();
         StructList.Builder<DeviceResources.Device.Tile.Builder> tileBuilders =
-                devBuilder.initTileList(tiles.size());
+                devBuilder.initTileList(device.getColumns() * device.getRows());
 
         int i=0;
-        for (Tile tile : tiles) {
-            DeviceResources.Device.Tile.Builder tileBuilder = tileBuilders.get(i);
-            tileBuilder.setName(allStrings.getIndex(tile.getName()));
-            tileBuilder.setType(tileTypeIndicies.get(tile.getTileTypeEnum()));
-            Site[] sites = tile.getSites();
-            StructList.Builder<DeviceResources.Device.Site.Builder> siteBuilders =
-                    tileBuilder.initSites(sites.length);
-            for (int j=0; j < sites.length; j++) {
-                DeviceResources.Device.Site.Builder siteBuilder = siteBuilders.get(j);
-                siteBuilder.setName(allStrings.getIndex(sites[j].getName()));
-                siteBuilder.setType(j);
+        for (Tile[] tiles : device.getTiles()) {
+            for (Tile tile : tiles) {
+                DeviceResources.Device.Tile.Builder tileBuilder = tileBuilders.get(i);
+                tileBuilder.setName(allStrings.getIndex(tile.getName()));
+                tileBuilder.setType(tileTypeIndicies.get(tile.getTileTypeEnum()));
+                Site[] sites = tile.getSites();
+                StructList.Builder<DeviceResources.Device.Site.Builder> siteBuilders = tileBuilder
+                        .initSites(sites.length);
+                for (int j = 0; j < sites.length; j++) {
+                    DeviceResources.Device.Site.Builder siteBuilder = siteBuilders.get(j);
+                    siteBuilder.setName(allStrings.getIndex(sites[j].getName()));
+                    siteBuilder.setType(j);
+                }
+                tileBuilder.setRow((short) tile.getRow());
+                tileBuilder.setCol((short) tile.getColumn());
+                i++;
             }
-            tileBuilder.setRow((short)tile.getRow());
-            tileBuilder.setCol((short)tile.getColumn());
-            i++;
         }
 
     }
