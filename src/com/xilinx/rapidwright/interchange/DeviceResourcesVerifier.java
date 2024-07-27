@@ -160,7 +160,6 @@ public class DeviceResourcesVerifier {
         Map<String, TileType.Reader> tileTypeMap = new HashMap<String, TileType.Reader>();
         int tileTypeCount = dReader.getTileTypeList().size();
         Map<TileTypeEnum, TileType.Reader> tileTypeEnumMap = new HashMap<TileTypeEnum, TileType.Reader>();
-        Map<TileTypeEnum, Integer> tileTypeIndexMap = new HashMap<>();
         HashMap<String, StructList.Reader<DeviceResources.Device.PIP.Reader>> ttPIPMap = new HashMap<>();
         for (int i=0; i < tileTypeCount; i++) {
             TileType.Reader ttReader = dReader.getTileTypeList().get(i);
@@ -169,7 +168,6 @@ public class DeviceResourcesVerifier {
             TileTypeEnum tileTypeEnum = TileTypeEnum.valueOf(name);
             tileTypeEnumMap.put(tileTypeEnum, ttReader);
             ttPIPMap.put(name, ttReader.getPips());
-            tileTypeIndexMap.put(tileTypeEnum, i);
         }
 
         expect(device.getName(), dReader.getName().toString());
@@ -346,7 +344,6 @@ public class DeviceResourcesVerifier {
             // Verify Tile Types
             TileType.Reader tileType = tileTypeMap.get(tileTypeName);
             expect(tile.getTileTypeEnum().name(), allStrings.get(tileType.getName()));
-            expect(tile.getTileTypeIndex(), tileTypeIndexMap.get(TileTypeEnum.valueOf(tileTypeName)));
             expect(tile.getWireCount(), tileType.getWires().size());
             PrimitiveList.Int.Reader wiresReader = tileType.getWires();
             for (int j=0; j < tile.getWireCount(); j++) {

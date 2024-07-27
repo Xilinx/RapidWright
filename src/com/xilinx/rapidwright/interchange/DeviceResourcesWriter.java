@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.capnproto.MessageBuilder;
@@ -694,13 +695,14 @@ public class DeviceResourcesWriter {
         Map<TileTypeEnum, Integer> tileTypeIndicies = new HashMap<TileTypeEnum, Integer>();
 
         // Order tile types by their TILE_TYPE_IDX
-        TileTypeEnum[] tileTypeIndexArr = new TileTypeEnum[tileTypes.size()];
+        Map<Integer, TileTypeEnum> tileTypeIndexMap = new TreeMap<>();
         for (Entry<TileTypeEnum,Tile> e : tileTypes.entrySet()) {
-            tileTypeIndexArr[e.getValue().getTileTypeIndex()] = e.getKey();
+            tileTypeIndexMap.put(e.getValue().getTileTypeIndex(), e.getKey());
         }
 
-        for (int i = 0; i < tileTypes.size(); i++) {
-            TileTypeEnum type = tileTypeIndexArr[i];
+        int i = 0;
+        for (Entry<Integer, TileTypeEnum> e : tileTypeIndexMap.entrySet()) {
+            TileTypeEnum type = e.getValue();
             Tile tile = tileTypes.get(type);
             TileType.Builder tileType = tileTypesList.get(i);
             tileTypeIndicies.put(type, i);
@@ -783,6 +785,7 @@ public class DeviceResourcesWriter {
                     }
                 }
             }
+            i++;
         }
 
         return tileTypeIndicies;
