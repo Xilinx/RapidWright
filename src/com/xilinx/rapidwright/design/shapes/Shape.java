@@ -55,6 +55,8 @@ public class Shape {
     public Shape() {
         map = new LinkedHashMap<>();
         tags = new HashSet<>();
+        width = 1;
+        height = 1;
     }
 
     public Set<Cell> getCells() {
