@@ -1556,8 +1556,8 @@ public class DesignTools {
                     case PORT: {
                         // We found a site pin, add it to solution set
                         sitePinNames.add(pin.getName());
-                        if (belPin.isInput() && pin.isInput()) {
-                            // This is an input BEL pin that feeds an output site pin, mark it as an internal sink
+                        if (belPin.isInput() && pin.isInput() && siteInst.getSitePinInst(pin.getName()) != null) {
+                            // This is an input BEL pin that feeds a used output site pin, mark it as an internal sink
                             internalSinks.add(pin);
                         }
                         break;
