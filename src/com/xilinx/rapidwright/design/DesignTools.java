@@ -1576,7 +1576,13 @@ public class DesignTools {
                                     // Make sure we are coming in on the routed-thru pin
                                     String otherPinName = otherCell.getPinMappingsP2L().keySet().iterator().next();
                                     if (pin.getName().equals(otherPinName)) {
-                                        otherPin = LUTTools.getLUTOutputPin(pin.getBEL());
+                                        if (otherCell.isFFRoutethruCell()) {
+                                            otherPin = pin.getBEL().getPin("Q");
+                                        } else if (LUTTools.isCellALUT(otherCell)) {
+                                            otherPin = LUTTools.getLUTOutputPin(pin.getBEL());
+                                        } else {
+                                            throw new RuntimeException("ERROR: Unrecognized routethru cell: " + cell.getName());
+                                        }
                                     }
                                 }
                                 if (otherPin != null) {
