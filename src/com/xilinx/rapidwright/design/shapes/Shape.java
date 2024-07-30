@@ -137,6 +137,10 @@ public class Shape {
         return tags.add(tag);
     }
 
+    public boolean hasTag(ShapeTag tag) {
+        return tags.contains(tag);
+    }
+
     public String toString() {
         StringBuilder sb = new StringBuilder();
         for (Entry<Cell, ShapeLocation> e : map.entrySet()) {

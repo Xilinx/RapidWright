@@ -47,6 +47,7 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
@@ -61,6 +62,7 @@ import com.xilinx.rapidwright.placer.dreamplacefpga.DREAMPlaceFPGA;
 import com.xilinx.rapidwright.rwroute.RWRoute;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.VivadoTools;
 
 /**
@@ -212,9 +214,6 @@ public class ShapeTools {
                         for (EDIFHierPortInst conn : physicalNetPinMap.get(hierNet)) {
                             if (conn.getPortInst().equals(pi))
                                 continue;
-                            if (hierNet.getNet().isGND() || hierNet.getNet().isVCC()) {
-                                continue;
-                            }
                             String connType = conn.getCellType().getName();
                             String pinName = pi.getName();
                             if (pinName.equals("CO[7]")) {
@@ -256,8 +255,12 @@ public class ShapeTools {
                         if (belName.equals("HFF2") && conn.getCellType().getName().equals("CARRY8")) {
                             continue;
                         }
-                        Cell c = shape.addCell(conn.getFullHierarchicalInstName(), design, dx, dy, belName,
-                                conn.getCellType().getName());
+                        String cellName = conn.getFullHierarchicalInstName();
+                        Shape testCollision = cellShapeMap.get(cellName);
+                        if (testCollision != null && testCollision.hasTag(ShapeTag.CARRY_CHAIN)) {
+                            continue;
+                        }
+                        Cell c = shape.addCell(cellName, design, dx, dy, belName, conn.getCellType().getName());
                         Shape overlap = cellShapeMap.put(c.getName(), shape);
                         if (overlap != null && overlap != shape) {
                             shapes.remove(overlap);
@@ -281,8 +284,14 @@ public class ShapeTools {
                 }
                 shape.addTag(ShapeTag.CARRY_CHAIN);
                 break;
+            case RAMB18E2:
+                EDIFHierPortInst portInst = i.getPortInst("CASDIMUXA");
+                if (portInst != null && portInst.getNet() != null) {
+                    // TODO handle RAMB18E2 cascades
+                }
+                break;
             default:
-                throw new RuntimeException("ERROR: Unhandled chain-type instance: " + type);
+                throw new RuntimeException("ERROR: Unhandled chain-type instance: " + type + ", instance " + i);
             }
         }
 
@@ -290,20 +299,22 @@ public class ShapeTools {
         for (EDIFHierPortInst cout : chainStarts) {
             EDIFHierPortInst currCout = cout;
             Shape currShape = cellShapeMap.get(cout.getFullHierarchicalInstName());
-
+            int currDy = 0;
             while (currCout != null) {
                 String currCoutName = currCout.toString();
                 for (EDIFHierPortInst conn : physicalNetPinMap.get(currCout.getHierarchicalNet())) {
                     if (conn.toString().equals(currCoutName))
                         continue;
-                    currCout = conn.getHierarchicalInst().getPortInst("CO[7]");
+                    currCout = conn.getHierarchicalInst().getChild(conn.getPortInst().getCellInst())
+                            .getPortInst("CO[7]");
                     String nextCarry = conn.getFullHierarchicalInstName();
                     Shape nextShape = cellShapeMap.get(nextCarry);
                     if (nextShape != null) {
                         currShape.getTags().addAll(nextShape.getTags());
                         for (Entry<Cell, ShapeLocation> e : nextShape.getCellMap().entrySet()) {
                             ShapeLocation loc = e.getValue();
-                            loc.setDy(loc.getDy() + 1);
+                            currDy++;
+                            loc.setDy(currDy);
                             currShape.getCellMap().put(e.getKey(), loc);
                             cellShapeMap.put(e.getKey().getName(), currShape);
                         }
@@ -451,8 +462,11 @@ public class ShapeTools {
         for (int k = 0; k < 2; k++) {
             EDIFHierPortInst lutDriver = muxf7.getEDIFHierCellInst().getPortInstDriver("I" + Integer.toString(k));
             String lutBELName = f7BELName.charAt(6 + k) + "6LUT";
-            shape.addCell(lutDriver.getFullHierarchicalInstName(), design, 0, 0, lutBELName,
-                    lutDriver.getCellType().getName());
+            String cellType = lutDriver.getCellType().getName();
+            shape.addCell(lutDriver.getFullHierarchicalInstName(), design, 0, 0, lutBELName, cellType);
+            if (cellType.equals("SRLC32E")) {
+                shape.addTag(ShapeTag.SRL);
+            }
         }
     }
 
@@ -530,8 +544,30 @@ public class ShapeTools {
             }
             shape.addTag(ShapeTag.CLUSTER);
             break;
+        case RAM32M16:
+            shape.setHeight(1);
+            shape.setWidth(1);
+            for (EDIFCellInst i : macro.getCellType().getCellInsts()) {
+                String instName = i.getName();
+                String suffix = instName.endsWith("_D1") ? "6LUT" : "5LUT";
+                String belName = instName.charAt(3) + suffix;
+                shape.addCell(macro.getChild(i).toString(), design, 0, 0, belName, i.getCellName());
+            }
+            shape.addTag(ShapeTag.RAM32M16);
+            break;
+        case RAM32X1D:
+            shape.setHeight(1);
+            shape.setWidth(1);
+            // TODO - These macros can be combined into a single if shared inputs
+            for (EDIFCellInst i : macro.getCellType().getCellInsts()) {
+                String instName = i.getName();
+                String belName = instName.endsWith("SP") ? "H6LUT" : "G6LUT";
+                shape.addCell(macro.getChild(i).toString(), design, 0, 0, belName, i.getCellName());
+            }
+            shape.addTag(ShapeTag.CLUSTER);
+            break;
         default:
-            throw new RuntimeException("ERROR: Unsupported shape for macro " + cellType);
+            throw new RuntimeException("ERROR: Unsupported shape for macro " + cellType + ", instance " + macro);
         }
 
         return shape;

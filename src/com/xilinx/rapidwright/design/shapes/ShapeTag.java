@@ -32,7 +32,9 @@ public enum ShapeTag {
     CARRY_CHAIN("Carry-chain"),
     MUXF7("MuxF7"),
     MUXF8("MuxF8"),
-    MUXF9("MuxF9");
+    MUXF9("MuxF9"),
+    SRL("SRL"),
+    RAM32M16("RAM32M16");
     
     private String name;
     
