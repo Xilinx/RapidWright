@@ -345,6 +345,7 @@ public class PhysNetlistWriter {
         final boolean isStaticNet = net.isStaticNet();
         for (String siteWire : siteInst.getSiteWiresFromNet(net)) {
             BELPin[] belPins = siteInst.getSiteWirePins(siteWire);
+            BELPin versalRoutethru = null;
             for (BELPin belPin : belPins) {
                 BEL bel = belPin.getBEL();
                 Cell cell = siteInst.getCell(bel);
@@ -354,6 +355,11 @@ public class PhysNetlistWriter {
                     if (cell == null) {
                         if (belPin.isInput() || !net.isStaticNet()) {
                             // Skip if nothing placed here and cannot be driving a static net
+                            if (bel.getName().equals("LOOKAHEAD8") || (belPin.isOutput() && bel.getName().equals("FF_CLK_MOD"))) {
+                                versalRoutethru = belPin;
+                            } else if (bel.getName().equals("FF_CLK_MOD")) {
+                                nodes.add(new RouteBranchNode(site, belPin, false));
+                            }
                             continue;
                         }
                         assert(bel.isLUT() || // LUTs can be a GND or VCC source
@@ -375,6 +381,9 @@ public class PhysNetlistWriter {
                                 sitePIP = siteInst.getSitePIP(padout.getPin("IN"));
                             } else if (series == Series.Series7) {
                                 sitePIP = siteInst.getSitePIP("IUSED", "0");
+                            } else if (series == Series.Versal) {
+                                // No SitePIPs in HDIOB
+                                continue;
                             } else {
                                 throw new RuntimeException("Unsupported series " + series);
                             }
@@ -473,6 +482,11 @@ public class PhysNetlistWriter {
                             continue;
                         }
                     }
+                }
+
+                if (versalRoutethru != null) {
+                    nodes.add(new RouteBranchNode(site, versalRoutethru, routethru));
+                    versalRoutethru = null;
                 }
 
                 nodes.add(new RouteBranchNode(site, belPin, routethru));
