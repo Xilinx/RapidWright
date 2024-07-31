@@ -94,7 +94,7 @@ public class PhysNetlistReader {
     protected static final String DISABLE_AUTO_IO_BUFFERS = "DISABLE_AUTO_IO_BUFFERS";
     protected static final String OUT_OF_CONTEXT = "OUT_OF_CONTEXT";
 
-    public static boolean VALIDATE_MACROS_PLACED_FULLY = true;
+    public static boolean VALIDATE_MACROS_PLACED_FULLY = false;
 
     /**
      *  Checks that constant routing and net names are valid.
@@ -107,7 +107,7 @@ public class PhysNetlistReader {
      * macro definition in the library.
      * This incurs a runtime overhead.
      */
-    public static boolean CHECK_MACROS_CONSISTENT = true;
+    public static boolean CHECK_MACROS_CONSISTENT = false;
 
 
     /**
@@ -115,7 +115,7 @@ public class PhysNetlistReader {
      * consistency with logical netlist cells.
      * This incurs a runtime overhead.
      */
-    public static boolean CHECK_AND_CREATE_LOGICAL_CELL_IF_NOT_PRESENT = true;
+    public static boolean CHECK_AND_CREATE_LOGICAL_CELL_IF_NOT_PRESENT = false;
 
     protected final Design design;
     protected Device device;

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.device;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestPIP {
@@ -46,5 +47,18 @@ public class TestPIP {
                 Assertions.assertEquals(end, pip.getEndNode());
             }
         }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvu3p,INT_X0Y0/BYPASS_W14,INT_X0Y0/INT_NODE_IMUX_50_INT_OUT0,true",
+            "xcvu3p,INT_X9Y9/INT_NODE_IMUX_50_INT_OUT0,INT_X9Y9/BYPASS_W14,false"
+    })
+    public void testGetArbitraryPIPReversed(String deviceName, String startNodeName, String endNodeName, boolean isReversed) {
+        Device d = Device.getDevice(deviceName);
+        Node startNode = d.getNode(startNodeName);
+        Node endNode = d.getNode(endNodeName);
+        PIP pip = PIP.getArbitraryPIP(startNode, endNode);
+        Assertions.assertEquals(isReversed, pip.isReversed());
     }
 }
