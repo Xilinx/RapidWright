@@ -446,7 +446,7 @@ public class ShapeTools {
         for (int j = 0; j < 2; j++) {
             EDIFHierPortInst f7Driver = muxf8.getEDIFHierCellInst().getPortInstDriver("I" + Integer.toString(j));
             assert (f7Driver.getCellType().getName().equals("F7MUX"));
-            String belName = "MUXF7_" + (isTop ? (j == 0 ? "GH" : "EF") : (j == 0 ? "CD" : "AB"));
+            String belName = "F7MUX_" + (isTop ? (j == 0 ? "GH" : "EF") : (j == 0 ? "CD" : "AB"));
             Cell muxf7 = shape.addCell(f7Driver.getFullHierarchicalInstName(), design, 0, 0, belName, "F7MUX");
             muxf7s.remove(muxf7.getName());
             buildMuxF7Shape(design, muxf7, shape, belName);
