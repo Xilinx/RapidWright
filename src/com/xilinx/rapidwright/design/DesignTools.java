@@ -1751,15 +1751,6 @@ public class DesignTools {
             }
             cells.add(c);
         }
-        // Find encrypted cells that need to be removed
-        if (d.getNetlist().getEncryptedCells().size() > 0) { 
-            String name = hierarchicalCell.getFullHierarchicalInstName();
-            for (Cell c : d.getCells()) {
-                if (c.getName().startsWith(name)) {
-                    cells.add(c);
-                }
-            }
-        }
 
         // Remove all placement and routing information related to the cell to be
         // blackboxed
@@ -2606,7 +2597,11 @@ public class DesignTools {
         }
         String logPinName = targetCell.getLogicalPinMapping(belPin.getName());
         if (logPinName == null) return null;
-        EDIFPortInst portInst = targetCell.getEDIFCellInst().getPortInst(logPinName);
+        EDIFCellInst eci = targetCell.getEDIFCellInst();
+        if (eci == null) {
+            return null;
+        }
+        EDIFPortInst portInst = eci.getPortInst(logPinName);
         final EDIFNetlist netlist = targetCell.getSiteInst().getDesign().getNetlist();
         EDIFHierPortInst hierPortInst =
                 new EDIFHierPortInst(netlist.getHierCellInstFromName(targetCell.getParentHierarchicalInstName()), portInst);

@@ -94,6 +94,13 @@ public class PhysNetlistWriter {
      */
     public static boolean VERBOSE_PHYSICAL_NET_ROUTING = true;
 
+    public static final int NUM_PHYS_NETLIST_MESSAGES = 5;
+    public static final int PHYS_MSG_STRINGS = 0;
+    public static final int PHYS_MSG_SITEINSTS = 1;
+    public static final int PHYS_MSG_PLACEMENT = 2;
+    public static final int PHYS_MSG_ROUTING = 3;
+    public static final int PHYS_MSG_DESIGNPROPS = 4;
+
     protected static void writeSiteInsts(PhysNetlist.Builder physNetlist, Design design,
                                          StringEnumerator strings) {
         Builder<SiteInstance.Builder> siteInsts = physNetlist.initSiteInsts(design.getSiteInsts().size());
@@ -345,6 +352,7 @@ public class PhysNetlistWriter {
         final boolean isStaticNet = net.isStaticNet();
         for (String siteWire : siteInst.getSiteWiresFromNet(net)) {
             BELPin[] belPins = siteInst.getSiteWirePins(siteWire);
+            BELPin versalRoutethru = null;
             for (BELPin belPin : belPins) {
                 BEL bel = belPin.getBEL();
                 Cell cell = siteInst.getCell(bel);
@@ -354,6 +362,11 @@ public class PhysNetlistWriter {
                     if (cell == null) {
                         if (belPin.isInput() || !net.isStaticNet()) {
                             // Skip if nothing placed here and cannot be driving a static net
+                            if (bel.getName().equals("LOOKAHEAD8") || (belPin.isOutput() && bel.getName().equals("FF_CLK_MOD"))) {
+                                versalRoutethru = belPin;
+                            } else if (bel.getName().equals("FF_CLK_MOD")) {
+                                nodes.add(new RouteBranchNode(site, belPin, false));
+                            }
                             continue;
                         }
                         assert(bel.isLUT() || // LUTs can be a GND or VCC source
@@ -375,6 +388,9 @@ public class PhysNetlistWriter {
                                 sitePIP = siteInst.getSitePIP(padout.getPin("IN"));
                             } else if (series == Series.Series7) {
                                 sitePIP = siteInst.getSitePIP("IUSED", "0");
+                            } else if (series == Series.Versal) {
+                                // No SitePIPs in HDIOB
+                                continue;
                             } else {
                                 throw new RuntimeException("Unsupported series " + series);
                             }
@@ -473,6 +489,11 @@ public class PhysNetlistWriter {
                             continue;
                         }
                     }
+                }
+
+                if (versalRoutethru != null) {
+                    nodes.add(new RouteBranchNode(site, versalRoutethru, routethru));
+                    versalRoutethru = null;
                 }
 
                 nodes.add(new RouteBranchNode(site, belPin, routethru));
@@ -696,32 +717,58 @@ public class PhysNetlistWriter {
 
     public static void writePhysNetlist(Design design, String fileName) throws IOException {
         CodePerfTracker t = new CodePerfTracker("Write PhysNetlist");
+        String[] fileNames = new String[NUM_PHYS_NETLIST_MESSAGES];
 
         t.start("Initialize");
         MessageBuilder message = new MessageBuilder();
         PhysNetlist.Builder physNetlist = message.initRoot(PhysNetlist.factory);
         StringEnumerator strings = new StringEnumerator();
-
-        physNetlist.setPart(design.getPartName());
+        Interchange.IS_GZIPPED = false;
 
         t.stop().start("Write SiteInsts");
         writeSiteInsts(physNetlist, design, strings);
 
+        fileNames[PHYS_MSG_SITEINSTS] = fileName + "_siteInsts";
+        Interchange.writeInterchangeFile(fileNames[PHYS_MSG_SITEINSTS], message);
+        message = new MessageBuilder();
+        physNetlist = message.initRoot(PhysNetlist.factory);
+
         t.stop().start("Write Placement");
         writePlacement(physNetlist, design, strings);
+
+        fileNames[PHYS_MSG_PLACEMENT] = fileName + "_place";
+        Interchange.writeInterchangeFile(fileNames[PHYS_MSG_PLACEMENT], message);
+        message = new MessageBuilder();
+        physNetlist = message.initRoot(PhysNetlist.factory);
 
         t.stop().start("Write Routing");
         writePhysNets(physNetlist, design, strings);
 
+        fileNames[PHYS_MSG_ROUTING] = fileName + "_route";
+        Interchange.writeInterchangeFile(fileNames[PHYS_MSG_ROUTING], message);
+        message = new MessageBuilder();
+        physNetlist = message.initRoot(PhysNetlist.factory);
+
         t.stop().start("Write Design Props");
         writeDesignProperties(physNetlist, design, strings);
 
+        fileNames[PHYS_MSG_DESIGNPROPS] = fileName + "_designProps";
+        Interchange.writeInterchangeFile(fileNames[PHYS_MSG_DESIGNPROPS], message);
+        message = new MessageBuilder();
+        physNetlist = message.initRoot(PhysNetlist.factory);
+
         t.stop().start("Write Strings");
         writeStrings(physNetlist, strings);
+        physNetlist.setPart(design.getPartName());
+        fileNames[PHYS_MSG_STRINGS] = fileName + "_strings";
+        Interchange.writeInterchangeFile(fileNames[PHYS_MSG_STRINGS], message);
 
-        t.stop().start("Write File");
-        Interchange.writeInterchangeFile(fileName, message);
+        // Concat each individual message file into a single gzipped file (strings
+        // first)
+        t.stop().start("Write Single File");
+        Interchange.concatMessagesToSingleGZIPFile(fileNames, fileName);
 
         t.stop().printSummary();
+        Interchange.IS_GZIPPED = true;
     }
 }

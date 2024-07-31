@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Advanced Micro Devices, Inc.
@@ -167,6 +167,40 @@ public class TestNode {
         Assertions.assertNotEquals(0, allWiresInNode.length);
         for (Wire wire : allWiresInNode) {
             Assertions.assertEquals(node, wire.getNode());
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvu3p,INT_X0Y0/BYPASS_W14,INT_X0Y0/INT.INT_NODE_IMUX_50_INT_OUT0<<->>BYPASS_W14",
+            "xcvu3p,INT_X0Y0/INT_NODE_IMUX_50_INT_OUT0,",
+    })
+    public void testGetAllDownhillPIPsReversed(String deviceName, String startNodeName, String reversedPIPString) {
+        Device d = Device.getDevice(deviceName);
+        Node startNode = d.getNode(startNodeName);
+        for (PIP pip : startNode.getAllDownhillPIPs()) {
+            if (pip.toString().equals(reversedPIPString)) {
+                Assertions.assertTrue(pip.isReversed());
+            } else {
+                Assertions.assertFalse(pip.isReversed());
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvu3p,INT_X0Y0/INT_NODE_IMUX_50_INT_OUT0,INT_X0Y0/INT.INT_NODE_IMUX_50_INT_OUT0<<->>BYPASS_W14",
+            "xcvu3p,INT_X0Y0/BYPASS_W14,",
+    })
+    public void testGetAllUphillPIPsReversed(String deviceName, String endNodeName, String reversedPIPString) {
+        Device d = Device.getDevice(deviceName);
+        Node endNode = d.getNode(endNodeName);
+        for (PIP pip : endNode.getAllUphillPIPs()) {
+            if (pip.toString().equals(reversedPIPString)) {
+                Assertions.assertTrue(pip.isReversed());
+            } else {
+                Assertions.assertFalse(pip.isReversed());
+            }
         }
     }
 }

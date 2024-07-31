@@ -64,6 +64,8 @@ public class LogNetlistWriter {
     public static final String DEVICE_PRIMITIVES_LIB = "primitives";
     public static final String DEVICE_MACROS_LIB = "macros";
 
+    public static final int NUM_LOG_NETLIST_MULTI_MESSAGES = 6;
+
     LogNetlistWriter() {
         this(null, null);
     }
@@ -346,18 +348,65 @@ public class LogNetlistWriter {
             }
         }
         t.stop().start("Initialize");
+        Interchange.IS_GZIPPED = false;
         MessageBuilder message = new MessageBuilder();
         Netlist.Builder netlist = message.initRoot(Netlist.factory);
         LogNetlistWriter writer = new LogNetlistWriter();
-        t.stop();
-        writer.populateNetlistBuilder(n, netlist, t);
-        t.start("Write Top");
+        String[] fileNames = new String[NUM_LOG_NETLIST_MULTI_MESSAGES];
+
+        t.stop().start("Populate Enums");
+        writer.populateEnumerations(n);
+
+        t.stop().start("Write Ports");
+        message = new MessageBuilder();
+        netlist = message.initRoot(Netlist.factory);
+        writer.writeAllPortsToNetlistBuilder(netlist);
+        fileNames[1] = fileName + "_ports";
+        Interchange.writeInterchangeFile(fileNames[1], message);
+
+        t.stop().start("Write Cell Decls");
+        message = new MessageBuilder();
+        netlist = message.initRoot(Netlist.factory);
+        writer.writeAllCellDeclsToNetlistBuilder(netlist);
+        fileNames[2] = fileName + "_celldecls";
+        Interchange.writeInterchangeFile(fileNames[2], message);
+
+        t.stop().start("Write Insts");
+        message = new MessageBuilder();
+        netlist = message.initRoot(Netlist.factory);
+        writer.writeAllInstsToNetlistBuilder(netlist);
+        fileNames[3] = fileName + "_insts";
+        Interchange.writeInterchangeFile(fileNames[3], message);
+
+        t.stop().start("Write Cells");
+        message = new MessageBuilder();
+        netlist = message.initRoot(Netlist.factory);
+        writer.writeAllCellsToNetlistBuilder(netlist);
+        fileNames[4] = fileName + "_cells";
+        Interchange.writeInterchangeFile(fileNames[4], message);
+
+        t.stop().start("Write Top");
+        message = new MessageBuilder();
+        netlist = message.initRoot(Netlist.factory);
         writer.writeTopNetlistStuffToNetlistBuilder(n, netlist);
+        fileNames[5] = fileName + "_top";
+        Interchange.writeInterchangeFile(fileNames[5], message);
+
         t.stop().start("Write Strings");
+        message = new MessageBuilder();
+        netlist = message.initRoot(Netlist.factory);
         writeStrings(netlist, writer.allStrings);
-        t.stop().start("Write File");
-        Interchange.writeInterchangeFile(fileName, message);
+        netlist.setName(n.getName());
+        fileNames[0] = fileName + "_strings";
+        Interchange.writeInterchangeFile(fileNames[0], message);
+
+        // Concat each individual message file into a single gzipped file (strings
+        // first)
+        t.stop().start("Write Single File");
+        Interchange.concatMessagesToSingleGZIPFile(fileNames, fileName);
+
         t.stop().printSummary();
+        Interchange.IS_GZIPPED = true;
     }
 
     /**

@@ -22,10 +22,11 @@
 
 package com.xilinx.rapidwright.util;
 
-import com.xilinx.rapidwright.design.Design;
+import java.nio.file.Path;
+
 import org.junit.jupiter.api.Assertions;
 
-import java.nio.file.Path;
+import com.xilinx.rapidwright.design.Design;
 
 public class VivadoToolsHelper {
     public static void assertFullyRouted(Design design) {
@@ -43,6 +44,20 @@ public class VivadoToolsHelper {
         }
 
         ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(dcp);
+        Assertions.assertTrue(rrs.isFullyRouted());
+    }
+
+    /**
+     * Ensures that the provided design can be routed successfully in Vivado.
+     * 
+     * @param design The design to route.
+     * @param dir    The directory to work within.
+     */
+    public static void assertRoutedSuccessfullyByVivado(Design design, Path dir) {
+        if (!FileTools.isVivadoOnPath()) {
+            return;
+        }
+        ReportRouteStatusResult rrs = VivadoTools.routeDesignAndGetStatus(design, dir);
         Assertions.assertTrue(rrs.isFullyRouted());
     }
 }

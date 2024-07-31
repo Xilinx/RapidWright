@@ -1,3 +1,37 @@
+============= RapidWright 2024.1.1-beta released on 2024-07-17 ================
+Notes: 
+  - [VivadoTools] Source *_load.tcl from same dir as DCP (#1032)
+  - Test that PIP.isReversed() is correct (#1024)
+  - Add TestSite.testGetIntTile() (#1022)
+  - [EDIFTools] writeTclLoadScriptForPartialEncryptedDesigns abspath (#1029)
+  - Adding HDIOB types (#1028)
+  - Test for site routing from raw placed design (#1000)
+  - [RWRoute] Do not NPE on encrypted netlists (#1025)
+  - [RWRoute] Do not assume Y = 0 has Laguna tiles, since it could be HBM device (#1026)
+  - Adds UNKWN state for LSFJobs (#1027)
+  - Adding legacy support for u280 (#1021)
+  - Remove flawed loop intended to for encrypted cell removal (#1023)
+  - [DesignTools.makeBlackBox()] Fixes an issue of removing CARRY blocks fed by routethrus (#1009)
+  - Fix null netlist pointer on expanded macro children (#1008)
+  - [Interchange] Device Resources Verifier Fixes (#1014)
+  - Fix ConcurrentModificationError (#1015)
+  - [EDIFTools] Adding method to create a flat netlist from a hierarchical one (#1006)
+  - Adding HBM ComponentTypes (#1007)
+  - Test for wire/node mismatch reported in #983 (#1005)
+  - 3.6% memory reduction usage for large placed designs (de-duplication of cell pin strings)
+  - Add missing pin entry for BUFG_GT when tracking INT tile connections
+  - Fixes rare DCP write issue with stubbed bi-directional PIPs (more common on DFX designs)
+  - Fix for reversed flag on PIPs
+  - Addresses issue with Net.getBufferDelay() by checking for null wire names
+  - Fixes two site routing issues
+
+
+API Additions:
+  - (None)
+  
+API Removals:
+  - (None)
+
 ============= RapidWright 2024.1.0-beta released on 2024-06-11 ================
 Notes: 
   - Support for Vivado 2024.1 DCPs and devices
