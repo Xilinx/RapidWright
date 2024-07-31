@@ -3333,7 +3333,7 @@ public class DesignTools {
     //NOTE: SRL16E (reference name SRL16E, EDIFCell in RW) uses A2-A5, so we need to connect A1 & A6 to VCC,
     //however, when SitePinInsts (e.g. A3) are already in GND, adding those again will cause problems to A1
     static String[] lut6BELPins = new String[] {"A1", "A6"};
-    static HashSet<String> unisimFlipFlopTypes;
+    public static HashSet<String> unisimFlipFlopTypes;
     static {
         unisimFlipFlopTypes = new HashSet<>();
         unisimFlipFlopTypes.add("FDSE");//S CE, logical cell

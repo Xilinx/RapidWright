@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -94,7 +94,11 @@ public class Interchange {
         Path physFileName = lowerName.endsWith(PHYS_NETLIST_EXT) ? filePath : getExistingCompanionFile(filePath);
 
         if (logFileName == null) {
-            throw new RuntimeException("ERROR: Could not find logical netlist file: " + logFileName);
+            logFileName = Paths.get(filePath.toString() + LOG_NETLIST_EXT);
+            if (!Files.exists(logFileName)) {
+                throw new RuntimeException("ERROR: Could not find logical netlist file: " + logFileName);
+            }
+            physFileName = Paths.get(filePath.toString() + PHYS_NETLIST_EXT);
         }
 
         String xdcFileName = FileTools.replaceExtension(logFileName, ".xdc").toString();

@@ -34,8 +34,12 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.shapes.ShapeTools;
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.interchange.DeviceResourcesWriter;
 import com.xilinx.rapidwright.interchange.Interchange;
+import com.xilinx.rapidwright.interchange.LogNetlistWriter;
 import com.xilinx.rapidwright.interchange.PhysNetlistReader;
 import com.xilinx.rapidwright.interchange.PhysicalNetlistToDcp;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -150,11 +154,19 @@ public class DREAMPlaceFPGA {
 
     }
 
-    public static Design placeDesign(Design design, Path workDir, boolean makeOutOfContext) {
+    public static Design placeDesign(Design design, String ioPlacementFile, boolean makeOutOfContext, Path workDir) {
         // Create interchange netlist file
         String interchangeRootFile = workDir.toString() + File.separator + "design";
-        Interchange.writeDesignToInterchange(design, interchangeRootFile);
+        EDIFNetlist flatNetlist = EDIFTools.createFlatNetlist(design.getNetlist(), design.getPartName());
+        flatNetlist.setShapes(ShapeTools.extractShapes(design, null));
+        try {
+            LogNetlistWriter.writeLogNetlist(flatNetlist, interchangeRootFile + Interchange.LOG_NETLIST_EXT);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        // Interchange.writeDesignToInterchange(design, interchangeRootFile);
 
+        design.getNetlist().expandMacroUnisims(design.getDevice().getSeries());
         // Create device file if it doesn't already exist
         String deviceName = design.getDevice().getName();
         Path deviceFile = workDir.resolve(deviceName + ".device");
@@ -173,7 +185,7 @@ public class DREAMPlaceFPGA {
         settings.put(INTERCHANGE_DEVICE, deviceFile.toString());
         settings.put(INTERCHANGE_NETLIST, interchangeRootFile + Interchange.LOG_NETLIST_EXT);
         settings.put(PLACE_SOL, "");
-        settings.put(IO_PL, "");
+        settings.put(IO_PL, ioPlacementFile);
         writeJSONForDREAMPlaceFPGA(jsonFile, settings);
 
         // Run DREAMPlaceFPGA
@@ -202,23 +214,25 @@ public class DREAMPlaceFPGA {
     }
 
     public static void main(String[] args) {
-        // Usage: <input DCP> <output DCP> [--out_of_context] [work directory]
+        // Usage: <input DCP> <output DCP> [IO placement file (.pl)] [work directory]
         if (args.length < 2 || args.length > 4) {
-            System.out.println("USAGE: <input DCP> <output DCP> [" 
-                            + PhysicalNetlistToDcp.MAKE_DCP_OUT_OF_CONTEXT + "] [work directory]");
+            System.out.println("USAGE: <input DCP> <output DCP> [IO placement file (.pl)] [work directory]");
             return;
         }
         Design input = Design.readCheckpoint(args[0]);
 
-        boolean makeOutOfContext = false;
+        boolean makeOutOfContext = true;
+        String ioPlacementFile = "";
         if (args.length >= 3) {
-            if (args[2].equals(PhysicalNetlistToDcp.MAKE_DCP_OUT_OF_CONTEXT)) {
-                makeOutOfContext = true;
+            File file = new File(args[2]);
+            if (!file.isDirectory()) {
+                ioPlacementFile = args[2];
+                makeOutOfContext = false;
             } 
         }
 
-        Path workDir = args.length == 4 ? Paths.get(args[3]) : args.length == 3 && !makeOutOfContext ? Paths.get(args[2]) : Paths.get(System.getProperty("user.dir"));
-        Design placed = placeDesign(input, workDir, makeOutOfContext);
+        Path workDir = args.length == 4 ? Paths.get(args[3]) : args.length == 3 && makeOutOfContext ? Paths.get(args[2]) : Paths.get(System.getProperty("user.dir"));
+        Design placed = placeDesign(input, ioPlacementFile, makeOutOfContext, workDir);
         placed.writeCheckpoint(args[1]);
     }
 }

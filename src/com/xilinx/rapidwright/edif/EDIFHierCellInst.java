@@ -343,4 +343,20 @@ public class EDIFHierCellInst {
         }
         return true;
     }
+
+    /**
+     * Gets the (first found) driver on the net net attached to the named port
+     * instance.
+     * 
+     * @param portInstName Name of the port instance on this cell instance.
+     * @return The first driver found or null if port is invalid or an output.
+     */
+    public EDIFHierPortInst getPortInstDriver(String portInstName) {
+        EDIFHierPortInst input = getPortInst(portInstName);
+        if (input == null || input.isOutput())
+            return null;
+        EDIFHierNet net = input.getHierarchicalNet();
+        List<EDIFHierPortInst> srcs = net.getLeafHierPortInsts(true, false);
+        return srcs.size() > 0 ? srcs.get(0) : null;
+    }
 }

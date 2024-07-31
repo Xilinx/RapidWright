@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -23,7 +23,11 @@
 
 package com.xilinx.rapidwright.interchange;
 
+import com.xilinx.rapidwright.design.shapes.Shape;
+import com.xilinx.rapidwright.design.shapes.ShapeLocation;
+import com.xilinx.rapidwright.design.shapes.ShapeTag;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
@@ -42,15 +46,19 @@ import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Net;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Port;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PortInstance;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
+import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Shape.ShapeElement;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import org.capnproto.MessageBuilder;
 import org.capnproto.PrimitiveList;
+import org.capnproto.PrimitiveList.Int;
 import org.capnproto.StructList;
 import org.capnproto.Text;
 import org.capnproto.TextList;
+import org.capnproto.TextList.Builder;
 import org.capnproto.Void;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -166,6 +174,41 @@ public class LogNetlistWriter {
                     allInsts.addObject(inst);
                 }
             }
+        }
+    }
+
+    protected void writeShapes(EDIFNetlist n, Netlist.Builder netlist) {
+        Collection<Shape> shapes = n.getShapes();
+        if (shapes == null) return;
+        StructList.Builder<com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Shape.Builder> shapeList = netlist
+                .initShapeList(shapes.size());
+        int i = 0;
+        for (Shape s : shapes) {
+            com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Shape.Builder curr = shapeList.get(i);
+            curr.setHeight(s.getHeight());
+            curr.setWidth(s.getWidth());
+            Int.Builder tags = curr.initTags(s.getTags().size());
+            int t = 0;
+            for (ShapeTag tag : s.getTags()) {
+                tags.set(t, allStrings.getIndex(tag.toString()));
+                t++;
+            }
+            StructList.Builder<ShapeElement.Builder> shapeElements = curr.initCells(s.getCellMap().size());
+            int j = 0;
+            for (Entry<com.xilinx.rapidwright.design.Cell, ShapeLocation> e : s.getCellMap().entrySet()) {
+                ShapeElement.Builder shapeElement = shapeElements.get(j);
+                shapeElement.setBelName(allStrings.getIndex(e.getValue().getBelName()));
+                shapeElement.setCellName(allStrings.getIndex(e.getKey().getName()));
+                shapeElement.setDx(e.getValue().getDx());
+                shapeElement.setDy(e.getValue().getDy());
+                List<SiteTypeEnum> types = e.getValue().getCompatibleSiteTypes();
+                Int.Builder elemSiteTypes = shapeElement.initSiteTypes(types.size());
+                for (int k = 0; k < types.size(); k++) {
+                    elemSiteTypes.set(k, allStrings.getIndex(types.get(k).name()));
+                }
+                j++;
+            }
+            i++;
         }
     }
 
@@ -353,6 +396,8 @@ public class LogNetlistWriter {
         writer.populateNetlistBuilder(n, netlist, t);
         t.start("Write Top");
         writer.writeTopNetlistStuffToNetlistBuilder(n, netlist);
+        t.stop().start("Write Shapes");
+        writer.writeShapes(n, netlist);
         t.stop().start("Write Strings");
         writeStrings(netlist, writer.allStrings);
         t.stop().start("Write File");

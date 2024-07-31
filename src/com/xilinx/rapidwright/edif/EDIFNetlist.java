@@ -62,6 +62,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.shapes.Shape;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IOStandard;
 import com.xilinx.rapidwright.device.Series;
@@ -110,6 +111,8 @@ public class EDIFNetlist extends EDIFName {
     private boolean trackCellChanges = false;
 
     private Map<EDIFCell, List<EDIFChange>> modifiedCells = null;
+
+    private Collection<Shape> shapes;
 
     private boolean DEBUG = false;
 
@@ -2053,6 +2056,14 @@ public class EDIFNetlist extends EDIFName {
      */
     public void resetCellInstIOStandardFallbackMap() {
         cellInstIOStandardFallback = null;
+    }
+
+    public Collection<Shape> getShapes() {
+        return shapes;
+    }
+
+    public void setShapes(Collection<Shape> shapes) {
+        this.shapes = shapes;
     }
 
     public static void main(String[] args) throws FileNotFoundException {
