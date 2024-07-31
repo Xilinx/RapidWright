@@ -366,94 +366,87 @@ public class PhysNetlistWriter {
                         assert(bel.isLUT() || // LUTs can be a GND or VCC source
                                 (net.isGNDNet() && bel.isGndSource()) ||
                                 (net.isVCCNet() && bel.isVccSource()));
-                    } else if (cell.isPortCell()) {
-                        if (Utils.isIOB(siteInst)) {
-                            assert(belPin.isBidir());
+                    } else if (belPin.isBidir()) {
+                        // Attempt to find the actual direction of this BELPin
 
-                            Series series = siteInst.getDesign().getDevice().getSeries();
-                            if (series == Series.Versal) {
-                                Cell iobCell;
-                                if (bel.getName().equals("PAD_M")) {
-                                    iobCell = siteInst.getCell("IOB_M");
-                                } else if (bel.getName().equals("PAD_S")) {
-                                    iobCell = siteInst.getCell("IOB_S");
-                                } else {
-                                    throw new RuntimeException("ERROR: Unrecognized BEL: " + bel.getName());
-                                }
-
-                                if (iobCell == null) {
-                                    iobCell = siteInst.getCell("DIFFRXTX");
-                                }
-
-                                if (iobCell.getType().startsWith("IBUF")) {
-                                    // IBUF* cell exists, thus PAD must be output
-                                    bidirPinIsInput = false;
-                                } else if (iobCell.getType().startsWith("OBUF")) {
-                                    // OBUF* cell exists, thus PAD must be input
-                                    bidirPinIsInput = true;
-                                } else {
-                                    throw new RuntimeException("ERROR: Unrecognized cell type: " + iobCell.getType());
-                                }
-
-                                bidirPinIsOutput = !bidirPinIsInput;
-                            } else {
-                                assert(bel.getName().equals("PAD"));
-                                SitePIP sitePIP;
-                                if (series == Series.UltraScalePlus || series == Series.UltraScale) {
-                                    BEL padout = siteInst.getBEL("PADOUT");
-                                    if (padout == null) {
-                                        // HPIOB_SNGL site types do not contain this SitePIP; ignore
-                                        continue;
+                        if (cell.isPortCell()) {
+                            if (Utils.isIOB(siteInst)) {
+                                Series series = siteInst.getDesign().getDevice().getSeries();
+                                if (series == Series.Versal) {
+                                    Cell iobCell;
+                                    if (bel.getName().equals("PAD_M")) {
+                                        iobCell = siteInst.getCell("IOB_M");
+                                    } else if (bel.getName().equals("PAD_S")) {
+                                        iobCell = siteInst.getCell("IOB_S");
+                                    } else {
+                                        throw new RuntimeException("ERROR: Unrecognized BEL: " + bel.getName());
                                     }
-                                    sitePIP = siteInst.getSitePIP(padout.getPin("IN"));
-                                } else if (series == Series.Series7) {
-                                    sitePIP = siteInst.getSitePIP("IUSED", "0");
-                                } else {
-                                    throw new RuntimeException("Unsupported series " + series);
-                                }
 
-                                SitePIPStatus sitePIPStatus = siteInst.getSitePIPStatus(sitePIP);
-                                bidirPinIsInput = !sitePIPStatus.isUsed();
-                                bidirPinIsOutput = !bidirPinIsInput;
+                                    if (iobCell == null) {
+                                        iobCell = siteInst.getCell("DIFFRXTX");
+                                    }
+
+                                    if (iobCell.getType().startsWith("IBUF")) {
+                                        // IBUF* cell exists, thus PAD must be output
+                                        bidirPinIsInput = false;
+                                    } else if (iobCell.getType().startsWith("OBUF")) {
+                                        // OBUF* cell exists, thus PAD must be input
+                                        bidirPinIsInput = true;
+                                    } else {
+                                        throw new RuntimeException("ERROR: Unrecognized cell type: " + iobCell.getType());
+                                    }
+                                } else {
+                                    assert (bel.getName().equals("PAD"));
+                                    SitePIP sitePIP;
+                                    if (series == Series.UltraScalePlus || series == Series.UltraScale) {
+                                        BEL padout = siteInst.getBEL("PADOUT");
+                                        if (padout == null) {
+                                            // HPIOB_SNGL site types do not contain this SitePIP; ignore
+                                            continue;
+                                        }
+                                        sitePIP = siteInst.getSitePIP(padout.getPin("IN"));
+                                    } else if (series == Series.Series7) {
+                                        sitePIP = siteInst.getSitePIP("IUSED", "0");
+                                    } else {
+                                        throw new RuntimeException("Unsupported series " + series);
+                                    }
+
+                                    SitePIPStatus sitePIPStatus = siteInst.getSitePIPStatus(sitePIP);
+                                    bidirPinIsInput = !sitePIPStatus.isUsed();
+                                }
+                            } else if (siteInst.getSiteTypeEnum() == SiteTypeEnum.GTY_REFCLK) {
+                                Series series = siteInst.getDesign().getDevice().getSeries();
+                                assert (series == Series.Versal);
+                                assert (bel.getName().startsWith("GTY_REFCLK")); // GTY_REFCLK[NP]
+                                BEL obufdsBel = siteInst.getBEL("GTY_OBUFDS");
+                                assert (obufdsBel != null);
+                                Cell obufdsCell = siteInst.getCell(obufdsBel);
+                                bidirPinIsInput = (obufdsCell != null);
+                            } else if (siteInst.getSiteTypeEnum() == SiteTypeEnum.GTYE4_COMMON) {
+                                assert (bel.getName().startsWith("REFCLK"));
+                                BEL obufdsBel = siteInst.getBEL("OBUFDS" + bel.getName().charAt(6) + "_GTYE4");
+                                assert (obufdsBel != null);
+                                Cell obufdsCell = siteInst.getCell(obufdsBel);
+                                bidirPinIsInput = (obufdsCell != null);
+                            } else {
+                                throw new RuntimeException("Unable to process PORT cell at site " + siteInst.getSiteName());
                             }
-                        } else if (siteInst.getSiteTypeEnum() == SiteTypeEnum.GTY_REFCLK) {
+                        } else {
                             Series series = siteInst.getDesign().getDevice().getSeries();
                             assert(series == Series.Versal);
-                            if (belPin.isBidir()) {
-                                assert(bel.getName().startsWith("GTY_REFCLK")); // GTY_REFCLK[NP]
-                                BEL obufdsBel = siteInst.getBEL("GTY_OBUFDS");
-                                assert(obufdsBel != null);
-                                Cell obufdsCell = siteInst.getCell(obufdsBel);
-                                bidirPinIsInput = (obufdsCell != null);
-                                bidirPinIsOutput = !bidirPinIsInput;
-                            }
-                        } else if (siteInst.getSiteName().startsWith("GTY")) {
-                            if (belPin.isBidir()) {
-                                assert(bel.getName().startsWith("REFCLK"));
-                                BEL obufdsBel = siteInst.getBEL("OBUFDS" + bel.getName().charAt(6) + "_GTYE4");
-                                assert(obufdsBel != null);
-                                Cell obufdsCell = siteInst.getCell(obufdsBel);
-                                bidirPinIsInput = (obufdsCell != null);
-                                bidirPinIsOutput = !bidirPinIsInput;
-                            }
-                        } else {
-                            throw new RuntimeException("Unable to process PORT cell at site " + siteInst.getSiteName());
-                        }
-                    } else if (belPin.isBidir()) {
-                        Series series = siteInst.getDesign().getDevice().getSeries();
-                        assert(series == Series.Versal);
 
-                        String cellType = cell.getType();
-                        if (cellType.startsWith("IBUF")) {
-                            bidirPinIsInput = true;
-                        } else if (cellType.startsWith("OBUF")) {
-                            bidirPinIsInput = false;
-                        } else if (cellType.equals("PS9")) {
-                            assert(belPin.getName().startsWith("PSS_PAD_"));
-                            // Assume output?
-                            bidirPinIsInput = false;
-                        } else {
-                            throw new RuntimeException("ERROR: Unrecognized cell type: " + cellType);
+                            String cellType = cell.getType();
+                            if (cellType.startsWith("IBUF")) {
+                                bidirPinIsInput = true;
+                            } else if (cellType.startsWith("OBUF")) {
+                                bidirPinIsInput = false;
+                            } else if (cellType.equals("PS9")) {
+                                assert(belPin.getName().startsWith("PSS_PAD_"));
+                                // Assume output?
+                                bidirPinIsInput = false;
+                            } else {
+                                throw new RuntimeException("ERROR: Unrecognized cell type: " + cellType);
+                            }
                         }
                         bidirPinIsOutput = !bidirPinIsInput;
                     }
