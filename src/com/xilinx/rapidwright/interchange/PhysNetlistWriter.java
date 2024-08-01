@@ -344,28 +344,36 @@ public class PhysNetlistWriter {
     public static void extractIntraSiteRouting(Net net, List<RouteBranchNode> nodes, SiteInst siteInst) {
         Site site = siteInst.getSite();
         final boolean isStaticNet = net.isStaticNet();
+        BELPin possibleRoutethruInputPin = null;
         for (String siteWire : siteInst.getSiteWiresFromNet(net)) {
             BELPin[] belPins = siteInst.getSiteWirePins(siteWire);
-            BELPin versalRoutethru = null;
             for (BELPin belPin : belPins) {
                 BEL bel = belPin.getBEL();
+                String belName = bel.getName();
                 Cell cell = siteInst.getCell(bel);
                 boolean bidirPinIsInput = false;
                 boolean bidirPinIsOutput = false;
                 if (bel.getBELClass() == BELClass.BEL) {
                     if (cell == null) {
-                        if (belPin.isInput() || !net.isStaticNet()) {
-                            // Skip if nothing placed here and cannot be driving a static net
-                            if (bel.getName().equals("LOOKAHEAD8") || (belPin.isOutput() && bel.getName().equals("FF_CLK_MOD"))) {
-                                versalRoutethru = belPin;
-                            } else if (bel.getName().equals("FF_CLK_MOD")) {
-                                nodes.add(new RouteBranchNode(site, belPin, false));
+                        if (belPin.isInput()) {
+                            if (net.isUsedNet()) {
+                                // Ignore input BELPins on GLOBAL_USEDNET
+                            } else if ((belName.equals("LOOKAHEAD8") && belPin.getName().startsWith("CY")) || belName.equals("FF_CLK_MOD")) {
+                                assert(possibleRoutethruInputPin == null);
+                                possibleRoutethruInputPin = belPin;
                             }
                             continue;
+                        } else if (!isStaticNet) {
+                            if (possibleRoutethruInputPin == null || bel != possibleRoutethruInputPin.getBEL()) {
+                                // Skip if not driving a static net and no possibility of a routethru
+                                continue;
+                            }
+                            // Possible routethru! Allowed to proceed
+                        } else {
+                            assert(bel.isLUT() || // LUTs can be a GND or VCC source
+                                    (net.isGNDNet() && bel.isGndSource()) ||
+                                    (net.isVCCNet() && bel.isVccSource()));
                         }
-                        assert(bel.isLUT() || // LUTs can be a GND or VCC source
-                                (net.isGNDNet() && bel.isGndSource()) ||
-                                (net.isVCCNet() && bel.isVccSource()));
                     } else if (belPin.isBidir()) {
                         // Attempt to find the actual direction of this BELPin
 
@@ -374,12 +382,12 @@ public class PhysNetlistWriter {
                                 Series series = siteInst.getDesign().getDevice().getSeries();
                                 if (series == Series.Versal) {
                                     Cell iobCell;
-                                    if (bel.getName().equals("PAD_M")) {
+                                    if (belName.equals("PAD_M")) {
                                         iobCell = siteInst.getCell("IOB_M");
-                                    } else if (bel.getName().equals("PAD_S")) {
+                                    } else if (belName.equals("PAD_S")) {
                                         iobCell = siteInst.getCell("IOB_S");
                                     } else {
-                                        throw new RuntimeException("ERROR: Unrecognized BEL: " + bel.getName());
+                                        throw new RuntimeException("ERROR: Unrecognized BEL: " + belName);
                                     }
 
                                     if (iobCell == null) {
@@ -396,7 +404,7 @@ public class PhysNetlistWriter {
                                         throw new RuntimeException("ERROR: Unrecognized cell type: " + iobCell.getType());
                                     }
                                 } else {
-                                    assert (bel.getName().equals("PAD"));
+                                    assert (belName.equals("PAD"));
                                     SitePIP sitePIP;
                                     if (series == Series.UltraScalePlus || series == Series.UltraScale) {
                                         BEL padout = siteInst.getBEL("PADOUT");
@@ -417,14 +425,14 @@ public class PhysNetlistWriter {
                             } else if (siteInst.getSiteTypeEnum() == SiteTypeEnum.GTY_REFCLK) {
                                 Series series = siteInst.getDesign().getDevice().getSeries();
                                 assert (series == Series.Versal);
-                                assert (bel.getName().startsWith("GTY_REFCLK")); // GTY_REFCLK[NP]
+                                assert (belName.startsWith("GTY_REFCLK")); // GTY_REFCLK[NP]
                                 BEL obufdsBel = siteInst.getBEL("GTY_OBUFDS");
                                 assert (obufdsBel != null);
                                 Cell obufdsCell = siteInst.getCell(obufdsBel);
                                 bidirPinIsInput = (obufdsCell != null);
                             } else if (siteInst.getSiteTypeEnum() == SiteTypeEnum.GTYE4_COMMON) {
-                                assert (bel.getName().startsWith("REFCLK"));
-                                BEL obufdsBel = siteInst.getBEL("OBUFDS" + bel.getName().charAt(6) + "_GTYE4");
+                                assert (belName.startsWith("REFCLK"));
+                                BEL obufdsBel = siteInst.getBEL("OBUFDS" + belName.charAt(6) + "_GTYE4");
                                 assert (obufdsBel != null);
                                 Cell obufdsCell = siteInst.getCell(obufdsBel);
                                 bidirPinIsInput = (obufdsCell != null);
@@ -497,9 +505,13 @@ public class PhysNetlistWriter {
                     assert(belPin.isOutput() || bidirPinIsOutput);
 
                     if (bel.getBELClass() == BELClass.BEL) {
-                        routethru = cell != null && cell.isRoutethru();
-
-                        // Fall through
+                        if (cell != null) {
+                            routethru = cell.isRoutethru();
+                        } else if (possibleRoutethruInputPin != null && bel == possibleRoutethruInputPin.getBEL()) {
+                            nodes.add(new RouteBranchNode(site, possibleRoutethruInputPin, routethru));
+                            possibleRoutethruInputPin = null;
+                            routethru = true;
+                        }
                     } else if (bel.getBELClass() == BELClass.RBEL) {
                         if (isStaticNet && bel.isStaticSource()) {
                             assert(belPin.isOutput());
@@ -523,16 +535,11 @@ public class PhysNetlistWriter {
                             continue;
                         }
 
-                        if (bel.getName().equals("IO") && siteInst.getSitePinInst(belPin.getName()) == null) {
+                        if (belName.equals("IO") && siteInst.getSitePinInst(belPin.getName()) == null) {
                             // Skip IO site ports without a site pin
                             continue;
                         }
                     }
-                }
-
-                if (versalRoutethru != null) {
-                    nodes.add(new RouteBranchNode(site, versalRoutethru, routethru));
-                    versalRoutethru = null;
                 }
 
                 nodes.add(new RouteBranchNode(site, belPin, routethru));
