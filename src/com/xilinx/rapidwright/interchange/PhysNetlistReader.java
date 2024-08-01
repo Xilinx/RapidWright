@@ -130,8 +130,7 @@ public class PhysNetlistReader {
     protected BELPinCache belPinCache;
 
     public PhysNetlistReader(EDIFNetlist netlist) {
-        design = new Design();
-        design.setNetlist(netlist);
+        design = new Design(netlist);
     }
 
     protected Design read(String physNetlistFileName) throws IOException {
