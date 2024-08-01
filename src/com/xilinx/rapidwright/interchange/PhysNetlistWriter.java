@@ -344,6 +344,7 @@ public class PhysNetlistWriter {
     public static void extractIntraSiteRouting(Net net, List<RouteBranchNode> nodes, SiteInst siteInst) {
         Site site = siteInst.getSite();
         final boolean isStaticNet = net.isStaticNet();
+        final boolean isUsedNet = net.isUsedNet();
         BELPin possibleRoutethruInputPin = null;
         for (String siteWire : siteInst.getSiteWiresFromNet(net)) {
             BELPin[] belPins = siteInst.getSiteWirePins(siteWire);
@@ -356,7 +357,7 @@ public class PhysNetlistWriter {
                 if (bel.getBELClass() == BELClass.BEL) {
                     if (cell == null) {
                         if (belPin.isInput()) {
-                            if (net.isUsedNet()) {
+                            if (isUsedNet) {
                                 // Ignore input BELPins on GLOBAL_USEDNET
                             } else if ((belName.equals("LOOKAHEAD8") && belPin.getName().startsWith("CY")) || belName.equals("FF_CLK_MOD")) {
                                 assert(possibleRoutethruInputPin == null);
@@ -368,7 +369,7 @@ public class PhysNetlistWriter {
                                 // Skip if not driving a static net and no possibility of a routethru
                                 continue;
                             }
-                            // Possible routethru! Allowed to proceed
+                            // Expected routethru! Allowed to proceed
                         } else {
                             assert(bel.isLUT() || // LUTs can be a GND or VCC source
                                     (net.isGNDNet() && bel.isGndSource()) ||
@@ -508,6 +509,9 @@ public class PhysNetlistWriter {
                         if (cell != null) {
                             routethru = cell.isRoutethru();
                         } else if (possibleRoutethruInputPin != null && bel == possibleRoutethruInputPin.getBEL()) {
+                            // belPin is an output pin corresponding to an input pin (on the same BEL, a BEL
+                            // which doesn't have a cell placed on it) that we previously recorded as the
+                            // start of a possible routethru. With a confirmed routethrough, commit this input pin.
                             nodes.add(new RouteBranchNode(site, possibleRoutethruInputPin, routethru));
                             possibleRoutethruInputPin = null;
                             routethru = true;
@@ -524,7 +528,7 @@ public class PhysNetlistWriter {
                                 continue;
                             }
                         } else {
-                            assert(net.isStaticNet() || net.isUsedNet());
+                            assert(net.isStaticNet() || isUsedNet);
                         }
                     } else {
                         assert(bel.getBELClass() == BELClass.PORT);
