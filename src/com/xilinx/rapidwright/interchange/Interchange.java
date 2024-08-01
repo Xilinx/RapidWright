@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -299,7 +299,8 @@ public class Interchange {
             logNetlistPath = FileTools.replaceDir(logNetlistPath, workingPath);
         }
         String logNetlistFileName = logNetlistPath.toString();
-        LogNetlistWriter.writeLogNetlist(design.getNetlist(), logNetlistFileName);
+        EDIFNetlist netlist = design.getNetlist();
+        LogNetlistWriter.writeLogNetlist(netlist, logNetlistFileName);
         t.stop().start(WRITE_PHYSICAL_NETLIST);
 
         Path physNetlistPath = FileTools.replaceExtension(dcpPath, ".phys");
@@ -309,10 +310,12 @@ public class Interchange {
         String physNetlistFileName = physNetlistPath.toString();
         PhysNetlistWriter.writePhysNetlist(design, physNetlistFileName);
         t.stop();
+        List<String> encryptedCells = netlist.getEncryptedCells();
         design = null;
         System.gc();
         t.start(READ_LOGICAL_NETLIST);
-        EDIFNetlist netlist = LogNetlistReader.readLogNetlist(logNetlistFileName);
+        netlist = LogNetlistReader.readLogNetlist(logNetlistFileName);
+        netlist.addEncryptedCells(encryptedCells);
         t.stop().start(READ_PHYSICAL_NETLIST);
         Design designReturn = PhysNetlistReader.readPhysNetlist(physNetlistFileName, netlist);
         t.stop().start(WRITE_DCP);
