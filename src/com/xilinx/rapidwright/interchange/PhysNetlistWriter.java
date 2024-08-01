@@ -345,7 +345,7 @@ public class PhysNetlistWriter {
         Site site = siteInst.getSite();
         final boolean isStaticNet = net.isStaticNet();
         final boolean isUsedNet = net.isUsedNet();
-        BELPin possibleRoutethruInputPin = null;
+        Series series = siteInst.getDesign().getDevice().getSeries();
         for (String siteWire : siteInst.getSiteWiresFromNet(net)) {
             BELPin[] belPins = siteInst.getSiteWirePins(siteWire);
             for (BELPin belPin : belPins) {
@@ -354,33 +354,59 @@ public class PhysNetlistWriter {
                 Cell cell = siteInst.getCell(bel);
                 boolean bidirPinIsInput = false;
                 boolean bidirPinIsOutput = false;
+                boolean routethru = false;
                 if (bel.getBELClass() == BELClass.BEL) {
                     if (cell == null) {
-                        if (belPin.isInput()) {
-                            if (isUsedNet) {
-                                // Ignore input BELPins on GLOBAL_USEDNET
-                            } else if ((belName.equals("LOOKAHEAD8") && belPin.getName().startsWith("CY")) || belName.equals("FF_CLK_MOD")) {
-                                assert(possibleRoutethruInputPin == null);
-                                possibleRoutethruInputPin = belPin;
-                            }
+                        if (belPin.isInput() || belPin.isBidir()) {
+                            // Skip if nothing placed here
                             continue;
-                        } else if (!isStaticNet) {
-                            if (possibleRoutethruInputPin == null || bel != possibleRoutethruInputPin.getBEL()) {
-                                // Skip if not driving a static net and no possibility of a routethru
-                                continue;
-                            }
-                            // Expected routethru! Allowed to proceed
                         } else {
-                            assert(bel.isLUT() || // LUTs can be a GND or VCC source
-                                    (net.isGNDNet() && bel.isGndSource()) ||
-                                    (net.isVCCNet() && bel.isVccSource()));
+                            assert(belPin.isOutput());
+
+                            if (isStaticNet) {
+                                // Must be a static source; allow
+                                assert(bel.isLUT() || // LUTs can be a GND or VCC source
+                                        (net.isGNDNet() && bel.isGndSource()) ||
+                                        (net.isVCCNet() && bel.isVccSource()));
+                            } else {
+                                // Check for routethru
+
+                                BELPin possibleRoutethruInputPin = null;
+                                if (series == Series.Versal) {
+                                    if (belName.equals("LOOKAHEAD8")) {
+                                        assert(belPin.getName().startsWith("COUT"));
+                                        possibleRoutethruInputPin = bel.getPin("CY" + belPin.getName().charAt(4));
+                                    } else if (belName.equals("FF_CLK_MOD")) {
+                                        assert(belPin.getName().startsWith("CLK_OUT"));
+                                        possibleRoutethruInputPin = bel.getPin("CLK");
+                                    } else {
+                                        // Not a known routethru
+                                        continue;
+                                    }
+                                } else {
+                                    // Not a known routethru
+                                    continue;
+                                }
+
+                                if (possibleRoutethruInputPin != null) {
+                                    if (siteInst.getNetFromSiteWire(possibleRoutethruInputPin.getSiteWireName()) != net) {
+                                        // Net on routethru input is not the same; not a routethru
+                                        continue;
+                                    }
+
+                                    assert(!routethru);
+                                    nodes.add(new RouteBranchNode(site, possibleRoutethruInputPin, routethru));
+                                    routethru = true;
+
+                                    // Fall through for output pin to be added
+                                }
+                            }
                         }
                     } else if (belPin.isBidir()) {
                         // Attempt to find the actual direction of this BELPin
 
                         if (cell.isPortCell()) {
                             if (Utils.isIOB(siteInst)) {
-                                Series series = siteInst.getDesign().getDevice().getSeries();
                                 if (series == Series.Versal) {
                                     Cell iobCell;
                                     if (belName.equals("PAD_M")) {
@@ -424,7 +450,6 @@ public class PhysNetlistWriter {
                                     bidirPinIsInput = !sitePIPStatus.isUsed();
                                 }
                             } else if (siteInst.getSiteTypeEnum() == SiteTypeEnum.GTY_REFCLK) {
-                                Series series = siteInst.getDesign().getDevice().getSeries();
                                 assert (series == Series.Versal);
                                 assert (belName.startsWith("GTY_REFCLK")); // GTY_REFCLK[NP]
                                 BEL obufdsBel = siteInst.getBEL("GTY_OBUFDS");
@@ -441,7 +466,6 @@ public class PhysNetlistWriter {
                                 throw new RuntimeException("Unable to process PORT cell at site " + siteInst.getSiteName());
                             }
                         } else {
-                            Series series = siteInst.getDesign().getDevice().getSeries();
                             assert(series == Series.Versal);
 
                             String cellType = cell.getType();
@@ -461,7 +485,6 @@ public class PhysNetlistWriter {
                     }
                 }
 
-                boolean routethru = false;
                 if (belPin.isInput() || bidirPinIsInput) {
                     if (bel.getBELClass() == BELClass.BEL) {
                         if (!VERBOSE_PHYSICAL_NET_ROUTING && !cell.isRoutethru()) {
@@ -507,14 +530,8 @@ public class PhysNetlistWriter {
 
                     if (bel.getBELClass() == BELClass.BEL) {
                         if (cell != null) {
+                            assert(!routethru);
                             routethru = cell.isRoutethru();
-                        } else if (possibleRoutethruInputPin != null && bel == possibleRoutethruInputPin.getBEL()) {
-                            // belPin is an output pin corresponding to an input pin (on the same BEL, a BEL
-                            // which doesn't have a cell placed on it) that we previously recorded as the
-                            // start of a possible routethru. With a confirmed routethrough, commit this input pin.
-                            nodes.add(new RouteBranchNode(site, possibleRoutethruInputPin, routethru));
-                            possibleRoutethruInputPin = null;
-                            routethru = true;
                         }
                     } else if (bel.getBELClass() == BELClass.RBEL) {
                         if (isStaticNet && bel.isStaticSource()) {
