@@ -228,14 +228,17 @@ public class VivadoTools {
     }
 
     /**
-     * Run Vivado's `report_route_status` command on the provided DCP (which is assumed
-     * to be unencrypted) path and return its result as a ReportRouteStatusResult object.
+     * Run Vivado's `report_route_status` command on the provided DCP. Assume the
+     * given DCP is encrypted if, given <path>/<name>.dcp, <path>/<name>_load.tcl
+     * exists. Return report as a ReportRouteStatusResult object.
      *
      * @param dcp Path to DCP to report on.
      * @return ReportRouteStatusResult object.
      */
     public static ReportRouteStatusResult reportRouteStatus(Path dcp) {
-        return reportRouteStatus(dcp, false);
+        Path tcl = FileTools.replaceExtension(dcp, EDIFTools.LOAD_TCL_SUFFIX);
+        boolean encrypted = tcl.toFile().exists();
+        return reportRouteStatus(dcp, encrypted);
     }
 
     /**
