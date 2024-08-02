@@ -175,6 +175,11 @@ public class RWRoute{
 
     public static final EnumSet<Series> SUPPORTED_SERIES;
 
+    // HUS-related variables ->
+    private boolean isCongestedDesign;
+    private boolean isUseHUS;
+    // HUS-related variables <-
+
     static {
         SUPPORTED_SERIES = EnumSet.of(Series.UltraScale, Series.UltraScalePlus);
     }
@@ -251,6 +256,9 @@ public class RWRoute{
         nodesPushed = 0;
         nodesPopped = 0;
         overUsedRnodes = new HashSet<>();
+
+        isUseHUS = config.isUseHUS();
+        isCongestedDesign = false;
 
         routerTimer.getRuntimeTracker("Initialization").stop();
     }
@@ -865,7 +873,25 @@ public class RWRoute{
                 }
             }
 
-            updateCostFactors();
+            if (isUseHUS) {
+                if (routeIteration == 1) {
+                    // determine the congested design based on the ratio of overused rnode number to the number of connections
+                    long overUseCnt = 0;
+                    for (RouteNode rnode : routingGraph.getRnodes())
+                        if (rnode.getOccupancy() > RouteNode.capacity)
+                            overUseCnt ++;
+                    if (overUseCnt * 1.0 / numConnectionsToRoute > config.getHUSDetermineCongestedThreshold()) 
+                        isCongestedDesign = true;
+                }
+
+                // update congestion factors
+                if (isCongestedDesign)
+                    updateCostFactorsHistoricalCentric(); // Hybrid updating strategy
+                else
+                    updateCostFactors(); // RWRoute default updating strategy
+            } else {
+                updateCostFactors();
+            }
 
             rnodesCreatedThisIteration = routingGraph.numNodes() - lastIterationRnodeCount;
             List<Connection> unroutableConnections = getUnroutableConnections();
@@ -1236,6 +1262,24 @@ public class RWRoute{
      */
     private void updateCostFactors() {
         updateCongestionCosts.start();
+        presentCongestionFactor *= config.getPresentCongestionMultiplier();
+        presentCongestionFactor = Math.min(presentCongestionFactor, config.getMaxPresentCongestionFactor());
+        updateCost();
+        updateCongestionCosts.stop();
+    }
+
+    /**
+     * Updates the congestion cost factors for congested designs.
+     */
+    private void updateCostFactorsHistoricalCentric() {
+        updateCongestionCosts.start();
+        float congestedConnRatio = (float)connectionsRoutedIteration / sortedIndirectConnections.size();
+		// Hybrid updating strategy: slow down the increasing of the present congestion factor; increase the historical congestion factor
+        if (congestedConnRatio < config.getHUSStartHistoricalUpdateThreshold()) { 
+            config.setPresentCongestionMultiplier(config.getHUSAlpha());
+            historicalCongestionFactor = config.getHUSBeta();
+        }
+        
         presentCongestionFactor *= config.getPresentCongestionMultiplier();
         presentCongestionFactor = Math.min(presentCongestionFactor, config.getMaxPresentCongestionFactor());
         updateCost();
