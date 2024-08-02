@@ -397,7 +397,8 @@ public class Utils{
             SiteTypeEnum.HPIOBDIFFOUTBUF,
             SiteTypeEnum.HRIO,
             SiteTypeEnum.HRIODIFFINBUF,
-            SiteTypeEnum.HRIODIFFOUTBUF
+            SiteTypeEnum.HRIODIFFOUTBUF,
+            SiteTypeEnum.XPIOB
         );
 
         uramTypes = EnumSet.of(

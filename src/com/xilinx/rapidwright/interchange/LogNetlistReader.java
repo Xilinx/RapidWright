@@ -62,7 +62,7 @@ import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
 public class LogNetlistReader {
-    public static boolean CHECK_UNISIM_DEFINITIONS = true;
+    public static boolean CHECK_UNISIM_DEFINITIONS = false;
 
     private String[] allStrings;
     private EDIFPort[] allPorts;
