@@ -131,7 +131,10 @@ public class PhysNetlistReader {
 
     public PhysNetlistReader(EDIFNetlist netlist) {
         design = new Design();
-        design.setNetlist(netlist);
+        if (netlist != null) {
+            design.setNetlist(netlist);
+            design.setName(netlist.getName());
+        }
     }
 
     protected Design read(String physNetlistFileName) throws IOException {
