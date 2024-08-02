@@ -1274,7 +1274,7 @@ public class RWRoute{
     private void updateCostFactorsHistoricalCentric() {
         updateCongestionCosts.start();
         float congestedConnRatio = (float)connectionsRoutedIteration / sortedIndirectConnections.size();
-		// Hybrid updating strategy: slow down the increasing of the present congestion factor; increase the historical congestion factor
+        // Hybrid updating strategy: slow down the increasing of the present congestion factor; increase the historical congestion factor
         if (congestedConnRatio < config.getHUSStartHistoricalUpdateThreshold()) { 
             config.setPresentCongestionMultiplier(config.getHUSAlpha());
             historicalCongestionFactor = config.getHUSBeta();
