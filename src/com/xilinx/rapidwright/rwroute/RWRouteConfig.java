@@ -917,8 +917,8 @@ public class RWRouteConfig {
     }
 
     /** Checks if the hybrid updating strategy (HUS) is enabled.
-     *  HUS will, once its user-configurable thresholds are met, slow down the growth of overused nodes' present costs
-     *  and instead increases the growth of their historical costs.
+     *  HUS will, once its user-configurable thresholds are met, slow down the growth of present costs of used nodes and
+     *  instead increases the growth of overused nodes' historical costs.
      *  Default: false.
      */
     public boolean isUseHUS() {
@@ -927,6 +927,8 @@ public class RWRouteConfig {
 
     /**
      * Sets whether hybrid updating strategy (HUS) is enabled.
+     * HUS will, once its user-configurable thresholds are met, slow down the growth of present costs of used nodes and
+     *  instead increases the growth of overused nodes' historical costs.
      * Default: false.
      * @param useHUS true to enable the hybrid updating strategy (HUS)
      */
