@@ -872,6 +872,7 @@ public class RWRoute{
                 }
             }
 
+            boolean lastUseHUS = useHUS;
             updateCostFactors();
 
             rnodesCreatedThisIteration = routingGraph.numNodes() - lastIterationRnodeCount;
@@ -905,6 +906,10 @@ public class RWRoute{
                         System.err.println("ERROR: Unroutable connections: " + unroutableConnections.size());
                     }
                 }
+            }
+
+            if (lastUseHUS && !useHUS) {
+                System.out.println("INFO: Hybrid Updating Strategy (HUS) activated");
             }
 
             routeIteration++;
@@ -1300,8 +1305,6 @@ public class RWRoute{
                 // Activate HUS: slow down the present cost growth and increase historical cost growth instead
                 config.setPresentCongestionMultiplier(config.getHUSalpha());
                 historicalCongestionFactor = config.getHUSbeta();
-
-                System.out.println("INFO: Hybrid Updating Strategy (HUS) activated");
                 useHUS = false;
             }
         }
