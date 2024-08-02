@@ -39,7 +39,6 @@ import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -122,6 +121,11 @@ public class RWRoute{
     /** Flag for whether LUT routethrus are to be considered */
     protected boolean lutRoutethru;
 
+    /** Flag for use of Hybrid Updating Strategy (HUS) */
+    private boolean useHUS;
+    /** Flag (computed at end of iteration 1) to indicate design is congested enough to consider HUS */
+    private boolean HUSinitialCongested;
+
     /** The current routing iteration */
     protected int routeIteration;
     /** Timers to store runtime of different phases */
@@ -174,11 +178,6 @@ public class RWRoute{
     protected Map<String, List<String>> routesToSinkINTTiles;
 
     public static final EnumSet<Series> SUPPORTED_SERIES;
-
-    // HUS-related variables ->
-    private boolean isCongestedDesign;
-    private boolean isUseHUS;
-    // HUS-related variables <-
 
     static {
         SUPPORTED_SERIES = EnumSet.of(Series.UltraScale, Series.UltraScalePlus);
@@ -257,8 +256,8 @@ public class RWRoute{
         nodesPopped = 0;
         overUsedRnodes = new HashSet<>();
 
-        isUseHUS = config.isUseHUS();
-        isCongestedDesign = false;
+        useHUS = config.isUseHUS();
+        HUSinitialCongested = false;
 
         routerTimer.getRuntimeTracker("Initialization").stop();
     }
@@ -873,25 +872,7 @@ public class RWRoute{
                 }
             }
 
-            if (isUseHUS) {
-                if (routeIteration == 1) {
-                    // determine the congested design based on the ratio of overused rnode number to the number of connections
-                    long overUseCnt = 0;
-                    for (RouteNode rnode : routingGraph.getRnodes())
-                        if (rnode.getOccupancy() > RouteNode.capacity)
-                            overUseCnt ++;
-                    if (overUseCnt * 1.0 / numConnectionsToRoute > config.getHUSDetermineCongestedThreshold()) 
-                        isCongestedDesign = true;
-                }
-
-                // update congestion factors
-                if (isCongestedDesign)
-                    updateCostFactorsHistoricalCentric(); // Hybrid updating strategy
-                else
-                    updateCostFactors(); // RWRoute default updating strategy
-            } else {
-                updateCostFactors();
-            }
+            updateCostFactors();
 
             rnodesCreatedThisIteration = routingGraph.numNodes() - lastIterationRnodeCount;
             List<Connection> unroutableConnections = getUnroutableConnections();
@@ -1262,27 +1243,15 @@ public class RWRoute{
      */
     private void updateCostFactors() {
         updateCongestionCosts.start();
-        presentCongestionFactor *= config.getPresentCongestionMultiplier();
-        presentCongestionFactor = Math.min(presentCongestionFactor, config.getMaxPresentCongestionFactor());
-        updateCost();
-        updateCongestionCosts.stop();
-    }
 
-    /**
-     * Updates the congestion cost factors for congested designs.
-     */
-    private void updateCostFactorsHistoricalCentric() {
-        updateCongestionCosts.start();
-        float congestedConnRatio = (float)connectionsRoutedIteration / sortedIndirectConnections.size();
-        // Hybrid updating strategy: slow down the increasing of the present congestion factor; increase the historical congestion factor
-        if (congestedConnRatio < config.getHUSStartHistoricalUpdateThreshold()) { 
-            config.setPresentCongestionMultiplier(config.getHUSAlpha());
-            historicalCongestionFactor = config.getHUSBeta();
-        }
-        
+        checkHUS();
+
+        // Inflate the present congestion factor
         presentCongestionFactor *= config.getPresentCongestionMultiplier();
         presentCongestionFactor = Math.min(presentCongestionFactor, config.getMaxPresentCongestionFactor());
+
         updateCost();
+
         updateCongestionCosts.stop();
     }
 
@@ -1302,6 +1271,38 @@ public class RWRoute{
             } else {
                 assert(overuse < 0);
                 assert(rnode.getPresentCongestionCost() == 1);
+            }
+        }
+    }
+
+    /**
+     * Check whether to activate Hybrid Updating Strategy (HUS)
+     */
+    private void checkHUS() {
+        if (!useHUS) {
+            return;
+        }
+
+        if (routeIteration == 1) {
+            // Count the number of overused nodes
+            long overUseCnt = 0;
+            for (RouteNode rnode : routingGraph.getRnodes()) {
+                if (rnode.isOverUsed()) {
+                    overUseCnt++;
+                }
+            }
+            HUSinitialCongested = (float) overUseCnt / numConnectionsToRoute > config.getHUSinitialCongestedThreshold();
+        }
+
+        if (HUSinitialCongested) {
+            float congestedConnRatio = (float) connectionsRoutedIteration / sortedIndirectConnections.size();
+            if (congestedConnRatio < config.getHUSactivateThreshold()) {
+                // Activate HUS: slow down the present cost growth and increase historical cost growth instead
+                config.setPresentCongestionMultiplier(config.getHUSalpha());
+                historicalCongestionFactor = config.getHUSbeta();
+
+                System.out.println("INFO: Hybrid Updating Strategy (HUS) activated");
+                useHUS = false;
             }
         }
     }
