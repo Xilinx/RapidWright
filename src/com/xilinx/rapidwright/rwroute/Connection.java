@@ -472,7 +472,7 @@ public class Connection implements Comparable<Connection>{
         return s.toString();
     }
 
-    public void setAllTargets(RouteNodeGraph routingGraph) {
+    public void setAllTargets(RWRoute.ConnectionState state) {
         if (sinkRnode.countConnectionsOfUser(netWrapper) == 0 ||
             sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE) {
             // Since this connection will have been ripped up, only mark a node
@@ -480,7 +480,7 @@ public class Connection implements Comparable<Connection>{
             // This prevents -- for the case where the same net needs to be routed
             // to the same LUT more than once -- the illegal case of the same
             // physical pin servicing more than one logical pin
-            routingGraph.addTarget(sinkRnode);
+            sinkRnode.markTarget(state);
         } else {
             assert(altSinkRnodes != null && !altSinkRnodes.isEmpty());
         }
@@ -493,7 +493,7 @@ public class Connection implements Comparable<Connection>{
                     // Except if it is not a PINFEED_I
                     rnode.getType() != RouteNodeType.PINFEED_I) {
                     assert(rnode.getIntentCode() != IntentCode.NODE_PINBOUNCE);
-                    routingGraph.addTarget(rnode);
+                    rnode.markTarget(state);
                 }
             }
         }

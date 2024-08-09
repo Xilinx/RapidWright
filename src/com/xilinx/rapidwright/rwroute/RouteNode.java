@@ -309,11 +309,17 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     }
 
     /**
-     * Sets the boolean value of target.
-     * @param isTarget The value to be set.
+     * Marks this node as a target.
+     * @param state State from the connection that is being routed.
      */
-    public void setTarget(boolean isTarget) {
-        this.isTarget = isTarget;
+    public void markTarget(RWRoute.ConnectionState state) {
+        this.isTarget = true;
+        state.targets.add(this);
+    }
+
+
+    public void clearTarget() {
+        this.isTarget = false;
     }
 
     /**

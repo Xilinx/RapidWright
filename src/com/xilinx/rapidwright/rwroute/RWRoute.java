@@ -1502,6 +1502,7 @@ public class RWRoute {
         protected final float dlyWeight;
         protected final float estDlyWeight;
         protected final PriorityQueue<RouteNode> queue;
+        protected final List<RouteNode> targets;
 
         ConnectionState(Connection connection, int sequence, float rnodeCostWeight, float shareWeight,
                         float rnodeWLWeight, float estWlWeight, float dlyWeight, float estDlyWeight,
@@ -1515,6 +1516,7 @@ public class RWRoute {
             this.dlyWeight = dlyWeight;
             this.estDlyWeight = estDlyWeight;
             this.queue = queue;
+            targets = new ArrayList<>();
         }
     }
 
@@ -1576,7 +1578,10 @@ public class RWRoute {
             }
         }
 
-        routingGraph.resetExpansion();
+        for (RouteNode target : state.targets) {
+            assert(target.isTarget());
+            target.clearTarget();
+        }
     }
 
     /**
@@ -1984,7 +1989,7 @@ public class RWRoute {
         assert(state.queue.isEmpty());
 
         // Sets the sink rnode(s) of the connection as the target(s)
-        connection.setAllTargets(routingGraph);
+        connection.setAllTargets(state);
 
         // Adds the source rnode to the queue
         RouteNode sourceRnode = connection.getSourceRnode();

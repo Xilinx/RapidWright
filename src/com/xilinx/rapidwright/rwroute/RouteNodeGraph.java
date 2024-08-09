@@ -508,26 +508,6 @@ public class RouteNodeGraph {
         return rnode;
     }
 
-    protected Collection<RouteNode> getTargets() {
-        return targets;
-    }
-
-    public void addTarget(RouteNode rnode) {
-        getTargets().add(rnode);
-        rnode.setTarget(true);
-    }
-
-    /**
-     * Resets the expansion history.
-     */
-    public void resetExpansion() {
-        for (RouteNode node : getTargets()) {
-            assert(node.isTarget());
-            node.setTarget(false);
-        }
-        getTargets().clear();
-    }
-
     public int averageChildren() {
         int sum = 0;
         for (RouteNode rnode : getRnodes()) {
