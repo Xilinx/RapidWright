@@ -443,8 +443,6 @@ public class PartialRouter extends RWRoute {
             }
             stashedPrev.clear();
         }
-
-        routingGraph.resetExpansion();
     }
 
     @Override
@@ -695,8 +693,6 @@ public class PartialRouter extends RWRoute {
                 }
             }
         }
-
-        routingGraph.resetExpansion();
 
         for (RouteNode rnode : rnodes) {
             // Check already unpreserved above
