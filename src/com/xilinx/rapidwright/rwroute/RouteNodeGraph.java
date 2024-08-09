@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -83,7 +84,7 @@ public class RouteNodeGraph {
      */
     private final Collection<RouteNode> targets;
 
-    private long createRnodeTime;
+    private AtomicLong createRnodeTime;
 
     public static final short SUPER_LONG_LINE_LENGTH_IN_TILES = 60;
 
@@ -125,7 +126,7 @@ public class RouteNodeGraph {
         preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
         targets = new ArrayList<>();
-        createRnodeTime = 0;
+        createRnodeTime = new AtomicLong();
 
         Device device = design.getDevice();
         intYToSLRIndex = new int[device.getRows()];
@@ -416,11 +417,11 @@ public class RouteNodeGraph {
     }
 
     protected void addCreateRnodeTime(long time) {
-        createRnodeTime += time;
+        createRnodeTime.addAndGet(time);
     }
 
     protected long getCreateRnodeTime() {
-        return createRnodeTime;
+        return createRnodeTime.get();
     }
 
     public Net getPreservedNet(Node node) {
