@@ -1886,7 +1886,7 @@ public class EDIFNetlist extends EDIFName {
         return encryptedCells != null ? encryptedCells : Collections.emptyList();
     }
 
-    protected void setEncryptedCells(List<String> encryptedCells) {
+    public void setEncryptedCells(List<String> encryptedCells) {
         if (encryptedCells == null || encryptedCells.isEmpty()) {
             this.encryptedCells = null;
         } else {

@@ -4214,7 +4214,6 @@ public class DesignTools {
             cell.makePrimitive();
         }
         n.removeUnusedCellsFromAllWorkLibraries();
-        n.getEncryptedCells().clear();
-        n.addEncryptedCells(netlists.stream().map(Object::toString).collect(Collectors.toList()));
+        n.setEncryptedCells(netlists.stream().map(Object::toString).collect(Collectors.toList()));
     }
 }
