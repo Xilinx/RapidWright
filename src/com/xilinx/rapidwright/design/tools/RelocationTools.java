@@ -23,6 +23,7 @@
 
 package com.xilinx.rapidwright.design.tools;
 
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -363,13 +364,13 @@ public class RelocationTools {
      * @param options The relocation options.
      * @param limit   Limit the number of printed options to this value.
      */
-    public static void printValidRelocationOptions(Pair<Site, Map<Integer, Site>> options, int limit) {
+    public static void printValidRelocationOptions(Pair<Site, Map<Integer, Site>> options, int limit, PrintStream ps) {
         Site anchor = options.getFirst();
         Map<Integer, Site> map = options.getSecond();
         for (Entry<Integer, Site> e : map.entrySet()) {
             int validXOffset = anchor.getTile().getTileXCoordinate() - e.getValue().getTile().getTileXCoordinate();
             int validYOffset = anchor.getTile().getTileYCoordinate() - e.getValue().getTile().getTileYCoordinate();
-            System.err.printf("  tileXOffset=%4d, tileYOffset=%4d anchorSite=%s, newAnchorSite=%s\n", validXOffset,
+            ps.printf("  tileXOffset=%4d, tileYOffset=%4d anchorSite=%s, newAnchorSite=%s\n", validXOffset,
                     validYOffset, anchor, e.getValue());
             if (limit-- == 0) {
                 break;
@@ -390,8 +391,8 @@ public class RelocationTools {
             if (options == null || options.getSecond().size() < 2) {
                 System.out.println("No valid relocation options for the provided DCP '" + inputDCPName + "'");
             } else {
-                System.out.println("Valid Relocation Options:");
-                printValidRelocationOptions(options, Integer.MAX_VALUE);
+                System.out.println("Possible Valid Relocation Options:");
+                printValidRelocationOptions(options, Integer.MAX_VALUE, System.out);
             }
             return;
         }
@@ -413,7 +414,7 @@ public class RelocationTools {
                 System.err.println("Could not relocate to tileXOffset=" + tileXOffset + ", tileYOffset="
                         + tileYOffset + ", here are some other valid options:");
                 int numOfValidSuggestions = 6;
-                printValidRelocationOptions(options, numOfValidSuggestions);
+                printValidRelocationOptions(options, numOfValidSuggestions, System.err);
                 System.exit(1);
             } else {
                 throw new RuntimeException("ERROR: Relocation of DCP '" + inputDCPName

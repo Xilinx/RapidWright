@@ -267,6 +267,10 @@ public class TestRelocationTools {
         int yOffset = 5;
         
         Path outputDCP = dir.resolve("output.dcp");
+
+        // Smoke test for valid location report mode
+        RelocationTools.main(new String[] { dcpName.toString() });
+
         RelocationTools.main(new String[] {dcpName.toString(), outputDCP.toString(), 
                         Integer.toString(xOffset), Integer.toString(yOffset)});
         
