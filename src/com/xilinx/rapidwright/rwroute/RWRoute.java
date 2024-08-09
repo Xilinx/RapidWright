@@ -774,7 +774,7 @@ public class RWRoute {
         RuntimeTracker routeWireNets = routerTimer.createRuntimeTracker("route wire nets", "Routing");
         routeWireNets.start();
         preRoutingEstimation();
-        routeIndirectConnections();
+        routeIndirectConnectionsIteratively();
         // NOTE: route direct connections after indirect connection.
         // The reason is that there maybe additional direct connections in the soft preserve mode for partial routing,
         // and those direct connections should be included to be routed
@@ -856,10 +856,18 @@ public class RWRoute {
         }
     }
 
+    protected void routeIndirectConnections(Collection<Connection> connections) {
+        for (Connection connection : connections) {
+            if (shouldRoute(connection)) {
+                routeIndirectConnection(connection);
+            }
+        }
+    }
+
     /**
      * Routes indirect connections iteratively.
      */
-    public void routeIndirectConnections() {
+    public void routeIndirectConnectionsIteratively() {
         sortConnections();
         initializeRouting();
         long lastIterationRnodeCount = 0;
@@ -871,11 +879,7 @@ public class RWRoute {
             if (config.isTimingDriven()) {
                 setRerouteCriticality();
             }
-            for (Connection connection : sortedIndirectConnections) {
-                if (shouldRoute(connection)) {
-                    routeConnection(connection);
-                }
-            }
+            routeIndirectConnections(sortedIndirectConnections);
             rnodesTimer.setTime(routingGraph.getCreateRnodeTime());
 
             updateCostFactors();
@@ -1524,7 +1528,7 @@ public class RWRoute {
      * Routes a connection.
      * @param connection The connection to route.
      */
-    protected void routeConnection(Connection connection) {
+    protected void routeIndirectConnection(Connection connection) {
         int sequence = connectionsRouted.incrementAndGet();
         connectionsRoutedThisIteration.incrementAndGet();
         float rnodeCostWeight = 1 - connection.getCriticality();
