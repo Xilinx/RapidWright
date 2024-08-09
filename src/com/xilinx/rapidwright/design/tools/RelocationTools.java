@@ -386,8 +386,13 @@ public class RelocationTools {
         String inputDCPName = args[0];
         Design d = Design.readCheckpoint(inputDCPName);
         if (args.length == 1) {
-            
-            printValidRelocationOptions(getValidRelocationOptions(d), Integer.MAX_VALUE);
+            Pair<Site, Map<Integer, Site>> options = getValidRelocationOptions(d);
+            if (options == null || options.getSecond().size() < 2) {
+                System.out.println("No valid relocation options for the provided DCP '" + inputDCPName + "'");
+            } else {
+                System.out.println("Valid Relocation Options:");
+                printValidRelocationOptions(options, Integer.MAX_VALUE);
+            }
             return;
         }
         String outputDCPName = args[1];
