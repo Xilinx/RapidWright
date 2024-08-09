@@ -1189,7 +1189,7 @@ public class RWRoute {
     /**
      * Sorts indirect connections for routing.
      */
-    protected void sortConnections() {
+    private void sortConnections() {
         sortedIndirectConnections.clear();
         sortedIndirectConnections.addAll(indirectConnections);
         Collections.sort(sortedIndirectConnections);
