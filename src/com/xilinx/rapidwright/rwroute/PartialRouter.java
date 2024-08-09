@@ -158,10 +158,11 @@ public class PartialRouter extends RWRoute {
             return false;
         }
 
-        // Presence of a prev pointer means that only that arc is allowed to enter this end node
+        // Presence of a prev pointer means that:
+        //   (a) end node has been visited before
+        //   (b) only this is arc allowed to enter this end node
         RouteNode prev = endRnode.getPrev();
         if (prev != null) {
-            // If end node has been visited already
             if (endRnode.isVisited(start.getVisited())) {
                 // Visited possibly from a different arc uphill of end, or possibly from
                 // the same start -> end arc during prepareRouteConnection()

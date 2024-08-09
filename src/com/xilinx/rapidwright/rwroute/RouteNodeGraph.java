@@ -511,7 +511,6 @@ public class RouteNodeGraph {
         return targets;
     }
 
-
     public void addTarget(RouteNode rnode) {
         getTargets().add(rnode);
         rnode.setTarget(true);
