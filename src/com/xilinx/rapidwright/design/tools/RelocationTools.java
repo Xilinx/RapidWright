@@ -370,8 +370,8 @@ public class RelocationTools {
         for (Entry<Integer, Site> e : map.entrySet()) {
             int validXOffset = anchor.getTile().getTileXCoordinate() - e.getValue().getTile().getTileXCoordinate();
             int validYOffset = anchor.getTile().getTileYCoordinate() - e.getValue().getTile().getTileYCoordinate();
-            ps.printf("  tileXOffset=%4d, tileYOffset=%4d anchorSite=%s, newAnchorSite=%s\n", validXOffset,
-                    validYOffset, anchor, e.getValue());
+            ps.printf("  tileXOffset=%4d, tileYOffset=%4d anchorSite=%s/%s, newAnchorSite=%s/%s\n", validXOffset,
+                    validYOffset, anchor.getTile(), anchor, e.getValue().getTile(), e.getValue());
             if (limit-- == 0) {
                 break;
             }
