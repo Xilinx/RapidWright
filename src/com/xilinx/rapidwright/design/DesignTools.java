@@ -4199,7 +4199,8 @@ public class DesignTools {
      * should be named after the cell type. This is useful in the scenarios where a
      * design has many thousand of individual encrypted cell files that are time
      * consuming to load. By providing a higher level of hierarchy cell definition,
-     * the number of individual loads can be reduced.
+     * encompassing all existing encrypted cells, the number of individual 
+     * files to be loaded by Vivado can be reduced.
      * 
      * @param design   The design to modify.
      * @param netlists The list of encrypted cell files (*.edn, *.edf, or *.dcp)
