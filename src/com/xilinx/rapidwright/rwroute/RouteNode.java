@@ -32,7 +32,6 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +41,7 @@ import java.util.Map;
  * Each RouteNode instance is associated with a {@link Node} instance. It is denoted as "rnode".
  * The routing resource graph is built "lazily", i.e., RouteNode Objects (rnodes) are created when needed.
  */
-abstract public class RouteNode extends Node implements Comparable<RouteNode> {
+public class RouteNode extends Node implements Comparable<RouteNode> {
     /** Each RouteNode Object can be legally used by one net only */
     public static final short capacity = 1;
     /** Memoized static array for use by Collection.toArray() or similar */
@@ -93,9 +92,9 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
      */
     private Map<RouteNode, Integer> driversCounts;
 
-    protected RouteNode(Node node, RouteNodeType type, Map<Tile, BitSet> lagunaI) {
+    protected RouteNode(RouteNodeGraph routingGraph, Node node, RouteNodeType type) {
         super(node);
-        RouteNodeInfo nodeInfo = RouteNodeInfo.get(this, lagunaI);
+        RouteNodeInfo nodeInfo = RouteNodeInfo.get(this, routingGraph.lagunaI);
         this.type = (type == null) ? nodeInfo.type : type;
         endTileXCoordinate = nodeInfo.endTileXCoordinate;
         endTileYCoordinate = nodeInfo.endTileYCoordinate;
@@ -117,30 +116,6 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
         // Do not use Float.compare() since it also compares NaN, which we'll assume is unreachable
         // return Float.compare(this.lowerBoundTotalPathCost, that.lowerBoundTotalPathCost);
         return (int) Math.signum(this.lowerBoundTotalPathCost - that.lowerBoundTotalPathCost);
-    }
-
-    abstract protected RouteNode getOrCreate(Node node, RouteNodeType type);
-
-    protected void setChildren(RuntimeTracker setChildrenTimer) {
-        if (children != null)
-            return;
-        setChildrenTimer.start();
-        List<Node> allDownHillNodes = getAllDownhillNodes();
-        List<RouteNode> childrenList = new ArrayList<>(allDownHillNodes.size());
-        for (Node downhill: allDownHillNodes) {
-            if (isExcluded(downhill)) {
-                continue;
-            }
-
-            RouteNode child = getOrCreate(downhill, null);
-            childrenList.add(child);//the sink rnode of a target connection has been created up-front
-        }
-        if (!childrenList.isEmpty()) {
-            children = childrenList.toArray(EMPTY_ARRAY);
-        } else {
-            children = EMPTY_ARRAY;
-        }
-        setChildrenTimer.stop();
     }
 
     private void setBaseCost() {
@@ -414,8 +389,29 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
      * Gets the children of a RouteNode Object.
      * @return A list of RouteNode Objects.
      */
-    public RouteNode[] getChildren() {
-        return children != null ? children : EMPTY_ARRAY;
+    public RouteNode[] getChildren(RouteNodeGraph routingGraph) {
+        if (children == null) {
+            long start = RuntimeTracker.now();
+            List<Node> allDownHillNodes = getAllDownhillNodes();
+            List<RouteNode> childrenList = new ArrayList<>(allDownHillNodes.size());
+            for (Node downhill : allDownHillNodes) {
+                if (isExcluded(routingGraph, downhill)) {
+                    continue;
+                }
+
+                RouteNode child = routingGraph.getOrCreate(downhill, null);
+                childrenList.add(child);//the sink rnode of a target connection has been created up-front
+            }
+            if (!childrenList.isEmpty()) {
+                children = childrenList.toArray(EMPTY_ARRAY);
+            } else {
+                children = EMPTY_ARRAY;
+            }
+            long time = RuntimeTracker.elapsed(start);
+            routingGraph.addCreateRnodeTime(time);
+        }
+        return children;
+
     }
 
     /**
@@ -620,21 +616,28 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
     }
 
     /**
-     * Checks if a RouteNode instance has ever been expanded, as determined
-     * by whether its children member is null.
-     * @return true, if a RouteNode instance has been expanded before.
+     * Get the number of children on this node without expanding.
+     * @return Number of children on this node.
      */
-    public boolean everExpanded() {
-        return children != null;
+    public int numChildren() {
+        return children != null ? children.length : 0;
     }
 
     /**
-     * Checks if a RouteNode instance has been visited by a specific integer identifier.
-     * @param id Integer identifier.
+     * Checks if a RouteNode instance has been visited by a specific connection sequence.
+     * @param seq Connection sequence int.
      * @return true, if a RouteNode instance has been visited before.
      */
-    public boolean isVisited(int id) {
-        return visited == id;
+    public boolean isVisited(int seq) {
+        return visited == seq;
+    }
+
+    /**
+     * Gets the connection sequence that this RouteNode instance has been visited by.
+     * @return Connection sequence int.
+     */
+    public int getVisited() {
+        return visited;
     }
 
     /**
@@ -676,9 +679,13 @@ abstract public class RouteNode extends Node implements Comparable<RouteNode> {
      * @param child The downhill node.
      * @return True, if the arc should be excluded from the routing resource graph.
      */
-    abstract public boolean isExcluded(Node child);
+    public boolean isExcluded(RouteNodeGraph routingGraph, Node child) {
+        return routingGraph.isExcluded(this, child);
+    }
 
-    abstract public int getSLRIndex();
+    public int getSLRIndex(RouteNodeGraph routingGraph) {
+        return routingGraph.intYToSLRIndex[getEndTileYCoordinate()];
+    }
 
     /**
      * @param index Bit index.

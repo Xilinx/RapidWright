@@ -24,23 +24,6 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.PriorityQueue;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
@@ -74,11 +57,29 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
 import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 import com.xilinx.rapidwright.util.Utils;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.PriorityQueue;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
+
 /**
  * RWRoute class provides the main methods for routing a design.
  * Creating a RWRoute Object needs a {@link Design} Object and a {@link RWRouteConfig} Object.
  */
-public class RWRoute{
+public class RWRoute {
     /** The design to route */
     protected Design design;
     /** Created NetWrappers */
@@ -150,12 +151,12 @@ public class RWRoute{
     /** A map from node types to the total wirelength of used nodes of the types */
     private Map<IntentCode, Long> nodeTypeLength;
     /** The total number of connections that are routed */
-    protected int connectionsRouted;
+    private final AtomicInteger connectionsRouted;
     /** The total number of connections routed in an iteration */
-    private int connectionsRoutedIteration;
+    private final AtomicInteger connectionsRoutedThisIteration;
     /** Total number of nodes pushed/popped from the queue */
-    private long nodesPushed;
-    private long nodesPopped;
+    private final AtomicLong nodesPushed;
+    private final AtomicLong nodesPopped;
 
     /** The maximum criticality constraint of connection */
     private static final float MAX_CRITICALITY = 0.99f;
@@ -182,6 +183,10 @@ public class RWRoute{
     public RWRoute(Design design, RWRouteConfig config) {
         this.design = design;
         this.config = config;
+        connectionsRouted = new AtomicInteger();
+        connectionsRoutedThisIteration = new AtomicInteger();
+        nodesPushed = new AtomicLong();
+        nodesPopped = new AtomicLong();
     }
 
     protected static String getUnsupportedSeriesMessage(Part part) {
@@ -246,10 +251,10 @@ public class RWRoute{
         }
 
         sortedIndirectConnections = new ArrayList<>(indirectConnections.size());
-        connectionsRouted = 0;
-        connectionsRoutedIteration = 0;
-        nodesPushed = 0;
-        nodesPopped = 0;
+        connectionsRouted.set(0);
+        connectionsRoutedThisIteration.set(0);
+        nodesPushed.set(0);
+        nodesPopped.set(0);
         overUsedRnodes = new HashSet<>();
 
         routerTimer.getRuntimeTracker("Initialization").stop();
@@ -271,9 +276,9 @@ public class RWRoute{
         if (config.isTimingDriven()) {
             /* An instantiated delay estimator that is used to calculate delay of routing resources */
             DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
-            return new RouteNodeGraphTimingDriven(rnodesTimer, design, config, estimator);
+            return new RouteNodeGraphTimingDriven(design, config, estimator);
         } else {
-            return new RouteNodeGraph(rnodesTimer, design, config);
+            return new RouteNodeGraph(design, config);
         }
     }
 
@@ -724,11 +729,17 @@ public class RWRoute{
     }
 
     /**
+     * @return ProrityQueue<RouteNode> object to be used for routing.
+     */
+    protected PriorityQueue<RouteNode> getQueue() {
+        return queue;
+    }
+
+    /**
      * Initializes routing.
      */
     private void initializeRouting() {
         routingGraph.initialize();
-        queue.clear();
         routeIteration = 1;
         historicalCongestionFactor = config.getHistoricalCongestionFactor();
         presentCongestionFactor = config.getInitialPresentCongestionFactor();
@@ -812,13 +823,14 @@ public class RWRoute{
     private void estimateDelayOfConnections() {
         for (Connection connection : indirectConnections) {
             RouteNode source = connection.getSourceRnode();
-            if (source.getChildren().length == 0) {
+            RouteNode[] children = source.getChildren(routingGraph);
+            if (children.length == 0) {
                 // output pin is blocked
                 swapOutputPin(connection);
                 source = connection.getSourceRnode();
             }
             short estDelay = (short) 10000;
-            for (RouteNode child : source.getChildren()) {
+            for (RouteNode child : children) {
                 short tmpDelay = 113;
                 tmpDelay += child.getDelay();
                 if (tmpDelay < estDelay) {
@@ -854,8 +866,8 @@ public class RWRoute{
         long lastIterationRnodeTime = 0;
 
         while (routeIteration < config.getMaxIterations()) {
-            long startIteration = System.nanoTime();
-            connectionsRoutedIteration = 0;
+            long start = RuntimeTracker.now();
+            connectionsRoutedThisIteration.set(0);
             if (config.isTimingDriven()) {
                 setRerouteCriticality();
             }
@@ -864,6 +876,7 @@ public class RWRoute{
                     routeConnection(connection);
                 }
             }
+            rnodesTimer.setTime(routingGraph.getCreateRnodeTime());
 
             updateCostFactors();
 
@@ -875,7 +888,6 @@ public class RWRoute{
                 System.out.println("                 " + connection);
                 needsResorting = handleUnroutableConnection(connection) || needsResorting;
             }
-            rnodesCreatedThisIteration = routingGraph.numNodes() - lastIterationRnodeCount;
             for (Connection connection : getCongestedConnections()) {
                 needsResorting = handleCongestedConnection(connection) || needsResorting;
             }
@@ -887,8 +899,8 @@ public class RWRoute{
                 updateTiming();
             }
 
-            printRoutingIterationStatisticsInfo(System.nanoTime() - startIteration,
-                    (float) ((rnodesTimer.getTime() - lastIterationRnodeTime) * 1e-9));
+            long elapsed = RuntimeTracker.elapsed(start);
+            printRoutingIterationStatisticsInfo(elapsed, (float) ((rnodesTimer.getTime() - lastIterationRnodeTime) * 1e-9));
 
             if (overUsedRnodes.size() == 0) {
                 if (unroutableConnections.isEmpty()) {
@@ -1074,7 +1086,7 @@ public class RWRoute{
         if (connection.getAltSinkRnodes().isEmpty()) {
             // Check that this connection's exclusive sink node is used but never overused
             RouteNode sinkRnode = connection.getSinkRnode();
-            assert (sinkRnode.countConnectionsOfUser(connection.getNetWrapper()) > 0);
+            assert(sinkRnode.countConnectionsOfUser(connection.getNetWrapper()) > 0);
             assert(!sinkRnode.isOverUsed());
         }
 
@@ -1174,14 +1186,7 @@ public class RWRoute{
     private void sortConnections() {
         sortedIndirectConnections.clear();
         sortedIndirectConnections.addAll(indirectConnections);
-        sortedIndirectConnections.sort((connection1, connection2) -> {
-            int comp = connection2.getNetWrapper().getConnections().size() - connection1.getNetWrapper().getConnections().size();
-            if (comp == 0) {
-                return Short.compare(connection1.getHpwl(), connection2.getHpwl());
-            } else {
-                return comp;
-            }
-        });
+        Collections.sort(sortedIndirectConnections);
     }
 
     private void printIterationHeader(boolean timingDriven) {
@@ -1214,7 +1219,7 @@ public class RWRoute{
                     routeIteration,
                     rnodesCreatedThisIteration,
                     rnodesCreationTime,
-                    connectionsRoutedIteration,
+                    connectionsRoutedThisIteration.get(),
                     overUsed,
                     (short)(maxDelayAndTimingVertex == null? 0 : maxDelayAndTimingVertex.getFirst()),
                     iterationRuntime * 1e-9);
@@ -1223,7 +1228,7 @@ public class RWRoute{
                     routeIteration,
                     rnodesCreatedThisIteration,
                     rnodesCreationTime,
-                    connectionsRoutedIteration,
+                    connectionsRoutedThisIteration.get(),
                     overUsed,
                     "",
                     iterationRuntime * 1e-9);
@@ -1485,19 +1490,56 @@ public class RWRoute{
     }
 
     /**
+     * Class encapsulating all state necessary to route the included connection
+     */
+    protected static class ConnectionState {
+        protected final Connection connection;
+        protected final int sequence;
+        protected final float rnodeCostWeight;
+        protected final float shareWeight;
+        protected final float rnodeWLWeight;
+        protected final float estWlWeight;
+        protected final float dlyWeight;
+        protected final float estDlyWeight;
+        protected final PriorityQueue<RouteNode> queue;
+
+        ConnectionState(Connection connection, int sequence, float rnodeCostWeight, float shareWeight,
+                        float rnodeWLWeight, float estWlWeight, float dlyWeight, float estDlyWeight,
+                        PriorityQueue<RouteNode> queue) {
+            this.connection = connection;
+            this.sequence = sequence;
+            this.rnodeCostWeight = rnodeCostWeight;
+            this.shareWeight = shareWeight;
+            this.rnodeWLWeight = rnodeWLWeight;
+            this.estWlWeight = estWlWeight;
+            this.dlyWeight = dlyWeight;
+            this.estDlyWeight = estDlyWeight;
+            this.queue = queue;
+        }
+    }
+
+    /**
      * Routes a connection.
      * @param connection The connection to route.
      */
     protected void routeConnection(Connection connection) {
+        int sequence = connectionsRouted.incrementAndGet();
+        connectionsRoutedThisIteration.incrementAndGet();
         float rnodeCostWeight = 1 - connection.getCriticality();
         float shareWeight = (float) (Math.pow(rnodeCostWeight, config.getShareExponent()));
         float rnodeWLWeight = rnodeCostWeight * oneMinusWlWeight;
         float estWlWeight = rnodeCostWeight * wlWeight;
         float dlyWeight = connection.getCriticality() * oneMinusTimingWeight / 100f;
         float estDlyWeight = connection.getCriticality() * timingWeight;
+        final PriorityQueue<RouteNode> queue = getQueue();
+        assert(queue.isEmpty());
 
-        prepareRouteConnection(connection, shareWeight, rnodeCostWeight,
-                rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
+        ConnectionState state = new ConnectionState(connection, sequence,
+                rnodeCostWeight, shareWeight,
+                rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight,
+                queue);
+
+        prepareRouteConnection(state);
 
         int nodesPoppedThisConnection = 0;
         RouteNode rnode;
@@ -1506,11 +1548,10 @@ public class RWRoute{
             if (rnode.isTarget()) {
                 break;
             }
-            exploreAndExpand(rnode, connection, shareWeight, rnodeCostWeight,
-                    rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight);
+            exploreAndExpand(state, rnode);
         }
-        nodesPushed += nodesPoppedThisConnection + queue.size();
-        nodesPopped += nodesPoppedThisConnection;
+        nodesPushed.addAndGet(nodesPoppedThisConnection + queue.size());
+        nodesPopped.addAndGet(nodesPoppedThisConnection);
 
         if (rnode != null) {
             queue.clear();
@@ -1664,29 +1705,24 @@ public class RWRoute{
     /**
      * Explores children (downhill rnodes) of a rnode for routing a connection and pushes the child into the queue,
      * if it is the target or is an accessible routing resource.
+     * @param state State from the connection that is being routed.
      * @param rnode The rnode popped out from the queue.
-     * @param connection The connection that is being routed.
-     * @param shareWeight The criticality-aware share weight for a new sharing factor.
-     * @param rnodeCostWeight The cost weight of the childRnode
-     * @param rnodeLengthWeight The wirelength weight of childRnode's exact wirelength.
-     * @param rnodeEstWlWeight The weight of estimated wirelength from childRnode to the connection's sink.
-     * @param rnodeDelayWeight The weight of childRnode's exact delay.
-     * @param rnodeEstDlyWeight The weight of estimated delay to the target.
      */
-    private void exploreAndExpand(RouteNode rnode, Connection connection, float shareWeight, float rnodeCostWeight,
-                                  float rnodeLengthWeight, float rnodeEstWlWeight,
-                                  float rnodeDelayWeight, float rnodeEstDlyWeight) {
-        boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(rnode);
-        for (RouteNode childRNode:rnode.getChildren()) {
+    private void exploreAndExpand(ConnectionState state, RouteNode rnode) {
+        final boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(rnode);
+        final Connection connection = state.connection;
+        final int sequence = state.sequence;
+        final PriorityQueue<RouteNode> queue = state.queue;
+        for (RouteNode childRNode:rnode.getChildren(routingGraph)) {
             // Targets that are visited more than once must be overused
-            assert(!childRNode.isTarget() || !childRNode.isVisited(connectionsRouted) || childRNode.willOverUse(connection.getNetWrapper()));
+            assert(!childRNode.isTarget() || !childRNode.isVisited(sequence) || childRNode.willOverUse(connection.getNetWrapper()));
 
             // If childRnode is preserved, then it must be preserved for the current net we're routing
             Net preservedNet;
             assert((preservedNet = routingGraph.getPreservedNet(childRNode)) == null ||
                     preservedNet == connection.getNetWrapper().getNet());
 
-            if (childRNode.isVisited(connectionsRouted)) {
+            if (childRNode.isVisited(sequence)) {
                 // Node must be in queue already.
 
                 // Note: it is possible this is a cheaper path to childRNode; however, because the
@@ -1709,8 +1745,8 @@ public class RWRoute{
                 }
 
                 if (earlyTermination) {
-                    assert(!childRNode.isVisited(connectionsRouted));
-                    nodesPushed += queue.size();
+                    assert(!childRNode.isVisited(sequence));
+                    nodesPushed.addAndGet(queue.size());
                     queue.clear();
                 }
             } else {
@@ -1742,22 +1778,21 @@ public class RWRoute{
                         break;
                     case LAGUNA_I:
                         if (!connection.isCrossSLR() ||
-                            connection.getSinkRnode().getSLRIndex() == childRNode.getSLRIndex()) {
+                            connection.getSinkRnode().getSLRIndex(routingGraph) == childRNode.getSLRIndex(routingGraph)) {
                             // Do not consider approaching a SLL if not needing to cross
                             continue;
                         }
                         break;
                     case SUPER_LONG_LINE:
                         assert(connection.isCrossSLR() &&
-                                connection.getSinkRnode().getSLRIndex() != rnode.getSLRIndex());
+                                connection.getSinkRnode().getSLRIndex(routingGraph) != rnode.getSLRIndex(routingGraph));
                         break;
                     default:
                         throw new RuntimeException("Unexpected rnode type: " + childRNode.getType());
                 }
             }
 
-            evaluateCostAndPush(rnode, longParent, childRNode, connection, shareWeight, rnodeCostWeight,
-                    rnodeLengthWeight, rnodeEstWlWeight, rnodeDelayWeight, rnodeEstDlyWeight);
+            evaluateCostAndPush(state, rnode, longParent, childRNode);
             if (childRNode.isTarget() && queue.size() == 1) {
                 // Target is uncongested and the only thing in the (previously cleared) queue, abandon immediately
                 break;
@@ -1812,31 +1847,25 @@ public class RWRoute{
 
     /**
      * Evaluates the cost of a child of a rnode and pushes the child into the queue after cost evaluation.
+     * @param state State from the connection that is being routed.
      * @param rnode The parent rnode of the child in question.
      * @param longParent A boolean value to indicate if the parent is a Long node
      * @param childRnode The child rnode in question.
-     * @param connection The target connection being routed.
-     * @param sharingWeight The sharing weight based on a connection's criticality and the shareExponent for computing a new sharing factor.
-     * @param rnodeCostWeight The cost weight of the childRnode
-     * @param rnodeLengthWeight The wirelength weight of childRnode's exact length.
-     * @param rnodeEstWlWeight The weight of estimated wirelength from childRnode to the connection's sink.
-     * @param rnodeDelayWeight The weight of childRnode's exact delay.
-     * @param rnodeEstDlyWeight The weight of estimated delay from childRnode to the target.
      */
-    protected void evaluateCostAndPush(RouteNode rnode, boolean longParent, RouteNode childRnode, Connection connection, float sharingWeight, float rnodeCostWeight,
-                                       float rnodeLengthWeight, float rnodeEstWlWeight,
-                                       float rnodeDelayWeight, float rnodeEstDlyWeight) {
-        int countSourceUses = childRnode.countConnectionsOfUser(connection.getNetWrapper());
-        float sharingFactor = 1 + sharingWeight* countSourceUses;
+    protected void evaluateCostAndPush(ConnectionState state, RouteNode rnode, boolean longParent, RouteNode childRnode) {
+        final Connection connection = state.connection;
+        final int countSourceUses = childRnode.countConnectionsOfUser(connection.getNetWrapper());
+        final float sharingFactor = 1 + state.shareWeight * countSourceUses;
 
         // Set the prev pointer, as RouteNode.getEndTileYCoordinate() and
         // RouteNode.getSLRIndex() require this
         childRnode.setPrev(rnode);
 
-        float newPartialPathCost = rnode.getUpstreamPathCost() + rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor)
-                                + rnodeLengthWeight * childRnode.getLength() / sharingFactor;
+        float newPartialPathCost = rnode.getUpstreamPathCost();
+        newPartialPathCost += state.rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor);
+        newPartialPathCost += state.rnodeWLWeight * childRnode.getLength() / sharingFactor;
         if (config.isTimingDriven()) {
-            newPartialPathCost += rnodeDelayWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode, longParent));
+            newPartialPathCost += state.dlyWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode, longParent));
         }
 
         int childX = childRnode.getEndTileXCoordinate();
@@ -1847,7 +1876,7 @@ public class RWRoute{
         int deltaX = Math.abs(childX - sinkX);
         int deltaY = Math.abs(childY - sinkY);
         if (connection.isCrossSLR()) {
-            int deltaSLR = Math.abs(sinkRnode.getSLRIndex() - childRnode.getSLRIndex());
+            int deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
             if (deltaSLR != 0) {
                 // Check for overshooting which occurs when child and sink node are in
                 // adjacent SLRs and less than a SLL wire's length apart in the Y axis.
@@ -1885,11 +1914,11 @@ public class RWRoute{
         }
 
         int distanceToSink = deltaX + deltaY;
-        float newTotalPathCost = newPartialPathCost + rnodeEstWlWeight * distanceToSink / sharingFactor;
+        float newTotalPathCost = newPartialPathCost + state.estWlWeight * distanceToSink / sharingFactor;
         if (config.isTimingDriven()) {
-            newTotalPathCost += rnodeEstDlyWeight * (deltaX * 0.32 + deltaY * 0.16);
+            newTotalPathCost += state.estDlyWeight * (deltaX * 0.32 + deltaY * 0.16);
         }
-        push(childRnode, newPartialPathCost, newTotalPathCost);
+        push(state, childRnode, newPartialPathCost, newTotalPathCost);
     }
 
     /**
@@ -1925,18 +1954,19 @@ public class RWRoute{
 
     /**
      * Sets the costs of a rnode and pushes it to the queue.
+     * @param state State from the connection that is being routed.
      * @param childRnode A child rnode.
      * @param newPartialPathCost The upstream path cost from childRnode to the source.
      * @param newTotalPathCost Total path cost of childRnode.
      */
-    protected void push(RouteNode childRnode, float newPartialPathCost, float newTotalPathCost) {
+    protected void push(ConnectionState state, RouteNode childRnode, float newPartialPathCost, float newTotalPathCost) {
         assert(childRnode.getPrev() != null || childRnode.getType() == RouteNodeType.PINFEED_O);
         childRnode.setLowerBoundTotalPathCost(newTotalPathCost);
         childRnode.setUpstreamPathCost(newPartialPathCost);
         // Use the number-of-connections-routed-so-far as the identifier for whether a rnode
         // has been visited by this connection before
-        childRnode.setVisited(connectionsRouted);
-        queue.add(childRnode);
+        childRnode.setVisited(state.sequence);
+        state.queue.add(childRnode);
     }
 
     /**
@@ -1944,31 +1974,22 @@ public class RWRoute{
      * known-uncongested downstream-from-source routing segments acquired from prior
      * iterations, as well as marking known-uncongested upstream-from-sink segments
      * as targets.
-     * @param connectionToRoute The target connection to be routed.
-     * @param shareWeight The criticality-aware share weight for a new sharing factor.
-     * @param rnodeCostWeight The cost weight of the childRnode
-     * @param rnodeLengthWeight The wirelength weight of childRnode's exact wirelength.
-     * @param rnodeEstWlWeight The weight of estimated wirelength from childRnode to the connection's sink.
-     * @param rnodeDelayWeight The weight of childRnode's exact delay.
-     * @param rnodeEstDlyWeight The weight of estimated delay to the target.
+     * @param state State from the connection that is being routed.
      */
-    protected void prepareRouteConnection(Connection connectionToRoute, float shareWeight, float rnodeCostWeight,
-                                          float rnodeLengthWeight, float rnodeEstWlWeight,
-                                          float rnodeDelayWeight, float rnodeEstDlyWeight) {
-        // Rips up the connection
-        ripUp(connectionToRoute);
+    protected void prepareRouteConnection(ConnectionState state) {
+        final Connection connection = state.connection;
 
-        connectionsRouted++;
-        connectionsRoutedIteration++;
-        assert(queue.isEmpty());
+        // Rips up the connection
+        ripUp(connection);
+        assert(state.queue.isEmpty());
 
         // Sets the sink rnode(s) of the connection as the target(s)
-        connectionToRoute.setAllTargets(true);
+        connection.setAllTargets(routingGraph);
 
         // Adds the source rnode to the queue
-        RouteNode sourceRnode = connectionToRoute.getSourceRnode();
+        RouteNode sourceRnode = connection.getSourceRnode();
         assert(sourceRnode.getPrev() == null);
-        push(sourceRnode, 0, 0);
+        push(state, sourceRnode, 0, 0);
     }
 
     /**
@@ -2082,9 +2103,9 @@ public class RWRoute{
             printFormattedString("Average #children per node:", routingGraph.averageChildren());
             System.out.printf("------------------------------------------------------------------------------\n");
             printFormattedString("Num iterations:", routeIteration);
-            printFormattedString("Connections routed:", connectionsRouted);
-            printFormattedString("Nodes pushed:", nodesPushed);
-            printFormattedString("Nodes popped:", nodesPopped);
+            printFormattedString("Connections routed:", connectionsRouted.get());
+            printFormattedString("Nodes pushed:", nodesPushed.get());
+            printFormattedString("Nodes popped:", nodesPopped.get());
             System.out.printf("------------------------------------------------------------------------------\n");
         }
 

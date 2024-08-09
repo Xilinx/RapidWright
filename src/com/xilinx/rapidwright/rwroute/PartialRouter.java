@@ -46,13 +46,13 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
-import com.xilinx.rapidwright.util.RuntimeTracker;
 
 /**
  * A class extending {@link RWRoute} for partial routing.
@@ -72,12 +72,16 @@ public class PartialRouter extends RWRoute {
 
     protected class RouteNodeGraphPartial extends RouteNodeGraph {
 
-        public RouteNodeGraphPartial(RuntimeTracker setChildrenTimer, Design design, RWRouteConfig config) {
-            super(setChildrenTimer, design, config);
+        public RouteNodeGraphPartial(Design design, RWRouteConfig config, Map<Tile, RouteNode[]> nodesMap) {
+            super(design, config, nodesMap);
+        }
+
+        public RouteNodeGraphPartial(Design design, RWRouteConfig config) {
+            this(design, config, new HashMap<>());
         }
 
         @Override
-        protected boolean isExcluded(Node parent, Node child) {
+        protected boolean isExcluded(RouteNode parent, Node child) {
             // Routing part of an existing (preserved) route are never excluded
             if (isPartOfExistingRoute(parent, child)) {
                 return false;
@@ -87,15 +91,21 @@ public class PartialRouter extends RWRoute {
     }
 
     protected class RouteNodeGraphPartialTimingDriven extends RouteNodeGraphTimingDriven {
-        public RouteNodeGraphPartialTimingDriven(RuntimeTracker rnodesTimer,
-                                                 Design design,
+        public RouteNodeGraphPartialTimingDriven(Design design,
+                                                 RWRouteConfig config,
+                                                 DelayEstimatorBase delayEstimator,
+                                                 Map<Tile, RouteNode[]> nodesMap) {
+            super(design, config, delayEstimator, nodesMap);
+        }
+
+        public RouteNodeGraphPartialTimingDriven(Design design,
                                                  RWRouteConfig config,
                                                  DelayEstimatorBase delayEstimator) {
-            super(rnodesTimer, design, config, delayEstimator);
+            this(design, config, delayEstimator, new HashMap<>());
         }
 
         @Override
-        protected boolean isExcluded(Node parent, Node child) {
+        protected boolean isExcluded(RouteNode parent, Node child) {
             if (isPartOfExistingRoute(parent, child)) {
                 return false;
             }
@@ -141,22 +151,23 @@ public class PartialRouter extends RWRoute {
      * @param end End Node of arc.
      * @return True if arc is part of an existing route.
      */
-    protected boolean isPartOfExistingRoute(Node start, Node end) {
+    protected boolean isPartOfExistingRoute(RouteNode start, Node end) {
         // End node can only be part of existing route if it is in the graph already
         RouteNode endRnode = routingGraph.getNode(end);
-        if (endRnode == null)
-            return false;
-
-        // If end node has been visited already
-        if (endRnode.isVisited(connectionsRouted)) {
-            // Visited possibly from a different arc uphill of end, or possibly from
-            // the same start -> end arc during prepareRouteConnection()
+        if (endRnode == null) {
             return false;
         }
 
         // Presence of a prev pointer means that only that arc is allowed to enter this end node
         RouteNode prev = endRnode.getPrev();
         if (prev != null) {
+            // If end node has been visited already
+            if (endRnode.isVisited(start.getVisited())) {
+                // Visited possibly from a different arc uphill of end, or possibly from
+                // the same start -> end arc during prepareRouteConnection()
+                return false;
+            }
+
             if (prev.equals(start) && routingGraph.isPreserved(end)) {
                 // Arc matches start node and end node is preserved
                 // This implies that both start and end nodes must be preserved for the same net
@@ -175,9 +186,9 @@ public class PartialRouter extends RWRoute {
         if (config.isTimingDriven()) {
             /* An instantiated delay estimator that is used to calculate delay of routing resources */
             DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
-            return new RouteNodeGraphPartialTimingDriven(rnodesTimer, design, config, estimator);
+            return new RouteNodeGraphPartialTimingDriven(design, config, estimator);
         } else {
-            return new RouteNodeGraphPartial(rnodesTimer, design, config);
+            return new RouteNodeGraphPartial(design, config);
         }
     }
 
