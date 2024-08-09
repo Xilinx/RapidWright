@@ -70,7 +70,7 @@ public class PartialRouter extends RWRoute {
 
     protected Map<Net, List<SitePinInst>> netToPins;
 
-    protected class RouteNodeGraphPartial extends RouteNodeGraph {
+    protected static class RouteNodeGraphPartial extends RouteNodeGraph {
 
         public RouteNodeGraphPartial(Design design, RWRouteConfig config, Map<Tile, RouteNode[]> nodesMap) {
             super(design, config, nodesMap);
@@ -83,14 +83,14 @@ public class PartialRouter extends RWRoute {
         @Override
         protected boolean isExcluded(RouteNode parent, Node child) {
             // Routing part of an existing (preserved) route are never excluded
-            if (isPartOfExistingRoute(parent, child)) {
+            if (isPartOfExistingRoute(this, parent, child)) {
                 return false;
             }
             return super.isExcluded(parent, child);
         }
     }
 
-    protected class RouteNodeGraphPartialTimingDriven extends RouteNodeGraphTimingDriven {
+    protected static class RouteNodeGraphPartialTimingDriven extends RouteNodeGraphTimingDriven {
         public RouteNodeGraphPartialTimingDriven(Design design,
                                                  RWRouteConfig config,
                                                  DelayEstimatorBase delayEstimator,
@@ -106,7 +106,7 @@ public class PartialRouter extends RWRoute {
 
         @Override
         protected boolean isExcluded(RouteNode parent, Node child) {
-            if (isPartOfExistingRoute(parent, child)) {
+            if (isPartOfExistingRoute(this, parent, child)) {
                 return false;
             }
             return super.isExcluded(parent, child);
@@ -151,7 +151,7 @@ public class PartialRouter extends RWRoute {
      * @param end End Node of arc.
      * @return True if arc is part of an existing route.
      */
-    protected boolean isPartOfExistingRoute(RouteNode start, Node end) {
+    protected static boolean isPartOfExistingRoute(RouteNodeGraph routingGraph, RouteNode start, Node end) {
         // End node can only be part of existing route if it is in the graph already
         RouteNode endRnode = routingGraph.getNode(end);
         if (endRnode == null) {
