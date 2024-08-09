@@ -1012,7 +1012,15 @@ public class EDIFTools {
                                                             Path dcpFileName, String partName) {
         ArrayList<String> lines = new ArrayList<String>();
         for (String cellName : edif.getEncryptedCells()) {
-            lines.add(EDIFNetlist.READ_EDIF_CMD + " {" + cellName + "}");
+            if (cellName.endsWith(".edn") || cellName.endsWith(".edf")) {
+                lines.add(EDIFNetlist.READ_EDIF_CMD + " {" + cellName + "}");
+            } else if (cellName.endsWith(".dcp")) {
+                lines.add("read_checkpoint {" + cellName + "}");
+            } else if (cellName.endsWith(".v")) {
+                lines.add("read_verilog {" + cellName + "}");
+            } else {
+                System.err.println("ERROR: Unrecognized or missing extension for encrypted cell file: " + cellName);
+            }
         }
         Path pathDCPFileName = dcpFileName.toAbsolutePath();
 

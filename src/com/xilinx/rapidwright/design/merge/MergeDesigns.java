@@ -114,7 +114,7 @@ public class MergeDesigns {
         }
 
         design0.getNetlist().removeUnusedCellsFromAllWorkLibraries();
-
+        design0.getNetlist().resetParentNetMap();
         return design0;
     }
 
