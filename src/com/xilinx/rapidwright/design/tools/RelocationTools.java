@@ -23,6 +23,16 @@
 
 package com.xilinx.rapidwright.design.tools;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
+
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
@@ -38,16 +48,6 @@ import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.stream.Collectors;
 
 /**
  * A collection of tools to help relocate designs.
@@ -385,7 +385,7 @@ public class RelocationTools {
         }
         String inputDCPName = args[0];
         Design d = Design.readCheckpoint(inputDCPName);
-        if (args.length > 1 && args.length < 4) {
+        if (args.length == 1) {
             printValidRelocationOptions(null, Integer.MAX_VALUE);
             return;
         }
