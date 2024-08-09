@@ -386,7 +386,8 @@ public class RelocationTools {
         String inputDCPName = args[0];
         Design d = Design.readCheckpoint(inputDCPName);
         if (args.length == 1) {
-            printValidRelocationOptions(null, Integer.MAX_VALUE);
+            
+            printValidRelocationOptions(getValidRelocationOptions(d), Integer.MAX_VALUE);
             return;
         }
         String outputDCPName = args[1];
