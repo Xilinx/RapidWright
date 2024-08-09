@@ -38,6 +38,7 @@ import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockGenerator;
 import com.xilinx.rapidwright.design.merge.MergeDesigns;
 import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.design.tools.RelocationTools;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.PseudoPIPHelper;
 import com.xilinx.rapidwright.device.browser.DeviceBrowser;
@@ -176,6 +177,7 @@ public class MainEntrypoint {
         addFunction("PrintEDIFInstances", PrintEDIFInstances::main);
         addFunction("ProbeRouter", ProbeRouter::main);
         addFunction("PseudoPIPHelper", PseudoPIPHelper::main);
+        addFunction("RelocationTools", RelocationTools::main);
         addFunction("ReplaceEDIFInDCP", ReplaceEDIFInDCP::main);
         addFunction("ReportDevicePerformance", ReportDevicePerformance::main);
         addFunction("ReportTimingExample", ReportTimingExample::main);
