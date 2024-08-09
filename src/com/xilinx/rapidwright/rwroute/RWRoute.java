@@ -89,7 +89,7 @@ public class RWRoute {
     /** A list of direct connections that are easily routed through dedicated resources */
     private List<Connection> directConnections;
     /** Sorted indirect connections */
-    private List<Connection> sortedIndirectConnections;
+    protected List<Connection> sortedIndirectConnections;
     /** A list of global clock nets */
     protected List<Net> clkNets;
     /** Static nets */
@@ -119,9 +119,9 @@ public class RWRoute {
     /** 1 - timingWeight */
     private float oneMinusTimingWeight;
     /** Flag for whether LUT pin swaps are to be considered */
-    protected boolean lutPinSwapping;
+    private boolean lutPinSwapping;
     /** Flag for whether LUT routethrus are to be considered */
-    protected boolean lutRoutethru;
+    private boolean lutRoutethru;
 
     /** The current routing iteration */
     protected int routeIteration;
@@ -784,7 +784,9 @@ public class RWRoute {
         routeWireNets.addChild(rnodesTimer);
         // Do not time the cost evaluation method for routing connections, the timer itself takes time
         routerTimer.createRuntimeTracker("route connections", "route wire nets").setTime(routeWireNets.getTime() - rnodesTimer.getTime() - updateTimingTimer.getTime() - updateCongestionCosts.getTime());
-        routeWireNets.addChild(updateTimingTimer);
+        if (config.isTimingDriven()) {
+            routeWireNets.addChild(updateTimingTimer);
+        }
         routeWireNets.addChild(updateCongestionCosts);
 
         routerTimer.createRuntimeTracker("finalize routes", "Routing").start();
@@ -1187,7 +1189,7 @@ public class RWRoute {
     /**
      * Sorts indirect connections for routing.
      */
-    private void sortConnections() {
+    protected void sortConnections() {
         sortedIndirectConnections.clear();
         sortedIndirectConnections.addAll(indirectConnections);
         Collections.sort(sortedIndirectConnections);
@@ -2101,7 +2103,7 @@ public class RWRoute {
         System.out.print(MessageGenerator.formatString(s, value));
     }
 
-    private void printRoutingStatistics() {
+    protected void printRoutingStatistics() {
         MessageGenerator.printHeader("Statistics");
         computesNodeUsageAndTotalWirelength();
         printNodeTypeUsageAndWirelength(config.isVerbose(), nodeTypeUsage, nodeTypeLength);
