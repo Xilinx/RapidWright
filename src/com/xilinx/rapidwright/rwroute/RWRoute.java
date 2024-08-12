@@ -1296,7 +1296,7 @@ public class RWRoute{
                     overUseCnt++;
                 }
             }
-            husInitialCongested = (float) overUseCnt / numConnectionsToRoute > config.getHusInitialCongestedThreshold();
+            husInitialCongested = (float) overUseCnt / sortedIndirectConnections.size() > config.getHusInitialCongestedThreshold();
         }
 
         if (husInitialCongested) {
