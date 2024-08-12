@@ -84,7 +84,7 @@ public class RouteNodeGraph {
      */
     private final Collection<RouteNode> targets;
 
-    private AtomicLong createRnodeTime;
+    private long createRnodeTime;
 
     public static final short SUPER_LONG_LINE_LENGTH_IN_TILES = 60;
 
@@ -126,7 +126,7 @@ public class RouteNodeGraph {
         preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
         targets = new ArrayList<>();
-        createRnodeTime = new AtomicLong();
+        createRnodeTime = 0;
 
         Device device = design.getDevice();
         intYToSLRIndex = new int[device.getRows()];
@@ -417,11 +417,11 @@ public class RouteNodeGraph {
     }
 
     protected void addCreateRnodeTime(long time) {
-        createRnodeTime.addAndGet(time);
+        createRnodeTime += time;
     }
 
     protected long getCreateRnodeTime() {
-        return createRnodeTime.get();
+        return createRnodeTime;
     }
 
     public Net getPreservedNet(Node node) {
