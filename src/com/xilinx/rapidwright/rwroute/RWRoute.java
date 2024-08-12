@@ -658,6 +658,10 @@ public class RWRoute{
                 }
                 if (sourceINTRnode == null && sourceINTNode != null) {
                     sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
+                    // Where only a single primary source exists, always preserve 
+                    // its projected-to-INT source node, since it could
+                    // be a projection from LAGUNA/RXQ* -> RXD* (node for INT/LOGIC_OUTS_*)
+                    routingGraph.preserve(sourceINTNode, net);
                 }
                 if (altSourceINTRnode == null && altSourceINTNode != null) {
                     altSourceINTRnode = getOrCreateRouteNode(altSourceINTNode, RouteNodeType.PINFEED_O);
