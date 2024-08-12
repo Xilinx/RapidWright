@@ -124,7 +124,7 @@ public class RWRoute{
     /** Flag for use of Hybrid Updating Strategy (HUS) */
     private boolean useHUS;
     /** Flag (computed at end of iteration 1) to indicate design is congested enough to consider HUS */
-    private boolean HUSinitialCongested;
+    private boolean initialCongestedFlagInHUS;
 
     /** The current routing iteration */
     protected int routeIteration;
@@ -257,7 +257,7 @@ public class RWRoute{
         overUsedRnodes = new HashSet<>();
 
         useHUS = config.isUseHUS();
-        HUSinitialCongested = false;
+        initialCongestedFlagInHUS = false;
 
         routerTimer.getRuntimeTracker("Initialization").stop();
     }
@@ -1296,15 +1296,15 @@ public class RWRoute{
                     overUseCnt++;
                 }
             }
-            HUSinitialCongested = (float) overUseCnt / numConnectionsToRoute > config.getHUSinitialCongestedThreshold();
+            initialCongestedFlagInHUS = (float) overUseCnt / numConnectionsToRoute > config.getInitialCongestedThresholdInHUS();
         }
 
-        if (HUSinitialCongested) {
+        if (initialCongestedFlagInHUS) {
             float congestedConnRatio = (float) connectionsRoutedIteration / sortedIndirectConnections.size();
-            if (congestedConnRatio < config.getHUSactivateThreshold()) {
+            if (congestedConnRatio < config.getActivateThresholdInHUS()) {
                 // Activate HUS: slow down the present cost growth and increase historical cost growth instead
-                config.setPresentCongestionMultiplier(config.getHUSalpha());
-                historicalCongestionFactor = config.getHUSbeta();
+                config.setPresentCongestionMultiplier(config.getAlphaInHUS());
+                historicalCongestionFactor = config.getBetaInHUS();
                 useHUS = false;
             }
         }
