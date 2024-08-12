@@ -122,9 +122,9 @@ public class RWRoute{
     protected boolean lutRoutethru;
 
     /** Flag for use of Hybrid Updating Strategy (HUS) */
-    private boolean useHUS;
+    private boolean hus;
     /** Flag (computed at end of iteration 1) to indicate design is congested enough to consider HUS */
-    private boolean initialCongestedFlagInHUS;
+    private boolean husInitialCongested;
 
     /** The current routing iteration */
     protected int routeIteration;
@@ -256,8 +256,8 @@ public class RWRoute{
         nodesPopped = 0;
         overUsedRnodes = new HashSet<>();
 
-        useHUS = config.isUseHUS();
-        initialCongestedFlagInHUS = false;
+        hus = config.isHus();
+        husInitialCongested = false;
 
         routerTimer.getRuntimeTracker("Initialization").stop();
     }
@@ -860,6 +860,7 @@ public class RWRoute{
         long lastIterationRnodeCount = 0;
         long lastIterationRnodeTime = 0;
 
+        boolean initialHus = this.hus;
         while (routeIteration < config.getMaxIterations()) {
             long startIteration = System.nanoTime();
             connectionsRoutedIteration = 0;
@@ -872,7 +873,6 @@ public class RWRoute{
                 }
             }
 
-            boolean lastUseHUS = useHUS;
             updateCostFactors();
 
             rnodesCreatedThisIteration = routingGraph.numNodes() - lastIterationRnodeCount;
@@ -908,7 +908,7 @@ public class RWRoute{
                 }
             }
 
-            if (lastUseHUS && !useHUS) {
+            if (initialHus && !hus) {
                 System.out.println("INFO: Hybrid Updating Strategy (HUS) activated");
             }
 
@@ -1249,7 +1249,7 @@ public class RWRoute{
     private void updateCostFactors() {
         updateCongestionCosts.start();
 
-        checkHUS();
+        checkHus();
 
         // Inflate the present congestion factor
         presentCongestionFactor *= config.getPresentCongestionMultiplier();
@@ -1283,8 +1283,8 @@ public class RWRoute{
     /**
      * Check whether to activate Hybrid Updating Strategy (HUS)
      */
-    private void checkHUS() {
-        if (!useHUS) {
+    private void checkHus() {
+        if (!hus) {
             return;
         }
 
@@ -1296,16 +1296,16 @@ public class RWRoute{
                     overUseCnt++;
                 }
             }
-            initialCongestedFlagInHUS = (float) overUseCnt / numConnectionsToRoute > config.getInitialCongestedThresholdInHUS();
+            husInitialCongested = (float) overUseCnt / numConnectionsToRoute > config.getHusInitialCongestedThreshold();
         }
 
-        if (initialCongestedFlagInHUS) {
+        if (husInitialCongested) {
             float congestedConnRatio = (float) connectionsRoutedIteration / sortedIndirectConnections.size();
-            if (congestedConnRatio < config.getActivateThresholdInHUS()) {
+            if (congestedConnRatio < config.getHusActivateThreshold()) {
                 // Activate HUS: slow down the present cost growth and increase historical cost growth instead
-                config.setPresentCongestionMultiplier(config.getAlphaInHUS());
-                historicalCongestionFactor = config.getBetaInHUS();
-                useHUS = false;
+                config.setPresentCongestionMultiplier(config.getHusAlpha());
+                historicalCongestionFactor = config.getHusBeta();
+                hus = false;
             }
         }
     }

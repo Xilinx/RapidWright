@@ -95,15 +95,15 @@ public class RWRouteConfig {
     /* true to enable GND -> VCC optimization for LUT inputs */
     private boolean invertGndToVccForLutInputs;
     /* true to use HUS */
-    private boolean useHUS;
+    private boolean hus;
     /* The value of alpha in HUS*/
-    private float alphaInHUS;
+    private float husAlpha;
     /* The value of Beta in HUS*/
-    private float betaInHUS;
+    private float husBeta;
     /* The threshold for determining whether a case is a congested design in HUS */
-    private float initialCongestedThresholdInHUS;
+    private float husInitialCongestedThreshold;
     /* The threshold for determining whether to start using historical-centric updating in HUS */
-    private float activateThresholdInHUS;
+    private float husActivateThreshold;
 
     /** Constructs a Configuration Object */
     public RWRouteConfig(String[] arguments) {
@@ -135,11 +135,11 @@ public class RWRouteConfig {
         lutPinSwapping = false;
         lutRoutethru = false;
         invertGndToVccForLutInputs = true;
-        useHUS = false;
-        alphaInHUS = 1.1f;
-        betaInHUS = 2f;
-        initialCongestedThresholdInHUS = 0.5f;
-        activateThresholdInHUS = 0.4f;
+        hus = false;
+        husAlpha = 1.1f;
+        husBeta = 2f;
+        husInitialCongestedThreshold = 0.5f;
+        husActivateThreshold = 0.4f;
         if (arguments != null) {
             parseArguments(arguments);
         }
@@ -248,20 +248,20 @@ public class RWRouteConfig {
             case "--noInvertGndToVccForLutInputs":
                 setInvertGndToVccForLutInputs(false);
                 break;
-            case "--useHUS":
-                setUseHUS(true);
+            case "--hus":
+                setHus(true);
                 break;
-            case "--alphaInHUS":
-                setAlphaInHUS(Float.parseFloat(arguments[++i]));
+            case "--husAlpha":
+                setHusAlpha(Float.parseFloat(arguments[++i]));
                 break;
-            case "--betaInHUS":
-                setBetaInHUS(Float.parseFloat(arguments[++i]));
+            case "--husBeta":
+                setHusBeta(Float.parseFloat(arguments[++i]));
                 break;
-            case "--initialCongestedThresholdInHUS":
-                setInitialCongestedThresholdInHUS(Float.parseFloat(arguments[++i]));
+            case "--husInitialCongestedThreshold":
+                setHusInitialCongestedThreshold(Float.parseFloat(arguments[++i]));
                 break;
-            case "--activateThresholdInHUS":
-                setActivateThresholdInHUS(Float.parseFloat(arguments[++i]));
+            case "--husActivateThreshold":
+                setHusActivateThreshold(Float.parseFloat(arguments[++i]));
                 break;
             default:
                 throw new IllegalArgumentException("ERROR: RWRoute argument '" + arg + "' not recognized.");
@@ -921,8 +921,8 @@ public class RWRouteConfig {
      *  instead increases the growth of overused nodes' historical costs.
      *  Default: false.
      */
-    public boolean isUseHUS() {
-        return useHUS;
+    public boolean isHus() {
+        return hus;
     }
 
     /**
@@ -930,10 +930,10 @@ public class RWRouteConfig {
      * HUS will, once its user-configurable thresholds are met, slow down the growth of present costs of used nodes and
      *  instead increases the growth of overused nodes' historical costs.
      * Default: false.
-     * @param useHUS true to enable the hybrid updating strategy (HUS)
+     * @param hus true to enable the hybrid updating strategy (HUS)
      */
-    public void setUseHUS(boolean useHUS) {
-        this.useHUS = useHUS;
+    public void setHus(boolean hus) {
+        this.hus = hus;
     }
 
     /**
@@ -941,17 +941,17 @@ public class RWRouteConfig {
      * Default: 1.1
      * @return the value of alpha in the hybrid updating strategy (HUS)
      */
-    public float getAlphaInHUS() {
-        return alphaInHUS;
+    public float getHusAlpha() {
+        return husAlpha;
     }
 
     /**
      * Sets the value of alpha in the hybrid updating strategy (HUS)
      * Default: 1.1
-     * @param alphaInHUS the value of alpha in the hybrid updating strategy (HUS)
+     * @param husAlpha the value of alpha in the hybrid updating strategy (HUS)
      */
-    public void setAlphaInHUS(float alphaInHUS) {
-        this.alphaInHUS = alphaInHUS;
+    public void setHusAlpha(float husAlpha) {
+        this.husAlpha = husAlpha;
     }
 
     /**
@@ -959,17 +959,17 @@ public class RWRouteConfig {
      * Default: 2.0
      * @return the value of beta in the hybrid updating strategy (HUS)
      */
-    public float getBetaInHUS() {
-        return betaInHUS;
+    public float getHusBeta() {
+        return husBeta;
     }
 
     /**
      * Sets the value of beta in the hybrid updating strategy (HUS)
      * Default: 2.0
-     * @param betaInHUS the value of beta in the hybrid updating strategy (HUS)
+     * @param husBeta the value of beta in the hybrid updating strategy (HUS)
      */
-    public void setBetaInHUS(float betaInHUS) {
-        this.betaInHUS = betaInHUS;
+    public void setHusBeta(float husBeta) {
+        this.husBeta = husBeta;
     }
 
     /**
@@ -978,18 +978,18 @@ public class RWRouteConfig {
      * Default: 0.5
      * @return the threshold for determining whether a design is congested enough to consider HUS
      */
-    public float getInitialCongestedThresholdInHUS() {
-        return initialCongestedThresholdInHUS;
+    public float getHusInitialCongestedThreshold() {
+        return husInitialCongestedThreshold;
     }
 
     /**
      * Sets the threshold (number of overused nodes at the end of routing iteration 1 divided by
      * total number of connections to be routed) above which a design is congested enough to consider HUS
      * Default: 0.5
-     * @param initialCongestedThresholdInHUS the threshold for determining whether a design is congested enough to consider HUS
+     * @param husInitialCongestedThreshold the threshold for determining whether a design is congested enough to consider HUS
      */
-    public void setInitialCongestedThresholdInHUS(float initialCongestedThresholdInHUS) {
-        this.initialCongestedThresholdInHUS = initialCongestedThresholdInHUS;
+    public void setHusInitialCongestedThreshold(float husInitialCongestedThreshold) {
+        this.husInitialCongestedThreshold = husInitialCongestedThreshold;
     }
 
     /**
@@ -998,18 +998,18 @@ public class RWRouteConfig {
      * Default: 0.4
      * @return the threshold for determining whether to activate HUS
      */
-    public float getActivateThresholdInHUS() {
-        return activateThresholdInHUS;
+    public float getHusActivateThreshold() {
+        return husActivateThreshold;
     }
 
     /**
      * Sets the threshold (number of congested connections at the end of the routing iteration divided by
      * total number of connections to be routed) below which HUS will be activated
      * Default: 0.4
-     * @param activateThresholdInHUS the threshold for determining whether to activate HUS
+     * @param husActivateThreshold the threshold for determining whether to activate HUS
      */
-    public void setActivateThresholdInHUS(float activateThresholdInHUS) {
-        this.activateThresholdInHUS = activateThresholdInHUS;
+    public void setHusActivateThreshold(float husActivateThreshold) {
+        this.husActivateThreshold = husActivateThreshold;
     }
 
     @Override
@@ -1048,12 +1048,12 @@ public class RWRouteConfig {
         s.append(MessageGenerator.formatString("Historical congestion factor: ", historicalCongestionFactor));
         s.append(MessageGenerator.formatString("LUT pin swapping: ", isLutPinSwapping()));
         s.append(MessageGenerator.formatString("LUT routethrus: ", isLutRoutethru()));
-        s.append(MessageGenerator.formatString("Use Hybrid Updating Strategy: ", isUseHUS()));
-        if (isUseHUS()) {
-            s.append(MessageGenerator.formatString("HUS alpha: ", alphaInHUS));
-            s.append(MessageGenerator.formatString("HUS beta: ", betaInHUS));
-            s.append(MessageGenerator.formatString("HUS initial congestion threshold: ", initialCongestedThresholdInHUS));
-            s.append(MessageGenerator.formatString("HUS activate threshold: ", activateThresholdInHUS));
+        s.append(MessageGenerator.formatString("Use Hybrid Updating Strategy: ", isHus()));
+        if (isHus()) {
+            s.append(MessageGenerator.formatString("HUS alpha: ", husAlpha));
+            s.append(MessageGenerator.formatString("HUS beta: ", husBeta));
+            s.append(MessageGenerator.formatString("HUS initial congested threshold: ", husInitialCongestedThreshold));
+            s.append(MessageGenerator.formatString("HUS activate threshold: ", husActivateThreshold));
         }
 
         return s.toString();

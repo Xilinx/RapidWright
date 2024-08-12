@@ -173,7 +173,7 @@ public class TestRWRoute {
     @LargeTest(max_memory_gb = 8)
     public void testNonTimingDrivenFullRoutingWithHUS(String path) {
         Design design = RapidWrightDCP.loadDCP(path);
-        RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--useHUS"});
+        RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--hus"});
         assertAllSourcesRoutedFlagSet(design);
         assertAllPinsRouted(design);
         VivadoToolsHelper.assertFullyRouted(design);
