@@ -910,6 +910,7 @@ public class RWRoute{
 
             if (initialHus && !hus) {
                 System.out.println("INFO: Hybrid Updating Strategy (HUS) activated");
+                initialHus = false;
             }
 
             routeIteration++;
@@ -1303,8 +1304,19 @@ public class RWRoute{
             float congestedConnRatio = (float) connectionsRoutedIteration / sortedIndirectConnections.size();
             if (congestedConnRatio < config.getHusActivateThreshold()) {
                 // Activate HUS: slow down the present cost growth and increase historical cost growth instead
-                config.setPresentCongestionMultiplier(config.getHusAlpha());
-                historicalCongestionFactor = config.getHusBeta();
+                float husAlpha = config.getHusAlpha();
+                if (husAlpha >= config.getPresentCongestionMultiplier()) {
+                    System.out.println("WARNING: HUS alpha is not less than the current present congestion multiplier.");
+                }
+                config.setPresentCongestionMultiplier(husAlpha);
+
+                float husBeta = config.getHusBeta();
+                if (husBeta <= historicalCongestionFactor) {
+                    System.out.println("WARNING: HUS beta is not greater than the current historical congestion factor.");
+                }
+                historicalCongestionFactor = husBeta;
+
+                // Disable HUS from being activated again
                 hus = false;
             }
         }
