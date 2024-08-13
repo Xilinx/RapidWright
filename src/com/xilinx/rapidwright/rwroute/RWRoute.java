@@ -120,8 +120,6 @@ public class RWRoute {
     private float oneMinusTimingWeight;
     /** Flag for whether LUT pin swaps are to be considered */
     private boolean lutPinSwapping;
-    /** Flag for whether LUT routethrus are to be considered */
-    private boolean lutRoutethru;
 
     /** The current routing iteration */
     protected int routeIteration;
@@ -139,8 +137,8 @@ public class RWRoute {
     protected RouteNodeGraph routingGraph;
     /** Count of rnodes created in the current routing iteration */
     protected long rnodesCreatedThisIteration;
-    /** The queue to store candidate nodes to route a connection */
-    private PriorityQueue<RouteNode> queue;
+    /** State necessary to route the included connection */
+    private ConnectionState connectionState;
 
     /** Total wirelength of the routed design */
     private int totalWL;
@@ -227,7 +225,7 @@ public class RWRoute {
         minRerouteCriticality = config.getMinRerouteCriticality();
         criticalConnections = new ArrayList<>();
 
-        queue = new PriorityQueue<>();
+        connectionState = new ConnectionState();
         routingGraph = createRouteNodeGraph();
         if (config.isTimingDriven()) {
             nodesDelays = new HashMap<>();
@@ -236,7 +234,6 @@ public class RWRoute {
         routethruHelper = new RouteThruHelper(design.getDevice());
         presentCongestionFactor = config.getInitialPresentCongestionFactor();
         lutPinSwapping = config.isLutPinSwapping();
-        lutRoutethru = config.isLutRoutethru();
 
         routerTimer.createRuntimeTracker("determine route targets", "Initialization").start();
         determineRoutingTargets();
@@ -729,10 +726,10 @@ public class RWRoute {
     }
 
     /**
-     * @return ProrityQueue<RouteNode> object to be used for routing.
+     * @return ConnectionState object to be used for routing.
      */
-    protected PriorityQueue<RouteNode> getQueue() {
-        return queue;
+    protected ConnectionState getConnectionState() {
+        return connectionState;
     }
 
     /**
@@ -1499,30 +1496,21 @@ public class RWRoute {
      * Class encapsulating all state necessary to route the included connection
      */
     protected static class ConnectionState {
-        protected final Connection connection;
-        protected final int sequence;
-        protected final float rnodeCostWeight;
-        protected final float shareWeight;
-        protected final float rnodeWLWeight;
-        protected final float estWlWeight;
-        protected final float dlyWeight;
-        protected final float estDlyWeight;
         protected final PriorityQueue<RouteNode> queue;
         protected final List<RouteNode> targets;
 
-        ConnectionState(Connection connection, int sequence, float rnodeCostWeight, float shareWeight,
-                        float rnodeWLWeight, float estWlWeight, float dlyWeight, float estDlyWeight,
-                        PriorityQueue<RouteNode> queue) {
-            this.connection = connection;
-            this.sequence = sequence;
-            this.rnodeCostWeight = rnodeCostWeight;
-            this.shareWeight = shareWeight;
-            this.rnodeWLWeight = rnodeWLWeight;
-            this.estWlWeight = estWlWeight;
-            this.dlyWeight = dlyWeight;
-            this.estDlyWeight = estDlyWeight;
-            this.queue = queue;
-            targets = new ArrayList<>();
+        protected Connection connection;
+        protected int sequence;
+        protected float rnodeCostWeight;
+        protected float shareWeight;
+        protected float rnodeWLWeight;
+        protected float estWlWeight;
+        protected float dlyWeight;
+        protected float estDlyWeight;
+
+        protected ConnectionState() {
+            this.queue = new PriorityQueue<>();
+            this.targets = new ArrayList<>();
         }
     }
 
@@ -1531,21 +1519,19 @@ public class RWRoute {
      * @param connection The connection to route.
      */
     protected void routeIndirectConnection(Connection connection) {
-        int sequence = connectionsRouted.incrementAndGet();
+        ConnectionState state = getConnectionState();
+        state.connection = connection;
+        state.sequence = connectionsRouted.incrementAndGet();
         connectionsRoutedThisIteration.incrementAndGet();
-        float rnodeCostWeight = 1 - connection.getCriticality();
-        float shareWeight = (float) (Math.pow(rnodeCostWeight, config.getShareExponent()));
-        float rnodeWLWeight = rnodeCostWeight * oneMinusWlWeight;
-        float estWlWeight = rnodeCostWeight * wlWeight;
-        float dlyWeight = connection.getCriticality() * oneMinusTimingWeight / 100f;
-        float estDlyWeight = connection.getCriticality() * timingWeight;
-        final PriorityQueue<RouteNode> queue = getQueue();
-        assert(queue.isEmpty());
+        state.rnodeCostWeight = 1 - connection.getCriticality();
+        state.shareWeight = (float) (Math.pow(state.rnodeCostWeight, config.getShareExponent()));
+        state.rnodeWLWeight = state.rnodeCostWeight * oneMinusWlWeight;
+        state.estWlWeight = state.rnodeCostWeight * wlWeight;
+        state.dlyWeight = connection.getCriticality() * oneMinusTimingWeight / 100f;
+        state.estDlyWeight = connection.getCriticality() * timingWeight;
 
-        ConnectionState state = new ConnectionState(connection, sequence,
-                rnodeCostWeight, shareWeight,
-                rnodeWLWeight, estWlWeight, dlyWeight, estDlyWeight,
-                queue);
+        PriorityQueue<RouteNode> queue = state.queue;
+        assert(queue.isEmpty());
 
         prepareRouteConnection(state);
 
