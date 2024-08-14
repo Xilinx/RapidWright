@@ -179,6 +179,47 @@ public class TestRWRoute {
         VivadoToolsHelper.assertFullyRouted(design);
     }
 
+    @ParameterizedTest
+    @CsvSource({
+            "bnn.dcp,false,false",
+            "bnn.dcp,false,true",
+            "bnn.dcp,true,false",
+            "optical-flow.dcp,false,false",
+            "optical-flow.dcp,true,true"
+    })
+    @LargeTest(max_memory_gb = 8)
+    public void testFullRoutingWithCUFR(String path, boolean timingDriven, boolean enlargeBoundingBox) {
+        Design design = RapidWrightDCP.loadDCP(path);
+        CUFR.routeDesignWithUserDefinedArguments(design, new String[]{
+                timingDriven ? "--timingDriven" : "--nonTimingDriven",
+                enlargeBoundingBox ? "--enlargeBoundingBox" : "--fixBoundingBox",
+                "--verbose"
+        });
+        assertAllSourcesRoutedFlagSet(design);
+        assertAllPinsRouted(design);
+        VivadoToolsHelper.assertFullyRouted(design);
+    }
+
+    @Test
+    @LargeTest(max_memory_gb = 8)
+    public void testNonTimingDrivenPartialCUFR() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_partial.dcp");
+        design.setTrackNetChanges(true);
+
+        boolean softPreserve = false;
+        PartialCUFR.routeDesignWithUserDefinedArguments(design, new String[]{
+                "--fixBoundingBox",
+                "--useUTurnNodes",
+                "--nonTimingDriven",
+        }, null, softPreserve);
+
+        Assertions.assertFalse(design.getModifiedNets().isEmpty());
+        for (Net net : design.getModifiedNets()) {
+            assertAllPinsRouted(net);
+        }
+        VivadoToolsHelper.assertFullyRouted(design);
+    }
+
     /**
      * Tests the timing driven full routing, i.e., RWRoute running in timing-driven mode.
      * The bnn design from Rosetta benchmarks is used.
