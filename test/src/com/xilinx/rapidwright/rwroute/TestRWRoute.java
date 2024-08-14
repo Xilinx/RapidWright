@@ -165,6 +165,20 @@ public class TestRWRoute {
         VivadoToolsHelper.assertFullyRouted(design);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "bnn.dcp",          // does not activate HUS
+            "optical-flow.dcp"  // activates HUS
+    })
+    @LargeTest(max_memory_gb = 8)
+    public void testNonTimingDrivenFullRoutingWithHUS(String path) {
+        Design design = RapidWrightDCP.loadDCP(path);
+        RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--hus"});
+        assertAllSourcesRoutedFlagSet(design);
+        assertAllPinsRouted(design);
+        VivadoToolsHelper.assertFullyRouted(design);
+    }
+
     /**
      * Tests the timing driven full routing, i.e., RWRoute running in timing-driven mode.
      * The bnn design from Rosetta benchmarks is used.

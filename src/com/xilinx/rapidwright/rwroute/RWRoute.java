@@ -39,7 +39,6 @@ import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -121,6 +120,11 @@ public class RWRoute{
     protected boolean lutPinSwapping;
     /** Flag for whether LUT routethrus are to be considered */
     protected boolean lutRoutethru;
+
+    /** Flag for use of Hybrid Updating Strategy (HUS) */
+    private boolean hus;
+    /** Flag (computed at end of iteration 1) to indicate design is congested enough to consider HUS */
+    private boolean husInitialCongested;
 
     /** The current routing iteration */
     protected int routeIteration;
@@ -251,6 +255,9 @@ public class RWRoute{
         nodesPushed = 0;
         nodesPopped = 0;
         overUsedRnodes = new HashSet<>();
+
+        hus = config.isHus();
+        husInitialCongested = false;
 
         routerTimer.getRuntimeTracker("Initialization").stop();
     }
@@ -857,6 +864,7 @@ public class RWRoute{
         long lastIterationRnodeCount = 0;
         long lastIterationRnodeTime = 0;
 
+        boolean initialHus = this.hus;
         while (routeIteration < config.getMaxIterations()) {
             long startIteration = System.nanoTime();
             connectionsRoutedIteration = 0;
@@ -902,6 +910,11 @@ public class RWRoute{
                         System.err.println("ERROR: Unroutable connections: " + unroutableConnections.size());
                     }
                 }
+            }
+
+            if (initialHus && !hus) {
+                System.out.println("INFO: Hybrid Updating Strategy (HUS) activated");
+                initialHus = false;
             }
 
             routeIteration++;
@@ -1240,9 +1253,15 @@ public class RWRoute{
      */
     private void updateCostFactors() {
         updateCongestionCosts.start();
+
+        checkHus();
+
+        // Inflate the present congestion factor
         presentCongestionFactor *= config.getPresentCongestionMultiplier();
         presentCongestionFactor = Math.min(presentCongestionFactor, config.getMaxPresentCongestionFactor());
+
         updateCost();
+
         updateCongestionCosts.stop();
     }
 
@@ -1262,6 +1281,47 @@ public class RWRoute{
             } else {
                 assert(overuse < 0);
                 assert(rnode.getPresentCongestionCost() == 1);
+            }
+        }
+    }
+
+    /**
+     * Check whether to activate Hybrid Updating Strategy (HUS)
+     */
+    private void checkHus() {
+        if (!hus) {
+            return;
+        }
+
+        if (routeIteration == 1) {
+            // Count the number of overused nodes
+            long overUseCnt = 0;
+            for (RouteNode rnode : routingGraph.getRnodes()) {
+                if (rnode.isOverUsed()) {
+                    overUseCnt++;
+                }
+            }
+            husInitialCongested = (float) overUseCnt / sortedIndirectConnections.size() > config.getHusInitialCongestedThreshold();
+        }
+
+        if (husInitialCongested) {
+            float congestedConnRatio = (float) connectionsRoutedIteration / sortedIndirectConnections.size();
+            if (congestedConnRatio < config.getHusActivateThreshold()) {
+                // Activate HUS: slow down the present cost growth and increase historical cost growth instead
+                float husAlpha = config.getHusAlpha();
+                if (husAlpha >= config.getPresentCongestionMultiplier()) {
+                    System.out.println("WARNING: HUS alpha is not less than the current present congestion multiplier.");
+                }
+                config.setPresentCongestionMultiplier(husAlpha);
+
+                float husBeta = config.getHusBeta();
+                if (husBeta <= historicalCongestionFactor) {
+                    System.out.println("WARNING: HUS beta is not greater than the current historical congestion factor.");
+                }
+                historicalCongestionFactor = husBeta;
+
+                // Disable HUS from being activated again
+                hus = false;
             }
         }
     }
