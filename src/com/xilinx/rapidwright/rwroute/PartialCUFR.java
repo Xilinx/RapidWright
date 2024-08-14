@@ -37,6 +37,7 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -47,13 +48,15 @@ public class PartialCUFR extends PartialRouter {
     private CUFRpartitionTree partitionTree;
     /** Timer to store partitioning runtime */
     private RuntimeTracker partitionTimer;
-    /** A unique ConnectionState instance to be reused by each thread (shadows RWRoute.connectionState) */
-    private final ThreadLocal<ConnectionState> connectionState;
+    /** A unique ConnectionState instance to be reused by each thread (shadows RWRoute.connectionState)
+     *  (do not use ThreadLocal as the only way to have its values garbage collected is through calling
+     *  ThreadLocal.remove() from the owning thread; this cannot be done elegantly when routing has finished) */
+    private final Map<Thread,ConnectionState> connectionState;
     private boolean needsRepartitioning;
 
     public PartialCUFR(Design design, RWRouteConfig config, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         super(design, config, pinsToRoute, softPreserve);
-        connectionState = ThreadLocal.withInitial(ConnectionState::new);
+        connectionState = new ConcurrentHashMap<>();
         needsRepartitioning = true;
     }
 
@@ -90,7 +93,7 @@ public class PartialCUFR extends PartialRouter {
 
     @Override
     protected ConnectionState getConnectionState() {
-        return connectionState.get();
+        return connectionState.computeIfAbsent(Thread.currentThread(), (k) -> new ConnectionState());
     }
 
     @Override

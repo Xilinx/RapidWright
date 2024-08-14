@@ -34,6 +34,7 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -69,12 +70,14 @@ public class CUFR extends RWRoute {
     private CUFRpartitionTree partitionTree;
     /** Timer to store partitioning runtime */
     private RuntimeTracker partitionTimer;
-    /** A unique ConnectionState instance to be reused by each thread (shadows RWRoute.connectionState) */
-    private final ThreadLocal<ConnectionState> connectionState;
+    /** A unique ConnectionState instance to be reused by each thread (shadows RWRoute.connectionState)
+     *  (do not use ThreadLocal as the only way to have its values garbage collected is through calling
+     *  ThreadLocal.remove() from the owning thread; this cannot be done elegantly when routing has finished) */
+    private final Map<Thread,ConnectionState> connectionState;
 
     public CUFR(Design design, RWRouteConfig config) {
         super(design, config);
-        connectionState = ThreadLocal.withInitial(ConnectionState::new);
+        connectionState = new ConcurrentHashMap<>();
     }
 
     public static class RouteNodeGraphCUFR extends RouteNodeGraph {
@@ -110,7 +113,7 @@ public class CUFR extends RWRoute {
 
     @Override
     protected ConnectionState getConnectionState() {
-        return connectionState.get();
+        return connectionState.computeIfAbsent(Thread.currentThread(), (k) -> new ConnectionState());
     }
 
     @Override
