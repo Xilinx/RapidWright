@@ -1561,11 +1561,17 @@ public class RWRoute {
      * Class encapsulating all state necessary to route the included connection
      */
     protected static class ConnectionState {
+        /** Priority queue of all candidate nodes to be considered for routing this connection */
         protected final PriorityQueue<RouteNode> queue;
+        /** The list of nodes marked as a target for this connection */
         protected final List<RouteNode> targets;
 
+        /** Connection to be routed */
         protected Connection connection;
+        /** Unique sequence count for this routing attempt for this connection */
         protected int sequence;
+
+        /** Pre-computed weights specific to this connection for one routing iteration */
         protected float rnodeCostWeight;
         protected float shareWeight;
         protected float rnodeWLWeight;
