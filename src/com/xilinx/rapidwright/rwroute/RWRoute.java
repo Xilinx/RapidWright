@@ -121,6 +121,11 @@ public class RWRoute {
     /** Flag for whether LUT pin swaps are to be considered */
     private boolean lutPinSwapping;
 
+    /** Flag for use of Hybrid Updating Strategy (HUS) */
+    private boolean hus;
+    /** Flag (computed at end of iteration 1) to indicate design is congested enough to consider HUS */
+    private boolean husInitialCongested;
+
     /** The current routing iteration */
     protected int routeIteration;
     /** Timers to store runtime of different phases */
@@ -253,6 +258,9 @@ public class RWRoute {
         nodesPushed.set(0);
         nodesPopped.set(0);
         overUsedRnodes = new HashSet<>();
+
+        hus = config.isHus();
+        husInitialCongested = false;
 
         routerTimer.getRuntimeTracker("Initialization").stop();
     }
@@ -660,6 +668,10 @@ public class RWRoute {
                 }
                 if (sourceINTRnode == null && sourceINTNode != null) {
                     sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
+                    // Where only a single primary source exists, always preserve 
+                    // its projected-to-INT source node, since it could
+                    // be a projection from LAGUNA/RXQ* -> RXD* (node for INT/LOGIC_OUTS_*)
+                    routingGraph.preserve(sourceINTNode, net);
                 }
                 if (altSourceINTRnode == null && altSourceINTNode != null) {
                     altSourceINTRnode = getOrCreateRouteNode(altSourceINTNode, RouteNodeType.PINFEED_O);
@@ -872,6 +884,7 @@ public class RWRoute {
         long lastIterationRnodeCount = 0;
         long lastIterationRnodeTime = 0;
 
+        boolean initialHus = this.hus;
         while (routeIteration < config.getMaxIterations()) {
             long start = RuntimeTracker.now();
             connectionsRoutedThisIteration.set(0);
@@ -913,6 +926,11 @@ public class RWRoute {
                         System.err.println("ERROR: Unroutable connections: " + unroutableConnections.size());
                     }
                 }
+            }
+
+            if (initialHus && !hus) {
+                System.out.println("INFO: Hybrid Updating Strategy (HUS) activated");
+                initialHus = false;
             }
 
             routeIteration++;
@@ -1244,9 +1262,15 @@ public class RWRoute {
      */
     private void updateCostFactors() {
         updateCongestionCosts.start();
+
+        checkHus();
+
+        // Inflate the present congestion factor
         presentCongestionFactor *= config.getPresentCongestionMultiplier();
         presentCongestionFactor = Math.min(presentCongestionFactor, config.getMaxPresentCongestionFactor());
+
         updateCost();
+
         updateCongestionCosts.stop();
     }
 
@@ -1266,6 +1290,47 @@ public class RWRoute {
             } else {
                 assert(overuse < 0);
                 assert(rnode.getPresentCongestionCost() == 1);
+            }
+        }
+    }
+
+    /**
+     * Check whether to activate Hybrid Updating Strategy (HUS)
+     */
+    private void checkHus() {
+        if (!hus) {
+            return;
+        }
+
+        if (routeIteration == 1) {
+            // Count the number of overused nodes
+            long overUseCnt = 0;
+            for (RouteNode rnode : routingGraph.getRnodes()) {
+                if (rnode.isOverUsed()) {
+                    overUseCnt++;
+                }
+            }
+            husInitialCongested = (float) overUseCnt / sortedIndirectConnections.size() > config.getHusInitialCongestedThreshold();
+        }
+
+        if (husInitialCongested) {
+            float congestedConnRatio = (float) connectionsRoutedThisIteration.get() / sortedIndirectConnections.size();
+            if (congestedConnRatio < config.getHusActivateThreshold()) {
+                // Activate HUS: slow down the present cost growth and increase historical cost growth instead
+                float husAlpha = config.getHusAlpha();
+                if (husAlpha >= config.getPresentCongestionMultiplier()) {
+                    System.out.println("WARNING: HUS alpha is not less than the current present congestion multiplier.");
+                }
+                config.setPresentCongestionMultiplier(husAlpha);
+
+                float husBeta = config.getHusBeta();
+                if (husBeta <= historicalCongestionFactor) {
+                    System.out.println("WARNING: HUS beta is not greater than the current historical congestion factor.");
+                }
+                historicalCongestionFactor = husBeta;
+
+                // Disable HUS from being activated again
+                hus = false;
             }
         }
     }
