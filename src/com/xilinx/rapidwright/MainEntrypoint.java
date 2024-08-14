@@ -83,6 +83,8 @@ import com.xilinx.rapidwright.placer.handplacer.HandPlacer;
 import com.xilinx.rapidwright.placer.handplacer.ModuleOptimizer;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.Router;
+import com.xilinx.rapidwright.rwroute.CUFR;
+import com.xilinx.rapidwright.rwroute.PartialCUFR;
 import com.xilinx.rapidwright.rwroute.PartialRouter;
 import com.xilinx.rapidwright.rwroute.RWRoute;
 import com.xilinx.rapidwright.tests.CheckAccuracyUsingGnlDesigns;
@@ -125,6 +127,7 @@ public class MainEntrypoint {
         addFunction("CheckAccuracyUsingGnlDesigns", CheckAccuracyUsingGnlDesigns::main);
         addFunction("CompareRouteStatusReports", CompareRouteStatusReports::main);
         addFunction("CopyMMCMCell", CopyMMCMCell::main);
+        addFunction("CUFR", CUFR::main);
         addFunction("CustomRouting", CustomRouting::main);
         addFunction("DcpToInterchange", DcpToInterchange::main);
         addFunction("DecomposeLUT", DecomposeLUT::main);
@@ -160,6 +163,7 @@ public class MainEntrypoint {
         addFunction("MultGenerator", MultGenerator::main);
         addFunction("PartPrinter", PartPrinter::main);
         addFunction("PartTileBrowser", PartTileBrowser::main);
+        addFunction("PartialCUFR", PartialCUFR::main);
         addFunction("PartialRouter", PartialRouter::main);
         addFunction("PBlockGenDebugger", PBlockGenDebugger::main);
         addFunction("PBlockGenerator", PBlockGenerator::main);

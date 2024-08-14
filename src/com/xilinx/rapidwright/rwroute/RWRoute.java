@@ -111,13 +111,13 @@ public class RWRoute {
     /** The historical congestion cost factor */
     private float historicalCongestionFactor;
     /** Wirelength-driven weighting factor */
-    private float wlWeight;
+    protected float wlWeight;
     /** 1 - wlWeight */
-    private float oneMinusWlWeight;
+    protected float oneMinusWlWeight;
     /** Timing-driven weighting factor */
-    private float timingWeight;
+    protected float timingWeight;
     /** 1 - timingWeight */
-    private float oneMinusTimingWeight;
+    protected float oneMinusTimingWeight;
     /** Flag for whether LUT pin swaps are to be considered */
     private boolean lutPinSwapping;
 
@@ -747,7 +747,7 @@ public class RWRoute {
     /**
      * Initializes routing.
      */
-    private void initializeRouting() {
+    protected void initializeRouting() {
         routingGraph.initialize();
         routeIteration = 1;
         historicalCongestionFactor = config.getHistoricalCongestionFactor();
@@ -1994,7 +1994,7 @@ public class RWRoute {
      * @param sharingFactor The sharing factor.
      * @return The sum of the congestion cost and the bias cost of rnode.
      */
-    private float getNodeCost(RouteNode rnode, Connection connection, int countSameSourceUsers, float sharingFactor) {
+    protected float getNodeCost(RouteNode rnode, Connection connection, int countSameSourceUsers, float sharingFactor) {
         boolean hasSameSourceUsers = countSameSourceUsers!= 0;
         float presentCongestionCost;
 
