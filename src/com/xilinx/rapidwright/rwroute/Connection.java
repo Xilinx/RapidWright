@@ -435,23 +435,14 @@ public class Connection implements Comparable<Connection>{
     }
 
     @Override
-    public int compareTo(Connection arg0) {
-        if (this == arg0)
-            return 0;
-        if (netWrapper.getConnections().size() > arg0.getNetWrapper().getConnections().size()) {
-            return 1;
-        } else if (netWrapper.getConnections().size() == arg0.getNetWrapper().getConnections().size()) {
-            if (this.getHpwl() > arg0.getHpwl()) {
-                return 1;
-            } else if (getHpwl() == arg0.getHpwl()) {
-                if (hashCode() > arg0.hashCode()) {
-                    return -1;
-                }
-            }
-        } else {
-            return -1;
+    public int compareTo(Connection that) {
+        // 1st priority: descending net fanout
+        int comp = Integer.compare(that.getNetWrapper().getConnections().size(), this.getNetWrapper().getConnections().size());
+        if (comp != 0) {
+            return comp;
         }
-        return -1;
+        // 2nd priority: ascending HPWL
+        return Short.compare(this.getHpwl(), that.getHpwl());
     }
 
     public String bbRectangleString() {
@@ -481,7 +472,7 @@ public class Connection implements Comparable<Connection>{
         return s.toString();
     }
 
-    public void setAllTargets(boolean target) {
+    public void setAllTargets(RWRoute.ConnectionState state) {
         if (sinkRnode.countConnectionsOfUser(netWrapper) == 0 ||
             sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE) {
             // Since this connection will have been ripped up, only mark a node
@@ -489,7 +480,7 @@ public class Connection implements Comparable<Connection>{
             // This prevents -- for the case where the same net needs to be routed
             // to the same LUT more than once -- the illegal case of the same
             // physical pin servicing more than one logical pin
-            sinkRnode.setTarget(target);
+            sinkRnode.markTarget(state);
         } else {
             assert(altSinkRnodes != null && !altSinkRnodes.isEmpty());
         }
@@ -502,7 +493,7 @@ public class Connection implements Comparable<Connection>{
                     // Except if it is not a PINFEED_I
                     rnode.getType() != RouteNodeType.PINFEED_I) {
                     assert(rnode.getIntentCode() != IntentCode.NODE_PINBOUNCE);
-                    rnode.setTarget(target);
+                    rnode.markTarget(state);
                 }
             }
         }

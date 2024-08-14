@@ -63,7 +63,7 @@ public class TimingAndWirelengthReport{
         this.design = design;
         timingManager = new TimingManager(design, null, config, RWRoute.createClkTimingData(config), design.getNets(), isPartialRouting);
         estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
-        routingGraph = new RouteNodeGraphTimingDriven(null, design, config, estimator);
+        routingGraph = new RouteNodeGraphTimingDriven(design, config, estimator);
         wirelength = 0;
         usedNodes = 0;
         nodeTypeUsage = new HashMap<>();
