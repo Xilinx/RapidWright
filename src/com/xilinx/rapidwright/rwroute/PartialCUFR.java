@@ -25,6 +25,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -35,19 +36,25 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Class that extends {@link PartialRouter} with {@link CUFR}'s parallel capabilities.
+ */
 public class PartialCUFR extends PartialRouter {
-    /* A recursive partitioning ternary tree*/
+    /* A recursive partitioning ternary tree */
     private CUFRpartitionTree partitionTree;
-
+    /** Timer to store partitioning runtime */
     private RuntimeTracker partitionTimer;
-
+    /** A unique ConnectionState instance to be reused by each thread (shadows RWRoute.connectionState) */
     private final ThreadLocal<ConnectionState> connectionState;
+    private boolean needsRepartitioning;
 
     public PartialCUFR(Design design, RWRouteConfig config, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         super(design, config, pinsToRoute, softPreserve);
         connectionState = ThreadLocal.withInitial(ConnectionState::new);
+        needsRepartitioning = true;
     }
 
     public static class RouteNodeGraphPartialCUFR extends RouteNodeGraphPartial {
@@ -116,15 +123,20 @@ public class PartialCUFR extends PartialRouter {
     @Override
     protected void routeIndirectConnections(Collection<Connection> connections) {
         boolean firstIteration = (routeIteration == 1);
-        if (firstIteration || config.isEnlargeBoundingBox()) {
+        if (firstIteration || config.isEnlargeBoundingBox() || needsRepartitioning) {
             partitionTimer.start();
             partitionTree = new CUFRpartitionTree(sortedIndirectConnections, design.getDevice().getColumns(), design.getDevice().getRows());
             partitionTimer.stop();
+            needsRepartitioning = false;
         }
 
-        sortedIndirectConnections.clear();
         routePartitionTree(partitionTree.root);
-        super.routeIndirectConnections(sortedIndirectConnections);
+    }
+
+    @Override
+    protected void unpreserveNet(Net net) {
+        super.unpreserveNet(net);
+        needsRepartitioning = true;
     }
 
     @Override
@@ -133,6 +145,23 @@ public class PartialCUFR extends PartialRouter {
         RuntimeTracker routeConnectionsTimer = routerTimer.getRuntimeTracker("route connections");
         routeConnectionsTimer.setTime(routeConnectionsTimer.getTime() - partitionTimer.getTime());
         super.printRoutingStatistics();
+    }
+
+    /**
+     * Partially routes a {@link Design} instance; specifically, all nets with no routing PIPs already present.
+     * @param design The {@link Design} instance to be routed.
+     * @param args An array of string arguments, can be null.
+     * If null, the design will be routed in the full timing-driven routing mode with default a {@link RWRouteConfig} instance.
+     * For more options of the configuration, please refer to the {@link RWRouteConfig} class.
+     * @return Routed design.
+     */
+    public static Design routeDesignWithUserDefinedArguments(Design design, String[] args) {
+        boolean softPreserve = false;
+        List<SitePinInst> pinsToRoute = null;
+
+        // Instantiates a RWRouteConfig Object and parses the arguments.
+        // Uses the default configuration if basic usage only.
+        return routeDesignWithUserDefinedArguments(design, args, pinsToRoute, softPreserve);
     }
 
     /**
@@ -165,7 +194,7 @@ public class PartialCUFR extends PartialRouter {
     }
 
     /**
-     * The main interface of {@link CUFR} that reads in a {@link Design} design
+     * The main interface of {@link PartialCUFR} that reads in a {@link Design} design
      * (DCP or FPGA Interchange), and parses the arguments for the
      * {@link RWRouteConfig} object of the router.
      *

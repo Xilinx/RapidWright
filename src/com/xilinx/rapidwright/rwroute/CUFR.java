@@ -65,11 +65,11 @@ import java.util.concurrent.ConcurrentHashMap;
  *      (this strategy has been integrated into RWRoute)
  */
 public class CUFR extends RWRoute {
-    /* A recursive partitioning ternary tree*/
+    /* A recursive partitioning ternary tree */
     private CUFRpartitionTree partitionTree;
-
+    /** Timer to store partitioning runtime */
     private RuntimeTracker partitionTimer;
-
+    /** A unique ConnectionState instance to be reused by each thread (shadows RWRoute.connectionState) */
     private final ThreadLocal<ConnectionState> connectionState;
 
     public CUFR(Design design, RWRouteConfig config) {
