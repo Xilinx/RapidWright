@@ -1570,10 +1570,12 @@ public class RWRoute {
             }
         }
 
-        for (RouteNode target : state.targets) {
-            assert(target.isTarget());
+        // Reset the nodes marked as this connection's target(s)
+        List<RouteNode> targets = state.targets;
+        for (RouteNode target : targets) {
             target.clearTarget();
         }
+        targets.clear();
     }
 
     /**
