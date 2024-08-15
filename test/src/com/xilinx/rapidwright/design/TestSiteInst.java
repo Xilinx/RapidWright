@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -164,6 +164,32 @@ public class TestSiteInst {
 
             if (d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
         }
+    }
+
+    @Test
+    public void testUnrouteFFRouteThru() {
+        Design d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
+        SiteInst si = d.getSiteInstFromSiteName("SLICE_X58Y84");
+        Cell ffCell = si.getCell("AFF");
+        Assertions.assertTrue(ffCell.isFFRoutethruCell());
+
+        // Check all intra-site routing present
+        Net net = si.getNetFromSiteWire("AQ");
+        Assertions.assertSame(net, si.getNetFromSiteWire("FFMUXA1_OUT1"));
+        Assertions.assertEquals("D5", si.getUsedSitePIP("FFMUXA1").getInputPinName());
+        Assertions.assertSame(net, si.getNetFromSiteWire("A5LUT_O5"));
+
+        // Unroute intra-site net
+        BELPin o5 = si.getBELPin("A5LUT", "O5");
+        BELPin aq = si.getBELPin("AFF", "Q");
+        Assertions.assertTrue(si.unrouteIntraSiteNet(o5, aq));
+
+        // Check all intra-site net (incl. routethru cell) is gone
+        Assertions.assertNull(si.getNetFromSiteWire("AQ"));
+        Assertions.assertNull(si.getNetFromSiteWire("FFMUXA1_OUT1"));
+        Assertions.assertNull(si.getUsedSitePIP("FFMUXA1"));
+        Assertions.assertNull(si.getNetFromSiteWire("A5LUT_O5"));
+        Assertions.assertNull(si.getCell("AFF"));
     }
 
     @Test
