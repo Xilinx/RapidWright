@@ -504,7 +504,7 @@ public class DeviceResourcesVerifier {
         Set<Unisim> unisimsExpected = new HashSet<Unisim>();
         for (EDIFLibrary lib : primsAndMacros.getLibraries()) {
             EDIFLibrary reference = lib.isHDIPrimitivesLibrary() ? Design.getPrimitivesLibrary(design.getDevice().getName()) :
-                                                    Design.getMacroPrimitives(series);
+                                                    new EDIFLibrary(Design.getMacroPrimitives(series));
 
             if (!lib.isHDIPrimitivesLibrary()) {
                 // Remove unused macros from reference
