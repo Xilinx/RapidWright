@@ -22,6 +22,9 @@
 
 package com.xilinx.rapidwright.edif;
 
+/**
+ * Extension of {@link EDIFLibrary} with setNetlist() method disabled.
+ */
 public class EDIFLibraryNoNetlist extends EDIFLibrary {
     public EDIFLibraryNoNetlist(String name) {
         super(name);

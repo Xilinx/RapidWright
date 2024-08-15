@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2018-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -204,16 +204,6 @@ public class PolynomialGenerator {
         sub.setNetlist(subDesign2.getNetlist());
         operators.put("-o", sub2);
 
-        // EDIFLibrary work = d.getNetlist().getWorkLibrary();
-        // EDIFLibrary hdi = d.getNetlist().getHDIPrimitivesLibrary();
-        // for (Design design : new Design[]{multDesign,multDesign2,adderDesign,adderDesign2,subDesign,subDesign2}) {
-        //     for (EDIFCell cell : design.getNetlist().getWorkLibrary().getCells()) {
-        //         work.addCell(cell);
-        //     }
-        //     for (EDIFCell cell : design.getNetlist().getHDIPrimitivesLibrary().getCells()) {
-        //         if (!hdi.containsCell(cell)) hdi.addCell(cell);
-        //     }
-        // }
         return operators;
     }
 
