@@ -59,6 +59,12 @@ public class EDIFLibrary extends EDIFName {
         super(name);
     }
 
+    /**
+     * Shallow copy constructor - Creates a new EDIFLibrary object containing
+     * shallow copies of its contained EDIFCell-s.
+     *
+     * @param copy The original library
+     */
     public EDIFLibrary(EDIFLibrary copy) {
         super(copy.getName());
 

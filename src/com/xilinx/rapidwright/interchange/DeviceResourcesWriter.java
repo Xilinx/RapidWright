@@ -321,6 +321,8 @@ public class DeviceResourcesWriter {
 
         removeUnusedMacros(macros, prims);
 
+        // Perform a deep copy because macro cells (which were shallow copied before)
+        // must now instantiate primitives from our primitives library
         macros = netlist.copyLibraryAndSubCells(macros);
 
         Map<String, Pair<String, EnumSet<IOStandard>>> macroCollapseExceptionMap =
