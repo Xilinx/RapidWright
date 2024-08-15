@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -487,8 +487,12 @@ public class EDIFCell extends EDIFPropertyObject {
      * @param library the library to set
      */
     public void setLibrary(EDIFLibrary library) {
-        assert(library != null);
-        assert(this.library == null || this.library == library);
+        if (library == null) {
+            throw new RuntimeException("ERROR: library argument cannot be null.");
+        }
+        if (this.library != null && this.library != library) {
+            throw new RuntimeException("ERROR: EDIFCell is already attached to a library. Call EDIFLibrary.removeCell() first.");
+        }
 
         this.library = library;
     }

@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -163,10 +163,19 @@ public class EDIFLibrary extends EDIFName {
      * @param netlist the netlist to set
      */
     public void setNetlist(EDIFNetlist netlist) {
-        assert(netlist != null);
+        if (netlist == null) {
+            throw new RuntimeException("ERROR: netlist argument cannot be null.");
+        }
+        if (this.netlist != null && this.netlist != netlist) {
+            throw new RuntimeException("ERROR: EDIFLibrary is already attached to a netlist. Call EDIFNetlist.removeLibrary() first.");
+        }
         assert(this.netlist == null || this.netlist == netlist);
 
         this.netlist = netlist;
+    }
+
+    protected void clearNetlist() {
+        this.netlist = null;
     }
 
     /**

@@ -322,7 +322,11 @@ public class EDIFNetlist extends EDIFName {
     }
 
     public EDIFLibrary removeLibrary(String name) {
-        return libraries.remove(name);
+        EDIFLibrary library = libraries.remove(name);
+        if (library != null) {
+            library.clearNetlist();
+        }
+        return library;
     }
 
     public void renameNetlistAndTopCell(String newName) {
