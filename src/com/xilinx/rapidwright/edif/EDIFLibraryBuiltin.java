@@ -23,15 +23,20 @@
 package com.xilinx.rapidwright.edif;
 
 /**
- * Extension of {@link EDIFLibrary} with setNetlist() method disabled.
+ * Extension of {@link EDIFLibrary} with setNetlist() and removeCell() methods disabled.
  */
-public class EDIFLibraryNoNetlist extends EDIFLibrary {
-    public EDIFLibraryNoNetlist(String name) {
+public class EDIFLibraryBuiltin extends EDIFLibrary {
+    public EDIFLibraryBuiltin(String name) {
         super(name);
     }
 
     @Override
     public void setNetlist(EDIFNetlist netlist) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public EDIFCell removeCell(EDIFCell cell) {
         throw new UnsupportedOperationException();
     }
 }
