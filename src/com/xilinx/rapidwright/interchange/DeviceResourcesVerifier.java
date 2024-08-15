@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -504,7 +504,7 @@ public class DeviceResourcesVerifier {
         Set<Unisim> unisimsExpected = new HashSet<Unisim>();
         for (EDIFLibrary lib : primsAndMacros.getLibraries()) {
             EDIFLibrary reference = lib.isHDIPrimitivesLibrary() ? Design.getPrimitivesLibrary(design.getDevice().getName()) :
-                                                    Design.getMacroPrimitives(series);
+                                                    new EDIFLibrary(Design.getMacroPrimitives(series));
 
             if (!lib.isHDIPrimitivesLibrary()) {
                 // Remove unused macros from reference
@@ -742,7 +742,7 @@ public class DeviceResourcesVerifier {
 
         List<Map.Entry<SiteTypeEnum, String>> entries = new ArrayList<>();
 
-        Map<SiteTypeEnum,Set<String>> sites = physCell.getCompatiblePlacements();
+        Map<SiteTypeEnum,Set<String>> sites = physCell.getCompatiblePlacements(design.getDevice());
         Set<SiteTypeEnum> siteTypes = new HashSet<SiteTypeEnum>();
         siteTypes.addAll(sites.keySet());
         siteTypes.retainAll(siteMap.keySet());
