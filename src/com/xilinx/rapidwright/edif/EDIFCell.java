@@ -82,6 +82,16 @@ public class EDIFCell extends EDIFPropertyObject {
      * Shallow Copy constructor - Creates a new EDIFCell object, EDIFCell
      * contents point to orig.
      *
+     * @param orig The original cell
+     */
+    public EDIFCell(EDIFCell orig) {
+        this(null, orig);
+    }
+
+    /**
+     * Shallow Copy constructor - Creates a new EDIFCell object, EDIFCell
+     * contents point to orig.
+     *
      * @param lib  Destination library of the copied cell.
      * @param orig The original cell
      */
@@ -477,7 +487,14 @@ public class EDIFCell extends EDIFPropertyObject {
      * @param library the library to set
      */
     public void setLibrary(EDIFLibrary library) {
+        assert(library != null);
+        assert(this.library == null || this.library == library);
+
         this.library = library;
+    }
+
+    protected void clearLibrary() {
+        this.library = null;
     }
 
     public boolean hasContents() {

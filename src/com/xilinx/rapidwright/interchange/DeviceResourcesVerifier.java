@@ -742,7 +742,7 @@ public class DeviceResourcesVerifier {
 
         List<Map.Entry<SiteTypeEnum, String>> entries = new ArrayList<>();
 
-        Map<SiteTypeEnum,Set<String>> sites = physCell.getCompatiblePlacements();
+        Map<SiteTypeEnum,Set<String>> sites = physCell.getCompatiblePlacements(design.getDevice());
         Set<SiteTypeEnum> siteTypes = new HashSet<SiteTypeEnum>();
         siteTypes.addAll(sites.keySet());
         siteTypes.retainAll(siteMap.keySet());

@@ -41,7 +41,7 @@ public class TestUnisimPlacements {
             Design des = new Design("top", part.getName());
             EDIFCell cell = Design.getPrimitivesLibrary(des.getDevice().getName()).getCell("FDRE");
             Cell c = des.createCell("inst", cell);
-            Assertions.assertTrue(c.getCompatiblePlacements().size() > 1);
+            Assertions.assertTrue(c.getCompatiblePlacements(des.getDevice()).size() > 1);
             break;
         }
     }

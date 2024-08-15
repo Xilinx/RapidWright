@@ -303,7 +303,7 @@ public class DeviceResourcesWriter {
         t.stop().start("Prims&Macros");
         // Create an EDIFNetlist populated with just primitive and macro libraries
         EDIFLibrary prims = Design.getPrimitivesLibrary(device.getName());
-        EDIFLibrary macros = Design.getMacroPrimitives(series);
+        EDIFLibrary macros = new EDIFLibrary(Design.getMacroPrimitives(series));
         EDIFNetlist netlist = new EDIFNetlist("PrimitiveLibs");
         netlist.addLibrary(prims);
         netlist.addLibrary(macros);
@@ -320,6 +320,19 @@ public class DeviceResourcesWriter {
         }
 
         removeUnusedMacros(macros, prims);
+
+        // Make all instances within macro cells point to 'prims' or 'macros'
+        for (EDIFCell cell : macros.getCells()) {
+            for (EDIFCellInst inst : cell.getCellInsts()) {
+                String typeName = inst.getCellName();
+                EDIFCell type = prims.getCell(typeName);
+                if (type == null) {
+                    type = macros.getCell(typeName);
+                }
+                assert(type != null);
+                inst.setCellType(type);
+            }
+        }
 
         Map<String, Pair<String, EnumSet<IOStandard>>> macroCollapseExceptionMap =
                 EDIFNetlist.macroCollapseExceptionMap.getOrDefault(series, Collections.emptyMap());
