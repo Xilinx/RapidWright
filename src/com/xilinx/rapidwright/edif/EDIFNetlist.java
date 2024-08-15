@@ -623,6 +623,18 @@ public class EDIFNetlist extends EDIFName {
         copyCellAndSubCellsWorker(cell, copiedCells);
     }
 
+    /**
+     * This copies the library and all of its cells into this netlist.
+     * @param library The library (and all its cells) to copy into this netlist's libraries
+     */
+    public EDIFLibrary copyLibraryAndSubCells(EDIFLibrary library) {
+        Set<EDIFCell> copiedCells = new HashSet<>();
+        for (EDIFCell cell : library.getCells()) {
+            copyCellAndSubCellsWorker(cell, copiedCells);
+        }
+        return getLibrary(library.getName());
+    }
+
     private EDIFCell copyCellAndSubCellsWorker(EDIFCell cell, Set<EDIFCell> copiedCells) {
         EDIFLibrary destLib = getLibrary(cell.getLibrary().getName());
         if (destLib == null) {
