@@ -492,7 +492,6 @@ public class EDIFNetlist extends EDIFName {
         for (EDIFCell c : toRemove) {
             oldWork.removeCell(c);
             work.addCell(c);
-
         }
         removeLibrary(library);
     }

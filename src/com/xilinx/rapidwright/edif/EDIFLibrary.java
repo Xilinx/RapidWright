@@ -169,7 +169,6 @@ public class EDIFLibrary extends EDIFName {
         if (this.netlist != null && this.netlist != netlist) {
             throw new RuntimeException("ERROR: EDIFLibrary is already attached to a netlist. Call EDIFNetlist.removeLibrary() first.");
         }
-        assert(this.netlist == null || this.netlist == netlist);
 
         this.netlist = netlist;
     }
