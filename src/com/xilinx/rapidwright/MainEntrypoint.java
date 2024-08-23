@@ -73,6 +73,7 @@ import com.xilinx.rapidwright.interchange.EnumerateCellBelMapping;
 import com.xilinx.rapidwright.interchange.GenerateInterchangeDevices;
 import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.interchange.LogicalNetlistExample;
+import com.xilinx.rapidwright.interchange.LogicalNetlistToEdif;
 import com.xilinx.rapidwright.interchange.PhysicalNetlistExample;
 import com.xilinx.rapidwright.interchange.PhysicalNetlistToDcp;
 import com.xilinx.rapidwright.ipi.BlockCreator;
@@ -152,6 +153,7 @@ public class MainEntrypoint {
         addFunction("JobQueue", JobQueue::main);
         addFunction("Lesson1", Lesson1::main);
         addFunction("LogicalNetlistExample", LogicalNetlistExample::main);
+        addFunction("LogicalNetlistToEdif", LogicalNetlistToEdif::main);
         addFunction("LUTTools", LUTTools::main);
         addFunction("MakeBlackBox", MakeBlackBox::main);
         addFunction("MergeDesigns", MergeDesigns::main);
