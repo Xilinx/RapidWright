@@ -3306,11 +3306,12 @@ public class DesignTools {
         if (sitePin == null) {
             sitePin = vcc.createPin(sitePinName, si);
         }
-        // For the RST inversion to be interpreted properly by Vivado, there must be no
-        // site routing
-        // on the path.
-        BELPin belPin = sitePin.getBELPin();
-        si.unrouteIntraSiteNet(belPin, belPin);
+        if (gndInvertibleToVcc != null) {
+            // For the RST inversion to be interpreted properly by Vivado, there must be no
+            // site routing on the path around the inverter BEL
+            BELPin belPin = sitePin.getBELPin();
+            si.unrouteIntraSiteNet(belPin, belPin);
+        }
     }
 
     public static void createMissingStaticSitePins(BELPin belPin, SiteInst si, Cell cell) {
