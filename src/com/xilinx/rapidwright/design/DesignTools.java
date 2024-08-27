@@ -3305,12 +3305,10 @@ public class DesignTools {
         if (si.getSitePinInst(sitePinName) == null) {
             SitePinInst sitePin = vcc.createPin(sitePinName, si);
             if (gndInvertibleToVcc != null && sitePinName.contains("RST")) {
-                assert sitePin.getSiteWireBELPins().size() == 2;
-                for (BELPin pin : sitePin.getSiteWireBELPins()) {
-                    if (pin.isSitePort()) continue;
-                    assert pin.getBEL().getPins().length == 2;
-                    si.routeIntraSiteNet(gndInvertibleToVcc, pin, pin);
-                }
+                assert sitePin.getSiteWireBELPins().size() == 1;
+                BELPin pin = sitePin.getSiteWireBELPins().get(0);
+                assert pin.getBEL().getPins().length == 2;
+                si.routeIntraSiteNet(gndInvertibleToVcc, pin, pin);
             }            
         }
     }
