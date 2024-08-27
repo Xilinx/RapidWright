@@ -3302,15 +3302,15 @@ public class DesignTools {
     }
     
     private static void maybeCreateVccPinAndPossibleInversion(SiteInst si, String sitePinName, Net vcc, Net gndInvertibleToVcc) {
-        if (si.getSitePinInst(sitePinName) == null) {
-            SitePinInst sitePin = vcc.createPin(sitePinName, si);
-            if (gndInvertibleToVcc != null && sitePinName.contains("RST")) {
-                assert sitePin.getSiteWireBELPins().size() == 1;
-                BELPin pin = sitePin.getSiteWireBELPins().get(0);
-                assert pin.getBEL().getPins().length == 2;
-                si.routeIntraSiteNet(gndInvertibleToVcc, pin, pin);
-            }            
+        SitePinInst sitePin = si.getSitePinInst(sitePinName);
+        if (sitePin == null) {
+            sitePin = vcc.createPin(sitePinName, si);
         }
+        // For the RST inversion to be interpreted properly by Vivado, there must be no
+        // site routing
+        // on the path.
+        BELPin belPin = sitePin.getBELPin();
+        si.unrouteIntraSiteNet(belPin, belPin);
     }
 
     public static void createMissingStaticSitePins(BELPin belPin, SiteInst si, Cell cell) {
