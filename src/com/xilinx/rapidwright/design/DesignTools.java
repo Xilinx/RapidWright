@@ -4192,4 +4192,29 @@ public class DesignTools {
             updatePinsIsRouted(net);
         }
     }
+
+    /**
+     * Removes all the existing encrypted cell files from a design and replaces them
+     * with the provided list and black boxes those cells. The provided files
+     * should be named after the cell type. This is useful in the scenarios where a
+     * design has many thousand of individual encrypted cell files that are time
+     * consuming to load. By providing a higher level of hierarchy cell definition,
+     * encompassing all existing encrypted cells, the number of individual 
+     * files to be loaded by Vivado can be reduced.
+     * 
+     * @param design   The design to modify.
+     * @param netlists The list of encrypted cell files (*.edn, *.edf, or *.dcp)
+     *                 that should be used instead.
+     */
+    public static void replaceEncryptedCells(Design design, List<Path> netlists) {
+        EDIFNetlist n = design.getNetlist();
+        for (Path p : netlists) {
+            String fileName = p.getFileName().toString();
+            String cellType = fileName.substring(0, fileName.lastIndexOf('.'));
+            EDIFCell cell = n.getCell(cellType);
+            cell.makePrimitive();
+        }
+        n.removeUnusedCellsFromAllWorkLibraries();
+        n.setEncryptedCells(netlists.stream().map(Object::toString).collect(Collectors.toList()));
+    }
 }
