@@ -3263,9 +3263,7 @@ public class DesignTools {
                         } else { //SRST
                             sitePinName = sitePinNames.getSecond();
                         }
-                        if (si.getSitePinInst(sitePinName) == null) {
-                            vcc.createPin(sitePinName, si);
-                        }
+                        maybeCreateVccPinAndPossibleInversion(si, sitePinName, vcc, gndInvertibleToVcc);
                     }
                 }
             } else if (cell.getType().equals("RAMB36E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
@@ -3275,9 +3273,7 @@ public class DesignTools {
                 Net net = si.getNetFromSiteWire(siteWire);
                 if (net == null) {
                     for (String pinName : Arrays.asList("RSTREGBU", "RSTREGBL")) {
-                        if (si.getSitePinInst(pinName) == null) {
-                            vcc.createPin(pinName, si);
-                        }
+                        maybeCreateVccPinAndPossibleInversion(si, pinName, vcc, gndInvertibleToVcc);
                     }
                 }
             } else if (cell.getType().equals("RAMB18E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
@@ -3299,11 +3295,22 @@ public class DesignTools {
                     } else {
                         pinName = "RSTREGBU";
                     }
-                    if (si.getSitePinInst(pinName) == null) {
-                        vcc.createPin(pinName, si);
-                    }
+                    maybeCreateVccPinAndPossibleInversion(si, pinName, vcc, gndInvertibleToVcc);
                 }
             }
+        }
+    }
+    
+    private static void maybeCreateVccPinAndPossibleInversion(SiteInst si, String sitePinName, Net vcc, Net gndInvertibleToVcc) {
+        SitePinInst sitePin = si.getSitePinInst(sitePinName);
+        if (sitePin == null) {
+            sitePin = vcc.createPin(sitePinName, si);
+        }
+        if (gndInvertibleToVcc != null) {
+            // For the RST inversion to be interpreted properly by Vivado, there must be no
+            // site routing on the path around the inverter BEL
+            BELPin belPin = sitePin.getBELPin();
+            si.unrouteIntraSiteNet(belPin, belPin);
         }
     }
 
