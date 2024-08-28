@@ -31,9 +31,9 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.rwroute.RWRouteConfig;
 import com.xilinx.rapidwright.rwroute.Connection;
 import com.xilinx.rapidwright.rwroute.NetWrapper;
+import com.xilinx.rapidwright.rwroute.RWRouteConfig;
 import com.xilinx.rapidwright.rwroute.RouteNode;
 import com.xilinx.rapidwright.rwroute.RouteNodeGraph;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
@@ -299,6 +299,9 @@ public class TimingManager {
         for (ConstraintGroup group : constraintGroups) {
             List<String> constraints = design.getXDCConstraints(group);
             for (String constraint : constraints) {
+                if (constraint.contains("#")) {
+                    constraint = constraint.substring(0, constraint.indexOf('#'));
+                }
                 if (constraint.contains("-period")) {
                     int startIndex = constraint.indexOf("-period");
                     treq = Math.max(treq, Float.parseFloat(constraint.substring(startIndex+7, startIndex+13)));
