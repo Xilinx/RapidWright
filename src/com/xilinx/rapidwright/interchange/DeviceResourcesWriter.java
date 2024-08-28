@@ -694,7 +694,7 @@ public class DeviceResourcesWriter {
 
         Map<TileTypeEnum, Integer> tileTypeIndicies = new HashMap<TileTypeEnum, Integer>();
 
-        // Order tile types by their TILE_TYPE_IDX
+        // Order tile types by their TILE_TYPE_IDX (may not be contiguous)
         Map<Integer, TileTypeEnum> tileTypeIndexMap = new TreeMap<>();
         for (Entry<TileTypeEnum,Tile> e : tileTypes.entrySet()) {
             tileTypeIndexMap.put(e.getValue().getTileTypeIndex(), e.getKey());

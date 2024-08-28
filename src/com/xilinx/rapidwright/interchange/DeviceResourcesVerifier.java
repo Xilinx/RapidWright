@@ -339,6 +339,7 @@ public class DeviceResourcesVerifier {
             expect(tile.getTileTypeEnum().name(), tileTypeName);
             expect(tile.getRow(), tileReader.getRow());
             expect(tile.getColumn(), tileReader.getCol());
+            // Note: Tile.getUniqueAddress() is equivalent to the INDEX property on a Vivado Tile object
             expect(tile.getUniqueAddress(), i);
 
             // Verify Tile Types
