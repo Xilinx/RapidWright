@@ -1030,7 +1030,7 @@ public class RWRoute {
             for (Connection connection : netWrapper.getConnections()) {
                 // Examine getNodes() because connection.getRnodes() is empty for direct connections
                 List<Node> nodes = connection.getNodes();
-                if (nodes.isEmpty()) {
+                if (nodes == null || nodes.isEmpty()) {
                     // Unroutable connection
                     continue;
                 }
@@ -1348,6 +1348,10 @@ public class RWRoute {
         for (Entry<Net,NetWrapper> e : nets.entrySet()) {
             NetWrapper netWrapper = e.getValue();
             for (Connection connection:netWrapper.getConnections()) {
+                if (connection.getNodes() == null) {
+                    continue;
+                }
+                    
                 netNodes.addAll(connection.getNodes());
             }
             for (Node node:netNodes) {

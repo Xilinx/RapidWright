@@ -23,9 +23,21 @@
 
 package com.xilinx.rapidwright.design.tools;
 
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
+
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
+import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -35,15 +47,8 @@ import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * A collection of tools to help relocate designs.
@@ -315,5 +320,124 @@ public class RelocationTools {
             e.getKey().unPlace();
             e.getKey().place(e.getValue());
         }
+    }
+
+    /**
+     * Based on the provided design, calculates all of the valid locations that the
+     * implemented component could be relocated to on the currently targeted device.
+     * 
+     * @param design The design to evaluate for relocation options.
+     * @return A pair, where the first element is the anchor site selected in the
+     *         design and the second element is a sorted map of placement options
+     *         where the keys are ordered by increasing Manhattan distance (in tile
+     *         (X,Y) coordinate values) from the original anchor site and the value
+     *         is the potential relocated anchor site.
+     */
+    public static Pair<Site, Map<Integer, Site>> getValidRelocationOptions(Design design) {
+        ArrayList<Site> validLocs = null;
+        Site anchor = null;
+
+        Module m = new Module(design);
+        anchor = m.getAnchor();
+        validLocs = m.calculateAllValidPlacements(m.getDevice());
+        
+        if (validLocs == null || validLocs.size() < 2) {
+            return null;
+        }
+        Map<Integer, Site> options = new TreeMap<>();
+        for (Site s : validLocs) {
+            int validXOffset = anchor.getTile().getTileXCoordinate() - s.getTile().getTileXCoordinate();
+            int validYOffset = anchor.getTile().getTileYCoordinate() - s.getTile().getTileYCoordinate();
+            if (validXOffset == 0 && validYOffset == 0) {
+                continue;
+            }
+            options.put(Math.abs(validXOffset) + Math.abs(validYOffset), s);
+        }
+
+        return new Pair<Site, Map<Integer, Site>>(anchor, options);
+    }
+
+    /**
+     * Prints out valid relocation options produced by
+     * {@link #getValidRelocationOptions(Design)}.
+     * 
+     * @param options The relocation options.
+     * @param limit   Limit the number of printed options to this value.
+     */
+    public static void printValidRelocationOptions(Pair<Site, Map<Integer, Site>> options, int limit, PrintStream ps) {
+        Site anchor = options.getFirst();
+        Map<Integer, Site> map = options.getSecond();
+        for (Entry<Integer, Site> e : map.entrySet()) {
+            int validXOffset = e.getValue().getTile().getTileXCoordinate() - anchor.getTile().getTileXCoordinate();
+            int validYOffset = e.getValue().getTile().getTileYCoordinate() - anchor.getTile().getTileYCoordinate();
+            ps.printf("  tileXOffset=%4d, tileYOffset=%4d anchorSite=%s/%s, newAnchorSite=%s/%s\n", validXOffset,
+                    validYOffset, anchor.getTile(), anchor, e.getValue().getTile(), e.getValue());
+            if (limit-- == 0) {
+                break;
+            }
+        }
+    }
+
+    /**
+     * Offers a command line accessible way to relocate a design implementation. It
+     * can provide a list of valid relocation options for which full relocation is
+     * possible by providing just a single DCP as an option. Or, it will perform a
+     * best effort relocation (relocating as much as possible and
+     * unplacing/unrouting incompatible cells/routes) when provided a DCP, output
+     * location and set of offsets.
+     * 
+     * @param args Two modes, for listing relocation options args[0]==<input.dcp>;
+     *             for relocation (full or best effort partial)
+     *             args[0]==<input.dcp>, args[1]==<output.dcp>,
+     *             args[2]==<tile_x_offset>, args[3]==<tile_y_offset>.
+     */
+    public static void main(String[] args) {
+        if (args.length != 4 && args.length != 1) {
+            System.out.println("USAGE (query valid relocation options): <input.dcp>");
+            System.out.println("USAGE (design relocation (full or partial): "
+                    + "<input.dcp> <output.dcp> <tile_x_offset> <tile_y_offset>");
+            return;
+        }
+        String inputDCPName = args[0];
+        Design d = Design.readCheckpoint(inputDCPName);
+        if (args.length == 1) {
+            Pair<Site, Map<Integer, Site>> options = getValidRelocationOptions(d);
+            if (options == null || options.getSecond().size() < 2) {
+                System.out.println("No valid relocation options for the provided DCP '" + inputDCPName + "'");
+            } else {
+                System.out.println("Possible Valid Relocation Options:");
+                printValidRelocationOptions(options, Integer.MAX_VALUE, System.out);
+            }
+            return;
+        }
+        String outputDCPName = args[1];
+        int tileXOffset = Integer.parseInt(args[2]);
+        int tileYOffset = Integer.parseInt(args[3]);
+
+        boolean success = relocate(d, "", tileXOffset, tileYOffset);
+
+        if (!success) {
+            Pair<Site, Map<Integer, Site>> options = null;
+            try {
+                options = getValidRelocationOptions(d);
+            } catch (Exception e) {
+                // Failed to identify any valid options, skip to throwing the error below
+            }
+            
+            if (options != null && options.getSecond().size() > 1) {
+                System.err.println("Could not relocate to tileXOffset=" + tileXOffset + ", tileYOffset="
+                        + tileYOffset + ", here are some other valid options:");
+                int numOfValidSuggestions = 6;
+                printValidRelocationOptions(options, numOfValidSuggestions, System.err);
+                System.exit(1);
+            } else {
+                throw new RuntimeException("ERROR: Relocation of DCP '" + inputDCPName
+                        + "' has failed.  It is possible that the tile X and Y offsets "
+                    + "are incompatible with the target device ("
+                    + d.getPartName() + ").");
+            }
+        }
+
+        d.writeCheckpoint(outputDCPName);
     }
 }

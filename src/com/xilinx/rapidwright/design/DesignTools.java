@@ -3263,9 +3263,7 @@ public class DesignTools {
                         } else { //SRST
                             sitePinName = sitePinNames.getSecond();
                         }
-                        if (si.getSitePinInst(sitePinName) == null) {
-                            vcc.createPin(sitePinName, si);
-                        }
+                        maybeCreateVccPinAndPossibleInversion(si, sitePinName, vcc, gndInvertibleToVcc);
                     }
                 }
             } else if (cell.getType().equals("RAMB36E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
@@ -3275,9 +3273,7 @@ public class DesignTools {
                 Net net = si.getNetFromSiteWire(siteWire);
                 if (net == null) {
                     for (String pinName : Arrays.asList("RSTREGBU", "RSTREGBL")) {
-                        if (si.getSitePinInst(pinName) == null) {
-                            vcc.createPin(pinName, si);
-                        }
+                        maybeCreateVccPinAndPossibleInversion(si, pinName, vcc, gndInvertibleToVcc);
                     }
                 }
             } else if (cell.getType().equals("RAMB18E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
@@ -3299,11 +3295,22 @@ public class DesignTools {
                     } else {
                         pinName = "RSTREGBU";
                     }
-                    if (si.getSitePinInst(pinName) == null) {
-                        vcc.createPin(pinName, si);
-                    }
+                    maybeCreateVccPinAndPossibleInversion(si, pinName, vcc, gndInvertibleToVcc);
                 }
             }
+        }
+    }
+    
+    private static void maybeCreateVccPinAndPossibleInversion(SiteInst si, String sitePinName, Net vcc, Net gndInvertibleToVcc) {
+        SitePinInst sitePin = si.getSitePinInst(sitePinName);
+        if (sitePin == null) {
+            sitePin = vcc.createPin(sitePinName, si);
+        }
+        if (gndInvertibleToVcc != null) {
+            // For the RST inversion to be interpreted properly by Vivado, there must be no
+            // site routing on the path around the inverter BEL
+            BELPin belPin = sitePin.getBELPin();
+            si.unrouteIntraSiteNet(belPin, belPin);
         }
     }
 
@@ -4191,5 +4198,30 @@ public class DesignTools {
         for (Net net : design.getNets()) {
             updatePinsIsRouted(net);
         }
+    }
+
+    /**
+     * Removes all the existing encrypted cell files from a design and replaces them
+     * with the provided list and black boxes those cells. The provided files
+     * should be named after the cell type. This is useful in the scenarios where a
+     * design has many thousand of individual encrypted cell files that are time
+     * consuming to load. By providing a higher level of hierarchy cell definition,
+     * encompassing all existing encrypted cells, the number of individual 
+     * files to be loaded by Vivado can be reduced.
+     * 
+     * @param design   The design to modify.
+     * @param netlists The list of encrypted cell files (*.edn, *.edf, or *.dcp)
+     *                 that should be used instead.
+     */
+    public static void replaceEncryptedCells(Design design, List<Path> netlists) {
+        EDIFNetlist n = design.getNetlist();
+        for (Path p : netlists) {
+            String fileName = p.getFileName().toString();
+            String cellType = fileName.substring(0, fileName.lastIndexOf('.'));
+            EDIFCell cell = n.getCell(cellType);
+            cell.makePrimitive();
+        }
+        n.removeUnusedCellsFromAllWorkLibraries();
+        n.setEncryptedCells(netlists.stream().map(Object::toString).collect(Collectors.toList()));
     }
 }
