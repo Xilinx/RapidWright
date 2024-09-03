@@ -378,10 +378,24 @@ public class RelocationTools {
         }
     }
 
+    /**
+     * Offers a command line accessible way to relocate a design implementation. It
+     * can provide a list of valid relocation options for which full relocation is
+     * possible by providing just a single DCP as an option. Or, it will perform a
+     * best effort relocation (relocating as much as possible and
+     * unplacing/unrouting incompatible cells/routes) when provided a DCP, output
+     * location and set of offsets.
+     * 
+     * @param args Two modes, for listing relocation options args[0]==<input.dcp>;
+     *             for relocation (full or best effort partial)
+     *             args[0]==<input.dcp>, args[1]==<output.dcp>,
+     *             args[2]==<tile_x_offset>, args[3]==<tile_y_offset>.
+     */
     public static void main(String[] args) {
         if (args.length != 4 && args.length != 1) {
             System.out.println("USAGE (query valid relocation options): <input.dcp>");
-            System.out.println("USAGE (to relocate a design): <input.dcp> <output.dcp> <tile_x_offset> <tile_y_offset>");
+            System.out.println("USAGE (design relocation (full or partial): "
+                    + "<input.dcp> <output.dcp> <tile_x_offset> <tile_y_offset>");
             return;
         }
         String inputDCPName = args[0];
