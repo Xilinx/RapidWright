@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -474,7 +474,7 @@ public class TestDesign {
             assert (d.getDevice().getName().equals("xcvu3p"));
             int tileDX = 0;
             int tileDY = slr * targetDevice.getMasterSLR().getNumOfClockRegionRows()
-                             * targetPart.getSeries().getCLEHeight();
+                    * targetPart.getSeries().getCLEHeight();
             Assertions.assertTrue(d.retargetPart(targetPart, tileDX, tileDY));
             Path output = tempDir.resolve("retarget_" + slr + ".dcp");
 
@@ -498,6 +498,21 @@ public class TestDesign {
                 VivadoToolsHelper.assertFullyRouted(output);
             }
         }
+    }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "picoblaze_ooc_X10Y235.dcp",            // Pre 2022.1 DCP
+            "picoblaze_ooc_X10Y235_2022_1.dcp",     // 2022.1 DCP
+    })
+    public void testNetOrder(String dcpFileName) {
+        Design design1 = RapidWrightDCP.loadDCP(dcpFileName);
+        Object[] nets1 = design1.getNets().toArray();
+
+        for (int i = 0; i < 10; i++) {
+            Design design2 = RapidWrightDCP.loadDCP(dcpFileName);
+            Object[] nets2 = design2.getNets().toArray();
+            Assertions.assertTrue(Arrays.equals(nets1, nets2));
+        }
     }
 }
