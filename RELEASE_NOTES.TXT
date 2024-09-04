@@ -1,3 +1,30 @@
+============= RapidWright 2024.1.2-beta released on 2024-09-04 ================
+Notes:
+  - Creating a standalone entry point to relocate DCPs (#1047)
+  - [Interchange] Reorders tile types and tiles to follow their Vivado index (#1039)
+  - [DesignTools] Conform to Vivado *RST* pin inversion site routing configuration (#1053)
+  - Fix for design merging, including designs with encrypted cells (#1035)
+  - Filters out comments in XDC while parsing clk constraints (#1037)
+  - Assign an empty list when path finding for direct connections fails (#1052)
+  - Make LogicalNetlistToEdif not expand macros by default (#1051)
+  - [Interchange] Fixes to support Versal designs via Interchange (#1040)
+  - EDIF cleanup preventing singleton cells/libraries from attaching to user designs (#1050)
+  - [RWRoute] Refactoring/cleanup/preparation for multi-threading (#1046)
+  - Add Hybrid Updating Strategy (HUS) (#1043)
+  - [TestSiteInst] Add test for unrouting through FF routethru cells (#1041)
+  - [TestPIP] Test PIP constructor for reversed wires (#1045)
+  - [RWRoute] Preserve primary source nodes on connections (#1038)
+  - Small Interchange/PhysNetlistReader/VivadoTools improvements (#1042)
+  - [UnisimManager] Use EDIFLibraryBuiltin for primitive/macro libs
+  - Avoids NPE when site routing BRAMs
+  - Fix isCarry() for Versal devices
+  - Resolves PIP constructor issue for reversed PIPs
+  - [SiteInst] unrouteIntraSiteNet() to handle FF routethru cells
+
+API Additions:
+  - com.xilinx.rapidwright.design.Design "public Series getSeries()"
+  - com.xilinx.rapidwright.design.SiteInst "public SitePIP getUsedSitePIP(BEL bel)"
+
 ============= RapidWright 2024.1.1-beta released on 2024-07-17 ================
 Notes: 
   - [VivadoTools] Source *_load.tcl from same dir as DCP (#1032)

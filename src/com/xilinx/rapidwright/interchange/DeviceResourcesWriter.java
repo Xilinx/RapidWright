@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -303,10 +303,10 @@ public class DeviceResourcesWriter {
         t.stop().start("Prims&Macros");
         // Create an EDIFNetlist populated with just primitive and macro libraries
         EDIFLibrary prims = Design.getPrimitivesLibrary(device.getName());
-        EDIFLibrary macros = Design.getMacroPrimitives(series);
+        // Copy the macros library so we can modify it
+        EDIFLibrary macros = new EDIFLibrary(Design.getMacroPrimitives(series));
         EDIFNetlist netlist = new EDIFNetlist("PrimitiveLibs");
         netlist.addLibrary(prims);
-        netlist.addLibrary(macros);
         List<EDIFCell> dupsToRemove = new ArrayList<EDIFCell>();
         for (EDIFCell hdiCell : prims.getCells()) {
             EDIFCell cell = macros.getCell(hdiCell.getName());
@@ -320,6 +320,10 @@ public class DeviceResourcesWriter {
         }
 
         removeUnusedMacros(macros, prims);
+
+        // Perform a deep copy because macro cells (which were shallow copied before)
+        // must now instantiate primitives from our primitives library
+        macros = netlist.copyLibraryAndSubCells(macros);
 
         Map<String, Pair<String, EnumSet<IOStandard>>> macroCollapseExceptionMap =
                 EDIFNetlist.macroCollapseExceptionMap.getOrDefault(series, Collections.emptyMap());

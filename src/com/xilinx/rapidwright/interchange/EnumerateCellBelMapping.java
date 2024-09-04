@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Keith Rothman, Google, Inc.
@@ -718,7 +718,7 @@ public class EnumerateCellBelMapping {
 
         List<Map.Entry<SiteTypeEnum, String>> entries = new ArrayList<>();
 
-        Map<SiteTypeEnum,Set<String>> sites = physCell.getCompatiblePlacements();
+        Map<SiteTypeEnum,Set<String>> sites = physCell.getCompatiblePlacements(design.getDevice());
         for (Map.Entry<SiteTypeEnum,Set<String>> site : sites.entrySet()) {
             for (String bel : site.getValue()) {
                 entries.add(new AbstractMap.SimpleEntry<SiteTypeEnum, String>(site.getKey(), bel));

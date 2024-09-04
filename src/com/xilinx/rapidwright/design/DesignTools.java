@@ -2095,7 +2095,7 @@ public class DesignTools {
             // Don't move cell if already placed
             return true;
         }
-        Map<SiteTypeEnum, Set<String>> compatTypes = c.getCompatiblePlacements();
+        Map<SiteTypeEnum, Set<String>> compatTypes = c.getCompatiblePlacements(design.getDevice());
 
         for (Entry<SiteTypeEnum, Set<String>> e : compatTypes.entrySet()) {
             for (Site s : design.getDevice().getAllSitesOfType(e.getKey())) {
