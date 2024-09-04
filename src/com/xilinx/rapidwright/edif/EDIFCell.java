@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -76,6 +76,16 @@ public class EDIFCell extends EDIFPropertyObject {
     public EDIFCell(EDIFLibrary lib, String name) {
         super(name);
         if (lib != null) lib.addCell(this);
+    }
+
+    /**
+     * Shallow Copy constructor - Creates a new EDIFCell object, EDIFCell
+     * contents point to orig.
+     *
+     * @param orig The original cell
+     */
+    public EDIFCell(EDIFCell orig) {
+        this(null, orig);
     }
 
     /**
@@ -477,7 +487,18 @@ public class EDIFCell extends EDIFPropertyObject {
      * @param library the library to set
      */
     public void setLibrary(EDIFLibrary library) {
+        if (library == null) {
+            throw new RuntimeException("ERROR: library argument cannot be null.");
+        }
+        if (this.library != null && this.library != library) {
+            throw new RuntimeException("ERROR: EDIFCell is already attached to a library. Call EDIFLibrary.removeCell() first.");
+        }
+
         this.library = library;
+    }
+
+    protected void clearLibrary() {
+        this.library = null;
     }
 
     public boolean hasContents() {
