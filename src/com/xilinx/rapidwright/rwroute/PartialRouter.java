@@ -354,7 +354,7 @@ public class PartialRouter extends RWRoute {
                             continue;
                         }
 
-                        assert (rnode.getPrev() != null);
+                        assert(rnode.getPrev() != null);
                     }
 
                     // RouteNode must only exist if its net has been unpreserved
@@ -366,12 +366,13 @@ public class PartialRouter extends RWRoute {
                     // from the beginning. However, since other objects (e.g. Connection-s) may hold a reference
                     // to this, that would not be wise.
                     // Instead, increment the use of this RouteNode with a null net (since global nets have
-                    // no corresponding NetWrapper) in order to flag it as being irreversibly used thus forcing
-                    // the non-global to find another path
+                    // no corresponding NetWrapper) in order to indicate to Connection.isCongested() that it needs
+                    // to be rerouted.
                     rnode.incrementUser(null);
                 }
             }
         }
+
         return unpreserveNets;
     }
 
