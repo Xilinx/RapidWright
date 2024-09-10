@@ -95,7 +95,7 @@ public class DREAMPlaceFPGA {
     public static final boolean ENABLE_IF_DEFAULT = true;
     public static final boolean ENABLE_SITE_ROUTING_DEFAULT = true;
 
-    public static final String dreamPlaceFPGAExec = "python dreamplacefpga/Placer.py";
+    public static final String dreamPlaceFPGAExec = "DREAMPlaceFPGA";
 
     public static Map<String, Object> getSettingsMap() {
         Map<String, Object> map = new HashMap<>();
@@ -147,17 +147,24 @@ public class DREAMPlaceFPGA {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-
     }
 
     public static Design placeDesign(Design design, Path workDir, boolean makeOutOfContext) {
+        boolean removeWorkDir = false;
+        if (workDir == null) {
+            workDir = Paths.get("DREAMPlaceFPGA" + FileTools.getUniqueProcessAndHostID());
+            FileTools.makeDirs(workDir.toString());
+            removeWorkDir = true;
+        }
+
         // Create interchange netlist file
         String interchangeRootFile = workDir.toString() + File.separator + "design";
         Interchange.writeDesignToInterchange(design, interchangeRootFile);
 
         // Create device file if it doesn't already exist
         String deviceName = design.getDevice().getName();
-        Path deviceFile = workDir.resolve(deviceName + ".device");
+        Path deviceDir = FileTools.getUserSpecificRapidWrightDataPath();
+        Path deviceFile = deviceDir.resolve(deviceName + ".device");
         if (!Files.exists(deviceFile)) {
             try {
                 DeviceResourcesWriter.writeDeviceResourcesFile(design.getPartName(), design.getDevice(),
@@ -171,13 +178,11 @@ public class DREAMPlaceFPGA {
         Path jsonFile = workDir.resolve("design.json");
         Map<String, Object> settings = getSettingsMap();
         settings.put(INTERCHANGE_DEVICE, deviceFile.toString());
-        settings.put(INTERCHANGE_NETLIST, interchangeRootFile + Interchange.LOG_NETLIST_EXT);
-        settings.put(PLACE_SOL, "");
-        settings.put(IO_PL, "");
+        settings.put(INTERCHANGE_NETLIST, workDir.relativize(Paths.get(interchangeRootFile + Interchange.LOG_NETLIST_EXT)).toString());
         writeJSONForDREAMPlaceFPGA(jsonFile, settings);
 
         // Run DREAMPlaceFPGA
-        String exec = dreamPlaceFPGAExec + " " + jsonFile.toString();
+        String exec = dreamPlaceFPGAExec + " " + workDir.relativize(jsonFile);
         boolean verbose = true;
         String[] environ = null;
         Integer exitCode = FileTools.runCommand(exec, verbose, environ, workDir.toFile());
@@ -198,6 +203,10 @@ public class DREAMPlaceFPGA {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+
+        if (removeWorkDir) {
+            FileTools.deleteFolder(workDir.toString());
+        }
         return placedDesign;
     }
 
@@ -217,7 +226,9 @@ public class DREAMPlaceFPGA {
             } 
         }
 
-        Path workDir = args.length == 4 ? Paths.get(args[3]) : args.length == 3 && !makeOutOfContext ? Paths.get(args[2]) : Paths.get(System.getProperty("user.dir"));
+        Path workDir = args.length == 4 ? Paths.get(args[3]) :
+                args.length == 3 && !makeOutOfContext ? Paths.get(args[2]) :
+                null;
         Design placed = placeDesign(input, workDir, makeOutOfContext);
         placed.writeCheckpoint(args[1]);
     }
