@@ -152,7 +152,7 @@ public class DREAMPlaceFPGA {
     public static Design placeDesign(Design design, Path workDir, boolean makeOutOfContext) {
         boolean removeWorkDir = false;
         if (workDir == null) {
-            workDir = Paths.get("DREAMPlaceFPGA" + FileTools.getUniqueProcessAndHostID());
+            workDir = Paths.get("DREAMPlaceFPGAWorkdir" + FileTools.getUniqueProcessAndHostID());
             FileTools.makeDirs(workDir.toString());
             removeWorkDir = true;
         }
