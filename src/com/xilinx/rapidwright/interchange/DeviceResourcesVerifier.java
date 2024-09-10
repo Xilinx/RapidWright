@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -147,6 +147,8 @@ public class DeviceResourcesVerifier {
 
         dReader = readMsg.getRoot(DeviceResources.Device.factory);
 
+        boolean containsRoutingResources = dReader.getNodes().size() > 0;
+        
         int strCount = dReader.getStrList().size();
         TextList.Reader reader = dReader.getStrList();
         for (int i=0; i < strCount; i++) {
@@ -155,10 +157,11 @@ public class DeviceResourcesVerifier {
         }
 
         // Create a lookup map for tile types
-        Map<String,TileType.Reader> tileTypeMap = new HashMap<String, TileType.Reader>();
+        Map<String, TileType.Reader> tileTypeMap = new HashMap<String, TileType.Reader>();
+        int tileTypeCount = dReader.getTileTypeList().size();
         Map<TileTypeEnum, TileType.Reader> tileTypeEnumMap = new HashMap<TileTypeEnum, TileType.Reader>();
         HashMap<String, StructList.Reader<DeviceResources.Device.PIP.Reader>> ttPIPMap = new HashMap<>();
-        for (int i=0; i < dReader.getTileTypeList().size(); i++) {
+        for (int i=0; i < tileTypeCount; i++) {
             TileType.Reader ttReader = dReader.getTileTypeList().get(i);
             String name = allStrings.get(ttReader.getName());
             tileTypeMap.put(name, ttReader);
@@ -336,6 +339,8 @@ public class DeviceResourcesVerifier {
             expect(tile.getTileTypeEnum().name(), tileTypeName);
             expect(tile.getRow(), tileReader.getRow());
             expect(tile.getColumn(), tileReader.getCol());
+            // Note: Tile.getUniqueAddress() is equivalent to the INDEX property on a Vivado Tile object
+            expect(tile.getUniqueAddress(), i);
 
             // Verify Tile Types
             TileType.Reader tileType = tileTypeMap.get(tileTypeName);
@@ -371,10 +376,11 @@ public class DeviceResourcesVerifier {
 
                 PrimitiveList.Int.Reader pinToWires = siteTypeReader.getPrimaryPinsToTileWires();
                 expect(site.getSitePinCount(), pinToWires.size());
+
+                StructList.Reader<SitePin.Reader> sitePins = stReader.getPins();
                 for (int k=0; k < site.getSitePinCount(); k++) {
                     String pinName = site.getPinName(k);
-                    expect(allStrings.getIndex(pinName),
-                           stReader.getPins().get(k).getName());
+                    expect(allStrings.getIndex(pinName), sitePins.get(k).getName());
                     expect(allStrings.getIndex(site.getTileWireNameFromPinName(pinName)),
                            pinToWires.get(k));
                 }
@@ -387,23 +393,25 @@ public class DeviceResourcesVerifier {
                     expect(allStrings.getIndex(altSiteTypes[k].name()), altStReader.getName());
 
                     ParentPins.Reader parentPins = siteTypeReader.getAltPinsToPrimaryPins().get(k);
+                    Int.Reader parentPinIdxs = parentPins.getPins();
 
-                    String[] altSitePins = siteInst.getSitePinNames();
+                    String[] altSitePinNames = siteInst.getSitePinNames();
                     Set<String> altSitePinSet = new HashSet<String>();
-                    for (int l=0; l < altSitePins.length; ++l) {
-                        altSitePinSet.add(altSitePins[l]);
+                    for (int l=0; l < altSitePinNames.length; ++l) {
+                        altSitePinSet.add(altSitePinNames[l]);
                     }
-                    expect(parentPins.getPins().size(), altSitePins.length);
-                    expect(parentPins.getPins().size(), altStReader.getPins().size());
+                    expect(parentPinIdxs.size(), altSitePinNames.length);
+                    expect(parentPinIdxs.size(), altStReader.getPins().size());
 
-                    for (int l=0; l < parentPins.getPins().size(); l++) {
-                        String sitePin = allStrings.get(altStReader.getPins().get(l).getName());
+                    StructList.Reader<SitePin.Reader> altSitePins = altStReader.getPins();
+                    for (int l = 0; l < parentPinIdxs.size(); l++) {
+                        String sitePin = allStrings.get(altSitePins.get(l).getName());
                         if (!altSitePinSet.contains(sitePin)) {
                             throw new RuntimeException("Site pin " + sitePin + " not found in site.");
                         }
 
                         String primSitePin = siteInst.getPrimarySitePinName(sitePin);
-                        expect(site.getPinIndex(primSitePin), parentPins.getPins().get(l));
+                        expect(site.getPinIndex(primSitePin), parentPinIdxs.get(l));
                     }
 
                     design.removeSiteInst(siteInst);
@@ -499,7 +507,13 @@ public class DeviceResourcesVerifier {
         Set<Unisim> unisimsExpected = new HashSet<Unisim>();
         for (EDIFLibrary lib : primsAndMacros.getLibraries()) {
             EDIFLibrary reference = lib.isHDIPrimitivesLibrary() ? Design.getPrimitivesLibrary(design.getDevice().getName()) :
-                                                    Design.getMacroPrimitives(series);
+                                                    new EDIFLibrary(Design.getMacroPrimitives(series));
+
+            if (!lib.isHDIPrimitivesLibrary()) {
+                // Remove unused macros from reference
+                EDIFLibrary prims = Design.getPrimitivesLibrary(design.getDevice().getName());
+                DeviceResourcesWriter.removeUnusedMacros(reference, prims);
+            }
 
             Set<String> cellsFound = new HashSet<String>();
             cellsFound.addAll(lib.getCellMap().keySet());
@@ -609,7 +623,10 @@ public class DeviceResourcesVerifier {
         verifyCellBelPinMaps(allStrings, dReader, design);
         verifyPackages(allStrings, dReader, device);
 
-        ConstantDefinitions.verifyConstants(allStrings, device, design, siteTypes, dReader.getConstants(), tileTypeEnumMap);
+        if (containsRoutingResources) {
+            ConstantDefinitions.verifyConstants(allStrings, device, design, siteTypes, dReader.getConstants(), tileTypeEnumMap);            
+        }
+
 
         return true;
     }
@@ -728,7 +745,7 @@ public class DeviceResourcesVerifier {
 
         List<Map.Entry<SiteTypeEnum, String>> entries = new ArrayList<>();
 
-        Map<SiteTypeEnum,Set<String>> sites = physCell.getCompatiblePlacements();
+        Map<SiteTypeEnum,Set<String>> sites = physCell.getCompatiblePlacements(design.getDevice());
         Set<SiteTypeEnum> siteTypes = new HashSet<SiteTypeEnum>();
         siteTypes.addAll(sites.keySet());
         siteTypes.retainAll(siteMap.keySet());

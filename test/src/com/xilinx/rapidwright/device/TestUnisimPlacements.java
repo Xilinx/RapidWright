@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Advanced Micro Devices, Inc.
@@ -41,7 +41,7 @@ public class TestUnisimPlacements {
             Design des = new Design("top", part.getName());
             EDIFCell cell = Design.getPrimitivesLibrary(des.getDevice().getName()).getCell("FDRE");
             Cell c = des.createCell("inst", cell);
-            Assertions.assertTrue(c.getCompatiblePlacements().size() > 1);
+            Assertions.assertTrue(c.getCompatiblePlacements(des.getDevice()).size() > 1);
             break;
         }
     }

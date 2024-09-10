@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -23,11 +23,13 @@
 
 package com.xilinx.rapidwright.design;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -46,6 +48,8 @@ import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
 import com.xilinx.rapidwright.util.VivadoTools;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -252,4 +256,44 @@ public class TestRelocationTools {
         );
     }
 
+    @Test
+    public void testRelocationTools(@TempDir Path dir) {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235_2022_1.dcp");
+        d.getNet("clk").unroute();
+        Path dcpName = dir.resolve("picoblaze_unrouted_clk.dcp");
+        d.writeCheckpoint(dcpName);
+        
+        int xOffset = 0;
+        int yOffset = 5;
+        
+        Path outputDCP = dir.resolve("output.dcp");
+
+        // Smoke test for valid location report mode
+        RelocationTools.main(new String[] { dcpName.toString() });
+
+        RelocationTools.main(new String[] {dcpName.toString(), outputDCP.toString(), 
+                        Integer.toString(xOffset), Integer.toString(yOffset)});
+        
+        Design testOutput = Design.readCheckpoint(outputDCP);
+        
+        for (SiteInst s : d.getSiteInsts()) {
+            Tile origin = s.getTile();
+            Tile relocated = origin.getTileXYNeighbor(xOffset, yOffset);
+            Site relocatedSite = relocated.getSites()[s.getSite().getSiteIndexInTile()];
+            SiteInst relocatedSiteInst = testOutput.getSiteInstFromSite(relocatedSite);
+            Assertions.assertNotNull(relocatedSiteInst);
+            Assertions.assertEquals(relocatedSiteInst.getCells().size(), s.getCells().size());
+        }
+    }
+
+    @Test
+    public void testGetValidRelocationOptions() {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235_2022_1.dcp");
+        d.getNet("clk").unroute();
+        
+        Pair<Site, Map<Integer, Site>> relocOptions = RelocationTools.getValidRelocationOptions(d);
+
+        Assertions.assertNotNull(relocOptions);
+        Assertions.assertEquals(215, relocOptions.getSecond().size());
+    }
 }

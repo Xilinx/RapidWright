@@ -165,6 +165,61 @@ public class TestRWRoute {
         VivadoToolsHelper.assertFullyRouted(design);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "bnn.dcp",          // does not activate HUS
+            "optical-flow.dcp"  // activates HUS
+    })
+    @LargeTest(max_memory_gb = 8)
+    public void testNonTimingDrivenFullRoutingWithHUS(String path) {
+        Design design = RapidWrightDCP.loadDCP(path);
+        RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--hus"});
+        assertAllSourcesRoutedFlagSet(design);
+        assertAllPinsRouted(design);
+        VivadoToolsHelper.assertFullyRouted(design);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "bnn.dcp,false,false",
+            "bnn.dcp,false,true",
+            "bnn.dcp,true,false",
+            "optical-flow.dcp,false,false",
+            "optical-flow.dcp,true,true"
+    })
+    @LargeTest(max_memory_gb = 8)
+    public void testFullRoutingWithCUFR(String path, boolean timingDriven, boolean enlargeBoundingBox) {
+        Design design = RapidWrightDCP.loadDCP(path);
+        CUFR.routeDesignWithUserDefinedArguments(design, new String[]{
+                timingDriven ? "--timingDriven" : "--nonTimingDriven",
+                enlargeBoundingBox ? "--enlargeBoundingBox" : "--fixBoundingBox",
+                "--verbose"
+        });
+        assertAllSourcesRoutedFlagSet(design);
+        assertAllPinsRouted(design);
+        VivadoToolsHelper.assertFullyRouted(design);
+    }
+
+    @Test
+    @LargeTest(max_memory_gb = 8)
+    public void testNonTimingDrivenPartialCUFR() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_partial.dcp");
+        design.setTrackNetChanges(true);
+
+        boolean softPreserve = false;
+        PartialCUFR.routeDesignWithUserDefinedArguments(design, new String[]{
+                "--fixBoundingBox",
+                "--useUTurnNodes",
+                "--nonTimingDriven",
+        }, null, softPreserve);
+
+        Assertions.assertFalse(design.getModifiedNets().isEmpty());
+        for (Net net : design.getModifiedNets()) {
+            assertAllPinsRouted(net);
+        }
+        VivadoToolsHelper.assertFullyRouted(design);
+    }
+
     /**
      * Tests the timing driven full routing, i.e., RWRoute running in timing-driven mode.
      * The bnn design from Rosetta benchmarks is used.
@@ -383,16 +438,20 @@ public class TestRWRoute {
     @ParameterizedTest
     @CsvSource({
             // Dedicated connections, hence no nodes popped
-            "GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,BUFG_GT_SYNC_X0Y46,CLK_IN,0",
-            "GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,BUFG_GT_X0Y78,CLK_IN,0", // (dst pin can be projected to INT but not src pin)
+            "xcvu3p,GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,BUFG_GT_SYNC_X0Y46,CLK_IN,0",
+            "xcvu3p,GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,BUFG_GT_X0Y78,CLK_IN,0", // (dst pin can be projected to INT but not src pin)
 
             // Non-dedicated connections
-            "IOB_X0Y47,I,SLICE_X77Y122,FX,600",
+            "xcvu3p,IOB_X0Y47,I,SLICE_X77Y122,FX,600",
+
+            // 240 CLB height SLR, no LAG tiles on Y0 (since HBM on bottom edge)
+            "xcu50,SLICE_X38Y239,AQ,SLICE_X38Y240,A1,500"
     })
-    public void testSingleConnection(String srcSiteName, String srcPinName,
+    public void testSingleConnection(String partName,
+                                     String srcSiteName, String srcPinName,
                                      String dstSiteName, String dstPinName,
                                      int nodesPoppedLimit) {
-        testSingleConnectionHelper("xcvu3p",
+        testSingleConnectionHelper(partName,
                 srcSiteName, srcPinName,
                 dstSiteName, dstPinName,
                 nodesPoppedLimit);

@@ -1,9 +1,8 @@
 /*
- * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Jakob Wenzel, Xilinx Research Labs.
+ * Author: Eddie Hung, Advanced Micro Devices, Inc.
  *
  * This file is part of RapidWright.
  *
@@ -21,22 +20,23 @@
  *
  */
 
-package com.xilinx.rapidwright.util;
+package com.xilinx.rapidwright.edif;
 
-public enum JobState {
-    RUNNING("running"),
-    EXITED("exited"),
-    SUSPENDED("suspended"),
-    PENDING("pending"),
-    UNKNOWN("unknown");
-
-    private final String name;
-
-    JobState(String name) {
-        this.name = name;
+/**
+ * Extension of {@link EDIFLibrary} with setNetlist() and removeCell() methods disabled.
+ */
+public class EDIFLibraryBuiltin extends EDIFLibrary {
+    public EDIFLibraryBuiltin(String name) {
+        super(name);
     }
 
-    public String getName() {
-        return name;
+    @Override
+    public void setNetlist(EDIFNetlist netlist) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public EDIFCell removeCell(EDIFCell cell) {
+        throw new UnsupportedOperationException();
     }
 }

@@ -29,9 +29,10 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
-import com.xilinx.rapidwright.util.RuntimeTracker;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -69,11 +70,17 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
         }};
     }
 
-    public RouteNodeGraphTimingDriven(RuntimeTracker rnodesTimer,
-                                      Design design,
+    public RouteNodeGraphTimingDriven(Design design,
                                       RWRouteConfig config,
                                       DelayEstimatorBase delayEstimator) {
-        super(rnodesTimer, design, config);
+        this(design, config, delayEstimator, new HashMap<>());
+    }
+
+    protected RouteNodeGraphTimingDriven(Design design,
+                                         RWRouteConfig config,
+                                         DelayEstimatorBase delayEstimator,
+                                         Map<Tile, RouteNode[]> nodesMap) {
+        super(design, config, nodesMap);
         this.delayEstimator = delayEstimator;
         this.maskNodesCrossRCLK = config.isMaskNodesCrossRCLK();
 
@@ -96,14 +103,14 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
     private final Set<Integer> excludeAboveRclk;
     private final Set<Integer> excludeBelowRclk;
 
-    protected class RouteNodeImpl extends RouteNodeGraph.RouteNodeImpl {
+    protected static class RouteNodeTimingDriven extends RouteNode {
 
         /** The delay of this rnode computed based on the timing model */
         private final float delay;
 
-        protected RouteNodeImpl(Node node, RouteNodeType type) {
-            super(node, type);
-            delay = RouterHelper.computeNodeDelay(delayEstimator, node);
+        protected RouteNodeTimingDriven(RouteNodeGraphTimingDriven routingGraph, Node node, RouteNodeType type) {
+            super(routingGraph, node, type);
+            delay = RouterHelper.computeNodeDelay(routingGraph.delayEstimator, node);
         }
 
         @Override
@@ -133,11 +140,11 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
 
     @Override
     protected RouteNode create(Node node, RouteNodeType type) {
-        return new RouteNodeImpl(node, type);
+        return new RouteNodeTimingDriven(this, node, type);
     }
 
     @Override
-    protected boolean isExcluded(Node parent, Node child) {
+    protected boolean isExcluded(RouteNode parent, Node child) {
         if (super.isExcluded(parent, child))
             return true;
         if (maskNodesCrossRCLK) {

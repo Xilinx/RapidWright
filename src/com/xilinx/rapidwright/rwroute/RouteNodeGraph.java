@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -51,7 +52,6 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.ParallelismTools;
-import com.xilinx.rapidwright.util.RuntimeTracker;
 import com.xilinx.rapidwright.util.Utils;
 
 /**
@@ -65,7 +65,7 @@ public class RouteNodeGraph {
      * A map of nodes to created rnodes
      */
     protected final Map<Tile, RouteNode[]> nodesMap;
-    private int nodesMapSize;
+    private final AtomicInteger nodesMapSize;
 
     /**
      * A map of preserved nodes to their nets
@@ -82,14 +82,14 @@ public class RouteNodeGraph {
     /**
      * Visited rnodes data during connection routing
      */
-    protected final Collection<RouteNode> targets;
+    private final Collection<RouteNode> targets;
 
-    protected final RuntimeTracker setChildrenTimer;
+    private long createRnodeTime;
 
     public static final short SUPER_LONG_LINE_LENGTH_IN_TILES = 60;
 
     /** Array mapping an INT tile's Y coordinate, to its SLR index */
-    private final int[] intYToSLRIndex;
+    public final int[] intYToSLRIndex;
     public final int[] nextLagunaColumn;
     public final int[] prevLagunaColumn;
 
@@ -112,53 +112,21 @@ public class RouteNodeGraph {
      */
     protected final boolean lutRoutethru;
 
-    protected class RouteNodeImpl extends RouteNode {
-        protected RouteNodeImpl(Node node, RouteNodeType type) {
-            super(node, type, lagunaI);
-        }
-
-        @Override
-        protected RouteNode getOrCreate(Node node, RouteNodeType type) {
-            return RouteNodeGraph.this.getOrCreate(node, type);
-        }
-
-        @Override
-        public boolean isExcluded(Node child) {
-            return RouteNodeGraph.this.isExcluded(this, child);
-        }
-
-        @Override
-        public void setTarget(boolean isTarget) {
-            if (isTarget) {
-                assert(!isTarget());
-                targets.add(this);
-            }
-            super.setTarget(isTarget);
-        }
-
-        @Override
-        public RouteNode[] getChildren() {
-            setChildren(setChildrenTimer);
-            return super.getChildren();
-        }
-
-        @Override
-        public int getSLRIndex() {
-             return intYToSLRIndex[getEndTileYCoordinate()];
-        }
+    public RouteNodeGraph(Design design, RWRouteConfig config) {
+        this(design, config, new HashMap<>());
     }
 
-    public RouteNodeGraph(RuntimeTracker setChildrenTimer, Design design, RWRouteConfig config) {
+    protected RouteNodeGraph(Design design, RWRouteConfig config, Map<Tile, RouteNode[]> nodesMap) {
         this.design = design;
         lutRoutethru = config.isLutRoutethru();
 
-        nodesMap = new HashMap<>();
-        nodesMapSize = 0;
+        this.nodesMap = nodesMap;
+        nodesMapSize = new AtomicInteger();
         preservedMap = new ConcurrentHashMap<>();
         preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
         targets = new ArrayList<>();
-        this.setChildrenTimer = setChildrenTimer;
+        createRnodeTime = 0;
 
         Device device = design.getDevice();
         intYToSLRIndex = new int[device.getRows()];
@@ -267,7 +235,8 @@ public class RouteNodeGraph {
                 for (int x = 0; x < lagunaTilesAtY.length; x++) {
                     Tile tile = lagunaTilesAtY[x];
                     if (tile != null) {
-                        if (y == 0) {
+                        // For LAGUNA tiles on the first SLR boundary
+                        if (nextLagunaColumn[x] == Integer.MAX_VALUE) {
                             assert(x == tile.getTileXCoordinate());
                             // Looks like (on US+) LAGUNA tiles are always on the left side of an INT tile,
                             // with tile X coordinate one smaller
@@ -315,7 +284,7 @@ public class RouteNodeGraph {
     }
 
     public void initialize() {
-        targets.clear();
+        assert(targets.isEmpty());
     }
 
     protected Net preserve(Node node, Net net) {
@@ -411,7 +380,7 @@ public class RouteNodeGraph {
         return !allowedTileEnums.contains(tileType);
     }
 
-    protected boolean isExcluded(Node parent, Node child) {
+    protected boolean isExcluded(RouteNode parent, Node child) {
         if (isPreserved(child)) {
             return true;
         }
@@ -445,6 +414,14 @@ public class RouteNodeGraph {
         }
 
         return false;
+    }
+
+    protected void addCreateRnodeTime(long time) {
+        createRnodeTime += time;
+    }
+
+    protected long getCreateRnodeTime() {
+        return createRnodeTime;
     }
 
     public Net getPreservedNet(Node node) {
@@ -511,11 +488,11 @@ public class RouteNodeGraph {
     }
 
     public int numNodes() {
-        return nodesMapSize;
+        return nodesMapSize.get();
     }
 
     protected RouteNode create(Node node, RouteNodeType type) {
-        return new RouteNodeImpl(node, type);
+        return new RouteNode(this, node, type);
     }
 
     public RouteNode getOrCreate(Node node, RouteNodeType type) {
@@ -526,26 +503,15 @@ public class RouteNodeGraph {
         if (rnode == null) {
             rnode = create(node, type);
             rnodes[wireIndex] = rnode;
-            nodesMapSize++;
+            nodesMapSize.incrementAndGet();
         }
         return rnode;
-    }
-
-    /**
-     * Resets the expansion history.
-     */
-    public void resetExpansion() {
-        for (RouteNode node : targets) {
-            assert(node.isTarget());
-            node.setTarget(false);
-        }
-        targets.clear();
     }
 
     public int averageChildren() {
         int sum = 0;
         for (RouteNode rnode : getRnodes()) {
-            sum += rnode.everExpanded() ? rnode.getChildren().length : 0;
+            sum += rnode.numChildren();
         }
         return Math.round((float) sum / numNodes());
     }

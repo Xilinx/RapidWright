@@ -45,7 +45,7 @@ public class LogicalNetlistToEdif {
 
         // Read LogicalNetlist
         t.start("Read LogicalNetlist");
-        EDIFNetlist netlist = LogNetlistReader.readLogNetlist(args[0]);
+        EDIFNetlist netlist = LogNetlistReader.readLogNetlist(args[0], false);
 
         // Write EDIF
         t.stop().start("Write EDIF");

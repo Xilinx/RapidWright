@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -59,26 +59,45 @@ public class EDIFLibrary extends EDIFName {
         super(name);
     }
 
+    /**
+     * Shallow copy constructor - Creates a new EDIFLibrary object containing
+     * shallow copies of its contained EDIFCell-s.
+     *
+     * @param copy The original library
+     */
+    public EDIFLibrary(EDIFLibrary copy) {
+        super(copy.getName());
+
+        for (Map.Entry<String,EDIFCell> e : copy.getCellMap().entrySet()) {
+            addCell(e.getValue());
+        }
+    }
+
     protected EDIFLibrary() {
 
     }
 
     /**
-     * Adds the provided cell to the library. All cells
-     * must be unique by their name.
+     * Adds the provided cell to the library. All cells must be unique by their name.
+     * If provided cell is already attached to a library, make a shallow copy.
      * @param cell The cell to add to the library.
      * @return The cell that has been added.
      */
     public EDIFCell addCell(EDIFCell cell) {
         if (cells == null) cells = getNewMap();
-        EDIFCell collision = cells.put(cell.getName(), cell);
-        if (collision != null && cell != collision) {
+        return cells.compute(cell.getName(), (k,v) -> {
+            if (v == null) {
+                v = (cell.getLibrary() != null) ? new EDIFCell(cell) : cell;
+                v.setLibrary(this);
+                return v;
+            }
+            if (v == cell) {
+                return v;
+            }
             throw new RuntimeException("ERROR: Failed to add cell " +
-                cell.getName() + " to library " + getName()+". The library "
-                + "already contains a cell with the same name.");
-        }
-        cell.setLibrary(this);
-        return cell;
+                    cell.getName() + " to library " + getName()+". The library "
+                    + "already contains a cell with the same name.");
+        });
     }
 
     private String findUniqueCellName(String name) {
@@ -150,7 +169,18 @@ public class EDIFLibrary extends EDIFName {
      * @param netlist the netlist to set
      */
     public void setNetlist(EDIFNetlist netlist) {
+        if (netlist == null) {
+            throw new RuntimeException("ERROR: netlist argument cannot be null.");
+        }
+        if (this.netlist != null && this.netlist != netlist) {
+            throw new RuntimeException("ERROR: EDIFLibrary is already attached to a netlist. Call EDIFNetlist.removeLibrary() first.");
+        }
+
         this.netlist = netlist;
+    }
+
+    protected void clearNetlist() {
+        this.netlist = null;
     }
 
     /**
@@ -168,7 +198,11 @@ public class EDIFLibrary extends EDIFName {
      * @return The removed cell, or null if it did not exist in the library.
      */
     public EDIFCell removeCell(String name) {
-        return cells == null ? null : cells.remove(name);
+        EDIFCell cell = cells == null ? null : cells.remove(name);
+        if (cell != null) {
+            cell.clearLibrary();
+        }
+        return cell;
     }
 
     /**
