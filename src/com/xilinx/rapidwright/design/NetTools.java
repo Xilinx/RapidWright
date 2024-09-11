@@ -29,11 +29,18 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 
 public class NetTools {
-    private static HashSet<String> clkSrcSpiNamesOfUS = new HashSet<>();
+    private static HashSet<SiteTypeEnum> clkSrcSiteTypeEnumsOfUS = new HashSet<>();
     static {
-        clkSrcSpiNamesOfUS.add("CLK_OUT");
-        clkSrcSpiNamesOfUS.add("CLKOUT");
-        clkSrcSpiNamesOfUS.add("CLKFBOUT");
+        clkSrcSiteTypeEnumsOfUS.addAll(List.of(
+            SiteTypeEnum.BUFGCE,
+            SiteTypeEnum.BUFG_FABRIC,
+            SiteTypeEnum.BUFGCE_DIV,
+            SiteTypeEnum.BUFGCTRL,
+            SiteTypeEnum.BUFG_GT,
+            SiteTypeEnum.BUFG_PS,
+            SiteTypeEnum.BUFG,
+            SiteTypeEnum.BUFCE_LEAF
+        ));
     }
 
     private static HashSet<SiteTypeEnum> clkSrcSiteTypeEnumsOfVersal = new HashSet<>();
@@ -48,15 +55,14 @@ public class NetTools {
         ));
     }
 
-    public static boolean isClockNet(Net net) {
+    public static boolean isGlobalClockNet(Net net) {
         Series series = net.getDesign().getDevice().getSeries();
         SitePinInst srcSpi = net.getSource();
         if (srcSpi == null)
             return false;        
-        String srcSpiName = srcSpi.getName();
         
         if (series == Series.UltraScale || series == Series.UltraScalePlus) {
-            return clkSrcSpiNamesOfUS.contains(srcSpiName);
+            return clkSrcSiteTypeEnumsOfUS.contains(srcSpi.getSiteTypeEnum());
         }
 
         if (series == Series.Versal) {
@@ -67,6 +73,6 @@ public class NetTools {
     }
 
     public static boolean isGlobalNet(Net net) {
-        return net.isStaticNet() || isClockNet(net);
+        return net.isStaticNet() || isGlobalClockNet(net);
     }
 }
