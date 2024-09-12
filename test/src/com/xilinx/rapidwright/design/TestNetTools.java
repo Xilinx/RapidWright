@@ -1,16 +1,30 @@
 package com.xilinx.rapidwright.design;
 
 import java.util.HashSet;
-import java.util.List;
 
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 public class TestNetTools {
+    /**
+     * Tests the method NetTools.isGlobalClockNet(Net net).
+     * For each DCP file, Vivado uses the TCL command 
+     *      get_nets -hier -parent_net -filter { TYPE == "GLOBAL_CLOCK" } 
+     * to retrieve all nets of type GLOBAL_CLOCK. 
+     * The method NetTools.isGlobalClockNet(Net net) returns true for these nets and false for others.
+     * 
+     * All Versal/Ultrascale+ designs under the RapidWrightDCP path will be checked, except for the following:
+     *      picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp    The source cell bufgce_inst of this design is not placed yet.
+     *      picoblaze_ooc_X10Y235_unreadable_edif.dcp       This design would call vivado to generate an readable EDIF file.
+     *      two_clk_check_NetTools.dcp                      This design is not added to the RapidWrightDCP yet.
+     * 
+     * All Series-7 designs are not supported by NetTools.isGlobalClockNet(Net net) yet, so they are not tested now.
+     * @param pathAndlobalClockNames Use ' ' as the delimiter to split this string, where the first element is the path to the DCP file, 
+     *                               and the remaining elements are the names of the global clock nets reported by Vivado.
+     */
     @ParameterizedTest
     @CsvSource({
             // UltraScale+
@@ -27,14 +41,14 @@ public class TestNetTools {
             // "picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp clk",          // The source cell bufgce_inst is not placed yet.
             "picoblaze_ooc_X10Y235.dcp",
             "picoblaze_ooc_X10Y235_2022_1.dcp",
-            "picoblaze_ooc_X10Y235_unreadable_edif.dcp",
+            // "picoblaze_ooc_X10Y235_unreadable_edif.dcp",                 // This case would call vivado to generate an readable EDIF file.
             "picoblaze_partial.dcp clk",
             "reduce_or_routed_7overlaps.dcp",
             "testCopyImplementation.dcp",
             
             // UltraScale
-            // "microblazeAndILA_3pblocks.dcp sl_iport0_o_0[1] u_ila_0_clk_out1",
-            // "microblazeAndILA_3pblocks_2024.1.dcp sl_iport0_o_0[1] u_ila_0_clk_out1",
+            "microblazeAndILA_3pblocks.dcp base_mb_i/clk_wiz_1/inst/clk_out1 base_mb_i/clk_wiz_1/inst/clkfbout_buf_base_mb_clk_wiz_1_0 base_mb_i/mdm_1/U0/No_Dbg_Reg_Access.BUFG_DRCK/Dbg_Clk_31 dbg_hub/inst/BSCANID.u_xsdbm_id/itck_i",
+            "microblazeAndILA_3pblocks_2024.1.dcp base_mb_i/clk_wiz_1/inst/clk_out1 base_mb_i/clk_wiz_1/inst/clkfbout_buf_base_mb_clk_wiz_1_0 base_mb_i/mdm_1/U0/No_Dbg_Reg_Access.BUFG_DRCK/Dbg_Clk_31 dbg_hub/inst/BSCANID.u_xsdbm_id/itck_i",
 
             // Versal
             "noc_tutorial_routed.dcp",
@@ -60,7 +74,7 @@ public class TestNetTools {
         }
         HashSet<String> globalClockNamesFromRWRoute = new HashSet<>();
         Design design = RapidWrightDCP.loadDCP(path);
-        System.out.println(design.getDevice().getSeries());
+        System.out.println("Series:" + design.getDevice().getSeries());
 
         for (Net net: design.getNets()) {
             if (NetTools.isGlobalClockNet(net)) {
