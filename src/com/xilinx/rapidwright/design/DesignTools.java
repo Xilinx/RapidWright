@@ -3162,8 +3162,12 @@ public class DesignTools {
     }
 
     public static void createPossiblePinsToStaticNets(Design design) {
-        createA1A6ToStaticNets(design);
-        createCeClkOfRoutethruFFToVCC(design);
+        if (design.getSeries() == Series.Versal) {
+            // TODO
+        } else {
+            createA1A6ToStaticNets(design);
+            createCeClkOfRoutethruFFToVCC(design);
+        }
         createCeSrRstPinsToVCC(design);
     }
 
