@@ -39,7 +39,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -2262,8 +2261,10 @@ public class DesignTools {
      * @since 2023.1.2
      */
     public static List<String> getAllRoutedSitePinsFromPhysicalPin(Cell cell, Net net, String belPinName) {
+        if (belPinName == null) {
+            return Collections.emptyList();
+        }
         SiteInst inst = cell.getSiteInst();
-        if (belPinName == null) return Collections.emptyList();
         List<String> sitePins = new ArrayList<>();
         Set<String> siteWires = new HashSet<>(inst.getSiteWiresFromNet(net));
         Queue<BELPin> queue = new LinkedList<>();
@@ -2280,18 +2281,28 @@ public class DesignTools {
             }
             if (curr.isInput()) {
                 BELPin source = curr.getSourcePin();
-                if (source == null) return Collections.emptyList();
+                if (source == null) {
+                    return Collections.emptyList();
+                }
                 if (source.isSitePort()) {
                     return Collections.singletonList(source.getName());
-                } else if (source.getBEL().getBELClass() == BELClass.RBEL) {
-                    SitePIP sitePIP = inst.getUsedSitePIP(source.getBELName());
-                    if (sitePIP == null) continue;
-                    queue.add(sitePIP.getInputPin());
-                } else if (source.getBEL().isLUT() || source.getBEL().getBELType().endsWith("MUX")) {
-                    Cell possibleRouteThru = inst.getCell(source.getBEL());
-                    if (possibleRouteThru != null && possibleRouteThru.isRoutethru()) {
-                        String routeThru = possibleRouteThru.getPinMappingsP2L().keySet().iterator().next();
-                        queue.add(source.getBEL().getPin(routeThru));
+                } else {
+                    BEL bel = source.getBEL();
+                    if (bel.getBELClass() == BELClass.RBEL) {
+                        SitePIP sitePIP = inst.getUsedSitePIP(source.getBELName());
+                        if (sitePIP == null) {
+                            continue;
+                        }
+                        queue.add(sitePIP.getInputPin());
+                    } else if (bel.isLUT() ||
+                            bel.getBELType().endsWith("MUX") || // F[789]MUX
+                            // Versal
+                            bel.getName().endsWith("_IMR")) {
+                        Cell possibleRouteThru = inst.getCell(bel);
+                        if (possibleRouteThru != null && possibleRouteThru.isRoutethru()) {
+                            String routeThru = possibleRouteThru.getPinMappingsP2L().keySet().iterator().next();
+                            queue.add(bel.getPin(routeThru));
+                        }
                     }
                 }
             } else { // output
@@ -3288,14 +3299,17 @@ public class DesignTools {
                             continue;
                         }
 
-                        Net net = si.getNetFromSiteWire(sitePinName);
-                        if (net != null) {
-                            // It is possible for sitewire to be assigned to a non VCC net, but a SitePinInst to not yet exist
-                            assert(!net.isVCCNet());
-                            continue;
+                        Net sitePinNet = si.getNetFromSiteWire(sitePinName);
+                        if (sitePinNet != null) {
+                            if (sitePinNet != vccNet) {
+                                // It is possible for sitewire to be assigned to a non VCC net, but a SitePinInst to not yet exist
+                                assert(!sitePinNet.isGNDNet());
+                                continue;
+                            }
+                        } else {
+                            BELPin belPin = bel.getPin(belPinName);
+                            assert(si.getNetFromSiteWire(belPin.getSiteWireName()) == sitePinNet);
                         }
-                        BELPin belPin = bel.getPin(belPinName);
-                        assert(si.getNetFromSiteWire(belPin.getSiteWireName()) == null);
 
                         SitePinInst spi = new SitePinInst(false, sitePinName, si);
                         boolean updateSiteRouting = false;
