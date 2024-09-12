@@ -2516,26 +2516,28 @@ public class DesignTools {
 
     /**
      * Looks backwards from a SitePinInst output pin and finds the corresponding BELPin of the
-     * driver.
+     * driver. Walk through any used SitePIPs found until a non routing BEL is found.
      * @param sitePinInst The output site pin instance from which to find the logical driver.
      * @return The logical driver's BELPin of the provided sitePinInst.
      */
     public static BELPin getLogicalBELPinDriver(SitePinInst sitePinInst) {
-        if (!sitePinInst.isOutPin()) return null;
+        if (!sitePinInst.isOutPin()) {
+            return null;
+        }
         SiteInst siteInst = sitePinInst.getSiteInst();
-        for (BELPin pin : sitePinInst.getBELPin().getSiteConns()) {
-            if (pin.isInput()) continue;
-            if (pin.getBEL().getBELClass() == BELClass.RBEL) {
-                SitePIP p = siteInst.getUsedSitePIP(pin.getBELName());
-                if (p == null) continue;
-                for (BELPin pin2 : p.getInputPin().getSiteConns()) {
-                    if (pin2.isOutput()) {
-                        return pin2;
-                    }
-                }
+        BELPin pin = sitePinInst.getBELPin().getSourcePin();
+        while (pin.getBEL().getBELClass() == BELClass.RBEL) {
+            SitePIP p = siteInst.getUsedSitePIP(pin.getBELName());
+            if (p == null) {
+                pin = null;
+                break;
             }
+            pin = p.getInputPin().getSourcePin();
+        }
+        if (pin != null) {
             return pin;
         }
+
         // Looks like the approach above failed (site may not be routed), try logical path
         Net net = sitePinInst.getNet();
         if (net == null) return null;
