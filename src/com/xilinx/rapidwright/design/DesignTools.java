@@ -2563,7 +2563,9 @@ public class DesignTools {
      */
     public static boolean routeAlternativeOutputSitePin(Net net, SitePinInst sitePinInst) {
         if (sitePinInst == null) return false;
-        net.setAlternateSource(sitePinInst);
+        if (net.getAlternateSource() == null) {
+            net.setAlternateSource(sitePinInst);
+        }
         sitePinInst.setNet(net);
 
         BELPin driver = getLogicalBELPinDriver(net.getSource());
