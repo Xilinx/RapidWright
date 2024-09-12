@@ -3171,10 +3171,16 @@ public class DesignTools {
         Net vcc = design.getVccNet();
         Net gnd = design.getGndNet();
         for (SiteInst si : design.getSiteInsts()) {
-            if (!Utils.isSLICE(si)) continue;
-            for (BEL bel : si.getBELs()) {
-                Cell cell = si.getCell(bel);
-                if (cell == null || !cell.isFFRoutethruCell()) {
+            if (!Utils.isSLICE(si)) {
+                continue;
+            }
+            for (Cell cell : si.getCells()) {
+                if (!cell.isFFRoutethruCell()) {
+                    continue;
+                }
+
+                BEL bel = cell.getBEL();
+                if (bel == null) {
                     continue;
                 }
 
