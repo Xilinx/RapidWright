@@ -224,7 +224,7 @@ public class PartialRouter extends RWRoute {
             return NodeStatus.INUSE;
         }
         if (preservedNet != null) {
-            if (!softPreserve || net.isStaticNet()) {
+            if (!softPreserve) {
                 return NodeStatus.UNAVAILABLE;
             }
 
@@ -331,7 +331,7 @@ public class PartialRouter extends RWRoute {
 
                         // This could be a leftover node from a previously unpreserved net
                         // (with its prev pointer set to allow its routing to be recovered)
-                        // Fall through so that this can be cleared
+                        // Fall through so that this can be cleared and blocked
                     } else {
                         if (preservedNet == null) {
                             // Assume this node has already been unpreserved
