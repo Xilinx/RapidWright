@@ -372,7 +372,6 @@ public class PartialRouter extends RWRoute {
                 }
             }
         }
-
         return unpreserveNets;
     }
 
