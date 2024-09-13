@@ -71,8 +71,4 @@ public class NetTools {
         // fallback
         return net.isClockNet();
     }
-
-    public static boolean isGlobalNet(Net net) {
-        return net.isStaticNet() || isGlobalClockNet(net);
-    }
 }
