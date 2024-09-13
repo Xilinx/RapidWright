@@ -53,14 +53,14 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always() && matrix.os == 'ubuntu-latest'
         with:
-          name: Java Test Report ${{ matrix.single_threaded && '(Single Threaded)' || ''}}
+          name: Java Test Report ${{ matrix.single_threaded }}
           path: build/reports/tests/testJava
 
       - name: Upload Test Results
         if: always() && matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: Unit Test Results ${{ matrix.single_threaded && '(Single Threaded)' || ''}}
+          name: Unit Test Results ${{ matrix.single_threaded }}
           path: |
             build/test-results/**/*.xml
 
