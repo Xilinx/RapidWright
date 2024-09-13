@@ -98,7 +98,7 @@ public class TestNetTools {
         System.out.println("Series:" + design.getDevice().getSeries());
 
         for (Net net: design.getNets()) {
-            if (NetTools.isGlobalClockNet(net)) {
+            if (NetTools.isGlobalClock(net)) {
                 globalClockNamesFromRWRoute.add(net.getName());
             }
         }
