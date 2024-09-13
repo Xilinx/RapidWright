@@ -2470,12 +2470,12 @@ public class DesignTools {
     public static List<SitePinInst> getLegalAlternativeOutputPins(Net net) {
         SitePinInst src = net.getSource();
         if (src == null) {
-            return null;
+            return Collections.emptyList();
         }
         SiteInst siteInst = src.getSiteInst();
         // Currently only support SLICE scenarios
         if (!Utils.isSLICE(siteInst)) {
-            return null;
+            return Collections.emptyList();
         }
 
         // Series 7: AMUX <-> A, BMUX <-> B, CMUX <-> C, DMUX <-> D
@@ -2486,7 +2486,9 @@ public class DesignTools {
 
         // Find the logical source
         BELPin logicalSource = getLogicalBELPinDriver(src);
-        if (logicalSource == null) return null;
+        if (logicalSource == null) {
+            return Collections.emptyList();
+        }
         q.add(logicalSource);
 
         List<SitePinInst> alternateSpis = new ArrayList<>(0);
