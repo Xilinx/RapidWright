@@ -146,4 +146,5 @@ task testLsf(type: JavaExec) {
   doFirst {
     project.mkdir(workingDir)
   }
+  enableAssertions = true
 }
