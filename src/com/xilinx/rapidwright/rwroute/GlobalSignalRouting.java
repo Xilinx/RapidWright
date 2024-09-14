@@ -43,6 +43,7 @@ import com.xilinx.rapidwright.placer.blockplacer.SmallestEnclosingCircle;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
+import com.xilinx.rapidwright.rwroute.RouterHelper.RouteNodeWithPrev;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -93,7 +94,7 @@ public class GlobalSignalRouting {
             clkPIPs.addAll(RouterHelper.getPIPsFromNodes(nodes));
 
             Node hDistr = nodes.get(nodes.size() - 1);
-            RouteNode hdistr = new RouteNode(hDistr.getTile(), hDistr.getWireIndex());
+            RouteNode hdistr = new RouteNode(hDistr);
             horDistributionLines.put(getDominateClockRegionOfNode(hDistr), hdistr);
         }
         clk.setPIPs(clkPIPs);
@@ -330,50 +331,32 @@ public class GlobalSignalRouting {
                                       Design design, RouteThruHelper routeThruHelper) {
         NetType netType = currNet.getType();
         Set<PIP> netPIPs = new HashSet<>(currNet.getPIPs());
-        Queue<LightweightRouteNode> q = new LinkedList<>();
-        Set<LightweightRouteNode> visitedRoutingNodes = new HashSet<>();
-        Set<LightweightRouteNode> usedRoutingNodes = new HashSet<>();
-        Map<Node, LightweightRouteNode> createdRoutingNodes = new HashMap<>();
-
-        boolean debug = false;
-        if (debug) {
-            System.out.println("Net: " + currNet.getName());
-        }
-
+        Queue<RouteNodeWithPrev> q = new LinkedList<>();
+        Set<Node> visitedRoutingNodes = new HashSet<>();
+        Set<Node> usedRoutingNodes = new HashSet<>();
+        Map<Node, RouteNodeWithPrev> nodeMap = new HashMap<>();
         Set<SitePin> sitePinsToCreate = new HashSet<>();
         for (SitePinInst sink : currNet.getPins()) {
-            if (sink.isRouted()) continue;
-            if (sink.isOutPin()) continue;
-            int watchdog = 10000;
-            if (debug) {
-                System.out.println("SINK: TILE = " + sink.getTile().getName() + " NODE = " + sink.getConnectedNode().toString());
+            if (sink.isRouted() || sink.isOutPin()) {
+                continue;
             }
+            int watchdog = 10000;
             q.clear();
             visitedRoutingNodes.clear();
             List<Node> pathNodes = new ArrayList<>();
-            Node node = sink.getConnectedNode();
-            if (debug) System.out.println(node);
-            LightweightRouteNode sinkRNode = RouterHelper.createRoutingNode(node, createdRoutingNodes);
-            sinkRNode.setPrev(null);
-            q.add(sinkRNode);
+            RouteNodeWithPrev rnode = nodeMap.computeIfAbsent(sink.getConnectedNode(), RouteNodeWithPrev::new);
+            rnode.setPrev(null);
+            q.add(rnode);
             boolean success = false;
             while (!q.isEmpty()) {
-                LightweightRouteNode routingNode = q.poll();
-                visitedRoutingNodes.add(routingNode);
-                if (debug) System.out.println("DEQUEUE:" + routingNode);
-                if (debug) System.out.println(", PREV = " + routingNode.getPrev() == null ? " null" : routingNode.getPrev());
-                if (success = isThisOurStaticSource(design, routingNode, netType, usedRoutingNodes)) {
-                    //trace back for a complete path
-                    if (debug) {
-                        System.out.println("SINK: TILE = " + sink.getTile().getName() + " NODE = " + sink.getConnectedNode().toString());
-                        System.out.println("SOURCE " + routingNode.toString() + " found");
-                    }
-                    while (routingNode != null) {
-                        usedRoutingNodes.add(routingNode);// use routed RNodes as the source
-                        pathNodes.add(routingNode.getNode());
-
-                        if (debug) System.out.println("  " + routingNode.toString());
-                        routingNode = routingNode.getPrev();
+                rnode = q.poll();
+                visitedRoutingNodes.add(rnode);
+                if (success = isThisOurStaticSource(design, rnode, netType, usedRoutingNodes)) {
+                    // trace back for a complete path
+                    while (rnode != null) {
+                        usedRoutingNodes.add(rnode);
+                        pathNodes.add(rnode);
+                        rnode = rnode.getPrev();
                     }
 
                     // Note that the static net router goes backward from sinks to sources,
@@ -384,30 +367,46 @@ public class GlobalSignalRouting {
                     // to add as a new source pin
                     Node sourceNode = pathNodes.get(0);
                     if (((currNet.getType() == NetType.GND && !sourceNode.isTiedToGnd()) ||
-                            (currNet.getType() == NetType.VCC && !sourceNode.isTiedToVcc()))) {
+                         (currNet.getType() == NetType.VCC && !sourceNode.isTiedToVcc()))) {
                         SitePin sitePin = sourceNode.getSitePin();
                         if (sitePin != null && !sitePin.isInput()) {
                             sitePinsToCreate.add(sitePin);
                         }
                     }
-
-                    if (debug) {
-                        for (Node pathNode:pathNodes) {
-                            System.out.println(pathNode.toString());
-                        }
-                    }
                     break;
                 }
-                if (debug) {
-                    System.out.println("KEEP LOOKING FOR A SOURCE...");
-                }
-                for (Node uphillNode : routingNode.getNode().getAllUphillNodes()) {
-                    if (routeThruHelper.isRouteThru(uphillNode, routingNode.getNode())) continue;
-                    LightweightRouteNode nParent = RouterHelper.createRoutingNode(uphillNode, createdRoutingNodes);
-                    if (!pruneNode(nParent, getNodeState, visitedRoutingNodes, usedRoutingNodes)) {
-                        nParent.setPrev(routingNode);
-                        q.add(nParent);
+                for (Node uphillNode : rnode.getAllUphillNodes()) {
+                    if (routeThruHelper.isRouteThru(uphillNode, rnode)) {
+                        continue;
                     }
+
+                    switch(uphillNode.getIntentCode()) {
+                        case NODE_GLOBAL_VDISTR:
+                        case NODE_GLOBAL_HROUTE:
+                        case NODE_GLOBAL_HDISTR:
+                        case NODE_HLONG:
+                        case NODE_VLONG:
+                        case NODE_GLOBAL_VROUTE:
+                        case NODE_GLOBAL_LEAF:
+                        case NODE_GLOBAL_BUFG:
+                            continue;
+                    }
+                    NodeStatus status = getNodeState.apply(uphillNode);
+                    if (status == NodeStatus.UNAVAILABLE) {
+                        continue;
+                    }
+                    if (status == NodeStatus.INUSE) {
+                        boolean visited = visitedRoutingNodes.add(uphillNode);
+                        assert(!visited);
+                        usedRoutingNodes.add(uphillNode);
+                    } else {
+                        if (!visitedRoutingNodes.add(uphillNode)) {
+                            continue;
+                        }
+                    }
+                    RouteNodeWithPrev uphillRnode = nodeMap.computeIfAbsent(sink.getConnectedNode(), RouteNodeWithPrev::new);
+                    uphillRnode.setPrev(rnode);
+                    q.add(uphillRnode);
                 }
                 watchdog--;
                 if (watchdog < 0) {
@@ -453,72 +452,26 @@ public class GlobalSignalRouting {
     }
 
     /**
-     * Checks if a {@link LightweightRouteNode} instance that represents a {@link Node} object should be pruned.
-     * @param routingNode The RoutingNode in question.
-     * @param getNodeStatus Lambda for indicating the status of a Node: available, in-use (preserved
-     *                      for same net as we're routing), or unavailable (preserved for other net).
-     * @param visitedRoutingNodes RoutingNode instances that have been visited.
-     * @return true, if the RoutingNode instance should not be considered as an available resource.
-     */
-    private static boolean pruneNode(LightweightRouteNode routingNode,
-                                     Function<Node,NodeStatus> getNodeStatus,
-                                     Set<LightweightRouteNode> visitedRoutingNodes,
-                                     Set<LightweightRouteNode> usedRoutingNodes) {
-        Node node = routingNode.getNode();
-        IntentCode ic = node.getTile().getWireIntentCode(node.getWireIndex());
-        switch(ic) {
-            case NODE_GLOBAL_VDISTR:
-            case NODE_GLOBAL_HROUTE:
-            case NODE_GLOBAL_HDISTR:
-            case NODE_HLONG:
-            case NODE_VLONG:
-            case NODE_GLOBAL_VROUTE:
-            case NODE_GLOBAL_LEAF:
-            case NODE_GLOBAL_BUFG:
-                return true;
-            default:
-        }
-        NodeStatus status = getNodeStatus.apply(node);
-        if (status == NodeStatus.UNAVAILABLE) {
-            return true;
-        }
-        if (status == NodeStatus.INUSE) {
-            assert(!visitedRoutingNodes.contains(routingNode));
-            usedRoutingNodes.add(routingNode);
-            return false;
-        }
-        return visitedRoutingNodes.contains(routingNode);
-    }
-    /**
-     * Determines if the given {@link LightweightRouteNode} instance that represents a {@link Node} instance can serve as our sink.
-     * @param routingNode The {@link LightweightRouteNode} instance in question.
+     * Determines if the given {@link Node} instance can serve as our sink.
+     * @param node The {@link Node} instance in question.
      * @param type The net type to designate the static source type.
      * @param usedRoutingNodes The used RoutingNode instances by of the given net type representing the VCC or GND net.
      * @return true if this sources is usable, false otherwise.
      */
-    private static boolean isThisOurStaticSource(Design design, LightweightRouteNode routingNode, NetType type, Set<LightweightRouteNode> usedRoutingNodes) {
-        if (usedRoutingNodes != null && usedRoutingNodes.contains(routingNode))
+    private static boolean isThisOurStaticSource(Design design,
+                                                 Node node,
+                                                 NetType type,
+                                                 Set<Node> usedRoutingNodes) {
+        if (usedRoutingNodes != null && usedRoutingNodes.contains(node))
             return true;
-        Node node = routingNode.getNode();
-        return isNodeUsableStaticSource(node, type, design);
-    }
 
-    /**
-     * This method handles queries during the static source routing process.
-     * It determines if the node in question can be used as a source for the current NetType.
-     * @param node The node in question.
-     * @param type The {@link NetType} instance to indicate what kind of static source we need (GND/VCC).
-     * @param design The design instance to use for getting corresponding {@link SiteInst} instance info.
-     * @return True if the pin is a hard source or an unused LUT output that can be repurposed as a source.
-     */
-    private static boolean isNodeUsableStaticSource(Node node, NetType type, Design design) {
         // We should look for 3 different potential sources
         // before we stop:
         // (1) GND_WIRE
         // (2) VCC_WIRE
         // (3) Unused LUT Outputs ([A-H]_O, [A-H]MUX)
         if ((type == NetType.VCC && node.isTiedToVcc()) ||
-                (type == NetType.GND && node.isTiedToGnd())) {
+            (type == NetType.GND && node.isTiedToGnd())) {
             return true;
         }
         String wireName = node.getWireName();

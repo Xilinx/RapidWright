@@ -65,6 +65,36 @@ import com.xilinx.rapidwright.util.Utils;
  * A collection of supportive methods for the router.
  */
 public class RouterHelper {
+    static class RouteNodeWithPrev extends Node {
+        protected RouteNodeWithPrev prev;
+        RouteNodeWithPrev(Node node) {
+            super(node);
+        }
+
+        void setPrev(RouteNodeWithPrev prev) {
+            this.prev = prev;
+        }
+
+        RouteNodeWithPrev getPrev() {
+            return prev;
+        }
+    }
+
+    static class RouteNodeWithPrevAndDelay extends RouteNodeWithPrev {
+        short delay;
+        RouteNodeWithPrevAndDelay(Node node) {
+            super(node);
+        }
+
+        void setDelay(int delay) {
+            this.delay = (short) delay;
+        }
+
+        short getDelay() {
+            return delay;
+        }
+    }
+
     /**
      * Checks if a {@link Net} instance has source and sink {@link SitePinInst} instances to be routable.
      * @param net The net to be checked.
@@ -165,23 +195,25 @@ public class RouterHelper {
      */
     public static List<Node> projectInputPinToINTNode(SitePinInst input) {
         List<Node> sinkToSwitchBoxPath = new ArrayList<>();
-        LightweightRouteNode sink = new LightweightRouteNode(input.getConnectedNode());
+        RouteNodeWithPrev sink = new RouteNodeWithPrev(input.getConnectedNode());
         sink.setPrev(null);
-        Queue<LightweightRouteNode> q = new LinkedList<>();
+        Queue<RouteNodeWithPrev> q = new LinkedList<>();
         q.add(sink);
         int watchdog = 1000;
         while (!q.isEmpty()) {
-            LightweightRouteNode n = q.poll();
-            if (n.getNode().getTile().getTileTypeEnum() == TileTypeEnum.INT) {
+            RouteNodeWithPrev n = q.poll();
+            if (n.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
                 while (n != null) {
-                    sinkToSwitchBoxPath.add(n.getNode());
+                    sinkToSwitchBoxPath.add(n);
                     n = n.getPrev();
                 }
                 return sinkToSwitchBoxPath;
             }
-            for (Node uphill : n.getNode().getAllUphillNodes()) {
-                if (uphill.getAllUphillNodes().size() == 0) continue;
-                LightweightRouteNode prev = new LightweightRouteNode(uphill);
+            for (Node uphill : n.getAllUphillNodes()) {
+                if (uphill.getAllUphillNodes().size() == 0) {
+                    continue;
+                }
+                RouteNodeWithPrev prev = new RouteNodeWithPrev(uphill);
                 prev.setPrev(n);
                 q.add(prev);
             }
@@ -520,21 +552,21 @@ public class RouterHelper {
      * @param estimator An instantiation of DelayEstimatorBase.
      * @return The map containing net delay for each sink pin paired with an INT tile node of a routed net.
      */
-    public static Map<Pair<SitePinInst, Node>, Short> getSourceToSinkINTNodeDelays(Net net, DelayEstimatorBase estimator) {
+    public static Map<SitePinInst, Pair<Node,Short>> getSourceToSinkINTNodeDelays(Net net, DelayEstimatorBase estimator) {
         List<PIP> pips = net.getPIPs();
-        Map<Node, LightweightRouteNode> nodeRoutingNodeMap = new HashMap<>();
+        Map<Node, RouteNodeWithPrevAndDelay> nodeMap = new HashMap<>();
         boolean firstPIP = true;
         for (PIP pip : pips) {
             Node startNode = pip.getStartNode();
-            LightweightRouteNode startrn = createRoutingNode(pip.getStartNode(), nodeRoutingNodeMap);
+            RouteNodeWithPrevAndDelay startrn = nodeMap.computeIfAbsent(startNode, RouteNodeWithPrevAndDelay::new);
 
             if (firstPIP) {
-                startrn.setDelayFromSource(0);
+                startrn.setDelay(0);
             }
             firstPIP = false;
 
             Node endNode = pip.getEndNode();
-            LightweightRouteNode endrn = createRoutingNode(endNode, nodeRoutingNodeMap);
+            RouteNodeWithPrevAndDelay endrn = nodeMap.computeIfAbsent(startNode, RouteNodeWithPrevAndDelay::new);
             endrn.setPrev(startrn);
             int delay = 0;
             if (endNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {//device independent?
@@ -542,36 +574,21 @@ public class RouterHelper {
                         + DelayEstimatorBase.getExtraDelay(endNode, DelayEstimatorBase.isLong(startNode));
             }
 
-            endrn.setDelayFromSource(startrn.getDelayFromSource() + delay);
+            endrn.setDelay(startrn.getDelay() + delay);
         }
 
-        Map<Pair<SitePinInst, Node>, Short> sinkNodeDelays = new HashMap<>();
+        Map<SitePinInst, Pair<Node,Short>> sinkNodeDelays = new HashMap<>();
         for (SitePinInst sink : net.getSinkPins()) {
             Node sinkNode = sink.getConnectedNode();
-            if (!(sinkNode.getTile().getTileTypeEnum() == TileTypeEnum.INT)) {
+            if (sinkNode.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
                 sinkNode = projectInputPinToINTNode(sink).get(0);
             }
 
-            short routeDelay = (short) nodeRoutingNodeMap.get(sinkNode).getDelayFromSource();
-            sinkNodeDelays.put(new Pair<>(sink, sinkNode), routeDelay);
+            short routeDelay = nodeMap.get(sinkNode).getDelay();
+            sinkNodeDelays.put(sink, new Pair<>(sinkNode,routeDelay));
         }
 
         return sinkNodeDelays;
-    }
-
-    /**
-     * Creates a {@link LightweightRouteNode} Object based on a {@link Node} Object, avoiding duplicates.
-     * @param node The {@link Node} instance that is used to create a RoutingNode object.
-     * @param createdRoutingNodes A map storing created {@link LightweightRouteNode} instances and corresponding {@link Node} instances.
-     * @return A created RoutingNode instance based on a node
-     */
-    public static LightweightRouteNode createRoutingNode(Node node, Map<Node, LightweightRouteNode> createdRoutingNodes) {
-        LightweightRouteNode resourceNode = createdRoutingNodes.get(node);
-        if (resourceNode == null) {
-            resourceNode = new LightweightRouteNode(node);
-            createdRoutingNodes.put(node, resourceNode);
-        }
-        return resourceNode;
     }
 
     /**
@@ -613,25 +630,25 @@ public class RouterHelper {
             path.add(source);
             return path;
         }
-        LightweightRouteNode sourcer = new LightweightRouteNode(source);
+        RouteNodeWithPrev sourcer = new RouteNodeWithPrev(source);
         sourcer.setPrev(null);
-        Queue<LightweightRouteNode> queue = new LinkedList<>();
+        Queue<RouteNodeWithPrev> queue = new LinkedList<>();
         queue.add(sourcer);
 
         int watchdog = 10000;
         boolean success = false;
         while (!queue.isEmpty()) {
-            LightweightRouteNode curr = queue.poll();
-            if (curr.getNode().equals(sink)) {
+            RouteNodeWithPrev curr = queue.poll();
+            if (curr.equals(sink)) {
                 while (curr != null) {
-                    path.add(curr.getNode());
+                    path.add(curr);
                     curr = curr.getPrev();
                 }
                 success = true;
                 break;
             }
-            for (Node n : curr.getNode().getAllDownhillNodes()) {
-                LightweightRouteNode child = new LightweightRouteNode(n);
+            for (Node n : curr.getAllDownhillNodes()) {
+                RouteNodeWithPrev child = new RouteNodeWithPrev(n);
                 child.setPrev(curr);
                 queue.add(child);
             }
@@ -699,5 +716,4 @@ public class RouterHelper {
         reader.close();
         return path;
     }
-
 }
