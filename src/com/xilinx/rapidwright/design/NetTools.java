@@ -39,10 +39,7 @@ public class NetTools {
             SiteTypeEnum.BUFG_GT,       // US/US+ and Versal
             SiteTypeEnum.BUFG_PS,       // US/US+ and Versal
             SiteTypeEnum.BUFG_FABRIC,   // Versal
-            SiteTypeEnum.BUFIO,         // Series-7
-            SiteTypeEnum.BUFR,          // Series-7
-            SiteTypeEnum.BUFHCE,        // Series-7
-            SiteTypeEnum.BUFMRCE        // Series-7
+            SiteTypeEnum.BUFHCE         // Series-7
         ));
     }
 
