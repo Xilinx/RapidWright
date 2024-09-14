@@ -26,46 +26,31 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
-import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 
 public class NetTools {
-    private static Set<SiteTypeEnum> commonClkSrcSiteTypeEnums = EnumSet.noneOf(SiteTypeEnum.class);
+    private static Set<SiteTypeEnum> clkSrcSiteTypeEnums = EnumSet.noneOf(SiteTypeEnum.class);
     static {
-        commonClkSrcSiteTypeEnums.addAll(List.of(
-            SiteTypeEnum.BUFGCE,
-            SiteTypeEnum.BUFGCE_DIV,
-            SiteTypeEnum.BUFGCTRL,
-            SiteTypeEnum.BUFG_GT,
-            SiteTypeEnum.BUFG_PS
-        ));
-    }
-    private static Set<SiteTypeEnum> clkSrcSiteTypeEnumsOfUSOnly = EnumSet.noneOf(SiteTypeEnum.class);
-    static {
-        clkSrcSiteTypeEnumsOfUSOnly.addAll(List.of(
-            SiteTypeEnum.BUFG
-        ));
-    }
-
-    private static Set<SiteTypeEnum> clkSrcSiteTypeEnumsOfVersalOnly = EnumSet.noneOf(SiteTypeEnum.class);
-    static {
-        clkSrcSiteTypeEnumsOfVersalOnly.addAll(List.of(
-            SiteTypeEnum.BUFG_FABRIC
+        clkSrcSiteTypeEnums.addAll(List.of(
+            SiteTypeEnum.BUFGCE,        // All supported series
+            SiteTypeEnum.BUFGCTRL,      // All supported series
+            SiteTypeEnum.BUFG,          // All supported series
+            SiteTypeEnum.BUFGCE_DIV,    // US/US+ and Versal
+            SiteTypeEnum.BUFG_GT,       // US/US+ and Versal
+            SiteTypeEnum.BUFG_PS,       // US/US+ and Versal
+            SiteTypeEnum.BUFG_FABRIC,   // Versal
+            SiteTypeEnum.BUFIO,         // Series-7
+            SiteTypeEnum.BUFR,          // Series-7
+            SiteTypeEnum.BUFHCE,        // Series-7
+            SiteTypeEnum.BUFMRCE        // Series-7
         ));
     }
 
     public static boolean isGlobalClock(Net net) {
-        Series series = net.getDesign().getDevice().getSeries();
         SitePinInst srcSpi = net.getSource();
         if (srcSpi == null)
             return false;        
         
-        if (series == Series.UltraScale || series == Series.UltraScalePlus) {
-            return commonClkSrcSiteTypeEnums.contains(srcSpi.getSiteTypeEnum()) || clkSrcSiteTypeEnumsOfUSOnly.contains(srcSpi.getSiteTypeEnum());
-        }
-
-        // Not support other series yet
-        assert(series == Series.Versal);
-        return commonClkSrcSiteTypeEnums.contains(srcSpi.getSiteTypeEnum()) ||  clkSrcSiteTypeEnumsOfVersalOnly.contains(srcSpi.getSiteTypeEnum());
+        return clkSrcSiteTypeEnums.contains(srcSpi.getSiteTypeEnum());
     }
 }

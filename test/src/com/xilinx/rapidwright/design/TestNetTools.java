@@ -23,26 +23,25 @@ package com.xilinx.rapidwright.design;
 
 import java.util.HashSet;
 
-import com.xilinx.rapidwright.support.RapidWrightDCP;
-
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+
 public class TestNetTools {
     /**
-     * Tests the method NetTools.isGlobalClockNet(Net net).
+     * Tests the method NetTools.isGlobalClock(Net net).
      * For each DCP file, Vivado uses the TCL command 
      *      get_nets -hier -parent_net -filter { TYPE == "GLOBAL_CLOCK" } 
      * to retrieve all nets of type GLOBAL_CLOCK. 
-     * The method NetTools.isGlobalClockNet(Net net) returns true for these nets and false for others.
+     * The method NetTools.isGlobalClock(Net net) returns true for these nets and false for others.
      * 
-     * All Versal/Ultrascale+ designs under the RapidWrightDCP path will be checked, except for the following:
+     * All Versal/Ultrascale+/Series-7 designs under the RapidWrightDCP path will be checked, except for the following:
      *      picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp    The source cell bufgce_inst of this design is not placed yet.
      *      picoblaze_ooc_X10Y235_unreadable_edif.dcp       This design would call vivado to generate an readable EDIF file.
      *      two_clk_check_NetTools.dcp                      This design is not added to the RapidWrightDCP yet.
      * 
-     * All Series-7 designs are not supported by NetTools.isGlobalClockNet(Net net) yet, so they are not tested now.
      * @param pathAndlobalClockNames Use ' ' as the delimiter to split this string, where the first element is the path to the DCP file, 
      *                               and the remaining elements are the names of the global clock nets reported by Vivado.
      */
@@ -78,38 +77,38 @@ public class TestNetTools {
             // "two_clk_check_NetTools.dcp clk1_IBUF_BUFG clk2_IBUF_BUFG rst1 rst2",
 
             // Series-7
-            // "bug226.dcp murax.apb3Router_1.io_mainClk",
-            // "bug349.dcp CLK_BUFG_BOT_R_X60Y48_BUFGCTRL_X0Y0_O",
-            // "bug635.dcp",
-            // "bug709.dcp clk_IBUF_BUFG",
-            // "ramb18.dcp",
-            // "routethru_luts.dcp",
-            // "routethru_pip.dcp",
+            "bug226.dcp murax.apb3Router_1.io_mainClk",
+            "bug349.dcp CLK_BUFG_BOT_R_X60Y48_BUFGCTRL_X0Y0_O",
+            "bug635.dcp",
+            "bug709.dcp clk_IBUF_BUFG",
+            "ramb18.dcp",
+            "routethru_luts.dcp",
+            "routethru_pip.dcp",
     })
-    public void testIsGlobalClockNet(String pathAndlobalClockNames) {
+    public void testisGlobalClock(String pathAndlobalClockNames) {
         String[] tmpList = pathAndlobalClockNames.split(" ");
         String path = tmpList[0];
         HashSet<String> globalClockNamesFromVivado = new HashSet<>();
         for (int i = 1; i < tmpList.length; i++) {
             globalClockNamesFromVivado.add(tmpList[i]);
         }
-        HashSet<String> globalClockNamesFromRWRoute = new HashSet<>();
+        HashSet<String> globalClockNamesFromNetTools = new HashSet<>();
         Design design = RapidWrightDCP.loadDCP(path);
-        System.out.println("Series:" + design.getDevice().getSeries());
+        System.out.println("Series: " + design.getDevice().getSeries());
 
         for (Net net: design.getNets()) {
             if (NetTools.isGlobalClock(net)) {
-                globalClockNamesFromRWRoute.add(net.getName());
+                globalClockNamesFromNetTools.add(net.getName());
             }
         }
         System.out.println("-----------Vivado------------");
-        for (String nameInVivado: globalClockNamesFromVivado) {
-            System.out.println(nameInVivado);
+        for (String clkName: globalClockNamesFromVivado) {
+            System.out.println(clkName);
         }
-        System.out.println("-----------RWRoute-----------");
-        for (String nameInRWRoute: globalClockNamesFromRWRoute) {
-            System.out.println(nameInRWRoute);
+        System.out.println("-----------NetTools-----------");
+        for (String clkName: globalClockNamesFromNetTools) {
+            System.out.println(clkName);
         }
-        Assertions.assertTrue(globalClockNamesFromVivado.equals(globalClockNamesFromRWRoute));
+        Assertions.assertEquals(globalClockNamesFromVivado,globalClockNamesFromNetTools);
     }
 }
