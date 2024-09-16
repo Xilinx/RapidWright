@@ -39,6 +39,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Part;
+import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
@@ -439,5 +442,50 @@ public class TestDesign {
         Net dout = design.getDevice().getSeries().equals(Series.UltraScalePlus) ? net
                 : design.getNet(ibufInst.getName() + "/O");
         Assertions.assertEquals(siteInst.getNetFromSiteWire("DOUT"), dout);
+    }
+
+    private void ensureDesignInSLR(Design d, int expectedSLR) {
+        for (SiteInst si : d.getSiteInsts()) {
+            Assertions.assertEquals(expectedSLR, si.getTile().getSLR().getId());
+        }
+        for (Net n : d.getNets()) {
+            for (PIP p : n.getPIPs()) {
+                Assertions.assertEquals(expectedSLR, p.getTile().getSLR().getId());
+            }
+        }
+    }
+
+    /**
+     * Tests relocating and retargeting a Picoblaze design from a vu3p to each of
+     * the three SLRs in a vu9p since all of the SLRs between the devices are
+     * relocation compatible.
+     * 
+     * @param tempDir Temp directory to write out results.
+     */
+    @Test
+    public void testRetargetPart(@TempDir Path tempDir) {
+        String targetPartName = "xcvu9p-flgb2104-2-i";
+        Part targetPart = PartNameTools.getPart(targetPartName);
+        int clockRegionHeight = 60;
+        Device targetDevice = Device.getDevice(targetPart);
+        for (int slr = 0; slr < targetDevice.getNumOfSLRs(); slr++) {
+            Design d = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+            assert (d.getDevice().getName().equals("xcvu3p"));
+            int tileDX = 0;
+            int tileDY = slr * targetDevice.getMasterSLR().getNumOfClockRegionRows() * clockRegionHeight;
+            Assertions.assertTrue(d.retargetPart(targetPart, tileDX, tileDY));
+            Path output = tempDir.resolve("retarget_" + slr + ".dcp");
+
+            Assertions.assertEquals(targetPartName, d.getPartName());
+            ensureDesignInSLR(d, slr);
+
+            d.writeCheckpoint(output);
+
+            Design d2 = Design.readCheckpoint(output);
+
+            Assertions.assertEquals(targetPartName, d2.getPartName());
+            ensureDesignInSLR(d2, slr);
+        }
+
     }
 }
