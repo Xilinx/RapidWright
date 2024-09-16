@@ -399,19 +399,6 @@ public class RouterHelper {
     }
 
     /**
-     * Checks if a DSP {@link BELPin} instance is invertible.
-     * @param belPin The bel pin in question.
-     * @return true, if the bel pin is invertible.
-     */
-    private static boolean isInvertibleDSPBELPin(BELPin belPin) {
-        if (belPin.getBELName().equals("CLKINV")) {
-            //NEED TO BE INVERTED when BEL.canInvert returns false
-            return true;
-        }
-        return belPin.getBEL().canInvert();
-    }
-
-    /**
      * Inverts all possible GND sink pins to VCC pins.
      * @param design The target design.
      * @param pins The GND net pins.
