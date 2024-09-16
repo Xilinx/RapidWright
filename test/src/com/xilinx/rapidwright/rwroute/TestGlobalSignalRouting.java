@@ -100,9 +100,9 @@ public class TestGlobalSignalRouting {
 
         GlobalSignalRouting.routeStaticNet(gndNet, gns, design, routeThruHelper);
         gndPins = gndNet.getPins();
-        Assertions.assertEquals(1858, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
+        Assertions.assertEquals(1852, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
         Assertions.assertEquals(22760, gndPins.stream().filter((spi) -> !spi.isOutPin()).count());
-        Assertions.assertEquals(39827, gndNet.getPIPs().size());
+        Assertions.assertEquals(39758, gndNet.getPIPs().size());
 
         GlobalSignalRouting.routeStaticNet(vccNet, gns, design, routeThruHelper);
         vccPins = vccNet.getPins();

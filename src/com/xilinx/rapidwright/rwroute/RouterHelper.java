@@ -78,6 +78,17 @@ public class RouterHelper {
         NodeWithPrev getPrev() {
             return prev;
         }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            if (obj == null)
+                return false;
+            // This method requires that object is Node or a subclass of one, otherwise exception will be thrown.
+            // If so, explicitly call the Node.equals(Node) overload, rather than the general-purpose Node.equals(Object).
+            return super.equals((Node) obj);
+        }
     }
 
     static class NodeWithDelay extends Node {
@@ -566,7 +577,7 @@ public class RouterHelper {
             firstPIP = false;
 
             Node endNode = pip.getEndNode();
-            NodeWithDelay endrn = nodeMap.computeIfAbsent(startNode, NodeWithDelay::new);
+            NodeWithDelay endrn = nodeMap.computeIfAbsent(endNode, NodeWithDelay::new);
             int delay = 0;
             if (endNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {//device independent?
                 delay = computeNodeDelay(estimator, endNode)
@@ -580,7 +591,12 @@ public class RouterHelper {
         for (SitePinInst sink : net.getSinkPins()) {
             Node sinkNode = sink.getConnectedNode();
             if (sinkNode.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
-                sinkNode = projectInputPinToINTNode(sink).get(0);
+                List<Node> nodes = projectInputPinToINTNode(sink);
+                if (!nodes.isEmpty()) {
+                    sinkNode = nodes.get(0);
+                } else {
+                    // Must be a direct connection (e.g. COUT -> CIN)
+                }
             }
 
             short routeDelay = nodeMap.get(sinkNode).getDelay();
