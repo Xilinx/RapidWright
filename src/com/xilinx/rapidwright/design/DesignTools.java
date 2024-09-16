@@ -2467,55 +2467,6 @@ public class DesignTools {
         return null;
     }
 
-    public static List<SitePinInst> getLegalAlternativeOutputPins(Net net) {
-        SitePinInst src = net.getSource();
-        if (src == null) {
-            return Collections.emptyList();
-        }
-        SiteInst siteInst = src.getSiteInst();
-        // Currently only support SLICE scenarios
-        if (!Utils.isSLICE(siteInst)) {
-            return Collections.emptyList();
-        }
-
-        // Series 7: AMUX <-> A, BMUX <-> B, CMUX <-> C, DMUX <-> D
-        // UltraScale/+: AMUX <-> A_O, BMUX <-> B_O, ... HMUX <-> H_O
-        // Versal: AQ <-> AQ2 <-> A_O, BQ <-> BQ2 -> B_O, ... HQ <-> HQ2 <-> H_O
-        Queue<BELPin> q = new LinkedList<>();
-        BELPin srcPin = src.getBELPin();
-
-        // Find the logical source
-        BELPin logicalSource = getLogicalBELPinDriver(src);
-        if (logicalSource == null) {
-            return Collections.emptyList();
-        }
-        q.add(logicalSource);
-
-        List<SitePinInst> alternateSpis = new ArrayList<>(0);
-
-        // Fan out from logical source to all site pins
-        while (!q.isEmpty()) {
-            BELPin currOutPin = q.poll();
-            Net currNet = siteInst.getNetFromSiteWire(currOutPin.getSiteWireName());
-            // Skip any resources used by another net
-            if (currNet != null && !currNet.equals(net)) continue;
-            for (BELPin pin : currOutPin.getSiteConns()) {
-                if (pin.getBEL().getBELClass() == BELClass.RBEL) {
-                    SitePIP pip = src.getSiteInst().getSitePIP(pin);
-                    q.add(pip.getOutputPin());
-                } else if (pin.isSitePort() && !pin.equals(srcPin)) {
-                    Net currNet2 = siteInst.getNetFromSiteWire(pin.getSiteWireName());
-                    if (currNet2 == null || currNet2.equals(net)) {
-                        // Create the pin in such a way as it is not put in the SiteInst map
-                        SitePinInst sitePinInst = new SitePinInst(true, pin.getName(), src.getSiteInst());
-                        alternateSpis.add(sitePinInst);
-                    }
-                }
-            }
-        }
-        return alternateSpis;
-    }
-
     /**
      * Looks backwards from a SitePinInst output pin and finds the corresponding BELPin of the
      * driver. Walk through any used SitePIPs found until a non routing BEL is found.
