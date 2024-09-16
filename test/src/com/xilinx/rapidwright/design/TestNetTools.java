@@ -74,7 +74,7 @@ public class TestNetTools {
             "noc_tutorial_routed.dcp",
             "picoblaze_2022.2.dcp",
             "versal_cout_hq2.dcp",
-            // "two_clk_check_NetTools.dcp clk1_IBUF_BUFG clk2_IBUF_BUFG rst1 rst2",
+            "two_clk_check_NetTools.dcp clk1_IBUF_BUFG clk2_IBUF_BUFG rst1 rst2",
 
             // Series-7
             "bug226.dcp murax.apb3Router_1.io_mainClk",
