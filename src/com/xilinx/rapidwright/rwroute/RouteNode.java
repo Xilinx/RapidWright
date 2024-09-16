@@ -264,14 +264,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         return super.hashCode();
     }
 
-    public boolean equals(Node obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        return super.equals(obj);
-    }
-
     @Override
     public boolean equals(Object obj) {
         if (this == obj)
