@@ -65,24 +65,24 @@ import com.xilinx.rapidwright.util.Utils;
  * A collection of supportive methods for the router.
  */
 public class RouterHelper {
-    static class RouteNodeWithPrev extends Node {
-        protected RouteNodeWithPrev prev;
-        RouteNodeWithPrev(Node node) {
+    static class NodeWithPrev extends Node {
+        protected NodeWithPrev prev;
+        NodeWithPrev(Node node) {
             super(node);
         }
 
-        void setPrev(RouteNodeWithPrev prev) {
+        void setPrev(NodeWithPrev prev) {
             this.prev = prev;
         }
 
-        RouteNodeWithPrev getPrev() {
+        NodeWithPrev getPrev() {
             return prev;
         }
     }
 
-    static class RouteNodeWithPrevAndDelay extends RouteNodeWithPrev {
+    static class NodeWithDelay extends Node {
         short delay;
-        RouteNodeWithPrevAndDelay(Node node) {
+        NodeWithDelay(Node node) {
             super(node);
         }
 
@@ -195,13 +195,13 @@ public class RouterHelper {
      */
     public static List<Node> projectInputPinToINTNode(SitePinInst input) {
         List<Node> sinkToSwitchBoxPath = new ArrayList<>();
-        RouteNodeWithPrev sink = new RouteNodeWithPrev(input.getConnectedNode());
+        NodeWithPrev sink = new NodeWithPrev(input.getConnectedNode());
         sink.setPrev(null);
-        Queue<RouteNodeWithPrev> q = new LinkedList<>();
+        Queue<NodeWithPrev> q = new LinkedList<>();
         q.add(sink);
         int watchdog = 1000;
         while (!q.isEmpty()) {
-            RouteNodeWithPrev n = q.poll();
+            NodeWithPrev n = q.poll();
             if (n.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
                 while (n != null) {
                     sinkToSwitchBoxPath.add(n);
@@ -213,7 +213,7 @@ public class RouterHelper {
                 if (uphill.getAllUphillNodes().size() == 0) {
                     continue;
                 }
-                RouteNodeWithPrev prev = new RouteNodeWithPrev(uphill);
+                NodeWithPrev prev = new NodeWithPrev(uphill);
                 prev.setPrev(n);
                 q.add(prev);
             }
@@ -554,11 +554,11 @@ public class RouterHelper {
      */
     public static Map<SitePinInst, Pair<Node,Short>> getSourceToSinkINTNodeDelays(Net net, DelayEstimatorBase estimator) {
         List<PIP> pips = net.getPIPs();
-        Map<Node, RouteNodeWithPrevAndDelay> nodeMap = new HashMap<>();
+        Map<Node, NodeWithDelay> nodeMap = new HashMap<>();
         boolean firstPIP = true;
         for (PIP pip : pips) {
             Node startNode = pip.getStartNode();
-            RouteNodeWithPrevAndDelay startrn = nodeMap.computeIfAbsent(startNode, RouteNodeWithPrevAndDelay::new);
+            NodeWithDelay startrn = nodeMap.computeIfAbsent(startNode, NodeWithDelay::new);
 
             if (firstPIP) {
                 startrn.setDelay(0);
@@ -566,8 +566,7 @@ public class RouterHelper {
             firstPIP = false;
 
             Node endNode = pip.getEndNode();
-            RouteNodeWithPrevAndDelay endrn = nodeMap.computeIfAbsent(startNode, RouteNodeWithPrevAndDelay::new);
-            endrn.setPrev(startrn);
+            NodeWithDelay endrn = nodeMap.computeIfAbsent(startNode, NodeWithDelay::new);
             int delay = 0;
             if (endNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {//device independent?
                 delay = computeNodeDelay(estimator, endNode)
@@ -630,15 +629,15 @@ public class RouterHelper {
             path.add(source);
             return path;
         }
-        RouteNodeWithPrev sourcer = new RouteNodeWithPrev(source);
+        NodeWithPrev sourcer = new NodeWithPrev(source);
         sourcer.setPrev(null);
-        Queue<RouteNodeWithPrev> queue = new LinkedList<>();
+        Queue<NodeWithPrev> queue = new LinkedList<>();
         queue.add(sourcer);
 
         int watchdog = 10000;
         boolean success = false;
         while (!queue.isEmpty()) {
-            RouteNodeWithPrev curr = queue.poll();
+            NodeWithPrev curr = queue.poll();
             if (curr.equals(sink)) {
                 while (curr != null) {
                     path.add(curr);
@@ -648,7 +647,7 @@ public class RouterHelper {
                 break;
             }
             for (Node n : curr.getAllDownhillNodes()) {
-                RouteNodeWithPrev child = new RouteNodeWithPrev(n);
+                NodeWithPrev child = new NodeWithPrev(n);
                 child.setPrev(curr);
                 queue.add(child);
             }

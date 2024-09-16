@@ -43,7 +43,7 @@ import com.xilinx.rapidwright.placer.blockplacer.SmallestEnclosingCircle;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
-import com.xilinx.rapidwright.rwroute.RouterHelper.RouteNodeWithPrev;
+import com.xilinx.rapidwright.rwroute.RouterHelper.NodeWithPrev;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -331,10 +331,10 @@ public class GlobalSignalRouting {
                                       Design design, RouteThruHelper routeThruHelper) {
         NetType netType = currNet.getType();
         Set<PIP> netPIPs = new HashSet<>(currNet.getPIPs());
-        Queue<RouteNodeWithPrev> q = new LinkedList<>();
+        Queue<NodeWithPrev> q = new LinkedList<>();
         Set<Node> visitedRoutingNodes = new HashSet<>();
         Set<Node> usedRoutingNodes = new HashSet<>();
-        Map<Node, RouteNodeWithPrev> nodeMap = new HashMap<>();
+        Map<Node, NodeWithPrev> nodeMap = new HashMap<>();
         Set<SitePin> sitePinsToCreate = new HashSet<>();
         for (SitePinInst sink : currNet.getPins()) {
             if (sink.isRouted() || sink.isOutPin()) {
@@ -344,7 +344,7 @@ public class GlobalSignalRouting {
             q.clear();
             visitedRoutingNodes.clear();
             List<Node> pathNodes = new ArrayList<>();
-            RouteNodeWithPrev rnode = nodeMap.computeIfAbsent(sink.getConnectedNode(), RouteNodeWithPrev::new);
+            NodeWithPrev rnode = nodeMap.computeIfAbsent(sink.getConnectedNode(), NodeWithPrev::new);
             rnode.setPrev(null);
             q.add(rnode);
             boolean success = false;
@@ -404,7 +404,7 @@ public class GlobalSignalRouting {
                             continue;
                         }
                     }
-                    RouteNodeWithPrev uphillRnode = nodeMap.computeIfAbsent(uphillNode, RouteNodeWithPrev::new);
+                    NodeWithPrev uphillRnode = nodeMap.computeIfAbsent(uphillNode, NodeWithPrev::new);
                     uphillRnode.setPrev(rnode);
                     q.add(uphillRnode);
                 }
