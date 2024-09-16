@@ -404,7 +404,7 @@ public class GlobalSignalRouting {
                             continue;
                         }
                     }
-                    RouteNodeWithPrev uphillRnode = nodeMap.computeIfAbsent(sink.getConnectedNode(), RouteNodeWithPrev::new);
+                    RouteNodeWithPrev uphillRnode = nodeMap.computeIfAbsent(uphillNode, RouteNodeWithPrev::new);
                     uphillRnode.setPrev(rnode);
                     q.add(uphillRnode);
                 }
