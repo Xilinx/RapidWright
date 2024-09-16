@@ -341,11 +341,13 @@ public class GlobalSignalRouting {
                 continue;
             }
             int watchdog = 10000;
-            q.clear();
-            visitedRoutingNodes.clear();
             List<Node> pathNodes = new ArrayList<>();
-            NodeWithPrev rnode = nodeMap.computeIfAbsent(sink.getConnectedNode(), NodeWithPrev::new);
+            Node node = sink.getConnectedNode();
+            visitedRoutingNodes.clear();
+            visitedRoutingNodes.add(node);
+            NodeWithPrev rnode = nodeMap.computeIfAbsent(node, NodeWithPrev::new);
             rnode.setPrev(null);
+            q.clear();
             q.add(rnode);
             boolean success = false;
             while (!q.isEmpty()) {
