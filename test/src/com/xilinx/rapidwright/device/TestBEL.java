@@ -71,11 +71,16 @@ public class TestBEL {
         Assertions.assertFalse(b.isFF());
     }
 
-    @Test
-    public void testDIFFRXTXisNotFF() {
-        Device d = Device.getDevice("xcvc1902");
-        Site s = d.getSite("IOB_X0Y0");
-        BEL b = s.getBEL("DIFFRXTX");
+    @ParameterizedTest
+    @CsvSource({
+            "xcvc1902,IOB_X0Y0,DIFFRXTX",
+            "xcvu3p,HPIOBDIFFINBUF_X0Y0,DIFFINBUF",
+            "xcvu3p,HPIOBDIFFOUTBUF_X0Y0,DIFFOUTBUF"
+    })
+    public void testDIFFsAreNotFF(String partName, String siteName, String belName) {
+        Device d = Device.getDevice(partName);
+        Site s = d.getSite(siteName);
+        BEL b = s.getBEL(belName);
         Assertions.assertNotNull(b);
         Assertions.assertFalse(b.isFF());
     }
