@@ -3260,34 +3260,44 @@ public class DesignTools {
                     continue;
                 }
 
-                if (cell.getLogicalPinMapping("O5") != null) {
-                    // LUT output comes out on O5
-                    // FIXME: Do we need to do anything on US/US+?
-                    continue;
-                }
-                assert(cell.getLogicalPinMapping("O6") != null ||
-                        cell.isRoutethru());
-
-                char fiveOrSix = belName.charAt(1);
-                assert(fiveOrSix == '5' || fiveOrSix == '6');
-                if (fiveOrSix != '6') {
-                    // Assume that O6 is only driven by 6LUT, even though possible for 5LUT, unless
-                    // it's a routethru
-                    assert(cell.isRoutethru());
-                    continue;
-                }
-                Net staticNet = (fiveOrSix == '6') ? vccNet : gndNet;
-
                 // Construct site pin from BEL name (e.g. [A-H][65]LUT) and pin name (A[1-6])
                 String sitePinName = belName.charAt(0) + "6";
 
-                if (fiveOrSix == '6'
-                        // Sitewire is not assigned to the net we are expecting to create a pin on
-                        && si.getNetFromSiteWire(sitePinName) != staticNet
-                        // No 5LUT exists
-                        && si.getCell(belName.charAt(0) + "5LUT") == null) {
-                    // No need to tie A6 high
-                    continue;
+                char fiveOrSix = belName.charAt(1);
+                assert(fiveOrSix == '5' || fiveOrSix == '6');
+                Net staticNet = vccNet;
+
+                if (cell.getLogicalPinMapping("O5") != null) {
+                    // LUT output comes out on O5
+                    if (fiveOrSix == '5') {
+                        // It's a 5LUT
+                        if (si.getCell(belName.charAt(0) + "6LUT") != null) {
+                            // But 6LUT exists; let the 6LUT deal with it
+                            continue;
+                        }
+                        // 5LUT without a 6LUT, tie A6 to VCC if sitewire says so
+                        if (si.getNetFromSiteWire(sitePinName) != staticNet) {
+                            continue;
+                        }
+                    } else {
+                        throw new RuntimeException("Assumption that only 5LUTs can use O5 failed here.");
+                    }
+                } else {
+                    if (fiveOrSix != '6') {
+                        // Assume that O6 is only driven by 6LUT, even though possible for 5LUT, unless
+                        // it's a routethru
+                        assert (cell.isRoutethru());
+                        continue;
+                    }
+
+                    assert(fiveOrSix == '6');
+                    // No 5LUT exists
+                    if (si.getCell(belName.charAt(0) + "5LUT") == null &&
+                            // Sitewire is not assigned to the net we are expecting to create a pin on
+                            si.getNetFromSiteWire(sitePinName) != staticNet) {
+                        // No need to tie A6 high
+                        continue;
+                    }
                 }
 
                 // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
