@@ -70,4 +70,13 @@ public class TestBEL {
         Assertions.assertTrue(b.isSliceFFClkMod());
         Assertions.assertFalse(b.isFF());
     }
+
+    @Test
+    public void testDIFFRXTXisNotFF() {
+        Device d = Device.getDevice("xcvc1902");
+        Site s = d.getSite("IOB_X0Y0");
+        BEL b = s.getBEL("DIFFRXTX");
+        Assertions.assertNotNull(b);
+        Assertions.assertFalse(b.isFF());
+    }
 }
