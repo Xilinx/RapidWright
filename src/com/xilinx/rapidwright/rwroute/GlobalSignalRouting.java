@@ -397,18 +397,21 @@ public class GlobalSignalRouting {
                     if (status == NodeStatus.UNAVAILABLE) {
                         continue;
                     }
-                    if (status == NodeStatus.INUSE) {
-                        boolean visited = visitedRoutingNodes.add(uphillNode);
-                        assert(!visited);
-                        usedRoutingNodes.add(uphillNode);
-                    } else {
-                        if (!visitedRoutingNodes.add(uphillNode)) {
-                            continue;
-                        }
+                    if (!visitedRoutingNodes.add(uphillNode)) {
+                        continue;
                     }
                     NodeWithPrev uphillRnode = nodeMap.computeIfAbsent(uphillNode, NodeWithPrev::new);
                     uphillRnode.setPrev(rnode);
-                    q.add(uphillRnode);
+                    if (status == NodeStatus.INUSE) {
+                        // uphillNode is already preserved for this net; add it to the set
+                        // of used nodes, and make it the next (and only) node to be popped
+                        usedRoutingNodes.add(uphillNode);
+                        q.clear();
+                        q.add(uphillRnode);
+                        break;
+                    } else {
+                        q.add(uphillRnode);
+                    }
                 }
                 watchdog--;
                 if (watchdog < 0) {
