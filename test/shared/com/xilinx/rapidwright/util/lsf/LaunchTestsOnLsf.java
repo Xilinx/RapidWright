@@ -133,8 +133,7 @@ public class LaunchTestsOnLsf {
             int memMB = pair.getSecond()*1024;
             LSFJob job = new LSFJob();
             job.setRunDir(toJobDir(pair.getFirst()));
-            job.setRapidWrightCommand(RunTest.class, memMB,
-                    "-ea \"" + testsJar + "\" \"" + pair.getFirst() + "\"");
+            job.setRapidWrightCommand(RunTest.class, memMB,'"'+testsJar.toString()+"\" \""+pair.getFirst()+'"');
             job.setLsfResourceMemoryLimit(memMB);
             jq.addJob(job);
             jobsToTests.put(job, pair.getFirst());
