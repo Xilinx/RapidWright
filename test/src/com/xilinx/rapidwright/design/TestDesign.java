@@ -466,13 +466,13 @@ public class TestDesign {
     public void testRetargetPart(@TempDir Path tempDir) {
         String targetPartName = "xcvu9p-flgb2104-2-i";
         Part targetPart = PartNameTools.getPart(targetPartName);
-        int clockRegionHeight = 60;
         Device targetDevice = Device.getDevice(targetPart);
         for (int slr = 0; slr < targetDevice.getNumOfSLRs(); slr++) {
             Design d = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
             assert (d.getDevice().getName().equals("xcvu3p"));
             int tileDX = 0;
-            int tileDY = slr * targetDevice.getMasterSLR().getNumOfClockRegionRows() * clockRegionHeight;
+            int tileDY = slr * targetDevice.getMasterSLR().getNumOfClockRegionRows()
+                             * targetPart.getSeries().getCLEHeight();
             Assertions.assertTrue(d.retargetPart(targetPart, tileDX, tileDY));
             Path output = tempDir.resolve("retarget_" + slr + ".dcp");
 
