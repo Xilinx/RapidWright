@@ -3252,7 +3252,7 @@ public class DesignTools {
                         assert(spi.getNet().isVCCNet());
                         continue;
                     }
-                    design.getVccNet().createPin(pinName, si);
+                    vccNet.createPin(pinName, si);
                 }
 
                 if (cell.getLogicalPinMapping("A6") != null) {
@@ -3276,14 +3276,14 @@ public class DesignTools {
                     assert(cell.isRoutethru());
                     continue;
                 }
-                Net net = (fiveOrSix == '6') ? vccNet : gndNet;
+                Net staticNet = (fiveOrSix == '6') ? vccNet : gndNet;
 
                 // Construct site pin from BEL name (e.g. [A-H][65]LUT) and pin name (A[1-6])
                 String sitePinName = belName.charAt(0) + "6";
 
                 if (fiveOrSix == '6'
                         // Sitewire is not assigned to the net we are expecting to create a pin on
-                        && si.getNetFromSiteWire(sitePinName) != net
+                        && si.getNetFromSiteWire(sitePinName) != staticNet
                         // No 5LUT exists
                         && si.getCell(belName.charAt(0) + "5LUT") == null) {
                     // No need to tie A6 high
@@ -3294,14 +3294,14 @@ public class DesignTools {
                 if (cell.getType().equals("SRL16E")) {
                     EDIFPropertyValue val = cell.getProperty("XILINX_LEGACY_PRIM");
                     if (val != null && val.getValue().equals("SRLC32E")) {
-                        net = gndNet;
+                        staticNet = gndNet;
                     }
                 }
 
                 SitePinInst pin = si.getSitePinInst(sitePinName);
                 if (pin == null) {
-                    net.createPin(sitePinName, si);
-                } else if (!pin.getNet().equals(net)) {
+                    staticNet.createPin(sitePinName, si);
+                } else if (!pin.getNet().equals(staticNet)) {
                     // pin.getNet().removePin(pin);
                     // net.addPin(pin);
                     throw new RuntimeException("ERROR: Site pin " + pin.getSitePinName() + " is not connected to VCC");
