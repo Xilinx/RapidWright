@@ -3177,10 +3177,8 @@ public class DesignTools {
     }
 
     public static void createPossiblePinsToStaticNets(Design design) {
-        if (design.getDevice().getSeries() == Series.Versal) {
-            // TODO
-        } else {
-            createA1A6ToStaticNets(design);
+        createA1A6ToStaticNets(design);
+        if (design.getDevice().getSeries() != Series.Versal) {
             createCeClkOfRoutethruFFToVCC(design);
         }
         createCeSrRstPinsToVCC(design);
@@ -3227,6 +3225,8 @@ public class DesignTools {
     }
 
     public static void createA1A6ToStaticNets(Design design) {
+        Net vccNet = design.getVccNet();
+        Net gndNet = design.getGndNet();
         for (SiteInst si : design.getSiteInsts()) {
             if (!Utils.isSLICE(si)) {
                 continue;
@@ -3244,19 +3244,56 @@ public class DesignTools {
                     continue;
                 }
 
-                if (bel.getName().endsWith("5LUT")) {
-                    bel = si.getBEL(bel.getName().charAt(0) + "6LUT");
-                }
-
-                boolean isSRL = ("SRL16E".equals(cell.getType()) || "SRLC32E".equals(cell.getType()));
-                for (String belPinName : lut6BELPins) {
-                    if (!isSRL && belPinName.equals("A1")) {
+                String belName = bel.getName();
+                if ("SRL16E".equals(cell.getType()) || "SRLC32E".equals(cell.getType())) {
+                    String pinName = belName.charAt(0) + "1";
+                    SitePinInst spi = si.getSitePinInst(pinName);
+                    if (spi != null) {
+                        assert(spi.getNet().isVCCNet());
                         continue;
                     }
-                    BELPin belPin = bel.getPin(belPinName);
-                    if (belPin != null) {
-                        createMissingStaticSitePins(belPin, si, cell);
+                    design.getVccNet().createPin(pinName, si);
+                }
+
+                if (cell.getLogicalPinMapping("A6") != null) {
+                    // A6 pin is being used by LUT
+                    continue;
+                }
+
+                if (cell.getLogicalPinMapping("O5") != null) {
+                    // LUT output comes out on O5
+                    // FIXME: Do we need to do anything on US/US+?
+                    continue;
+                }
+                assert(cell.getLogicalPinMapping("O6") != null);
+
+                char fiveOrSix = belName.charAt(1);
+                assert(fiveOrSix == '5' || fiveOrSix == '6');
+                assert(fiveOrSix == '6'); // Assume that O6 is only driven by 6LUT, even though possible for 5LUT
+
+                if (fiveOrSix == '6' && si.getCell(belName.charAt(0) + "5LUT") == null) {
+                    // No 5LUT exists, no need to tie A6 high
+                    continue;
+                }
+
+                Net net = (fiveOrSix == '6') ? vccNet : gndNet;
+                // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
+                if (cell.getType().equals("SRL16E")) {
+                    EDIFPropertyValue val = cell.getProperty("XILINX_LEGACY_PRIM");
+                    if (val != null && val.getValue().equals("SRLC32E")) {
+                        net = gndNet;
                     }
+                }
+
+                // Construct site pin from BEL name (e.g. [A-H][65]LUT) and pin name (A[1-6])
+                String sitePinName = belName.charAt(0) + "6";
+                SitePinInst pin = si.getSitePinInst(sitePinName);
+                if (pin == null) {
+                    net.createPin(sitePinName, si);
+                } else if (!pin.getNet().equals(net)) {
+                    // pin.getNet().removePin(pin);
+                    // net.addPin(pin);
+                    throw new RuntimeException("ERROR: Site pin " + pin.getSitePinName() + " is not connected to VCC");
                 }
             }
         }
@@ -3435,44 +3472,8 @@ public class DesignTools {
         }
     }
 
-    public static void createMissingStaticSitePins(BELPin belPin, SiteInst si, Cell cell) {
-        // SiteWire and SitePin Name are the same for LUT inputs
-        String siteWireName = belPin.getSiteWireName();
-        // VCC returned based on the site wire, site pins are not stored in dcp
-        Net netOnSiteWire = si.getNetFromSiteWire(siteWireName);
-        Net net = (netOnSiteWire != null) ? netOnSiteWire : si.getDesign().getVccNet();
-        if (net.isStaticNet()) {
-            // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
-            if (cell.getType().equals("SRL16E") && siteWireName.endsWith("6")) {
-                EDIFPropertyValue val = cell.getProperty("XILINX_LEGACY_PRIM");
-                if (val != null && val.getValue().equals("SRLC32E")) {
-                    net = si.getDesign().getGndNet();
-                }
-            }
-            String belName = belPin.getBELName();
-            if (LUTTools.isCellALUT(cell) &&
-                    // No net originally present on input sitewire
-                    netOnSiteWire != net &&
-                    // No cell placed in the 5LUT spot
-                    si.getCell(belName.replace('6', '5')) == null &&
-                    // No net present on output sitewire
-                    si.getNetFromSiteWire(belName.charAt(0) + "5LUT_O5") == null) {
-                // LUT input siteWire has no net attached, nor does the LUT output sitewire: no need for site pin
-                return;
-            }
-            SitePinInst pin = si.getSitePinInst(siteWireName);
-            if (pin == null) {
-                net.createPin(siteWireName, si);
-            } else if (!pin.getNet().equals(net)) {
-                pin.getNet().removePin(pin);
-                net.addPin(pin);
-            }
-        }
-    }
-
     //NOTE: SRL16E (reference name SRL16E, EDIFCell in RW) uses A2-A5, so we need to connect A1 & A6 to VCC,
     //however, when SitePinInsts (e.g. A3) are already in GND, adding those again will cause problems to A1
-    static String[] lut6BELPins = new String[] {"A1", "A6"};
     static HashSet<String> unisimFlipFlopTypes;
     static {
         unisimFlipFlopTypes = new HashSet<>();
