@@ -45,10 +45,10 @@ import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 import com.xilinx.rapidwright.rwroute.RouterHelper.NodeWithPrev;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -331,7 +331,7 @@ public class GlobalSignalRouting {
                                       Design design, RouteThruHelper routeThruHelper) {
         NetType netType = currNet.getType();
         Set<PIP> netPIPs = new HashSet<>(currNet.getPIPs());
-        Queue<NodeWithPrev> q = new LinkedList<>();
+        Queue<NodeWithPrev> q = new ArrayDeque<>();
         Set<Node> visitedRoutingNodes = new HashSet<>();
         Set<Node> usedRoutingNodes = new HashSet<>();
         Map<Node, NodeWithPrev> nodeMap = new HashMap<>();
@@ -368,8 +368,8 @@ public class GlobalSignalRouting {
                     // If the source is an output site pin, put it aside for consideration
                     // to add as a new source pin
                     Node sourceNode = pathNodes.get(0);
-                    if (((currNet.getType() == NetType.GND && !sourceNode.isTiedToGnd()) ||
-                         (currNet.getType() == NetType.VCC && !sourceNode.isTiedToVcc()))) {
+                    if (((netType == NetType.GND && !sourceNode.isTiedToGnd()) ||
+                         (netType == NetType.VCC && !sourceNode.isTiedToVcc()))) {
                         SitePin sitePin = sourceNode.getSitePin();
                         if (sitePin != null && !sitePin.isInput()) {
                             sitePinsToCreate.add(sitePin);
