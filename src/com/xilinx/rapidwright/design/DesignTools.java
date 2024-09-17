@@ -3244,10 +3244,6 @@ public class DesignTools {
                     continue;
                 }
 
-                if (cell.isRoutethru()) {
-                    continue;
-                }
-
                 String belName = bel.getName();
                 if ("SRL16E".equals(cell.getType()) || "SRLC32E".equals(cell.getType())) {
                     String pinName = belName.charAt(0) + "1";
@@ -3269,18 +3265,31 @@ public class DesignTools {
                     // FIXME: Do we need to do anything on US/US+?
                     continue;
                 }
-                assert(cell.getLogicalPinMapping("O6") != null);
+                assert(cell.getLogicalPinMapping("O6") != null ||
+                        cell.isRoutethru());
 
                 char fiveOrSix = belName.charAt(1);
                 assert(fiveOrSix == '5' || fiveOrSix == '6');
-                assert(fiveOrSix == '6'); // Assume that O6 is only driven by 6LUT, even though possible for 5LUT
+                if (fiveOrSix != '6') {
+                    // Assume that O6 is only driven by 6LUT, even though possible for 5LUT, unless
+                    // it's a routethru
+                    assert(cell.isRoutethru());
+                    continue;
+                }
+                Net net = (fiveOrSix == '6') ? vccNet : gndNet;
 
-                if (fiveOrSix == '6' && si.getCell(belName.charAt(0) + "5LUT") == null) {
-                    // No 5LUT exists, no need to tie A6 high
+                // Construct site pin from BEL name (e.g. [A-H][65]LUT) and pin name (A[1-6])
+                String sitePinName = belName.charAt(0) + "6";
+
+                if (fiveOrSix == '6'
+                        // Sitewire is not assigned to the net we are expecting to create a pin on
+                        && si.getNetFromSiteWire(sitePinName) != net
+                        // No 5LUT exists
+                        && si.getCell(belName.charAt(0) + "5LUT") == null) {
+                    // No need to tie A6 high
                     continue;
                 }
 
-                Net net = (fiveOrSix == '6') ? vccNet : gndNet;
                 // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
                 if (cell.getType().equals("SRL16E")) {
                     EDIFPropertyValue val = cell.getProperty("XILINX_LEGACY_PRIM");
@@ -3289,8 +3298,6 @@ public class DesignTools {
                     }
                 }
 
-                // Construct site pin from BEL name (e.g. [A-H][65]LUT) and pin name (A[1-6])
-                String sitePinName = belName.charAt(0) + "6";
                 SitePinInst pin = si.getSitePinInst(sitePinName);
                 if (pin == null) {
                     net.createPin(sitePinName, si);
