@@ -3244,6 +3244,10 @@ public class DesignTools {
                     continue;
                 }
 
+                if (cell.isRoutethru()) {
+                    continue;
+                }
+
                 String belName = bel.getName();
                 if ("SRL16E".equals(cell.getType()) || "SRLC32E".equals(cell.getType())) {
                     String pinName = belName.charAt(0) + "1";
