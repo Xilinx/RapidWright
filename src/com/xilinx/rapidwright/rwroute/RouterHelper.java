@@ -80,21 +80,6 @@ public class RouterHelper {
         }
     }
 
-    static class NodeWithDelay extends Node {
-        short delay;
-        NodeWithDelay(Node node) {
-            super(node);
-        }
-
-        void setDelay(int delay) {
-            this.delay = (short) delay;
-        }
-
-        short getDelay() {
-            return delay;
-        }
-    }
-
     /**
      * Checks if a {@link Net} instance has source and sink {@link SitePinInst} instances to be routable.
      * @param net The net to be checked.
@@ -541,26 +526,18 @@ public class RouterHelper {
      */
     public static Map<SitePinInst, Pair<Node,Short>> getSourceToSinkINTNodeDelays(Net net, DelayEstimatorBase estimator) {
         List<PIP> pips = net.getPIPs();
-        Map<Node, NodeWithDelay> nodeMap = new HashMap<>();
-        boolean firstPIP = true;
+        Map<Node, Integer> delayMap = new HashMap<>();
         for (PIP pip : pips) {
             Node startNode = pip.getStartNode();
-            NodeWithDelay startrn = nodeMap.computeIfAbsent(startNode, NodeWithDelay::new);
-
-            if (firstPIP) {
-                startrn.setDelay(0);
-            }
-            firstPIP = false;
+            int upstreamDelay = delayMap.getOrDefault(startNode, 0);
 
             Node endNode = pip.getEndNode();
-            NodeWithDelay endrn = nodeMap.computeIfAbsent(endNode, NodeWithDelay::new);
             int delay = 0;
             if (endNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {//device independent?
                 delay = computeNodeDelay(estimator, endNode)
                         + DelayEstimatorBase.getExtraDelay(endNode, DelayEstimatorBase.isLong(startNode));
             }
-
-            endrn.setDelay(startrn.getDelay() + delay);
+            delayMap.put(endNode, upstreamDelay + delay);
         }
 
         Map<SitePinInst, Pair<Node,Short>> sinkNodeDelays = new HashMap<>();
@@ -575,7 +552,7 @@ public class RouterHelper {
                 }
             }
 
-            short routeDelay = nodeMap.get(sinkNode).getDelay();
+            short routeDelay = (short) delayMap.get(sinkNode).intValue();
             sinkNodeDelays.put(sink, new Pair<>(sinkNode,routeDelay));
         }
 
