@@ -62,6 +62,7 @@ import com.xilinx.rapidwright.util.Job;
 import com.xilinx.rapidwright.util.JobQueue;
 import com.xilinx.rapidwright.util.LocalJob;
 import com.xilinx.rapidwright.util.ParallelismTools;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 /**
  * Test that we can write a DCP file and read it back in. We currently don't have a way to check designs for equality,
@@ -469,6 +470,7 @@ public class TestDesign {
         Device targetDevice = Device.getDevice(targetPart);
         for (int slr = 0; slr < targetDevice.getNumOfSLRs(); slr++) {
             Design d = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+            Part origPart = d.getPart();
             assert (d.getDevice().getName().equals("xcvu3p"));
             int tileDX = 0;
             int tileDY = slr * targetDevice.getMasterSLR().getNumOfClockRegionRows()
@@ -485,6 +487,16 @@ public class TestDesign {
 
             Assertions.assertEquals(targetPartName, d2.getPartName());
             ensureDesignInSLR(d2, slr);
+
+            // Try reversing the process to see if we get the original
+            d2.retargetPart(origPart, tileDX * -1, tileDY * -1);
+            assert (d2.getDevice().getName().equals(origPart.getDevice()));
+            ensureDesignInSLR(d2, 0);
+
+            // Just do a single sanity check that it opens ok in Vivado
+            if (slr == 1 && FileTools.isVivadoOnPath()) {
+                VivadoToolsHelper.assertFullyRouted(output);
+            }
         }
 
     }
