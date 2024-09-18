@@ -343,86 +343,94 @@ public class GlobalSignalRouting {
             int watchdog = 10000;
             List<Node> pathNodes = new ArrayList<>();
             Node node = sink.getConnectedNode();
-            visitedRoutingNodes.clear();
-            visitedRoutingNodes.add(node);
             NodeWithPrev rnode = nodeMap.computeIfAbsent(node, NodeWithPrev::new);
-            rnode.setPrev(null);
-            q.clear();
-            q.add(rnode);
-            boolean success = false;
-            while (!q.isEmpty()) {
-                rnode = q.poll();
-                visitedRoutingNodes.add(rnode);
-                if (success = isThisOurStaticSource(design, rnode, netType, usedRoutingNodes)) {
-                    // trace back for a complete path
-                    while (rnode != null) {
-                        usedRoutingNodes.add(rnode);
-                        pathNodes.add(rnode);
-                        rnode = rnode.getPrev();
-                    }
+            if (!usedRoutingNodes.contains(rnode)) {
+                rnode.setPrev(null);
+                assert(visitedRoutingNodes.isEmpty());
+                visitedRoutingNodes.add(node);
+                assert(q.isEmpty());
+                q.add(rnode);
+                search: while ((rnode = q.poll()) != null) {
+                    assert(!usedRoutingNodes.contains(rnode));
+                    assert(!(netType == NetType.VCC && node.isTiedToVcc()) || (netType == NetType.GND && node.isTiedToGnd()));
 
-                    // Note that the static net router goes backward from sinks to sources,
-                    // requiring the srcToSinkOrder parameter to be set to true below
-                    netPIPs.addAll(RouterHelper.getPIPsFromNodes(pathNodes, true));
-
-                    // If the source is an output site pin, put it aside for consideration
-                    // to add as a new source pin
-                    Node sourceNode = pathNodes.get(0);
-                    if (((netType == NetType.GND && !sourceNode.isTiedToGnd()) ||
-                         (netType == NetType.VCC && !sourceNode.isTiedToVcc()))) {
-                        SitePin sitePin = sourceNode.getSitePin();
-                        if (sitePin != null && !sitePin.isInput()) {
-                            sitePinsToCreate.add(sitePin);
-                        }
-                    }
-                    break;
-                }
-                for (Node uphillNode : rnode.getAllUphillNodes()) {
-                    if (routeThruHelper.isRouteThru(uphillNode, rnode)) {
-                        continue;
-                    }
-
-                    switch(uphillNode.getIntentCode()) {
-                        case NODE_GLOBAL_VDISTR:
-                        case NODE_GLOBAL_HROUTE:
-                        case NODE_GLOBAL_HDISTR:
-                        case NODE_HLONG:
-                        case NODE_VLONG:
-                        case NODE_GLOBAL_VROUTE:
-                        case NODE_GLOBAL_LEAF:
-                        case NODE_GLOBAL_BUFG:
-                            continue;
-                    }
-                    NodeStatus status = getNodeState.apply(uphillNode);
-                    if (status == NodeStatus.UNAVAILABLE) {
-                        continue;
-                    }
-                    if (!visitedRoutingNodes.add(uphillNode)) {
-                        continue;
-                    }
-                    NodeWithPrev uphillRnode = nodeMap.computeIfAbsent(uphillNode, NodeWithPrev::new);
-                    uphillRnode.setPrev(rnode);
-                    if (status == NodeStatus.INUSE) {
-                        // uphillNode is already preserved for this net; add it to the set
-                        // of used nodes, and make it the next (and only) node to be popped
-                        usedRoutingNodes.add(uphillNode);
-                        q.clear();
-                        q.add(uphillRnode);
+                    if (isThisOurStaticSource(design, rnode, netType)) {
                         break;
-                    } else {
+                    }
+
+                    for (Node uphillNode : rnode.getAllUphillNodes()) {
+                        if (routeThruHelper.isRouteThru(uphillNode, rnode)) {
+                            continue;
+                        }
+
+                        switch(uphillNode.getIntentCode()) {
+                            case NODE_GLOBAL_VDISTR:
+                            case NODE_GLOBAL_HROUTE:
+                            case NODE_GLOBAL_HDISTR:
+                            case NODE_HLONG:
+                            case NODE_VLONG:
+                            case NODE_GLOBAL_VROUTE:
+                            case NODE_GLOBAL_LEAF:
+                            case NODE_GLOBAL_BUFG:
+                                continue;
+                        }
+
+                        if (!visitedRoutingNodes.add(uphillNode)) {
+                            continue;
+                        }
+
+                        NodeStatus status = getNodeState.apply(uphillNode);
+                        if (status == NodeStatus.UNAVAILABLE) {
+                            continue;
+                        }
+
+                        if (status == NodeStatus.INUSE ||
+                            (netType == NetType.VCC && node.isTiedToVcc()) ||
+                            (netType == NetType.GND && node.isTiedToGnd()) ||
+                            usedRoutingNodes.contains(uphillNode)) {
+                            usedRoutingNodes.add(uphillNode);
+                            pathNodes.add(uphillNode);
+                            break search;
+                        }
+
+                        NodeWithPrev uphillRnode = nodeMap.computeIfAbsent(uphillNode, NodeWithPrev::new);
+                        uphillRnode.setPrev(rnode);
                         q.add(uphillRnode);
                     }
-                }
-                watchdog--;
-                if (watchdog < 0) {
-                    break;
+                    watchdog--;
+                    if (watchdog < 0) {
+                        System.err.println("ERROR: Failed to route " + currNet.getName() + " pin " + sink);
+                        break;
+                    }
                 }
             }
-            if (!success) {
-                System.err.println("ERROR: Failed to route " + currNet.getName() + " pin " + sink);
-            } else {
+            if (rnode != null) {
+                // trace back for a complete path
+                while (rnode != null) {
+                    usedRoutingNodes.add(rnode);
+                    pathNodes.add(rnode);
+                    rnode = rnode.getPrev();
+                }
+
+                // Note that the static net router goes backward from sinks to sources,
+                // requiring the srcToSinkOrder parameter to be set to true below
+                netPIPs.addAll(RouterHelper.getPIPsFromNodes(pathNodes, true));
+
+                // If the source is an output site pin, put it aside for consideration
+                // to add as a new source pin
+                Node sourceNode = pathNodes.get(0);
+                if (((netType == NetType.GND && !sourceNode.isTiedToGnd()) ||
+                     (netType == NetType.VCC && !sourceNode.isTiedToVcc()))) {
+                    SitePin sitePin = sourceNode.getSitePin();
+                    if (sitePin != null && !sitePin.isInput()) {
+                        sitePinsToCreate.add(sitePin);
+                    }
+                }
+
                 sink.setRouted(true);
             }
+            q.clear();
+            visitedRoutingNodes.clear();
         }
 
         for (SitePin sitePin : sitePinsToCreate) {
@@ -460,28 +468,21 @@ public class GlobalSignalRouting {
      * Determines if the given {@link Node} instance can serve as our sink.
      * @param node The {@link Node} instance in question.
      * @param type The net type to designate the static source type.
-     * @param usedRoutingNodes The used RoutingNode instances by of the given net type representing the VCC or GND net.
      * @return true if this sources is usable, false otherwise.
      */
     private static boolean isThisOurStaticSource(Design design,
                                                  Node node,
-                                                 NetType type,
-                                                 Set<Node> usedRoutingNodes) {
-        if (usedRoutingNodes != null && usedRoutingNodes.contains(node))
-            return true;
-
-        // We should look for 3 different potential sources
-        // before we stop:
-        // (1) GND_WIRE
-        // (2) VCC_WIRE
-        // (3) Unused LUT Outputs ([A-H]_O, [A-H]MUX)
+                                                 NetType type) {
+        // Look for unused LUT Outputs ([A-H]_O, [A-H]MUX)
         if ((type == NetType.VCC && node.isTiedToVcc()) ||
             (type == NetType.GND && node.isTiedToGnd())) {
             return true;
         }
         String wireName = node.getWireName();
         if (lutOutputPinNames.contains(wireName)) {
-            Site slice = node.getTile().getSites()[0];
+            Site[] sites = node.getTile().getSites();
+            assert(sites.length == 1);
+            Site slice = sites[0];
             SiteInst si = design.getSiteInstFromSite(slice);
             if (si == null) {
                 // Site is not used
