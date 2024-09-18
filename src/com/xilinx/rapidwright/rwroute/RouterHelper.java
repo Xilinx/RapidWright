@@ -78,17 +78,6 @@ public class RouterHelper {
         NodeWithPrev getPrev() {
             return prev;
         }
-        //
-        // @Override
-        // public boolean equals(Object obj) {
-        //     if (this == obj)
-        //         return true;
-        //     if (obj == null)
-        //         return false;
-        //     // This method requires that object is Node or a subclass of one, otherwise exception will be thrown.
-        //     // If so, explicitly call the Node.equals(Node) overload, rather than the general-purpose Node.equals(Object).
-        //     return super.equals((Node) obj);
-        // }
     }
 
     static class NodeWithDelay extends Node {
