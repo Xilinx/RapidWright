@@ -3243,7 +3243,7 @@ public class DesignTools {
                 if (cell.getName().equals(Cell.LOCKED)) {
                     continue;
                 }
-
+                
                 String belName = bel.getName();
                 if ("SRL16E".equals(cell.getType()) || "SRLC32E".equals(cell.getType())) {
                     String pinName = belName.charAt(0) + "1";
@@ -3301,11 +3301,6 @@ public class DesignTools {
                     }
 
                     assert(fiveOrSix == '6');
-                    // No 5LUT exists
-                    if (si.getCell(belName.charAt(0) + "5LUT") == null) {
-                        // No need to tie A6 high
-                        continue;
-                    }
                 }
 
                 // Construct site pin from BEL name (e.g. [A-H][65]LUT) and pin name (A[1-6])
