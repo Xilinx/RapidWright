@@ -792,10 +792,19 @@ public class TestDesignTools {
         Design design = new Design("test", Device.KCU105);
 
         if (createLUT6) {
-            design.createAndPlaceCell("lut6", Unisim.LUT6, "SLICE_X0Y0/A6LUT");
+            Cell cell = design.createAndPlaceCell("lut6", createLUT5 ? Unisim.LUT5 : Unisim.LUT6, "SLICE_X0Y0/A6LUT");
+            if (createLUT5) {
+                // Change default pin mapping from A6 to A1 since fractured
+                String logicalPin = cell.removePinMapping("A6");
+                cell.addPinMapping("A1", logicalPin);
+            }
         }
         if (createLUT5) {
-            design.createAndPlaceCell("lut5", Unisim.LUT5, "SLICE_X0Y0/A5LUT");
+            Cell cell = design.createAndPlaceCell("lut5", Unisim.LUT5, "SLICE_X0Y0/A5LUT");
+            // Route the intra-site wire for A6 for createA1A6ToStaticNets() to work
+            SiteInst si = cell.getSiteInst();
+            BELPin belPin = si.getBELPin("A6", "A6");
+            si.routeIntraSiteNet(design.getVccNet(), belPin, belPin);
         }
 
         DesignTools.createA1A6ToStaticNets(design);
