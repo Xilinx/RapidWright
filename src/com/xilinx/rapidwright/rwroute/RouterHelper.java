@@ -51,6 +51,7 @@ import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
@@ -386,6 +387,7 @@ public class RouterHelper {
     public static Set<SitePinInst> invertPossibleGndPinsToVccPins(Design design,
                                                                   List<SitePinInst> pins,
                                                                   boolean invertLutInputs) {
+        boolean isVersal = (design.getDevice().getSeries() == Series.Versal);
         Net gndNet = design.getGndNet();
         Set<SitePinInst> toInvertPins = new HashSet<>();
         nextSitePin: for (SitePinInst spi : pins) {
@@ -465,10 +467,10 @@ public class RouterHelper {
                     if (!belPin.getBEL().canInvert()) {
                         continue;
                     }
-                    if (spi.getSite().getName().startsWith("RAM")) {
-                        if (belPin.getBELName().startsWith("CLK")) {
-                            continue;
-                        }
+                    if (!isVersal &&
+                            spi.getSite().getName().startsWith("RAM") &&
+                            belPin.getBELName().startsWith("CLK")) {
+                        continue;
                     }
                     toInvertPins.add(spi);
                 }
