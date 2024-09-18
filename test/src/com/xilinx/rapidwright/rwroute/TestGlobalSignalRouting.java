@@ -25,9 +25,11 @@ package com.xilinx.rapidwright.rwroute;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
@@ -90,24 +92,32 @@ public class TestGlobalSignalRouting {
         Net vccNet = design.getVccNet();
         List<SitePinInst> gndPins = gndNet.getPins();
         List<SitePinInst> vccPins = vccNet.getPins();
-        // Note: these numbers are slightly different from RWRoute since RWRoute.routeStaticNets()
-        //       uses RouterHelper.invertPossibleGndPinsToVccPins()
-        Assertions.assertEquals(22760, gndPins.size());
-        Assertions.assertEquals(19402, vccPins.size());
 
-        Function<Node, NodeStatus> gns = (n) -> NodeStatus.AVAILABLE;
+        boolean invertLutInputs = true;
+        RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins, invertLutInputs);
+
+        Assertions.assertEquals(19010, gndPins.size());
+        Assertions.assertEquals(23152, vccPins.size());
+
+        Function<Node, NodeStatus> gns = (n) -> {
+            SitePin sitePin = n.getSitePin();
+            SiteInst site = (sitePin != null) ? design.getSiteInstFromSite(sitePin.getSite()) : null;
+            SitePinInst spi = (site != null) ? site.getSitePinInst(sitePin.getPinName()) : null;
+            return (spi == null) ? NodeStatus.AVAILABLE : NodeStatus.UNAVAILABLE;
+        };
+
         RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
 
         GlobalSignalRouting.routeStaticNet(gndNet, gns, design, routeThruHelper);
         gndPins = gndNet.getPins();
-        Assertions.assertEquals(1852, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
-        Assertions.assertEquals(22760, gndPins.stream().filter((spi) -> !spi.isOutPin()).count());
-        Assertions.assertEquals(39758, gndNet.getPIPs().size());
+        Assertions.assertEquals(2029, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
+        Assertions.assertEquals(19010, gndPins.stream().filter((spi) -> !spi.isOutPin()).count());
+        Assertions.assertEquals(36403, gndNet.getPIPs().size());
 
         GlobalSignalRouting.routeStaticNet(vccNet, gns, design, routeThruHelper);
         vccPins = vccNet.getPins();
         Assertions.assertEquals(0, vccPins.stream().filter((spi) -> spi.isOutPin()).count());
-        Assertions.assertEquals(19402, vccPins.stream().filter((spi) -> !spi.isOutPin()).count());
-        Assertions.assertEquals(23280, vccNet.getPIPs().size());
+        Assertions.assertEquals(23152, vccPins.stream().filter((spi) -> !spi.isOutPin()).count());
+        Assertions.assertEquals(27544, vccNet.getPIPs().size());
     }
 }
