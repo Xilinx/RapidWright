@@ -333,6 +333,7 @@ public class GlobalSignalRouting {
         Queue<Node> q = new ArrayDeque<>();
         Set<Node> usedRoutingNodes = new HashSet<>();
         Map<Node, Node> prevNode = new HashMap<>();
+        List<Node> pathNodes = new ArrayList<>();
         Set<SitePin> sitePinsToCreate = new HashSet<>();
         final Node INVALID_NODE = new Node(null, Integer.MAX_VALUE);
         assert(INVALID_NODE.isInvalidNode());
@@ -341,9 +342,10 @@ public class GlobalSignalRouting {
                 continue;
             }
             int watchdog = 10000;
-            List<Node> pathNodes = new ArrayList<>();
             Node node = sink.getConnectedNode();
-            if (!usedRoutingNodes.contains(node)) {
+            if (usedRoutingNodes.contains(node)) {
+                sink.setRouted(true);
+            } else {
                 assert(prevNode.isEmpty());
                 prevNode.put(node, INVALID_NODE);
                 assert(q.isEmpty());
@@ -422,6 +424,7 @@ public class GlobalSignalRouting {
                             sitePinsToCreate.add(sitePin);
                         }
                     }
+                    pathNodes.clear();
 
                     sink.setRouted(true);
                 }
