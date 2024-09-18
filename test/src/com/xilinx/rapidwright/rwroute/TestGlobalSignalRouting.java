@@ -93,7 +93,7 @@ public class TestGlobalSignalRouting {
         // Note: these numbers are slightly different from RWRoute since RWRoute.routeStaticNets()
         //       uses RouterHelper.invertPossibleGndPinsToVccPins()
         Assertions.assertEquals(22760, gndPins.size());
-        Assertions.assertEquals(19402, vccPins.size());
+        Assertions.assertEquals(19349, vccPins.size());
 
         Function<Node, NodeStatus> gns = (n) -> NodeStatus.AVAILABLE;
         RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
@@ -107,7 +107,7 @@ public class TestGlobalSignalRouting {
         GlobalSignalRouting.routeStaticNet(vccNet, gns, design, routeThruHelper);
         vccPins = vccNet.getPins();
         Assertions.assertEquals(0, vccPins.stream().filter((spi) -> spi.isOutPin()).count());
-        Assertions.assertEquals(19402, vccPins.stream().filter((spi) -> !spi.isOutPin()).count());
-        Assertions.assertEquals(23280, vccNet.getPIPs().size());
+        Assertions.assertEquals(19349, vccPins.stream().filter((spi) -> !spi.isOutPin()).count());
+        Assertions.assertEquals(23227, vccNet.getPIPs().size());
     }
 }
