@@ -43,7 +43,6 @@ import com.xilinx.rapidwright.placer.blockplacer.SmallestEnclosingCircle;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
-import com.xilinx.rapidwright.rwroute.RouterHelper.NodeWithPrev;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -331,11 +330,12 @@ public class GlobalSignalRouting {
                                       Design design, RouteThruHelper routeThruHelper) {
         NetType netType = currNet.getType();
         Set<PIP> netPIPs = new HashSet<>(currNet.getPIPs());
-        Queue<NodeWithPrev> q = new ArrayDeque<>();
-        Set<Node> visitedRoutingNodes = new HashSet<>();
+        Queue<Node> q = new ArrayDeque<>();
         Set<Node> usedRoutingNodes = new HashSet<>();
-        Map<Node, NodeWithPrev> nodeMap = new HashMap<>();
+        Map<Node, Node> prevNode = new HashMap<>();
         Set<SitePin> sitePinsToCreate = new HashSet<>();
+        final Node INVALID_NODE = new Node(null, Integer.MAX_VALUE);
+        assert(INVALID_NODE.isInvalidNode());
         for (SitePinInst sink : currNet.getPins()) {
             if (sink.isRouted() || sink.isOutPin()) {
                 continue;
@@ -343,23 +343,21 @@ public class GlobalSignalRouting {
             int watchdog = 10000;
             List<Node> pathNodes = new ArrayList<>();
             Node node = sink.getConnectedNode();
-            NodeWithPrev rnode = nodeMap.computeIfAbsent(node, NodeWithPrev::new);
-            if (!usedRoutingNodes.contains(rnode)) {
-                rnode.setPrev(null);
-                assert(visitedRoutingNodes.isEmpty());
-                visitedRoutingNodes.add(node);
+            if (!usedRoutingNodes.contains(node)) {
+                assert(prevNode.isEmpty());
+                prevNode.put(node, INVALID_NODE);
                 assert(q.isEmpty());
-                q.add(rnode);
-                search: while ((rnode = q.poll()) != null) {
-                    assert(!usedRoutingNodes.contains(rnode));
+                q.add(node);
+                search: while ((node = q.poll()) != null) {
+                    assert(!usedRoutingNodes.contains(node));
                     assert(!(netType == NetType.VCC && node.isTiedToVcc()) || (netType == NetType.GND && node.isTiedToGnd()));
 
-                    if (isThisOurStaticSource(design, rnode, netType)) {
+                    if (isThisOurStaticSource(design, node, netType)) {
                         break;
                     }
 
-                    for (Node uphillNode : rnode.getAllUphillNodes()) {
-                        if (routeThruHelper.isRouteThru(uphillNode, rnode)) {
+                    for (Node uphillNode : node.getAllUphillNodes()) {
+                        if (routeThruHelper.isRouteThru(uphillNode, node)) {
                             continue;
                         }
 
@@ -375,7 +373,7 @@ public class GlobalSignalRouting {
                                 continue;
                         }
 
-                        if (!visitedRoutingNodes.add(uphillNode)) {
+                        if (prevNode.putIfAbsent(uphillNode, node) != null) {
                             continue;
                         }
 
@@ -385,52 +383,51 @@ public class GlobalSignalRouting {
                         }
 
                         if (status == NodeStatus.INUSE ||
-                            (netType == NetType.VCC && node.isTiedToVcc()) ||
-                            (netType == NetType.GND && node.isTiedToGnd()) ||
+                            (netType == NetType.VCC && uphillNode.isTiedToVcc()) ||
+                            (netType == NetType.GND && uphillNode.isTiedToGnd()) ||
                             usedRoutingNodes.contains(uphillNode)) {
                             usedRoutingNodes.add(uphillNode);
                             pathNodes.add(uphillNode);
                             break search;
                         }
 
-                        NodeWithPrev uphillRnode = nodeMap.computeIfAbsent(uphillNode, NodeWithPrev::new);
-                        uphillRnode.setPrev(rnode);
-                        q.add(uphillRnode);
+                        q.add(uphillNode);
                     }
                     watchdog--;
                     if (watchdog < 0) {
-                        System.err.println("ERROR: Failed to route " + currNet.getName() + " pin " + sink);
                         break;
                     }
                 }
-            }
-            if (rnode != null) {
-                // trace back for a complete path
-                while (rnode != null) {
-                    usedRoutingNodes.add(rnode);
-                    pathNodes.add(rnode);
-                    rnode = rnode.getPrev();
-                }
+                if (node == null) {
+                    System.err.println("ERROR: Failed to route " + currNet.getName() + " pin " + sink);
+                } else {
+                    // trace back for a complete path
+                    do {
+                        usedRoutingNodes.add(node);
+                        pathNodes.add(node);
+                        node = prevNode.get(node);
+                    } while (node != INVALID_NODE);
 
-                // Note that the static net router goes backward from sinks to sources,
-                // requiring the srcToSinkOrder parameter to be set to true below
-                netPIPs.addAll(RouterHelper.getPIPsFromNodes(pathNodes, true));
+                    // Note that the static net router goes backward from sinks to sources,
+                    // requiring the srcToSinkOrder parameter to be set to true below
+                    netPIPs.addAll(RouterHelper.getPIPsFromNodes(pathNodes, true));
 
-                // If the source is an output site pin, put it aside for consideration
-                // to add as a new source pin
-                Node sourceNode = pathNodes.get(0);
-                if (((netType == NetType.GND && !sourceNode.isTiedToGnd()) ||
-                     (netType == NetType.VCC && !sourceNode.isTiedToVcc()))) {
-                    SitePin sitePin = sourceNode.getSitePin();
-                    if (sitePin != null && !sitePin.isInput()) {
-                        sitePinsToCreate.add(sitePin);
+                    // If the source is an output site pin, put it aside for consideration
+                    // to add as a new source pin
+                    Node sourceNode = pathNodes.get(0);
+                    if (((netType == NetType.GND && !sourceNode.isTiedToGnd()) ||
+                         (netType == NetType.VCC && !sourceNode.isTiedToVcc()))) {
+                        SitePin sitePin = sourceNode.getSitePin();
+                        if (sitePin != null && !sitePin.isInput()) {
+                            sitePinsToCreate.add(sitePin);
+                        }
                     }
-                }
 
-                sink.setRouted(true);
+                    sink.setRouted(true);
+                }
+                q.clear();
+                prevNode.clear();
             }
-            q.clear();
-            visitedRoutingNodes.clear();
         }
 
         for (SitePin sitePin : sitePinsToCreate) {
