@@ -3264,17 +3264,21 @@ public class DesignTools {
                 assert(fiveOrSix == '5' || fiveOrSix == '6');
                 Net staticNet = vccNet;
 
-                // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
-                if (cell.getType().equals("SRL16E")) {
-                    EDIFPropertyValue val = cell.getProperty("XILINX_LEGACY_PRIM");
-                    if (val != null && val.getValue().equals("SRLC32E")) {
-                        staticNet = gndNet;
-                    }
-                }
+                BEL lut6Bel = (fiveOrSix == '5') ? si.getBEL(belName.charAt(0) + "6LUT") : bel;
+                Net a6Net = si.getNetFromSiteWire(lut6Bel.getPin("A6").getSiteWireName());
 
-                // Tie A6 to staticNet only if sitewire says so
-                if (si.getNetFromSiteWire(bel.getPin("A6").getSiteWireName()) != staticNet) {
-                    continue;
+                // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
+                if (cell.getType().equals("SRL16E") && "SRLC32E".equals(cell.getPropertyValueString("XILINX_LEGACY_PRIM"))) {
+                    staticNet = gndNet;
+                    // Expect sitewire to be VCC and GND
+                    if (!a6Net.isStaticNet()) {
+                        throw new RuntimeException("ERROR: Site pin " + si.getSiteName() + "/" + belName.charAt(0) + "6 is not a static net");
+                    }
+                } else {
+                    // Tie A6 to staticNet only if sitewire says so
+                    if (a6Net != staticNet) {
+                        continue;
+                    }
                 }
 
                 if (cell.getLogicalPinMapping("O5") != null) {
