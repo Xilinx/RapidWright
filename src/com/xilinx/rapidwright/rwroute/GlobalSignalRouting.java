@@ -49,6 +49,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -338,12 +339,20 @@ public class GlobalSignalRouting {
         Set<SitePin> sitePinsToCreate = new HashSet<>();
         final Node INVALID_NODE = new Node(null, Integer.MAX_VALUE);
         assert(INVALID_NODE.isInvalidNode());
+        Map<Node,SitePinInst> nodeToSink = new HashMap<>();
         for (SitePinInst sink : currNet.getPins()) {
             if (sink.isRouted() || sink.isOutPin()) {
                 continue;
             }
+            nodeToSink.put(sink.getConnectedNode(), sink);
+        }
+        Iterator<Entry<Node, SitePinInst>> it = nodeToSink.entrySet().iterator();
+        while (it.hasNext()) {
             int watchdog = 10000;
-            Node node = sink.getConnectedNode();
+            Entry<Node, SitePinInst> e = it.next();
+            it.remove();
+            Node node = e.getKey();
+            SitePinInst sink = e.getValue();
             if (usedRoutingNodes.contains(node)) {
                 sink.setRouted(true);
             } else {
@@ -386,8 +395,11 @@ public class GlobalSignalRouting {
                             continue;
                         }
 
-                        if (usedRoutingNodes.contains(uphillNode)) {
-                            // uphillNode is known to be already part of this net's routing, terminate the search here
+                        if (usedRoutingNodes.contains(uphillNode) ||
+                            (netType == NetType.VCC && uphillNode.isTiedToVcc()) ||
+                            (netType == NetType.GND && uphillNode.isTiedToGnd())) {
+                            // uphillNode is known to be already part of this net's routing,
+                            // or we've found a new VCC/GND source so terminate the search here
                             node = uphillNode;
                             break search;
                         }
@@ -396,14 +408,14 @@ public class GlobalSignalRouting {
                         if (status == NodeStatus.UNAVAILABLE) {
                             continue;
                         }
-
-                        if (status == NodeStatus.INUSE ||
-                            (netType == NetType.VCC && uphillNode.isTiedToVcc()) ||
-                            (netType == NetType.GND && uphillNode.isTiedToGnd())) {
-                            // uphillNode is just discovered to be already part of this net's routing,
-                            // or we've found a new VCC/GND source so terminate the search here
-                            node = uphillNode;
-                            break search;
+                        if (status == NodeStatus.INUSE) {
+                            // uphillNode is just discovered to be already part of this net's routing
+                            SitePinInst uphillSink = nodeToSink.get(uphillNode);
+                            if (uphillSink == null) {
+                                // uphillNode is not a sink to be routed, or is one that's already been routed
+                                node = uphillNode;
+                                break search;
+                            }
                         }
 
                         q.add(uphillNode);
@@ -427,9 +439,10 @@ public class GlobalSignalRouting {
                     // requiring the srcToSinkOrder parameter to be set to true below
                     netPIPs.addAll(RouterHelper.getPIPsFromNodes(pathNodes, true));
 
+                    pathNodes.clear();
                     sink.setRouted(true);
                 }
-                pathNodes.clear();
+                assert(pathNodes.isEmpty());
                 q.clear();
                 prevNode.clear();
             }
