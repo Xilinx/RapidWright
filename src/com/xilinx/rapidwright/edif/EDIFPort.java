@@ -292,8 +292,9 @@ public class EDIFPort extends EDIFPropertyObject {
      */
     public void exportEDIFBusName(OutputStream os, EDIFWriteLegalNameCache<?> cache) throws IOException {
         String busName = getBusName(false);
-        byte[] rename = cache.getEDIFRename(busName);
-        exportSomeEDIFName(os, getName(), rename == null ? busName.getBytes() : rename);
+        EDIFPort collision = parentCell.getPort(busName);
+        byte[] rename = collision == null ? cache.getEDIFRename(busName) : cache.getBusCollisionEDIFRename(busName);
+        exportSomeEDIFName(os, getName(), rename == null ? busName.getBytes(StandardCharsets.UTF_8) : rename);
     }
 
     /**
