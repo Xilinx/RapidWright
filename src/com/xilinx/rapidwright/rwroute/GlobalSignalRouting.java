@@ -358,7 +358,7 @@ public class GlobalSignalRouting {
 
         for (Node node : nodesToRoute) {
             int watchdog = 10000;
-            SitePinInst sink = nodeToRouteToSink.remove(node);
+            SitePinInst sink = nodeToRouteToSink.get(node);
             if (usedRoutingNodes.contains(node)) {
                 sink.setRouted(true);
             } else {
@@ -416,13 +416,24 @@ public class GlobalSignalRouting {
                         }
                         if (status == NodeStatus.INUSE) {
                             // uphillNode is just discovered to be already part of this net's routing
-                            if (!nodeToRouteToSink.containsKey(uphillNode)) {
-                                // uphillNode is not a sink to be routed, or is one that's already been routed,
-                                // terminuate
+                            SitePinInst uphillSink = nodeToRouteToSink.get(uphillNode);
+                            if (uphillSink == null || uphillSink.isRouted()) {
+                                // uphillNode is not a sink to be routed, or is one that's already been routed, terminate
                                 node = uphillNode;
                                 break search;
                             }
-                            // uphillNode must be a sink to be routed; continue as normal
+
+                            // uphillNode must be a sink to be routed; preserve only the current routing, clear the queue,
+                            // and restart routing from this new sink to encourage reuse
+                            assert(!uphillSink.isRouted());
+                            do {
+                                usedRoutingNodes.add(node);
+                                node = prevNode.get(node);
+                            } while (node != INVALID_NODE);
+                            prevNode.keySet().removeIf((n) -> !usedRoutingNodes.contains(n) && !n.equals(uphillNode));
+                            q.clear();
+                            q.add(uphillNode);
+                            continue search;
                         }
 
                         q.add(uphillNode);
