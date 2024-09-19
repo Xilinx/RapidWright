@@ -475,7 +475,7 @@ class TestEDIFNetlist {
         net1.createPortInst(port1, 1);
         net1.createPortInst("R", ff);
         
-        DIFNet net2 = top.createNet("net2");
+        EDIFNet net2 = top.createNet("net2");
         net2.createPortInst(port2);
         net2.createPortInst("Q", ff);
 
