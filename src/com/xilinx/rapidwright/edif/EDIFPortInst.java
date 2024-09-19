@@ -314,9 +314,7 @@ public class EDIFPortInst implements Comparable<EDIFPortInst> {
         }
         else {
             os.write(EXPORT_CONST_MEMBER);
-            String busName = getPort().getBusName(false);
-            EDIFPort collision = getPort().getParentCell().getPort(busName);
-            os.write(collision == null ? cache.getLegalEDIFName(busName) : cache.getBusCollisionEDIFRename(busName));
+            os.write(getPort().getBusEDIFRename(cache));
             os.write(' ');
             os.write(Integer.toString(index).getBytes(StandardCharsets.UTF_8));
             os.write(')');

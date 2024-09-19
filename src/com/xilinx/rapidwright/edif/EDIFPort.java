@@ -291,12 +291,23 @@ public class EDIFPort extends EDIFPropertyObject {
      * @throws IOException
      */
     public void exportEDIFBusName(OutputStream os, EDIFWriteLegalNameCache<?> cache) throws IOException {
-        String busName = getBusName(false);
-        EDIFPort collision = parentCell.getPort(busName);
-        byte[] rename = collision == null ? cache.getEDIFRename(busName) : cache.getBusCollisionEDIFRename(busName);
-        exportSomeEDIFName(os, getName(), rename == null ? busName.getBytes(StandardCharsets.UTF_8) : rename);
+        exportSomeEDIFName(os, getName(), getBusEDIFRename(cache));
     }
 
+    /**
+     * Handles bus name collisions with single bit ports (same root name) to avoid
+     * EDIF export name legalization collisions.
+     * 
+     * @param cache The current EDIF name legalization cache
+     * @return The legalize EDIF bus name for this port
+     */
+    protected byte[] getBusEDIFRename(EDIFWriteLegalNameCache<?> cache) {
+        String busName = getBusName(false);
+        boolean collision = parentCell.getPortMap().containsKey(busName);
+        byte[] rename = collision ? cache.getBusCollisionEDIFRename(busName) : cache.getEDIFRename(busName);
+        return rename == null ? busName.getBytes(StandardCharsets.UTF_8) : rename;
+    }
+    
     /**
      * @return the parentCell
      */
