@@ -47,6 +47,8 @@ import com.xilinx.rapidwright.util.Utils;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -339,20 +341,24 @@ public class GlobalSignalRouting {
         Set<SitePin> sitePinsToCreate = new HashSet<>();
         final Node INVALID_NODE = new Node(null, Integer.MAX_VALUE);
         assert(INVALID_NODE.isInvalidNode());
-        Map<Node,SitePinInst> nodeToSink = new HashMap<>();
+
+        // Collect all node-sink pairs to be routed
+        Map<Node,SitePinInst> nodeToRouteToSink = new HashMap<>();
         for (SitePinInst sink : currNet.getPins()) {
             if (sink.isRouted() || sink.isOutPin()) {
                 continue;
             }
-            nodeToSink.put(sink.getConnectedNode(), sink);
+            nodeToRouteToSink.put(sink.getConnectedNode(), sink);
         }
-        Iterator<Entry<Node, SitePinInst>> it = nodeToSink.entrySet().iterator();
-        while (it.hasNext()) {
+
+        // Sort them by their tile, ensuring that sinks in the same tile are routed in sequence
+        // to maximize sharing
+        List<Node> nodesToRoute = new ArrayList<>(nodeToRouteToSink.keySet());
+        nodesToRoute.sort(Comparator.comparing((n) -> n.getTile().getUniqueAddress()));
+
+        for (Node node : nodesToRoute) {
             int watchdog = 10000;
-            Entry<Node, SitePinInst> e = it.next();
-            it.remove();
-            Node node = e.getKey();
-            SitePinInst sink = e.getValue();
+            SitePinInst sink = nodeToRouteToSink.remove(node);
             if (usedRoutingNodes.contains(node)) {
                 sink.setRouted(true);
             } else {
@@ -410,12 +416,13 @@ public class GlobalSignalRouting {
                         }
                         if (status == NodeStatus.INUSE) {
                             // uphillNode is just discovered to be already part of this net's routing
-                            SitePinInst uphillSink = nodeToSink.get(uphillNode);
-                            if (uphillSink == null) {
-                                // uphillNode is not a sink to be routed, or is one that's already been routed
+                            if (!nodeToRouteToSink.containsKey(uphillNode)) {
+                                // uphillNode is not a sink to be routed, or is one that's already been routed,
+                                // terminuate
                                 node = uphillNode;
                                 break search;
                             }
+                            // uphillNode must be a sink to be routed; continue as normal
                         }
 
                         q.add(uphillNode);
