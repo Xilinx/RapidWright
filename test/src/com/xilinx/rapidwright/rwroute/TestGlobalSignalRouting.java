@@ -32,6 +32,9 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.ReportRouteStatusResult;
+import com.xilinx.rapidwright.util.VivadoTools;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -110,14 +113,19 @@ public class TestGlobalSignalRouting {
 
         GlobalSignalRouting.routeStaticNet(gndNet, gns, design, routeThruHelper);
         gndPins = gndNet.getPins();
-        Assertions.assertEquals(929, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
+        Assertions.assertEquals(849, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
         Assertions.assertEquals(19010, gndPins.stream().filter((spi) -> !spi.isOutPin()).count());
-        Assertions.assertEquals(36095, gndNet.getPIPs().size());
+        Assertions.assertEquals(34938, gndNet.getPIPs().size());
 
         GlobalSignalRouting.routeStaticNet(vccNet, gns, design, routeThruHelper);
         vccPins = vccNet.getPins();
         Assertions.assertEquals(0, vccPins.stream().filter((spi) -> spi.isOutPin()).count());
         Assertions.assertEquals(23152, vccPins.stream().filter((spi) -> !spi.isOutPin()).count());
         Assertions.assertEquals(27544, vccNet.getPIPs().size());
+
+        if (FileTools.isVivadoOnPath()) {
+            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            Assertions.assertEquals(2, rrs.fullyRoutedNets);
+        }
     }
 }
