@@ -461,7 +461,7 @@ class TestEDIFNetlist {
 
         String portName = "unfortunate_name";
 
-        // Create two ports, one single-bit and another bussed with the same root name
+        // Create two bussed ports with a common root name, one having a trailing '_' underscore
         EDIFPort port0 = top.createPort(portName + "[2:0]", EDIFDirection.INOUT, 3);
         EDIFPort port1 = top.createPort(portName + "_[1:0]", EDIFDirection.INOUT, 2);
 
