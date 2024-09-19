@@ -371,7 +371,7 @@ public class GlobalSignalRouting {
                 q.add(node);
                 search: while ((node = q.poll()) != null) {
                     assert(!usedRoutingNodes.contains(node));
-                    assert(!(netType == NetType.VCC && node.isTiedToVcc()) || (netType == NetType.GND && node.isTiedToGnd()));
+                    assert(!node.isTied());
 
                     SitePin sitePin = getStaticSourceSitePin(design, node, netType);
                     if (sitePin != null) {
@@ -401,13 +401,23 @@ public class GlobalSignalRouting {
                             continue;
                         }
 
-                        if (usedRoutingNodes.contains(uphillNode) ||
-                            (netType == NetType.VCC && uphillNode.isTiedToVcc()) ||
-                            (netType == NetType.GND && uphillNode.isTiedToGnd())) {
-                            // uphillNode is known to be already part of this net's routing,
-                            // or we've found a new VCC/GND source so terminate the search here
+                        if (usedRoutingNodes.contains(uphillNode)) {
+                            // uphillNode is known to be already part of this net's routing
                             node = uphillNode;
                             break search;
+                        }
+
+                        boolean tiedToVcc = uphillNode.isTiedToVcc();
+                        boolean tiedToGnd = uphillNode.isTiedToGnd();
+                        if (tiedToVcc || tiedToGnd) {
+                            if ((netType == NetType.VCC && tiedToVcc) ||
+                                (netType == NetType.GND && tiedToGnd)) {
+                                // We've found the correct new VCC/GND source so terminate the search here
+                                node = uphillNode;
+                                break search;
+                            }
+                            // Wrong VCC/GND source, do not put in queue
+                            continue;
                         }
 
                         NodeStatus status = getNodeState.apply(uphillNode);
