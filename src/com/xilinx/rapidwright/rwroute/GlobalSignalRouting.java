@@ -43,6 +43,7 @@ import com.xilinx.rapidwright.placer.blockplacer.SmallestEnclosingCircle;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
+import com.xilinx.rapidwright.util.Utils;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -347,6 +348,9 @@ public class GlobalSignalRouting {
                 sink.setRouted(true);
             } else {
                 assert(prevNode.isEmpty());
+                // Use an invalid node as the sink's prev node, as that's what we'll be looking for
+                // during trace-back. This is necessary because `null` cannot be used since `null`
+                // is what Map uses internally to indicate key is not present.
                 prevNode.put(node, INVALID_NODE);
                 assert(q.isEmpty());
                 q.add(node);
@@ -354,7 +358,10 @@ public class GlobalSignalRouting {
                     assert(!usedRoutingNodes.contains(node));
                     assert(!(netType == NetType.VCC && node.isTiedToVcc()) || (netType == NetType.GND && node.isTiedToGnd()));
 
-                    if (isThisOurStaticSource(design, node, netType)) {
+                    SitePin sitePin = getStaticSourceSitePin(design, node, netType);
+                    if (sitePin != null) {
+                        // Unused LUT source found, terminate search
+                        sitePinsToCreate.add(sitePin);
                         break;
                     }
 
@@ -379,6 +386,12 @@ public class GlobalSignalRouting {
                             continue;
                         }
 
+                        if (usedRoutingNodes.contains(uphillNode)) {
+                            // uphillNode is known to be already part of this net's routing, terminate the search here
+                            node = uphillNode;
+                            break search;
+                        }
+
                         NodeStatus status = getNodeState.apply(uphillNode);
                         if (status == NodeStatus.UNAVAILABLE) {
                             continue;
@@ -386,10 +399,10 @@ public class GlobalSignalRouting {
 
                         if (status == NodeStatus.INUSE ||
                             (netType == NetType.VCC && uphillNode.isTiedToVcc()) ||
-                            (netType == NetType.GND && uphillNode.isTiedToGnd()) ||
-                            usedRoutingNodes.contains(uphillNode)) {
-                            usedRoutingNodes.add(uphillNode);
-                            pathNodes.add(uphillNode);
+                            (netType == NetType.GND && uphillNode.isTiedToGnd())) {
+                            // uphillNode is just discovered to be already part of this net's routing,
+                            // or we've found a new VCC/GND source so terminate the search here
+                            node = uphillNode;
                             break search;
                         }
 
@@ -414,20 +427,9 @@ public class GlobalSignalRouting {
                     // requiring the srcToSinkOrder parameter to be set to true below
                     netPIPs.addAll(RouterHelper.getPIPsFromNodes(pathNodes, true));
 
-                    // If the source is an output site pin, put it aside for consideration
-                    // to add as a new source pin
-                    Node sourceNode = pathNodes.get(0);
-                    if (((netType == NetType.GND && !sourceNode.isTiedToGnd()) ||
-                         (netType == NetType.VCC && !sourceNode.isTiedToVcc()))) {
-                        SitePin sitePin = sourceNode.getSitePin();
-                        if (sitePin != null && !sitePin.isInput()) {
-                            sitePinsToCreate.add(sitePin);
-                        }
-                    }
-                    pathNodes.clear();
-
                     sink.setRouted(true);
                 }
+                pathNodes.clear();
                 q.clear();
                 prevNode.clear();
             }
@@ -468,53 +470,59 @@ public class GlobalSignalRouting {
      * Determines if the given {@link Node} instance can serve as our sink.
      * @param node The {@link Node} instance in question.
      * @param type The net type to designate the static source type.
-     * @return true if this sources is usable, false otherwise.
+     * @return {@link SitePin} if a valid source is found, null otherwise.
      */
-    private static boolean isThisOurStaticSource(Design design,
-                                                 Node node,
-                                                 NetType type) {
-        // Look for unused LUT Outputs ([A-H]_O, [A-H]MUX)
-        if ((type == NetType.VCC && node.isTiedToVcc()) ||
-            (type == NetType.GND && node.isTiedToGnd())) {
-            return true;
+    private static SitePin getStaticSourceSitePin(Design design,
+                                                  Node node,
+                                                  NetType type) {
+        Tile tile = node.getTile();
+        if (!Utils.isCLB(tile.getTileTypeEnum())) {
+            return null;
         }
-        String wireName = node.getWireName();
-        if (lutOutputPinNames.contains(wireName)) {
-            Site[] sites = node.getTile().getSites();
-            assert(sites.length == 1);
-            Site slice = sites[0];
-            SiteInst si = design.getSiteInstFromSite(slice);
-            if (si == null) {
-                // Site is not used
-                return true;
-            }
 
-            String sitePinName;
-            if (wireName.endsWith("_O")) {
-                sitePinName = wireName.substring(wireName.length() - 3);
-            } else if (wireName.endsWith("MUX")) {
-                char lutLetter = wireName.charAt(wireName.length() - 4);
+        // Look for unused LUT Outputs ([A-H]_O, [A-H]MUX)
+        String wireName = node.getWireName();
+        if (!lutOutputPinNames.contains(wireName)) {
+            return null;
+        }
+
+        Site[] sites = tile.getSites();
+        assert(sites.length == 1);
+        Site slice = sites[0];
+        SiteInst si = design.getSiteInstFromSite(slice);
+
+        String sitePinName;
+        if (wireName.endsWith("_O")) {
+            sitePinName = wireName.substring(wireName.length() - 3);
+        } else if (wireName.endsWith("MUX")) {
+            char lutLetter = wireName.charAt(wireName.length() - 4);
+
+            if (si != null) {
                 Net o6Net = si.getNetFromSiteWire(lutLetter + "_O");
                 if (o6Net != null && o6Net.getType() != type) {
                     // 6LUT is occupied; play it safe and do not consider fracturing as that can require modifying the intra-site routing
-                    return false;
+                    return null;
                 }
 
                 Net o5Net = si.getNetFromSiteWire(lutLetter + "5LUT_O5");
                 if (o5Net != null && o5Net.getType() != type) {
                     // 5LUT is occupied
-                    return false;
+                    return null;
                 }
-
-                sitePinName = wireName.substring(wireName.length() - 4);
-            } else {
-                throw new RuntimeException(wireName);
             }
 
-            Net sitePinNet = si.getNetFromSiteWire(sitePinName);
-            return sitePinNet == null || sitePinNet.getType() == type;
+            sitePinName = wireName.substring(wireName.length() - 4);
+        } else {
+            throw new RuntimeException(wireName);
         }
-        return false;
-    }
 
+        if (si != null) {
+            Net sitePinNet = si.getNetFromSiteWire(sitePinName);
+            if (sitePinNet != null && sitePinNet.getType() != type) {
+                return null;
+            }
+        }
+
+        return new SitePin(slice, sitePinName);
+    }
 }
