@@ -516,28 +516,6 @@ public class RWRoute {
             GlobalSignalRouting.routeStaticNet(staticNet, gns, design, routethruHelper);
 
             preserveNet(staticNet, false);
-
-            // When a [A-H]MUX pin is used as a static source, also preserve the [A-H]_O pin
-            // so that it can't be used by other static nets, nor as a LUT routethru
-            for (SitePinInst spi : staticNet.getPins()) {
-                if (!spi.isOutPin()) {
-                    continue;
-                }
-
-                SiteInst si = spi.getSiteInst();
-                if (!Utils.isSLICE(si)) {
-                    continue;
-                }
-
-                String pinName = spi.getName();
-                if (pinName.endsWith("MUX")) {
-                    char lutLetter = pinName.charAt(0);
-                    Node oNode = si.getSite().getConnectedNode(lutLetter + "_O");
-                    routingGraph.preserve(oNode, staticNet);
-                } else {
-                    assert(pinName.endsWith("_O"));
-                }
-            }
         }
     }
 

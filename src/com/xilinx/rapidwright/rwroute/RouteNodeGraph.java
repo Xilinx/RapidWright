@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
@@ -308,8 +309,32 @@ public class RouteNodeGraph {
     }
 
     public void preserve(Net net, List<SitePinInst> pins) {
+        boolean isStaticNet = net.isStaticNet();
         for (SitePinInst pin : pins) {
             preserve(pin.getConnectedNode(), net);
+
+            if (isStaticNet && pin.isOutPin()) {
+                // When a LUT output is used as a static source, also preserve the other pin
+                // ([A-H]_O <-> [A-H]MUX) so that it can't be used by any other nets
+                SiteInst si = pin.getSiteInst();
+                if (!Utils.isSLICE(si)) {
+                    continue;
+                }
+
+                String pinName = pin.getName();
+                char lutLetter = pinName.charAt(0);
+                String otherPinName;
+                if (pinName.endsWith("MUX")) {
+                    otherPinName = lutLetter + "_O";
+                } else if (pinName.endsWith("_O")) {
+                    otherPinName = lutLetter + "MUX";
+                } else {
+                    throw new RuntimeException(pinName);
+                }
+
+                Node otherNode = si.getSite().getConnectedNode(otherPinName);
+                preserve(otherNode, net);
+            }
         }
 
         for (PIP pip : net.getPIPs()) {
