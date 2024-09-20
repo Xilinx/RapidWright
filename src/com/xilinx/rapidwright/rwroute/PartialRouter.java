@@ -40,12 +40,9 @@ import java.util.stream.Collectors;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -218,51 +215,6 @@ public class PartialRouter extends RWRoute {
     }
 
     @Override
-    protected NodeStatus getGlobalRoutingNodeStatus(Net net, Node node) {
-        Net preservedNet = routingGraph.getPreservedNet(node);
-        if (preservedNet == net) {
-            return NodeStatus.INUSE;
-        }
-        if (preservedNet != null) {
-            if (!softPreserve) {
-                return NodeStatus.UNAVAILABLE;
-            }
-
-            // Do not steal from other global nets, since we can't tell if they
-            // can be re-routed
-            if (preservedNet.isClockNet() || preservedNet.isStaticNet()) {
-                return NodeStatus.UNAVAILABLE;
-            }
-
-            // Do not steal PINBOUNCEs from preserved nets that serve as
-            // a used site pin
-            if (node.getIntentCode() == IntentCode.NODE_PINBOUNCE) {
-                SitePin sitePin = node.getSitePin();
-                SiteInst si = (sitePin != null) ? design.getSiteInstFromSite(sitePin.getSite()) : null;
-                Net netOnSiteWire = (si != null) ? si.getNetFromSiteWire(sitePin.getPinName()) : null;
-                if (netOnSiteWire != null) {
-                    assert(netOnSiteWire == preservedNet);
-                    return NodeStatus.UNAVAILABLE;
-                }
-            }
-        }
-
-        RouteNode rnode = routingGraph.getNode(node);
-        if (rnode != null) {
-            if (!softPreserve) {
-                return NodeStatus.UNAVAILABLE;
-            }
-
-            if (rnode.getType() == RouteNodeType.PINFEED_I) {
-                // Node must be a sink pin for a non-global net
-                return NodeStatus.UNAVAILABLE;
-            }
-        }
-
-        return NodeStatus.AVAILABLE;
-    }
-
-    @Override
     protected void routeGlobalClkNets() {
         if (clkNets.isEmpty())
             return;
@@ -277,102 +229,11 @@ public class PartialRouter extends RWRoute {
                 super.routeGlobalClkNet(clk);
             } else {
                 System.out.println("INFO: Routing " + clkPins.size() + " pins of clock " + clk + " (non timing-driven)");
-                Function<Node, NodeStatus> gns = (node) -> this.getGlobalRoutingNodeStatus(clk, node);
+                Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(clk, node);
                 UltraScaleClockRouting.incrementalClockRouter(clk, clkPins, gns);
                 preserveNet(clk, false);
             }
         }
-
-        List<Net> unpreserveNets = unpreserveCongestedNets(clkNets);
-        if (!unpreserveNets.isEmpty()) {
-            System.out.println("INFO: Unpreserving " + unpreserveNets.size() + " nets due to clock congestion");
-            for (Net net : unpreserveNets) {
-                System.out.println("\t" + net);
-            }
-        }
-    }
-
-    @Override
-    protected void routeStaticNets() {
-        if (staticNetAndRoutingTargets.isEmpty())
-            return;
-
-        super.routeStaticNets();
-
-        List<Net> unpreserveNets = unpreserveCongestedNets(staticNetAndRoutingTargets.keySet());
-        if (!unpreserveNets.isEmpty()) {
-            System.out.println("INFO: Unpreserving " + unpreserveNets.size() + " nets due to static net congestion");
-            for (Net net : unpreserveNets) {
-                System.out.println("\t" + net);
-            }
-        }
-    }
-
-    private List<Net> unpreserveCongestedNets(Collection<Net> globalNets) {
-        if (!softPreserve) {
-            return Collections.emptyList();
-        }
-
-        // Even though route{GlobalClk,Static}Nets() has called preserveNet() for all its nets,
-        // it will not overwrite those nodes which have already been preserved by other nets.
-        // Discover such occurrences so that the entire 'victim' net can be correctly
-        // unpreserved (thus re-routed) and re-preserve the global.
-        List<Net> unpreserveNets = new ArrayList<>();
-        for (Net net : globalNets) {
-            for (PIP pip : net.getPIPs()) {
-                for (Node node : Arrays.asList(pip.getStartNode(), pip.getEndNode())) {
-                    RouteNode rnode;
-                    Net preservedNet = routingGraph.getPreservedNet(node);
-                    if (preservedNet == net) {
-                        rnode = routingGraph.getNode(node);
-                        if (rnode == null) {
-                            continue;
-                        }
-
-                        // This could be a leftover node from a previously unpreserved net
-                        // (with its prev pointer set to allow its routing to be recovered)
-                        // Fall through so that this can be cleared and blocked
-                    } else {
-                        if (preservedNet == null) {
-                            // Assume this node has already been unpreserved
-                        } else if (RouterHelper.isRoutableNetWithSourceSinks(preservedNet)) {
-                            unpreserveNet(preservedNet);
-                            unpreserveNets.add(preservedNet);
-                        }
-
-                        // Preserve node for global net
-                        Net oldNet = routingGraph.preserve(node, net);
-                        if (oldNet != null) {
-                            // oldNet/preservedNet is not a routable net (e.g. driven by hier port)
-                            assert(oldNet == preservedNet);
-                            assert(!RouterHelper.isRoutableNetWithSourceSinks(preservedNet));
-                        }
-
-                        rnode = routingGraph.getNode(node);
-                        if (rnode == null) {
-                            assert(oldNet != null);
-                            continue;
-                        }
-
-                        assert(rnode.getPrev() != null);
-                    }
-
-                    // RouteNode must only exist if its net has been unpreserved
-                    // Clear its prev pointer so that it doesn't get misinterpreted
-                    // by RouteNodeGraphPartial.isPartOfExistingRoute as being part of an existing route
-                    rnode.clearPrev();
-
-                    // Ideally, we would want to blow this RouteNode from existence as if it was preserved
-                    // from the beginning. However, since other objects (e.g. Connection-s) may hold a reference
-                    // to this, that would not be wise.
-                    // Instead, increment the use of this RouteNode with a null net (since global nets have
-                    // no corresponding NetWrapper) in order to indicate to Connection.isCongested() that it needs
-                    // to be rerouted.
-                    rnode.incrementUser(null);
-                }
-            }
-        }
-        return unpreserveNets;
     }
 
     @Override
