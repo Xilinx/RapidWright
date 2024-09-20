@@ -334,7 +334,6 @@ public class GlobalSignalRouting {
         NetType netType = currNet.getType();
         Set<PIP> netPIPs = new HashSet<>(currNet.getPIPs());
         Queue<Node> q = new ArrayDeque<>();
-        List<Node> preservedNodes = new ArrayList<>();
         Set<Node> usedRoutingNodes = new HashSet<>();
         Map<Node, Node> prevNode = new HashMap<>();
         List<Node> pathNodes = new ArrayList<>();
@@ -449,10 +448,6 @@ public class GlobalSignalRouting {
                             q.clear();
                             q.add(uphillNode);
                             continue search;
-                        }
-                        if (status == NodeStatus.PRESERVED) {
-                            preservedNodes.add(uphillNode);
-                            continue;
                         }
 
                         q.add(uphillNode);
