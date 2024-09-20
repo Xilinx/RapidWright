@@ -259,7 +259,7 @@ public class PartialRouter extends RWRoute {
             }
         }
 
-        return NodeStatus.AVAILABLE;
+        return (preservedNet == null && rnode == null) ? NodeStatus.AVAILABLE : NodeStatus.PRESERVED;
     }
 
     @Override
@@ -277,7 +277,7 @@ public class PartialRouter extends RWRoute {
                 super.routeGlobalClkNet(clk);
             } else {
                 System.out.println("INFO: Routing " + clkPins.size() + " pins of clock " + clk + " (non timing-driven)");
-                Function<Node, NodeStatus> gns = (node) -> this.getGlobalRoutingNodeStatus(clk, node);
+                Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(clk, node);
                 UltraScaleClockRouting.incrementalClockRouter(clk, clkPins, gns);
                 preserveNet(clk, false);
             }

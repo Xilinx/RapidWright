@@ -28,5 +28,6 @@ package com.xilinx.rapidwright.rwroute;
 public enum NodeStatus {
     AVAILABLE,
     UNAVAILABLE,
-    INUSE
+    INUSE,
+    PRESERVED
 }

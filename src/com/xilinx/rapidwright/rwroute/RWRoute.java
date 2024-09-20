@@ -444,7 +444,11 @@ public class RWRoute {
         for (SitePinInst spi : clk.getPins()) {
             routingGraph.unpreserve(spi.getConnectedNode());
         }
-        Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(clk, node);
+        Function<Node, NodeStatus> gns = (node) -> {
+            NodeStatus ns = getGlobalRoutingNodeStatus(clk, node);
+            // Global clock router to never ripup preserved nets
+            return (ns == NodeStatus.PRESERVED) ? NodeStatus.UNAVAILABLE : ns;
+        };
         if (routesToSinkINTTiles != null) {
             // routes clock nets with references of partial routes
             System.out.println("INFO: Routing " + clk.getPins().size() + " pins of clock " + clk + " (timing-driven)");
