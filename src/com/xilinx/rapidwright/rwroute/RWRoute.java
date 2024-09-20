@@ -523,7 +523,7 @@ public class RWRoute {
 
             // When a [A-H]MUX pin is used as a static source, also preserve the [A-H]_O pin
             // so that it can't be used by other static nets, nor as a LUT routethru
-            for (SitePinInst spi : pins) {
+            for (SitePinInst spi : staticNet.getPins()) {
                 if (!spi.isOutPin()) {
                     continue;
                 }
