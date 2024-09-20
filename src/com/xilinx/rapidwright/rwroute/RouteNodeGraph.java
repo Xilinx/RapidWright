@@ -329,7 +329,7 @@ public class RouteNodeGraph {
                 } else if (pinName.endsWith("_O")) {
                     otherPinName = lutLetter + "MUX";
                 } else {
-                    throw new RuntimeException(pinName);
+                    throw new RuntimeException("ERROR: Unsupported site pin " + pin);
                 }
 
                 Node otherNode = si.getSite().getConnectedNode(otherPinName);
