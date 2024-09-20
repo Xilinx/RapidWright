@@ -160,7 +160,7 @@ public class PartialRouter extends RWRoute {
 
         // Presence of a prev pointer means that:
         //   (a) end node has been visited before
-        //   (b) only this is arc allowed to enter this end node
+        //   (b) only that arc is allowed to enter this end node
         RouteNode prev = endRnode.getPrev();
         if (prev != null) {
             if (endRnode.isVisited(start.getVisited())) {
@@ -321,40 +321,54 @@ public class PartialRouter extends RWRoute {
         for (Net net : globalNets) {
             for (PIP pip : net.getPIPs()) {
                 for (Node node : Arrays.asList(pip.getStartNode(), pip.getEndNode())) {
+                    RouteNode rnode;
                     Net preservedNet = routingGraph.getPreservedNet(node);
                     if (preservedNet == net) {
-                        continue;
-                    }
-                    if (preservedNet == null) {
-                        // Assume this node has already been unpreserved
-                    } else if (RouterHelper.isRoutableNetWithSourceSinks(preservedNet)) {
-                        unpreserveNet(preservedNet);
-                        unpreserveNets.add(preservedNet);
-                    }
+                        rnode = routingGraph.getNode(node);
+                        if (rnode == null) {
+                            continue;
+                        }
 
-                    // Preserve node for global net
-                    Net oldNet = routingGraph.preserve(node, net);
-                    if (oldNet != null) {
-                        // oldNet/preservedNet is not a routable net (e.g. driven by hier port)
-                        assert(oldNet == preservedNet);
-                        assert(!RouterHelper.isRoutableNetWithSourceSinks(preservedNet));
-                    }
-
-                    // RouteNode must only exist if the net has been unpreserved
-                    RouteNode rnode = routingGraph.getNode(node);
-                    if (rnode != null) {
-                        // Clear its prev pointer so that it doesn't get misinterpreted
-                        // by RouteNodeGraph.mustInclude as being part of an existing route
-                        assert (rnode.getPrev() != null);
-                        rnode.clearPrev();
-
-                        // Increment this RouteNode with a null net (since global nets have
-                        // no corresponding NetWrapper) in order to flag it as being irreversibly
-                        // used by a global net thus forcing the non-global to find another path
-                        rnode.incrementUser(null);
+                        // This could be a leftover node from a previously unpreserved net
+                        // (with its prev pointer set to allow its routing to be recovered)
+                        // Fall through so that this can be cleared and blocked
                     } else {
-                        assert(oldNet != null);
+                        if (preservedNet == null) {
+                            // Assume this node has already been unpreserved
+                        } else if (RouterHelper.isRoutableNetWithSourceSinks(preservedNet)) {
+                            unpreserveNet(preservedNet);
+                            unpreserveNets.add(preservedNet);
+                        }
+
+                        // Preserve node for global net
+                        Net oldNet = routingGraph.preserve(node, net);
+                        if (oldNet != null) {
+                            // oldNet/preservedNet is not a routable net (e.g. driven by hier port)
+                            assert(oldNet == preservedNet);
+                            assert(!RouterHelper.isRoutableNetWithSourceSinks(preservedNet));
+                        }
+
+                        rnode = routingGraph.getNode(node);
+                        if (rnode == null) {
+                            assert(oldNet != null);
+                            continue;
+                        }
+
+                        assert(rnode.getPrev() != null);
                     }
+
+                    // RouteNode must only exist if its net has been unpreserved
+                    // Clear its prev pointer so that it doesn't get misinterpreted
+                    // by RouteNodeGraphPartial.isPartOfExistingRoute as being part of an existing route
+                    rnode.clearPrev();
+
+                    // Ideally, we would want to blow this RouteNode from existence as if it was preserved
+                    // from the beginning. However, since other objects (e.g. Connection-s) may hold a reference
+                    // to this, that would not be wise.
+                    // Instead, increment the use of this RouteNode with a null net (since global nets have
+                    // no corresponding NetWrapper) in order to indicate to Connection.isCongested() that it needs
+                    // to be rerouted.
+                    rnode.incrementUser(null);
                 }
             }
         }
