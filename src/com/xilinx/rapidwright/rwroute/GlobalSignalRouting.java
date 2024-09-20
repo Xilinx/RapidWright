@@ -47,11 +47,10 @@ import com.xilinx.rapidwright.util.Utils;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -373,6 +372,11 @@ public class GlobalSignalRouting {
                 search: while ((node = q.poll()) != null) {
                     assert(!usedRoutingNodes.contains(node));
                     assert(!node.isTied());
+                    assert(netType != NetType.VCC || EnumSet.of(
+                            IntentCode.NODE_PINFEED,
+                            IntentCode.NODE_PINBOUNCE,
+                            IntentCode.INTENT_DEFAULT
+                    ).contains(node.getIntentCode()));
 
                     SitePin sitePin = getStaticSourceSitePin(design, node, netType);
                     if (sitePin != null) {
