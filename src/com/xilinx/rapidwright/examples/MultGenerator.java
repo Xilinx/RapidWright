@@ -263,7 +263,12 @@ public class MultGenerator extends ArithmeticGenerator {
             for (int i=0; i < port.getWidth(); i++) {
                 EDIFNet net = top.createNet(port.getBusName() + (port.getWidth() > 1 ? "[" + i + "]" : ""));
                 int ii = port.getWidth() - 1 - i;
-                net.createPortInst(port.getBusName(), ii, inst);
+                if (port.isBus()) {
+                    net.createPortInst(port.getBusName(), ii, inst);
+                } else {
+                    net.createPortInst(port, inst);
+                }
+
                 Net physNet = d.createNet(inst + "/" + net.getName());
 
                 // Correct differences in physical pin names
