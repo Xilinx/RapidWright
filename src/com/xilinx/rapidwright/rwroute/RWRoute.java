@@ -409,17 +409,21 @@ public class RWRoute {
      * @return NodeStatus result.
      */
     protected NodeStatus getGlobalRoutingNodeStatus(Net net, Node node) {
-        if (routingGraph.isPreserved(node)) {
-            // Node is preserved by any net -- for base RWRoute, we don't need
-            // to check which net it is nor whether it is already in use
-            // because global/static nets are routed from scratch
+        Net preservedNet = routingGraph.getPreservedNet(node);
+        if (preservedNet == net) {
+            return NodeStatus.INUSE;
+        }
+        if (preservedNet != null) {
             return NodeStatus.UNAVAILABLE;
         }
 
-        // A RouteNode will only be created if the net is necessary for
-        // a to-be-routed connection
-        return routingGraph.getNode(node) == null ? NodeStatus.AVAILABLE
-                                                  : NodeStatus.UNAVAILABLE;
+        RouteNode rnode = routingGraph.getNode(node);
+        if (rnode != null) {
+            // A RouteNode will only be created if the net is necessary for
+            // a to-be-routed connection
+            return NodeStatus.UNAVAILABLE;
+        }
+        return NodeStatus.AVAILABLE;
     }
 
     /**
@@ -505,10 +509,6 @@ public class RWRoute {
         for (Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
             Net staticNet = e.getKey();
             List<SitePinInst> pins = e.getValue();
-            // Since we preserved all pins in addStaticNetRoutingTargets(), unpreserve them here
-            for (SitePinInst spi : pins) {
-                routingGraph.unpreserve(spi.getConnectedNode());
-            }
 
             System.out.println("INFO: Routing " + pins.size() + " pins of " + staticNet);
 
