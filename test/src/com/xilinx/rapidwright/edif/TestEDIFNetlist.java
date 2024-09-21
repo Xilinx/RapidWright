@@ -451,6 +451,44 @@ class TestEDIFNetlist {
     }
 
     @Test
+    public void testBussedPortReNamingCollision(@TempDir Path path) {
+        final EDIFNetlist origNetlist = EDIFTools.createNewNetlist("test");
+
+        EDIFCell top = origNetlist.getTopCell();
+
+        EDIFCellInst ff = top.createChildCellInst("ff", Design.getPrimitivesLibrary().getCell("FDRE"));
+        origNetlist.getHDIPrimitivesLibrary().addCell(ff.getCellType());
+
+        String portName = "unfortunate_name";
+
+        // Create two bussed ports with a common root name, one having a trailing '_' underscore
+        EDIFPort port0 = top.createPort(portName + "[2:0]", EDIFDirection.INOUT, 3);
+        EDIFPort port1 = top.createPort(portName + "_[1:0]", EDIFDirection.INOUT, 2);
+        // And for good measure, throw in a single-bit port too with the same root
+        EDIFPort port2 = top.createPort(portName, EDIFDirection.INOUT, 1);
+
+        EDIFNet net0 = top.createNet("net0");
+        net0.createPortInst(port0, 0);
+        net0.createPortInst("D", ff);
+
+        EDIFNet net1 = top.createNet("net1");
+        net1.createPortInst(port1, 1);
+        net1.createPortInst("R", ff);
+        
+        EDIFNet net2 = top.createNet("net2");
+        net2.createPortInst(port2);
+        net2.createPortInst("Q", ff);
+
+        Path tempFile = path.resolve("test.edf");
+        origNetlist.exportEDIF(tempFile);
+
+        // Check using EDIFNetlistComparator
+        EDIFNetlist testNetlist = EDIFTools.readEdifFile(tempFile);
+        EDIFNetlistComparator comparer = new EDIFNetlistComparator();
+        Assertions.assertEquals(0, comparer.compareNetlists(origNetlist, testNetlist));
+    }
+
+    @Test
     public void testGetIOStandard() {
         final EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
         netlist.setDevice(Device.getDevice(Device.AWS_F1));
