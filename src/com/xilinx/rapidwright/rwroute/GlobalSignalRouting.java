@@ -419,27 +419,27 @@ public class GlobalSignalRouting {
                             case NODE_GLOBAL_LEAF:
                             case NODE_GLOBAL_BUFG:
                                 continue;
+
                             // VCC net should never need to use S/D/Q nodes ...
                             case NODE_SINGLE:
-                                if (netType == NetType.VCC) {
-                                    assert(isUltraScale);
-                                    // ... except for UltraScale where certain site pins have no direct connection to VCC_WIRE
-                                    // and even then, only consider INT_INT_SINGLE_\d+_INT_OUT "singles" that stay within the
-                                    // same tile
-                                    if (uphillNode.getAllWiresInNode().length > 1) {
-                                        continue;
-                                    }
-                                    assert(uphillNode.getWireName().matches("INT_INT_SINGLE_\\d+_INT_OUT"));
-                                }
-                                break;
                             case NODE_DOUBLE:
                             case NODE_HQUAD:
                             case NODE_VQUAD:
                                 if (netType == NetType.VCC) {
                                     assert(isUltraScale);
+                                    if (uphillNode.getIntentCode() == IntentCode.NODE_SINGLE) {
+                                        // ... except for UltraScale where certain site pins have no direct connection to VCC_WIRE
+                                        // and even then, only consider INT_INT_SINGLE_\d+_INT_OUT "singles" that stay within the
+                                        // same tile
+                                        if (uphillNode.getAllWiresInNode().length > 1) {
+                                            continue;
+                                        }
+                                        assert(uphillNode.getWireName().matches("INT_INT_SINGLE_\\d+_INT_OUT"));
+                                        break;
+                                    }
                                     continue;
                                 }
-                                throw new RuntimeException("ERROR: Unexpected intent code: " + uphillNode.getIntentCode());
+                                break;
                         }
 
                         if (prevNode.putIfAbsent(uphillNode, node) != null) {
