@@ -256,22 +256,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         return s.toString();
     }
 
-    @Override
-    public int hashCode() {
-        return super.hashCode();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        // This method requires that object is Node or a subclass of one, otherwise exception will be thrown.
-        // If so, explicitly call the Node.equals(Node) overload, rather than the general-purpose Node.equals(Object).
-        return super.equals((Node) obj);
-    }
-
     /**
      * Checks if coordinates of a RouteNode Object is within the connection's bounding box.
      * @param connection The connection that is being routed.
