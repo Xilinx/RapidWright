@@ -85,6 +85,16 @@ public class PartialRouter extends RWRoute {
             }
             return super.isExcluded(parent, child);
         }
+
+        @Override
+        public boolean isAccessible(RouteNode childRnode, Connection connection) {
+            Net preservedNet = getPreservedNet(childRnode);
+            if (preservedNet == connection.getNetWrapper().getNet()) {
+                // Always allow nodes preserved for this connection's net
+                return true;
+            }
+            return super.isAccessible(childRnode, connection);
+        }
     }
 
     protected static class RouteNodeGraphPartialTimingDriven extends RouteNodeGraphTimingDriven {
@@ -107,6 +117,16 @@ public class PartialRouter extends RWRoute {
                 return false;
             }
             return super.isExcluded(parent, child);
+        }
+
+        @Override
+        public boolean isAccessible(RouteNode childRnode, Connection connection) {
+            Net preservedNet = getPreservedNet(childRnode);
+            if (preservedNet == connection.getNetWrapper().getNet()) {
+                // Always allow nodes preserved for this connection's net
+                return true;
+            }
+            return super.isAccessible(childRnode, connection);
         }
     }
 
