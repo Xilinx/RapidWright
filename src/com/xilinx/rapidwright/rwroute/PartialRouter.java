@@ -274,7 +274,7 @@ public class PartialRouter extends RWRoute {
             }
         }
 
-        if (unpreserveNets.isEmpty()) {
+        if (!unpreserveNets.isEmpty()) {
             System.out.println("INFO: Unpreserving " + unpreserveNets.size() + " nets to improve sink routability");
             for (Net unpreserveNet : unpreserveNets) {
                 unpreserveNet(unpreserveNet);
