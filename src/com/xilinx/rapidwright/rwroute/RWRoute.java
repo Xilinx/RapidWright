@@ -1651,20 +1651,35 @@ public class RWRoute {
 
         SitePinInst altSource = net.getAlternateSource();
         if (altSource == null) {
-            System.out.println("INFO: No alternative source to swap");
-            return false;
+            altSource = DesignTools.getLegalAlternativeOutputPin(net);
+            if (altSource != null) {
+                // Add this SitePinInst to the net, but not to the SiteInst since it's not yet clear we'll be using it
+                net.addPin(altSource);
+                DesignTools.routeAlternativeOutputSitePin(net, altSource);
+            } else {
+                System.out.println("INFO: No alternative source to swap");
+                return false;
+            }
         }
 
         SitePinInst source = connection.getSource();
         if (source.equals(altSource)) {
             altSource = net.getSource();
         }
-        System.out.println("INFO: Swap source from " + source + " to " + altSource + "\n");
 
         RouteNode altSourceRnode = connection.getAltSourceRnode();
         if (altSourceRnode == null) {
-            throw new RuntimeException("No alternate source pin on net: " + net.getName());
+            Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
+            if (routingGraph.isPreserved(altSourceNode)) {
+                System.out.println("INFO: No alternative source to swap");
+                return false;
+            }
+            assert(routingGraph.getNode(altSourceNode) == null);
+            altSourceRnode = getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O);
         }
+
+        System.out.println("INFO: Swap source from " + source + " to " + altSource + "\n");
+
         connection.setSource(altSource);
         connection.setSourceRnode(altSourceRnode);
         connection.getSink().setRouted(false);
