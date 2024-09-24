@@ -311,7 +311,7 @@ public class RWRoute {
             connection.getAltSinkRnodes().removeIf((rnode) -> rnode.getOccupancy() > 0);
         }
 
-        // Wait for all outstanding RouteNodeGraph.asyncPreserve() calls to complete
+        // Wait for all outstanding RouteNodeGraph.preserveAsync() calls to complete
         routingGraph.awaitPreserve();
     }
 

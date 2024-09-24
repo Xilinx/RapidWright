@@ -505,6 +505,8 @@ public class PartialRouter extends RWRoute {
     }
 
     protected void unpreserveNet(Net net) {
+        assert(!net.getName().equals(Net.Z_NET));
+
         Set<RouteNode> rnodes = new HashSet<>();
         NetWrapper netWrapper = nets.get(net);
         if (netWrapper != null) {
