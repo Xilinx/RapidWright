@@ -262,19 +262,23 @@ public class PartialRouter extends RWRoute {
 
         // With all routingGraph.preserveAsync() calls having completed,
         // now check sink routability
-        Set<Net> netsToUnpreserve = new HashSet<>();
+        Set<Net> unpreserveNets = new HashSet<>();
         for (Connection connection : indirectConnections) {
             Net net = connection.getNetWrapper().getNet();
             RouteNode sinkRnode = connection.getSinkRnode();
             Net unpreserveNet = routingGraph.getPreservedNet(sinkRnode);
             if (unpreserveNet != null && unpreserveNet != net) {
-                netsToUnpreserve.add(unpreserveNet);
+                unpreserveNets.add(unpreserveNet);
                 sinkRnode.setType(RouteNodeType.PINFEED_I);
                 sinkRnode.clearPrev();
             }
         }
-        for (Net unpreserveNet : netsToUnpreserve) {
-            unpreserveNet(unpreserveNet);
+
+        if (unpreserveNets.isEmpty()) {
+            System.out.println("INFO: Unpreserving " + unpreserveNets.size() + " nets to improve sink routability");
+            for (Net unpreserveNet : unpreserveNets) {
+                unpreserveNet(unpreserveNet);
+            }
         }
 
         // Go through all nets to be routed
