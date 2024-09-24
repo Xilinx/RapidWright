@@ -34,6 +34,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
@@ -341,6 +342,29 @@ public class GlobalSignalRouting {
         final Node INVALID_NODE = new Node(null, Integer.MAX_VALUE);
         assert(INVALID_NODE.isInvalidNode());
 
+        // VCC wires are not expected to leave its tile
+        EnumSet<IntentCode> assertIntentCodeOfPoppedNodesOnVcc;
+        boolean isUltraScale = design.getDevice().getSeries() == Series.UltraScale;
+        if (isUltraScale) {
+            // On UltraScale, certain site pins (e.g. SLICE/CKEN_B1[1-4], SLICE/SRST_B[12])
+            // do not have an uphill PIP to VCC_WIRE (instead they have one to GND_WIRE, which
+            // Vivado itself chooses not to use)
+            assertIntentCodeOfPoppedNodesOnVcc = EnumSet.of(
+                    // Necessary for the following nodes used to reach VCC_WIRE
+                    IntentCode.NODE_LOCAL,  // INT_NODE_GLOBAL_\d+_OUT[01], uphill of CTRL_[EW]_B[0-9]
+                                            // corresponding to CKEN_B[1-4] and SRST_B[12] site pins
+                    IntentCode.NODE_SINGLE, // INT_INT_SINGLE_\d+_INT_OUT uphill of INT_NODE_GLOBAL_\d+_OUT[01]
+
+                    IntentCode.NODE_PINFEED,
+                    IntentCode.NODE_PINBOUNCE,
+                    IntentCode.INTENT_DEFAULT);
+        } else {
+            assertIntentCodeOfPoppedNodesOnVcc = EnumSet.of(
+                    IntentCode.NODE_PINFEED,
+                    IntentCode.NODE_PINBOUNCE,
+                    IntentCode.INTENT_DEFAULT);
+        }
+
         // Collect all node-sink pairs to be routed
         Map<Node,SitePinInst> nodeToRouteToSink = new HashMap<>();
         for (SitePinInst sink : currNet.getPins()) {
@@ -371,11 +395,7 @@ public class GlobalSignalRouting {
                 search: while ((node = q.poll()) != null) {
                     assert(!usedRoutingNodes.contains(node));
                     assert(!node.isTied());
-                    assert(netType != NetType.VCC || EnumSet.of(
-                            IntentCode.NODE_PINFEED,
-                            IntentCode.NODE_PINBOUNCE,
-                            IntentCode.INTENT_DEFAULT
-                    ).contains(node.getIntentCode()));
+                    assert(netType != NetType.VCC || assertIntentCodeOfPoppedNodesOnVcc.contains(node.getIntentCode()));
 
                     SitePin sitePin = getStaticSourceSitePin(design, node, netType);
                     if (sitePin != null) {
@@ -399,6 +419,27 @@ public class GlobalSignalRouting {
                             case NODE_GLOBAL_LEAF:
                             case NODE_GLOBAL_BUFG:
                                 continue;
+
+                            // VCC net should never need to use S/D/Q nodes ...
+                            case NODE_SINGLE:
+                            case NODE_DOUBLE:
+                            case NODE_HQUAD:
+                            case NODE_VQUAD:
+                                if (netType == NetType.VCC) {
+                                    assert(isUltraScale);
+                                    if (uphillNode.getIntentCode() == IntentCode.NODE_SINGLE) {
+                                        // ... except for UltraScale where certain site pins have no direct connection to VCC_WIRE
+                                        // and even then, only consider INT_INT_SINGLE_\d+_INT_OUT "singles" that stay within the
+                                        // same tile
+                                        if (uphillNode.getAllWiresInNode().length > 1) {
+                                            continue;
+                                        }
+                                        assert(uphillNode.getWireName().matches("INT_INT_SINGLE_\\d+_INT_OUT"));
+                                        break;
+                                    }
+                                    continue;
+                                }
+                                break;
                         }
 
                         if (prevNode.putIfAbsent(uphillNode, node) != null) {
