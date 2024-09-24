@@ -615,11 +615,19 @@ public class PartialRouter extends RWRoute {
         boolean hasAltOutput = super.handleUnroutableConnection(connection);
         if (hasAltOutput)
             return true;
-        if (softPreserve) {
-            if (routeIteration == 2) {
-                unpreserveNetsAndReleaseResources(connection);
-                return true;
+        if (routeIteration == 2) {
+            if (softPreserve) {
+                 int netsUnpreserved = unpreserveNetsAndReleaseResources(connection);
+                 if (netsUnpreserved > 0) {
+                     return true;
+                 }
             }
+        }
+        if (config.isUseBoundingBox() && !config.isEnlargeBoundingBox()) {
+            // Since bounding box is never enlarged, there is no hope of routing this connection
+            // so abandon it
+            indirectConnections.remove(connection);
+            return true;
         }
         return false;
     }
