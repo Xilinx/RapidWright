@@ -578,7 +578,6 @@ public class RWRoute {
             } else {
                 Node sinkINTNode = nodes.get(0);
                 indirectConnections.add(connection);
-                checkSinkRoutability(net, sinkINTNode);
                 RouteNode sinkRnode = getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I);
                 assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
                 connection.setSinkRnode(sinkRnode);
@@ -685,14 +684,6 @@ public class RWRoute {
             }
         }
         return netWrapper;
-    }
-
-    protected void checkSinkRoutability(Net net, Node sinkNode) {
-        Net oldNet = routingGraph.getPreservedNet(sinkNode);
-        if (oldNet != null && oldNet != net) {
-            throw new RuntimeException("ERROR: Sink node " + sinkNode + " of net '" + net.getName() + "' is "
-                    + " preserved by net '" + oldNet.getName() + "'");
-        }
     }
 
     /**
