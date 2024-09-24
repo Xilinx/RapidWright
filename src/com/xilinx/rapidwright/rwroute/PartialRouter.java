@@ -282,29 +282,9 @@ public class PartialRouter extends RWRoute {
         }
 
         // Go through all nets to be routed
-        Map<RouteNode, RouteNode> stashedPrev = new HashMap<>();
         for (Map.Entry<Net, NetWrapper> e : nets.entrySet()) {
             Net net = e.getKey();
             NetWrapper netWrapper = e.getValue();
-
-            // Temporarily stash the prev pointer of all sink nodes ahead of recovering routing
-            // (it's possible for another connection to use a bounce node, but now that node is
-            // needed as a site pin)
-            for (Connection connection : netWrapper.getConnections()) {
-                Consumer<RouteNode> action = (rnode) -> {
-                    if (rnode == null) {
-                        return;
-                    }
-                    RouteNode prev = rnode.getPrev();
-                    if (prev == null) {
-                        return;
-                    }
-                    stashedPrev.put(rnode, prev);
-                    rnode.clearPrev();
-                };
-                action.accept(connection.getSinkRnode());
-                connection.getAltSinkRnodes().forEach(action);
-            }
 
             // Create all nodes used by this net and set its previous pointer so that:
             // (a) the routing for each connection can be recovered by
@@ -350,14 +330,6 @@ public class PartialRouter extends RWRoute {
                     sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
                 }
             }
-
-            // Restore prev to avoid assertions firing
-            for (Map.Entry<RouteNode, RouteNode> e2 : stashedPrev.entrySet()) {
-                RouteNode rnode = e2.getKey();
-                RouteNode prev = e2.getValue();
-                rnode.setPrev(prev);
-            }
-            stashedPrev.clear();
         }
     }
 
