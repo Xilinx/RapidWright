@@ -579,7 +579,7 @@ public class RouterHelper {
      */
     public static boolean routeDirectConnection(Connection directConnection) {
         directConnection.setNodes(findPathBetweenNodes(directConnection.getSource().getConnectedNode(), directConnection.getSink().getConnectedNode()));
-        return directConnection.getNodes() != null;
+        return !directConnection.getNodes().isEmpty();
     }
 
     /**

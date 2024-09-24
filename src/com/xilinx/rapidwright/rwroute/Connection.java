@@ -413,7 +413,7 @@ public class Connection implements Comparable<Connection>{
     }
 
     public List<Node> getNodes() {
-        return nodes;
+        return nodes == null ? Collections.emptyList() : nodes;
     }
 
     public void setNodes(List<Node> nodes) {
