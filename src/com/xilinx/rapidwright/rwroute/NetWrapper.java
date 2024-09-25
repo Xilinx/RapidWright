@@ -158,7 +158,8 @@ public class NetWrapper{
 
             net.addPin(altSource);
             DesignTools.routeAlternativeOutputSitePin(net, altSource);
-
+        }
+        if (altSourceRnode == null) {
             Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
             if (altSourceNode == null) {
                 noAltSourceFound = true;
@@ -172,6 +173,7 @@ public class NetWrapper{
 
             altSourceRnode = routingGraph.getOrCreate(altSourceNode, RouteNodeType.PINFEED_O);
         }
+        assert(altSourceRnode != null);
         return altSource;
     }
 
