@@ -1655,7 +1655,6 @@ public class RWRoute {
                 if (altSource == null) {
                     return null;
                 }
-                // Add this SitePinInst to the net, but not to the SiteInst since it's not yet clear we'll be using it
                 net.addPin(altSource);
                 DesignTools.routeAlternativeOutputSitePin(net, altSource);
             }
