@@ -572,7 +572,7 @@ public class RWRoute {
                 if (connection.getSourceRnode() == null) {
                     assert(sourceINTNode != null);
                     if (sourceINTRnode == null) {
-                        sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
+                        sourceINTRnode = routingGraph.getOrCreate(sourceINTNode, RouteNodeType.PINFEED_O);
                         // Where only a single primary source exists, always preserve
                         // its projected-to-INT source node, since it could
                         // be a projection from LAGUNA/RXQ* -> RXD* (node for INT/LOGIC_OUTS_*)
@@ -585,7 +585,7 @@ public class RWRoute {
 
                 Node sinkINTNode = nodes.get(0);
                 indirectConnections.add(connection);
-                RouteNode sinkRnode = getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I);
+                RouteNode sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.PINFEED_I);
                 assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
                 connection.setSinkRnode(sinkRnode);
 
@@ -635,7 +635,7 @@ public class RWRoute {
                     if (routingGraph.isPreserved(node)) {
                         continue;
                     }
-                    RouteNode altSinkRnode = getOrCreateRouteNode(node, RouteNodeType.PINFEED_I);
+                    RouteNode altSinkRnode = routingGraph.getOrCreate(node, RouteNodeType.PINFEED_I);
                     assert(altSinkRnode.getType() == RouteNodeType.PINFEED_I);
                     connection.addAltSinkRnode(altSinkRnode);
                 }
@@ -675,18 +675,6 @@ public class RWRoute {
      */
     private void addConnectionSpanInfo(Connection connection) {
         connectionSpan.merge(connection.getHpwl(), 1, Integer::sum);
-    }
-
-    /**
-     * Creates a {@link RouteNode} Object based on a {@link Node} instance and avoids duplicates,
-     * used for creating the source and sink rnodes of {@link Connection} instances.
-     * NOTE: This method does not consider whether returned node is preserved.
-     * @param node The node associated to the {@link SitePinInst} instance.
-     * @param type The {@link RouteNodeType} of the {@link RouteNode} Object.
-     * @return The created {@link RouteNode} instance.
-     */
-    protected RouteNode getOrCreateRouteNode(Node node, RouteNodeType type) {
-        return routingGraph.getOrCreate(node, type);
     }
 
     /**

@@ -370,8 +370,8 @@ public class PartialRouter extends RWRoute {
                 if (routingGraph.isExcludedTile(end))
                     continue;
 
-                RouteNode rstart = getOrCreateRouteNode(start, null);
-                RouteNode rend = getOrCreateRouteNode(end, null);
+                RouteNode rstart = routingGraph.getOrCreate(start);
+                RouteNode rend = routingGraph.getOrCreate(end);
                 assert(rend.getPrev() == null);
                 rend.setPrev(rstart);
             }
@@ -530,8 +530,8 @@ public class PartialRouter extends RWRoute {
                 boolean startPreserved = routingGraph.unpreserve(start);
                 boolean endPreserved = routingGraph.unpreserve(end);
 
-                RouteNode rstart = getOrCreateRouteNode(start, null);
-                RouteNode rend = getOrCreateRouteNode(end, null);
+                RouteNode rstart = routingGraph.getOrCreate(start);
+                RouteNode rend = routingGraph.getOrCreate(end);
                 boolean rstartAdded = rnodes.add(rstart);
                 boolean rendAdded = rnodes.add(rend);
                 assert(rstartAdded == startPreserved);

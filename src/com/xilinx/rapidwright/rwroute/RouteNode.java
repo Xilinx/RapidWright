@@ -382,7 +382,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     continue;
                 }
 
-                RouteNode child = routingGraph.getOrCreate(downhill, null);
+                RouteNode child = routingGraph.getOrCreate(downhill);
                 childrenList.add(child);//the sink rnode of a target connection has been created up-front
             }
             if (!childrenList.isEmpty()) {

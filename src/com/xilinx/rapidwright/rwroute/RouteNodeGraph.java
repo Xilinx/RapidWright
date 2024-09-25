@@ -520,6 +520,10 @@ public class RouteNodeGraph {
         return new RouteNode(this, node, type);
     }
 
+    public RouteNode getOrCreate(Node node) {
+        return getOrCreate(node, null);
+    }
+
     public RouteNode getOrCreate(Node node, RouteNodeType type) {
         Tile tile = node.getTile();
         int wireIndex = node.getWireIndex();
