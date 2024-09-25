@@ -312,9 +312,12 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      * @param type New RouteNodeType value.
      */
     public void setType(RouteNodeType type) {
-        // Only support demotion from PINFEED_I to WIRE or PINBOUNCE since they have the same base cost
-        assert(this.type == RouteNodeType.PINFEED_I
-                && (type == RouteNodeType.WIRE || type == RouteNodeType.PINBOUNCE));
+        assert(this.type == type ||
+                // Support demotion from PINFEED_I to PINBOUNCE since they have the same base cost
+                (this.type == RouteNodeType.PINFEED_I && type == RouteNodeType.PINBOUNCE) ||
+                // Or promotion from PINBOUNCE to PINFEED_I (by PartialRouter when PINBOUNCE on
+                // preserved net needs to become a PINFEED_I)
+                (this.type == RouteNodeType.PINBOUNCE && type == RouteNodeType.PINFEED_I));
         this.type = type;
     }
 

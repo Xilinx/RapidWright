@@ -586,7 +586,7 @@ public class RWRoute {
                 Node sinkINTNode = nodes.get(0);
                 indirectConnections.add(connection);
                 RouteNode sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.PINFEED_I);
-                assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
+                sinkRnode.setType(RouteNodeType.PINFEED_I);
                 connection.setSinkRnode(sinkRnode);
 
                 // Where appropriate, allow all 6 LUT pins to be swapped to begin with
