@@ -269,7 +269,6 @@ public class PartialRouter extends RWRoute {
             if (unpreserveNet != null && unpreserveNet != net) {
                 unpreserveNets.add(unpreserveNet);
                 assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
-                sinkRnode.clearPrev();
             }
         }
 
@@ -381,10 +380,6 @@ public class PartialRouter extends RWRoute {
                 if (connection.isDirect()) {
                     continue;
                 }
-                RouteNode sourceRnode = connection.getSourceRnode();
-                RouteNode sinkRnode = connection.getSinkRnode();
-                assert(sourceRnode.getType() == RouteNodeType.PINFEED_O);
-                assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
 
                 // Even though this connection is not expected to have any routing yet,
                 // perform a rip up anyway in order to release any exclusive sinks
@@ -393,12 +388,8 @@ public class PartialRouter extends RWRoute {
                 connection.getSink().setRouted(false);
                 ripUp(connection);
 
+                RouteNode sinkRnode = connection.getSinkRnode();
                 finishRouteConnection(connection, sinkRnode);
-                if (!connection.getSink().isRouted() && connection.getAltSinkRnodes().isEmpty()) {
-                    // Undo what ripUp() did for this connection which has a single exclusive sink
-                    sinkRnode.incrementUser(connection.getNetWrapper());
-                    sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
-                }
             }
         }
 
@@ -406,6 +397,20 @@ public class PartialRouter extends RWRoute {
             preserveNet(net, true);
             numPreservedWire++;
             numPreservedRoutableNets++;
+        }
+    }
+
+    @Override
+    protected void finishRouteConnection(Connection connection, RouteNode rnode) {
+        super.finishRouteConnection(connection, rnode);
+
+        if (!connection.getSink().isRouted()) {
+            connection.resetRoute();
+            if (connection.getAltSinkRnodes().isEmpty()) {
+                // Undo what ripUp() would have done for this connection which has a single exclusive sink
+                rnode.incrementUser(connection.getNetWrapper());
+                rnode.updatePresentCongestionCost(presentCongestionFactor);
+            }
         }
     }
 
@@ -499,13 +504,13 @@ public class PartialRouter extends RWRoute {
                 // Since net already exists, all the nodes it uses must already
                 // have been created
                 RouteNode rstart = routingGraph.getNode(start);
-                assert (rstart != null);
+                assert(rstart != null);
                 boolean rstartAdded = rnodes.add(rstart);
                 boolean startPreserved = routingGraph.unpreserve(start);
                 assert(rstartAdded == startPreserved);
 
                 RouteNode rend = routingGraph.getNode(end);
-                assert (rend != null);
+                assert(rend != null);
                 boolean rendAdded = rnodes.add(rend);
                 boolean endPreserved = routingGraph.unpreserve(end);
                 assert(rendAdded == endPreserved);
@@ -558,11 +563,6 @@ public class PartialRouter extends RWRoute {
                 ripUp(connection);
 
                 finishRouteConnection(connection, sinkRnode);
-                if (!connection.getSink().isRouted() && connection.getAltSinkRnodes().isEmpty()) {
-                    // Undo what ripUp() did for this connection which has a single exclusive sink
-                    sinkRnode.incrementUser(connection.getNetWrapper());
-                    sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
-                }
             }
 
             netToPins.put(net, net.getSinkPins());

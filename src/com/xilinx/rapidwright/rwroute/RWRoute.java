@@ -1566,7 +1566,9 @@ public class RWRoute {
             queue.clear();
             finishRouteConnection(connection, rnode);
             if (!connection.getSink().isRouted()) {
-                throw new RuntimeException("Unable to save routing for connection " + connection);
+                List<RouteNode> rnodes = connection.getRnodes();
+                throw new RuntimeException("ERROR: Unable to save routing for connection " + connection + "\n" +
+                                           "       Backtracking terminated at " + rnodes.get(rnodes.size() -1));
             }
             if (config.isTimingDriven()) connection.updateRouteDelay();
             assert(connection.getSink().isRouted());
@@ -1574,8 +1576,8 @@ public class RWRoute {
             assert(queue.isEmpty());
             // Clears previous route of the connection
             connection.resetRoute();
+            connection.getSink().setRouted(false);
             assert(connection.getRnodes().isEmpty());
-            assert(!connection.getSink().isRouted());
 
             if (connection.getAltSinkRnodes().isEmpty()) {
                 // Undo what ripUp() did for this connection which has a single exclusive sink
@@ -1686,22 +1688,10 @@ public class RWRoute {
      */
     protected void finishRouteConnection(Connection connection, RouteNode rnode) {
         boolean routed = saveRouting(connection, rnode);
+        connection.getSink().setRouted(routed);
         if (routed) {
-            connection.getSink().setRouted(routed);
             updateUsersAndPresentCongestionCost(connection);
-        } else {
-            connection.resetRoute();
         }
-    }
-
-    protected void saveRoutingSource(Connection connection) {
-        List<RouteNode> rnodes = connection.getRnodes();
-        RouteNode sourceRnode = rnodes.get(rnodes.size() - 1);
-        if (sourceRnode.equals(connection.getSourceRnode())) {
-            return;
-        }
-
-        throw new RuntimeException("ERROR: Backtracking terminated at unexpected rnode: " + sourceRnode);
     }
 
     /**
@@ -1710,7 +1700,7 @@ public class RWRoute {
      * @param rnode RouteNode to start backtracking from.
      * @return True if backtracking successful.
      */
-    private boolean saveRouting(Connection connection, RouteNode rnode) {
+    protected boolean saveRouting(Connection connection, RouteNode rnode) {
         RouteNode sinkRnode = connection.getSinkRnode();
         List<RouteNode> altSinkRnodes = connection.getAltSinkRnodes();
         if (rnode != sinkRnode && !altSinkRnodes.contains(rnode)) {
@@ -1733,8 +1723,6 @@ public class RWRoute {
             // No prev pointer from sink rnode -> not routed
             return false;
         }
-
-        saveRoutingSource(connection);
         return true;
     }
 

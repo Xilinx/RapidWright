@@ -272,7 +272,6 @@ public class Connection implements Comparable<Connection>{
 
     public void resetRoute() {
         getRnodes().clear();
-        sink.setRouted(false);
     }
 
     public RouteNode getSourceRnode() {
