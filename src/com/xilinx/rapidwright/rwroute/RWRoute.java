@@ -1609,10 +1609,13 @@ public class RWRoute {
     protected void abandonConnectionIfUnroutable(Connection connection) {
         if (!config.isUseBoundingBox() || config.isEnlargeBoundingBox()) {
             return;
-        }
+       }
+
+        System.out.println("                 " + "Abandoning");
 
         // Since bounding box is never enlarged there is no hope of routing this connection so abandon it
         indirectConnections.remove(connection);
+        sortedIndirectConnections.remove(connection);
     }
 
     /**

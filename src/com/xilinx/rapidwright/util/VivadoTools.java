@@ -131,7 +131,6 @@ public class VivadoTools {
         final Path dcp = writeCheckpoint(design);
         boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
         ReportRouteStatusResult rrs = reportRouteStatus(dcp, dcp.getParent(), encrypted);
-
         FileTools.deleteFolder(dcp.getParent().toString());
 
         return rrs;
