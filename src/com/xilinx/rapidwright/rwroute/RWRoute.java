@@ -554,11 +554,34 @@ public class RWRoute {
         for (SitePinInst sink : sinkPins) {
             Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
             List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
+            if (sourceINTNode == null && !nodes.isEmpty()) {
+                // Sink can be projected to an INT tile, but source cannot be; try alternate source
+                Pair<SitePinInst,RouteNode> altSourceAndRnode = setupAlternateSource(connection.getSource());
+                if (altSourceAndRnode != null) {
+                    SitePinInst altSource = altSourceAndRnode.getFirst();
+                    RouteNode altSourceINTRnode = altSourceAndRnode.getSecond();
+                    connection.setSource(altSource);
+                    connection.setSourceRnode(altSourceINTRnode);
+                }
+            }
 
-            if (nodes.isEmpty() || sourceINTNode == null) {
+            if (sourceINTNode == null && connection.getSourceRnode() == null) {
                 directConnections.add(connection);
                 connection.setDirect(true);
             } else {
+                if (connection.getSourceRnode() == null) {
+                    assert(sourceINTNode != null);
+                    if (sourceINTRnode == null) {
+                        sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
+                        // Where only a single primary source exists, always preserve
+                        // its projected-to-INT source node, since it could
+                        // be a projection from LAGUNA/RXQ* -> RXD* (node for INT/LOGIC_OUTS_*)
+                        routingGraph.preserve(sourceINTNode, net);
+                    }
+                    assert(sourceINTRnode != null);
+                    connection.setSourceRnode(sourceINTRnode);
+                }
+
                 Node sinkINTNode = nodes.get(0);
                 indirectConnections.add(connection);
                 RouteNode sinkRnode = getOrCreateRouteNode(sinkINTNode, RouteNodeType.PINFEED_I);
@@ -623,23 +646,6 @@ public class RWRoute {
                     sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
                 }
 
-                if (sourceINTNode == null) {
-                    throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
-                }
-                if (sourceINTRnode == null && sourceINTNode != null) {
-                    sourceINTRnode = getOrCreateRouteNode(sourceINTNode, RouteNodeType.PINFEED_O);
-                    // Where only a single primary source exists, always preserve 
-                    // its projected-to-INT source node, since it could
-                    // be a projection from LAGUNA/RXQ* -> RXD* (node for INT/LOGIC_OUTS_*)
-                    routingGraph.preserve(sourceINTNode, net);
-                }
-
-                if (sourceINTRnode != null) {
-                    connection.setSourceRnode(sourceINTRnode);
-                } else {
-                    // Primary source does not reach the fabric (e.g. COUT)
-                    throw new RuntimeException();
-                }
                 connection.setDirect(false);
                 indirect++;
                 connection.computeHpwl();
