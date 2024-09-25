@@ -1693,11 +1693,9 @@ public class RWRoute {
         } while ((rnode = rnode.getPrev()) != null);
 
         List<RouteNode> rnodes = connection.getRnodes();
-        if (rnodes.size() == 1) {
-            // No prev pointer from sink rnode -> not routed
-            return false;
-        }
-        return true;
+        RouteNode sourceRnode = rnodes.get(rnodes.size() - 1);
+        // Only succesfully routed if backtracked to this connection's source node
+        return sourceRnode == connection.getSourceRnode();
     }
 
     /**
