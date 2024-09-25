@@ -556,7 +556,7 @@ public class RWRoute {
             List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
             if (sourceINTNode == null && !nodes.isEmpty()) {
                 // Sink can be projected to an INT tile, but source cannot be; try alternate source
-                Pair<SitePinInst,RouteNode> altSourceAndRnode = setupAlternateSource(connection.getSource());
+                Pair<SitePinInst,RouteNode> altSourceAndRnode = connection.getOrCreateAlternateSource(routingGraph);
                 if (altSourceAndRnode != null) {
                     SitePinInst altSource = altSourceAndRnode.getFirst();
                     RouteNode altSourceINTRnode = altSourceAndRnode.getSecond();
@@ -1633,32 +1633,6 @@ public class RWRoute {
         return false;
     }
 
-    protected Pair<SitePinInst,RouteNode> setupAlternateSource(SitePinInst source) {
-        Net net = source.getNet();
-        assert(net != null);
-
-        NetWrapper netWrapper = nets.get(net);
-        assert(netWrapper != null);
-
-        SitePinInst altSource = netWrapper.getAltSource(routingGraph);
-        if (altSource == null) {
-            return null;
-        }
-
-        RouteNode altSourceRnode;
-        if (source.equals(net.getSource())) {
-            altSourceRnode = netWrapper.getAltSourceRnode();
-        } else {
-            assert(source.equals(net.getAlternateSource()));
-            altSource = net.getSource();
-            assert(altSource != null);
-            altSourceRnode = netWrapper.getSourceRnode();
-        }
-
-        assert(altSourceRnode != null);
-        return new Pair<>(altSource, altSourceRnode);
-    }
-
     /**
      * Swaps the output pin of a connection, if its net has an alternative output pin.
      * @param connection The connection in question.
@@ -1666,7 +1640,7 @@ public class RWRoute {
      */
     protected boolean swapOutputPin(Connection connection) {
         SitePinInst source = connection.getSource();
-        Pair<SitePinInst,RouteNode> altSourceAndRnode = setupAlternateSource(connection.getSource());
+        Pair<SitePinInst,RouteNode> altSourceAndRnode = connection.getOrCreateAlternateSource(routingGraph);
         if (altSourceAndRnode == null) {
             return false;
         }

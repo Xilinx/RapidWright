@@ -143,7 +143,7 @@ public class NetWrapper{
         this.sourceRnode = sourceRnode;
     }
 
-    public SitePinInst getAltSource(RouteNodeGraph routingGraph) {
+    public SitePinInst getOrCreateAlternateSource(RouteNodeGraph routingGraph) {
         if (noAltSourceFound) {
             return null;
         }

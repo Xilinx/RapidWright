@@ -34,6 +34,7 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.util.Pair;
 
 /**
  * A Connection instance represents a pair of source-sink {@link SitePinInst} instances of a {@link Net} instance.
@@ -488,5 +489,26 @@ public class Connection implements Comparable<Connection>{
                 }
             }
         }
+    }
+
+    protected Pair<SitePinInst,RouteNode> getOrCreateAlternateSource(RouteNodeGraph routingGraph) {
+        SitePinInst altSource = netWrapper.getOrCreateAlternateSource(routingGraph);
+        if (altSource == null) {
+            return null;
+        }
+
+        Net net = netWrapper.getNet();
+        RouteNode altSourceRnode;
+        if (source.equals(net.getSource())) {
+            altSourceRnode = netWrapper.getAltSourceRnode();
+        } else {
+            assert(source.equals(net.getAlternateSource()));
+            altSource = net.getSource();
+            assert(altSource != null);
+            altSourceRnode = netWrapper.getSourceRnode();
+        }
+
+        assert(altSourceRnode != null);
+        return new Pair<>(altSource, altSourceRnode);
     }
 }
