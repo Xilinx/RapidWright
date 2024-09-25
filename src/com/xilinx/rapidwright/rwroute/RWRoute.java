@@ -1716,6 +1716,16 @@ public class RWRoute {
         }
     }
 
+    protected void saveRoutingSource(Connection connection) {
+        List<RouteNode> rnodes = connection.getRnodes();
+        RouteNode sourceRnode = rnodes.get(rnodes.size() - 1);
+        if (sourceRnode.equals(connection.getSourceRnode())) {
+            return;
+        }
+
+        throw new RuntimeException("ERROR: Backtracking terminated at unexpected rnode: " + sourceRnode);
+    }
+
     /**
      * Traces back for a connection from its sink rnode to its source, in order to build and store the routing path.
      * @param connection: The connection that is being routed.
@@ -1746,11 +1756,7 @@ public class RWRoute {
             return false;
         }
 
-        RouteNode sourceRnode = rnodes.get(rnodes.size()-1);
-        if (!sourceRnode.equals(connection.getSourceRnode())) {
-            throw new RuntimeException();
-        }
-
+        saveRoutingSource(connection);
         return true;
     }
 
