@@ -577,6 +577,7 @@ public class RWRoute {
                         // its projected-to-INT source node, since it could
                         // be a projection from LAGUNA/RXQ* -> RXD* (node for INT/LOGIC_OUTS_*)
                         routingGraph.preserve(sourceINTNode, net);
+                        netWrapper.setSourceRnode(sourceINTRnode);
                     }
                     assert(sourceINTRnode != null);
                     connection.setSourceRnode(sourceINTRnode);
@@ -1646,34 +1647,24 @@ public class RWRoute {
         Net net = source.getNet();
         assert(net != null);
 
-        SitePinInst altSource;
+        NetWrapper netWrapper = nets.get(net);
+        assert(netWrapper != null);
+
+        SitePinInst altSource = netWrapper.getAltSource(routingGraph);
+        if (altSource == null) {
+            return null;
+        }
+
+        RouteNode altSourceRnode;
         if (source.equals(net.getSource())) {
-            altSource = net.getAlternateSource();
-            if (altSource == null) {
-                // TODO: Cache this
-                altSource = DesignTools.getLegalAlternativeOutputPin(net);
-                if (altSource == null) {
-                    return null;
-                }
-                net.addPin(altSource);
-                DesignTools.routeAlternativeOutputSitePin(net, altSource);
-            }
+            altSourceRnode = netWrapper.getAltSourceRnode();
         } else {
             assert(source.equals(net.getAlternateSource()));
             altSource = net.getSource();
             assert(altSource != null);
+            altSourceRnode = netWrapper.getSourceRnode();
         }
 
-        Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
-        if (altSourceNode == null) {
-            return null;
-        }
-
-        if (routingGraph.isPreserved(altSourceNode)) {
-            return null;
-        }
-
-        RouteNode altSourceRnode = getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O);
         assert(altSourceRnode != null);
         return new Pair<>(altSource, altSourceRnode);
     }
