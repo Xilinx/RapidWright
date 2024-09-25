@@ -352,6 +352,7 @@ public class Connection implements Comparable<Connection>{
     }
 
     public void setSource(SitePinInst source) {
+        assert(source != null);
         this.source = source;
     }
 

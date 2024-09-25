@@ -33,7 +33,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -269,7 +268,7 @@ public class PartialRouter extends RWRoute {
             Net unpreserveNet = routingGraph.getPreservedNet(sinkRnode);
             if (unpreserveNet != null && unpreserveNet != net) {
                 unpreserveNets.add(unpreserveNet);
-                sinkRnode.setType(RouteNodeType.PINFEED_I);
+                assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
                 sinkRnode.clearPrev();
             }
         }
@@ -278,57 +277,6 @@ public class PartialRouter extends RWRoute {
             System.out.println("INFO: Unpreserving " + unpreserveNets.size() + " nets to improve sink routability");
             for (Net unpreserveNet : unpreserveNets) {
                 unpreserveNet(unpreserveNet);
-            }
-        }
-
-        // Go through all nets to be routed
-        for (Map.Entry<Net, NetWrapper> e : nets.entrySet()) {
-            Net net = e.getKey();
-            NetWrapper netWrapper = e.getValue();
-
-            // Create all nodes used by this net and set its previous pointer so that:
-            // (a) the routing for each connection can be recovered by
-            //      finishRouteConnection()
-            // (b) RouteNode.setChildren() will know to only allow this incoming
-            //     arc on these nodes
-            for (PIP pip : net.getPIPs()) {
-                Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
-                Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
-
-                // Do not include arcs that the router wouldn't explore
-                // e.g. those that leave the INT tile, since we project pins to their INT tile
-                if (routingGraph.isExcludedTile(end))
-                    continue;
-
-                RouteNode rstart = getOrCreateRouteNode(start, null);
-                RouteNode rend = getOrCreateRouteNode(end, null);
-                assert (rend.getPrev() == null);
-                rend.setPrev(rstart);
-            }
-
-            // Use the prev pointers to attempt to recover routing for all indirect connections
-            for (Connection connection : netWrapper.getConnections()) {
-                if (connection.isDirect()) {
-                    continue;
-                }
-                RouteNode sourceRnode = connection.getSourceRnode();
-                RouteNode sinkRnode = connection.getSinkRnode();
-                assert(sourceRnode.getType() == RouteNodeType.PINFEED_O);
-                assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
-
-                // Even though this connection is not expected to have any routing yet,
-                // perform a rip up anyway in order to release any exclusive sinks
-                // ahead of finishRouteConnection()
-                assert(connection.getRnodes().isEmpty());
-                connection.getSink().setRouted(false);
-                ripUp(connection);
-
-                finishRouteConnection(connection, sinkRnode);
-                if (!connection.getSink().isRouted() && connection.getAltSinkRnodes().isEmpty()) {
-                    // Undo what ripUp() did for this connection which has a single exclusive sink
-                    sinkRnode.incrementUser(connection.getNetWrapper());
-                    sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
-                }
             }
         }
     }
@@ -406,6 +354,51 @@ public class PartialRouter extends RWRoute {
             boolean partiallyPreserved = (pinsToRoute.size() < sinkPins.size());
             if (partiallyPreserved) {
                 partiallyPreservedNets.add(netWrapper);
+            }
+
+            // Create all nodes used by this net and set its previous pointer so that:
+            // (a) the routing for each connection can be recovered by
+            //      finishRouteConnection()
+            // (b) RouteNode.setChildren() will know to only allow this incoming
+            //     arc on these nodes
+            for (PIP pip : net.getPIPs()) {
+                Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
+                Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
+
+                // Do not include arcs that the router wouldn't explore
+                // e.g. those that leave the INT tile, since we project pins to their INT tile
+                if (routingGraph.isExcludedTile(end))
+                    continue;
+
+                RouteNode rstart = getOrCreateRouteNode(start, null);
+                RouteNode rend = getOrCreateRouteNode(end, null);
+                assert(rend.getPrev() == null);
+                rend.setPrev(rstart);
+            }
+
+            // Use the prev pointers to attempt to recover routing for all indirect connections
+            for (Connection connection : netWrapper.getConnections()) {
+                if (connection.isDirect()) {
+                    continue;
+                }
+                RouteNode sourceRnode = connection.getSourceRnode();
+                RouteNode sinkRnode = connection.getSinkRnode();
+                assert(sourceRnode.getType() == RouteNodeType.PINFEED_O);
+                assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
+
+                // Even though this connection is not expected to have any routing yet,
+                // perform a rip up anyway in order to release any exclusive sinks
+                // ahead of finishRouteConnection()
+                assert(connection.getRnodes().isEmpty());
+                connection.getSink().setRouted(false);
+                ripUp(connection);
+
+                finishRouteConnection(connection, sinkRnode);
+                if (!connection.getSink().isRouted() && connection.getAltSinkRnodes().isEmpty()) {
+                    // Undo what ripUp() did for this connection which has a single exclusive sink
+                    sinkRnode.incrementUser(connection.getNetWrapper());
+                    sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
+                }
             }
         }
 
