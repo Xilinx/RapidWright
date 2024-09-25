@@ -1598,21 +1598,38 @@ public class RWRoute {
         targets.clear();
     }
 
+    protected void enlargeBoundingBox(Connection connection) {
+        if (!config.isEnlargeBoundingBox()) {
+            return;
+        }
+
+        connection.enlargeBoundingBox(config.getExtensionXIncrement(), config.getExtensionYIncrement());
+    }
+
+    protected void abandonConnectionIfUnroutable(Connection connection) {
+        if (!config.isUseBoundingBox() || config.isEnlargeBoundingBox()) {
+            return;
+        }
+
+        // Since bounding box is never enlarged there is no hope of routing this connection so abandon it
+        indirectConnections.remove(connection);
+    }
+
     /**
      * Deals with a failed connection by possible output pin swapping and unrouting preserved nets if the router is in the soft preserve mode.
      * @param connection The failed connection.
      */
     protected boolean handleUnroutableConnection(Connection connection) {
-        if (config.isEnlargeBoundingBox()) {
-            connection.enlargeBoundingBox(config.getExtensionXIncrement(), config.getExtensionYIncrement());
+        enlargeBoundingBox(connection);
+        if (routeIteration == 1 && swapOutputPin(connection)) {
+            return true;
         }
-        return routeIteration == 1 && swapOutputPin(connection);
+        abandonConnectionIfUnroutable(connection);
+        return false;
     }
 
     protected boolean handleCongestedConnection(Connection connection) {
-        if (config.isEnlargeBoundingBox()) {
-            connection.enlargeBoundingBox(config.getExtensionXIncrement(), config.getExtensionYIncrement());
-        }
+        enlargeBoundingBox(connection);
         return false;
     }
 

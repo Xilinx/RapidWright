@@ -607,23 +607,22 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected boolean handleUnroutableConnection(Connection connection) {
-        boolean hasAltOutput = super.handleUnroutableConnection(connection);
-        if (hasAltOutput)
-            return true;
-        if ((routeIteration == 1 && !hasAltOutput) || routeIteration == 2) {
-            if (softPreserve) {
-                 int netsUnpreserved = unpreserveNetsAndReleaseResources(connection);
-                 if (netsUnpreserved > 0) {
-                     return true;
-                 }
-            }
-        }
-        if (config.isUseBoundingBox() && !config.isEnlargeBoundingBox()) {
-            // Since bounding box is never enlarged, and there is nothing to be unpreserved,
-            // then there is no hope of routing this connection so abandon it
-            indirectConnections.remove(connection);
+        enlargeBoundingBox(connection);
+        if (routeIteration == 1 && swapOutputPin(connection)) {
             return true;
         }
+        if (softPreserve && (
+                // First iteration, without alternate source
+                (routeIteration == 1 && connection.getNetWrapper().getNet().getAlternateSource() == null) ||
+                // Second iteration, with alternate source
+                (routeIteration == 2 && connection.getNetWrapper().getNet().getAlternateSource() != null))
+        ) {
+             int netsUnpreserved = unpreserveNetsAndReleaseResources(connection);
+             if (netsUnpreserved > 0) {
+                 return true;
+             }
+        }
+        abandonConnectionIfUnroutable(connection);
         return false;
     }
 
