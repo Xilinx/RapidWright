@@ -549,30 +549,13 @@ public class RWRoute {
         SitePinInst source = net.getSource();
         Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
 
-        // Pre-emptively set up alternate source since we may expand from both sources
-        SitePinInst altSource = net.getAlternateSource();
-        Node altSourceINTNode = null;
-        if (altSource == null) {
-            altSource = DesignTools.getLegalAlternativeOutputPin(net);
-            if (altSource != null) {
-                // Add this SitePinInst to the net, but not to the SiteInst since it's not yet clear we'll be using it
-                net.addPin(altSource);
-                DesignTools.routeAlternativeOutputSitePin(net, altSource);
-            }
-        }
-        if (altSource != null) {
-            assert(!altSource.equals(source));
-            altSourceINTNode = RouterHelper.projectOutputPinToINTNode(altSource);
-        }
-
         RouteNode sourceINTRnode = null;
-        RouteNode altSourceINTRnode = null;
         int indirect = 0;
         for (SitePinInst sink : sinkPins) {
             Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
             List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
 
-            if (nodes.isEmpty() || (sourceINTNode == null && altSourceINTNode == null)) {
+            if (nodes.isEmpty() || sourceINTNode == null) {
                 directConnections.add(connection);
                 connection.setDirect(true);
             } else {
@@ -640,7 +623,7 @@ public class RWRoute {
                     sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
                 }
 
-                if (sourceINTNode == null && altSourceINTNode == null) {
+                if (sourceINTNode == null) {
                     throw new RuntimeException("ERROR: Null projected INT node for the source of net " + net.toStringFull());
                 }
                 if (sourceINTRnode == null && sourceINTNode != null) {
@@ -650,19 +633,12 @@ public class RWRoute {
                     // be a projection from LAGUNA/RXQ* -> RXD* (node for INT/LOGIC_OUTS_*)
                     routingGraph.preserve(sourceINTNode, net);
                 }
-                if (altSourceINTRnode == null && altSourceINTNode != null) {
-                    altSourceINTRnode = getOrCreateRouteNode(altSourceINTNode, RouteNodeType.PINFEED_O);
-                }
 
                 if (sourceINTRnode != null) {
                     connection.setSourceRnode(sourceINTRnode);
-                    connection.setAltSourceRnode(altSourceINTRnode);
                 } else {
                     // Primary source does not reach the fabric (e.g. COUT)
-                    // just use alternate source
-                    assert(altSourceINTRnode != null);
-                    connection.setSource(net.getAlternateSource());
-                    connection.setSourceRnode(altSourceINTRnode);
+                    throw new RuntimeException();
                 }
                 connection.setDirect(false);
                 indirect++;
@@ -1640,48 +1616,62 @@ public class RWRoute {
         return false;
     }
 
+    protected Pair<SitePinInst,RouteNode> setupAlternateSource(SitePinInst source) {
+        Net net = source.getNet();
+        assert(net != null);
+
+        SitePinInst altSource;
+        if (source.equals(net.getSource())) {
+            altSource = net.getAlternateSource();
+            if (altSource == null) {
+                // TODO: Cache this
+                altSource = DesignTools.getLegalAlternativeOutputPin(net);
+                if (altSource == null) {
+                    return null;
+                }
+                // Add this SitePinInst to the net, but not to the SiteInst since it's not yet clear we'll be using it
+                net.addPin(altSource);
+                DesignTools.routeAlternativeOutputSitePin(net, altSource);
+            }
+        } else {
+            assert(source.equals(net.getAlternateSource()));
+            altSource = net.getSource();
+            assert(altSource != null);
+        }
+
+        Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
+        if (altSourceNode == null) {
+            return null;
+        }
+
+        if (routingGraph.isPreserved(altSourceNode)) {
+            return null;
+        }
+
+        RouteNode altSourceRnode = getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O);
+        assert(altSourceRnode != null);
+        return new Pair<>(altSource, altSourceRnode);
+    }
+
     /**
      * Swaps the output pin of a connection, if its net has an alternative output pin.
      * @param connection The connection in question.
      * @return true, if the output pin has been swapped.
      */
     protected boolean swapOutputPin(Connection connection) {
-        NetWrapper netWrapper = connection.getNetWrapper();
-        Net net = netWrapper.getNet();
-
-        SitePinInst altSource = net.getAlternateSource();
-        if (altSource == null) {
-            altSource = DesignTools.getLegalAlternativeOutputPin(net);
-            if (altSource != null) {
-                // Add this SitePinInst to the net, but not to the SiteInst since it's not yet clear we'll be using it
-                net.addPin(altSource);
-                DesignTools.routeAlternativeOutputSitePin(net, altSource);
-            } else {
-                System.out.println("INFO: No alternative source to swap");
-                return false;
-            }
-        }
-
         SitePinInst source = connection.getSource();
-        if (source.equals(altSource)) {
-            altSource = net.getSource();
+        Pair<SitePinInst,RouteNode> altSourceAndRnode = setupAlternateSource(connection.getSource());
+        if (altSourceAndRnode == null) {
+            return false;
         }
 
-        RouteNode altSourceRnode = connection.getAltSourceRnode();
-        if (altSourceRnode == null) {
-            Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
-            if (routingGraph.isPreserved(altSourceNode)) {
-                System.out.println("INFO: No alternative source to swap");
-                return false;
-            }
-            assert(routingGraph.getNode(altSourceNode) == null);
-            altSourceRnode = getOrCreateRouteNode(altSourceNode, RouteNodeType.PINFEED_O);
-        }
-
+        SitePinInst altSource = altSourceAndRnode.getFirst();
         System.out.println("INFO: Swap source from " + source + " to " + altSource + "\n");
-
         connection.setSource(altSource);
+
+        RouteNode altSourceRnode = altSourceAndRnode.getSecond();
         connection.setSourceRnode(altSourceRnode);
+
         connection.getSink().setRouted(false);
         return true;
     }
@@ -1732,29 +1722,7 @@ public class RWRoute {
 
         RouteNode sourceRnode = rnodes.get(rnodes.size()-1);
         if (!sourceRnode.equals(connection.getSourceRnode())) {
-            if (!sourceRnode.equals(connection.getAltSourceRnode())) {
-                // Didn't backtrack to alternate source either -- invalid routing
-                return false;
-            }
-
-            // Used source node is different to the one set on the connection
-            Net net = connection.getNetWrapper().getNet();
-
-            // Update connection's source SPI
-            if (connection.getSource() == net.getSource()) {
-                // Swap to alternate source
-                connection.setSource(net.getAlternateSource());
-            } else if (connection.getSource() == net.getAlternateSource()) {
-                // Swap back to main source
-                connection.setSource(net.getSource());
-            } else {
-                // Backtracked to neither the net's source nor its alternate source
-                throw new RuntimeException("Backtracking terminated at unexpected rnode: " + rnode);
-            }
-
-            // Swap source rnode
-            connection.setAltSourceRnode(connection.getSourceRnode());
-            connection.setSourceRnode(sourceRnode);
+            throw new RuntimeException();
         }
 
         return true;

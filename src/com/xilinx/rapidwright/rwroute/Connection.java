@@ -49,7 +49,6 @@ public class Connection implements Comparable<Connection>{
      * They are created based on the INT tile nodes the source and sink SitePinInsts connect to, respectively.
      */
     private RouteNode sourceRnode;
-    private RouteNode altSourceRnode;
     private RouteNode sinkRnode;
     private List<RouteNode> altSinkRnodes;
     /**
@@ -282,14 +281,6 @@ public class Connection implements Comparable<Connection>{
 
     public void setSourceRnode(RouteNode sourceNode) {
         sourceRnode = sourceNode;
-    }
-
-    public RouteNode getAltSourceRnode() {
-        return altSourceRnode;
-    }
-
-    public void setAltSourceRnode(RouteNode altSourceNode) {
-        altSourceRnode = altSourceNode;
     }
 
     public RouteNode getSinkRnode() {
