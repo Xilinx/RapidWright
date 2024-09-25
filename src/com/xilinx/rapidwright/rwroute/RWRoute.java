@@ -1996,7 +1996,8 @@ public class RWRoute {
      * @param newTotalPathCost Total path cost of childRnode.
      */
     protected void push(ConnectionState state, RouteNode childRnode, float newPartialPathCost, float newTotalPathCost) {
-        assert(childRnode.getPrev() != null || childRnode.getType() == RouteNodeType.PINFEED_O);
+        // Pushed node must have a prev pointer, unless it is a source (with no upstream path cost)
+        assert(childRnode.getPrev() != null || newPartialPathCost == 0);
         childRnode.setLowerBoundTotalPathCost(newTotalPathCost);
         childRnode.setUpstreamPathCost(newPartialPathCost);
         // Use the number-of-connections-routed-so-far as the identifier for whether a rnode
