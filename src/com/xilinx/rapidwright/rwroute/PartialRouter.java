@@ -357,41 +357,43 @@ public class PartialRouter extends RWRoute {
                 partiallyPreservedNets.add(netWrapper);
             }
 
-            // Create all nodes used by this net and set its previous pointer so that:
-            // (a) the routing for each connection can be recovered by
-            //      finishRouteConnection()
-            // (b) RouteNode.setChildren() will know to only allow this incoming
-            //     arc on these nodes
-            for (PIP pip : net.getPIPs()) {
-                Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
-                Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
+            if (net.hasPIPs()) {
+                // Create all nodes used by this net and set its previous pointer so that:
+                // (a) the routing for each connection can be recovered by
+                //      finishRouteConnection()
+                // (b) RouteNode.setChildren() will know to only allow this incoming
+                //     arc on these nodes
+                for (PIP pip : net.getPIPs()) {
+                    Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
+                    Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
 
-                // Do not include arcs that the router wouldn't explore
-                // e.g. those that leave the INT tile, since we project pins to their INT tile
-                if (routingGraph.isExcludedTile(end))
-                    continue;
+                    // Do not include arcs that the router wouldn't explore
+                    // e.g. those that leave the INT tile, since we project pins to their INT tile
+                    if (routingGraph.isExcludedTile(end))
+                        continue;
 
-                RouteNode rstart = routingGraph.getOrCreate(start);
-                RouteNode rend = routingGraph.getOrCreate(end);
-                assert(rend.getPrev() == null);
-                rend.setPrev(rstart);
-            }
-
-            // Use the prev pointers to attempt to recover routing for all indirect connections
-            for (Connection connection : netWrapper.getConnections()) {
-                if (connection.isDirect()) {
-                    continue;
+                    RouteNode rstart = routingGraph.getOrCreate(start);
+                    RouteNode rend = routingGraph.getOrCreate(end);
+                    assert(rend.getPrev() == null);
+                    rend.setPrev(rstart);
                 }
 
-                // Even though this connection is not expected to have any routing yet,
-                // perform a rip up anyway in order to release any exclusive sinks
-                // ahead of finishRouteConnection()
-                assert(connection.getRnodes().isEmpty());
-                connection.getSink().setRouted(false);
-                ripUp(connection);
+                // Use the prev pointers to attempt to recover routing for all indirect connections
+                for (Connection connection : netWrapper.getConnections()) {
+                    if (connection.isDirect()) {
+                        continue;
+                    }
 
-                RouteNode sinkRnode = connection.getSinkRnode();
-                finishRouteConnection(connection, sinkRnode);
+                    // Even though this connection is not expected to have any routing yet,
+                    // perform a rip up anyway in order to release any exclusive sinks
+                    // ahead of finishRouteConnection()
+                    assert(connection.getRnodes().isEmpty());
+                    connection.getSink().setRouted(false);
+                    ripUp(connection);
+
+                    RouteNode sinkRnode = connection.getSinkRnode();
+                    finishRouteConnection(connection, sinkRnode);
+                }
             }
         }
 
