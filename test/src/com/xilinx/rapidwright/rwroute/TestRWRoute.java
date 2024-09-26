@@ -271,7 +271,7 @@ public class TestRWRoute {
         design.setTrackNetChanges(true);
 
         // Pseudo-randomly unroute some pins from a multi-pin net
-        Random random = new Random();
+        Random random = new Random(0);
         for (Net net : design.getNets()) {
             if (!net.getName().endsWith("/processor/t_state_0")) {
                 continue;
