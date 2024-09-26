@@ -87,12 +87,16 @@ public class PartialRouter extends RWRoute {
 
         @Override
         public boolean isAccessible(RouteNode childRnode, Connection connection) {
+            if (super.isAccessible(childRnode, connection)) {
+                return true;
+            }
             Net preservedNet = getPreservedNet(childRnode);
             if (preservedNet == connection.getNetWrapper().getNet()) {
                 // Always allow nodes preserved for this connection's net
+                super.isAccessible(childRnode, connection);
                 return true;
             }
-            return super.isAccessible(childRnode, connection);
+            return false;
         }
     }
 
