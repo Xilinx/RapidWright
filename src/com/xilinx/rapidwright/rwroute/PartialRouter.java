@@ -84,20 +84,6 @@ public class PartialRouter extends RWRoute {
             }
             return super.isExcluded(parent, child);
         }
-
-        @Override
-        public boolean isAccessible(RouteNode childRnode, Connection connection) {
-            if (super.isAccessible(childRnode, connection)) {
-                return true;
-            }
-            Net preservedNet = getPreservedNet(childRnode);
-            if (preservedNet == connection.getNetWrapper().getNet()) {
-                // Always allow nodes preserved for this connection's net
-                super.isAccessible(childRnode, connection);
-                return true;
-            }
-            return false;
-        }
     }
 
     protected static class RouteNodeGraphPartialTimingDriven extends RouteNodeGraphTimingDriven {
@@ -120,16 +106,6 @@ public class PartialRouter extends RWRoute {
                 return false;
             }
             return super.isExcluded(parent, child);
-        }
-
-        @Override
-        public boolean isAccessible(RouteNode childRnode, Connection connection) {
-            Net preservedNet = getPreservedNet(childRnode);
-            if (preservedNet == connection.getNetWrapper().getNet()) {
-                // Always allow nodes preserved for this connection's net
-                return true;
-            }
-            return super.isAccessible(childRnode, connection);
         }
     }
 
@@ -413,6 +389,8 @@ public class PartialRouter extends RWRoute {
         super.finishRouteConnection(connection, rnode);
 
         if (!connection.getSink().isRouted()) {
+            // TODO: Consider backtrack-ed result into alternate source
+
             connection.resetRoute();
             if (connection.getAltSinkRnodes().isEmpty()) {
                 // Undo what ripUp() would have done for this connection which has a single exclusive sink
