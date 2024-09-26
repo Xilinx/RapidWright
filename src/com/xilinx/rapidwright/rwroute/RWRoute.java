@@ -565,7 +565,8 @@ public class RWRoute {
                 }
             }
 
-            if (sourceINTNode == null && connection.getSourceRnode() == null) {
+            if ((sourceINTNode == null && connection.getSourceRnode() == null) || nodes.isEmpty()) {
+                // Direct connection if either source or sink pin cannot be projected to INT tile
                 directConnections.add(connection);
                 connection.setDirect(true);
             } else {
