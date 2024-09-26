@@ -739,8 +739,9 @@ public class PhysNetlistReader {
             String name = SiteInst.STATIC_SOURCE + "_" + site.getName();
             SiteInst si = new SiteInst(name, site.getSiteTypeEnum());
             si.place(site);
+            si.setDesign(design);
             // Ensure it is not attached to the design
-            assert(si.getDesign() == null);
+            assert(design.getSiteInstFromSite(site) == null);
             return si;
         });
         assert(siteInst != null && siteInst.isPlaced());
