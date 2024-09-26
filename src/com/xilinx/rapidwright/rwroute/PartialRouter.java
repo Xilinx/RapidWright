@@ -386,24 +386,42 @@ public class PartialRouter extends RWRoute {
     }
 
     @Override
+    protected boolean saveRouting(Connection connection, RouteNode rnode) {
+        if (super.saveRouting(connection, rnode)) {
+            return true;
+        }
+
+        List<RouteNode> rnodes = connection.getRnodes();
+        RouteNode sourceRnode = rnodes.get(rnodes.size() - 1);
+        assert(sourceRnode != connection.getSourceRnode()); // Would have returned already
+        if (sourceRnode == rnode) {
+            // No back-tracking beyond the first node
+            assert(rnodes.size() == 1);
+            return false;
+        }
+        assert(rnodes.size() > 1);
+
+        // Check if alternate source exists (without creating one if it doesn't)
+        if (connection.getNetWrapper().getNet().getAlternateSource() != null) {
+            Pair<SitePinInst,RouteNode> altSourceAndRnode = connection.getOrCreateAlternateSource(routingGraph);
+            assert(altSourceAndRnode != null);
+            RouteNode altSourceRnode = altSourceAndRnode.getSecond();
+            if (sourceRnode == altSourceRnode) {
+                // We backtracked to the alternate source
+                SitePinInst altSource = altSourceAndRnode.getFirst();
+                connection.setSource(altSource);
+                connection.setSourceRnode(altSourceRnode);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
     protected void finishRouteConnection(Connection connection, RouteNode rnode) {
         super.finishRouteConnection(connection, rnode);
 
         if (!connection.getSink().isRouted()) {
-            List<RouteNode> rnodes = connection.getRnodes();
-            SitePinInst altSource = connection.getNetWrapper().getNet().getAlternateSource();
-            if (rnodes.size() > 1 && altSource != null) {
-                RouteNode sourceRnode = rnodes.get(rnodes.size() - 1);
-                assert(connection.getSourceRnode() != sourceRnode);
-                Pair<SitePinInst,RouteNode> altSourceAndRnode = connection.getOrCreateAlternateSource(routingGraph);
-                assert(altSourceAndRnode != null);
-                RouteNode altSourceRnode = altSourceAndRnode.getSecond();
-                if (sourceRnode == altSourceRnode) {
-                    // We must have backtracked to the alternate source
-                    throw new RuntimeException("TODO");
-                }
-            }
-
             connection.resetRoute();
             if (connection.getAltSinkRnodes().isEmpty()) {
                 // Undo what ripUp() would have done for this connection which has a single exclusive sink
