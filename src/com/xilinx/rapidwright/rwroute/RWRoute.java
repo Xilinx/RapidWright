@@ -555,7 +555,8 @@ public class RWRoute {
             Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
             List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
             if (sourceINTNode == null && !nodes.isEmpty()) {
-                // Sink can be projected to an INT tile, but source cannot be; try alternate source
+                // Sink can be projected to an INT tile, but primary source (e.g. COUT)
+                // cannot be; try alternate source
                 Pair<SitePinInst,RouteNode> altSourceAndRnode = connection.getOrCreateAlternateSource(routingGraph);
                 if (altSourceAndRnode != null) {
                     SitePinInst altSource = altSourceAndRnode.getFirst();
@@ -577,10 +578,10 @@ public class RWRoute {
                         // Where only a single primary source exists, always preserve
                         // its projected-to-INT source node, since it could
                         // be a projection from LAGUNA/RXQ* -> RXD* (node for INT/LOGIC_OUTS_*)
+                        assert(sourceINTRnode != null);
                         routingGraph.preserve(sourceINTNode, net);
                         netWrapper.setSourceRnode(sourceINTRnode);
                     }
-                    assert(sourceINTRnode != null);
                     connection.setSourceRnode(sourceINTRnode);
                 }
 
