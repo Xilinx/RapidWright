@@ -35,8 +35,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReferenceArray;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -70,7 +71,7 @@ public class RouteNodeGraph {
     /**
      * A map of preserved nodes to their nets
      */
-    private final AtomicReferenceArray<Net[]> preservedMap;
+    private final Map<Tile, Net[]> preservedMap;
     private final AtomicInteger preservedMapSize;
 
     /**
@@ -120,15 +121,15 @@ public class RouteNodeGraph {
         this.design = design;
         lutRoutethru = config.isLutRoutethru();
 
-        Device device = design.getDevice();
         this.nodesMap = nodesMap;
         nodesMapSize = new AtomicInteger();
-        preservedMap = new AtomicReferenceArray<>(device.getColumns() * device.getRows());
+        preservedMap = new ConcurrentHashMap<>();
         preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
         targets = new ArrayList<>();
         createRnodeTime = 0;
 
+        Device device = design.getDevice();
         intYToSLRIndex = new int[device.getRows()];
         Tile[][] intTiles = device.getTilesByRootName("INT");
         for (int y = 0; y < intTiles.length; y++) {
@@ -298,14 +299,7 @@ public class RouteNodeGraph {
     private Net preserve(Tile tile, int wireIndex, Net net) {
         // Assumes that tile/wireIndex describes the base wire on the node
         // No need to synchronize access to 'nets' since collisions are not expected
-        int tileId = tile.getUniqueAddress();
-        Net[] nets = preservedMap.get(tileId);
-        if (nets == null) {
-            nets = new Net[tile.getWireCount()];
-            if (!preservedMap.compareAndSet(tileId, null, nets)) {
-                nets = preservedMap.get(tileId);
-            }
-        }
+        Net[] nets = preservedMap.computeIfAbsent(tile, (t) -> new Net[t.getWireCount()]);
         Net oldNet = nets[wireIndex];
         // Do not clobber the old value
         if (oldNet == null) {
@@ -385,7 +379,7 @@ public class RouteNodeGraph {
 
     private boolean unpreserve(Tile tile, int wireIndex) {
         // Assumes that tile/wireIndex describes the base wire on its node
-        Net[] nets = preservedMap.get(tile.getUniqueAddress());
+        Net[] nets = preservedMap.get(tile);
         if (nets == null || nets[wireIndex] == null)
             return false;
         nets[wireIndex] = null;
@@ -395,7 +389,7 @@ public class RouteNodeGraph {
     public boolean isPreserved(Node node) {
         Tile tile = node.getTile();
         int wireIndex = node.getWireIndex();
-        Net[] nets = preservedMap.get(tile.getUniqueAddress());
+        Net[] nets = preservedMap.get(tile);
         return nets != null && nets[wireIndex] != null;
     }
 
@@ -461,7 +455,7 @@ public class RouteNodeGraph {
 
     private Net getPreservedNet(Tile tile, int wireIndex) {
         // Assumes that tile/wireIndex describes the base wire on its node
-        Net[] nets = preservedMap.get(tile.getUniqueAddress());
+        Net[] nets = preservedMap.get(tile);
         return nets != null ? nets[wireIndex] : null;
     }
 
@@ -567,7 +561,6 @@ public class RouteNodeGraph {
 
         Tile sinkTile = connection.getSinkRnode().getTile();
         if (childX != sinkTile.getTileXCoordinate()) {
-            // Not in same column
             return false;
         }
 
