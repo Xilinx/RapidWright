@@ -49,6 +49,7 @@ import com.xilinx.rapidwright.timing.ClkRouteTiming;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.util.Pair;
 
 /**
  * A class extending {@link RWRoute} for partial routing.
@@ -389,7 +390,19 @@ public class PartialRouter extends RWRoute {
         super.finishRouteConnection(connection, rnode);
 
         if (!connection.getSink().isRouted()) {
-            // TODO: Consider backtrack-ed result into alternate source
+            List<RouteNode> rnodes = connection.getRnodes();
+            SitePinInst altSource = connection.getNetWrapper().getNet().getAlternateSource();
+            if (rnodes.size() > 1 && altSource != null) {
+                RouteNode sourceRnode = rnodes.get(rnodes.size() - 1);
+                assert(connection.getSourceRnode() != sourceRnode);
+                Pair<SitePinInst,RouteNode> altSourceAndRnode = connection.getOrCreateAlternateSource(routingGraph);
+                assert(altSourceAndRnode != null);
+                RouteNode altSourceRnode = altSourceAndRnode.getSecond();
+                if (sourceRnode == altSourceRnode) {
+                    // We must have backtracked to the alternate source
+                    throw new RuntimeException("TODO");
+                }
+            }
 
             connection.resetRoute();
             if (connection.getAltSinkRnodes().isEmpty()) {
