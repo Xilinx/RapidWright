@@ -563,13 +563,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     }
 
     /**
-     * Clears the parent RouteNode instance.
-     */
-    public void clearPrev() {
-        this.prev = null;
-    }
-
-    /**
      * Gets the present congestion cost of a RouteNode Object.
      * @return The present congestion of a RouteNode Object.
      */
