@@ -738,8 +738,8 @@ public class PhysNetlistReader {
             // Create a dummy TIEOFF SiteInst
             String name = SiteInst.STATIC_SOURCE + "_" + site.getName();
             SiteInst si = new SiteInst(name, site.getSiteTypeEnum());
-            si.setDesign(design);
             si.place(site);
+            si.setDesign(design);
             // Ensure it is not attached to the design
             assert(design.getSiteInstFromSite(site) == null);
             return si;
