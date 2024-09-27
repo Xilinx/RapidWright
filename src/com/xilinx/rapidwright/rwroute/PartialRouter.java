@@ -241,7 +241,10 @@ public class PartialRouter extends RWRoute {
         super.determineRoutingTargets();
 
         // With all routingGraph.preserveAsync() calls having completed,
-        // now check sink routability
+        // now check that no sinks are preserved by another net
+        // (e.g. a pin was moved from one net to the other, but
+        // its old routing was not ripped up and got preserved)
+        // if so, unpreserve that blocking net
         Set<Net> unpreserveNets = new HashSet<>();
         for (Connection connection : indirectConnections) {
             Net net = connection.getNetWrapper().getNet();
