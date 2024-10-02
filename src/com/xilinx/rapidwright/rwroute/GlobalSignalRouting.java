@@ -634,13 +634,24 @@ public class GlobalSignalRouting {
         String sitePinName;
         if (isVersal) {
             sitePinName = wireName.substring(17, wireName.length() - 4);
+
+            // For [A-H]Q only
+            if (si != null && sitePinName.endsWith("Q")) {
+                char lutLetter = sitePinName.charAt(0);
+                Net o6Net = si.getNetFromSiteWire(lutLetter + "_O");
+                if (o6Net != null && o6Net.getType() != type) {
+                    // 6LUT is occupied
+                    return null;
+                }
+            }
         } else {
             if (wireName.endsWith("_O")) {
                 sitePinName = wireName.substring(wireName.length() - 3);
             } else if (wireName.endsWith("MUX")) {
-                char lutLetter = wireName.charAt(wireName.length() - 4);
+                sitePinName = wireName.substring(wireName.length() - 4);
 
                 if (si != null) {
+                    char lutLetter = sitePinName.charAt(0);
                     Net o6Net = si.getNetFromSiteWire(lutLetter + "_O");
                     if (o6Net != null && o6Net.getType() != type) {
                         // 6LUT is occupied; play it safe and do not consider fracturing as that can require modifying the intra-site routing
@@ -653,8 +664,6 @@ public class GlobalSignalRouting {
                         return null;
                     }
                 }
-
-                sitePinName = wireName.substring(wireName.length() - 4);
             } else {
                 throw new RuntimeException(wireName);
             }
