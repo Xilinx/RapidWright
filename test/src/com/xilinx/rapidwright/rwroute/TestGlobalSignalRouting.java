@@ -43,6 +43,7 @@ import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
 
@@ -142,10 +143,6 @@ public class TestGlobalSignalRouting {
         Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
         design.unrouteDesign();
 
-        // Even though we're starting from a fully-routed design, Versal designs may still need
-        // some preprocessing to discover all SLICE.CE pins
-        DesignTools.createPossiblePinsToStaticNets(design);
-
         Net gndNet = design.getGndNet();
         Net vccNet = design.getVccNet();
         Assertions.assertFalse(gndNet.hasPIPs());
@@ -154,8 +151,25 @@ public class TestGlobalSignalRouting {
         List<SitePinInst> gndPins = gndNet.getPins();
         List<SitePinInst> vccPins = vccNet.getPins();
         // Remove all existing output pins so that we can count how many new ones were created
-        gndPins.removeIf(SitePinInst::isOutPin);
-        vccPins.removeIf(SitePinInst::isOutPin);
+        for (SitePinInst spi : new ArrayList<>(gndPins)) {
+            if (spi.isOutPin()) {
+                gndNet.removePin(spi);
+                spi.detachSiteInst();
+            }
+        }
+        for (SitePinInst spi : new ArrayList<>(vccPins)) {
+            String pinName = spi.getName();
+            if (spi.isOutPin() || pinName.equals("RST") || pinName.startsWith("CKEN")) {
+                vccNet.removePin(spi);
+                spi.detachSiteInst();
+            }
+        }
+
+        Assertions.assertEquals(177, vccPins.size());
+
+        // Even though we're starting from a fully-routed design, Versal designs may still need
+        // some preprocessing to discover all SLICE.CE pins
+        DesignTools.createPossiblePinsToStaticNets(design);
 
         Assertions.assertEquals(123, gndPins.size());
         Assertions.assertEquals(232, vccPins.size());
@@ -164,9 +178,9 @@ public class TestGlobalSignalRouting {
 
         GlobalSignalRouting.routeStaticNet(gndNet, (n) -> getNodeState(design, NetType.GND, n), design, routeThruHelper);
         gndPins = gndNet.getPins();
-        Assertions.assertEquals(2, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
+        Assertions.assertEquals(8, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
         Assertions.assertEquals(123, gndPins.stream().filter((spi) -> !spi.isOutPin()).count());
-        Assertions.assertEquals(439, gndNet.getPIPs().size());
+        Assertions.assertEquals(436, gndNet.getPIPs().size());
 
         GlobalSignalRouting.routeStaticNet(vccNet, (n) -> getNodeState(design, NetType.VCC, n), design, routeThruHelper);
         vccPins = vccNet.getPins();

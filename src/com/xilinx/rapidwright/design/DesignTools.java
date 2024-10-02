@@ -3283,21 +3283,38 @@ public class DesignTools {
                     }
 
                     Pair<String, String> sitePinNames = pinMapping.get(bel.getName());
-                    final String[] belPinNames = new String[] {"CE"}; // TODO: "SR"
+                    final String[] belPinNames = new String[] {"CE", "SR"};
                     for (String belPinName : belPinNames) {
-                        String sitePinName = belPinName == belPinNames[0] ? sitePinNames.getFirst() : sitePinNames.getSecond();
+                        String sitePinName = (belPinName == belPinNames[0]) ? sitePinNames.getFirst() : sitePinNames.getSecond();
                         if (si.getSitePinInst(sitePinName) != null) {
                             continue;
                         }
 
                         Net net = si.getNetFromSiteWire(sitePinName);
                         if (net != null) {
-                            // It is possible for sitewire to be assigned to a non VCC net, but a SitePinInst to not yet exist
-                            assert(!net.isVCCNet());
-                            continue;
+                            if (belPinName == belPinNames[0]) {
+                                // CE: it is possible for sitewire to be assigned to a non VCC net, but a SitePinInst to not yet exist
+                                assert(!net.isVCCNet());
+                                continue;
+                            } else {
+                                // SR: it is possible for sitewire to be assigned the GND net, yet still be routed to VCC
+                                if (!net.isStaticNet()) {
+                                    continue;
+                                }
+                            }
                         }
+
                         BELPin belPin = bel.getPin(belPinName);
-                        assert(si.getNetFromSiteWire(belPin.getSiteWireName()) == null);
+                        Net belPinNet = si.getNetFromSiteWire(belPin.getSiteWireName());
+                        if (belPinNet != null) {
+                            if (belPinName == belPinNames[0]) {
+                                // CE
+                                assert(belPinNet.isVCCNet());
+                            } else {
+                                // SR
+                                assert(belPinNet.isStaticNet());
+                            }
+                        }
 
                         SitePinInst spi = new SitePinInst(false, sitePinName, si);
                         boolean updateSiteRouting = false;
