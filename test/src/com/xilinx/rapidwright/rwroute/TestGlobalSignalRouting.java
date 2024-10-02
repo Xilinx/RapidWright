@@ -140,16 +140,14 @@ public class TestGlobalSignalRouting {
     @Test
     public void testRouteStaticNetOnVersalDevice() {
         Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        design.unrouteDesign();
 
-        // estimate RWRoute.preprocess(design) and skip the series check
-        DesignTools.makePhysNetNamesConsistent(design);
-        DesignTools.createPossiblePinsToStaticNets(design);
-        DesignTools.createMissingSitePinInsts(design);
+        // Even though we're starting from a fully-routed design, Versal designs may still need
+        // some preprocessing to discover all SLICE.CE pins
+        DesignTools.createCeSrRstPinsToVCC(design);
 
         Net gndNet = design.getGndNet();
         Net vccNet = design.getVccNet();
-        gndNet.unroute();
-        vccNet.unroute();
         Assertions.assertFalse(gndNet.hasPIPs());
         Assertions.assertFalse(vccNet.hasPIPs());
 
@@ -184,7 +182,8 @@ public class TestGlobalSignalRouting {
 
         if (FileTools.isVivadoOnPath()) {
             ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
-            // Assertions.assertEquals(276, rrs.fullyRoutedNets);
+            Assertions.assertEquals(2, rrs.fullyRoutedNets);
+            Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
         }
     }
 }

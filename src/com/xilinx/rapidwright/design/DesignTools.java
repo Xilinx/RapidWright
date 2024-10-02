@@ -2307,7 +2307,10 @@ public class DesignTools {
                         if (!sitePIP.getInputPinName().equals(sink.getName())) continue;
                         // Make this the new source to search from and keep looking...
                         queue.add(sitePIP.getOutputPin());
-                    } else if (sink.getBEL().isFF() && !sink.getBELName().equals("DIFFRXTX")) {
+                    } else if (sink.getBEL().isFF() &&
+                            // TODO: Remove workaround in 2024.1.3
+                            !sink.getBELName().equals("DIFFRXTX")) {
+                        // FF pass thru option (not a site PIP)
                         siteWireName = sink.getBEL().getPin("Q").getSiteWireName();
                         if (siteWires.contains(siteWireName)) {
                             sitePins.add(siteWireName);

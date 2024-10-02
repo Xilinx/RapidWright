@@ -312,7 +312,6 @@ public class RouteNodeGraph {
 
     public void preserve(Net net, List<SitePinInst> pins) {
         boolean isStaticNet = net.isStaticNet();
-        List<String> suffixSetOfVersal = Arrays.asList("_O", "Q", "Q2");
         for (SitePinInst pin : pins) {
             preserve(pin.getConnectedNode(), net);
 
@@ -328,19 +327,18 @@ public class RouteNodeGraph {
                 char lutLetter = pinName.charAt(0);
                 String otherPinName;
                 if (design.getDevice().getSeries() == Series.Versal) {
+                    // TODO
                     continue;
-                } else {
-                if (pinName.endsWith("MUX")) {
+                } else if (pinName.endsWith("MUX")) {
                     otherPinName = lutLetter + "_O";
                 } else if (pinName.endsWith("_O")) {
                     otherPinName = lutLetter + "MUX";
                 } else {
                     throw new RuntimeException("ERROR: Unsupported site pin " + pin);
                 }
+
                 Node otherNode = si.getSite().getConnectedNode(otherPinName);
-                    assert(otherNode != null);
                 preserve(otherNode, net);
-                }
             }
         }
 
@@ -402,17 +400,7 @@ public class RouteNodeGraph {
 
     private static final Set<TileTypeEnum> allowedTileEnums;
     static {
-        allowedTileEnums = EnumSet.noneOf(TileTypeEnum.class);
-        allowedTileEnums.add(TileTypeEnum.INT);
-        allowedTileEnums.add(TileTypeEnum.CLE_BC_CORE);
-        allowedTileEnums.add(TileTypeEnum.INTF_LOCF_TL_TILE);
-        allowedTileEnums.add(TileTypeEnum.INTF_LOCF_TR_TILE);
-        allowedTileEnums.add(TileTypeEnum.INTF_LOCF_BL_TILE);
-        allowedTileEnums.add(TileTypeEnum.INTF_LOCF_BR_TILE);
-        allowedTileEnums.add(TileTypeEnum.INTF_ROCF_TL_TILE);
-        allowedTileEnums.add(TileTypeEnum.INTF_ROCF_TR_TILE);
-        allowedTileEnums.add(TileTypeEnum.INTF_ROCF_BL_TILE);
-        allowedTileEnums.add(TileTypeEnum.INTF_ROCF_BR_TILE);
+        allowedTileEnums = EnumSet.of(TileTypeEnum.INT);
         allowedTileEnums.addAll(Utils.getLagunaTileTypes());
     }
 
