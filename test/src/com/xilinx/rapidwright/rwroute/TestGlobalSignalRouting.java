@@ -170,8 +170,6 @@ public class TestGlobalSignalRouting {
             Assertions.assertEquals(0, vccPins.size());
             Assertions.assertEquals(0, gndPins.size());
 
-            design.getNetlist().getParentNetMap();
-
             DesignTools.createMissingSitePinInsts(design, gndNet);
             DesignTools.createMissingSitePinInsts(design, vccNet);
 
