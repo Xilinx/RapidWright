@@ -153,15 +153,18 @@ public class TestGlobalSignalRouting {
 
         List<SitePinInst> gndPins = gndNet.getPins();
         List<SitePinInst> vccPins = vccNet.getPins();
+        // Remove all existing output pins so that we can count how many new ones were created
+        gndPins.removeIf(SitePinInst::isOutPin);
+        vccPins.removeIf(SitePinInst::isOutPin);
 
-        Assertions.assertEquals(156, gndPins.size());
+        Assertions.assertEquals(123, gndPins.size());
         Assertions.assertEquals(232, vccPins.size());
 
         RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
 
         GlobalSignalRouting.routeStaticNet(gndNet, (n) -> getNodeState(design, NetType.GND, n), design, routeThruHelper);
         gndPins = gndNet.getPins();
-        Assertions.assertEquals(34, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
+        Assertions.assertEquals(2, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
         Assertions.assertEquals(123, gndPins.stream().filter((spi) -> !spi.isOutPin()).count());
         Assertions.assertEquals(439, gndNet.getPIPs().size());
 
