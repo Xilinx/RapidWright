@@ -144,7 +144,7 @@ public class TestGlobalSignalRouting {
 
         // Even though we're starting from a fully-routed design, Versal designs may still need
         // some preprocessing to discover all SLICE.CE pins
-        DesignTools.createCeSrRstPinsToVCC(design);
+        DesignTools.createPossiblePinsToStaticNets(design);
 
         Net gndNet = design.getGndNet();
         Net vccNet = design.getVccNet();
