@@ -29,6 +29,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
@@ -69,13 +70,15 @@ public class GlobalSignalRouting {
     static {
         lutOutputPinNames = new HashSet<>();
         for (String cle : new String[]{"L", "M"}) {
-            for (String pin : new String[]{"A", "B", "C", "D", "E", "F", "G", "H"}) {
+            for (char pin : LUTTools.lutLetters) {
                 // UltraScale/UltraScale+
                 lutOutputPinNames.add("CLE_CLE_" + cle + "_SITE_0_" + pin + "_O");
                 lutOutputPinNames.add("CLE_CLE_" + cle + "_SITE_0_" + pin + "MUX");
                 // Versal
                 for (int siteIndex = 0; siteIndex < 2; siteIndex++) {
                     lutOutputPinNames.add("CLE_SLICE" + cle + "_TOP_" + siteIndex + "_" + pin + "_O_PIN");
+                    lutOutputPinNames.add("CLE_SLICE" + cle + "_TOP_" + siteIndex + "_" + pin + "Q_PIN");
+                    // Q2 pin cannot be used otherwise leads to "Invalid Programming for Site"
                 }
             }
         }
@@ -620,7 +623,7 @@ public class GlobalSignalRouting {
         if (isVersal) {
             assert(sites.length == 2);
             // Site index is in wire name: e.g. CLE_SLICEL_TOP_0_A_O_PIN
-            siteIndex = wireName.charAt(wireName.length() - 9) - '0';
+            siteIndex = wireName.charAt(15) - '0';
         } else {
             assert(sites.length == 1);
             siteIndex = 0;
@@ -630,8 +633,7 @@ public class GlobalSignalRouting {
 
         String sitePinName;
         if (isVersal) {
-            assert(wireName.endsWith("_O_PIN"));
-            sitePinName = wireName.substring(wireName.length() - 7, wireName.length() - 4);
+            sitePinName = wireName.substring(17, wireName.length() - 4);
         } else {
             if (wireName.endsWith("_O")) {
                 sitePinName = wireName.substring(wireName.length() - 3);
