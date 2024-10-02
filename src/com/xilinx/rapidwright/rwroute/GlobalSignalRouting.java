@@ -24,6 +24,17 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Queue;
+import java.util.Set;
+import java.util.function.Function;
+
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
@@ -38,6 +49,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.placer.blockplacer.Point;
 import com.xilinx.rapidwright.placer.blockplacer.SmallestEnclosingCircle;
@@ -71,6 +83,10 @@ public class GlobalSignalRouting {
             for (String pin : new String[]{"A", "B", "C", "D", "E", "F", "G", "H"}) {
                 lutOutputPinNames.add("CLE_CLE_" + cle + "_SITE_0_" + pin + "_O");
                 lutOutputPinNames.add("CLE_CLE_" + cle + "_SITE_0_" + pin + "MUX");
+                // Versal
+                for (int siteIndex = 0; siteIndex < 2; siteIndex++) {
+                    lutOutputPinNames.add("CLE_SLICE" + cle + "_TOP_" + siteIndex + "_" + pin + "_O_PIN");
+                }
             }
         }
     }
@@ -342,29 +358,6 @@ public class GlobalSignalRouting {
         final Node INVALID_NODE = new Node(null, Integer.MAX_VALUE);
         assert(INVALID_NODE.isInvalidNode());
 
-        // VCC wires are not expected to leave its tile
-        EnumSet<IntentCode> assertIntentCodeOfPoppedNodesOnVcc;
-        boolean isUltraScale = design.getDevice().getSeries() == Series.UltraScale;
-        if (isUltraScale) {
-            // On UltraScale, certain site pins (e.g. SLICE/CKEN_B1[1-4], SLICE/SRST_B[12])
-            // do not have an uphill PIP to VCC_WIRE (instead they have one to GND_WIRE, which
-            // Vivado itself chooses not to use)
-            assertIntentCodeOfPoppedNodesOnVcc = EnumSet.of(
-                    // Necessary for the following nodes used to reach VCC_WIRE
-                    IntentCode.NODE_LOCAL,  // INT_NODE_GLOBAL_\d+_OUT[01], uphill of CTRL_[EW]_B[0-9]
-                                            // corresponding to CKEN_B[1-4] and SRST_B[12] site pins
-                    IntentCode.NODE_SINGLE, // INT_INT_SINGLE_\d+_INT_OUT uphill of INT_NODE_GLOBAL_\d+_OUT[01]
-
-                    IntentCode.NODE_PINFEED,
-                    IntentCode.NODE_PINBOUNCE,
-                    IntentCode.INTENT_DEFAULT);
-        } else {
-            assertIntentCodeOfPoppedNodesOnVcc = EnumSet.of(
-                    IntentCode.NODE_PINFEED,
-                    IntentCode.NODE_PINBOUNCE,
-                    IntentCode.INTENT_DEFAULT);
-        }
-
         // Collect all node-sink pairs to be routed
         Map<Node,SitePinInst> nodeToRouteToSink = new HashMap<>();
         for (SitePinInst sink : currNet.getPins()) {
@@ -395,7 +388,16 @@ public class GlobalSignalRouting {
                 search: while ((node = q.poll()) != null) {
                     assert(!usedRoutingNodes.contains(node));
                     assert(!node.isTied());
-                    assert(netType != NetType.VCC || assertIntentCodeOfPoppedNodesOnVcc.contains(node.getIntentCode()));
+                    // System.out.println(currNet.getName() + " " + (netType != NetType.VCC) + " " + node.getIntentCode());
+                    assert(netType != NetType.VCC || EnumSet.of(
+                            IntentCode.NODE_PINFEED,
+                            IntentCode.NODE_PINBOUNCE,
+                            IntentCode.INTENT_DEFAULT,
+                            IntentCode.NODE_IMUX,
+                            IntentCode.NODE_CLE_CTRL,
+                            IntentCode.NODE_IRI,
+                            IntentCode.NODE_INTF_CTRL
+                    ).contains(node.getIntentCode()));
 
                     SitePin sitePin = getStaticSourceSitePin(design, node, netType);
                     if (sitePin != null) {
@@ -405,10 +407,18 @@ public class GlobalSignalRouting {
                     }
 
                     for (Node uphillNode : node.getAllUphillNodes()) {
-                        if (routeThruHelper.isRouteThru(uphillNode, node)) {
+                        if (routeThruHelper.isRouteThru(uphillNode, node) && 
+                            node.getIntentCode() != IntentCode.NODE_IRI &&
+                            node.getTile().getTileTypeEnum() != TileTypeEnum.BLI_CLE_BOT_CORE &&
+                            node.getTile().getTileTypeEnum() != TileTypeEnum.BLI_CLE_BOT_CORE_MY) {
                             continue;
                         }
 
+                        if (uphillNode.getIntentCode() == IntentCode.NODE_CLE_CNODE && node.getIntentCode() != IntentCode.NODE_CLE_CTRL) {
+                            // Only allow PIPs with NODE_CLE_CNODE -> NODE_CLE_CTRL intent codes
+                            continue;
+                        }
+                        
                         switch(uphillNode.getIntentCode()) {
                             case NODE_GLOBAL_VDISTR:
                             case NODE_GLOBAL_HROUTE:
@@ -419,27 +429,6 @@ public class GlobalSignalRouting {
                             case NODE_GLOBAL_LEAF:
                             case NODE_GLOBAL_BUFG:
                                 continue;
-
-                            // VCC net should never need to use S/D/Q nodes ...
-                            case NODE_SINGLE:
-                            case NODE_DOUBLE:
-                            case NODE_HQUAD:
-                            case NODE_VQUAD:
-                                if (netType == NetType.VCC) {
-                                    assert(isUltraScale);
-                                    if (uphillNode.getIntentCode() == IntentCode.NODE_SINGLE) {
-                                        // ... except for UltraScale where certain site pins have no direct connection to VCC_WIRE
-                                        // and even then, only consider INT_INT_SINGLE_\d+_INT_OUT "singles" that stay within the
-                                        // same tile
-                                        if (uphillNode.getAllWiresInNode().length > 1) {
-                                            continue;
-                                        }
-                                        assert(uphillNode.getWireName().matches("INT_INT_SINGLE_\\d+_INT_OUT"));
-                                        break;
-                                    }
-                                    continue;
-                                }
-                                break;
                         }
 
                         if (prevNode.putIfAbsent(uphillNode, node) != null) {
@@ -535,6 +524,10 @@ public class GlobalSignalRouting {
             } else {
                 SitePinInst spi = si.getSitePinInst(pinName);
                 if (spi != null) {
+                    if (spi.getNet() == null) {
+                        // TODO: FIXME
+                        spi.setNet(currNet);
+                    }
                     if (spi.getNet() == currNet) {
                         continue;
                     }
@@ -573,33 +566,44 @@ public class GlobalSignalRouting {
         }
 
         Site[] sites = tile.getSites();
-        assert(sites.length == 1);
-        Site slice = sites[0];
+        if (design.getDevice().getSeries() == Series.Versal) {
+            assert(sites.length == 2);
+        } else {
+            assert(sites.length == 1);
+        }
+        
+        boolean isVersal = design.getDevice().getSeries() == Series.Versal;
+        int siteIndex = isVersal ? wireName.charAt(wireName.length() - 9) - '0' : 0;
+        Site slice = sites[siteIndex];
         SiteInst si = design.getSiteInstFromSite(slice);
 
         String sitePinName;
-        if (wireName.endsWith("_O")) {
-            sitePinName = wireName.substring(wireName.length() - 3);
-        } else if (wireName.endsWith("MUX")) {
-            char lutLetter = wireName.charAt(wireName.length() - 4);
-
-            if (si != null) {
-                Net o6Net = si.getNetFromSiteWire(lutLetter + "_O");
-                if (o6Net != null && o6Net.getType() != type) {
-                    // 6LUT is occupied; play it safe and do not consider fracturing as that can require modifying the intra-site routing
-                    return null;
-                }
-
-                Net o5Net = si.getNetFromSiteWire(lutLetter + "5LUT_O5");
-                if (o5Net != null && o5Net.getType() != type) {
-                    // 5LUT is occupied
-                    return null;
-                }
-            }
-
-            sitePinName = wireName.substring(wireName.length() - 4);
+        if (isVersal) {
+            assert(wireName.endsWith("_O_PIN"));
+            sitePinName = wireName.substring(wireName.length() - 7, wireName.length() - 4);
         } else {
-            throw new RuntimeException(wireName);
+            if (wireName.endsWith("_O")) {
+                sitePinName = wireName.substring(wireName.length() - 3);
+            } else if (wireName.endsWith("MUX")) {
+                char lutLetter = wireName.charAt(wireName.length() - 4);
+
+                if (si != null) {
+                    Net o6Net = si.getNetFromSiteWire(lutLetter + "_O");
+                    if (o6Net != null && o6Net.getType() != type) {
+                        // 6LUT is occupied; play it safe and do not consider fracturing as that can require modifying the intra-site routing
+                        return null;
+                    }
+                    Net o5Net = si.getNetFromSiteWire(lutLetter + "5LUT_O5");
+                    if (o5Net != null && o5Net.getType() != type) {
+                        // 5LUT is occupied
+                        return null;
+                    }
+                }
+
+                sitePinName = wireName.substring(wireName.length() - 4);
+            } else {
+                throw new RuntimeException(wireName);
+            }
         }
 
         if (si != null) {
@@ -608,7 +612,7 @@ public class GlobalSignalRouting {
                 return null;
             }
         }
-
+        
         return new SitePin(slice, sitePinName);
     }
 }

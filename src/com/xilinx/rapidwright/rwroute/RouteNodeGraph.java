@@ -148,6 +148,7 @@ public class RouteNodeGraph {
         // Device.getArbitraryTileOfType() typically gives you the North-Western-most
         // tile (with minimum X, maximum Y). Analyze the tile just below that.
         intTile = intTile.getTileXYNeighbor(0, -1);
+        Series series = device.getSeries();
         for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
             Node baseNode = Node.getNode(intTile, wireIndex);
             if (baseNode == null) {
@@ -173,7 +174,8 @@ public class RouteNodeGraph {
             } else if (wireName.startsWith("INT_NODE_IMUX_") &&
                     // Do not block INT_NODE_IMUX node accessibility when LUT routethrus are considered
                     !lutRoutethru) {
-                assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
+                assert(((series == Series.UltraScale || series == Series.UltraScalePlus) && baseNode.getIntentCode() == IntentCode.NODE_LOCAL) ||
+                        (series == Series.Versal                                         && baseNode.getIntentCode() == IntentCode.NODE_INODE));
                 assert(baseTile == intTile);
                 assert(wireIndex == baseNode.getWireIndex());
                 // Downhill to BOUNCE_* in the above/below/target tile, BYPASS_* in the base tile, IMUX_* in target tile
@@ -310,6 +312,7 @@ public class RouteNodeGraph {
 
     public void preserve(Net net, List<SitePinInst> pins) {
         boolean isStaticNet = net.isStaticNet();
+        List<String> suffixSetOfVersal = Arrays.asList("_O", "Q", "Q2");
         for (SitePinInst pin : pins) {
             preserve(pin.getConnectedNode(), net);
 
@@ -324,6 +327,9 @@ public class RouteNodeGraph {
                 String pinName = pin.getName();
                 char lutLetter = pinName.charAt(0);
                 String otherPinName;
+                if (design.getDevice().getSeries() == Series.Versal) {
+                    continue;
+                } else {
                 if (pinName.endsWith("MUX")) {
                     otherPinName = lutLetter + "_O";
                 } else if (pinName.endsWith("_O")) {
@@ -331,9 +337,10 @@ public class RouteNodeGraph {
                 } else {
                     throw new RuntimeException("ERROR: Unsupported site pin " + pin);
                 }
-
                 Node otherNode = si.getSite().getConnectedNode(otherPinName);
+                    assert(otherNode != null);
                 preserve(otherNode, net);
+                }
             }
         }
 
@@ -395,7 +402,17 @@ public class RouteNodeGraph {
 
     private static final Set<TileTypeEnum> allowedTileEnums;
     static {
-        allowedTileEnums = EnumSet.of(TileTypeEnum.INT);
+        allowedTileEnums = EnumSet.noneOf(TileTypeEnum.class);
+        allowedTileEnums.add(TileTypeEnum.INT);
+        allowedTileEnums.add(TileTypeEnum.CLE_BC_CORE);
+        allowedTileEnums.add(TileTypeEnum.INTF_LOCF_TL_TILE);
+        allowedTileEnums.add(TileTypeEnum.INTF_LOCF_TR_TILE);
+        allowedTileEnums.add(TileTypeEnum.INTF_LOCF_BL_TILE);
+        allowedTileEnums.add(TileTypeEnum.INTF_LOCF_BR_TILE);
+        allowedTileEnums.add(TileTypeEnum.INTF_ROCF_TL_TILE);
+        allowedTileEnums.add(TileTypeEnum.INTF_ROCF_TR_TILE);
+        allowedTileEnums.add(TileTypeEnum.INTF_ROCF_BL_TILE);
+        allowedTileEnums.add(TileTypeEnum.INTF_ROCF_BR_TILE);
         allowedTileEnums.addAll(Utils.getLagunaTileTypes());
     }
 

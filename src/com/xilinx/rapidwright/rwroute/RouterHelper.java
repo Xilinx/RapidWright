@@ -154,7 +154,7 @@ public class RouterHelper {
      * @return A node that connects to an INT tile from an output pin.
      */
     public static Node projectOutputPinToINTNode(SitePinInst output) {
-        int watchdog = 5;
+        int watchdog = 20;
 
         // Starting from the SPI's connected node, for each node in queue
         // return the first downhill node that is in an Interconnect tile.
@@ -198,7 +198,12 @@ public class RouterHelper {
         int watchdog = 1000;
         while (!q.isEmpty()) {
             NodeWithPrev n = q.poll();
-            if (n.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
+            TileTypeEnum tileType = n.getTile().getTileTypeEnum();
+            // Only extract IntentCode if not an INT tile
+            IntentCode ic = (tileType != TileTypeEnum.INT) ? n.getIntentCode() : null;
+            if (tileType == TileTypeEnum.INT || 
+                // Versal: IntentCode-s of nodes driven by CNODE/BNODEs 
+                ic == IntentCode.NODE_CLE_CTRL || ic == IntentCode.NODE_INTF_CTRL) {
                 while (n != null) {
                     sinkToSwitchBoxPath.add(n);
                     n = n.getPrev();

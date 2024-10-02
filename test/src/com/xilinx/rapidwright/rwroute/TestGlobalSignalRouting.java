@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
@@ -133,6 +134,57 @@ public class TestGlobalSignalRouting {
             ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
             Assertions.assertEquals(2, rrs.fullyRoutedNets);
             Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
+        }
+    }
+
+    @Test
+    public void testRouteStaticNetOnVersalDevice() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+
+        // estimate RWRoute.preprocess(design) and skip the series check
+        DesignTools.makePhysNetNamesConsistent(design);
+        DesignTools.createPossiblePinsToStaticNets(design);
+        DesignTools.createMissingSitePinInsts(design);
+
+        Net gndNet = design.getGndNet();
+        Net vccNet = design.getVccNet();
+        gndNet.unroute();
+        vccNet.unroute();
+        Assertions.assertFalse(gndNet.hasPIPs());
+        Assertions.assertFalse(vccNet.hasPIPs());
+
+        List<SitePinInst> gndPins = gndNet.getPins();
+        List<SitePinInst> vccPins = vccNet.getPins();
+
+        Assertions.assertEquals(156, gndPins.size());
+        Assertions.assertEquals(232, vccPins.size());
+
+        BiFunction<Node, NetType, NodeStatus> gns = (n, netType) -> {
+            SitePin sitePin = n.getSitePin();
+            SiteInst site = (sitePin != null) ? design.getSiteInstFromSite(sitePin.getSite()) : null;
+            SitePinInst spi = (site != null) ? site.getSitePinInst(sitePin.getPinName()) : null;
+            Net net = (spi != null) ? spi.getNet() : null;
+            return net == null ? NodeStatus.AVAILABLE :
+                   net.getType() == netType ? NodeStatus.INUSE : NodeStatus.UNAVAILABLE;
+        };
+
+        RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
+
+        GlobalSignalRouting.routeStaticNet(gndNet, (n) -> gns.apply(n, NetType.GND), design, routeThruHelper);
+        gndPins = gndNet.getPins();
+        Assertions.assertEquals(34, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
+        Assertions.assertEquals(123, gndPins.stream().filter((spi) -> !spi.isOutPin()).count());
+        Assertions.assertEquals(439, gndNet.getPIPs().size());
+
+        GlobalSignalRouting.routeStaticNet(vccNet, (n) -> gns.apply(n, NetType.VCC), design, routeThruHelper);
+        vccPins = vccNet.getPins();
+        Assertions.assertEquals(0, vccPins.stream().filter((spi) -> spi.isOutPin()).count());
+        Assertions.assertEquals(232, vccPins.stream().filter((spi) -> !spi.isOutPin()).count());
+        Assertions.assertEquals(464, vccNet.getPIPs().size());
+
+        if (FileTools.isVivadoOnPath()) {
+            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            // Assertions.assertEquals(276, rrs.fullyRoutedNets);
         }
     }
 }
