@@ -40,9 +40,12 @@ import com.xilinx.rapidwright.util.VivadoTools;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
@@ -138,8 +141,9 @@ public class TestGlobalSignalRouting {
         }
     }
 
-    @Test
-    public void testRouteStaticNetOnVersalDevice() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false,true})
+    public void testRouteStaticNetOnVersalDevice(boolean createStaticPins, @TempDir Path tempDir) {
         Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
         design.unrouteDesign();
 
@@ -148,24 +152,52 @@ public class TestGlobalSignalRouting {
         Assertions.assertFalse(gndNet.hasPIPs());
         Assertions.assertFalse(vccNet.hasPIPs());
 
-        List<SitePinInst> gndPins = gndNet.getPins();
-        List<SitePinInst> vccPins = vccNet.getPins();
-        // Remove all existing output pins so that we can count how many new ones were created
-        for (SitePinInst spi : new ArrayList<>(gndPins)) {
-            if (spi.isOutPin()) {
-                gndNet.removePin(spi);
-                spi.detachSiteInst();
-            }
-        }
-        for (SitePinInst spi : new ArrayList<>(vccPins)) {
-            String pinName = spi.getName();
-            if (spi.isOutPin() || pinName.equals("RST") || pinName.startsWith("CKEN")) {
-                vccNet.removePin(spi);
-                spi.detachSiteInst();
-            }
-        }
+        List<SitePinInst> gndPins;
+        List<SitePinInst> vccPins;
 
-        Assertions.assertEquals(177, vccPins.size());
+        if (createStaticPins) {
+            // Simulate a DCP with no static routing (and thus no static sink pins)
+            // by refreshing the unrouted design
+            Path tempCheckpoint = tempDir.resolve("checkpoint.dcp");
+            design.writeCheckpoint(tempCheckpoint);
+            design = Design.readCheckpoint(tempCheckpoint);
+
+            gndNet = design.getGndNet();
+            vccNet = design.getVccNet();
+            gndPins = gndNet.getPins();
+            vccPins = vccNet.getPins();
+
+            Assertions.assertEquals(0, vccPins.size());
+            Assertions.assertEquals(0, gndPins.size());
+
+            design.getNetlist().getParentNetMap();
+
+            DesignTools.createMissingSitePinInsts(design, gndNet);
+            DesignTools.createMissingSitePinInsts(design, vccNet);
+
+            Assertions.assertEquals(140, gndPins.size());
+            Assertions.assertEquals(165, vccPins.size());
+        } else {
+            gndPins = gndNet.getPins();
+            vccPins = vccNet.getPins();
+
+            // Remove all existing output pins so that we can count how many new ones were created
+            for (SitePinInst spi : new ArrayList<>(gndPins)) {
+                if (spi.isOutPin()) {
+                    gndNet.removePin(spi);
+                    spi.detachSiteInst();
+                }
+            }
+            for (SitePinInst spi : new ArrayList<>(vccPins)) {
+                if (spi.isOutPin()) {
+                    vccNet.removePin(spi);
+                    spi.detachSiteInst();
+                }
+            }
+
+            Assertions.assertEquals(123, gndPins.size());
+            Assertions.assertEquals(230, vccPins.size());
+        }
 
         // Even though we're starting from a fully-routed design, Versal designs may still need
         // some preprocessing to discover all SLICE.CE pins
@@ -176,14 +208,13 @@ public class TestGlobalSignalRouting {
 
         RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
 
-        GlobalSignalRouting.routeStaticNet(gndNet, (n) -> getNodeState(design, NetType.GND, n), design, routeThruHelper);
-        gndPins = gndNet.getPins();
+        Design finalDesign = design;
+        GlobalSignalRouting.routeStaticNet(gndNet, (n) -> getNodeState(finalDesign, NetType.GND, n), design, routeThruHelper);
         Assertions.assertEquals(8, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
         Assertions.assertEquals(123, gndPins.stream().filter((spi) -> !spi.isOutPin()).count());
         Assertions.assertEquals(436, gndNet.getPIPs().size());
 
-        GlobalSignalRouting.routeStaticNet(vccNet, (n) -> getNodeState(design, NetType.VCC, n), design, routeThruHelper);
-        vccPins = vccNet.getPins();
+        GlobalSignalRouting.routeStaticNet(vccNet, (n) -> getNodeState(finalDesign, NetType.VCC, n), design, routeThruHelper);
         Assertions.assertEquals(0, vccPins.stream().filter((spi) -> spi.isOutPin()).count());
         Assertions.assertEquals(232, vccPins.stream().filter((spi) -> !spi.isOutPin()).count());
         Assertions.assertEquals(464, vccNet.getPIPs().size());
