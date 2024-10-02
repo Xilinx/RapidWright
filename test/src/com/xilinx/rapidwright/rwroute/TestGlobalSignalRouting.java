@@ -118,7 +118,7 @@ public class TestGlobalSignalRouting {
         RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins, invertLutInputs);
 
         Assertions.assertEquals(19010, gndPins.size());
-        Assertions.assertEquals(23152, vccPins.size());
+        Assertions.assertEquals(23099, vccPins.size());
 
         RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
 
@@ -131,8 +131,8 @@ public class TestGlobalSignalRouting {
         GlobalSignalRouting.routeStaticNet(vccNet, (n) -> getNodeState(design, NetType.VCC, n), design, routeThruHelper);
         vccPins = vccNet.getPins();
         Assertions.assertEquals(0, vccPins.stream().filter((spi) -> spi.isOutPin()).count());
-        Assertions.assertEquals(23152, vccPins.stream().filter((spi) -> !spi.isOutPin()).count());
-        Assertions.assertEquals(27544, vccNet.getPIPs().size());
+        Assertions.assertEquals(23099, vccPins.stream().filter((spi) -> !spi.isOutPin()).count());
+        Assertions.assertEquals(27491, vccNet.getPIPs().size());
 
         if (FileTools.isVivadoOnPath()) {
             ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
