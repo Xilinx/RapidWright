@@ -602,8 +602,7 @@ public class GlobalSignalRouting {
     private static SitePin getStaticSourceSitePin(Design design,
                                                   Node node,
                                                   NetType type) {
-        Tile tile = node.getTile();
-        if (!Utils.isCLB(tile.getTileTypeEnum())) {
+        if (node.getIntentCode() != IntentCode.NODE_CLE_OUTPUT) {
             return null;
         }
 
@@ -613,6 +612,8 @@ public class GlobalSignalRouting {
             return null;
         }
 
+        Tile tile = node.getTile();
+        assert(Utils.isCLB(tile.getTileTypeEnum()));
         Site[] sites = tile.getSites();
         boolean isVersal = design.getDevice().getSeries() == Series.Versal;
         int siteIndex;
