@@ -3164,16 +3164,16 @@ public class DesignTools {
     }
 
     public static void createPossiblePinsToStaticNets(Design design) {
-        if (design.getDevice().getSeries() == Series.Versal) {
-            // TODO
-        } else {
-            createA1A6ToStaticNets(design);
-            createCeClkOfRoutethruFFToVCC(design);
-        }
+        createA1A6ToStaticNets(design);
+        createCeClkOfRoutethruFFToVCC(design);
         createCeSrRstPinsToVCC(design);
     }
 
     public static void createCeClkOfRoutethruFFToVCC(Design design) {
+        if (design.getDevice().getSeries() == Series.Versal) {
+            // Versal have OUTMUX[A-H][12]-es for bypassing FFs
+            return;
+        }
         Net vcc = design.getVccNet();
         Net gnd = design.getGndNet();
         for (SiteInst si : design.getSiteInsts()) {
@@ -3214,6 +3214,8 @@ public class DesignTools {
     }
 
     public static void createA1A6ToStaticNets(Design design) {
+        Net vccNet = design.getVccNet();
+        Net gndNet = design.getGndNet();
         for (SiteInst si : design.getSiteInsts()) {
             if (!Utils.isSLICE(si)) {
                 continue;
@@ -3231,19 +3233,74 @@ public class DesignTools {
                     continue;
                 }
 
-                if (bel.getName().endsWith("5LUT")) {
-                    bel = si.getBEL(bel.getName().charAt(0) + "6LUT");
-                }
-
-                boolean isSRL = ("SRL16E".equals(cell.getType()) || "SRLC32E".equals(cell.getType()));
-                for (String belPinName : lut6BELPins) {
-                    if (!isSRL && belPinName.equals("A1")) {
+                String belName = bel.getName();
+                if ("SRL16E".equals(cell.getType()) || "SRLC32E".equals(cell.getType())) {
+                    String pinName = belName.charAt(0) + "1";
+                    SitePinInst spi = si.getSitePinInst(pinName);
+                    if (spi != null) {
+                        assert(spi.getNet().isVCCNet());
                         continue;
                     }
-                    BELPin belPin = bel.getPin(belPinName);
-                    if (belPin != null) {
-                        createMissingStaticSitePins(belPin, si, cell);
+                    vccNet.createPin(pinName, si);
+                }
+
+                if (cell.getLogicalPinMapping("A6") != null) {
+                    // A6 pin is being used by LUT
+                    continue;
+                }
+
+                char fiveOrSix = belName.charAt(1);
+                assert(fiveOrSix == '5' || fiveOrSix == '6');
+                Net staticNet = vccNet;
+
+                BEL lut6Bel = (fiveOrSix == '5') ? si.getBEL(belName.charAt(0) + "6LUT") : bel;
+                Net a6Net = si.getNetFromSiteWire(lut6Bel.getPin("A6").getSiteWireName());
+
+                // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
+                if (cell.getType().equals("SRL16E") && "SRLC32E".equals(cell.getPropertyValueString("XILINX_LEGACY_PRIM"))) {
+                    staticNet = gndNet;
+                    // Expect sitewire to be VCC and GND
+                    if (!a6Net.isStaticNet()) {
+                        throw new RuntimeException("ERROR: Site pin " + si.getSiteName() + "/" + belName.charAt(0) + "6 is not a static net");
                     }
+                } else {
+                    // Tie A6 to staticNet only if sitewire says so
+                    if (a6Net != staticNet) {
+                        continue;
+                    }
+                }
+
+                if (cell.getLogicalPinMapping("O5") != null) {
+                    // LUT output comes out on O5
+                    if (fiveOrSix == '5') {
+                        // It's a 5LUT
+                        if (si.getCell(belName.charAt(0) + "6LUT") != null) {
+                            // But 6LUT exists; let the 6LUT deal with it
+                            continue;
+                        }
+                    } else {
+                        throw new RuntimeException("Assumption that only 5LUTs can use O5 failed here.");
+                    }
+                } else {
+                    if (fiveOrSix != '6') {
+                        // Assume that O6 is only driven by 6LUT, even though possible for 5LUT, unless
+                        // it's a routethru
+                        assert (cell.isRoutethru());
+                        continue;
+                    }
+
+                    assert(fiveOrSix == '6');
+                }
+
+                // Construct site pin from BEL name (e.g. [A-H][65]LUT) and pin name (A[1-6])
+                String sitePinName = belName.charAt(0) + "6";
+                SitePinInst pin = si.getSitePinInst(sitePinName);
+                if (pin == null) {
+                    staticNet.createPin(sitePinName, si);
+                } else if (!pin.getNet().equals(staticNet)) {
+                    // pin.getNet().removePin(pin);
+                    // net.addPin(pin);
+                    throw new RuntimeException("ERROR: Site pin " + pin.getSitePinName() + " is not connected to VCC");
                 }
             }
         }
@@ -3397,44 +3454,8 @@ public class DesignTools {
         }
     }
 
-    public static void createMissingStaticSitePins(BELPin belPin, SiteInst si, Cell cell) {
-        // SiteWire and SitePin Name are the same for LUT inputs
-        String siteWireName = belPin.getSiteWireName();
-        // VCC returned based on the site wire, site pins are not stored in dcp
-        Net netOnSiteWire = si.getNetFromSiteWire(siteWireName);
-        Net net = (netOnSiteWire != null) ? netOnSiteWire : si.getDesign().getVccNet();
-        if (net.isStaticNet()) {
-            // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
-            if (cell.getType().equals("SRL16E") && siteWireName.endsWith("6")) {
-                EDIFPropertyValue val = cell.getProperty("XILINX_LEGACY_PRIM");
-                if (val != null && val.getValue().equals("SRLC32E")) {
-                    net = si.getDesign().getGndNet();
-                }
-            }
-            String belName = belPin.getBELName();
-            if (LUTTools.isCellALUT(cell) &&
-                    // No net originally present on input sitewire
-                    netOnSiteWire != net &&
-                    // No cell placed in the 5LUT spot
-                    si.getCell(belName.replace('6', '5')) == null &&
-                    // No net present on output sitewire
-                    si.getNetFromSiteWire(belName.charAt(0) + "5LUT_O5") == null) {
-                // LUT input siteWire has no net attached, nor does the LUT output sitewire: no need for site pin
-                return;
-            }
-            SitePinInst pin = si.getSitePinInst(siteWireName);
-            if (pin == null) {
-                net.createPin(siteWireName, si);
-            } else if (!pin.getNet().equals(net)) {
-                pin.getNet().removePin(pin);
-                net.addPin(pin);
-            }
-        }
-    }
-
     //NOTE: SRL16E (reference name SRL16E, EDIFCell in RW) uses A2-A5, so we need to connect A1 & A6 to VCC,
     //however, when SitePinInsts (e.g. A3) are already in GND, adding those again will cause problems to A1
-    static String[] lut6BELPins = new String[] {"A1", "A6"};
     static HashSet<String> unisimFlipFlopTypes;
     static {
         unisimFlipFlopTypes = new HashSet<>();
