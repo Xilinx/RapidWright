@@ -148,7 +148,6 @@ public class RouteNodeGraph {
         // Device.getArbitraryTileOfType() typically gives you the North-Western-most
         // tile (with minimum X, maximum Y). Analyze the tile just below that.
         intTile = intTile.getTileXYNeighbor(0, -1);
-        Series series = device.getSeries();
         for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
             Node baseNode = Node.getNode(intTile, wireIndex);
             if (baseNode == null) {
@@ -174,8 +173,7 @@ public class RouteNodeGraph {
             } else if (wireName.startsWith("INT_NODE_IMUX_") &&
                     // Do not block INT_NODE_IMUX node accessibility when LUT routethrus are considered
                     !lutRoutethru) {
-                assert(((series == Series.UltraScale || series == Series.UltraScalePlus) && baseNode.getIntentCode() == IntentCode.NODE_LOCAL) ||
-                        (series == Series.Versal                                         && baseNode.getIntentCode() == IntentCode.NODE_INODE));
+                assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
                 assert(baseTile == intTile);
                 assert(wireIndex == baseNode.getWireIndex());
                 // Downhill to BOUNCE_* in the above/below/target tile, BYPASS_* in the base tile, IMUX_* in target tile
@@ -326,10 +324,7 @@ public class RouteNodeGraph {
                 String pinName = pin.getName();
                 char lutLetter = pinName.charAt(0);
                 String otherPinName;
-                if (design.getDevice().getSeries() == Series.Versal) {
-                    // TODO
-                    continue;
-                } else if (pinName.endsWith("MUX")) {
+                if (pinName.endsWith("MUX")) {
                     otherPinName = lutLetter + "_O";
                 } else if (pinName.endsWith("_O")) {
                     otherPinName = lutLetter + "MUX";

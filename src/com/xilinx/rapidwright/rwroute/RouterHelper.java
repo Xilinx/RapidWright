@@ -198,12 +198,7 @@ public class RouterHelper {
         int watchdog = 1000;
         while (!q.isEmpty()) {
             NodeWithPrev n = q.poll();
-            TileTypeEnum tileType = n.getTile().getTileTypeEnum();
-            // Only extract IntentCode if not an INT tile
-            IntentCode ic = (tileType != TileTypeEnum.INT) ? n.getIntentCode() : null;
-            if (tileType == TileTypeEnum.INT ||
-                // Versal: IntentCode-s of nodes driven by CNODE/BNODEs
-                ic == IntentCode.NODE_CLE_CTRL || ic == IntentCode.NODE_INTF_CTRL) {
+            if (n.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
                 while (n != null) {
                     sinkToSwitchBoxPath.add(n);
                     n = n.getPrev();
