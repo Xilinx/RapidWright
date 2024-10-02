@@ -91,6 +91,8 @@ public class TestGlobalSignalRouting {
         }
     }
 
+    // NOTE: This method does not avoid any existing routing (static or signal),
+    //       only their pins
     NodeStatus getNodeState(Design design, NetType netType, Node n) {
         SitePin sitePin = n.getSitePin();
         SiteInst site = (sitePin != null) ? design.getSiteInstFromSite(sitePin.getSite()) : null;
@@ -197,7 +199,7 @@ public class TestGlobalSignalRouting {
             Assertions.assertEquals(230, vccPins.size());
         }
 
-        // Even though we're starting from a fully-routed design, Versal designs may still need
+        // Even though we may be starting from a fully-routed design, Versal designs still need
         // some preprocessing to discover all SLICE.CE pins
         DesignTools.createPossiblePinsToStaticNets(design);
 

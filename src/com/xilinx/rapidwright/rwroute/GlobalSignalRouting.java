@@ -422,7 +422,7 @@ public class GlobalSignalRouting {
                     }
 
                     TileTypeEnum tileTypeEnum = node.getTile().getTileTypeEnum();
-                    // On Versal, only allow IRI -> BLI_CLE_BOT_CORE* routethrus
+                    // On Versal, only allow IRI routethrus on BLI_CLE_BOT_CORE* tile types
                     boolean notIriRoutethru = !isVersal ||
                             (intentCode != IntentCode.NODE_IRI &&
                             tileTypeEnum != TileTypeEnum.BLI_CLE_BOT_CORE &&

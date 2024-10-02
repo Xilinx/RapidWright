@@ -3312,8 +3312,6 @@ public class DesignTools {
                 if (pin == null) {
                     staticNet.createPin(sitePinName, si);
                 } else if (!pin.getNet().equals(staticNet)) {
-                    // pin.getNet().removePin(pin);
-                    // net.addPin(pin);
                     throw new RuntimeException("ERROR: Site pin " + pin.getSitePinName() + " is not connected to VCC");
                 }
             }
