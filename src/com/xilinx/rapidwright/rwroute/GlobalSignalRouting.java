@@ -449,15 +449,26 @@ public class GlobalSignalRouting {
                             case NODE_GLOBAL_LEAF:
                             case NODE_GLOBAL_BUFG:
                                 continue;
+                            // Versal
+                            case NODE_HLONG6:
+                            case NODE_HLONG10:
+                            case NODE_VLONG7:
+                            case NODE_VLONG12:
+                                continue;
 
                             // VCC net should never need to use S/D/Q nodes ...
                             case NODE_SINGLE:
                             case NODE_DOUBLE:
                             case NODE_HQUAD:
                             case NODE_VQUAD:
+                            // Versal
+                            case NODE_HSINGLE:
+                            case NODE_VSINGLE:
+                            case NODE_HDOUBLE:
+                            case NODE_VDOUBLE:
                                 if (netType == NetType.VCC) {
                                     assert(series == Series.UltraScale);
-                                    if (uphillNode.getIntentCode() == IntentCode.NODE_SINGLE) {
+                                    if (uphillIntentCode == IntentCode.NODE_SINGLE) {
                                         // ... except for UltraScale where certain site pins have no direct connection to VCC_WIRE
                                         // and even then, only consider INT_INT_SINGLE_\d+_INT_OUT "singles" that stay within the
                                         // same tile
