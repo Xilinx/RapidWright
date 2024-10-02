@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -518,6 +518,10 @@ public class RouteNodeGraph {
 
     protected RouteNode create(Node node, RouteNodeType type) {
         return new RouteNode(this, node, type);
+    }
+
+    public RouteNode getOrCreate(Node node) {
+        return getOrCreate(node, null);
     }
 
     public RouteNode getOrCreate(Node node, RouteNodeType type) {

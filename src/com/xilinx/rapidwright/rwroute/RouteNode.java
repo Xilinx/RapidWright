@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -256,22 +256,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         return s.toString();
     }
 
-    @Override
-    public int hashCode() {
-        return super.hashCode();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        // This method requires that object is Node or a subclass of one, otherwise exception will be thrown.
-        // If so, explicitly call the Node.equals(Node) overload, rather than the general-purpose Node.equals(Object).
-        return super.equals((Node) obj);
-    }
-
     /**
      * Checks if coordinates of a RouteNode Object is within the connection's bounding box.
      * @param connection The connection that is being routed.
@@ -328,9 +312,12 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      * @param type New RouteNodeType value.
      */
     public void setType(RouteNodeType type) {
-        // Only support demotion from PINFEED_I to WIRE or PINBOUNCE since they have the same base cost
-        assert(this.type == RouteNodeType.PINFEED_I
-                && (type == RouteNodeType.WIRE || type == RouteNodeType.PINBOUNCE));
+        assert(this.type == type ||
+                // Support demotion from PINFEED_I to PINBOUNCE since they have the same base cost
+                (this.type == RouteNodeType.PINFEED_I && type == RouteNodeType.PINBOUNCE) ||
+                // Or promotion from PINBOUNCE to PINFEED_I (by PartialRouter when PINBOUNCE on
+                // preserved net needs to become a PINFEED_I)
+                (this.type == RouteNodeType.PINBOUNCE && type == RouteNodeType.PINFEED_I));
         this.type = type;
     }
 
@@ -398,7 +385,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     continue;
                 }
 
-                RouteNode child = routingGraph.getOrCreate(downhill, null);
+                RouteNode child = routingGraph.getOrCreate(downhill);
                 childrenList.add(child);//the sink rnode of a target connection has been created up-front
             }
             if (!childrenList.isEmpty()) {
@@ -573,13 +560,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     public void setPrev(RouteNode prev) {
         assert(prev != null);
         this.prev = prev;
-    }
-
-    /**
-     * Clears the parent RouteNode instance.
-     */
-    public void clearPrev() {
-        this.prev = null;
     }
 
     /**
