@@ -26,9 +26,11 @@ package com.xilinx.rapidwright.rwroute;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 import com.xilinx.rapidwright.util.VivadoToolsHelper;
 import org.junit.jupiter.api.Assertions;
@@ -267,6 +269,19 @@ public class TestRWRoute {
     public void testNonTimingDrivenPartialRouting() {
         Design design = RapidWrightDCP.loadDCP("picoblaze_partial.dcp");
         design.setTrackNetChanges(true);
+
+        // Pseudo-randomly unroute some pins from a multi-pin net
+        Random random = new Random(0);
+        for (Net net : design.getNets()) {
+            if (!net.getName().endsWith("/processor/t_state_0")) {
+                continue;
+            }
+
+            List<SitePinInst> sinkPins = net.getSinkPins();
+            Assertions.assertTrue(sinkPins.size() > 1);
+            SitePinInst spi = sinkPins.get(random.nextInt(sinkPins.size()));
+            DesignTools.unroutePins(net, Collections.singletonList(spi));
+        }
 
         boolean softPreserve = false;
         Design routed = PartialRouter.routeDesignPartialNonTimingDriven(design, null, softPreserve);

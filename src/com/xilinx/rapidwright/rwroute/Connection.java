@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -34,6 +34,7 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.util.Pair;
 
 /**
  * A Connection instance represents a pair of source-sink {@link SitePinInst} instances of a {@link Net} instance.
@@ -49,7 +50,6 @@ public class Connection implements Comparable<Connection>{
      * They are created based on the INT tile nodes the source and sink SitePinInsts connect to, respectively.
      */
     private RouteNode sourceRnode;
-    private RouteNode altSourceRnode;
     private RouteNode sinkRnode;
     private List<RouteNode> altSinkRnodes;
     /**
@@ -273,7 +273,6 @@ public class Connection implements Comparable<Connection>{
 
     public void resetRoute() {
         getRnodes().clear();
-        sink.setRouted(false);
     }
 
     public RouteNode getSourceRnode() {
@@ -282,14 +281,6 @@ public class Connection implements Comparable<Connection>{
 
     public void setSourceRnode(RouteNode sourceNode) {
         sourceRnode = sourceNode;
-    }
-
-    public RouteNode getAltSourceRnode() {
-        return altSourceRnode;
-    }
-
-    public void setAltSourceRnode(RouteNode altSourceNode) {
-        altSourceRnode = altSourceNode;
     }
 
     public RouteNode getSinkRnode() {
@@ -361,6 +352,7 @@ public class Connection implements Comparable<Connection>{
     }
 
     public void setSource(SitePinInst source) {
+        assert(source != null);
         this.source = source;
     }
 
@@ -413,7 +405,7 @@ public class Connection implements Comparable<Connection>{
     }
 
     public List<Node> getNodes() {
-        return nodes;
+        return nodes == null ? Collections.emptyList() : nodes;
     }
 
     public void setNodes(List<Node> nodes) {
@@ -497,5 +489,26 @@ public class Connection implements Comparable<Connection>{
                 }
             }
         }
+    }
+
+    protected Pair<SitePinInst,RouteNode> getOrCreateAlternateSource(RouteNodeGraph routingGraph) {
+        SitePinInst altSource = netWrapper.getOrCreateAlternateSource(routingGraph);
+        if (altSource == null) {
+            return null;
+        }
+
+        Net net = netWrapper.getNet();
+        RouteNode altSourceRnode;
+        if (source.equals(net.getSource())) {
+            altSourceRnode = netWrapper.getAltSourceRnode();
+        } else {
+            assert(source.equals(net.getAlternateSource()));
+            altSource = net.getSource();
+            assert(altSource != null);
+            altSourceRnode = netWrapper.getSourceRnode();
+        }
+
+        assert(altSourceRnode != null);
+        return new Pair<>(altSource, altSourceRnode);
     }
 }
