@@ -39,7 +39,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -79,7 +78,6 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
-import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.placer.blockplacer.BlockPlacer2Impls;
 import com.xilinx.rapidwright.placer.blockplacer.ImplsInstancePort;
@@ -3329,6 +3327,11 @@ public class DesignTools {
             // inside the site, so no inter-site routing necessary
             return;
         }
+        final String CE = "CE";
+        final String SR = "SR";
+        final String[] belPinNames = new String[] {CE, SR};
+        boolean assertionsEnabled = false;
+        assert assertionsEnabled = true; // Only true if assertions are enabled
         Map<String, Pair<String, String>> pinMapping = belTypeSitePinNameMapping.get(series);
         Net vccNet = design.getVccNet();
         if (series == Series.Versal) {
@@ -3350,12 +3353,11 @@ public class DesignTools {
                     }
 
                     Pair<String, String> sitePinNames = pinMapping.get(bel.getName());
-                    final String[] belPinNames = new String[] {"CE", "SR"};
                     for (String belPinName : belPinNames) {
-                        String sitePinName = (belPinName == belPinNames[0]) ? sitePinNames.getFirst() : sitePinNames.getSecond();
+                        String sitePinName = (belPinName == CE) ? sitePinNames.getFirst() : sitePinNames.getSecond();
                         SitePinInst spi = si.getSitePinInst(sitePinName);
                         if (spi != null) {
-                            if (belPinName == belPinNames[0]) {
+                            if (belPinName == CE) {
                                 // CE
                                 continue;
                             }
@@ -3367,7 +3369,7 @@ public class DesignTools {
 
                         Net net = si.getNetFromSiteWire(sitePinName);
                         if (net != null) {
-                            if (belPinName == belPinNames[0]) {
+                            if (belPinName == CE) {
                                 // CE: it is possible for sitewire to be assigned to a non VCC net, but a SitePinInst to not yet exist
                                 assert(!net.isVCCNet());
                                 continue;
@@ -3379,20 +3381,22 @@ public class DesignTools {
                             }
                         }
 
-                        BELPin belPin = bel.getPin(belPinName);
-                        Net belPinNet = si.getNetFromSiteWire(belPin.getSiteWireName());
-                        if (belPinNet != null) {
-                            if (belPinName == belPinNames[0]) {
-                                // CE
-                                assert(belPinNet.isVCCNet());
-                            } else {
-                                // SR
-                                assert(belPinNet.isStaticNet());
+                        if (assertionsEnabled) {
+                            BELPin belPin = bel.getPin(belPinName);
+                            Net belPinNet = si.getNetFromSiteWire(belPin.getSiteWireName());
+                            if (belPinNet != null) {
+                                if (belPinName == CE) {
+                                    // CE
+                                    assert(belPinNet.isVCCNet());
+                                } else {
+                                    // SR
+                                    assert(belPinNet.isStaticNet());
+                                }
                             }
                         }
 
                         if (spi != null) {
-                            assert(belPinName == belPinNames[1]);
+                            assert(belPinName == SR);
                             // Move the SR pin from GND to VCC
                             spi.setNet(vccNet);
                         } else {
@@ -3409,7 +3413,6 @@ public class DesignTools {
             gndNet.getPins().removeIf(spi -> spi.getNet() != gndNet);
         } else if (series == Series.UltraScale || series == Series.UltraScalePlus) {
             Net gndInvertibleToVcc = design.getGndNet();
-            final String[] pins = new String[] {"CE", "SR"};
             for (Cell cell : design.getCells()) {
                 if (isUnisimFlipFlopType(cell.getType())) {
                     SiteInst si = cell.getSiteInst();
@@ -3418,14 +3421,14 @@ public class DesignTools {
                     }
                     BEL bel = cell.getBEL();
                     Pair<String, String> sitePinNames = pinMapping.get(bel.getBELType());
-                    for (String pin : pins) {
-                        BELPin belPin = cell.getBEL().getPin(pin);
+                    for (String belPinName : belPinNames) {
+                        BELPin belPin = cell.getBEL().getPin(belPinName);
                         Net net = si.getNetFromSiteWire(belPin.getSiteWireName());
-                        if (net == null || (net == gndInvertibleToVcc && pin.equals("SR"))) {
+                        if (net == null || (net == gndInvertibleToVcc && belPinName == SR)) {
                             String sitePinName;
-                            if (pin.equals("CE")) { // CKEN
+                            if (belPinName == CE) {
                                 sitePinName = sitePinNames.getFirst();
-                            } else { //SRST
+                            } else {
                                 sitePinName = sitePinNames.getSecond();
                             }
                             maybeCreateVccPinAndPossibleInversion(si, sitePinName, vccNet, gndInvertibleToVcc);
