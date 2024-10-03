@@ -37,8 +37,8 @@ import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestNet {
     @Test
-    void testSetPinsMultiSrc() {
-        Design d = new Design("testSetPinsMultiSrc", Device.KCU105);
+    void testSetPinsDualSrc() {
+        Design d = new Design("testSetPinsDualSrc", Device.KCU105);
         SiteInst si = d.createSiteInst("SLICE_X32Y73");
 
         Net net = new Net("foo");
@@ -53,6 +53,25 @@ public class TestNet {
     }
 
     @Test
+    void testSetPinsMultiSrc() {
+        Design d = new Design("testSetPinsMultiSrc", "xcvc1902");
+        SiteInst si = d.createSiteInst("SLICE_X249Y83");
+
+        Net net = new Net("foo");
+        List<SitePinInst> pins = Arrays.asList(
+                new SitePinInst("H_O", si),
+                new SitePinInst("HQ", si),
+                new SitePinInst("HQ2", si)
+        );
+
+        Assertions.assertTrue(net.setPins(pins));
+        Assertions.assertEquals(pins.get(0), net.getSource());
+        Assertions.assertEquals(pins.get(1), net.getAlternateSource());
+        Assertions.assertSame(pins.get(2), net.getAlternateSources().get(1));
+        Assertions.assertEquals(pins.subList(1, 3).toString(), net.getAlternateSources().toString());
+    }
+
+    @Test
     void testSetPinsMultiSrcStatic() {
         Design d = new Design("testSetPinsMultiSrcStatic", Device.KCU105);
         SiteInst si = d.createSiteInst("SLICE_X32Y73");
@@ -60,7 +79,7 @@ public class TestNet {
         Net net = d.getVccNet();
         List<SitePinInst> pins = Arrays.asList(
                 new SitePinInst("A_O", si),
-                new SitePinInst("B_O", si),
+                new SitePinInst("BQ", si),
                 new SitePinInst("C_O", si)
         );
 
