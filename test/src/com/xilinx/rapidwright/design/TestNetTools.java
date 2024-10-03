@@ -40,7 +40,6 @@ public class TestNetTools {
      * All Versal/Ultrascale+/Series-7 designs under the RapidWrightDCP path are available to be checked, except for the following:
      *      picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp    The source cell bufgce_inst of this design is not placed yet.
      *      picoblaze_ooc_X10Y235_unreadable_edif.dcp       This design would call vivado to generate an readable EDIF file.
-     *      two_clk_check_NetTools.dcp                      This design is not added to the RapidWrightDCP yet.
      * 
      * @param pathAndlobalClockNames Use ' ' as the delimiter to split this string, where the first element is the path to the DCP file, 
      *                               and the remaining elements are the names of the global clock nets reported by Vivado.
