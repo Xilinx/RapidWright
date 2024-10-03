@@ -23,7 +23,6 @@
 package com.xilinx.rapidwright.design;
 
 import java.util.EnumSet;
-import java.util.List;
 import java.util.Set;
 
 import com.xilinx.rapidwright.device.SiteTypeEnum;
@@ -31,16 +30,13 @@ import com.xilinx.rapidwright.device.SiteTypeEnum;
 public class NetTools {
     private static Set<SiteTypeEnum> clkSrcSiteTypeEnums = EnumSet.noneOf(SiteTypeEnum.class);
     static {
-        clkSrcSiteTypeEnums.addAll(List.of(
-            SiteTypeEnum.BUFGCE,        // All supported series
-            SiteTypeEnum.BUFGCTRL,      // All supported series
-            SiteTypeEnum.BUFG,          // All supported series
-            SiteTypeEnum.BUFGCE_DIV,    // US/US+ and Versal
-            SiteTypeEnum.BUFG_GT,       // US/US+ and Versal
-            SiteTypeEnum.BUFG_PS,       // US/US+ and Versal
-            SiteTypeEnum.BUFG_FABRIC,   // Versal
-            SiteTypeEnum.BUFHCE         // Series-7
-        ));
+        clkSrcSiteTypeEnums.add(SiteTypeEnum.BUFGCE);       // All supported series
+        clkSrcSiteTypeEnums.add(SiteTypeEnum.BUFGCTRL);     // All supported series
+        clkSrcSiteTypeEnums.add(SiteTypeEnum.BUFG);         // All supported series
+        clkSrcSiteTypeEnums.add(SiteTypeEnum.BUFGCE_DIV);   // US/US+ and Versal
+        clkSrcSiteTypeEnums.add(SiteTypeEnum.BUFG_GT);      // US/US+ and Versal
+        clkSrcSiteTypeEnums.add(SiteTypeEnum.BUFG_PS);      // US/US+ and Versal
+        clkSrcSiteTypeEnums.add(SiteTypeEnum.BUFG_FABRIC);  // Versal
     }
 
     public static boolean isGlobalClock(Net net) {
