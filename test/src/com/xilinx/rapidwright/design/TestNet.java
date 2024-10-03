@@ -79,9 +79,31 @@ public class TestNet {
         Net net = d.getVccNet();
         List<SitePinInst> pins = Arrays.asList(
                 new SitePinInst("A_O", si),
-                new SitePinInst("BQ", si),
+                new SitePinInst("BMUX", si),
                 new SitePinInst("C_O", si)
         );
+
+        Assertions.assertTrue(net.setPins(pins));
+        Assertions.assertSame(pins.get(0), net.getSource());
+        Assertions.assertSame(pins.get(1), net.getAlternateSource());
+        Assertions.assertSame(pins.get(2), net.getAlternateSources().get(1));
+        Assertions.assertEquals(pins.subList(1, 3).toString(), net.getAlternateSources().toString());
+    }
+
+    @Test
+    void testAddPinsMultiSrcStatic() {
+        Design d = new Design("testSetPinsMultiSrcStatic", "xcvc1902");
+        SiteInst si = d.createSiteInst("SLICE_X249Y83");
+
+        Net net = d.getVccNet();
+        List<SitePinInst> pins = Arrays.asList(
+                new SitePinInst("F_O", si),
+                new SitePinInst("GQ", si),
+                new SitePinInst("H_O", si)
+        );
+        for (SitePinInst spi : pins) {
+            Assertions.assertTrue(net.addPin(spi));
+        }
 
         Assertions.assertTrue(net.setPins(pins));
         Assertions.assertSame(pins.get(0), net.getSource());
