@@ -52,12 +52,15 @@ public abstract class EDIFWriteLegalNameCache<T> {
      */
     private final Map<String, byte[]>[] renames;
 
+    private final Map<String, byte[]> busCollisionRenames;
+
     private EDIFWriteLegalNameCache(Map<String, T> usedRenames, Supplier<Map<String, byte[]>> renameSupplier) {
         this.usedRenames = usedRenames;
         this.renames = new Map[256];
         for (int i = 0; i < renames.length; i++) {
             renames[i] = renameSupplier.get();
         }
+        this.busCollisionRenames = new HashMap<>();
     }
 
     protected abstract int getAndIncrement(String rename);
@@ -84,6 +87,11 @@ public abstract class EDIFWriteLegalNameCache<T> {
             return null;
         }
         return rename;
+    }
+
+    public byte[] getBusCollisionEDIFRename(String name) {
+        return busCollisionRenames.computeIfAbsent(name,
+                n -> (EDIFTools.makeNameEDIFCompatible(n) + "_BUS_").getBytes(StandardCharsets.UTF_8));
     }
 
     public static EDIFWriteLegalNameCache<?> singleThreaded() {

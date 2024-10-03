@@ -65,6 +65,21 @@ import com.xilinx.rapidwright.util.Utils;
  * A collection of supportive methods for the router.
  */
 public class RouterHelper {
+    static class NodeWithPrev extends Node {
+        protected NodeWithPrev prev;
+        NodeWithPrev(Node node) {
+            super(node);
+        }
+
+        void setPrev(NodeWithPrev prev) {
+            this.prev = prev;
+        }
+
+        NodeWithPrev getPrev() {
+            return prev;
+        }
+    }
+
     /**
      * Checks if a {@link Net} instance has source and sink {@link SitePinInst} instances to be routable.
      * @param net The net to be checked.
@@ -165,23 +180,25 @@ public class RouterHelper {
      */
     public static List<Node> projectInputPinToINTNode(SitePinInst input) {
         List<Node> sinkToSwitchBoxPath = new ArrayList<>();
-        LightweightRouteNode sink = new LightweightRouteNode(input.getConnectedNode());
+        NodeWithPrev sink = new NodeWithPrev(input.getConnectedNode());
         sink.setPrev(null);
-        Queue<LightweightRouteNode> q = new LinkedList<>();
+        Queue<NodeWithPrev> q = new LinkedList<>();
         q.add(sink);
         int watchdog = 1000;
         while (!q.isEmpty()) {
-            LightweightRouteNode n = q.poll();
-            if (n.getNode().getTile().getTileTypeEnum() == TileTypeEnum.INT) {
+            NodeWithPrev n = q.poll();
+            if (n.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
                 while (n != null) {
-                    sinkToSwitchBoxPath.add(n.getNode());
+                    sinkToSwitchBoxPath.add(n);
                     n = n.getPrev();
                 }
                 return sinkToSwitchBoxPath;
             }
-            for (Node uphill : n.getNode().getAllUphillNodes()) {
-                if (uphill.getAllUphillNodes().size() == 0) continue;
-                LightweightRouteNode prev = new LightweightRouteNode(uphill);
+            for (Node uphill : n.getAllUphillNodes()) {
+                if (uphill.getAllUphillNodes().size() == 0) {
+                    continue;
+                }
+                NodeWithPrev prev = new NodeWithPrev(uphill);
                 prev.setPrev(n);
                 q.add(prev);
             }
@@ -356,19 +373,6 @@ public class RouterHelper {
     }
 
     /**
-     * Checks if a DSP {@link BELPin} instance is invertible.
-     * @param belPin The bel pin in question.
-     * @return true, if the bel pin is invertible.
-     */
-    private static boolean isInvertibleDSPBELPin(BELPin belPin) {
-        if (belPin.getBELName().equals("CLKINV")) {
-            //NEED TO BE INVERTED when BEL.canInvert returns false
-            return true;
-        }
-        return belPin.getBEL().canInvert();
-    }
-
-    /**
      * Inverts all possible GND sink pins to VCC pins.
      * @param design The target design.
      * @param pins The GND net pins.
@@ -520,58 +524,39 @@ public class RouterHelper {
      * @param estimator An instantiation of DelayEstimatorBase.
      * @return The map containing net delay for each sink pin paired with an INT tile node of a routed net.
      */
-    public static Map<Pair<SitePinInst, Node>, Short> getSourceToSinkINTNodeDelays(Net net, DelayEstimatorBase estimator) {
+    public static Map<SitePinInst, Pair<Node,Short>> getSourceToSinkINTNodeDelays(Net net, DelayEstimatorBase estimator) {
         List<PIP> pips = net.getPIPs();
-        Map<Node, LightweightRouteNode> nodeRoutingNodeMap = new HashMap<>();
-        boolean firstPIP = true;
+        Map<Node, Integer> delayMap = new HashMap<>();
         for (PIP pip : pips) {
             Node startNode = pip.getStartNode();
-            LightweightRouteNode startrn = createRoutingNode(pip.getStartNode(), nodeRoutingNodeMap);
-
-            if (firstPIP) {
-                startrn.setDelayFromSource(0);
-            }
-            firstPIP = false;
+            int upstreamDelay = delayMap.getOrDefault(startNode, 0);
 
             Node endNode = pip.getEndNode();
-            LightweightRouteNode endrn = createRoutingNode(endNode, nodeRoutingNodeMap);
-            endrn.setPrev(startrn);
             int delay = 0;
             if (endNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {//device independent?
                 delay = computeNodeDelay(estimator, endNode)
                         + DelayEstimatorBase.getExtraDelay(endNode, DelayEstimatorBase.isLong(startNode));
             }
-
-            endrn.setDelayFromSource(startrn.getDelayFromSource() + delay);
+            delayMap.put(endNode, upstreamDelay + delay);
         }
 
-        Map<Pair<SitePinInst, Node>, Short> sinkNodeDelays = new HashMap<>();
+        Map<SitePinInst, Pair<Node,Short>> sinkNodeDelays = new HashMap<>();
         for (SitePinInst sink : net.getSinkPins()) {
             Node sinkNode = sink.getConnectedNode();
-            if (!(sinkNode.getTile().getTileTypeEnum() == TileTypeEnum.INT)) {
-                sinkNode = projectInputPinToINTNode(sink).get(0);
+            if (sinkNode.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
+                List<Node> nodes = projectInputPinToINTNode(sink);
+                if (!nodes.isEmpty()) {
+                    sinkNode = nodes.get(0);
+                } else {
+                    // Must be a direct connection (e.g. COUT -> CIN)
+                }
             }
 
-            short routeDelay = (short) nodeRoutingNodeMap.get(sinkNode).getDelayFromSource();
-            sinkNodeDelays.put(new Pair<>(sink, sinkNode), routeDelay);
+            short routeDelay = (short) delayMap.get(sinkNode).intValue();
+            sinkNodeDelays.put(sink, new Pair<>(sinkNode,routeDelay));
         }
 
         return sinkNodeDelays;
-    }
-
-    /**
-     * Creates a {@link LightweightRouteNode} Object based on a {@link Node} Object, avoiding duplicates.
-     * @param node The {@link Node} instance that is used to create a RoutingNode object.
-     * @param createdRoutingNodes A map storing created {@link LightweightRouteNode} instances and corresponding {@link Node} instances.
-     * @return A created RoutingNode instance based on a node
-     */
-    public static LightweightRouteNode createRoutingNode(Node node, Map<Node, LightweightRouteNode> createdRoutingNodes) {
-        LightweightRouteNode resourceNode = createdRoutingNodes.get(node);
-        if (resourceNode == null) {
-            resourceNode = new LightweightRouteNode(node);
-            createdRoutingNodes.put(node, resourceNode);
-        }
-        return resourceNode;
     }
 
     /**
@@ -594,7 +579,7 @@ public class RouterHelper {
      */
     public static boolean routeDirectConnection(Connection directConnection) {
         directConnection.setNodes(findPathBetweenNodes(directConnection.getSource().getConnectedNode(), directConnection.getSink().getConnectedNode()));
-        return directConnection.getNodes() != null;
+        return !directConnection.getNodes().isEmpty();
     }
 
     /**
@@ -613,25 +598,25 @@ public class RouterHelper {
             path.add(source);
             return path;
         }
-        LightweightRouteNode sourcer = new LightweightRouteNode(source);
+        NodeWithPrev sourcer = new NodeWithPrev(source);
         sourcer.setPrev(null);
-        Queue<LightweightRouteNode> queue = new LinkedList<>();
+        Queue<NodeWithPrev> queue = new LinkedList<>();
         queue.add(sourcer);
 
         int watchdog = 10000;
         boolean success = false;
         while (!queue.isEmpty()) {
-            LightweightRouteNode curr = queue.poll();
-            if (curr.getNode().equals(sink)) {
+            NodeWithPrev curr = queue.poll();
+            if (curr.equals(sink)) {
                 while (curr != null) {
-                    path.add(curr.getNode());
+                    path.add(curr);
                     curr = curr.getPrev();
                 }
                 success = true;
                 break;
             }
-            for (Node n : curr.getNode().getAllDownhillNodes()) {
-                LightweightRouteNode child = new LightweightRouteNode(n);
+            for (Node n : curr.getAllDownhillNodes()) {
+                NodeWithPrev child = new NodeWithPrev(n);
                 child.setPrev(curr);
                 queue.add(child);
             }
@@ -699,5 +684,4 @@ public class RouterHelper {
         reader.close();
         return path;
     }
-
 }
