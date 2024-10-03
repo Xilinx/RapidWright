@@ -3182,7 +3182,7 @@ public class DesignTools {
     }
 
     public static void createCeClkOfRoutethruFFToVCC(Design design) {
-        if (design.getDevice().getSeries() == Series.Versal) {
+        if (design.getSeries() == Series.Versal) {
             // Versal have OUTMUX[A-H][12]-es for bypassing FFs
             return;
         }
@@ -3323,7 +3323,7 @@ public class DesignTools {
      * @param design Design object to be modified in-place.
      */
     public static void createCeSrRstPinsToVCC(Design design) {
-        Series series = design.getDevice().getSeries();
+        Series series = design.getSeries();
         if (series == Series.Series7) {
             // Series7 have {CE,SR}USEDMUX which is used to supply VCC and GND respectively from
             // inside the site, so no inter-site routing necessary
