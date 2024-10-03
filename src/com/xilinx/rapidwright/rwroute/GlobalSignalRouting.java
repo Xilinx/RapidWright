@@ -29,6 +29,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
@@ -38,6 +39,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.placer.blockplacer.Point;
 import com.xilinx.rapidwright.placer.blockplacer.SmallestEnclosingCircle;
@@ -68,9 +70,16 @@ public class GlobalSignalRouting {
     static {
         lutOutputPinNames = new HashSet<>();
         for (String cle : new String[]{"L", "M"}) {
-            for (String pin : new String[]{"A", "B", "C", "D", "E", "F", "G", "H"}) {
+            for (char pin : LUTTools.lutLetters) {
+                // UltraScale/UltraScale+
                 lutOutputPinNames.add("CLE_CLE_" + cle + "_SITE_0_" + pin + "_O");
                 lutOutputPinNames.add("CLE_CLE_" + cle + "_SITE_0_" + pin + "MUX");
+                // Versal
+                for (int siteIndex = 0; siteIndex < 2; siteIndex++) {
+                    lutOutputPinNames.add("CLE_SLICE" + cle + "_TOP_" + siteIndex + "_" + pin + "_O_PIN");
+                    lutOutputPinNames.add("CLE_SLICE" + cle + "_TOP_" + siteIndex + "_" + pin + "Q_PIN");
+                    // Q2 pin cannot be used otherwise leads to "Invalid Programming for Site"
+                }
             }
         }
     }
@@ -344,25 +353,32 @@ public class GlobalSignalRouting {
 
         // VCC wires are not expected to leave its tile
         EnumSet<IntentCode> assertIntentCodeOfPoppedNodesOnVcc;
-        boolean isUltraScale = design.getDevice().getSeries() == Series.UltraScale;
-        if (isUltraScale) {
+        Series series = design.getDevice().getSeries();
+        assertIntentCodeOfPoppedNodesOnVcc = EnumSet.of(
+                IntentCode.NODE_PINFEED,
+                IntentCode.NODE_PINBOUNCE,
+                IntentCode.INTENT_DEFAULT);
+        boolean isVersal = false;
+        if (series == Series.UltraScale) {
             // On UltraScale, certain site pins (e.g. SLICE/CKEN_B1[1-4], SLICE/SRST_B[12])
             // do not have an uphill PIP to VCC_WIRE (instead they have one to GND_WIRE, which
             // Vivado itself chooses not to use)
-            assertIntentCodeOfPoppedNodesOnVcc = EnumSet.of(
-                    // Necessary for the following nodes used to reach VCC_WIRE
-                    IntentCode.NODE_LOCAL,  // INT_NODE_GLOBAL_\d+_OUT[01], uphill of CTRL_[EW]_B[0-9]
-                                            // corresponding to CKEN_B[1-4] and SRST_B[12] site pins
-                    IntentCode.NODE_SINGLE, // INT_INT_SINGLE_\d+_INT_OUT uphill of INT_NODE_GLOBAL_\d+_OUT[01]
 
-                    IntentCode.NODE_PINFEED,
-                    IntentCode.NODE_PINBOUNCE,
-                    IntentCode.INTENT_DEFAULT);
+            // INT_NODE_GLOBAL_\d+_OUT[01], uphill of CTRL_[EW]_B[0-9]
+            // corresponding to CKEN_B[1-4] and SRST_B[12] site pins
+            assertIntentCodeOfPoppedNodesOnVcc.add(IntentCode.NODE_LOCAL);
+            // INT_INT_SINGLE_\d+_INT_OUT uphill of INT_NODE_GLOBAL_\d+_OUT[01]
+            assertIntentCodeOfPoppedNodesOnVcc.add(IntentCode.NODE_SINGLE);
+        } else if (series == Series.UltraScalePlus) {
+            // No new intent codes
+        } else if (series == Series.Versal) {
+            isVersal = true;
+            assertIntentCodeOfPoppedNodesOnVcc.add(IntentCode.NODE_IMUX);
+            assertIntentCodeOfPoppedNodesOnVcc.add(IntentCode.NODE_CLE_CTRL);
+            assertIntentCodeOfPoppedNodesOnVcc.add(IntentCode.NODE_INTF_CTRL);
+            assertIntentCodeOfPoppedNodesOnVcc.add(IntentCode.NODE_IRI);
         } else {
-            assertIntentCodeOfPoppedNodesOnVcc = EnumSet.of(
-                    IntentCode.NODE_PINFEED,
-                    IntentCode.NODE_PINBOUNCE,
-                    IntentCode.INTENT_DEFAULT);
+            throw new RuntimeException("ERROR: Unsupported series " + series);
         }
 
         // Collect all node-sink pairs to be routed
@@ -395,7 +411,8 @@ public class GlobalSignalRouting {
                 search: while ((node = q.poll()) != null) {
                     assert(!usedRoutingNodes.contains(node));
                     assert(!node.isTied());
-                    assert(netType != NetType.VCC || assertIntentCodeOfPoppedNodesOnVcc.contains(node.getIntentCode()));
+                    IntentCode intentCode = node.getIntentCode();
+                    assert(netType != NetType.VCC || assertIntentCodeOfPoppedNodesOnVcc.contains(intentCode));
 
                     SitePin sitePin = getStaticSourceSitePin(design, node, netType);
                     if (sitePin != null) {
@@ -404,12 +421,28 @@ public class GlobalSignalRouting {
                         break;
                     }
 
+                    TileTypeEnum tileTypeEnum = node.getTile().getTileTypeEnum();
+                    // On Versal, only allow IRI routethrus on BLI_CLE_BOT_CORE* tile types
+                    boolean notIriRoutethru = !isVersal ||
+                            (intentCode != IntentCode.NODE_IRI &&
+                            tileTypeEnum != TileTypeEnum.BLI_CLE_BOT_CORE &&
+                            tileTypeEnum != TileTypeEnum.BLI_CLE_BOT_CORE_MY);
                     for (Node uphillNode : node.getAllUphillNodes()) {
-                        if (routeThruHelper.isRouteThru(uphillNode, node)) {
+                        if (routeThruHelper.isRouteThru(uphillNode, node) && notIriRoutethru) {
                             continue;
                         }
 
-                        switch(uphillNode.getIntentCode()) {
+                        IntentCode uphillIntentCode = uphillNode.getIntentCode();
+                        if (uphillIntentCode == IntentCode.NODE_CLE_CNODE && intentCode != IntentCode.NODE_CLE_CTRL) {
+                            assert(isVersal);
+                            // Only allow PIPs from NODE_CLE_CNODE to NODE_CLE_CTRL intent codes
+                            // (NODE_CLE_NODEs can also be used to re-enter the INT tile --- do not allow this
+                            // so that these precious resources are not consumed by the static router thereby
+                            // blocking the signal router from using them)
+                            continue;
+                        }
+
+                        switch(uphillIntentCode) {
                             case NODE_GLOBAL_VDISTR:
                             case NODE_GLOBAL_HROUTE:
                             case NODE_GLOBAL_HDISTR:
@@ -419,15 +452,26 @@ public class GlobalSignalRouting {
                             case NODE_GLOBAL_LEAF:
                             case NODE_GLOBAL_BUFG:
                                 continue;
+                            // Versal
+                            case NODE_HLONG6:
+                            case NODE_HLONG10:
+                            case NODE_VLONG7:
+                            case NODE_VLONG12:
+                                continue;
 
                             // VCC net should never need to use S/D/Q nodes ...
                             case NODE_SINGLE:
                             case NODE_DOUBLE:
                             case NODE_HQUAD:
                             case NODE_VQUAD:
+                            // Versal
+                            case NODE_HSINGLE:
+                            case NODE_VSINGLE:
+                            case NODE_HDOUBLE:
+                            case NODE_VDOUBLE:
                                 if (netType == NetType.VCC) {
-                                    assert(isUltraScale);
-                                    if (uphillNode.getIntentCode() == IntentCode.NODE_SINGLE) {
+                                    assert(series == Series.UltraScale);
+                                    if (uphillIntentCode == IntentCode.NODE_SINGLE) {
                                         // ... except for UltraScale where certain site pins have no direct connection to VCC_WIRE
                                         // and even then, only consider INT_INT_SINGLE_\d+_INT_OUT "singles" that stay within the
                                         // same tile
@@ -561,8 +605,7 @@ public class GlobalSignalRouting {
     private static SitePin getStaticSourceSitePin(Design design,
                                                   Node node,
                                                   NetType type) {
-        Tile tile = node.getTile();
-        if (!Utils.isCLB(tile.getTileTypeEnum())) {
+        if (node.getIntentCode() != IntentCode.NODE_CLE_OUTPUT) {
             return null;
         }
 
@@ -572,34 +615,58 @@ public class GlobalSignalRouting {
             return null;
         }
 
+        Tile tile = node.getTile();
+        assert(Utils.isCLB(tile.getTileTypeEnum()));
         Site[] sites = tile.getSites();
-        assert(sites.length == 1);
-        Site slice = sites[0];
+        boolean isVersal = design.getDevice().getSeries() == Series.Versal;
+        int siteIndex;
+        if (isVersal) {
+            assert(sites.length == 2);
+            // Site index is in wire name: e.g. CLE_SLICEL_TOP_0_A_O_PIN
+            siteIndex = wireName.charAt(15) - '0';
+        } else {
+            assert(sites.length == 1);
+            siteIndex = 0;
+        }
+        Site slice = sites[siteIndex];
         SiteInst si = design.getSiteInstFromSite(slice);
 
         String sitePinName;
-        if (wireName.endsWith("_O")) {
-            sitePinName = wireName.substring(wireName.length() - 3);
-        } else if (wireName.endsWith("MUX")) {
-            char lutLetter = wireName.charAt(wireName.length() - 4);
+        if (isVersal) {
+            sitePinName = wireName.substring(17, wireName.length() - 4);
 
-            if (si != null) {
+            // For [A-H]Q only
+            if (si != null && sitePinName.endsWith("Q")) {
+                char lutLetter = sitePinName.charAt(0);
                 Net o6Net = si.getNetFromSiteWire(lutLetter + "_O");
                 if (o6Net != null && o6Net.getType() != type) {
-                    // 6LUT is occupied; play it safe and do not consider fracturing as that can require modifying the intra-site routing
-                    return null;
-                }
-
-                Net o5Net = si.getNetFromSiteWire(lutLetter + "5LUT_O5");
-                if (o5Net != null && o5Net.getType() != type) {
-                    // 5LUT is occupied
+                    // 6LUT is occupied
                     return null;
                 }
             }
-
-            sitePinName = wireName.substring(wireName.length() - 4);
         } else {
-            throw new RuntimeException(wireName);
+            if (wireName.endsWith("_O")) {
+                sitePinName = wireName.substring(wireName.length() - 3);
+            } else if (wireName.endsWith("MUX")) {
+                sitePinName = wireName.substring(wireName.length() - 4);
+
+                if (si != null) {
+                    char lutLetter = sitePinName.charAt(0);
+                    Net o6Net = si.getNetFromSiteWire(lutLetter + "_O");
+                    if (o6Net != null && o6Net.getType() != type) {
+                        // 6LUT is occupied; play it safe and do not consider fracturing as that can require modifying the intra-site routing
+                        return null;
+                    }
+
+                    Net o5Net = si.getNetFromSiteWire(lutLetter + "5LUT_O5");
+                    if (o5Net != null && o5Net.getType() != type) {
+                        // 5LUT is occupied
+                        return null;
+                    }
+                }
+            } else {
+                throw new RuntimeException(wireName);
+            }
         }
 
         if (si != null) {
