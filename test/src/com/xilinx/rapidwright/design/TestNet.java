@@ -65,8 +65,10 @@ public class TestNet {
         );
 
         Assertions.assertTrue(net.setPins(pins));
-        Assertions.assertNull(net.getSource());
-        Assertions.assertNull(net.getAlternateSource());
+        Assertions.assertSame(pins.get(0), net.getSource());
+        Assertions.assertSame(pins.get(1), net.getAlternateSource());
+        Assertions.assertSame(pins.get(2), net.getAlternateSources().get(1));
+        Assertions.assertEquals(pins.subList(1, 3).toString(), net.getAlternateSources().toString());
     }
 
     @Test
