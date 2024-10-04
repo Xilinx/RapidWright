@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -392,9 +393,11 @@ public class RouterHelper {
                                                                   boolean invertLutInputs) {
         Net gndNet = design.getGndNet();
         Set<SitePinInst> toInvertPins = new HashSet<>();
+        List<SitePinInst> toInvertRoutedPins = new ArrayList<>();
         nextSitePin: for (SitePinInst spi : pins) {
-            if (!spi.getNet().equals(gndNet))
-                throw new RuntimeException(spi.toString());
+            if (!spi.getNet().equals(gndNet)) {
+                throw new RuntimeException("ERROR: Site pin " + spi + " is present on but not linked to the GND net.");
+            }
             SiteInst si = spi.getSiteInst();
             String siteWireName = spi.getSiteWireName();
             if (invertLutInputs && spi.isLUTInputPin()) {
@@ -439,7 +442,11 @@ public class RouterHelper {
                     }
                 }
 
-                toInvertPins.add(spi);
+                boolean added = toInvertPins.add(spi);
+                assert(added);
+                if (spi.isRouted()) {
+                    toInvertRoutedPins.add(spi);
+                }
 
                 for (Cell cell : connectedCells) {
                     // Find the logical pin name
@@ -474,20 +481,26 @@ public class RouterHelper {
                             continue;
                         }
                     }
-                    toInvertPins.add(spi);
+                    boolean added = toInvertPins.add(spi);
+                    assert(added);
+                    if (spi.isRouted()) {
+                        toInvertRoutedPins.add(spi);
+                    }
                 }
             }
         }
 
-        // Unroute all pins in a batch fashion
-        DesignTools.unroutePins(gndNet, toInvertPins);
+        // Unroute all routed pins in a batch fashion
+        if (!toInvertRoutedPins.isEmpty()) {
+            DesignTools.unroutePins(gndNet, toInvertRoutedPins);
+        }
         // Manually remove pins from net, because using DesignTools.batchRemoveSitePins()
         // will cause SitePinInst.detachSiteInst() to be called, which we do not want
         // as we are simply moving the SPI from one net to another
         gndNet.getPins().removeAll(toInvertPins);
 
         Net vccNet = design.getVccNet();
-        for (SitePinInst toinvert:toInvertPins) {
+        for (SitePinInst toinvert : toInvertPins) {
             assert(toinvert.getSiteInst() != null);
             if (!vccNet.addPin(toinvert)) {
                   throw new RuntimeException("ERROR: Couldn't invert site pin " +
