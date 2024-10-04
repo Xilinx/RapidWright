@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -35,7 +35,6 @@ import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
@@ -146,34 +145,18 @@ public class TimingAndWirelengthReport{
      * @param netWrapper
      */
     private void setAccumulativeDelayOfEachNetNode(NetWrapper netWrapper) {
-        List<PIP> pips = netWrapper.getNet().getPIPs();
-        Map<Node, LightweightRouteNode> nodeRoutingNodeMap = new HashMap<>();
-        boolean firstPIP = true;
-        for (PIP pip : pips) {
-            // This approach works because we observed that the PIPs are in order
-            Node startNode = pip.getStartNode();
-            LightweightRouteNode startrn = RouterHelper.createRoutingNode(startNode, nodeRoutingNodeMap);
-            if (firstPIP) startrn.setDelayFromSource(0);
-            firstPIP = false;
-
-            Node endNode = pip.getEndNode();
-            LightweightRouteNode endrn = RouterHelper.createRoutingNode(endNode, nodeRoutingNodeMap);
-            endrn.setPrev(startrn);
-            float delay = 0;
-            if (endNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
-                delay = RouterHelper.computeNodeDelay(estimator, endrn.getNode())
-                        + DelayEstimatorBase.getExtraDelay(endNode, DelayEstimatorBase.isLong(startNode));
-            }
-            endrn.setDelayFromSource(startrn.getDelayFromSource() + delay);
-        }
+        Map<SitePinInst, Pair<Node,Short>> sourceToSinkINTNodeDelays =
+                RouterHelper.getSourceToSinkINTNodeDelays(netWrapper.getNet(), estimator);
 
         for (Connection connection : netWrapper.getConnections()) {
-            if (connection.isDirect()) continue;
-            RouteNode sinkRnode = connection.getSinkRnode();
-            LightweightRouteNode sinkrn = nodeRoutingNodeMap.get(sinkRnode);
-            if (sinkrn == null) continue;
-            float connectionDelay = sinkrn.getDelayFromSource();
-            if (connection.getTimingEdges() == null) continue;
+            if (connection.isDirect()) {
+                continue;
+            }
+            Pair<Node,Short> sinkINTNodeDelay = sourceToSinkINTNodeDelays.get(connection.getSink());
+            short connectionDelay = sinkINTNodeDelay.getSecond();
+            if (connection.getTimingEdges() == null) {
+                continue;
+            }
             connection.setTimingEdgesDelay(connectionDelay);
         }
     }

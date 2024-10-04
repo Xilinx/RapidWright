@@ -354,4 +354,13 @@ public class TestNet {
 
         Assertions.assertEquals("I1", net0.getLogicalNet().getPortInst(f7mux0.getEDIFCellInst(), "I1").getName());
     }
+
+    @Test
+    public void testSingleClockNetSource() {
+        Design design = RapidWrightDCP.loadDCP("bug349.dcp");
+        Net net = design.getNet("CLK_BUFG_BOT_R_X60Y48_BUFGCTRL_X0Y0_O");
+        SitePinInst bufg_o = design.getSiteInstFromSiteName("BUFGCTRL_X0Y0").getSitePinInst("O");
+        Assertions.assertSame(bufg_o, net.getSource());
+        Assertions.assertNull(net.getAlternateSource());
+    }
 }

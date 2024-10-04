@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -27,7 +27,10 @@ package com.xilinx.rapidwright.rwroute;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Node;
 
 /**
  * A wrapper class of {@link Net} with additional information for the router.
@@ -44,11 +47,15 @@ public class NetWrapper{
     private float yCenter;
     /** The half-perimeter wirelength */
     private short doubleHpwl;
+    boolean noAltSourceFound;
+    private RouteNode sourceRnode;
+    private RouteNode altSourceRnode;
 
     public NetWrapper(int id, Net net) {
         this.id = id;
         this.net = net;
         connections = new ArrayList<>();
+        noAltSourceFound = false;
     }
 
     public void computeHPWLAndCenterCoordinates(int[] nextLagunaColumn, int[] prevLagunaColumn) {
@@ -128,4 +135,49 @@ public class NetWrapper{
         return id;
     }
 
+    public RouteNode getSourceRnode() {
+        return sourceRnode;
+    }
+
+    public void setSourceRnode(RouteNode sourceRnode) {
+        this.sourceRnode = sourceRnode;
+    }
+
+    public SitePinInst getOrCreateAlternateSource(RouteNodeGraph routingGraph) {
+        if (noAltSourceFound) {
+            return null;
+        }
+
+        SitePinInst altSource = net.getAlternateSource();
+        if (altSource == null) {
+            altSource = DesignTools.getLegalAlternativeOutputPin(net);
+            if (altSource == null) {
+                noAltSourceFound = true;
+                return null;
+            }
+
+            net.addPin(altSource);
+            DesignTools.routeAlternativeOutputSitePin(net, altSource);
+        }
+        if (altSourceRnode == null) {
+            Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
+            if (altSourceNode == null) {
+                noAltSourceFound = true;
+                return null;
+            }
+
+            if (routingGraph.isPreserved(altSourceNode)) {
+                noAltSourceFound = true;
+                return null;
+            }
+
+            altSourceRnode = routingGraph.getOrCreate(altSourceNode, RouteNodeType.PINFEED_O);
+        }
+        assert(altSourceRnode != null);
+        return altSource;
+    }
+
+    public RouteNode getAltSourceRnode() {
+        return altSourceRnode;
+    }
 }

@@ -108,9 +108,10 @@ public abstract class Job {
      * @param memoryLimitMB maximum memory in MB
      * @param arguments command arguments as single string
      */
-    public void setRapidWrightCommand(Class<?> mainClass, int memoryLimitMB, String arguments) {
+    public void setRapidWrightCommand(Class<?> mainClass, int memoryLimitMB, boolean enableAssertions, String arguments) {
         command = System.getProperty("java.home")+"/bin/java -cp "
                 + System.getProperty("java.class.path") + " -Xmx"+memoryLimitMB+"m "
+                + (enableAssertions ? "-ea " : "")
                 + mainClass.getCanonicalName()+" "+arguments;
     }
 
