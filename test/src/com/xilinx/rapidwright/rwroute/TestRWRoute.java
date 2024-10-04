@@ -458,7 +458,7 @@ public class TestRWRoute {
             "xcvu3p,GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,BUFG_GT_X0Y78,CLK_IN,0", // (dst pin can be projected to INT but not src pin)
 
             // Non-dedicated connections
-            "xcvu3p,IOB_X0Y47,I,SLICE_X77Y122,FX,600",
+            "xcvu3p,IOB_X0Y47,I,SLICE_X77Y122,FX,100",
 
             // 240 CLB height SLR, no LAG tiles on Y0 (since HBM on bottom edge)
             "xcu50,SLICE_X38Y239,AQ,SLICE_X38Y240,A1,500"
