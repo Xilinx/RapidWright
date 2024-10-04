@@ -373,7 +373,7 @@ public class RouterHelper {
     }
 
     /**
-     * Inverts all possible unrouted GND sink pins to VCC pins.
+     * Inverts all possible GND sink pins to VCC pins.
      * @param design The target design.
      * @param pins The GND net pins.
      */
@@ -382,7 +382,7 @@ public class RouterHelper {
     }
 
     /**
-     * Inverts all possible unrouted GND sink pins to VCC pins.
+     * Inverts all possible GND sink pins to VCC pins.
      * @param design The target design.
      * @param pins The GND net pins.
      * @param invertLutInputs True to invert LUT inputs.
@@ -393,14 +393,8 @@ public class RouterHelper {
         Net gndNet = design.getGndNet();
         Set<SitePinInst> toInvertPins = new HashSet<>();
         nextSitePin: for (SitePinInst spi : pins) {
-            if (!spi.getNet().equals(gndNet)) {
-                throw new RuntimeException("ERROR: Site pin " + spi + " is present on but not linked to the GND net.");
-            }
-            if (spi.isRouted()) {
-                // Do not invert fully routed pins
-                continue;
-            }
-
+            if (!spi.getNet().equals(gndNet))
+                throw new RuntimeException(spi.toString());
             SiteInst si = spi.getSiteInst();
             String siteWireName = spi.getSiteWireName();
             if (invertLutInputs && spi.isLUTInputPin()) {
@@ -485,15 +479,17 @@ public class RouterHelper {
             }
         }
 
-        // Manually remove pins from net, because using Net.removePin() will call
-        // Net.unroutePin() -- unnecessary because this pin is not routed
+        // Unroute all pins in a batch fashion
+        DesignTools.unroutePins(gndNet, toInvertPins);
+        // Manually remove pins from net, because using DesignTools.batchRemoveSitePins()
+        // will cause SitePinInst.detachSiteInst() to be called, which we do not want
+        // as we are simply moving the SPI from one net to another
         gndNet.getPins().removeAll(toInvertPins);
 
         Net vccNet = design.getVccNet();
-        for (SitePinInst toinvert : toInvertPins) {
+        for (SitePinInst toinvert:toInvertPins) {
             assert(toinvert.getSiteInst() != null);
-            boolean updateSiteRouting = false;
-            if (!vccNet.addPin(toinvert, updateSiteRouting)) {
+            if (!vccNet.addPin(toinvert)) {
                   throw new RuntimeException("ERROR: Couldn't invert site pin " +
                           toinvert);
             }
