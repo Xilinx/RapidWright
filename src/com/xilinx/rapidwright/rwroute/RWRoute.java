@@ -1853,25 +1853,18 @@ public class RWRoute {
                 // Account for any detours that must be taken to get to and back from the closest Laguna column
                 int nextLagunaColumn = routingGraph.nextLagunaColumn[childX];
                 int prevLagunaColumn = routingGraph.prevLagunaColumn[childX];
-                int nextLagunaColumnDist = Math.abs(nextLagunaColumn - childX);
-                int prevLagunaColumnDist = Math.abs(prevLagunaColumn - childX);
-                if (sinkX >= childX) {
-                    if (nextLagunaColumnDist <= prevLagunaColumnDist || prevLagunaColumn == Integer.MIN_VALUE) {
-                        assert (nextLagunaColumn != Integer.MAX_VALUE);
-                        deltaX = Math.abs(nextLagunaColumn - childX) + Math.abs(nextLagunaColumn - sinkX);
-                    } else {
-                        deltaX = Math.abs(childX - prevLagunaColumn) + Math.abs(sinkX - prevLagunaColumn);
-                    }
-                } else { // childX > sinkX
-                    if (prevLagunaColumnDist <= nextLagunaColumnDist) {
-                        assert (prevLagunaColumn != Integer.MIN_VALUE);
-                        deltaX = Math.abs(childX - prevLagunaColumn) + Math.abs(sinkX - prevLagunaColumn);
-                    } else {
-                        deltaX = Math.abs(nextLagunaColumn - childX) + Math.abs(nextLagunaColumn - sinkX);
-                    }
+                int nextLagunaColumnDeltaX = (nextLagunaColumn == Integer.MAX_VALUE) ? Integer.MAX_VALUE :
+                        Math.abs(nextLagunaColumn - childX) + Math.abs(sinkX - nextLagunaColumn);
+                int prevLagunaColumnDeltaX = (prevLagunaColumn == Integer.MIN_VALUE) ? Integer.MAX_VALUE :
+                        Math.abs(prevLagunaColumn - childX) + Math.abs(sinkX - prevLagunaColumn);
+                if (nextLagunaColumnDeltaX <= prevLagunaColumnDeltaX) {
+                    assert(deltaX <= nextLagunaColumnDeltaX);
+                    deltaX = nextLagunaColumnDeltaX;
+                } else {
+                    assert(deltaX <= prevLagunaColumnDeltaX);
+                    deltaX = prevLagunaColumnDeltaX;
                 }
-
-                assert(deltaX >= 0);
+                assert(deltaX >= 0 && deltaX < Integer.MAX_VALUE);
             }
         }
 
