@@ -1600,7 +1600,7 @@ public class RWRoute {
     protected void abandonConnectionIfUnroutable(Connection connection) {
         if (!config.isUseBoundingBox() || config.isEnlargeBoundingBox()) {
             return;
-       }
+        }
 
         System.out.println("                 " + "Abandoning");
 
