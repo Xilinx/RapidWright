@@ -456,7 +456,7 @@ public class Connection implements Comparable<Connection>{
     }
 
     public void setAllTargets(RWRoute.ConnectionState state) {
-        if (sinkRnode.countConnectionsOfUser(netWrapper) == 0 ||
+        if (sinkRnode.countConnectionsOfUser(netWrapper) == 1 ||
             sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE) {
             // Since this connection will have been ripped up, only mark a node
             // as a target if it's not already used by this net.

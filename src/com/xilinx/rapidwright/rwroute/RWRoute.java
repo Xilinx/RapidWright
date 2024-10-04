@@ -1373,12 +1373,27 @@ public class RWRoute {
     protected void ripUp(Connection connection) {
         List<RouteNode> rnodes = connection.getRnodes();
         if (rnodes.isEmpty()) {
+<<<<<<< HEAD
             assert(!connection.isRouted());
             if (connection.getAltSinkRnodes().isEmpty()) {
                 // If there is no alternate sink, decrement this one-and-only sink node
                 RouteNode sinkRnode = connection.getSinkRnode();
                 rnodes = Collections.singletonList(sinkRnode);
             }
+=======
+            assert(!connection.getSink().isRouted());
+            return;
+        }
+
+        RouteNode sinkRnode = rnodes.get(0);
+        if (sinkRnode == connection.getSinkRnode()) {
+            // Sink is exclusive -- do not rip up
+            assert(connection.getAltSinkRnodes().isEmpty());
+            rnodes = rnodes.subList(1, rnodes.size() - 1);
+        } else {
+            // Sink is not exclusive
+            assert(connection.getAltSinkRnodes().contains(sinkRnode));
+>>>>>>> 1d0497a... [RWRoute] ripUp() to not release exclusive sink nodes
         }
 
         for (RouteNode rnode : rnodes) {
@@ -1393,12 +1408,27 @@ public class RWRoute {
      */
     private void updateUsersAndPresentCongestionCost(Connection connection) {
         List<RouteNode> rnodes = connection.getRnodes();
+        if (rnodes.isEmpty()) {
+            assert(!connection.getSink().isRouted());
+            return;
+        }
+
         NetWrapper netWrapper = connection.getNetWrapper();
+
+        RouteNode sinkRnode = rnodes.get(0);
+        if (sinkRnode == connection.getSinkRnode()) {
+            // Sink is exclusive -- do not rip up
+            assert(connection.getAltSinkRnodes().isEmpty());
+            rnodes = rnodes.subList(1, rnodes.size() - 1);
+        } else {
+            // Sink is not exclusive
+            assert(connection.getAltSinkRnodes().contains(sinkRnode));
+        }
+
         for (RouteNode rnode : rnodes) {
             rnode.incrementUser(netWrapper);
             rnode.updatePresentCongestionCost(presentCongestionFactor);
         }
-        RouteNode sinkRnode = rnodes.get(0);
         assert(sinkRnode.countConnectionsOfUser(netWrapper) == 1 ||
                (sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE && sinkRnode.countConnectionsOfUser(netWrapper) > 1));
     }
@@ -1549,13 +1579,6 @@ public class RWRoute {
             connection.resetRoute();
             connection.setRouted(false);
             assert(connection.getRnodes().isEmpty());
-
-            if (connection.getAltSinkRnodes().isEmpty()) {
-                // Undo what ripUp() did for this connection which has a single exclusive sink
-                RouteNode sinkRnode = connection.getSinkRnode();
-                sinkRnode.incrementUser(connection.getNetWrapper());
-                sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
-            }
         }
 
         // Reset the nodes marked as this connection's target(s)
@@ -1702,8 +1725,8 @@ public class RWRoute {
                 boolean earlyTermination = false;
                 if (childRNode == connection.getSinkRnode() && connection.getAltSinkRnodes().isEmpty()) {
                     // This sink must be exclusively reserved for this connection already
-                    assert(childRNode.getOccupancy() == 0 ||
-                            childRNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
+                    assert(childRNode.getOccupancy() == 1 ||
+                           childRNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
                     earlyTermination = true;
                 } else {
                     // Target is not an exclusive sink, only early terminate if this net will not

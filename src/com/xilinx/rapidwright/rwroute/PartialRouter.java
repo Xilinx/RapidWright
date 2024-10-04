@@ -281,13 +281,6 @@ public class PartialRouter extends RWRoute {
                         ripUp(connection);
                         connection.resetRoute();
                         connection.getSink().setRouted(false);
-
-                        if (connection.getAltSinkRnodes().isEmpty()) {
-                            // Since this connection only has a single sink, re-increment its usage
-                            RouteNode sinkRnode = connection.getSinkRnode();
-                            sinkRnode.incrementUser(netWrapper);
-                            sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
-                        }
                         break;
                     }
                 }
@@ -400,9 +393,9 @@ public class PartialRouter extends RWRoute {
                     // Even though this connection is not expected to have any routing yet,
                     // perform a rip up anyway in order to release any exclusive sinks
                     // ahead of finishRouteConnection()
-                    assert(connection.getRnodes().isEmpty());
-                    connection.setRouted(false);
-                    ripUp(connection);
+                    // assert(connection.getRnodes().isEmpty());
+                    // connection.setRouted(false);
+                    // ripUp(connection);
 
                     RouteNode sinkRnode = connection.getSinkRnode();
                     finishRouteConnection(connection, sinkRnode);
@@ -455,11 +448,6 @@ public class PartialRouter extends RWRoute {
 
         if (!connection.isRouted()) {
             connection.resetRoute();
-            if (connection.getAltSinkRnodes().isEmpty()) {
-                // Undo what ripUp() would have done for this connection which has a single exclusive sink
-                rnode.incrementUser(connection.getNetWrapper());
-                rnode.updatePresentCongestionCost(presentCongestionFactor);
-            }
         }
     }
 
@@ -612,8 +600,6 @@ public class PartialRouter extends RWRoute {
                 // ripUp(connection);
 
                 finishRouteConnection(connection, sinkRnode);
-
-                assert(sinkRnode.countConnectionsOfUser(netWrapper) > 0 && !sinkRnode.isOverUsed());
             }
 
             netToPins.put(net, net.getSinkPins());
