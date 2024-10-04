@@ -166,7 +166,7 @@ public class PartialRouter extends RWRoute {
                 return false;
             }
 
-            if (prev.equals(start) && routingGraph.isPreserved(end)) {
+            if (prev == start && routingGraph.isPreserved(end)) {
                 // Arc matches start node and end node is preserved
                 // This implies that both start and end nodes must be preserved for the same net
                 // (which assumedly is the net we're currently routing, and is asserted upstream)
@@ -200,7 +200,7 @@ public class PartialRouter extends RWRoute {
     protected int getNumIndirectConnectionPins() {
         int totalSitePins = 0;
         for (Connection connection : indirectConnections) {
-            totalSitePins += (connection.getSink().isRouted() && !connection.isCongested()) ? 0 : 1;
+            totalSitePins += (connection.isRouted() && !connection.isCongested()) ? 0 : 1;
         }
         return totalSitePins;
     }
@@ -209,7 +209,7 @@ public class PartialRouter extends RWRoute {
     protected int getNumConnectionsCrossingSLRs() {
         int numCrossingSLRs = 0;
         for (Connection c : indirectConnections) {
-            numCrossingSLRs += (!c.isCrossSLR() || (c.getSink().isRouted() && !c.isCongested())) ? 0 : 1;
+            numCrossingSLRs += (!c.isCrossSLR() || (c.isRouted() && !c.isCongested())) ? 0 : 1;
         }
         return numCrossingSLRs;
     }
@@ -247,7 +247,7 @@ public class PartialRouter extends RWRoute {
         // if so, unpreserve that blocking net
         Set<Net> unpreserveNets = new HashSet<>();
         for (Connection connection : indirectConnections) {
-            Net net = connection.getNetWrapper().getNet();
+            Net net = connection.getNet();
             RouteNode sinkRnode = connection.getSinkRnode();
             Net unpreserveNet = routingGraph.getPreservedNet(sinkRnode);
             if (unpreserveNet != null && unpreserveNet != net) {
@@ -372,7 +372,7 @@ public class PartialRouter extends RWRoute {
                     // perform a rip up anyway in order to release any exclusive sinks
                     // ahead of finishRouteConnection()
                     assert(connection.getRnodes().isEmpty());
-                    connection.getSink().setRouted(false);
+                    connection.setRouted(false);
                     ripUp(connection);
 
                     RouteNode sinkRnode = connection.getSinkRnode();
@@ -424,7 +424,7 @@ public class PartialRouter extends RWRoute {
     protected void finishRouteConnection(Connection connection, RouteNode rnode) {
         super.finishRouteConnection(connection, rnode);
 
-        if (!connection.getSink().isRouted()) {
+        if (!connection.isRouted()) {
             connection.resetRoute();
             if (connection.getAltSinkRnodes().isEmpty()) {
                 // Undo what ripUp() would have done for this connection which has a single exclusive sink
@@ -579,7 +579,7 @@ public class PartialRouter extends RWRoute {
                 // perform a rip up anyway in order to release any exclusive sinks
                 // ahead of finishRouteConnection()
                 assert(connection.getRnodes().isEmpty());
-                connection.getSink().setRouted(false);
+                connection.setRouted(false);
                 ripUp(connection);
 
                 finishRouteConnection(connection, sinkRnode);
@@ -626,9 +626,9 @@ public class PartialRouter extends RWRoute {
         }
         if (softPreserve && (
                 // First iteration, without alternate source
-                (routeIteration == 1 && connection.getNetWrapper().getNet().getAlternateSource() == null) ||
+                (routeIteration == 1 && connection.getNet().getAlternateSource() == null) ||
                 // Second iteration, with alternate source
-                (routeIteration == 2 && connection.getNetWrapper().getNet().getAlternateSource() != null))
+                (routeIteration == 2 && connection.getNet().getAlternateSource() != null))
         ) {
              int netsUnpreserved = unpreserveNetsAndReleaseResources(connection);
              if (netsUnpreserved > 0) {

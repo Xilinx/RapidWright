@@ -23,10 +23,8 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
-import java.util.Collection;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -37,7 +35,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -80,11 +77,6 @@ public class RouteNodeGraph {
      */
     private final CountUpDownLatch asyncPreserveOutstanding;
 
-    /**
-     * Visited rnodes data during connection routing
-     */
-    private final Collection<RouteNode> targets;
-
     private long createRnodeTime;
 
     public static final short SUPER_LONG_LINE_LENGTH_IN_TILES = 60;
@@ -126,7 +118,6 @@ public class RouteNodeGraph {
         preservedMap = new ConcurrentHashMap<>();
         preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
-        targets = new ArrayList<>();
         createRnodeTime = 0;
 
         Device device = design.getDevice();
@@ -285,7 +276,6 @@ public class RouteNodeGraph {
     }
 
     public void initialize() {
-        assert(targets.isEmpty());
     }
 
     protected Net preserve(Node node, Net net) {
@@ -571,6 +561,9 @@ public class RouteNodeGraph {
         if (!Utils.isCLB(tail.getTile().getTileTypeEnum())) {
             return false;
         }
+
+        // Should not get to this point unless LUT routethru-s are enabled
+        assert(lutRoutethru);
 
         if (!RouteThruHelper.isRouteThruPIPAvailable(design, head, tail)) {
             return false;

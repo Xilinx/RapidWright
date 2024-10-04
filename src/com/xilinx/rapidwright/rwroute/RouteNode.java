@@ -212,14 +212,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         return getOccupancy() > 0;
     }
 
-    /**
-     * Checks if a RouteNode Object are illegally driven by multiple drivers.
-     * @return true, if a RouteNode Object has multiple drivers.
-     */
-    public boolean hasMultiDrivers() {
-        return RouteNode.capacity < uniqueDriverCount();
-    }
-
     public static short getLength(Node node) {
         return RouteNodeInfo.get(node, null).length;
     }
@@ -262,7 +254,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      * @return true, if coordinates of a RouteNode is within the connection's bounding box.
      */
     public boolean isInConnectionBoundingBox(Connection connection) {
-        return endTileXCoordinate > connection.getXMinBB() && endTileXCoordinate < connection.getXMaxBB() && endTileYCoordinate > connection.getYMinBB() && endTileYCoordinate < connection.getYMaxBB();
+        return endTileXCoordinate > connection.getXMinBB() && endTileXCoordinate < connection.getXMaxBB() &&
+               endTileYCoordinate > connection.getYMinBB() && endTileYCoordinate < connection.getYMaxBB();
     }
 
     /**
@@ -289,7 +282,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         isTarget = true;
         state.targets.add(this);
     }
-
 
     /*
      * Clears the target state on this node.
@@ -508,36 +500,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     }
 
     /**
-     * Gets the number of unique drivers.
-     * @return The number of unique drivers of a rnode, i.e., the key set size of the driver map
-     */
-    public int uniqueDriverCount() {
-        if (driversCounts == null) {
-            return 0;
-        }
-        return driversCounts.size();
-    }
-
-    /**
-     * Adds a driver to the driver map.
-     * @param parent The driver to be added.
-     */
-    public void incrementDriver(RouteNode parent) {
-        if (driversCounts == null) {
-            driversCounts = new IdentityHashMap<>();
-        }
-        driversCounts.merge(parent, 1, Integer::sum);
-    }
-
-    /**
-     * Decrements the driver count of a RouteNode instance.
-     * @param parent The driver that should have its count reduced by 1.
-     */
-    public void decrementDriver(RouteNode parent) {
-        driversCounts.compute(parent, (k,v) -> (v == 1) ? null : v - 1);
-    }
-
-    /**
      * Gets the number of users.
      * @return The number of users.
      */
@@ -621,11 +583,11 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
 
     /**
      * Mark a RouteNode instance as being visited by a specific integer identifier.
-     * @param id Integer identifier.
+     * @param seq Integer identifier.
      */
-    public void setVisited(int id) {
-        assert(id > 0);
-        visited = id;
+    public void setVisited(int seq) {
+        assert(seq > 0);
+        visited = seq;
     }
 
     /**
