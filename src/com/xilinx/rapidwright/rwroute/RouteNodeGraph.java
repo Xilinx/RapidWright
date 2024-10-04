@@ -105,6 +105,8 @@ public class RouteNodeGraph {
      */
     protected final boolean lutRoutethru;
 
+    protected final Map<TileTypeEnum, Integer> baseWireCounts;
+
     public RouteNodeGraph(Design design, RWRouteConfig config) {
         this(design, config, new HashMap<>());
     }
@@ -119,6 +121,7 @@ public class RouteNodeGraph {
         preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
         createRnodeTime = 0;
+        baseWireCounts = new ConcurrentHashMap<>();
 
         Device device = design.getDevice();
         intYToSLRIndex = new int[device.getRows()];
@@ -278,6 +281,20 @@ public class RouteNodeGraph {
     public void initialize() {
     }
 
+    protected int getBaseWireCount(Tile tile, int startWireIndex) {
+        return baseWireCounts.computeIfAbsent(tile.getTileTypeEnum(), (e) -> {
+            // Check all wires in tile to find the index of the last base wire
+            int lastBaseWire = startWireIndex;
+            for (int i = lastBaseWire + 1; i < tile.getWireCount(); i++) {
+                Node node = Node.getNode(tile, i);
+                if (node != null && node.getTile() == tile && node.getWireIndex() == i) {
+                    lastBaseWire = i;
+                }
+            }
+            return lastBaseWire + 1;
+        });
+    }
+
     protected Net preserve(Node node, Net net) {
         Net oldNet = preserve(node.getTile(), node.getWireIndex(), net);
         if (oldNet == null) {
@@ -289,7 +306,7 @@ public class RouteNodeGraph {
     private Net preserve(Tile tile, int wireIndex, Net net) {
         // Assumes that tile/wireIndex describes the base wire on the node
         // No need to synchronize access to 'nets' since collisions are not expected
-        Net[] nets = preservedMap.computeIfAbsent(tile, (t) -> new Net[t.getWireCount()]);
+        Net[] nets = preservedMap.computeIfAbsent(tile, (t) -> new Net[getBaseWireCount(t, wireIndex)]);
         Net oldNet = nets[wireIndex];
         // Do not clobber the old value
         if (oldNet == null) {
@@ -517,7 +534,7 @@ public class RouteNodeGraph {
     public RouteNode getOrCreate(Node node, RouteNodeType type) {
         Tile tile = node.getTile();
         int wireIndex = node.getWireIndex();
-        RouteNode[] rnodes = nodesMap.computeIfAbsent(tile, (t) -> new RouteNode[t.getWireCount()]);
+        RouteNode[] rnodes = nodesMap.computeIfAbsent(tile, (t) -> new RouteNode[getBaseWireCount(t, wireIndex)]);
         RouteNode rnode = rnodes[wireIndex];
         if (rnode == null) {
             rnode = create(node, type);
