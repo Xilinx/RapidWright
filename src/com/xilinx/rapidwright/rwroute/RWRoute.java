@@ -1392,10 +1392,15 @@ public class RWRoute {
      * @param connection The routed connection.
      */
     private void updateUsersAndPresentCongestionCost(Connection connection) {
-        for (RouteNode rnode : connection.getRnodes()) {
-            rnode.incrementUser(connection.getNetWrapper());
+        List<RouteNode> rnodes = connection.getRnodes();
+        NetWrapper netWrapper = connection.getNetWrapper();
+        for (RouteNode rnode : rnodes) {
+            rnode.incrementUser(netWrapper);
             rnode.updatePresentCongestionCost(presentCongestionFactor);
         }
+        RouteNode sinkRnode = rnodes.get(0);
+        assert(sinkRnode.countConnectionsOfUser(netWrapper) == 1 ||
+               (sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE && sinkRnode.countConnectionsOfUser(netWrapper) > 1));
     }
 
     /**

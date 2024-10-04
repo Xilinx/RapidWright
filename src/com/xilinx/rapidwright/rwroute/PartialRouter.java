@@ -607,11 +607,13 @@ public class PartialRouter extends RWRoute {
                 // Even though this connection is not expected to have any routing yet,
                 // perform a rip up anyway in order to release any exclusive sinks
                 // ahead of finishRouteConnection()
-                assert(connection.getRnodes().isEmpty());
-                connection.setRouted(false);
-                ripUp(connection);
+                // assert(connection.getRnodes().isEmpty());
+                // connection.setRouted(false);
+                // ripUp(connection);
 
                 finishRouteConnection(connection, sinkRnode);
+
+                assert(sinkRnode.countConnectionsOfUser(netWrapper) > 0 && !sinkRnode.isOverUsed());
             }
 
             netToPins.put(net, net.getSinkPins());
