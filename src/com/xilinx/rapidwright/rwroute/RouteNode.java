@@ -83,12 +83,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      * The number is used for the sharing mechanism of RWRoute.
      */
     private Map<NetWrapper, Integer> usersConnectionCounts;
-    /**
-     * A map that records all the driver rnodes of a rnode based on all routed connections.
-     * It is possible that a rnode are driven by different rnodes after routing of all connections of a net.
-     * We count the drivers of a rnode to facilitate the route fixer at the end of routing.
-     */
-    private Map<RouteNode, Integer> driversCounts;
 
     protected RouteNode(RouteNodeGraph routingGraph, Node node, RouteNodeType type) {
         super(node);
@@ -102,7 +96,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         presentCongestionCost = initialPresentCongestionCost;
         historicalCongestionCost = initialHistoricalCongestionCost;
         usersConnectionCounts = null;
-        driversCounts = null;
         visited = 0;
         assert(prev == null);
         assert(!isTarget);
