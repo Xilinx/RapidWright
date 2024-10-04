@@ -1373,14 +1373,6 @@ public class RWRoute {
     protected void ripUp(Connection connection) {
         List<RouteNode> rnodes = connection.getRnodes();
         if (rnodes.isEmpty()) {
-<<<<<<< HEAD
-            assert(!connection.isRouted());
-            if (connection.getAltSinkRnodes().isEmpty()) {
-                // If there is no alternate sink, decrement this one-and-only sink node
-                RouteNode sinkRnode = connection.getSinkRnode();
-                rnodes = Collections.singletonList(sinkRnode);
-            }
-=======
             assert(!connection.getSink().isRouted());
             return;
         }
@@ -1393,7 +1385,6 @@ public class RWRoute {
         } else {
             // Sink is not exclusive
             assert(connection.getAltSinkRnodes().contains(sinkRnode));
->>>>>>> 1d0497a... [RWRoute] ripUp() to not release exclusive sink nodes
         }
 
         for (RouteNode rnode : rnodes) {
