@@ -390,13 +390,6 @@ public class PartialRouter extends RWRoute {
                         continue;
                     }
 
-                    // Even though this connection is not expected to have any routing yet,
-                    // perform a rip up anyway in order to release any exclusive sinks
-                    // ahead of finishRouteConnection()
-                    // assert(connection.getRnodes().isEmpty());
-                    // connection.setRouted(false);
-                    // ripUp(connection);
-
                     RouteNode sinkRnode = connection.getSinkRnode();
                     finishRouteConnection(connection, sinkRnode);
                 }
@@ -591,13 +584,6 @@ public class PartialRouter extends RWRoute {
                 RouteNode sinkRnode = connection.getSinkRnode();
                 assert(sourceRnode.getType() == RouteNodeType.PINFEED_O);
                 assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
-
-                // Even though this connection is not expected to have any routing yet,
-                // perform a rip up anyway in order to release any exclusive sinks
-                // ahead of finishRouteConnection()
-                // assert(connection.getRnodes().isEmpty());
-                // connection.setRouted(false);
-                // ripUp(connection);
 
                 finishRouteConnection(connection, sinkRnode);
             }
