@@ -498,7 +498,7 @@ public class PartialRouter extends RWRoute {
         return unpreserveNets.size();
     }
 
-    protected void unpreserveNet(Net net) {
+    protected NetWrapper unpreserveNet(Net net) {
         assert(!net.getName().equals(Net.Z_NET));
 
         Set<RouteNode> rnodes = new HashSet<>();
@@ -616,6 +616,7 @@ public class PartialRouter extends RWRoute {
 
         numPreservedWire--;
         numPreservedRoutableNets--;
+        return netWrapper;
     }
 
     @Override

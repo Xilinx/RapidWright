@@ -137,9 +137,10 @@ public class PartialCUFR extends PartialRouter {
     }
 
     @Override
-    protected void unpreserveNet(Net net) {
-        super.unpreserveNet(net);
+    protected NetWrapper unpreserveNet(Net net) {
+        NetWrapper netWrapper = super.unpreserveNet(net);
         needsRepartitioning = true;
+        return netWrapper;
     }
 
     @Override
