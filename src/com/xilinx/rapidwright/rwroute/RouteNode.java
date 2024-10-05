@@ -50,7 +50,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     public static final int initialHistoricalCongestionCost = 1;
 
     /** The type of a rnode*/
-    private RouteNodeType type;
+    private byte type;
     /** The tileXCoordinate and tileYCoordinate of the INT tile that the associated node stops at */
     private final short endTileXCoordinate;
     private final short endTileYCoordinate;
@@ -63,8 +63,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     /** The children (downhill rnodes) of this rnode */
     protected RouteNode[] children;
 
-    /** Present congestion cost */
-    private float presentCongestionCost;
     /** Historical congestion cost */
     private float historicalCongestionCost;
     /** Upstream path cost */
@@ -87,13 +85,12 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     protected RouteNode(RouteNodeGraph routingGraph, Node node, RouteNodeType type) {
         super(node);
         RouteNodeInfo nodeInfo = RouteNodeInfo.get(this, routingGraph.lagunaI);
-        this.type = (type == null) ? nodeInfo.type : type;
+        this.type = (byte) ((type == null) ? nodeInfo.type : type).ordinal();
         endTileXCoordinate = nodeInfo.endTileXCoordinate;
         endTileYCoordinate = nodeInfo.endTileYCoordinate;
         length = nodeInfo.length;
         children = null;
         setBaseCost();
-        presentCongestionCost = initialPresentCongestionCost;
         historicalCongestionCost = initialHistoricalCongestionCost;
         usersConnectionCounts = null;
         visited = 0;
@@ -110,7 +107,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
 
     private void setBaseCost() {
         baseCost = 0.4f;
-        switch (type) {
+        switch (getType()) {
             case LAGUNA_I:
                 // Make all approaches to SLLs zero-cost to encourage exploration
                 // Assigning a base cost of zero would normally break congestion resolution
@@ -180,7 +177,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 baseCost = 1f;
                 break;
             default:
-                throw new RuntimeException(type.toString());
+                throw new RuntimeException(getType().toString());
         }
     }
 
@@ -209,21 +206,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         return RouteNodeInfo.get(node, null).length;
     }
 
-    /**
-     * Updates the present congestion cost based on the present congestion penalty factor.
-     * @param pres_fac The present congestion penalty factor.
-     */
-    public void updatePresentCongestionCost(float pres_fac) {
-        int occ = getOccupancy();
-        int cap = RouteNode.capacity;
-
-        if (occ < cap) {
-            setPresentCongestionCost(1);
-        } else {
-            setPresentCongestionCost(1 + (occ - cap + 1) * pres_fac);
-        }
-    }
-
     @Override
     public String toString() {
         StringBuilder s = new StringBuilder();
@@ -231,7 +213,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         s.append(", ");
         s.append("(" + endTileXCoordinate + "," + getEndTileYCoordinate() + ")");
         s.append(", ");
-        s.append(String.format("type = %s", type));
+        s.append(String.format("type = %s", getType()));
         s.append(", ");
         s.append(String.format("ic = %s", getIntentCode()));
         s.append(", ");
@@ -289,7 +271,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      * @return The RouteNodeType of a RouteNode Object.
      */
     public RouteNodeType getType() {
-        return type;
+        return RouteNodeType.values[type];
     }
 
     /**
@@ -297,13 +279,13 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      * @param type New RouteNodeType value.
      */
     public void setType(RouteNodeType type) {
-        assert(this.type == type ||
+        assert(this.type == type.ordinal() ||
                 // Support demotion from PINFEED_I to PINBOUNCE since they have the same base cost
-                (this.type == RouteNodeType.PINFEED_I && type == RouteNodeType.PINBOUNCE) ||
+                (this.type == RouteNodeType.PINFEED_I.ordinal() && type == RouteNodeType.PINBOUNCE) ||
                 // Or promotion from PINBOUNCE to PINFEED_I (by PartialRouter when PINBOUNCE on
                 // preserved net needs to become a PINFEED_I)
-                (this.type == RouteNodeType.PINBOUNCE && type == RouteNodeType.PINFEED_I));
-        this.type = type;
+                (this.type == RouteNodeType.PINBOUNCE.ordinal() && type == RouteNodeType.PINFEED_I));
+        this.type = (byte) type.ordinal();
     }
 
     /**
@@ -521,16 +503,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      * Gets the present congestion cost of a RouteNode Object.
      * @return The present congestion of a RouteNode Object.
      */
-    public float getPresentCongestionCost() {
-        return presentCongestionCost;
-    }
-
-    /**
-     * Sets the present congestion cost of a RouteNode Object.
-     * @param presentCongestionCost The present congestion cost to be set.
-     */
-    public void setPresentCongestionCost(float presentCongestionCost) {
-        this.presentCongestionCost = presentCongestionCost;
+    public float getPresentCongestionCost(RouteNodeGraph routingGraph) {
+        return routingGraph.getPresentCongestionCost(getOccupancy());
     }
 
     /**

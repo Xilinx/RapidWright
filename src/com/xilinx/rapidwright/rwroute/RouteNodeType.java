@@ -25,6 +25,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 
@@ -61,6 +62,7 @@ public enum RouteNodeType {
      * Denotes other wiring {@link RouteNode} Objects
      * that are created for routing {@link Connection} Objects.
      */
-    WIRE
+    WIRE;
 
+    public static final RouteNodeType[] values = values();
 }

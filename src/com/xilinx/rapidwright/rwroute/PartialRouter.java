@@ -69,12 +69,8 @@ public class PartialRouter extends RWRoute {
 
     protected static class RouteNodeGraphPartial extends RouteNodeGraph {
 
-        public RouteNodeGraphPartial(Design design, RWRouteConfig config, Map<Tile, RouteNode[]> nodesMap) {
-            super(design, config, nodesMap);
-        }
-
         public RouteNodeGraphPartial(Design design, RWRouteConfig config) {
-            this(design, config, new HashMap<>());
+            super(design, config);
         }
 
         @Override
@@ -90,15 +86,8 @@ public class PartialRouter extends RWRoute {
     protected static class RouteNodeGraphPartialTimingDriven extends RouteNodeGraphTimingDriven {
         public RouteNodeGraphPartialTimingDriven(Design design,
                                                  RWRouteConfig config,
-                                                 DelayEstimatorBase delayEstimator,
-                                                 Map<Tile, RouteNode[]> nodesMap) {
-            super(design, config, delayEstimator, nodesMap);
-        }
-
-        public RouteNodeGraphPartialTimingDriven(Design design,
-                                                 RWRouteConfig config,
                                                  DelayEstimatorBase delayEstimator) {
-            this(design, config, delayEstimator, new HashMap<>());
+            super(design, config, delayEstimator);
         }
 
         @Override

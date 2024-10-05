@@ -646,7 +646,6 @@ public class RWRoute {
                     // Since this connection only has a single sink target, increment
                     // its usage here immediately
                     sinkRnode.incrementUser(netWrapper);
-                    sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
                 }
 
                 connection.setDirect(false);
@@ -833,6 +832,7 @@ public class RWRoute {
             if (config.isTimingDriven()) {
                 setRerouteCriticality();
             }
+            routingGraph.updatePresentCongestionCosts(presentCongestionFactor);
             routeIndirectConnections(sortedIndirectConnections);
             rnodesTimer.setTime(routingGraph.getCreateRnodeTime());
 
@@ -1224,16 +1224,10 @@ public class RWRoute {
     private void updateCost() {
         overUsedRnodes.clear();
         for (RouteNode rnode : routingGraph.getRnodes()) {
-            int overuse=rnode.getOccupancy() - RouteNode.capacity;
-            if (overuse == 0) {
-                rnode.setPresentCongestionCost(1 + presentCongestionFactor);
-            } else if (overuse > 0) {
+            int overuse = rnode.getOccupancy() - RouteNode.capacity;
+            if (overuse > 0) {
                 overUsedRnodes.add(rnode);
-                rnode.setPresentCongestionCost(1 + (overuse + 1) * presentCongestionFactor);
                 rnode.setHistoricalCongestionCost(rnode.getHistoricalCongestionCost() + overuse * historicalCongestionFactor);
-            } else {
-                assert(overuse < 0);
-                assert(rnode.getPresentCongestionCost() == 1);
             }
         }
     }
@@ -1388,7 +1382,6 @@ public class RWRoute {
 
         for (RouteNode rnode : rnodes) {
             rnode.decrementUser(connection.getNetWrapper());
-            rnode.updatePresentCongestionCost(presentCongestionFactor);
         }
     }
 
@@ -1417,7 +1410,6 @@ public class RWRoute {
 
         for (RouteNode rnode : rnodes) {
             rnode.incrementUser(netWrapper);
-            rnode.updatePresentCongestionCost(presentCongestionFactor);
         }
         assert(sinkRnode.countConnectionsOfUser(netWrapper) == 1 ||
                (sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE && sinkRnode.countConnectionsOfUser(netWrapper) > 1));
@@ -1904,26 +1896,27 @@ public class RWRoute {
      * @return The sum of the congestion cost and the bias cost of rnode.
      */
     private float getNodeCost(RouteNode rnode, Connection connection, int countSameSourceUsers, float sharingFactor) {
-        boolean hasSameSourceUsers = (countSameSourceUsers!= 0);
+        boolean hasSameSourceUsers = (countSameSourceUsers != 0);
         float presentCongestionCost;
 
         if (hasSameSourceUsers) {// the rnode is used by other connection(s) from the same net
-            int overoccupancy = rnode.getOccupancy() - RouteNode.capacity;
+            int occupancyWithoutThisNet = rnode.getOccupancy() - 1;
             // make the congestion cost less for the current connection
-            presentCongestionCost = 1 + overoccupancy * presentCongestionFactor;
+            presentCongestionCost = routingGraph.getPresentCongestionCost(occupancyWithoutThisNet);
         } else {
-            presentCongestionCost = rnode.getPresentCongestionCost();
+            presentCongestionCost = rnode.getPresentCongestionCost(routingGraph);
         }
 
+        float baseCost = rnode.getBaseCost();
         float biasCost = 0;
         if (!rnode.isTarget() && rnode.getType() != RouteNodeType.SUPER_LONG_LINE) {
             NetWrapper net = connection.getNetWrapper();
             float distToCenter = Math.abs(rnode.getEndTileXCoordinate() - net.getXCenter()) +
                     Math.abs(rnode.getEndTileYCoordinate() - net.getYCenter());
-            biasCost = rnode.getBaseCost() / net.getConnections().size() * distToCenter / net.getDoubleHpwl();
+            biasCost = baseCost / net.getConnections().size() * distToCenter / net.getDoubleHpwl();
         }
 
-        return rnode.getBaseCost() * rnode.getHistoricalCongestionCost() * presentCongestionCost / sharingFactor + biasCost;
+        return baseCost * rnode.getHistoricalCongestionCost() * presentCongestionCost / sharingFactor + biasCost;
     }
 
     /**
