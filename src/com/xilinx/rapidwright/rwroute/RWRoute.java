@@ -1378,9 +1378,8 @@ public class RWRoute {
         }
 
         RouteNode sinkRnode = rnodes.get(0);
-        if (sinkRnode == connection.getSinkRnode()) {
+        if (sinkRnode == connection.getSinkRnode() && connection.getAltSinkRnodes().isEmpty()) {
             // Sink is exclusive -- do not rip up
-            assert(connection.getAltSinkRnodes().isEmpty());
             rnodes = rnodes.subList(1, rnodes.size() - 1);
         } else {
             // Sink is not exclusive
