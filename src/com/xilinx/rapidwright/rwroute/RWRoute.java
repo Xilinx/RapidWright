@@ -642,7 +642,7 @@ public class RWRoute {
                     connection.addAltSinkRnode(altSinkRnode);
                 }
 
-                if (connection.hasAltSinks()) {
+                if (!connection.hasAltSinks()) {
                     // Since this connection only has a single sink target, increment
                     // its usage here immediately
                     sinkRnode.incrementUser(netWrapper);
@@ -1372,9 +1372,11 @@ public class RWRoute {
         }
 
         RouteNode sinkRnode = rnodes.get(0);
-        if (sinkRnode == connection.getSinkRnode() && !connection.hasAltSinks()) {
-            // Sink is exclusive -- do not rip up
-            rnodes = rnodes.subList(1, rnodes.size() - 1);
+        if (sinkRnode == connection.getSinkRnode()) {
+            if (!connection.hasAltSinks()) {
+                // Sink is exclusive -- do not rip up
+                rnodes = rnodes.subList(1, rnodes.size() - 1);
+            }
         } else {
             // Sink is not exclusive
             assert(connection.getAltSinkRnodes().contains(sinkRnode));
@@ -1400,9 +1402,10 @@ public class RWRoute {
 
         RouteNode sinkRnode = rnodes.get(0);
         if (sinkRnode == connection.getSinkRnode()) {
-            // Sink is exclusive -- do not rip up
-            assert(!connection.hasAltSinks());
-            rnodes = rnodes.subList(1, rnodes.size() - 1);
+            if (!connection.hasAltSinks()) {
+                // Sink is exclusive -- do not increment
+                rnodes = rnodes.subList(1, rnodes.size() - 1);
+            }
         } else {
             // Sink is not exclusive
             assert(connection.getAltSinkRnodes().contains(sinkRnode));
@@ -1737,8 +1740,8 @@ public class RWRoute {
                         }
                         break;
                     case PINBOUNCE:
-                        // A PINBOUNCE can only be a target if this connection has an alternate sink
-                        assert(!childRNode.isTarget() || !connection.hasAltSinks());
+                        // A PINBOUNCE can only be a target if this connection has alternate sink(s)
+                        assert(!childRNode.isTarget() || connection.hasAltSinks());
                         if (!isAccessiblePinbounce(childRNode, connection)) {
                             continue;
                         }
