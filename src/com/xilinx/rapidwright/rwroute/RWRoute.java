@@ -642,7 +642,7 @@ public class RWRoute {
                     connection.addAltSinkRnode(altSinkRnode);
                 }
 
-                if (connection.getAltSinkRnodes().isEmpty()) {
+                if (connection.hasAltSinks()) {
                     // Since this connection only has a single sink target, increment
                     // its usage here immediately
                     sinkRnode.incrementUser(netWrapper);
@@ -1048,7 +1048,7 @@ public class RWRoute {
             }
         }
 
-        if (connection.getAltSinkRnodes().isEmpty()) {
+        if (!connection.hasAltSinks()) {
             // Check that this connection's exclusive sink node is used but never overused
             RouteNode sinkRnode = connection.getSinkRnode();
             assert(sinkRnode.countConnectionsOfUser(connection.getNetWrapper()) > 0);
@@ -1125,7 +1125,7 @@ public class RWRoute {
                 }
             } else {
                 // Routing must go to an alternate sink
-                assert(!connection.getAltSinkRnodes().isEmpty());
+                assert(connection.hasAltSinks());
 
                 // Assume that it doesn't need unprojecting back to the sink pin
                 // since the sink node is a site pin
@@ -1372,7 +1372,7 @@ public class RWRoute {
         }
 
         RouteNode sinkRnode = rnodes.get(0);
-        if (sinkRnode == connection.getSinkRnode() && connection.getAltSinkRnodes().isEmpty()) {
+        if (sinkRnode == connection.getSinkRnode() && !connection.hasAltSinks()) {
             // Sink is exclusive -- do not rip up
             rnodes = rnodes.subList(1, rnodes.size() - 1);
         } else {
@@ -1401,7 +1401,7 @@ public class RWRoute {
         RouteNode sinkRnode = rnodes.get(0);
         if (sinkRnode == connection.getSinkRnode()) {
             // Sink is exclusive -- do not rip up
-            assert(connection.getAltSinkRnodes().isEmpty());
+            assert(!connection.hasAltSinks());
             rnodes = rnodes.subList(1, rnodes.size() - 1);
         } else {
             // Sink is not exclusive
@@ -1704,8 +1704,8 @@ public class RWRoute {
             }
 
             if (childRNode.isTarget()) {
-                boolean earlyTermination = false;
-                if (childRNode == connection.getSinkRnode() && connection.getAltSinkRnodes().isEmpty()) {
+                boolean earlyTermination;
+                if (childRNode == connection.getSinkRnode() && !connection.hasAltSinks()) {
                     // This sink must be exclusively reserved for this connection already
                     assert(childRNode.getOccupancy() == 1 ||
                            childRNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
@@ -1738,7 +1738,7 @@ public class RWRoute {
                         break;
                     case PINBOUNCE:
                         // A PINBOUNCE can only be a target if this connection has an alternate sink
-                        assert(!childRNode.isTarget() || connection.getAltSinkRnodes().isEmpty());
+                        assert(!childRNode.isTarget() || !connection.hasAltSinks());
                         if (!isAccessiblePinbounce(childRNode, connection)) {
                             continue;
                         }

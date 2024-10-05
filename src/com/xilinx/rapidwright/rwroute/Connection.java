@@ -282,6 +282,10 @@ public class Connection implements Comparable<Connection>{
         return altSinkRnodes == null ? Collections.emptyList() : altSinkRnodes;
     }
 
+    public boolean hasAltSinks() {
+        return altSinkRnodes != null && !altSinkRnodes.isEmpty();
+    }
+
     public void addAltSinkRnode(RouteNode sinkRnode) {
         if (altSinkRnodes == null) {
             altSinkRnodes = new ArrayList<>(1);
