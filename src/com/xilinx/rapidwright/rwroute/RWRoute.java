@@ -1382,9 +1382,13 @@ public class RWRoute {
             assert(connection.getAltSinkRnodes().contains(sinkRnode));
         }
 
+        NetWrapper netWrapper = connection.getNetWrapper();
         for (RouteNode rnode : rnodes) {
-            rnode.decrementUser(connection.getNetWrapper());
+            rnode.decrementUser(netWrapper);
         }
+
+        assert(sinkRnode.countConnectionsOfUser(netWrapper) > 0 ||
+               (sinkRnode.countConnectionsOfUser(netWrapper) == 0 && connection.hasAltSinks()));
     }
 
     /**
@@ -1398,8 +1402,6 @@ public class RWRoute {
             return;
         }
 
-        NetWrapper netWrapper = connection.getNetWrapper();
-
         RouteNode sinkRnode = rnodes.get(0);
         if (sinkRnode == connection.getSinkRnode()) {
             if (!connection.hasAltSinks()) {
@@ -1411,11 +1413,18 @@ public class RWRoute {
             assert(connection.getAltSinkRnodes().contains(sinkRnode));
         }
 
+        NetWrapper netWrapper = connection.getNetWrapper();
         for (RouteNode rnode : rnodes) {
             rnode.incrementUser(netWrapper);
         }
         assert(sinkRnode.countConnectionsOfUser(netWrapper) == 1 ||
-               (sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE && sinkRnode.countConnectionsOfUser(netWrapper) > 1));
+               (sinkRnode.countConnectionsOfUser(netWrapper) > 1 &&
+                       // An alternate sink (e.g. LUT routethru to FF) that serves more than one FF
+                       (sinkRnode != connection.getSinkRnode() ||
+                        // A bounce node that is this sink and also used to serve a different sink
+                        sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE)
+               )
+        );
     }
 
     /**
