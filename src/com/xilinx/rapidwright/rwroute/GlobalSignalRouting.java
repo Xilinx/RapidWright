@@ -342,7 +342,6 @@ public class GlobalSignalRouting {
                                       Function<Node,NodeStatus> getNodeState,
                                       Design design, RouteThruHelper routeThruHelper) {
         NetType netType = currNet.getType();
-        List<PIP> pips = currNet.getPIPs();
         Queue<Node> q = new ArrayDeque<>();
         Set<Node> usedRoutingNodes = new HashSet<>();
         Map<Node, Node> prevNode = new HashMap<>();
@@ -554,7 +553,9 @@ public class GlobalSignalRouting {
 
                     // Note that the static net router goes backward from sinks to sources,
                     // requiring the srcToSinkOrder parameter to be set to true below
-                    pips.addAll(RouterHelper.getPIPsFromNodes(pathNodes, true));
+                    for (PIP pip : RouterHelper.getPIPsFromNodes(pathNodes, true)) {
+                        currNet.addPIP(pip);
+                    }
 
                     pathNodes.clear();
                     sink.setRouted(true);
