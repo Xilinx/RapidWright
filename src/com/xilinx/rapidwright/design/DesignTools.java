@@ -3412,7 +3412,6 @@ public class DesignTools {
             Net gndNet = design.getGndNet();
             gndNet.getPins().removeIf(spi -> spi.getNet() != gndNet);
         } else if (series == Series.UltraScale || series == Series.UltraScalePlus) {
-            Net gndInvertibleToVcc = design.getGndNet();
             for (Cell cell : design.getCells()) {
                 if (isUnisimFlipFlopType(cell.getType())) {
                     SiteInst si = cell.getSiteInst();
@@ -3424,14 +3423,14 @@ public class DesignTools {
                     for (String belPinName : belPinNames) {
                         BELPin belPin = cell.getBEL().getPin(belPinName);
                         Net net = si.getNetFromSiteWire(belPin.getSiteWireName());
-                        if (net == null || (net == gndInvertibleToVcc && belPinName == SR)) {
+                        if (net == null || (belPinName == SR && net.isGNDNet())) {
                             String sitePinName;
                             if (belPinName == CE) {
                                 sitePinName = sitePinNames.getFirst();
                             } else {
                                 sitePinName = sitePinNames.getSecond();
                             }
-                            maybeCreateVccPinAndPossibleInversion(si, sitePinName, vccNet, gndInvertibleToVcc);
+                            maybeCreateVccPin(si, sitePinName, vccNet);
                         }
                     }
                 } else if (cell.getType().equals("RAMB36E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
@@ -3441,7 +3440,7 @@ public class DesignTools {
                     Net net = si.getNetFromSiteWire(siteWire);
                     if (net == null) {
                         for (String pinName : Arrays.asList("RSTREGBU", "RSTREGBL")) {
-                            maybeCreateVccPinAndPossibleInversion(si, pinName, vccNet, gndInvertibleToVcc);
+                            maybeCreateVccPin(si, pinName, vccNet);
                         }
                     }
                 } else if (cell.getType().equals("RAMB18E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
@@ -3463,7 +3462,7 @@ public class DesignTools {
                         } else {
                             pinName = "RSTREGBU";
                         }
-                        maybeCreateVccPinAndPossibleInversion(si, pinName, vccNet, gndInvertibleToVcc);
+                        maybeCreateVccPin(si, pinName, vccNet);
                     }
                 }
             }
@@ -3472,17 +3471,16 @@ public class DesignTools {
         }
     }
     
-    private static void maybeCreateVccPinAndPossibleInversion(SiteInst si, String sitePinName, Net vcc, Net gndInvertibleToVcc) {
+    private static void maybeCreateVccPin(SiteInst si, String sitePinName, Net vcc) {
         SitePinInst sitePin = si.getSitePinInst(sitePinName);
-        if (sitePin == null) {
-            sitePin = vcc.createPin(sitePinName, si);
+        if (sitePin != null) {
+            return;
         }
-        if (gndInvertibleToVcc != null) {
-            // For the RST inversion to be interpreted properly by Vivado, there must be no
-            // site routing on the path around the inverter BEL
-            BELPin belPin = sitePin.getBELPin();
-            si.unrouteIntraSiteNet(belPin, belPin);
-        }
+        sitePin = new SitePinInst(false, sitePinName, si);
+        // For the RST inversion to be interpreted properly by Vivado, there must be no
+        // site routing on the path around the inverter BEL
+        boolean updateSiteRouting = false;
+        vcc.addPin(sitePin, updateSiteRouting);
     }
 
     //NOTE: SRL16E (reference name SRL16E, EDIFCell in RW) uses A2-A5, so we need to connect A1 & A6 to VCC,
