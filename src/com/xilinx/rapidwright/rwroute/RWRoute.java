@@ -1771,8 +1771,6 @@ public class RWRoute {
                         assert(connection.isCrossSLR() &&
                                 connection.getSinkRnode().getSLRIndex(routingGraph) != rnode.getSLRIndex(routingGraph));
                         break;
-                    case INACCESSIBLE:
-                        continue;
                     default:
                         throw new RuntimeException("Unexpected rnode type: " + childRNode.getType());
                 }

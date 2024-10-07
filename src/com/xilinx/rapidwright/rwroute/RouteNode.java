@@ -390,7 +390,9 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 }
 
                 RouteNode child = routingGraph.getOrCreate(downhill);
-                childrenList.add(child);//the sink rnode of a target connection has been created up-front
+                if (child.getType() != RouteNodeType.INACCESSIBLE) {
+                    childrenList.add(child);
+                }
             }
             if (!childrenList.isEmpty()) {
                 children = childrenList.toArray(EMPTY_ARRAY);
