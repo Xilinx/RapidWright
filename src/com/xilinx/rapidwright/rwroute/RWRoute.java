@@ -235,7 +235,6 @@ public class RWRoute {
         if (config.isTimingDriven()) {
             nodesDelays = new HashMap<>();
         }
-        rnodesCreatedThisIteration = 0;
         routethruHelper = new RouteThruHelper(design.getDevice());
         presentCongestionFactor = config.getInitialPresentCongestionFactor();
         lutPinSwapping = config.isLutPinSwapping();
@@ -822,7 +821,7 @@ public class RWRoute {
     public void routeIndirectConnectionsIteratively() {
         sortConnections();
         initializeRouting();
-        long lastIterationRnodeCount = 0;
+        long lastIterationRnodeCount = routingGraph.numNodes();
         long lastIterationRnodeTime = 0;
 
         boolean initialHus = this.hus;
@@ -1596,7 +1595,7 @@ public class RWRoute {
             return;
         }
 
-        System.out.println("                 " + "Abandoning");
+        System.out.println("INFO: Abandoning\n");
 
         // Since bounding box is never enlarged there is no hope of routing this connection so abandon it
         indirectConnections.remove(connection);
