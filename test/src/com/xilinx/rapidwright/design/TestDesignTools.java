@@ -1063,6 +1063,38 @@ public class TestDesignTools {
         DesignTools.createCeSrRstPinsToVCC(design);
     }
 
+    @ParameterizedTest
+    @CsvSource({
+            // US+
+            Device.AWS_F1+",RAMB36_X0Y0/RAMB36E2,RAMB36E2,RSTREGBU,",
+            Device.AWS_F1+",RAMB36_X0Y0/RAMB36E2,RAMB36E2,RSTREGBL,",
+            Device.AWS_F1+",RAMB18_X0Y1/RAMB18E2_U,RAMB18E2,RSTREGBU,RSTREGBL",
+            Device.AWS_F1+",RAMB18_X0Y0/RAMB18E2_L,RAMB18E2,RSTREGBL,RSTREGBU",
+            // US
+            Device.KCU105+",RAMB36_X0Y0/RAMB36E2,RAMB36E2,RSTREGBU_X,",
+            Device.KCU105+",RAMB36_X0Y0/RAMB36E2,RAMB36E2,RSTREGBL_X,",
+            Device.KCU105+",RAMB18_X0Y1/RAMB18E2_U,RAMB18E2,RSTREGBU_X,RSTREGBL_X",
+            Device.KCU105+",RAMB18_X0Y0/RAMB18E2_L,RAMB18E2,RSTREGBL_X,RSTREGBU_X",
+    })
+    public void testCreateCeSrRstPinsToVccRAMB(String deviceName, String location, String unisimName, String sitePinNameVcc, String sitePinNameNotPresent) {
+        Design design = new Design("test", deviceName);
+        Cell c = design.createAndPlaceCell("ram", Unisim.valueOf(unisimName), location);
+
+        DesignTools.createCeSrRstPinsToVCC(design);
+
+        SiteInst si = c.getSiteInst();
+        SitePinInst spi = si.getSitePinInst(sitePinNameVcc);
+        Assertions.assertNotNull(spi);
+        Net vcc = design.getVccNet();
+        Assertions.assertEquals(vcc, spi.getNet());
+        Assertions.assertNotNull(spi.getConnectedNode());
+
+        if (sitePinNameNotPresent != null) {
+            spi = si.getSitePinInst(sitePinNameNotPresent);
+            Assertions.assertNull(spi);
+        }
+    }
+
     @Test
     public void testMakePhysNetNamesConsistentLogicalVccGnd() {
         Design design = RapidWrightDCP.loadDCP("bug701.dcp");
