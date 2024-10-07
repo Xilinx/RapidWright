@@ -3412,6 +3412,14 @@ public class DesignTools {
             Net gndNet = design.getGndNet();
             gndNet.getPins().removeIf(spi -> spi.getNet() != gndNet);
         } else if (series == Series.UltraScale || series == Series.UltraScalePlus) {
+            String[] rambRstRegSitePinNames;
+            if (series == Series.UltraScalePlus) {
+                rambRstRegSitePinNames = new String[]{"RSTREGBU", "RSTREGBL"};
+            } else if (series == Series.UltraScale) {
+                rambRstRegSitePinNames = new String[]{"RSTREGBU_X", "RSTREGBL_X"};
+            } else {
+                throw new RuntimeException(series.toString());
+            }
             for (Cell cell : design.getCells()) {
                 if (isUnisimFlipFlopType(cell.getType())) {
                     SiteInst si = cell.getSiteInst();
@@ -3434,33 +3442,25 @@ public class DesignTools {
                         }
                     }
                 } else if (cell.getType().equals("RAMB36E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
-                    //cell.getEDIFCellInst().getProperty("DOB_REG")): integer(0)
                     SiteInst si = cell.getSiteInst();
                     String siteWire = cell.getSiteWireNameFromLogicalPin("RSTREGB");
                     Net net = si.getNetFromSiteWire(siteWire);
                     if (net == null) {
-                        for (String pinName : Arrays.asList("RSTREGBU", "RSTREGBL")) {
+                        for (String pinName : rambRstRegSitePinNames) {
                             maybeCreateVccPin(si, pinName, vccNet);
                         }
                     }
                 } else if (cell.getType().equals("RAMB18E2") && cell.getAllPhysicalPinMappings("RSTREGB") == null) {
                     SiteInst si = cell.getSiteInst();
-                    // type RAMB180: L_O, type RAMB181: U_O
-                    // TODO Type should be consistent with getPrimarySiteTypeEnum()?
-                    // System.out.println(cell.getAllPhysicalPinMappings("RSTREGB") + ", " + si + ", " + cell.getSiteWireNameFromLogicalPin("RSTREGB") + ", " + si.getPrimarySiteTypeEnum());
-                    // [RSTREGB], SiteInst(name="RAMB18_X5Y64", type="RAMB180", site="RAMB18_X5Y64"), OPTINV_RSTREGB_L_O, RAMBFIFO18
-                    // [RSTREGB], SiteInst(name="RAMB18_X5Y31", type="RAMB181", site="RAMB18_X5Y31"), OPTINV_RSTREGB_U_O, RAMB181
-                    // null, SiteInst(name="RAMB18_X6Y43", type="RAMB181", site="RAMB18_X6Y43"), null, RAMB181
-                    // null, SiteInst(name="RAMB18_X5Y22", type="RAMB180", site="RAMB18_X5Y22"), null, RAMBFIFO18
-                    // The following workaround solves the RAMB18 RSTREGB pin issue
                     String siteWire = cell.getBEL().getPin("RSTREGB").getSiteWireName();
                     Net net = si.getNetFromSiteWire(siteWire);
                     if (net == null) {
                         String pinName;
-                        if (siteWire.endsWith("L_O")) {
-                            pinName = "RSTREGBL";
+                        if (siteWire.endsWith("U_O")) {
+                            pinName = rambRstRegSitePinNames[0];
                         } else {
-                            pinName = "RSTREGBU";
+                            assert(siteWire.endsWith("L_O"));
+                            pinName = rambRstRegSitePinNames[1];
                         }
                         maybeCreateVccPin(si, pinName, vccNet);
                     }
