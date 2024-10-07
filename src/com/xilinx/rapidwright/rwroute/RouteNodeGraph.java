@@ -61,8 +61,8 @@ public class RouteNodeGraph {
 
     /**
      * A map of nodes to created rnodes. Assume that only a single
-     * thread will operate on each tile at one time (so no need
-     * for AtomicReferenceArray)
+     * thread will operate on each tile (first dimension) simultaneously
+     * (so no need for AtomicReferenceArray)
      */
     protected final RouteNode[][] nodesMap;
     private final AtomicInteger nodesMapSize;

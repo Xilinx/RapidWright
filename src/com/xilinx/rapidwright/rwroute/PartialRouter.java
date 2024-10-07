@@ -263,7 +263,7 @@ public class PartialRouter extends RWRoute {
                         }
 
                         // If an overused exclusive sink is found -- it must also be used
-                        // by the net to which this sink belongs to, so rip up this connection's
+                        // by the net to which that sink belongs to, so rip up this connection's
                         // routing
                         ripUp(connection);
                         connection.resetRoute();
