@@ -3483,8 +3483,6 @@ public class DesignTools {
         vcc.addPin(sitePin, updateSiteRouting);
     }
 
-    //NOTE: SRL16E (reference name SRL16E, EDIFCell in RW) uses A2-A5, so we need to connect A1 & A6 to VCC,
-    //however, when SitePinInsts (e.g. A3) are already in GND, adding those again will cause problems to A1
     static HashSet<String> unisimFlipFlopTypes;
     static {
         unisimFlipFlopTypes = new HashSet<>();
@@ -3492,6 +3490,8 @@ public class DesignTools {
         unisimFlipFlopTypes.add("FDPE");//PRE CE
         unisimFlipFlopTypes.add("FDRE");//R and CE
         unisimFlipFlopTypes.add("FDCE");//CLR CE
+        unisimFlipFlopTypes.add("LDCE");
+        unisimFlipFlopTypes.add("LPCE");
     }
 
     private static boolean isUnisimFlipFlopType(String cellType) {
