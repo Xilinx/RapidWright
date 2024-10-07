@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * This file is part of RapidWright.
@@ -109,7 +109,7 @@ public class TimingManager {
      * @param illegalNets {@link NetWrapper} instances in question.
      * @param nodesDelays Stored nodes and their delay values.
      */
-    public void updateIllegalNetsDelays(Set<NetWrapper> illegalNets, Map<Node, Float> nodesDelays) {
+    public void updateIllegalNetsDelays(List<NetWrapper> illegalNets, Map<Node, Float> nodesDelays) {
          for (NetWrapper netWrapper:illegalNets) {
              for (Connection connection:netWrapper.getConnections()) {
                  float netDelay = 0;

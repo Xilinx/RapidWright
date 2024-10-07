@@ -28,7 +28,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +41,6 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
@@ -69,12 +67,8 @@ public class PartialRouter extends RWRoute {
 
     protected static class RouteNodeGraphPartial extends RouteNodeGraph {
 
-        public RouteNodeGraphPartial(Design design, RWRouteConfig config, Map<Tile, RouteNode[]> nodesMap) {
-            super(design, config, nodesMap);
-        }
-
         public RouteNodeGraphPartial(Design design, RWRouteConfig config) {
-            this(design, config, new HashMap<>());
+            super(design, config);
         }
 
         @Override
@@ -90,15 +84,8 @@ public class PartialRouter extends RWRoute {
     protected static class RouteNodeGraphPartialTimingDriven extends RouteNodeGraphTimingDriven {
         public RouteNodeGraphPartialTimingDriven(Design design,
                                                  RWRouteConfig config,
-                                                 DelayEstimatorBase delayEstimator,
-                                                 Map<Tile, RouteNode[]> nodesMap) {
-            super(design, config, delayEstimator, nodesMap);
-        }
-
-        public RouteNodeGraphPartialTimingDriven(Design design,
-                                                 RWRouteConfig config,
                                                  DelayEstimatorBase delayEstimator) {
-            this(design, config, delayEstimator, new HashMap<>());
+            super(design, config, delayEstimator);
         }
 
         @Override
@@ -166,7 +153,7 @@ public class PartialRouter extends RWRoute {
                 return false;
             }
 
-            if (prev.equals(start) && routingGraph.isPreserved(end)) {
+            if (prev == start && routingGraph.isPreserved(end)) {
                 // Arc matches start node and end node is preserved
                 // This implies that both start and end nodes must be preserved for the same net
                 // (which assumedly is the net we're currently routing, and is asserted upstream)
@@ -200,7 +187,7 @@ public class PartialRouter extends RWRoute {
     protected int getNumIndirectConnectionPins() {
         int totalSitePins = 0;
         for (Connection connection : indirectConnections) {
-            totalSitePins += (connection.getSink().isRouted() && !connection.isCongested()) ? 0 : 1;
+            totalSitePins += (connection.isRouted() && !connection.isCongested()) ? 0 : 1;
         }
         return totalSitePins;
     }
@@ -209,7 +196,7 @@ public class PartialRouter extends RWRoute {
     protected int getNumConnectionsCrossingSLRs() {
         int numCrossingSLRs = 0;
         for (Connection c : indirectConnections) {
-            numCrossingSLRs += (!c.isCrossSLR() || (c.getSink().isRouted() && !c.isCongested())) ? 0 : 1;
+            numCrossingSLRs += (!c.isCrossSLR() || (c.isRouted() && !c.isCongested())) ? 0 : 1;
         }
         return numCrossingSLRs;
     }
@@ -247,7 +234,7 @@ public class PartialRouter extends RWRoute {
         // if so, unpreserve that blocking net
         Set<Net> unpreserveNets = new HashSet<>();
         for (Connection connection : indirectConnections) {
-            Net net = connection.getNetWrapper().getNet();
+            Net net = connection.getNet();
             RouteNode sinkRnode = connection.getSinkRnode();
             Net unpreserveNet = routingGraph.getPreservedNet(sinkRnode);
             if (unpreserveNet != null && unpreserveNet != net) {
@@ -261,7 +248,29 @@ public class PartialRouter extends RWRoute {
             for (Net net : unpreserveNets) {
                 System.out.println("\t" + net);
                 assert(!net.isStaticNet());
-                unpreserveNet(net);
+                NetWrapper netWrapper = unpreserveNet(net);
+                for (Connection connection : netWrapper.getConnections()) {
+                    List<RouteNode> rnodes = connection.getRnodes();
+                    if (rnodes.size() < 3) {
+                        continue;
+                    }
+                    // Look for overused exclusive sinks (with type PINFEED_I) within
+                    // this connection's used nodes (except for the first and last used node,
+                    // corresponding to source and sink)
+                    for (RouteNode rnode : rnodes.subList(1, rnodes.size() - 1)) {
+                        if (rnode.getType() != RouteNodeType.PINFEED_I || !rnode.isOverUsed()) {
+                            continue;
+                        }
+
+                        // If an overused exclusive sink is found -- it must also be used
+                        // by the net to which that sink belongs to, so rip up this connection's
+                        // routing
+                        ripUp(connection);
+                        connection.resetRoute();
+                        connection.getSink().setRouted(false);
+                        break;
+                    }
+                }
             }
         }
     }
@@ -368,13 +377,6 @@ public class PartialRouter extends RWRoute {
                         continue;
                     }
 
-                    // Even though this connection is not expected to have any routing yet,
-                    // perform a rip up anyway in order to release any exclusive sinks
-                    // ahead of finishRouteConnection()
-                    assert(connection.getRnodes().isEmpty());
-                    connection.getSink().setRouted(false);
-                    ripUp(connection);
-
                     RouteNode sinkRnode = connection.getSinkRnode();
                     finishRouteConnection(connection, sinkRnode);
                 }
@@ -424,13 +426,8 @@ public class PartialRouter extends RWRoute {
     protected void finishRouteConnection(Connection connection, RouteNode rnode) {
         super.finishRouteConnection(connection, rnode);
 
-        if (!connection.getSink().isRouted()) {
+        if (!connection.isRouted()) {
             connection.resetRoute();
-            if (connection.getAltSinkRnodes().isEmpty()) {
-                // Undo what ripUp() would have done for this connection which has a single exclusive sink
-                rnode.incrementUser(connection.getNetWrapper());
-                rnode.updatePresentCongestionCost(presentCongestionFactor);
-            }
         }
     }
 
@@ -498,7 +495,7 @@ public class PartialRouter extends RWRoute {
         return unpreserveNets.size();
     }
 
-    protected void unpreserveNet(Net net) {
+    protected NetWrapper unpreserveNet(Net net) {
         assert(!net.getName().equals(Net.Z_NET));
 
         Set<RouteNode> rnodes = new HashSet<>();
@@ -575,13 +572,6 @@ public class PartialRouter extends RWRoute {
                 assert(sourceRnode.getType() == RouteNodeType.PINFEED_O);
                 assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
 
-                // Even though this connection is not expected to have any routing yet,
-                // perform a rip up anyway in order to release any exclusive sinks
-                // ahead of finishRouteConnection()
-                assert(connection.getRnodes().isEmpty());
-                connection.getSink().setRouted(false);
-                ripUp(connection);
-
                 finishRouteConnection(connection, sinkRnode);
             }
 
@@ -616,6 +606,7 @@ public class PartialRouter extends RWRoute {
 
         numPreservedWire--;
         numPreservedRoutableNets--;
+        return netWrapper;
     }
 
     @Override
@@ -626,9 +617,9 @@ public class PartialRouter extends RWRoute {
         }
         if (softPreserve && (
                 // First iteration, without alternate source
-                (routeIteration == 1 && connection.getNetWrapper().getNet().getAlternateSource() == null) ||
+                (routeIteration == 1 && connection.getNet().getAlternateSource() == null) ||
                 // Second iteration, with alternate source
-                (routeIteration == 2 && connection.getNetWrapper().getNet().getAlternateSource() != null))
+                (routeIteration == 2 && connection.getNet().getAlternateSource() != null))
         ) {
              int netsUnpreserved = unpreserveNetsAndReleaseResources(connection);
              if (netsUnpreserved > 0) {

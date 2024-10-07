@@ -212,19 +212,6 @@ public class Connection implements Comparable<Connection>{
     }
 
     /**
-     * Checks if a connection is routed through any rnodes that have multiple drivers.
-     * @return
-     */
-    public boolean useRnodesWithMultiDrivers() {
-        for (RouteNode rn : getRnodes()) {
-            if (rn.hasMultiDrivers()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
      * Add the give RouteNode to the list of those used by this Connection.
      * Expand the bounding box accordingly, since this node could describe an
      * existing routing path computed using a different bounding box.
@@ -295,6 +282,10 @@ public class Connection implements Comparable<Connection>{
         return altSinkRnodes == null ? Collections.emptyList() : altSinkRnodes;
     }
 
+    public boolean hasAltSinks() {
+        return altSinkRnodes != null && !altSinkRnodes.isEmpty();
+    }
+
     public void addAltSinkRnode(RouteNode sinkRnode) {
         if (altSinkRnodes == null) {
             altSinkRnodes = new ArrayList<>(1);
@@ -345,6 +336,10 @@ public class Connection implements Comparable<Connection>{
 
     public NetWrapper getNetWrapper() {
         return this.netWrapper;
+    }
+
+    public Net getNet() {
+        return netWrapper.getNet();
     }
 
     public SitePinInst getSource() {
@@ -465,7 +460,7 @@ public class Connection implements Comparable<Connection>{
     }
 
     public void setAllTargets(RWRoute.ConnectionState state) {
-        if (sinkRnode.countConnectionsOfUser(netWrapper) == 0 ||
+        if (sinkRnode.countConnectionsOfUser(netWrapper) == 1 ||
             sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE) {
             // Since this connection will have been ripped up, only mark a node
             // as a target if it's not already used by this net.
@@ -510,5 +505,13 @@ public class Connection implements Comparable<Connection>{
 
         assert(altSourceRnode != null);
         return new Pair<>(altSource, altSourceRnode);
+    }
+
+    public boolean isRouted() {
+        return sink.isRouted();
+    }
+
+    public void setRouted(boolean isRouted) {
+        sink.setRouted(isRouted);
     }
 }
