@@ -3493,7 +3493,7 @@ public class DesignTools {
         unisimFlipFlopTypes.add("FDRE");//R and CE
         unisimFlipFlopTypes.add("FDCE");//CLR CE
         unisimFlipFlopTypes.add("LDCE");
-        unisimFlipFlopTypes.add("LPCE");
+        unisimFlipFlopTypes.add("LDPE");
     }
 
     private static boolean isUnisimFlipFlopType(String cellType) {
