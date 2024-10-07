@@ -109,18 +109,19 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         baseCost = 0.4f;
         switch (getType()) {
             case LAGUNA_I:
+                assert(getLength() == 0);
                 // Make all approaches to SLLs zero-cost to encourage exploration
                 // Assigning a base cost of zero would normally break congestion resolution
                 // (since RWroute.getNodeCost() would return zero) but doing it here should be
                 // okay because this node only leads to a SLL which will have a non-zero base cost
                 baseCost = 0.0f;
-                break;
+                return;
             case SUPER_LONG_LINE:
-                assert(length == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
-                baseCost = 0.3f * length;
+                assert(getLength() == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
+                baseCost = 0.3f * RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
                 break;
             case WIRE:
-                // NOTE: IntentCode is device-dependent
+                short length = getLength();
                 IntentCode ic = getIntentCode();
                 switch(ic) {
                     case NODE_OUTPUT:       // LUT route-thru
@@ -135,35 +136,63 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         assert(length <= 1);
                         break;
                     case NODE_SINGLE:
-                        assert(length <= 2);
-                        if (length == 2) baseCost *= length;
+                        if (length <= 1) {
+                            assert(!getAllDownhillPIPs().isEmpty());
+                        } else {
+                            assert(length == 2);
+                            baseCost *= length;
+                        }
                         break;
                     case NODE_DOUBLE:
-                        if (endTileXCoordinate != getTile().getTileXCoordinate()) {
-                            assert(length <= 2);
-                            // Typically, length = 1 (since tile X is not equal)
-                            // In US, have seen length = 2, e.g. VU440's INT_X171Y827/EE2_E_BEG7.
-                            if (length == 2) baseCost *= length;
+                        if (length == 0) {
+                            assert(!getAllDownhillPIPs().isEmpty());
                         } else {
-                            // Typically, length = 2 except for horizontal U-turns (length = 0)
-                            // or vertical U-turns (length = 1).
-                            // In US, have seen length = 3, e.g. VU440's INT_X171Y827/NN2_E_BEG7.
-                            assert(length <= 3);
+                            if (getBeginTileXCoordinate() != getEndTileXCoordinate()) {
+                                assert(length <= 2);
+                                // Typically, length = 1 (since tile X is not equal)
+                                // In US, have seen length = 2, e.g. VU440's INT_X171Y827/EE2_E_BEG7.
+                                if (length == 2) {
+                                    baseCost *= length;
+                                }
+                            } else {
+                                // Typically, length = 2 except for horizontal U-turns (length = 0)
+                                // or vertical U-turns (length = 1).
+                                // In US, have seen length = 3, e.g. VU440's INT_X171Y827/NN2_E_BEG7.
+                                assert(length <= 3);
+                            }
                         }
                         break;
                     case NODE_HQUAD:
-                        assert (length != 0 || getAllDownhillNodes().isEmpty());
-                        baseCost = 0.35f * length;
+                        if (length == 0) {
+                            assert(getAllDownhillPIPs().isEmpty());
+                            baseCost = 0.0f;
+                            return;
+                        } else {
+                            baseCost = 0.35f * length;
+                        }
                         break;
                     case NODE_VQUAD:
-                        // In case of U-turn nodes
-                        if (length != 0) baseCost = 0.15f * length;// VQUADs have length 4 and 5
+                        if (length == 0) {
+                            assert(!getAllDownhillPIPs().isEmpty());
+                        } else {
+                            // VQUADs have length 4 and 5
+                            baseCost = 0.15f * length;
+                        }
                         break;
                     case NODE_HLONG:
-                        assert (length != 0 || getAllDownhillNodes().isEmpty());
-                        baseCost = 0.15f * length;// HLONGs have length 6 and 7
+                        if (length == 0) {
+                            assert(getAllDownhillPIPs().isEmpty());
+                            baseCost = 0.0f;
+                            return;
+                        } else {
+                            // HLONGs have length 6 and 7
+                            baseCost = 0.15f * length;
+                        }
                         break;
                     case NODE_VLONG:
+                        if (length == 0) {
+                            assert(!getAllDownhillPIPs().isEmpty());
+                        }
                         baseCost = 0.7f;
                         break;
                     default:
@@ -171,14 +200,19 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 }
                 break;
             case PINFEED_I:
+                break;
             case PINBOUNCE:
+                assert(getLength() <= 1);
                 break;
             case PINFEED_O:
-                baseCost = 1f;
+                // Only setBaseCost() is called on creation; getBaseCost() should
+                // never be called
+                assert(getLength() == 0);
                 break;
             default:
                 throw new RuntimeException(getType().toString());
         }
+        assert(baseCost > 0);
     }
 
     /**
@@ -335,6 +369,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      * @return The base cost of a RouteNode Object.
      */
     public float getBaseCost() {
+        assert(getType() != RouteNodeType.PINFEED_O);
         return baseCost;
     }
 
