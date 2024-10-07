@@ -2134,7 +2134,7 @@ public class RWRoute {
     }
 
     private static Design routeDesign(Design design, RWRouteConfig config) {
-        if (!config.isMaskNodesCrossRCLK()) {
+        if (config.isTimingDriven() && !config.isMaskNodesCrossRCLK()) {
             System.out.println("WARNING: Not masking nodes across RCLK could result in delay optimism.");
         }
 
