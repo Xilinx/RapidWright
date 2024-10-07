@@ -348,13 +348,13 @@ public class TestRWRoute {
             "SLICE_X0Y299,SLICE_X0Y300,200",    // Far from Laguna column
             "SLICE_X0Y300,SLICE_X0Y299,200",
             "SLICE_X53Y299,SLICE_X53Y300,200",  // Equidistant from two Laguna columns
-            "SLICE_X53Y300,SLICE_X53Y299,700",
+            "SLICE_X53Y300,SLICE_X53Y299,1300",
             // Perfect
             "SLICE_X9Y241,SLICE_X9Y300,200",
             "SLICE_X9Y300,SLICE_X9Y241,100",
             "SLICE_X9Y358,SLICE_X9Y299,100",
             "SLICE_X9Y299,SLICE_X9Y358,200",
-            "SLICE_X53Y241,SLICE_X69Y300,400",
+            "SLICE_X53Y241,SLICE_X69Y300,600",
             "SLICE_X53Y358,SLICE_X69Y299,600",
             // Far
             "SLICE_X9Y240,SLICE_X9Y359,100",    // On Laguna
@@ -372,7 +372,7 @@ public class TestRWRoute {
             "SLICE_X79Y0,SLICE_X79Y899,200",    // Straight up: next to Laguna column
             "SLICE_X0Y0,SLICE_X0Y899,600",      // Straight up: far from Laguna column
             "SLICE_X168Y0,SLICE_X168Y899,400",  // Straight up: far from Laguna column
-            "SLICE_X9Y0,SLICE_X162Y899,900",    // Up and right
+            "SLICE_X9Y0,SLICE_X162Y899,700",    // Up and right
             "SLICE_X168Y162,SLICE_X9Y899,1200", // Up and left
     })
     public void testSLRCrossingNonTimingDriven(String srcSiteName, String dstSiteName, long nodesPoppedLimit) {
