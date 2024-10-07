@@ -164,9 +164,10 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         break;
                     case NODE_HQUAD:
                         if (length == 0) {
+                            // Since this node has zero length (and by extension no downhill PIPs)
+                            // mark it as being inacccessible so that it will never be queued
                             assert(getAllDownhillPIPs().isEmpty());
-                            baseCost = 0.0f;
-                            return;
+                            type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
                         } else {
                             baseCost = 0.35f * length;
                         }
@@ -181,9 +182,10 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         break;
                     case NODE_HLONG:
                         if (length == 0) {
+                            // Since this node has zero length (and by extension no downhill PIPs)
+                            // mark it as being inacccessible so that it will never be queued
                             assert(getAllDownhillPIPs().isEmpty());
-                            baseCost = 0.0f;
-                            return;
+                            type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
                         } else {
                             // HLONGs have length 6 and 7
                             baseCost = 0.15f * length;
