@@ -51,6 +51,7 @@ import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
@@ -395,6 +396,7 @@ public class RouterHelper {
     public static Set<SitePinInst> invertPossibleGndPinsToVccPins(Design design,
                                                                   List<SitePinInst> pins,
                                                                   boolean invertLutInputs) {
+        final boolean isVersal = (design.getSeries() == Series.Versal);
         Net gndNet = design.getGndNet();
         Set<SitePinInst> toInvertPins = new HashSet<>();
         nextSitePin: for (SitePinInst spi : pins) {
@@ -403,7 +405,14 @@ public class RouterHelper {
             SiteInst si = spi.getSiteInst();
             String siteWireName = spi.getSiteWireName();
             if (invertLutInputs && spi.isLUTInputPin()) {
-                Collection<Cell> connectedCells = DesignTools.getConnectedCells(spi);
+                BELPin spiBelPin;
+                if (isVersal) {
+                    // Walk through IMR before checking for connected cells
+                    spiBelPin = si.getBELPin(spi.getSiteWireName() + "_IMR", "Q");
+                } else {
+                    spiBelPin = spi.getBELPin();
+                }
+                Collection<Cell> connectedCells = DesignTools.getConnectedCells(spiBelPin, si);
                 if (connectedCells.isEmpty()) {
                     for (BELPin belPin : si.getSiteWirePins(siteWireName)) {
                         if (belPin.isSitePort()) {
