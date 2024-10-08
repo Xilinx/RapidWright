@@ -299,12 +299,11 @@ public class TestRWRoute {
         Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
         design.setTrackNetChanges(true);
 
-        // Unroute all signal nets
-        for (Net net: design.getNets()) {
-            if (!NetTools.isGlobalClock(net) && !net.isStaticNet()) {
-                net.unroute();
-            }
-        }
+        // Unroute all nets (there are no global clocks)
+        design.unrouteDesign();
+        // Also remove output pins from static nets
+        design.getGndNet().getPins().removeIf(SitePinInst::isOutPin);
+        design.getVccNet().getPins().removeIf(SitePinInst::isOutPin);
 
         boolean softPreserve = false;
         Design routed = PartialRouter.routeDesignPartialNonTimingDriven(design, null, softPreserve);
@@ -313,13 +312,13 @@ public class TestRWRoute {
             assertAllPinsRouted(net);
         }
 
-        Assertions.assertEquals(288, routed.getModifiedNets().size());
+        Assertions.assertEquals(290, routed.getModifiedNets().size());
         for (Net net : routed.getModifiedNets()) {
             assertAllPinsRouted(net);
         }
         if (FileTools.isVivadoOnPath()) {
             ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
-            Assertions.assertEquals(290, rrs.fullyRoutedNets); // 2 more than 288 above since it includes VCC & GND nets
+            Assertions.assertEquals(290, rrs.fullyRoutedNets);
             Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
             Assertions.assertEquals(8, rrs.unroutedNets); // There are 8 nets driven from a blackbox cell;
                                                                     // these are marked as routable despite not being so
