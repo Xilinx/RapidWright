@@ -300,6 +300,7 @@ public class TestRWRoute {
      * Other nets within each kernel are fully routed.
      */
     @Test
+    @LargeTest(max_memory_gb = 8)
     public void testNonTimingDrivenPartialRoutingOnVersalDevice() {
         Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
         design.setTrackNetChanges(true);
@@ -335,8 +336,8 @@ public class TestRWRoute {
         for (Net net : routed.getModifiedNets()) {
             assertAllPinsRouted(net);
         }
-        ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
         
+        ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
         Assertions.assertEquals(rrs.fullyRoutedNets, 290);
         // 8 nets are originally unrouted
         Assertions.assertEquals(rrs.unroutedNets, 8);
