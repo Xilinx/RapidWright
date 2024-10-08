@@ -206,10 +206,9 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_CLE_CNODE:    // CLE_BC_CORE*.CNODE_OUTS_[EW]*
                     case NODE_INTF_BNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_BNODE_OUTS*
                     case NODE_INTF_CNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_CNODE_OUTS*
-                        assert(length == 0 ||
-                               // W nodes to have length 1 to ensure that a zero-length BNODE -> BNODE path
-                               // does not exist
-                               (length == 1 && getWireName().matches("[BC]NODE_OUTS_[EW]\\d+")));
+                        // length == 1 because one side of BCNODE-s are shared between CLE_W_CORE_XaYb and CLE_E_CORE_X(a+1)Yb
+                        // or CLE_W_CORE_X(a-1)Yb and CLE_E_CORE_XaYb
+                        assert(length <= 1);
                         break;
                     default:
                         throw new RuntimeException(ic.toString());
