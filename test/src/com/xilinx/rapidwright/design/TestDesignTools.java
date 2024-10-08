@@ -1016,33 +1016,37 @@ public class TestDesignTools {
     @ParameterizedTest
     @CsvSource({
             // US+
-            Device.AWS_F1+",SLICE_X0Y0/AFF,true",
-            Device.AWS_F1+",SLICE_X0Y0/AFF2,false",
-            Device.AWS_F1+",SLICE_X1Y1/HFF,true",
-            Device.AWS_F1+",SLICE_X1Y1/HFF2,false",
+            Device.AWS_F1+",SLICE_X0Y0/AFF,FDRE,true",
+            Device.AWS_F1+",SLICE_X0Y0/AFF2,FDSE,false",
+            Device.AWS_F1+",SLICE_X1Y1/HFF,FDPE,true",
+            Device.AWS_F1+",SLICE_X1Y1/HFF2,FDCE,false",
+            Device.AWS_F1+",SLICE_X0Y0/AFF,LDCE,true",
+            Device.AWS_F1+",SLICE_X0Y0/AFF2,LDPE,false",
+            Device.AWS_F1+",SLICE_X1Y1/HFF,LDPE,true",
+            Device.AWS_F1+",SLICE_X1Y1/HFF2,LDCE,false",
             // US
-            Device.KCU105+",SLICE_X0Y0/AFF,true",
-            Device.KCU105+",SLICE_X0Y0/AFF2,false",
-            Device.KCU105+",SLICE_X1Y1/HFF,true",
-            Device.KCU105+",SLICE_X1Y1/HFF2,false",
+            Device.KCU105+",SLICE_X0Y0/AFF,FDRE,true",
+            Device.KCU105+",SLICE_X0Y0/AFF2,FDSE,false",
+            Device.KCU105+",SLICE_X1Y1/HFF,FDPE,true",
+            Device.KCU105+",SLICE_X1Y1/HFF2,FDCE,false",
             // Series7
-            Device.PYNQ_Z1+",SLICE_X0Y0/AFF,true",
-            Device.PYNQ_Z1+",SLICE_X0Y0/A5FF,false",
-            Device.PYNQ_Z1+",SLICE_X1Y1/DFF,true",
-            Device.PYNQ_Z1+",SLICE_X1Y1/D5FF,false",
+            Device.PYNQ_Z1+",SLICE_X0Y0/AFF,FDRE,true",
+            Device.PYNQ_Z1+",SLICE_X0Y0/A5FF,FDSE,false",
+            Device.PYNQ_Z1+",SLICE_X1Y1/DFF,FDPE,true",
+            Device.PYNQ_Z1+",SLICE_X1Y1/D5FF,FDCE,false",
             // Versal
-            "xcvc1902,SLICE_X40Y0/AFF,false",
-            "xcvc1902,SLICE_X40Y0/DFF2,false",
-            "xcvc1902,SLICE_X40Y0/EFF,false",
-            "xcvc1902,SLICE_X40Y0/HFF2,false",
-            "xcvp1002,SLICE_X40Y0/AFF,false",
-            "xcvp1002,SLICE_X40Y0/DFF2,false",
-            "xcvp1002,SLICE_X40Y0/EFF,false",
-            "xcvp1002,SLICE_X40Y0/HFF2,false",
+            "xcvc1902,SLICE_X40Y0/AFF,FDRE,false",
+            "xcvc1902,SLICE_X40Y0/DFF2,FDSE,false",
+            "xcvc1902,SLICE_X40Y0/EFF,FDPE,false",
+            "xcvc1902,SLICE_X40Y0/HFF2,FDCE,false",
+            "xcvp1002,SLICE_X40Y0/AFF,FDRE,false",
+            "xcvp1002,SLICE_X40Y0/DFF2,FDSE,false",
+            "xcvp1002,SLICE_X40Y0/EFF,FDPE,false",
+            "xcvp1002,SLICE_X40Y0/HFF2,FDCE,false",
     })
-    public void testCreateCeSrRstPinsToVCC(String deviceName, String location, boolean connectSrToGnd) {
+    public void testCreateCeSrRstPinsToVCC(String deviceName, String location, String unisimName, boolean connectSrToGnd) {
         Design design = new Design("test", deviceName);
-        Cell c = design.createAndPlaceCell("ff", Unisim.FDRE, location);
+        Cell c = design.createAndPlaceCell("ff", Unisim.valueOf(unisimName), location);
         SiteInst si = c.getSiteInst();
 
         BEL bel = c.getBEL();
@@ -1078,8 +1082,6 @@ public class TestDesignTools {
         if (series == Series.Series7) {
             // Series7 have {CE,SR}USEDMUX which is used to supply VCC and GND respectively from inside the site
             Assertions.assertNull(srSpi);
-        } else if (series == Series.Versal) {
-            // FIXME
         } else {
             Assertions.assertNotNull(srSpi);
             Assertions.assertEquals(vcc, srSpi.getNet());
@@ -1093,6 +1095,38 @@ public class TestDesignTools {
         design.createAndPlaceCell("cell", Unisim.FDRE, "LAGUNA_X7Y341/RX_REG0");
 
         DesignTools.createCeSrRstPinsToVCC(design);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            // US+
+            Device.AWS_F1+",RAMB36_X0Y0/RAMB36E2,RAMB36E2,RSTREGBU,",
+            Device.AWS_F1+",RAMB36_X0Y0/RAMB36E2,RAMB36E2,RSTREGBL,",
+            Device.AWS_F1+",RAMB18_X0Y1/RAMB18E2_U,RAMB18E2,RSTREGBU,RSTREGBL",
+            Device.AWS_F1+",RAMB18_X0Y0/RAMB18E2_L,RAMB18E2,RSTREGBL,RSTREGBU",
+            // US
+            Device.KCU105+",RAMB36_X0Y0/RAMB36E2,RAMB36E2,RSTREGBU_X,",
+            Device.KCU105+",RAMB36_X0Y0/RAMB36E2,RAMB36E2,RSTREGBL_X,",
+            Device.KCU105+",RAMB18_X0Y1/RAMB18E2_U,RAMB18E2,RSTREGBU_X,RSTREGBL_X",
+            Device.KCU105+",RAMB18_X0Y0/RAMB18E2_L,RAMB18E2,RSTREGBL_X,RSTREGBU_X",
+    })
+    public void testCreateCeSrRstPinsToVccRAMB(String deviceName, String location, String unisimName, String sitePinNameVcc, String sitePinNameNotPresent) {
+        Design design = new Design("test", deviceName);
+        Cell c = design.createAndPlaceCell("ram", Unisim.valueOf(unisimName), location);
+
+        DesignTools.createCeSrRstPinsToVCC(design);
+
+        SiteInst si = c.getSiteInst();
+        SitePinInst spi = si.getSitePinInst(sitePinNameVcc);
+        Assertions.assertNotNull(spi);
+        Net vcc = design.getVccNet();
+        Assertions.assertEquals(vcc, spi.getNet());
+        Assertions.assertNotNull(spi.getConnectedNode());
+
+        if (sitePinNameNotPresent != null) {
+            spi = si.getSitePinInst(sitePinNameNotPresent);
+            Assertions.assertNull(spi);
+        }
     }
 
     @Test
