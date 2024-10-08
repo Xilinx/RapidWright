@@ -597,6 +597,7 @@ public class RouterHelper {
 
     /**
      * Find a path from a source node to a sink node.
+     * Intermediate nodes with tile type returning true for {@link Utils#isClocking(TileTypeEnum)} will be ignored.
      * @param source The source node.
      * @param sink The sink node.
      * @return A list of nodes making up the path.
@@ -629,6 +630,9 @@ public class RouterHelper {
                 break;
             }
             for (Node n : curr.getAllDownhillNodes()) {
+                if (Utils.isClocking(n.getTile().getTileTypeEnum())) {
+                    continue;
+                }
                 NodeWithPrev child = new NodeWithPrev(n);
                 child.setPrev(curr);
                 queue.add(child);
