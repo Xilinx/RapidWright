@@ -194,6 +194,15 @@ public class RWRoute {
         connectionsRoutedThisIteration = new AtomicInteger();
         nodesPushed = new AtomicLong();
         nodesPopped = new AtomicLong();
+
+        if (design.getSeries() == Series.Versal) {
+            if (config.isLutPinSwapping()) {
+                throw new RuntimeException("ERROR: '--lutPinSwapping' not yet supported on Versal.");
+            }
+            if (config.isLutRoutethru()) {
+                throw new RuntimeException("ERROR: '--lutRoutethru' not yet supported on Versal.");
+            }
+        }
     }
 
     protected static String getUnsupportedSeriesMessage(Part part) {
