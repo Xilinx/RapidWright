@@ -181,7 +181,10 @@ public class RWRoute {
     public static final EnumSet<Series> SUPPORTED_SERIES;
 
     static {
-        SUPPORTED_SERIES = EnumSet.of(Series.UltraScale, Series.UltraScalePlus);
+        SUPPORTED_SERIES = EnumSet.noneOf(Series.class);
+        SUPPORTED_SERIES.add(Series.UltraScale);
+        SUPPORTED_SERIES.add(Series.UltraScalePlus);
+        SUPPORTED_SERIES.add(Series.Versal);
     }
 
     public RWRoute(Design design, RWRouteConfig config) {
