@@ -325,11 +325,12 @@ public class RouteNodeGraph {
 
                 String pinName = pin.getName();
                 char lutLetter = pinName.charAt(0);
-                String otherPinName;
-                if (pinName.endsWith("MUX")) {
+                String otherPinName = null;
+                String otherPinNameSuffix = design.getSeries() == Series.Versal ? "Q" : "MUX";
+                if (pinName.endsWith(otherPinNameSuffix)) {
                     otherPinName = lutLetter + "_O";
                 } else if (pinName.endsWith("_O")) {
-                    otherPinName = lutLetter + "MUX";
+                    otherPinName = lutLetter + otherPinNameSuffix;
                 } else {
                     throw new RuntimeException("ERROR: Unsupported site pin " + pin);
                 }
