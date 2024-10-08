@@ -566,8 +566,8 @@ public class RWRoute {
         int indirect = 0;
         for (SitePinInst sink : sinkPins) {
             Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
-            List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
-            if (sourceINTNode == null && !nodes.isEmpty()) {
+            Node sinkINTNode = RouterHelper.projectInputPinToINTNode(sink);
+            if (sourceINTNode == null && sinkINTNode != null) {
                 // Sink can be projected to an INT tile, but primary source (e.g. COUT)
                 // cannot be; try alternate source
                 Pair<SitePinInst,RouteNode> altSourceAndRnode = connection.getOrCreateAlternateSource(routingGraph);
@@ -579,7 +579,7 @@ public class RWRoute {
                 }
             }
 
-            if ((sourceINTNode == null && connection.getSourceRnode() == null) || nodes.isEmpty()) {
+            if ((sourceINTNode == null && connection.getSourceRnode() == null) || sinkINTNode == null) {
                 // Direct connection if either source or sink pin cannot be projected to INT tile
                 directConnections.add(connection);
                 connection.setDirect(true);
@@ -598,7 +598,6 @@ public class RWRoute {
                     connection.setSourceRnode(sourceINTRnode);
                 }
 
-                Node sinkINTNode = nodes.get(0);
                 indirectConnections.add(connection);
                 RouteNode sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.PINFEED_I);
                 sinkRnode.setType(RouteNodeType.PINFEED_I);

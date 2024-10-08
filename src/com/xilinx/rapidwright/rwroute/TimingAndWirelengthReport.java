@@ -124,11 +124,11 @@ public class TimingAndWirelengthReport{
                 }
             }
             Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
-            List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
-            if (nodes.isEmpty()) {
+            Node sinkINTNode = RouterHelper.projectInputPinToINTNode(sink);
+            if (sinkINTNode == null) {
                 connection.setDirect(true);
             } else {
-                connection.setSinkRnode(routingGraph.getOrCreate(nodes.get(0), RouteNodeType.PINFEED_I));
+                connection.setSinkRnode(routingGraph.getOrCreate(sinkINTNode, RouteNodeType.PINFEED_I));
                 if (sourceINTNode == null) {
                     sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
                 }

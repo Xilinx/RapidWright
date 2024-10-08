@@ -178,34 +178,26 @@ public class RouterHelper {
     /**
      * Gets a list of {@link Node} instances that connect an input {@link SitePinInst} instance to an INT {@link Tile} instance.
      * @param input The input pin.
-     * @return A list of nodes from the input SitePinInst to an INT tile.
+     * @return A node that connects to an INT tile from an input pin.
      */
-    public static List<Node> projectInputPinToINTNode(SitePinInst input) {
-        List<Node> sinkToSwitchBoxPath = new ArrayList<>();
-        NodeWithPrev sink = new NodeWithPrev(input.getConnectedNode());
-        sink.setPrev(null);
-        Queue<NodeWithPrev> q = new LinkedList<>();
+    public static Node projectInputPinToINTNode(SitePinInst input) {
+        Node sink = input.getConnectedNode();
+        Queue<Node> q = new LinkedList<>();
         q.add(sink);
         int watchdog = 1000;
         while (!q.isEmpty()) {
-            NodeWithPrev n = q.poll();
+            Node n = q.poll();
             TileTypeEnum tileType = n.getTile().getTileTypeEnum();
             if (tileType == TileTypeEnum.INT ||
                 // Versal only: Terminate at non INT (e.g. CLE_BC_CORE) tile type for CTRL pin inputs
                 EnumSet.of(IntentCode.NODE_CLE_CTRL, IntentCode.NODE_INTF_CTRL).contains(n.getIntentCode())) {
-                while (n != null) {
-                    sinkToSwitchBoxPath.add(n);
-                    n = n.getPrev();
-                }
-                return sinkToSwitchBoxPath;
+                return n;
             }
             for (Node uphill : n.getAllUphillNodes()) {
                 if (uphill.getAllUphillNodes().size() == 0) {
                     continue;
                 }
-                NodeWithPrev prev = new NodeWithPrev(uphill);
-                prev.setPrev(n);
-                q.add(prev);
+                q.add(uphill);
             }
             watchdog--;
             if (watchdog < 0) {
@@ -213,16 +205,16 @@ public class RouterHelper {
             }
         }
 
-        return sinkToSwitchBoxPath;
+        return null;
     }
 
     public static Tile getUpstreamINTTileOfClkIn(SitePinInst clkIn) {
-        List<Node> pathToINTTile = projectInputPinToINTNode(clkIn);
-        if (pathToINTTile.isEmpty()) {
+        Node intNode = projectInputPinToINTNode(clkIn);
+        if (intNode == null) {
             throw new RuntimeException("ERROR: CLK_IN does not connect to INT Tile directly");
         }
 
-        return pathToINTTile.get(0).getTile();
+        return intNode.getTile();
     }
 
     /**
@@ -557,9 +549,9 @@ public class RouterHelper {
         for (SitePinInst sink : net.getSinkPins()) {
             Node sinkNode = sink.getConnectedNode();
             if (sinkNode.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
-                List<Node> nodes = projectInputPinToINTNode(sink);
-                if (!nodes.isEmpty()) {
-                    sinkNode = nodes.get(0);
+                Node sinkINTNode = projectInputPinToINTNode(sink);
+                if (sinkINTNode != null) {
+                    sinkNode = sinkINTNode;
                 } else {
                     // Must be a direct connection (e.g. COUT -> CIN)
                 }
