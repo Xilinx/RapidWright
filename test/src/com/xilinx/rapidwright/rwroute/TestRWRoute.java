@@ -294,53 +294,36 @@ public class TestRWRoute {
         VivadoToolsHelper.assertFullyRouted(design);
     }
 
-    /**
-     * Tests the non-timing driven partial routing, i.e., RWRoute running in its wirelength-driven partial routing mode.
-     * The picoblaze design is from one of the RapidWright tutorials with nets between computing kernels not routed.
-     * Other nets within each kernel are fully routed.
-     */
     @Test
-    @LargeTest(max_memory_gb = 8)
     public void testNonTimingDrivenPartialRoutingOnVersalDevice() {
         Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
         design.setTrackNetChanges(true);
 
-        boolean softPreserve = false;
-        List<SitePinInst> pinsToRoute = null;
-        String[] args = new String[] {
-            "--fixBoundingBox",
-            "--useUTurnNodes",
-            "--nonTimingDriven",
-            "--verbose"
-        };
+        // Unroute all signal nets
         for (Net net: design.getNets()) {
             if (!NetTools.isGlobalClock(net) && !net.isStaticNet()) {
                 net.unroute();
             }
         }
-        RWRouteConfig config = new RWRouteConfig(args);
-        // Pre-processing of the design regarding physical net names pins
-        DesignTools.makePhysNetNamesConsistent(design);
-        DesignTools.createPossiblePinsToStaticNets(design);
-        DesignTools.createMissingSitePinInsts(design);
-        DesignTools.updatePinsIsRouted(design);
-        pinsToRoute = PartialRouter.getUnroutedPins(design);
 
-        if (config.isMaskNodesCrossRCLK()) {
-            System.out.println("WARNING: Masking nodes across RCLK for partial routing could result in routability problems.");
-        }
+        boolean softPreserve = false;
+        Design routed = PartialRouter.routeDesignPartialNonTimingDriven(design, null, softPreserve);
 
-        Design routed = PartialRouter.routeDesign(design, new PartialRouter(design, config, pinsToRoute, softPreserve));
-
-        Assertions.assertFalse(routed.getModifiedNets().isEmpty());
         for (Net net : routed.getModifiedNets()) {
             assertAllPinsRouted(net);
         }
-        
-        // ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(routed);
-        // Assertions.assertEquals(rrs.fullyRoutedNets, 290);
-        // 8 nets are originally unrouted
-        // Assertions.assertEquals(rrs.unroutedNets, 8);
+
+        Assertions.assertEquals(288, routed.getModifiedNets().size());
+        for (Net net : routed.getModifiedNets()) {
+            assertAllPinsRouted(net);
+        }
+        if (FileTools.isVivadoOnPath()) {
+            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            Assertions.assertEquals(290, rrs.fullyRoutedNets); // 2 more than 288 above since it includes VCC & GND nets
+            Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
+            Assertions.assertEquals(8, rrs.unroutedNets); // There are 8 nets driven from a blackbox cell;
+                                                                    // these are marked as routable despite not being so
+        }
     }
 
     /**
