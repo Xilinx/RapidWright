@@ -1015,24 +1015,28 @@ public class TestDesignTools {
     @ParameterizedTest
     @CsvSource({
             // US+
-            Device.AWS_F1+",SLICE_X0Y0/AFF,SRST1,true",
-            Device.AWS_F1+",SLICE_X0Y0/AFF2,SRST1,false",
-            Device.AWS_F1+",SLICE_X1Y1/HFF,SRST2,true",
-            Device.AWS_F1+",SLICE_X1Y1/HFF2,SRST2,false",
+            Device.AWS_F1+",SLICE_X0Y0/AFF,FDRE,SRST1,true",
+            Device.AWS_F1+",SLICE_X0Y0/AFF2,FDSE,SRST1,false",
+            Device.AWS_F1+",SLICE_X1Y1/HFF,FDPE,SRST2,true",
+            Device.AWS_F1+",SLICE_X1Y1/HFF2,FDCE,SRST2,false",
+            Device.AWS_F1+",SLICE_X0Y0/AFF,LDCE,SRST1,true",
+            Device.AWS_F1+",SLICE_X0Y0/AFF2,LDPE,SRST1,false",
+            Device.AWS_F1+",SLICE_X1Y1/HFF,LDPE,SRST2,true",
+            Device.AWS_F1+",SLICE_X1Y1/HFF2,LDCE,SRST2,false",
             // US
-            Device.KCU105+",SLICE_X0Y0/AFF,SRST_B1,true",
-            Device.KCU105+",SLICE_X0Y0/AFF2,SRST_B1,false",
-            Device.KCU105+",SLICE_X1Y1/HFF,SRST_B2,true",
-            Device.KCU105+",SLICE_X1Y1/HFF2,SRST_B2,false",
+            Device.KCU105+",SLICE_X0Y0/AFF,FDRE,SRST_B1,true",
+            Device.KCU105+",SLICE_X0Y0/AFF2,FDSE,SRST_B1,false",
+            Device.KCU105+",SLICE_X1Y1/HFF,FDPE,SRST_B2,true",
+            Device.KCU105+",SLICE_X1Y1/HFF2,FDCE,SRST_B2,false",
             // Series7
-            Device.PYNQ_Z1+",SLICE_X0Y0/AFF,SR,true",
-            Device.PYNQ_Z1+",SLICE_X0Y0/A5FF,SR,false",
-            Device.PYNQ_Z1+",SLICE_X1Y1/DFF,SR,true",
-            Device.PYNQ_Z1+",SLICE_X1Y1/D5FF,SR,false",
+            Device.PYNQ_Z1+",SLICE_X0Y0/AFF,FDRE,SR,true",
+            Device.PYNQ_Z1+",SLICE_X0Y0/A5FF,FDSE,SR,false",
+            Device.PYNQ_Z1+",SLICE_X1Y1/DFF,FDPE,SR,true",
+            Device.PYNQ_Z1+",SLICE_X1Y1/D5FF,FDCE,SR,false",
     })
-    public void testCreateCeSrRstPinsToVCC(String deviceName, String location, String sitePinName, boolean connectGnd) {
+    public void testCreateCeSrRstPinsToVCC(String deviceName, String location, String unisimName, String sitePinName, boolean connectGnd) {
         Design design = new Design("test", deviceName);
-        Cell c = design.createAndPlaceCell("ff", Unisim.FDRE, location);
+        Cell c = design.createAndPlaceCell("ff", Unisim.valueOf(unisimName), location);
         BELPin sr = c.getBEL().getPin("SR");
         SiteInst si = c.getSiteInst();
         Assertions.assertNull(si.getNetFromSiteWire(sr.getSiteWireName()));

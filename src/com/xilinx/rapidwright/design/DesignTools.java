@@ -3414,7 +3414,7 @@ public class DesignTools {
         } else if (series == Series.UltraScale || series == Series.UltraScalePlus) {
             Net gndInvertibleToVcc = design.getGndNet();
             for (Cell cell : design.getCells()) {
-                if (isUnisimFlipFlopType(cell.getType())) {
+                if (isFlipFlopOrLatchNeedingCeSrToVcc(cell.getType())) {
                     SiteInst si = cell.getSiteInst();
                     if (!Utils.isSLICE(si)) {
                         continue;
@@ -3485,19 +3485,20 @@ public class DesignTools {
         }
     }
 
-    //NOTE: SRL16E (reference name SRL16E, EDIFCell in RW) uses A2-A5, so we need to connect A1 & A6 to VCC,
-    //however, when SitePinInsts (e.g. A3) are already in GND, adding those again will cause problems to A1
-    static HashSet<String> unisimFlipFlopTypes;
+    // Used by createCeSrRstPinsToVCC()
+    static Set<String> flipFlopAndLatchTypesNeedingCeSrToVcc;
     static {
-        unisimFlipFlopTypes = new HashSet<>();
-        unisimFlipFlopTypes.add("FDSE");//S CE, logical cell
-        unisimFlipFlopTypes.add("FDPE");//PRE CE
-        unisimFlipFlopTypes.add("FDRE");//R and CE
-        unisimFlipFlopTypes.add("FDCE");//CLR CE
+        flipFlopAndLatchTypesNeedingCeSrToVcc = new HashSet<>();
+        flipFlopAndLatchTypesNeedingCeSrToVcc.add("FDSE");//S CE, logical cell
+        flipFlopAndLatchTypesNeedingCeSrToVcc.add("FDPE");//PRE CE
+        flipFlopAndLatchTypesNeedingCeSrToVcc.add("FDRE");//R and CE
+        flipFlopAndLatchTypesNeedingCeSrToVcc.add("FDCE");//CLR CE
+        flipFlopAndLatchTypesNeedingCeSrToVcc.add("LDCE");
+        flipFlopAndLatchTypesNeedingCeSrToVcc.add("LDPE");
     }
 
-    private static boolean isUnisimFlipFlopType(String cellType) {
-        return unisimFlipFlopTypes.contains(cellType);
+    private static boolean isFlipFlopOrLatchNeedingCeSrToVcc(String cellType) {
+        return flipFlopAndLatchTypesNeedingCeSrToVcc.contains(cellType);
     }
 
     /** Mapping from device Series to another mapping from FF BEL name to CKEN/SRST site pin name **/
