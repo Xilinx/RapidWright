@@ -179,13 +179,13 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         short minLength = length == 0 ? 1 : length;
                         baseCost = 0.15f * minLength;
                         break;
-                    case NODE_HLONG:
+                    case NODE_HLONG: // US/US+
                         assert (length != 0 || getAllDownhillNodes().isEmpty());
                         baseCost = 0.15f * length;// HLONGs have length 6 and 7
                         break;
                     case NODE_VLONG7:  // Versal only
                     case NODE_VLONG12: // Versal only
-                    case NODE_VLONG:
+                    case NODE_VLONG:   // US/US+
                         baseCost = 0.7f;
                         break;
 
