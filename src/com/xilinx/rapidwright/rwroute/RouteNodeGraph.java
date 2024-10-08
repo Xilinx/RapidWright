@@ -400,6 +400,9 @@ public class RouteNodeGraph {
     static {
         allowedTileEnums = EnumSet.noneOf(TileTypeEnum.class);
         allowedTileEnums.add(TileTypeEnum.INT);
+        allowedTileEnums.addAll(Utils.getLagunaTileTypes());
+
+        // Versal only
         allowedTileEnums.add(TileTypeEnum.CLE_BC_CORE);
         allowedTileEnums.add(TileTypeEnum.INTF_LOCF_TL_TILE);
         allowedTileEnums.add(TileTypeEnum.INTF_LOCF_TR_TILE);
@@ -409,7 +412,6 @@ public class RouteNodeGraph {
         allowedTileEnums.add(TileTypeEnum.INTF_ROCF_TR_TILE);
         allowedTileEnums.add(TileTypeEnum.INTF_ROCF_BL_TILE);
         allowedTileEnums.add(TileTypeEnum.INTF_ROCF_BR_TILE);
-        allowedTileEnums.addAll(Utils.getLagunaTileTypes());
     }
 
     protected boolean isExcludedTile(Node child) {
