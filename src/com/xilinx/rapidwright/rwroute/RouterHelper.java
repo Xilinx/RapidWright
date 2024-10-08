@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -189,11 +190,9 @@ public class RouterHelper {
         while (!q.isEmpty()) {
             NodeWithPrev n = q.poll();
             TileTypeEnum tileType = n.getTile().getTileTypeEnum();
-            // Only extract IntentCode if not an INT tile
-            IntentCode ic = (tileType != TileTypeEnum.INT) ? n.getIntentCode() : null;
             if (tileType == TileTypeEnum.INT ||
-                // Versal: IntentCode-s of nodes driven by CNODE/BNODEs
-                ic == IntentCode.NODE_CLE_CTRL || ic == IntentCode.NODE_INTF_CTRL) {
+                // Versal only: Terminate at non INT (e.g. CLE_BC_CORE) tile type for CTRL pin inputs
+                EnumSet.of(IntentCode.NODE_CLE_CTRL, IntentCode.NODE_INTF_CTRL).contains(n.getIntentCode())) {
                 while (n != null) {
                     sinkToSwitchBoxPath.add(n);
                     n = n.getPrev();
