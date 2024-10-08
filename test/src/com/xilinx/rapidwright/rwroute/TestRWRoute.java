@@ -46,6 +46,7 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
@@ -285,6 +286,51 @@ public class TestRWRoute {
 
         boolean softPreserve = false;
         Design routed = PartialRouter.routeDesignPartialNonTimingDriven(design, null, softPreserve);
+
+        Assertions.assertFalse(routed.getModifiedNets().isEmpty());
+        for (Net net : routed.getModifiedNets()) {
+            assertAllPinsRouted(net);
+        }
+        VivadoToolsHelper.assertFullyRouted(design);
+    }
+
+    /**
+     * Tests the non-timing driven partial routing, i.e., RWRoute running in its wirelength-driven partial routing mode.
+     * The picoblaze design is from one of the RapidWright tutorials with nets between computing kernels not routed.
+     * Other nets within each kernel are fully routed.
+     * This test takes around 40s on a machine with a CPU @ 2.5GHz.
+     */
+    @Test
+    public void testNonTimingDrivenPartialRoutingOnVersalDevice() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        design.setTrackNetChanges(true);
+
+        boolean softPreserve = false;
+        List<SitePinInst> pinsToRoute = null;
+        String[] args = new String[] {
+            "--fixBoundingBox",
+            "--useUTurnNodes",
+            "--nonTimingDriven",
+            "--verbose"
+        };
+        for (Net net: design.getNets()) {
+            if (!NetTools.isGlobalClock(net) && !net.isStaticNet()) {
+                net.unroute();
+            }
+        }
+        RWRouteConfig config = new RWRouteConfig(args);
+        // Pre-processing of the design regarding physical net names pins
+        DesignTools.makePhysNetNamesConsistent(design);
+        DesignTools.createPossiblePinsToStaticNets(design);
+        DesignTools.createMissingSitePinInsts(design);
+        DesignTools.updatePinsIsRouted(design);
+        pinsToRoute = PartialRouter.getUnroutedPins(design);
+
+        if (config.isMaskNodesCrossRCLK()) {
+            System.out.println("WARNING: Masking nodes across RCLK for partial routing could result in routability problems.");
+        }
+
+        Design routed = PartialRouter.routeDesign(design, new PartialRouter(design, config, pinsToRoute, softPreserve));
 
         Assertions.assertFalse(routed.getModifiedNets().isEmpty());
         for (Net net : routed.getModifiedNets()) {
