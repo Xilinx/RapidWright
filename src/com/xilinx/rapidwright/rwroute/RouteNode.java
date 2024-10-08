@@ -141,7 +141,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_PINFEED:
                         assert(length == 0);
                         break;
-                    case NODE_LOCAL:
+                    case NODE_LOCAL:    // US and US+
                     case INTENT_DEFAULT:
                         assert(length <= 1);
                         break;
