@@ -434,13 +434,7 @@ public class Connection implements Comparable<Connection>{
             return comp;
         }
         // 2nd priority: ascending HPWL
-        int compHPWL = Short.compare(this.getHpwl(), that.getHpwl());
-        if (compHPWL != 0) {
-            return compHPWL;
-        }
-        // TODO: FIXME
-        // fallback: ascending lexicographical order of sink SitePinInst
-        return this.getSink().toString().compareTo(that.getSink().toString());
+        return Short.compare(this.getHpwl(), that.getHpwl());
     }
 
     public String bbRectangleString() {
