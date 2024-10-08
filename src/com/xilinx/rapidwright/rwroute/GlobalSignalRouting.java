@@ -24,16 +24,6 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Queue;
-import java.util.Set;
-import java.util.function.Function;
-
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
@@ -59,8 +49,17 @@ import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 import com.xilinx.rapidwright.util.Utils;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Queue;
+import java.util.Set;
+import java.util.function.Function;
 
 /**
  * A collection of methods for routing global signals, i.e. GLOBAL_CLOCK, VCC and GND.
