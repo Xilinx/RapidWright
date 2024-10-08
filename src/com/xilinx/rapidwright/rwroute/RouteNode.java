@@ -144,10 +144,14 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     case INTENT_DEFAULT:
                         assert(length <= 1);
                         break;
+                    case NODE_VSINGLE:
+                    case NODE_HSINGLE:
                     case NODE_SINGLE:
                         assert(length <= 2);
                         if (length == 2) baseCost *= length;
                         break;
+                    case NODE_VDOUBLE:
+                    case NODE_HDOUBLE:
                     case NODE_DOUBLE:
                         if (endTileXCoordinate != getTile().getTileXCoordinate()) {
                             assert(length <= 2);
@@ -169,12 +173,31 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         // In case of U-turn nodes
                         if (length != 0) baseCost = 0.15f * length;// VQUADs have length 4 and 5
                         break;
+                    case NODE_HLONG6:
+                    case NODE_HLONG10:
+                        short minLength = length == 0 ? 1 : length;
+                        baseCost = 0.15f * minLength;
+                        break;
                     case NODE_HLONG:
                         assert (length != 0 || getAllDownhillNodes().isEmpty());
                         baseCost = 0.15f * length;// HLONGs have length 6 and 7
                         break;
+                    case NODE_VLONG7:
+                    case NODE_VLONG12:
                     case NODE_VLONG:
                         baseCost = 0.7f;
+                        break;
+                    // Try to allow the following types.
+                    // The cost is set to original baseCost.
+                    case NODE_SDQNODE:
+                    case NODE_INODE:
+                    case NODE_IMUX:
+                    case NODE_CLE_BNODE:
+                    case NODE_CLE_CNODE:
+                    case NODE_CLE_CTRL:
+                    case NODE_INTF_BNODE:
+                    case NODE_INTF_CNODE:
+                    case NODE_INTF_CTRL:
                         break;
                     default:
                         throw new RuntimeException(ic.toString());
