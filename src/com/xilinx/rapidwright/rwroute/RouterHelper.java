@@ -608,7 +608,7 @@ public class RouterHelper {
         Queue<NodeWithPrev> queue = new LinkedList<>();
         queue.add(sourcer);
 
-        int watchdog = 10000;
+        int watchdog = 50000;
         boolean success = false;
         while (!queue.isEmpty()) {
             NodeWithPrev curr = queue.poll();

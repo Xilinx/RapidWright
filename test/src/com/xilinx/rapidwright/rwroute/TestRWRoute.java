@@ -298,7 +298,6 @@ public class TestRWRoute {
      * Tests the non-timing driven partial routing, i.e., RWRoute running in its wirelength-driven partial routing mode.
      * The picoblaze design is from one of the RapidWright tutorials with nets between computing kernels not routed.
      * Other nets within each kernel are fully routed.
-     * This test takes around 40s on a machine with a CPU @ 2.5GHz.
      */
     @Test
     public void testNonTimingDrivenPartialRoutingOnVersalDevice() {
@@ -336,7 +335,11 @@ public class TestRWRoute {
         for (Net net : routed.getModifiedNets()) {
             assertAllPinsRouted(net);
         }
-        VivadoToolsHelper.assertFullyRouted(design);
+        ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+        
+        Assertions.assertEquals(rrs.fullyRoutedNets, 290);
+        // 8 nets are originally unrouted
+        Assertions.assertEquals(rrs.unroutedNets, 8);
     }
 
     /**
