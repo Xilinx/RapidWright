@@ -293,28 +293,39 @@ public class TestRWRoute {
         VivadoToolsHelper.assertFullyRouted(design);
     }
 
-    @Test
-    public void testNonTimingDrivenPartialRoutingOnVersalDevice() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testNonTimingDrivenRoutingOnVersalDevice(boolean partial) {
+        // Note: there are no global clocks in this design, just a local clock that doesn't use a BUFG
         Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
         design.setTrackNetChanges(true);
 
-        // Unroute all nets (there are no global clocks, just a local clock that doesn't use a BUFG)
-        design.unrouteDesign();
-        // Also remove output pins from static nets
-        design.getGndNet().getPins().removeIf(SitePinInst::isOutPin);
-        design.getVccNet().getPins().removeIf(SitePinInst::isOutPin);
+        int expectedNetsModified = 290;
+        if (partial) {
+            // Pseudo-randomly unroute at least one pin from each net
+            Random random = new Random(0);
+            for (Net net : design.getNets()) {
+                List<SitePinInst> sinkPins = net.getSinkPins();
+                if (sinkPins.isEmpty()) {
+                    continue;
+                }
+                Collections.shuffle(sinkPins, random);
+                int numPinsToUnroute = random.nextInt(sinkPins.size()) + 1;
+                List<SitePinInst> sinkPinsToUnroute = sinkPins.subList(0, numPinsToUnroute);
+                DesignTools.unroutePins(net, sinkPinsToUnroute);
+            }
 
-        boolean softPreserve = false;
-        Design routed = PartialRouter.routeDesignPartialNonTimingDriven(design, null, softPreserve);
+            boolean softPreserve = false;
+            PartialRouter.routeDesignPartialNonTimingDriven(design, null, softPreserve);
+        } else {
+            RWRoute.routeDesignFullNonTimingDriven(design);
+        }
 
-        for (Net net : routed.getModifiedNets()) {
+        Assertions.assertEquals(expectedNetsModified, design.getModifiedNets().size());
+        for (Net net : design.getModifiedNets()) {
             assertAllPinsRouted(net);
         }
 
-        Assertions.assertEquals(290, routed.getModifiedNets().size());
-        for (Net net : routed.getModifiedNets()) {
-            assertAllPinsRouted(net);
-        }
         if (FileTools.isVivadoOnPath()) {
             ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
             Assertions.assertEquals(290, rrs.fullyRoutedNets);
