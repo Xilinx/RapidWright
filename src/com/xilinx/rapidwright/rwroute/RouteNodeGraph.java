@@ -193,6 +193,8 @@ public class RouteNodeGraph {
         accessibleWireOnlyIfAboveBelowTarget.put(intTile.getTileTypeEnum(), wires);
 
         if (lutRoutethru) {
+            assert(design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus);
+
             muxWires = new EnumMap<>(TileTypeEnum.class);
             for (TileTypeEnum tileTypeEnum : Utils.getCLBTileTypes()) {
                 Tile clbTile = device.getArbitraryTileOfType(tileTypeEnum);
@@ -402,7 +404,7 @@ public class RouteNodeGraph {
         allowedTileEnums.add(TileTypeEnum.INT);
         allowedTileEnums.addAll(Utils.getLagunaTileTypes());
 
-        // Versal only
+        // Versal only: include tiles hosting BNODE/CNODEs
         allowedTileEnums.add(TileTypeEnum.CLE_BC_CORE);
         allowedTileEnums.add(TileTypeEnum.INTF_LOCF_TL_TILE);
         allowedTileEnums.add(TileTypeEnum.INTF_LOCF_TR_TILE);

@@ -46,7 +46,6 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
@@ -299,7 +298,7 @@ public class TestRWRoute {
         Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
         design.setTrackNetChanges(true);
 
-        // Unroute all nets (there are no global clocks)
+        // Unroute all nets (there are no global clocks, just a local clock that doesn't use a BUFG)
         design.unrouteDesign();
         // Also remove output pins from static nets
         design.getGndNet().getPins().removeIf(SitePinInst::isOutPin);
