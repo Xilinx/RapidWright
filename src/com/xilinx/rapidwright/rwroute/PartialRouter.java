@@ -250,10 +250,12 @@ public class PartialRouter extends RWRoute {
         Set<Net> unpreserveNets = new HashSet<>();
         for (Connection connection : indirectConnections) {
             Net net = connection.getNetWrapper().getNet();
+            Net preservedNet;
+            assert((preservedNet = routingGraph.getPreservedNet(connection.getSourceRnode())) == null || preservedNet == net);
             RouteNode sinkRnode = connection.getSinkRnode();
-            Net unpreserveNet = routingGraph.getPreservedNet(sinkRnode);
-            if (unpreserveNet != null && unpreserveNet != net) {
-                unpreserveNets.add(unpreserveNet);
+            preservedNet = routingGraph.getPreservedNet(sinkRnode);
+            if (preservedNet != null && preservedNet != net) {
+                unpreserveNets.add(preservedNet);
                 assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
             }
         }
