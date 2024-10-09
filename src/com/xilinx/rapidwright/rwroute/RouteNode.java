@@ -176,8 +176,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         break;
                     case NODE_HLONG6:  // Versal only
                     case NODE_HLONG10: // Versal only
-                        short minLength = length == 0 ? 1 : length;
-                        baseCost = 0.15f * minLength;
+                        baseCost = 0.15f * (length == 0 ? 1 : length);
                         break;
                     case NODE_HLONG: // US/US+
                         assert (length != 0 || getAllDownhillNodes().isEmpty());
@@ -185,6 +184,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         break;
                     case NODE_VLONG7:  // Versal only
                     case NODE_VLONG12: // Versal only
+                        baseCost = 0.15f * (length == 0 ? 1 : length);
+                        break;
                     case NODE_VLONG:   // US/US+
                         baseCost = 0.7f;
                         break;
