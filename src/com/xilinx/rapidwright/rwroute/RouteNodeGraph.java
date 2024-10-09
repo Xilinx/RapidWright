@@ -414,7 +414,7 @@ public class RouteNodeGraph {
         allowedTileEnums.add(TileTypeEnum.INTF_ROCF_BR_TILE);
     }
 
-    protected boolean isExcludedTile(Node child) {
+    public static boolean isExcludedTile(Node child) {
         Tile tile = child.getTile();
         TileTypeEnum tileType = tile.getTileTypeEnum();
         return !allowedTileEnums.contains(tileType);
