@@ -1337,6 +1337,28 @@ public class RWRoute {
         nodeTypes.add(IntentCode.NODE_LAGUNA_DATA); // UltraScale+ only
     }
 
+    static List<IntentCode> nodeTypesOnVersalDevice = new ArrayList<>();
+    static {
+        nodeTypesOnVersalDevice.add(IntentCode.NODE_VSINGLE);
+        nodeTypesOnVersalDevice.add(IntentCode.NODE_HSINGLE);
+        nodeTypesOnVersalDevice.add(IntentCode.NODE_VDOUBLE);
+        nodeTypesOnVersalDevice.add(IntentCode.NODE_HDOUBLE);
+        nodeTypesOnVersalDevice.add(IntentCode.NODE_VQUAD);
+        nodeTypesOnVersalDevice.add(IntentCode.NODE_HQUAD);
+        nodeTypesOnVersalDevice.add(IntentCode.NODE_VLONG7);
+        nodeTypesOnVersalDevice.add(IntentCode.NODE_VLONG12);
+        nodeTypesOnVersalDevice.add(IntentCode.NODE_HLONG6);
+        nodeTypesOnVersalDevice.add(IntentCode.NODE_HLONG10);
+        nodeTypesOnVersalDevice.add(IntentCode.NODE_CLE_BNODE);
+        nodeTypesOnVersalDevice.add(IntentCode.NODE_INTF_BNODE);
+        nodeTypesOnVersalDevice.add(IntentCode.NODE_CLE_CNODE);
+        nodeTypesOnVersalDevice.add(IntentCode.NODE_INTF_CNODE);
+        nodeTypesOnVersalDevice.add(IntentCode.NODE_LOCAL);
+        nodeTypesOnVersalDevice.add(IntentCode.NODE_PINBOUNCE);
+        nodeTypesOnVersalDevice.add(IntentCode.NODE_PINFEED);
+        nodeTypesOnVersalDevice.add(IntentCode.NODE_LAGUNA_DATA);
+    }
+
     /**
      * Fixes routes of nets with routing path cycles and multi-driver nodes.
      * @return A set of nets that have been fixed.
@@ -2052,11 +2074,12 @@ public class RWRoute {
         }
     }
 
-    public static void printNodeTypeUsageAndWirelength(boolean verbose, Map<IntentCode, Long> nodeTypeUsage, Map<IntentCode, Long> nodeTypeLength) {
+    public static void printNodeTypeUsageAndWirelength(boolean verbose, Map<IntentCode, Long> nodeTypeUsage, Map<IntentCode, Long> nodeTypeLength, Series series) {
         if (verbose) {
             System.out.println("Node Usage Per Type");
             System.out.printf(" %-16s  %13s  %12s\n", "Node Type", "Usage", "Length");
-            for (IntentCode ic : nodeTypes) {
+            List<IntentCode> nodeTypeList = series == Series.Versal ? nodeTypesOnVersalDevice : nodeTypes;
+            for (IntentCode ic : nodeTypeList) {
                 long usage = nodeTypeUsage.getOrDefault(ic, 0L);
                 long length = nodeTypeLength.getOrDefault(ic, 0L);
                 System.out.printf(" %-16s  %13d  %12d\n", ic, usage, length);
@@ -2106,7 +2129,7 @@ public class RWRoute {
     protected void printRoutingStatistics() {
         MessageGenerator.printHeader("Statistics");
         computesNodeUsageAndTotalWirelength();
-        printNodeTypeUsageAndWirelength(config.isVerbose(), nodeTypeUsage, nodeTypeLength);
+        printNodeTypeUsageAndWirelength(config.isVerbose(), nodeTypeUsage, nodeTypeLength, design.getSeries());
         printFormattedString("Total wirelength:", totalWL);
         if (config.isVerbose()) {
             printFormattedString("Total INT tile nodes:", totalINTNodes);

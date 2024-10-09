@@ -82,7 +82,7 @@ public class TimingAndWirelengthReport{
         System.out.println("\n");
         System.out.println("Total nodes: " + usedNodes);
         System.out.println("Total wirelength: " + wirelength);
-        RWRoute.printNodeTypeUsageAndWirelength(true, nodeTypeUsage, nodeTypeLength);
+        RWRoute.printNodeTypeUsageAndWirelength(true, nodeTypeUsage, nodeTypeLength, design.getSeries());
     }
 
     /**
