@@ -1504,7 +1504,13 @@ public class RWRoute {
                     if (pip.isRouteThru()) {
                         continue;
                     }
-                    SitePin sp = pip.getStartNode().getSitePin();
+                    Node startNode = pip.getStartNode();
+                    IntentCode startIntent = startNode.getIntentCode();
+                    if (startIntent != IntentCode.NODE_CLE_OUTPUT &&  // US+ and Versal
+                            startIntent != IntentCode.NODE_OUTPUT) {  // US
+                        continue;
+                    }
+                    SitePin sp = startNode.getSitePin();
                     if (sp.getPinName().equals(source.getName())) {
                         pip.setIsLogicalDriver(true);
                         break;
