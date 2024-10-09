@@ -144,27 +144,18 @@ public class RouterHelper {
      * @return A node that connects to an INT tile from an output pin.
      */
     public static Node projectOutputPinToINTNode(SitePinInst output) {
-        int watchdog = 5;
+        Node source = output.getConnectedNode();
+        int watchdog = 1000;
 
-        // Starting from the SPI's connected node, for each node in queue
-        // return the first downhill node that is in an Interconnect tile.
-        // Otherwise, restart the queue with all such downhill nodes and repeat.
-        // No backtracking.
+        // Starting from the SPI's connected node, perform a downhill breadth-first search
         Queue<Node> queue = new ArrayDeque<>();
-        queue.add(output.getConnectedNode());
+        queue.add(source);
         while (!queue.isEmpty() && watchdog >= 0) {
             Node node = queue.poll();
             watchdog--;
-            assert(!Utils.isInterConnect(node.getTile().getTileTypeEnum()));
-
-            List<Node> downhillNodes = node.getAllDownhillNodes();
-            if (downhillNodes.isEmpty()) {
-                continue;
-            }
-
-            queue.clear();
-            for (Node downhill : downhillNodes) {
+            for (Node downhill : node.getAllDownhillNodes()) {
                 if (Utils.isInterConnect(downhill.getTile().getTileTypeEnum())) {
+                    // Return node that has downhill in the INT tile
                     return node;
                 }
                 queue.add(downhill);
@@ -181,24 +172,23 @@ public class RouterHelper {
      */
     public static Node projectInputPinToINTNode(SitePinInst input) {
         Node sink = input.getConnectedNode();
-        Queue<Node> q = new LinkedList<>();
-        q.add(sink);
         int watchdog = 1000;
-        while (!q.isEmpty()) {
-            Node n = q.poll();
-            TileTypeEnum tileType = n.getTile().getTileTypeEnum();
-            if (tileType == TileTypeEnum.INT) {
-                return n;
-            }
-            for (Node uphill : n.getAllUphillNodes()) {
-                if (uphill.getAllUphillNodes().size() == 0) {
-                    continue;
-                }
-                q.add(uphill);
-            }
+
+        // Starting from the SPI's connected node, perform an uphill breadth-first search
+        Queue<Node> queue = new ArrayDeque<>();
+        queue.add(sink);
+        while (!queue.isEmpty() && watchdog >= 0) {
+            Node node = queue.poll();
             watchdog--;
-            if (watchdog < 0) {
-                break;
+            for (Node uphill : node.getAllUphillNodes()) {
+                TileTypeEnum uphillTileType = uphill.getTile().getTileTypeEnum();
+                if (uphillTileType == TileTypeEnum.INT ||
+                        // Versal only: Terminate at non INT (e.g. CLE_BC_CORE) tile type for CTRL pin inputs
+                        EnumSet.of(IntentCode.NODE_CLE_CTRL, IntentCode.NODE_INTF_CTRL).contains(uphill.getIntentCode())) {
+                    // Return the uphill in the INT tile
+                    return uphill;
+                }
+                queue.add(uphill);
             }
         }
 
