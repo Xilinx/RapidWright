@@ -304,11 +304,26 @@ public class TestRWRoute {
         if (partial) {
             // Pseudo-randomly unroute at least one pin from each net
             Random random = new Random(0);
+            Net Z_NET = design.createNet(Net.Z_NET);
             for (Net net : design.getNets()) {
                 List<SitePinInst> sinkPins = net.getSinkPins();
                 if (sinkPins.isEmpty()) {
                     continue;
                 }
+
+                if (net.getName().equals("processor/address_loop[6].output_data.pc_vector_mux_lut/O6")) {
+                    // For one hand chosen net, block all its downhill PIPs such that
+                    // its output pin
+                    net.unroute();
+                    Node sourcePinNode = net.getSource().getConnectedNode();        // CLE_W_CORE_X50Y6/CLE_SLICEL_TOP_0_D_O_PIN
+                    Node sourceNode = sourcePinNode.getAllDownhillNodes().get(0);   // CLE_W_CORE_X50Y6/CLE_SLICEL_TOP_0_D_O
+                    design.setTrackingChanges(false);
+                    for (PIP pip : sourceNode.getAllDownhillPIPs()) {
+                        Z_NET.addPIP(pip);
+                    }
+                    design.setTrackingChanges(true);
+                }
+
                 Collections.shuffle(sinkPins, random);
                 int numPinsToUnroute = random.nextInt(sinkPins.size()) + 1;
                 List<SitePinInst> sinkPinsToUnroute = sinkPins.subList(0, numPinsToUnroute);
