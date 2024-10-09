@@ -532,7 +532,17 @@ public class RouteNodeGraph {
     }
 
     protected RouteNode create(Node node, RouteNodeType type) {
-        return new RouteNode(this, node, type);
+        RouteNode rnode = new RouteNode(this, node, type);
+        // PINFEED_I should have zero length, except for on US/US+ where the PINFEED_I is a PINBOUNCE node.
+        assert(rnode.getType() != RouteNodeType.PINFEED_I ||
+                rnode.getLength() == 0 ||
+                (rnode.getLength() == 1 && (design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus) &&
+                        rnode.getIntentCode() == IntentCode.NODE_PINBOUNCE));
+        // PINBOUNCE should have zero length, except for on US/US+
+        assert(rnode.getType() != RouteNodeType.PINBOUNCE ||
+                rnode.getLength() == 0 ||
+                (rnode.getLength() == 1 && design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus));
+        return rnode;
     }
 
     public RouteNode getOrCreate(Node node) {
