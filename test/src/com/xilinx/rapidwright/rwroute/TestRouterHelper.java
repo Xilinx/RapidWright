@@ -209,8 +209,7 @@ public class TestRouterHelper {
         SitePinInst p = new SitePinInst("TX_T_OUT", si);
         Node intNode = RouterHelper.projectOutputPinToINTNode(p);
 
-        // FIXME: Known broken --  https://github.com/Xilinx/RapidWright/issues/558
-        Assertions.assertNotEquals(Objects.toString(intNode), "INT_INTF_L_CMT_X182Y90/LOGIC_OUTS_R19");
+        Assertions.assertEquals(intNode.toString(), "INT_INTF_L_CMT_X182Y90/LOGIC_OUTS_R19");
     }
 
     @ParameterizedTest
