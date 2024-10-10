@@ -180,17 +180,14 @@ public class RouterHelper {
         queue.add(sink);
         while (!queue.isEmpty() && watchdog >= 0) {
             Node node = queue.poll();
-            watchdog--;
-            for (Node uphill : node.getAllUphillNodes()) {
-                TileTypeEnum uphillTileType = uphill.getTile().getTileTypeEnum();
-                if (uphillTileType == TileTypeEnum.INT ||
-                        // Versal only: Terminate at non INT (e.g. CLE_BC_CORE) tile type for CTRL pin inputs
-                        EnumSet.of(IntentCode.NODE_CLE_CTRL, IntentCode.NODE_INTF_CTRL).contains(uphill.getIntentCode())) {
-                    // Return node that has at least one uphill in the INT tile
-                    return node;
-                }
-                queue.add(uphill);
+            TileTypeEnum tileType = node.getTile().getTileTypeEnum();
+            if (tileType == TileTypeEnum.INT ||
+                    // Versal only: Terminate at non INT (e.g. CLE_BC_CORE) tile type for CTRL pin inputs
+                    EnumSet.of(IntentCode.NODE_CLE_CTRL, IntentCode.NODE_INTF_CTRL).contains(node.getIntentCode())) {
+                return node;
             }
+            watchdog--;
+            node.getAllUphillNodes(queue);
         }
 
         return null;
