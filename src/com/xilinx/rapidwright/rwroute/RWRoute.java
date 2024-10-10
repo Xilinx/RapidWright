@@ -181,10 +181,10 @@ public class RWRoute {
     public static final EnumSet<Series> SUPPORTED_SERIES;
 
     static {
-        SUPPORTED_SERIES = EnumSet.noneOf(Series.class);
-        SUPPORTED_SERIES.add(Series.UltraScale);
-        SUPPORTED_SERIES.add(Series.UltraScalePlus);
-        SUPPORTED_SERIES.add(Series.Versal);
+        SUPPORTED_SERIES = EnumSet.of(
+                Series.UltraScale,
+                Series.UltraScalePlus,
+                Series.Versal);
     }
 
     public RWRoute(Design design, RWRouteConfig config) {
@@ -248,7 +248,6 @@ public class RWRoute {
         if (config.isTimingDriven()) {
             nodesDelays = new HashMap<>();
         }
-        rnodesCreatedThisIteration = 0;
         routethruHelper = new RouteThruHelper(design.getDevice());
         presentCongestionFactor = config.getInitialPresentCongestionFactor();
         lutPinSwapping = config.isLutPinSwapping();
@@ -838,7 +837,7 @@ public class RWRoute {
     public void routeIndirectConnectionsIteratively() {
         sortConnections();
         initializeRouting();
-        long lastIterationRnodeCount = 0;
+        long lastIterationRnodeCount = routingGraph.numNodes();
         long lastIterationRnodeTime = 0;
 
         boolean initialHus = this.hus;
