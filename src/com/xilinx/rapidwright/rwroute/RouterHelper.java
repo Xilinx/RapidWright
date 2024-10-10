@@ -156,7 +156,7 @@ public class RouterHelper {
             watchdog--;
             for (Node downhill : node.getAllDownhillNodes()) {
                 if (Utils.isInterConnect(downhill.getTile().getTileTypeEnum())) {
-                    // Return node that has downhill in the INT tile
+                    // Return node that has at laest one downhill in the INT tile
                     return node;
                 }
                 queue.add(downhill);
@@ -186,8 +186,8 @@ public class RouterHelper {
                 if (uphillTileType == TileTypeEnum.INT ||
                         // Versal only: Terminate at non INT (e.g. CLE_BC_CORE) tile type for CTRL pin inputs
                         EnumSet.of(IntentCode.NODE_CLE_CTRL, IntentCode.NODE_INTF_CTRL).contains(uphill.getIntentCode())) {
-                    // Return the uphill in the INT tile
-                    return uphill;
+                    // Return node that has at least one uphill in the INT tile
+                    return node;
                 }
                 queue.add(uphill);
             }
