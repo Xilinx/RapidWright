@@ -177,21 +177,29 @@ public class RouterHelper {
      */
     public static Node projectInputPinToINTNode(SitePinInst input) {
         Node sink = input.getConnectedNode();
-        int watchdog = 20;
+        if (sink.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
+            return sink;
+        }
+        int watchdog = 40;
 
         // Starting from the SPI's connected node, perform an uphill breadth-first search
         Queue<Node> queue = new ArrayDeque<>();
         queue.add(sink);
         while (!queue.isEmpty() && watchdog >= 0) {
             Node node = queue.poll();
-            TileTypeEnum tileType = node.getTile().getTileTypeEnum();
-            if (tileType == TileTypeEnum.INT ||
-                    // Versal only: Terminate at non INT (e.g. CLE_BC_CORE) tile type for CTRL pin inputs
-                    EnumSet.of(IntentCode.NODE_CLE_CTRL, IntentCode.NODE_INTF_CTRL).contains(node.getIntentCode())) {
-                return node;
-            }
             watchdog--;
-            node.getAllUphillNodes(queue);
+            for (Node uphill : node.getAllUphillNodes()) {
+                TileTypeEnum uphillTileType = uphill.getTile().getTileTypeEnum();
+                if (uphillTileType == TileTypeEnum.INT ||
+                        // Versal only: Terminate at non INT (e.g. CLE_BC_CORE) tile type for CTRL pin inputs
+                        EnumSet.of(IntentCode.NODE_CLE_CTRL, IntentCode.NODE_INTF_CTRL).contains(uphill.getIntentCode())) {
+                    return uphill;
+                }
+                if (Utils.isClocking(uphillTileType)) {
+                    continue;
+                }
+                queue.add(uphill);
+            }
         }
 
         return null;
