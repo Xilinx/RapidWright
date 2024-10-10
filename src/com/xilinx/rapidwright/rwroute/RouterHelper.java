@@ -146,7 +146,7 @@ public class RouterHelper {
      */
     public static Node projectOutputPinToINTNode(SitePinInst output) {
         Node source = output.getConnectedNode();
-        int watchdog = 1000;
+        int watchdog = 20;
 
         // Starting from the SPI's connected node, perform a downhill breadth-first search
         Queue<Node> queue = new ArrayDeque<>();
@@ -177,7 +177,7 @@ public class RouterHelper {
      */
     public static Node projectInputPinToINTNode(SitePinInst input) {
         Node sink = input.getConnectedNode();
-        int watchdog = 1000;
+        int watchdog = 20;
 
         // Starting from the SPI's connected node, perform an uphill breadth-first search
         Queue<Node> queue = new ArrayDeque<>();
