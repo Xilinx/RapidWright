@@ -156,7 +156,7 @@ public class RouterHelper {
             watchdog--;
             for (Node downhill : node.getAllDownhillNodes()) {
                 if (Utils.isInterConnect(downhill.getTile().getTileTypeEnum())) {
-                    // Return node that has at laest one downhill in the INT tile
+                    // Return node that has at least one downhill in the INT tile
                     return node;
                 }
                 queue.add(downhill);
