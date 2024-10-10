@@ -32,6 +32,7 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.Pair;
@@ -83,7 +84,7 @@ public class Connection implements Comparable<Connection>{
     /** To indicate if the route delay of a connection has been patched up, when there are consecutive long nodes */
     private boolean dlyPatched;
     /** true to indicate that a connection cross SLRs */
-    private boolean crossSLR;
+    private final boolean crossSLR;
     /** List of nodes assigned to a connection to form the path for generating PIPs */
     private List<Node> nodes;
 
@@ -96,6 +97,9 @@ public class Connection implements Comparable<Connection>{
         this.netWrapper = netWrapper;
         netWrapper.addConnection(this);
         crossSLR = !source.getTile().getSLR().equals(sink.getTile().getSLR());
+        if (crossSLR && source.getSiteInst().getDesign().getSeries() == Series.Versal) {
+            throw new RuntimeException("ERROR: Cross-SLR connections not yet supported on Versal.");
+        }
     }
 
     /**
