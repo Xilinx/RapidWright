@@ -54,11 +54,11 @@ import java.util.stream.Stream;
 public class TestRouterHelper {
     @ParameterizedTest
     @CsvSource({
-            "xcvup3,SLICE_X0Y0,COUT,null",
-            "xcvup3,SLICE_X0Y299,COUT,null",
-            "xcvup3,SLICE_X0Y0,A_O,CLEL_R_X0Y0/CLE_CLE_L_SITE_0_A_O",
-            "xcvup3,GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,null",
-            "xcvup3,IOB_X1Y95,I,INT_INTF_L_IO_X72Y109/LOGIC_OUTS_R23",
+            "xcvu3p,SLICE_X0Y0,COUT,null",
+            "xcvu3p,SLICE_X0Y299,COUT,null",
+            "xcvu3p,SLICE_X0Y0,A_O,CLEL_R_X0Y0/CLE_CLE_L_SITE_0_A_O",
+            "xcvu3p,GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,null",
+            "xcvu3p,IOB_X1Y95,I,INT_INTF_L_IO_X72Y109/LOGIC_OUTS_R23",
             "xcvu3p,MMCM_X0Y0,LOCKED,INT_INTF_L_IO_X36Y54/LOGIC_OUTS_R0",
             "xcvp1002,MMCM_X2Y0,LOCKED,BLI_CLE_BOT_CORE_X27Y0/LOGIC_OUTS_D23"
     })
