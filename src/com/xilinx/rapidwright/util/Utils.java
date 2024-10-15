@@ -352,7 +352,8 @@ public class Utils{
                 TileTypeEnum.RCLK_CLEM_CLKBUF_L,
                 // Versal
                 TileTypeEnum.CLK_REBUF_BUFGS_HSR_CORE,
-                TileTypeEnum.CLK_PLL_AND_PHY
+                TileTypeEnum.CLK_PLL_AND_PHY,
+                TileTypeEnum.CMT_MMCM
         );
 
         lockedSiteTypes = EnumSet.of(
