@@ -609,6 +609,10 @@ public class RouterHelper {
         Queue<NodeWithPrev> queue = new LinkedList<>();
         queue.add(sourcer);
 
+        // Only block clocking tiles if both source and sink are not in a clock tile
+        final boolean blockClocking = !Utils.isClocking(source.getTile().getTileTypeEnum()) &&
+                !Utils.isClocking(sink.getTile().getTileTypeEnum());
+
         int watchdog = 10000;
         boolean success = false;
         while (!queue.isEmpty()) {
@@ -622,7 +626,7 @@ public class RouterHelper {
                 break;
             }
             for (Node n : curr.getAllDownhillNodes()) {
-                if (Utils.isClocking(n.getTile().getTileTypeEnum())) {
+                if (blockClocking && Utils.isClocking(n.getTile().getTileTypeEnum())) {
                     continue;
                 }
                 NodeWithPrev child = new NodeWithPrev(n);

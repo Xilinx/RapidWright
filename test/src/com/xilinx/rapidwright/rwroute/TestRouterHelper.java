@@ -29,6 +29,7 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
@@ -306,5 +307,19 @@ public class TestRouterHelper {
 
         // If not flattening/uniquifying, there must be no inverted pins
         Assertions.assertEquals(!flatten || !uniquify, invertedPins.isEmpty());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvp1002,XPIO_NIBBLE_SC_1_X9Y0/XPIO_IOBPAIR_5_RXOUT_M_PIN,CMT_MMCM_X11Y0/CMT_MMCM_TOP_0_CLKIN1_PIN",
+            "xcvp1002,CMT_MMCM_X11Y0/CMT_MMCM_TOP_0_CLKOUT0_PIN,CLK_REBUF_BUFGS_HSR_CORE_X8Y0/CLK_BUFGCE_59_I_PIN",
+    })
+    public void testFindPathBetweenNodes(String partName, String sourceNodeName, String sinkNodeName) {
+        Device device = Device.getDevice(partName);
+        Node sourceNode = device.getNode(sourceNodeName);
+        Node sinkNode = device.getNode(sinkNodeName);
+
+        List<Node> path = RouterHelper.findPathBetweenNodes(sourceNode, sinkNode);
+        Assertions.assertTrue(path.size() > 2);
     }
 }
