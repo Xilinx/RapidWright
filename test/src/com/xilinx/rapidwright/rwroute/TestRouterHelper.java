@@ -48,24 +48,37 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
 public class TestRouterHelper {
     @ParameterizedTest
     @CsvSource({
-            "SLICE_X0Y0,COUT,null",
-            "SLICE_X0Y299,COUT,null",
-            "SLICE_X0Y0,A_O,CLEL_R_X0Y0/CLE_CLE_L_SITE_0_A_O",
-            "GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,null",
-            "IOB_X1Y95,I,INT_INTF_L_IO_X72Y109/LOGIC_OUTS_R23"
+            "xcvup3,SLICE_X0Y0,COUT,null",
+            "xcvup3,SLICE_X0Y299,COUT,null",
+            "xcvup3,SLICE_X0Y0,A_O,CLEL_R_X0Y0/CLE_CLE_L_SITE_0_A_O",
+            "xcvup3,GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,null",
+            "xcvup3,IOB_X1Y95,I,INT_INTF_L_IO_X72Y109/LOGIC_OUTS_R23",
+            "xcvu3p,MMCM_X0Y0,LOCKED,INT_INTF_L_IO_X36Y54/LOGIC_OUTS_R0",
+            "xcvp1002,MMCM_X2Y0,LOCKED,BLI_CLE_BOT_CORE_X27Y0/LOGIC_OUTS_D23"
     })
-    public void testProjectOutputPinToINTNode(String siteName, String pinName, String nodeAsString) {
-        Design design = new Design("design", "xcvu3p");
+    public void testProjectOutputPinToINTNode(String partName, String siteName, String pinName, String nodeAsString) {
+        Design design = new Design("design", partName);
         SiteInst si = design.createSiteInst(siteName);
         SitePinInst spi = new SitePinInst(pinName, si);
         Assertions.assertEquals(nodeAsString, String.valueOf(RouterHelper.projectOutputPinToINTNode(spi)));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvu3p,MMCM_X0Y0,PSEN,INT_X36Y56/IMUX_W0",
+            "xcvp1002,MMCM_X2Y0,PSEN,INT_X27Y0/IMUX_B_W24"
+    })
+    public void testProjectInputPinToINTNode(String partName, String siteName, String pinName, String nodeAsString) {
+        Design design = new Design("design", partName);
+        SiteInst si = design.createSiteInst(siteName);
+        SitePinInst spi = new SitePinInst(pinName, si);
+        Assertions.assertEquals(nodeAsString, String.valueOf(RouterHelper.projectInputPinToINTNode(spi)));
     }
 
     @ParameterizedTest
