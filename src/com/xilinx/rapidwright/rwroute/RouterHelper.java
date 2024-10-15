@@ -148,6 +148,9 @@ public class RouterHelper {
         Node source = output.getConnectedNode();
         int watchdog = 20;
 
+        // Only block clocking tiles if source is not in a clock tile
+        final boolean blockClocking = !Utils.isClocking(source.getTile().getTileTypeEnum());
+
         // Starting from the SPI's connected node, perform a downhill breadth-first search
         Queue<Node> queue = new ArrayDeque<>();
         queue.add(source);
@@ -160,7 +163,7 @@ public class RouterHelper {
                     // Return node that has at least one downhill in the INT tile
                     return node;
                 }
-                if (Utils.isClocking(downhillTileType)) {
+                if (blockClocking && Utils.isClocking(downhillTileType)) {
                     continue;
                 }
                 queue.add(downhill);
