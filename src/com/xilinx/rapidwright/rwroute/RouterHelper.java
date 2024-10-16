@@ -148,6 +148,9 @@ public class RouterHelper {
         Node source = output.getConnectedNode();
         int watchdog = 20;
 
+        // Only block clocking tiles if source is not in a clock tile
+        final boolean blockClocking = !Utils.isClocking(source.getTile().getTileTypeEnum());
+
         // Starting from the SPI's connected node, perform a downhill breadth-first search
         Queue<Node> queue = new ArrayDeque<>();
         queue.add(source);
@@ -160,7 +163,7 @@ public class RouterHelper {
                     // Return node that has at least one downhill in the INT tile
                     return node;
                 }
-                if (Utils.isClocking(downhillTileType)) {
+                if (blockClocking && Utils.isClocking(downhillTileType)) {
                     continue;
                 }
                 queue.add(downhill);
@@ -606,6 +609,10 @@ public class RouterHelper {
         Queue<NodeWithPrev> queue = new LinkedList<>();
         queue.add(sourcer);
 
+        // Only block clocking tiles if both source and sink are not in a clock tile
+        final boolean blockClocking = !Utils.isClocking(source.getTile().getTileTypeEnum()) &&
+                !Utils.isClocking(sink.getTile().getTileTypeEnum());
+
         int watchdog = 10000;
         boolean success = false;
         while (!queue.isEmpty()) {
@@ -619,7 +626,7 @@ public class RouterHelper {
                 break;
             }
             for (Node n : curr.getAllDownhillNodes()) {
-                if (Utils.isClocking(n.getTile().getTileTypeEnum())) {
+                if (blockClocking && Utils.isClocking(n.getTile().getTileTypeEnum())) {
                     continue;
                 }
                 NodeWithPrev child = new NodeWithPrev(n);

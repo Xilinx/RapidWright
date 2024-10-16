@@ -29,6 +29,7 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
@@ -47,24 +48,37 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
 public class TestRouterHelper {
     @ParameterizedTest
     @CsvSource({
-            "SLICE_X0Y0,COUT,null",
-            "SLICE_X0Y299,COUT,null",
-            "SLICE_X0Y0,A_O,CLEL_R_X0Y0/CLE_CLE_L_SITE_0_A_O",
-            "GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,null",
-            "IOB_X1Y95,I,INT_INTF_L_IO_X72Y109/LOGIC_OUTS_R23"
+            "xcvu3p,SLICE_X0Y0,COUT,null",
+            "xcvu3p,SLICE_X0Y299,COUT,null",
+            "xcvu3p,SLICE_X0Y0,A_O,CLEL_R_X0Y0/CLE_CLE_L_SITE_0_A_O",
+            "xcvu3p,GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,null",
+            "xcvu3p,IOB_X1Y95,I,INT_INTF_L_IO_X72Y109/LOGIC_OUTS_R23",
+            "xcvu3p,MMCM_X0Y0,LOCKED,INT_INTF_L_IO_X36Y54/LOGIC_OUTS_R0",
+            "xcvp1002,MMCM_X2Y0,LOCKED,BLI_CLE_BOT_CORE_X27Y0/LOGIC_OUTS_D23"
     })
-    public void testProjectOutputPinToINTNode(String siteName, String pinName, String nodeAsString) {
-        Design design = new Design("design", "xcvu3p");
+    public void testProjectOutputPinToINTNode(String partName, String siteName, String pinName, String nodeAsString) {
+        Design design = new Design("design", partName);
         SiteInst si = design.createSiteInst(siteName);
         SitePinInst spi = new SitePinInst(pinName, si);
         Assertions.assertEquals(nodeAsString, String.valueOf(RouterHelper.projectOutputPinToINTNode(spi)));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvu3p,MMCM_X0Y0,PSEN,INT_X36Y56/IMUX_W0",
+            "xcvp1002,MMCM_X2Y0,PSEN,INT_X27Y0/IMUX_B_W24"
+    })
+    public void testProjectInputPinToINTNode(String partName, String siteName, String pinName, String nodeAsString) {
+        Design design = new Design("design", partName);
+        SiteInst si = design.createSiteInst(siteName);
+        SitePinInst spi = new SitePinInst(pinName, si);
+        Assertions.assertEquals(nodeAsString, String.valueOf(RouterHelper.projectInputPinToINTNode(spi)));
     }
 
     @ParameterizedTest
@@ -306,5 +320,19 @@ public class TestRouterHelper {
 
         // If not flattening/uniquifying, there must be no inverted pins
         Assertions.assertEquals(!flatten || !uniquify, invertedPins.isEmpty());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvp1002,XPIO_NIBBLE_SC_1_X9Y0/XPIO_IOBPAIR_5_RXOUT_M_PIN,CMT_MMCM_X11Y0/CMT_MMCM_TOP_0_CLKIN1_PIN",
+            "xcvp1002,CMT_MMCM_X11Y0/CMT_MMCM_TOP_0_CLKOUT0_PIN,CLK_REBUF_BUFGS_HSR_CORE_X8Y0/CLK_BUFGCE_59_I_PIN",
+    })
+    public void testFindPathBetweenNodes(String partName, String sourceNodeName, String sinkNodeName) {
+        Device device = Device.getDevice(partName);
+        Node sourceNode = device.getNode(sourceNodeName);
+        Node sinkNode = device.getNode(sinkNodeName);
+
+        List<Node> path = RouterHelper.findPathBetweenNodes(sourceNode, sinkNode);
+        Assertions.assertTrue(path.size() > 2);
     }
 }
