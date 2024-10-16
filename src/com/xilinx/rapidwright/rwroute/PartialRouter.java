@@ -40,8 +40,10 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -248,10 +250,12 @@ public class PartialRouter extends RWRoute {
         Set<Net> unpreserveNets = new HashSet<>();
         for (Connection connection : indirectConnections) {
             Net net = connection.getNetWrapper().getNet();
+            Net preservedNet;
+            assert((preservedNet = routingGraph.getPreservedNet(connection.getSourceRnode())) == null || preservedNet == net);
             RouteNode sinkRnode = connection.getSinkRnode();
-            Net unpreserveNet = routingGraph.getPreservedNet(sinkRnode);
-            if (unpreserveNet != null && unpreserveNet != net) {
-                unpreserveNets.add(unpreserveNet);
+            preservedNet = routingGraph.getPreservedNet(sinkRnode);
+            if (preservedNet != null && preservedNet != net) {
+                unpreserveNets.add(preservedNet);
                 assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
             }
         }
@@ -342,6 +346,8 @@ public class PartialRouter extends RWRoute {
             }
 
             if (net.hasPIPs()) {
+                final boolean isVersal = (design.getSeries() == Series.Versal);
+
                 // Create all nodes used by this net and set its previous pointer so that:
                 // (a) the routing for each connection can be recovered by
                 //      finishRouteConnection()
@@ -353,8 +359,28 @@ public class PartialRouter extends RWRoute {
 
                     // Do not include arcs that the router wouldn't explore
                     // e.g. those that leave the INT tile, since we project pins to their INT tile
-                    if (routingGraph.isExcludedTile(end))
+                    if (routingGraph.isExcludedTile(end)) {
                         continue;
+                    }
+
+                    if (isVersal) {
+                        // Skip all PIPs downstream from a NODE_INTF_CTRL (since that is the intent that
+                        // RouterHelper.projectInputPinToINTNode() will terminate at)
+                        // NODE_INTF_CTRL -> NODE_PINFEED -> NODE_IRI -> NODE_IRI -> NODE_PINFEED (site pin)
+
+                        IntentCode startIntent = start.getIntentCode();
+                        if (startIntent == IntentCode.NODE_INTF_CTRL || startIntent == IntentCode.NODE_IRI) {
+                            continue;
+                        }
+
+                        IntentCode endIntent = end.getIntentCode();
+                        if (endIntent == IntentCode.NODE_IRI ||
+                                // Skip NODE_OUTPUT -> NODE_INTF[24] since RouterHelper.projectOutputPinToINTNode()
+                                // terminates at the latter
+                                endIntent == IntentCode.NODE_INTF2 || endIntent == IntentCode.NODE_INTF4) {
+                            continue;
+                        }
+                    }
 
                     RouteNode rstart = routingGraph.getOrCreate(start);
                     RouteNode rend = routingGraph.getOrCreate(end);
