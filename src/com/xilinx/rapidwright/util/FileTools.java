@@ -1929,17 +1929,27 @@ public class FileTools {
     }
 
     /**
+     * Gets the full path to an executable if it is set in the PATH
+     * environment variable. Works for Windows and Linux.
+     * @param exe Executable to search for (e.g. vivado)
+     * @return Full path to executable, or throws RuntimeException if not found.
+     */
+    public static String getPath(String exe) {
+        String[] cmd = new String[]{isWindows() ? "where" : "which", exe};
+        final List<String> fullOutput = execCommandGetOutput(true, cmd);
+        if (fullOutput.isEmpty() || fullOutput.get(0).contains("INFO:") || fullOutput.get(0).contains("which: no")) {
+            throw new RuntimeException("ERROR: Couldn't find " + exe + " on PATH");
+        }
+        return fullOutput.get(0).trim().replace("\\", "/");
+    }
+
+    /**
      * Gets the full path to the vivado executable if it is set in the PATH
      * environment variable. Works for Windows and Linux.
      * @return Full path to vivado executable, or throws RuntimeException if not found.
      */
     public static String getVivadoPath() {
-        String[] cmd = new String[]{isWindows() ? "where" : "which",isWindows() ? "vivado.bat" : "vivado"};
-        final List<String> fullOutput = execCommandGetOutput(true, cmd);
-        if (fullOutput.isEmpty() || fullOutput.get(0).contains("INFO:") || fullOutput.get(0).contains("which: no")) {
-            throw new RuntimeException("ERROR: Couldn't find vivado on PATH");
-        }
-        return fullOutput.get(0).trim().replace("\\", "/");
+        return getPath(isWindows() ? "vivado.bat" : "vivado");
     }
 
     private static String currentOS = null;
