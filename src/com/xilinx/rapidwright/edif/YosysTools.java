@@ -27,13 +27,12 @@ import com.xilinx.rapidwright.util.FileTools;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class YosysTools {
     public static final String yosysExec = "yosys";
 
-    public static final String SYNTH_XILINX = " synth_xilinx";
+    public static final String SYNTH_XILINX = "synth_xilinx";
 
     public static final String SYNTH_XILINX_FLAG_FAMILY_XCUP = " -family xcup";
     public static final String SYNTH_XILINX_FLAG_EDIF = " -edif ";
@@ -62,7 +61,6 @@ public class YosysTools {
         String command = SYNTH_XILINX;
         command += SYNTH_XILINX_FLAG_EDIF + edf;
         command += flags;
-        command += "; dump";
         run(command, workDir, paths);
         return EDIFTools.readEdifFile(edf);
     }
