@@ -1671,7 +1671,16 @@ public class FileTools {
      *         problem it returns null.
      */
     public static Integer runCommand(String[] command, boolean verbose, String[] environ, File runDir) {
-        if (verbose) System.out.println(command);
+        if (verbose) {
+            for (String c : command) {
+                if (c.contains(" ")) {
+                    System.out.print(" \"" + c.replace("\"", "\\\"") + "\"");
+                } else {
+                    System.out.print(" " + c);
+                }
+            }
+            System.out.println();
+        }
         int returnValue = 0;
         Process p = null;
         try {
