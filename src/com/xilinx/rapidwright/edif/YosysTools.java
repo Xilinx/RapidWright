@@ -47,7 +47,7 @@ public class YosysTools {
      */
     public static void run(String command, Path workDir, Path... paths) {
         List<String> exec = new ArrayList<>();
-        exec.add(FileTools.getPath(yosysExec));
+        exec.add(FileTools.getExecutablePath(yosysExec));
         exec.add("-p");
         exec.add(command);
         for (Path path : paths) {
