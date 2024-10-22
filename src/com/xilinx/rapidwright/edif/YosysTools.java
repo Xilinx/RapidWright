@@ -39,6 +39,12 @@ public class YosysTools {
     public static final String SYNTH_XILINX_FLAG_FLATTEN = " -flatten";
     public static final String SYNTH_XILINX_FLAG_OUT_OF_CONTEXT = " -noclkbuf -noiopad";
 
+    /**
+     * Run the given command string in Yosys, on the files given.
+     * @param command Yosys command(s), separated by ';'
+     * @param workDir Working directory
+     * @param paths Path objects of input files
+     */
     public static void run(String command, Path workDir, Path... paths) {
         List<String> exec = new ArrayList<>();
         exec.add(FileTools.getPath(yosysExec));
@@ -56,8 +62,16 @@ public class YosysTools {
         }
     }
 
+    /**
+     * Call Yosys' 'synth_xilinx' command with the given flags on the files given.
+     * @param flags String with flags to be provided to 'synth_xilinx', in addition to
+     *              '-edif <workDir>/output.edf'.
+     * @param workDir Working directory
+     * @param paths Path objects of input files
+     * @return EDIFNetlist object of Yosys' result
+     */
     public static EDIFNetlist synthXilinxWithWorkDir(String flags, Path workDir, Path... paths) {
-        final Path edf = workDir.resolve("netlist.edf");
+        final Path edf = workDir.resolve("output.edf");
         String command = SYNTH_XILINX;
         command += SYNTH_XILINX_FLAG_EDIF + edf;
         command += flags;
@@ -65,10 +79,24 @@ public class YosysTools {
         return EDIFTools.readEdifFile(edf);
     }
 
+    /**
+     * Call Yosys' 'synth_xilinx' command with the default flags '-family xcvup -flatten
+     * -edif <workDir>/output.edf' on the files given.
+     * @param workDir Working directory
+     * @param paths Path objects of input files
+     * @return EDIFNetlist object of Yosys' result
+     */
     public static EDIFNetlist synthXilinxWithWorkDir(Path workDir, Path... paths) {
         return synthXilinxWithWorkDir(SYNTH_XILINX_FLAG_FAMILY_XCUP + SYNTH_XILINX_FLAG_FLATTEN, workDir, paths);
     }
 
+    /**
+     * Call Yosys' 'synth_xilinx' command with the given flags on the files given.
+     * @param flags String with flags to be provided to 'synth_xilinx', in addition to
+     *              '-edif <workDir>/output.edf'.
+     * @param paths Path objects of input files
+     * @return EDIFNetlist object of Yosys' result
+     */
     public static EDIFNetlist synthXilinx(String flags, Path... paths) {
         final Path workDir = FileSystems.getDefault()
                 .getPath("yosysToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
@@ -80,6 +108,12 @@ public class YosysTools {
         return netlist;
     }
 
+    /**
+     * Call Yosys' 'synth_xilinx' command with the default flags '-family xcvup -flatten
+     * -edif <workDir>/output.edf' on the files given.
+     * @param paths Path objects of input files
+     * @return EDIFNetlist object of Yosys' result
+     */
     public static EDIFNetlist synthXilinx(Path... paths) {
         final Path workDir = FileSystems.getDefault()
                 .getPath("yosysToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
