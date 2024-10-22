@@ -1941,7 +1941,7 @@ public class FileTools {
      * @param exe Executable to search for (e.g. vivado)
      * @return Full path to executable, or throws RuntimeException if not found.
      */
-    public static String getPath(String exe) {
+    public static String getExecutablePath(String exe) {
         String[] cmd = new String[]{isWindows() ? "where" : "which", exe};
         final List<String> fullOutput = execCommandGetOutput(true, cmd);
         if (fullOutput.isEmpty() || fullOutput.get(0).contains("INFO:") || fullOutput.get(0).contains("which: no")) {
@@ -1956,7 +1956,7 @@ public class FileTools {
      * @return Full path to vivado executable, or throws RuntimeException if not found.
      */
     public static String getVivadoPath() {
-        return getPath(isWindows() ? "vivado.bat" : "vivado");
+        return getExecutablePath(isWindows() ? "vivado.bat" : "vivado");
     }
 
     private static String currentOS = null;
