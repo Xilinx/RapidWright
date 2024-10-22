@@ -492,7 +492,7 @@ public class RWRoute {
         List<SitePinInst> sinks = staticNet.getSinkPins();
         if (sinks.size() > 0) {
             staticNet.unroute();
-            // Remove all output pins from unouted net as those used will be repopulated
+            // Remove all output pins from unrouted net as those used will be repopulated
             staticNet.getPins().removeIf(SitePinInst::isOutPin);
 
             // Preserve all pins (e.g. in case of BOUNCE nodes that may serve as a site pin)

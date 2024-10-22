@@ -346,7 +346,7 @@ public class PartialRouter extends RWRoute {
             }
 
             if (net.hasPIPs()) {
-                final boolean isVersal = (design.getSeries() == Series.Versal);
+                final boolean isVersal = design.getSeries() == Series.Versal;
 
                 // Create all nodes used by this net and set its previous pointer so that:
                 // (a) the routing for each connection can be recovered by
