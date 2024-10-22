@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.edif;
 
 import com.xilinx.rapidwright.util.FileTools;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -40,6 +41,8 @@ public class TestYosysTools {
 
     @Test
     void testSynthXilinx(@TempDir Path workDir) {
+        Assumptions.assumeTrue(YosysTools.isYosysOnPath());
+
         Path input = workDir.resolve("input.v");
         FileTools.writeStringToTextFile(verilogFd, input.toString());
         EDIFNetlist netlist = YosysTools.synthXilinxWithWorkDir(workDir, input);
@@ -86,6 +89,8 @@ public class TestYosysTools {
 
     @Test
     void testSynthXilinxMultiFile(@TempDir Path workDir) {
+        Assumptions.assumeTrue(YosysTools.isYosysOnPath());
+
         Path input1 = workDir.resolve("input1.v");
         FileTools.writeStringToTextFile(verilogHier1, input1.toString());
 

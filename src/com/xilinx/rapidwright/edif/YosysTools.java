@@ -124,4 +124,12 @@ public class YosysTools {
         FileTools.deleteFolder(workDir.toString());
         return netlist;
     }
+
+    /**
+     * Checks if yosys is available on current PATH (uses unix 'which' or windows 'where').
+     * @return true if yosys is on current PATH, false otherwise.
+     */
+    public static boolean isYosysOnPath() {
+        return FileTools.isExecutableOnPath("yosys");
+    }
 }
