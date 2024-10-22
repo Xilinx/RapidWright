@@ -1715,9 +1715,7 @@ public class FileTools {
         System.out.println("Log File: " + logFileName);
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.redirectErrorStream(true);
-        if (logFileName != null) {
-            pb.redirectOutput(new File(logFileName));
-        }
+        pb.redirectOutput(new File(logFileName));
         Process p = null;
         int returnVal = -1;
         try {
