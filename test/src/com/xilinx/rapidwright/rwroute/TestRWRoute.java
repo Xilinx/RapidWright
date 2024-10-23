@@ -393,7 +393,8 @@ public class TestRWRoute {
 
         Assertions.assertTrue(srcSpi.isRouted());
         Assertions.assertTrue(dstSpi.isRouted());
-        Assertions.assertTrue(Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped")) <= nodesPoppedLimit);
+        long nodesPopped = Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped"));
+        Assertions.assertTrue(nodesPopped >= (nodesPoppedLimit - 100) && nodesPopped <= nodesPoppedLimit);
     }
 
     @ParameterizedTest
@@ -405,14 +406,14 @@ public class TestRWRoute {
             "SLICE_X0Y299,SLICE_X0Y300,200",    // Far from Laguna column
             "SLICE_X0Y300,SLICE_X0Y299,200",
             "SLICE_X53Y299,SLICE_X53Y300,200",  // Equidistant from two Laguna columns
-            "SLICE_X53Y300,SLICE_X53Y299,700",
+            "SLICE_X53Y300,SLICE_X53Y299,1300",
             // Perfect
             "SLICE_X9Y241,SLICE_X9Y300,200",
             "SLICE_X9Y300,SLICE_X9Y241,100",
             "SLICE_X9Y358,SLICE_X9Y299,100",
             "SLICE_X9Y299,SLICE_X9Y358,200",
-            "SLICE_X53Y241,SLICE_X69Y300,500",
-            "SLICE_X53Y358,SLICE_X69Y299,500",
+            "SLICE_X53Y241,SLICE_X69Y300,600",
+            "SLICE_X53Y358,SLICE_X69Y299,600",
             // Far
             "SLICE_X9Y240,SLICE_X9Y359,100",    // On Laguna
             "SLICE_X9Y359,SLICE_X9Y240,200",
@@ -429,8 +430,8 @@ public class TestRWRoute {
             "SLICE_X79Y0,SLICE_X79Y899,200",    // Straight up: next to Laguna column
             "SLICE_X0Y0,SLICE_X0Y899,600",      // Straight up: far from Laguna column
             "SLICE_X168Y0,SLICE_X168Y899,400",  // Straight up: far from Laguna column
-            "SLICE_X9Y0,SLICE_X162Y899,1000",   // Up and right
-            "SLICE_X168Y162,SLICE_X9Y899,600",  // Up and left
+            "SLICE_X9Y0,SLICE_X162Y899,700",    // Up and right
+            "SLICE_X168Y162,SLICE_X9Y899,1200", // Up and left
     })
     public void testSLRCrossingNonTimingDriven(String srcSiteName, String dstSiteName, long nodesPoppedLimit) {
         testSingleConnectionHelper(Device.AWS_F1, srcSiteName, "AQ", dstSiteName, "A1", nodesPoppedLimit);
@@ -515,7 +516,7 @@ public class TestRWRoute {
             "xcvu3p,GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,BUFG_GT_X0Y78,CLK_IN,0", // (dst pin can be projected to INT but not src pin)
 
             // Non-dedicated connections
-            "xcvu3p,IOB_X0Y47,I,SLICE_X77Y122,FX,600",
+            "xcvu3p,IOB_X0Y47,I,SLICE_X77Y122,FX,100",
 
             // 240 CLB height SLR, no LAG tiles on Y0 (since HBM on bottom edge)
             "xcu50,SLICE_X38Y239,AQ,SLICE_X38Y240,A1,500"

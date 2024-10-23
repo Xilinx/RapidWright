@@ -25,6 +25,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 
@@ -58,9 +59,16 @@ public enum RouteNodeType {
     LAGUNA_I,
 
     /**
-     * Denotes other wiring {@link RouteNode} Objects
-     * that are created for routing {@link Connection} Objects.
+     * Denotes general purpose {@link RouteNode} objects.
      */
-    WIRE
+    WIRE,
 
+    /**
+     * Denotes {@link RouteNode} objects that should be treated as being inaccessible and
+     * never queued for exploration during routing. Typically, these are routing nodes that
+     * have already been created but later discovered to not be needed (e.g. is a dead-end node).
+     */
+    INACCESSIBLE;
+
+    public static final RouteNodeType[] values = values();
 }

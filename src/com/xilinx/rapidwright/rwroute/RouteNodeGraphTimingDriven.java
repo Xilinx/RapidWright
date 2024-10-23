@@ -70,17 +70,10 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
         }};
     }
 
-    public RouteNodeGraphTimingDriven(Design design,
-                                      RWRouteConfig config,
-                                      DelayEstimatorBase delayEstimator) {
-        this(design, config, delayEstimator, new HashMap<>());
-    }
-
     protected RouteNodeGraphTimingDriven(Design design,
                                          RWRouteConfig config,
-                                         DelayEstimatorBase delayEstimator,
-                                         Map<Tile, RouteNode[]> nodesMap) {
-        super(design, config, nodesMap);
+                                         DelayEstimatorBase delayEstimator) {
+        super(design, config);
         this.delayEstimator = delayEstimator;
         this.maskNodesCrossRCLK = config.isMaskNodesCrossRCLK();
 

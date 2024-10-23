@@ -341,12 +341,11 @@ public class GlobalSignalRouting {
                                       Function<Node,NodeStatus> getNodeState,
                                       Design design, RouteThruHelper routeThruHelper) {
         NetType netType = currNet.getType();
-        Set<PIP> netPIPs = new HashSet<>(currNet.getPIPs());
         Queue<Node> q = new ArrayDeque<>();
         Set<Node> usedRoutingNodes = new HashSet<>();
         Map<Node, Node> prevNode = new HashMap<>();
         List<Node> pathNodes = new ArrayList<>();
-        Set<SitePin> sitePinsToCreate = new HashSet<>();
+        List<SitePin> sitePinsToCreate = new ArrayList<>();
         final Node INVALID_NODE = new Node(null, Integer.MAX_VALUE);
         assert(INVALID_NODE.isInvalidNode());
 
@@ -553,7 +552,9 @@ public class GlobalSignalRouting {
 
                     // Note that the static net router goes backward from sinks to sources,
                     // requiring the srcToSinkOrder parameter to be set to true below
-                    netPIPs.addAll(RouterHelper.getPIPsFromNodes(pathNodes, true));
+                    for (PIP pip : RouterHelper.getPIPsFromNodes(pathNodes, true)) {
+                        currNet.addPIP(pip);
+                    }
 
                     pathNodes.clear();
                     sink.setRouted(true);
@@ -564,6 +565,7 @@ public class GlobalSignalRouting {
             }
         }
 
+        assert(sitePinsToCreate.stream().distinct().count() == sitePinsToCreate.size());
         for (SitePin sitePin : sitePinsToCreate) {
             Site site = sitePin.getSite();
             SiteInst si = design.getSiteInstFromSite(site);
@@ -591,8 +593,6 @@ public class GlobalSignalRouting {
             currNet.addPin(spi, updateSiteRouting);
             spi.setRouted(true);
         }
-
-        currNet.setPIPs(netPIPs);
     }
 
     /**
