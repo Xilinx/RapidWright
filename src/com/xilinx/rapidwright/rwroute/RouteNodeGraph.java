@@ -112,6 +112,8 @@ public class RouteNodeGraph {
     protected final static int MAX_OCCUPANCY = 256;
     protected final float[] presentCongestionCosts;
 
+    protected final boolean isVersal;
+
     protected static int getTileCount(Design design) {
         Device device = design.getDevice();
         return device.getColumns() * device.getRows();
@@ -289,6 +291,7 @@ public class RouteNodeGraph {
         }
 
         presentCongestionCosts = new float[MAX_OCCUPANCY];
+        isVersal = series == Series.Versal;
     }
 
     public void initialize() {
@@ -353,7 +356,7 @@ public class RouteNodeGraph {
                 String pinName = pin.getName();
                 char lutLetter = pinName.charAt(0);
                 String otherPinName = null;
-                String otherPinNameSuffix = design.getSeries() == Series.Versal ? "Q" : "MUX";
+                String otherPinNameSuffix = isVersal ? "Q" : "MUX";
                 if (pinName.endsWith(otherPinNameSuffix)) {
                     otherPinName = lutLetter + "_O";
                 } else if (pinName.endsWith("_O")) {
@@ -650,6 +653,15 @@ public class RouteNodeGraph {
 
     protected boolean allowRoutethru(Node head, Node tail) {
         if (!Utils.isCLB(tail.getTile().getTileTypeEnum())) {
+            return false;
+        }
+
+        if (tail.getIntentCode() == IntentCode.NODE_PINFEED) {
+            assert(isVersal);
+            assert(head.getIntentCode() == IntentCode.NODE_IMUX ||
+                   head.getIntentCode() == IntentCode.NODE_PINBOUNCE ||
+                   head.getIntentCode() == IntentCode.NODE_CLE_CTRL ||
+                   head.getIntentCode() == IntentCode.NODE_INTF_CTRL);
             return false;
         }
 

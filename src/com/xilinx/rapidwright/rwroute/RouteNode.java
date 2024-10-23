@@ -245,7 +245,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
             case PINFEED_O:
                 // Only setBaseCost() is called on creation; getBaseCost() should
                 // never be called
-                assert(getLength() == 0);
+                assert(getLength() == 0 ||
+                       (getLength() <= 3 && (getIntentCode() == IntentCode.NODE_INTF2 || getIntentCode() == IntentCode.NODE_INTF4)));
                 break;
             default:
                 throw new RuntimeException(getType().toString());
