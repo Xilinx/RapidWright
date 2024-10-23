@@ -293,6 +293,64 @@ public class TestRWRoute {
         VivadoToolsHelper.assertFullyRouted(design);
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testNonTimingDrivenRoutingOnVersalDevice(boolean partial) {
+        // Note: there are no global clocks in this design, just a local clock that doesn't use a BUFG
+        Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        design.setTrackNetChanges(true);
+
+        int expectedNetsModified = 290;
+        if (partial) {
+            // Pseudo-randomly unroute at least one pin from each net
+            Random random = new Random(0);
+            Net Z_NET = design.createNet(Net.Z_NET);
+            for (Net net : design.getNets()) {
+                List<SitePinInst> sinkPins = net.getSinkPins();
+                if (sinkPins.isEmpty()) {
+                    continue;
+                }
+
+                if (net.getName().equals("processor/address_loop[6].output_data.pc_vector_mux_lut/O6")) {
+                    // For one hand chosen net, unroute it entirely and block
+                    // all of its primary output's downhill PIPs such that 
+                    // the alternate output must be used
+                    net.unroute();
+                    Node sourcePinNode = net.getSource().getConnectedNode();        // CLE_W_CORE_X50Y6/CLE_SLICEL_TOP_0_D_O_PIN
+                    Node sourceNode = sourcePinNode.getAllDownhillNodes().get(0);   // CLE_W_CORE_X50Y6/CLE_SLICEL_TOP_0_D_O
+                    design.setTrackingChanges(false);
+                    for (PIP pip : sourceNode.getAllDownhillPIPs()) {
+                        Z_NET.addPIP(pip);
+                    }
+                    design.setTrackingChanges(true);
+                }
+
+                Collections.shuffle(sinkPins, random);
+                int numPinsToUnroute = random.nextInt(sinkPins.size()) + 1;
+                List<SitePinInst> sinkPinsToUnroute = sinkPins.subList(0, numPinsToUnroute);
+                DesignTools.unroutePins(net, sinkPinsToUnroute);
+            }
+
+            boolean softPreserve = false;
+            PartialRouter.routeDesignPartialNonTimingDriven(design, null, softPreserve);
+        } else {
+            RWRoute.routeDesignFullNonTimingDriven(design);
+        }
+
+        Assertions.assertEquals(expectedNetsModified, design.getModifiedNets().size());
+        for (Net net : design.getModifiedNets()) {
+            assertAllPinsRouted(net);
+        }
+
+        if (FileTools.isVivadoOnPath()) {
+            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            Assertions.assertEquals(290, rrs.fullyRoutedNets);
+            Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
+            Assertions.assertEquals(8, rrs.unroutedNets); // There are 8 nets driven from a blackbox cell;
+                                                                    // these are marked as routable despite not being so
+        }
+    }
+
     /**
      * Tests timing driven partial routing.
      * The picoblaze design is from one of the RapidWright tutorials with nets between computing kernels not routed.

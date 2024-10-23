@@ -133,22 +133,27 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 // NOTE: IntentCode is device-dependent
                 IntentCode ic = getIntentCode();
                 switch(ic) {
-                    case NODE_OUTPUT:       // LUT route-thru
-                    case NODE_CLE_OUTPUT:
-                    case NODE_LAGUNA_OUTPUT:
-                    case NODE_LAGUNA_DATA:  // US+: U-turn SLL at the boundary of the device
+                    case NODE_OUTPUT:        // CLE/LAGUNA_TILE/BRAM/etc. outputs (US)
+                                             // LAG_LAG.LAG_LAGUNA_SITE_*_{T,R}XQ* (US+)
+                    case NODE_CLE_OUTPUT:    // CLE outputs (US+ and Versal)
+                    case NODE_LAGUNA_OUTPUT: // LAG_LAG.{LAG_MUX_ATOM_*_TXOUT,RXD*} (US+)
+                    case NODE_LAGUNA_DATA:   // LAG_LAG.UBUMP* super long lines for u-turns at the boundary of the device (US+)
                     case NODE_PINFEED:
                         assert(length == 0);
                         break;
-                    case NODE_LOCAL:
+                    case NODE_LOCAL:    // US and US+
                     case INTENT_DEFAULT:
                         assert(length <= 1);
                         break;
-                    case NODE_SINGLE:
+                    case NODE_VSINGLE: // Versal-only
+                    case NODE_HSINGLE: // Versal-only
+                    case NODE_SINGLE:  // US and US+
                         assert(length <= 2);
                         if (length == 2) baseCost *= length;
                         break;
-                    case NODE_DOUBLE:
+                    case NODE_VDOUBLE: // Versal only
+                    case NODE_HDOUBLE: // Versal only
+                    case NODE_DOUBLE:  // US and US+
                         if (endTileXCoordinate != getTile().getTileXCoordinate()) {
                             assert(length <= 2);
                             // Typically, length = 1 (since tile X is not equal)
@@ -169,12 +174,42 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         // In case of U-turn nodes
                         if (length != 0) baseCost = 0.15f * length;// VQUADs have length 4 and 5
                         break;
-                    case NODE_HLONG:
+                    case NODE_HLONG6:  // Versal only
+                    case NODE_HLONG10: // Versal only
+                        baseCost = 0.15f * (length == 0 ? 1 : length);
+                        break;
+                    case NODE_HLONG: // US/US+
                         assert (length != 0 || getAllDownhillNodes().isEmpty());
                         baseCost = 0.15f * length;// HLONGs have length 6 and 7
                         break;
-                    case NODE_VLONG:
+                    case NODE_VLONG7:  // Versal only
+                    case NODE_VLONG12: // Versal only
+                        baseCost = 0.15f * (length == 0 ? 1 : length);
+                        break;
+                    case NODE_VLONG:   // US/US+
                         baseCost = 0.7f;
+                        break;
+
+                    // Versal only
+                    case NODE_SDQNODE:      // INT.INT_NODE_SDQ_ATOM_*_OUT[01]
+                                            // INT.OUT_[NESW]NODE_[EW]_*
+                        assert(length == 0 ||
+                               // Feedthrough nodes to reach tiles immediately above/below
+                               (length == 1 && getWireName().matches("OUT_[NESW]NODE_[EW]_\\d+")));
+                        break;
+                    case NODE_INODE:        // INT.INT_NODE_IMUX_ATOM_*_INT_OUT[01]
+                    case NODE_IMUX:         // INT.IMUX_B_[EW]*
+                    case NODE_CLE_CTRL:     // CLE_BC_CORE*.CTRL_[LR]_B*
+                    case NODE_INTF_CTRL:    // INTF_[LR]OCF_[TB][LR]_TILE.INTF_IRI*
+                        assert(length == 0);
+                        break;
+                    case NODE_CLE_BNODE:    // CLE_BC_CORE*.BNODE_OUTS_[EW]*
+                    case NODE_CLE_CNODE:    // CLE_BC_CORE*.CNODE_OUTS_[EW]*
+                    case NODE_INTF_BNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_BNODE_OUTS*
+                    case NODE_INTF_CNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_CNODE_OUTS*
+                        // length == 1 because one side of BCNODE-s are shared between CLE_W_CORE_XaYb and CLE_E_CORE_X(a+1)Yb
+                        // or CLE_W_CORE_X(a-1)Yb and CLE_E_CORE_XaYb
+                        assert(length <= 1);
                         break;
                     default:
                         throw new RuntimeException(ic.toString());
