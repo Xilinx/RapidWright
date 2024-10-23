@@ -312,8 +312,9 @@ public class TestRWRoute {
                 }
 
                 if (net.getName().equals("processor/address_loop[6].output_data.pc_vector_mux_lut/O6")) {
-                    // For one hand chosen net, block all its downhill PIPs such that
-                    // its output pin
+                    // For one hand chosen net, unroute it entirely and block
+                    // all of its primary output's downhill PIPs such that 
+                    // the alternate output must be used
                     net.unroute();
                     Node sourcePinNode = net.getSource().getConnectedNode();        // CLE_W_CORE_X50Y6/CLE_SLICEL_TOP_0_D_O_PIN
                     Node sourceNode = sourcePinNode.getAllDownhillNodes().get(0);   // CLE_W_CORE_X50Y6/CLE_SLICEL_TOP_0_D_O
