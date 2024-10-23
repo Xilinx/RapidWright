@@ -268,11 +268,10 @@ public class GlobalSignalRouting {
         for (SitePinInst p : clkPins) {
             if (p.isOutPin()) continue;
             assert(lcbCandidates.isEmpty());
-            List<Node> intNodes = RouterHelper.projectInputPinToINTNode(p);
-            if (intNodes == null || intNodes.isEmpty()) {
+            Node intNode = RouterHelper.projectInputPinToINTNode(p);
+            if (intNode == null) {
                 throw new RuntimeException("Unable to get INT tile for pin " + p);
             }
-            Node intNode = intNodes.get(0);
 
             outer: for (Node prev : intNode.getAllUphillNodes()) {
                 NodeStatus prevNodeStatus = getNodeStatus.apply(prev);

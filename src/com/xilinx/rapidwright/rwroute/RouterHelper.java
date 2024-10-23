@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -51,6 +52,7 @@ import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
@@ -142,28 +144,26 @@ public class RouterHelper {
      * @return A node that connects to an INT tile from an output pin.
      */
     public static Node projectOutputPinToINTNode(SitePinInst output) {
-        int watchdog = 5;
+        Node source = output.getConnectedNode();
+        int watchdog = 20;
 
-        // Starting from the SPI's connected node, for each node in queue
-        // return the first downhill node that is in an Interconnect tile.
-        // Otherwise, restart the queue with all such downhill nodes and repeat.
-        // No backtracking.
+        // Only block clocking tiles if source is not in a clock tile
+        final boolean blockClocking = !Utils.isClocking(source.getTile().getTileTypeEnum());
+
+        // Starting from the SPI's connected node, perform a downhill breadth-first search
         Queue<Node> queue = new ArrayDeque<>();
-        queue.add(output.getConnectedNode());
+        queue.add(source);
         while (!queue.isEmpty() && watchdog >= 0) {
             Node node = queue.poll();
             watchdog--;
-            assert(!Utils.isInterConnect(node.getTile().getTileTypeEnum()));
-
-            List<Node> downhillNodes = node.getAllDownhillNodes();
-            if (downhillNodes.isEmpty()) {
-                continue;
-            }
-
-            queue.clear();
-            for (Node downhill : downhillNodes) {
-                if (Utils.isInterConnect(downhill.getTile().getTileTypeEnum())) {
+            for (Node downhill : node.getAllDownhillNodes()) {
+                TileTypeEnum downhillTileType = downhill.getTile().getTileTypeEnum();
+                if (Utils.isInterConnect(downhillTileType)) {
+                    // Return node that has at least one downhill in the INT tile
                     return node;
+                }
+                if (blockClocking && Utils.isClocking(downhillTileType)) {
+                    continue;
                 }
                 queue.add(downhill);
             }
@@ -175,48 +175,45 @@ public class RouterHelper {
     /**
      * Gets a list of {@link Node} instances that connect an input {@link SitePinInst} instance to an INT {@link Tile} instance.
      * @param input The input pin.
-     * @return A list of nodes from the input SitePinInst to an INT tile.
+     * @return A node that connects to an INT tile from an input pin.
      */
-    public static List<Node> projectInputPinToINTNode(SitePinInst input) {
-        List<Node> sinkToSwitchBoxPath = new ArrayList<>();
-        NodeWithPrev sink = new NodeWithPrev(input.getConnectedNode());
-        sink.setPrev(null);
-        Queue<NodeWithPrev> q = new LinkedList<>();
-        q.add(sink);
-        int watchdog = 1000;
-        while (!q.isEmpty()) {
-            NodeWithPrev n = q.poll();
-            if (n.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
-                while (n != null) {
-                    sinkToSwitchBoxPath.add(n);
-                    n = n.getPrev();
+    public static Node projectInputPinToINTNode(SitePinInst input) {
+        Node sink = input.getConnectedNode();
+        if (sink.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
+            return sink;
+        }
+        int watchdog = 40;
+
+        // Starting from the SPI's connected node, perform an uphill breadth-first search
+        Queue<Node> queue = new ArrayDeque<>();
+        queue.add(sink);
+        while (!queue.isEmpty() && watchdog >= 0) {
+            Node node = queue.poll();
+            watchdog--;
+            for (Node uphill : node.getAllUphillNodes()) {
+                TileTypeEnum uphillTileType = uphill.getTile().getTileTypeEnum();
+                if (uphillTileType == TileTypeEnum.INT ||
+                        // Versal only: Terminate at non INT (e.g. CLE_BC_CORE) tile type for CTRL pin inputs
+                        EnumSet.of(IntentCode.NODE_CLE_CTRL, IntentCode.NODE_INTF_CTRL).contains(uphill.getIntentCode())) {
+                    return uphill;
                 }
-                return sinkToSwitchBoxPath;
-            }
-            for (Node uphill : n.getAllUphillNodes()) {
-                if (uphill.getAllUphillNodes().size() == 0) {
+                if (Utils.isClocking(uphillTileType)) {
                     continue;
                 }
-                NodeWithPrev prev = new NodeWithPrev(uphill);
-                prev.setPrev(n);
-                q.add(prev);
-            }
-            watchdog--;
-            if (watchdog < 0) {
-                break;
+                queue.add(uphill);
             }
         }
 
-        return sinkToSwitchBoxPath;
+        return null;
     }
 
     public static Tile getUpstreamINTTileOfClkIn(SitePinInst clkIn) {
-        List<Node> pathToINTTile = projectInputPinToINTNode(clkIn);
-        if (pathToINTTile.isEmpty()) {
+        Node intNode = projectInputPinToINTNode(clkIn);
+        if (intNode == null) {
             throw new RuntimeException("ERROR: CLK_IN does not connect to INT Tile directly");
         }
 
-        return pathToINTTile.get(0).getTile();
+        return intNode.getTile();
     }
 
     /**
@@ -328,15 +325,26 @@ public class RouterHelper {
     public static Set<SitePinInst> invertPossibleGndPinsToVccPins(Design design,
                                                                   List<SitePinInst> pins,
                                                                   boolean invertLutInputs) {
+        final boolean isVersal = (design.getSeries() == Series.Versal);
         Net gndNet = design.getGndNet();
         Set<SitePinInst> toInvertPins = new HashSet<>();
         nextSitePin: for (SitePinInst spi : pins) {
             if (!spi.getNet().equals(gndNet))
                 throw new RuntimeException(spi.toString());
+            if (spi.isOutPin()) {
+                continue;
+            }
             SiteInst si = spi.getSiteInst();
             String siteWireName = spi.getSiteWireName();
             if (invertLutInputs && spi.isLUTInputPin()) {
-                Collection<Cell> connectedCells = DesignTools.getConnectedCells(spi);
+                BELPin spiBelPin;
+                if (isVersal) {
+                    // Walk through IMR before checking for connected cells
+                    spiBelPin = si.getBELPin(spi.getSiteWireName() + "_IMR", "Q");
+                } else {
+                    spiBelPin = spi.getBELPin();
+                }
+                Collection<Cell> connectedCells = DesignTools.getConnectedCells(spiBelPin, si);
                 if (connectedCells.isEmpty()) {
                     for (BELPin belPin : si.getSiteWirePins(siteWireName)) {
                         if (belPin.isSitePort()) {
@@ -407,10 +415,10 @@ public class RouterHelper {
                     if (!belPin.getBEL().canInvert()) {
                         continue;
                     }
-                    if (spi.getSite().getName().startsWith("RAM")) {
-                        if (belPin.getBELName().startsWith("CLK")) {
-                            continue;
-                        }
+                    // Emulate Vivado's behaviour and do not invert CLK* site pins
+                    if (Utils.isBRAM(spi.getSiteInst()) &&
+                            belPin.getBELName().startsWith("CLK")) {
+                        continue;
                     }
                     toInvertPins.add(spi);
                 }
@@ -482,9 +490,9 @@ public class RouterHelper {
         for (SitePinInst sink : net.getSinkPins()) {
             Node sinkNode = sink.getConnectedNode();
             if (sinkNode.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
-                List<Node> nodes = projectInputPinToINTNode(sink);
-                if (!nodes.isEmpty()) {
-                    sinkNode = nodes.get(0);
+                Node sinkINTNode = projectInputPinToINTNode(sink);
+                if (sinkINTNode != null) {
+                    sinkNode = sinkINTNode;
                 } else {
                     // Must be a direct connection (e.g. COUT -> CIN)
                 }
@@ -522,6 +530,7 @@ public class RouterHelper {
 
     /**
      * Find a path from a source node to a sink node.
+     * Intermediate nodes with tile type returning true for {@link Utils#isClocking(TileTypeEnum)} will be ignored.
      * @param source The source node.
      * @param sink The sink node.
      * @return A list of nodes making up the path.
@@ -541,6 +550,10 @@ public class RouterHelper {
         Queue<NodeWithPrev> queue = new LinkedList<>();
         queue.add(sourcer);
 
+        // Only block clocking tiles if both source and sink are not in a clock tile
+        final boolean blockClocking = !Utils.isClocking(source.getTile().getTileTypeEnum()) &&
+                !Utils.isClocking(sink.getTile().getTileTypeEnum());
+
         int watchdog = 10000;
         boolean success = false;
         while (!queue.isEmpty()) {
@@ -554,6 +567,9 @@ public class RouterHelper {
                 break;
             }
             for (Node n : curr.getAllDownhillNodes()) {
+                if (blockClocking && Utils.isClocking(n.getTile().getTileTypeEnum())) {
+                    continue;
+                }
                 NodeWithPrev child = new NodeWithPrev(n);
                 child.setPrev(curr);
                 queue.add(child);

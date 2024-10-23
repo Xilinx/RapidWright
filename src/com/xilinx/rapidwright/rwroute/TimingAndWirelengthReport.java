@@ -82,7 +82,7 @@ public class TimingAndWirelengthReport{
         System.out.println("\n");
         System.out.println("Total nodes: " + usedNodes);
         System.out.println("Total wirelength: " + wirelength);
-        RWRoute.printNodeTypeUsageAndWirelength(true, nodeTypeUsage, nodeTypeLength);
+        RWRoute.printNodeTypeUsageAndWirelength(true, nodeTypeUsage, nodeTypeLength, design.getSeries());
     }
 
     /**
@@ -95,7 +95,9 @@ public class TimingAndWirelengthReport{
             if (net.getSource().toString().contains("CLK")) continue;
             NetWrapper netplus = createNetWrapper(net);
             for (Node node : RouterHelper.getNodesOfNet(net)) {
-                if (node.getTile().getTileTypeEnum() != TileTypeEnum.INT) continue;
+                if (RouteNodeGraph.isExcludedTile(node)) {
+                    continue;
+                }
                 usedNodes++;
                 int wl = RouteNode.getLength(node);
                 wirelength += wl;
@@ -124,11 +126,11 @@ public class TimingAndWirelengthReport{
                 }
             }
             Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
-            List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
-            if (nodes.isEmpty()) {
+            Node sinkINTNode = RouterHelper.projectInputPinToINTNode(sink);
+            if (sinkINTNode == null) {
                 connection.setDirect(true);
             } else {
-                connection.setSinkRnode(routingGraph.getOrCreate(nodes.get(0), RouteNodeType.PINFEED_I));
+                connection.setSinkRnode(routingGraph.getOrCreate(sinkINTNode, RouteNodeType.PINFEED_I));
                 if (sourceINTNode == null) {
                     sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
                 }
