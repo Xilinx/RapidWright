@@ -40,9 +40,9 @@ public class TestReportRouteStatus {
         Design design = RapidWrightDCP.loadDCP("optical-flow.dcp");
         DesignTools.createMissingSitePinInsts(design);
         ReportRouteStatusResult rrs = ReportRouteStatus.reportRouteStatus(design);
-        Assertions.assertEquals(-1, rrs.logicalNets);
-        Assertions.assertEquals(58863, rrs.routableNets);
-        Assertions.assertEquals(58863, rrs.unroutedNets);
+        Assertions.assertEquals(185996, rrs.logicalNets);
+        Assertions.assertEquals(58865, rrs.routableNets);
+        Assertions.assertEquals(58865, rrs.unroutedNets);
         Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
     }
 }

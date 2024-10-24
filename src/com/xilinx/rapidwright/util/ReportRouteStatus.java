@@ -56,7 +56,7 @@ public class ReportRouteStatus {
 
         Collection<Net> nets = design.getNets();
         for (Net net : nets) {
-            if (!RouterHelper.isRoutableNetWithSourceSinks(net)) {
+            if (!net.isStaticNet() && !RouterHelper.isRoutableNetWithSourceSinks(net)) {
                 rrs.netsNotNeedingRouting++;
                 continue;
             }
@@ -115,19 +115,7 @@ public class ReportRouteStatus {
         // Print out the result in Vivado's style -- note that this analysis differs from Vivado in that
         // only physical nets are examined.
         System.out.println();
-        System.out.println("RapidWright Design Route Status");
-        System.out.println("                                               :      # nets :");
-        System.out.println("   ------------------------------------------- : ----------- :");
-        System.out.printf ("   # of physical nets......................... : %11d :\n", rrs.logicalNets);
-        System.out.printf ("       # of nets not needing routing.......... : %11d :\n", rrs.netsNotNeedingRouting);
-        System.out.printf ("       # of routable nets..................... : %11d :\n", rrs.routableNets);
-        System.out.printf ("           # of unrouted nets................. : %11d :\n", rrs.unroutedNets);
-        System.out.printf ("           # of fully routed nets............. : %11d :\n", rrs.fullyRoutedNets);
-        System.out.printf ("       # of nets with routing errors.......... : %11d :\n", rrs.netsWithRoutingErrors);
-        System.out.printf ("           # of nets with some unrouted pins.. : %11d :\n", rrs.netsWithSomeUnroutedPins);
-        System.out.printf ("           # of nets with resource conflicts.. : %11d :\n", rrs.netsWithResourceConflicts);
-        System.out.println("   ------------------------------------------- : ----------- :");
-
+        System.out.println(rrs.toString("RapidWright "));
         if (!rrs.isFullyRouted()) {
             throw new RuntimeException("Design is not fully routed");
         }

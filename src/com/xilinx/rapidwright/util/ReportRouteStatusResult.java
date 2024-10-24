@@ -80,4 +80,41 @@ public class ReportRouteStatusResult {
         return logicalNets > 0 && unroutedNets == 0 && netsWithRoutingErrors == 0;
     }
 
+    @Override
+    public String toString() {
+        return toString("");
+    }
+
+    public String toString(String prefix) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("%sDesign Route Status\n", prefix));
+        sb.append("                                               :      # nets :\n");
+        sb.append("   ------------------------------------------- : ----------- :\n");
+        sb.append(String.format("   # of physical nets......................... : %11d :\n", logicalNets));
+        sb.append(String.format("       # of nets not needing routing.......... : %11d :\n", netsNotNeedingRouting));
+        if (internallyRoutedNets > 0) {
+            sb.append(String.format("           # of internally routed nets........ : %11d :\n", internallyRoutedNets));
+        }
+        if (netsWithNoLoads > 0) {
+            sb.append(String.format("           # of nets with no loads............ : %11d :\n", netsWithNoLoads));
+        }
+        if (implicitlyRoutedPorts > 0) {
+            sb.append(String.format("           # of implicitly routed ports....... : %11d :\n", implicitlyRoutedPorts));
+        }
+        sb.append(String.format("       # of routable nets..................... : %11d :\n", routableNets));
+        if (unroutedNets > 0) {
+            sb.append(String.format("           # of unrouted nets................. : %11d :\n", unroutedNets));
+        }
+        sb.append(String.format("           # of fully routed nets............. : %11d :\n", fullyRoutedNets));
+        sb.append(String.format("       # of nets with routing errors.......... : %11d :\n", netsWithRoutingErrors));
+        if (netsWithSomeUnroutedPins > 0) {
+            sb.append(String.format("           # of nets with some unrouted pins.. : %11d :\n", netsWithSomeUnroutedPins));
+        }
+        if (netsWithResourceConflicts > 0) {
+            sb.append(String.format("           # of nets with resource conflicts.. : %11d :\n", netsWithResourceConflicts));
+        }
+        sb.append("   ------------------------------------------- : ----------- :\n");
+        return sb.toString();
+    }
+
 }
