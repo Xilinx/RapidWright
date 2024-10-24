@@ -60,7 +60,7 @@ public abstract class EDIFWriteLegalNameCache<T> {
         for (int i = 0; i < renames.length; i++) {
             renames[i] = renameSupplier.get();
         }
-        this.busCollisionRenames = new HashMap<>();
+        this.busCollisionRenames = new ConcurrentHashMap<>();
     }
 
     protected abstract int getAndIncrement(String rename);
