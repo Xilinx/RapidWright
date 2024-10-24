@@ -112,10 +112,8 @@ public class ReportRouteStatus {
 
         ReportRouteStatusResult rrs = reportRouteStatus(design);
 
-        // Print out the result in Vivado's style -- note that this analysis differs from Vivado in that
-        // only physical nets are examined.
         System.out.println();
-        System.out.println(rrs.toString("RapidWright "));
+        System.out.println(rrs.toString("RapidWright Design Route Status"));
         if (!rrs.isFullyRouted()) {
             throw new RuntimeException("Design is not fully routed");
         }

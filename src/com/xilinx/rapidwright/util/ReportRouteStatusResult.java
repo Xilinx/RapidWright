@@ -82,15 +82,16 @@ public class ReportRouteStatusResult {
 
     @Override
     public String toString() {
-        return toString("");
+        return toString("Design Route Status");
     }
 
-    public String toString(String prefix) {
+    public String toString(String title) {
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format("%sDesign Route Status\n", prefix));
+        sb.append(title);
+        sb.append("\n");
         sb.append("                                               :      # nets :\n");
         sb.append("   ------------------------------------------- : ----------- :\n");
-        sb.append(String.format("   # of physical nets......................... : %11d :\n", logicalNets));
+        sb.append(String.format("   # of logical nets.......................... : %11d :\n", logicalNets));
         sb.append(String.format("       # of nets not needing routing.......... : %11d :\n", netsNotNeedingRouting));
         if (internallyRoutedNets > 0) {
             sb.append(String.format("           # of internally routed nets........ : %11d :\n", internallyRoutedNets));
@@ -113,7 +114,7 @@ public class ReportRouteStatusResult {
         if (netsWithResourceConflicts > 0) {
             sb.append(String.format("           # of nets with resource conflicts.. : %11d :\n", netsWithResourceConflicts));
         }
-        sb.append("   ------------------------------------------- : ----------- :\n");
+        sb.append("   ------------------------------------------- : ----------- :");
         return sb.toString();
     }
 
