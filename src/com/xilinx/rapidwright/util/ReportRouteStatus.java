@@ -30,36 +30,29 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
 public class ReportRouteStatus {
-    public static void main(String[] args) {
-        if (args.length != 1) {
-            System.out.println("USAGE: ReportRouteStatus <design.dcp>");
-            System.exit(1);
-        }
-
-        Design design = Design.readCheckpoint(args[0]);
-
-        DesignTools.updatePinsIsRouted(design);
+    /**
+     * Compute the route status of given Design's physical nets by examining the SitePinInst.isRouted()
+     * state of each net's pins, as well as to discovering node conflicts between each net's PIPs.
+     * @param design Design to examine.
+     * @return ReportRouteStatusResult object.
+     */
+    public static ReportRouteStatusResult reportRouteStatus(Design design) {
+        ReportRouteStatusResult rrs = new ReportRouteStatusResult();
 
         Map<Node, Net> nodesUsedByDesign = new HashMap<>();
         Set<Net> conflictingNets = new HashSet<>();
 
-        Collection<Net> nets = design.getNets();
-        int numPhysicalNets = nets.size();
-        int numRoutableNets = 0;
-        int numUnroutedNets = 0;
-        int numNetsWithUnroutedPins = 0;
-        for (Net net : nets) {
+        for (Net net : design.getNets()) {
             if (!RouterHelper.isRoutableNetWithSourceSinks(net)) {
                 continue;
             }
-            numRoutableNets++;
+            rrs.routableNets++;
 
             boolean isFullyRouted = true;
             boolean isPartiallyRouted = false;
@@ -85,28 +78,45 @@ public class ReportRouteStatus {
                 conflictingNets.add(net);
             } else if (!isFullyRouted) {
                 if (isPartiallyRouted) {
-                    numNetsWithUnroutedPins++;
+                    rrs.netsWithSomeUnroutedPins++;
                 } else {
-                    numUnroutedNets++;
+                    rrs.unroutedNets++;
                 }
             }
         }
 
-        int numConflictingNets = conflictingNets.size();
+        rrs.netsWithResourceConflicts = conflictingNets.size();
+        rrs.netsWithRoutingErrors = rrs.netsWithSomeUnroutedPins + rrs.netsWithResourceConflicts;
+        rrs.fullyRoutedNets = rrs.routableNets - rrs.unroutedNets - rrs.netsWithRoutingErrors;
+        return rrs;
+    }
+
+    public static void main(String[] args) {
+        if (args.length != 1) {
+            System.out.println("USAGE: ReportRouteStatus <design.dcp>");
+            System.exit(1);
+        }
+
+        Design design = Design.readCheckpoint(args[0]);
+
+        DesignTools.updatePinsIsRouted(design);
+
+        ReportRouteStatusResult rrs = reportRouteStatus(design);
+        int numPhysicalNets = design.getNets().size();
         System.out.println();
-        System.out.println("Design Route Status");
+        System.out.println("RapidWright Design Route Status");
         System.out.println("                                               :      # nets :");
         System.out.println("   ------------------------------------------- : ----------- :");
         System.out.printf ("   # of physical nets......................... : %11d :\n", numPhysicalNets);
-        System.out.printf ("       # of nets not needing routing.......... : %11d :\n", numPhysicalNets - numRoutableNets);
-        System.out.printf ("       # of routable nets..................... : %11d :\n", numRoutableNets);
-        System.out.printf ("           # of unrouted nets................. : %11d :\n", numUnroutedNets);
-        System.out.printf ("           # of fully routed nets............. : %11d :\n", numRoutableNets - numUnroutedNets - numNetsWithUnroutedPins - numConflictingNets);
-        System.out.printf ("       # of nets with routing errors.......... : %11d :\n", numNetsWithUnroutedPins + numConflictingNets);
-        System.out.printf ("           # of nets with some unrouted pins.. : %11d :\n", numNetsWithUnroutedPins);
-        System.out.printf ("           # of nets with resource conflicts.. : %11d :\n", numConflictingNets);
+        System.out.printf ("       # of nets not needing routing.......... : %11d :\n", numPhysicalNets - rrs.routableNets);
+        System.out.printf ("       # of routable nets..................... : %11d :\n", rrs.routableNets);
+        System.out.printf ("           # of unrouted nets................. : %11d :\n", rrs.unroutedNets);
+        System.out.printf ("           # of fully routed nets............. : %11d :\n", rrs.fullyRoutedNets);
+        System.out.printf ("       # of nets with routing errors.......... : %11d :\n", rrs.netsWithRoutingErrors);
+        System.out.printf ("           # of nets with some unrouted pins.. : %11d :\n", rrs.netsWithSomeUnroutedPins);
+        System.out.printf ("           # of nets with resource conflicts.. : %11d :\n", rrs.netsWithResourceConflicts);
         System.out.println("   ------------------------------------------- : ----------- :");
 
-        System.exit((numNetsWithUnroutedPins == 0 && numConflictingNets == 0) ? 0 : 1);
+        System.exit(rrs.isFullyRouted() ? 0 : 1);
     }
 }

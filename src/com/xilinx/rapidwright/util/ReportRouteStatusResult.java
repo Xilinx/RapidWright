@@ -26,19 +26,20 @@ import java.util.List;
 
 public class ReportRouteStatusResult {
 
-    public final int logicalNets;
-    public final int netsWithNoPlacedPins;
-    public final int netsNotNeedingRouting;
-    public final int internallyRoutedNets;
-    public final int netsWithNoLoads;
-    public final int implicitlyRoutedPorts;
-    public final int routableNets;
-    public final int unroutedNets;
-    public final int fullyRoutedNets;
-    public final int netsWithNoDriver;
-    public final int netsWithRoutingErrors;
-    public final int netsWithSomeUnplacedPins;
-    public final int netsWithSomeUnroutedPins;
+    public int logicalNets;
+    public int netsWithNoPlacedPins;
+    public int netsNotNeedingRouting;
+    public int internallyRoutedNets;
+    public int netsWithNoLoads;
+    public int implicitlyRoutedPorts;
+    public int routableNets;
+    public int unroutedNets;
+    public int fullyRoutedNets;
+    public int netsWithNoDriver;
+    public int netsWithRoutingErrors;
+    public int netsWithSomeUnplacedPins;
+    public int netsWithSomeUnroutedPins;
+    public int netsWithResourceConflicts;
 
     private static int parseLog(List<String> log, String key) {
         List<String> matchingLines = VivadoTools.searchVivadoLog(log, key);
@@ -47,6 +48,9 @@ public class ReportRouteStatusResult {
         }
         // Consider first match only
         return Integer.parseInt(matchingLines.get(0).replaceAll("[^\\d]", ""));
+    }
+
+    public ReportRouteStatusResult() {
     }
 
     /**
@@ -69,6 +73,7 @@ public class ReportRouteStatusResult {
         netsWithRoutingErrors = parseLog(log, "# of nets with routing errors");
         netsWithSomeUnplacedPins = parseLog(log, "# of nets with some unplaced pins");
         netsWithSomeUnroutedPins = parseLog(log, "# of nets with some unrouted pins");
+        netsWithResourceConflicts = parseLog(log, "# of nets with resource conflicts");
     }
 
     public boolean isFullyRouted() {
