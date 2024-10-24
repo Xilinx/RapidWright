@@ -37,8 +37,13 @@ import java.util.Set;
 
 public class ReportRouteStatus {
     /**
-     * Compute the route status of given Design's physical nets by examining the SitePinInst.isRouted()
-     * state of each net's pins, as well as to discovering node conflicts between each net's PIPs.
+     * Compute the route status of given Design's physical nets by examining the
+     * {@link SitePinInst#isRouted()} state of each net's pins, as well as to discovering node conflicts
+     * between each net's PIPs.
+     * Freshly loaded designs, as well as designs that are not up-to-date, can call
+     * {@link DesignTools#updatePinsIsRouted(Design)} for recomputing the SitePinInst.isRouted() state.
+     * Note that currently this method does not check the Design's logical netlist nor its physical
+     * placement --- these are assumed to be correct.
      * @param design Design to examine.
      * @return ReportRouteStatusResult object.
      */
@@ -102,6 +107,9 @@ public class ReportRouteStatus {
         DesignTools.updatePinsIsRouted(design);
 
         ReportRouteStatusResult rrs = reportRouteStatus(design);
+
+        // Print out the result in Vivado's style -- note that this analysis differs from Vivado in that
+        // only physical nets are examined.
         int numPhysicalNets = design.getNets().size();
         System.out.println();
         System.out.println("RapidWright Design Route Status");
