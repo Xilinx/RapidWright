@@ -30,6 +30,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -53,8 +54,10 @@ public class ReportRouteStatus {
         Map<Node, Net> nodesUsedByDesign = new HashMap<>();
         Set<Net> conflictingNets = new HashSet<>();
 
-        for (Net net : design.getNets()) {
+        Collection<Net> nets = design.getNets();
+        for (Net net : nets) {
             if (!RouterHelper.isRoutableNetWithSourceSinks(net)) {
+                rrs.netsNotNeedingRouting++;
                 continue;
             }
             rrs.routableNets++;
@@ -90,9 +93,7 @@ public class ReportRouteStatus {
             }
         }
 
-        // Since we do not analyze logical nets, set it to -1
-        rrs.logicalNets = -1;
-
+        rrs.logicalNets = nets.size();
         rrs.netsWithResourceConflicts = conflictingNets.size();
         rrs.netsWithRoutingErrors = rrs.netsWithSomeUnroutedPins + rrs.netsWithResourceConflicts;
         rrs.fullyRoutedNets = rrs.routableNets - rrs.unroutedNets - rrs.netsWithRoutingErrors;
@@ -113,13 +114,12 @@ public class ReportRouteStatus {
 
         // Print out the result in Vivado's style -- note that this analysis differs from Vivado in that
         // only physical nets are examined.
-        int numPhysicalNets = design.getNets().size();
         System.out.println();
         System.out.println("RapidWright Design Route Status");
         System.out.println("                                               :      # nets :");
         System.out.println("   ------------------------------------------- : ----------- :");
-        System.out.printf ("   # of physical nets......................... : %11d :\n", numPhysicalNets);
-        System.out.printf ("       # of nets not needing routing.......... : %11d :\n", numPhysicalNets - rrs.routableNets);
+        System.out.printf ("   # of physical nets......................... : %11d :\n", rrs.logicalNets);
+        System.out.printf ("       # of nets not needing routing.......... : %11d :\n", rrs.netsNotNeedingRouting);
         System.out.printf ("       # of routable nets..................... : %11d :\n", rrs.routableNets);
         System.out.printf ("           # of unrouted nets................. : %11d :\n", rrs.unroutedNets);
         System.out.printf ("           # of fully routed nets............. : %11d :\n", rrs.fullyRoutedNets);
