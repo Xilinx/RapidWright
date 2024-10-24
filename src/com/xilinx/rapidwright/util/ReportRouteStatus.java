@@ -90,6 +90,9 @@ public class ReportRouteStatus {
             }
         }
 
+        // Since we do not analyze logical nets, set it to -1
+        rrs.logicalNets = -1;
+
         rrs.netsWithResourceConflicts = conflictingNets.size();
         rrs.netsWithRoutingErrors = rrs.netsWithSomeUnroutedPins + rrs.netsWithResourceConflicts;
         rrs.fullyRoutedNets = rrs.routableNets - rrs.unroutedNets - rrs.netsWithRoutingErrors;
@@ -125,6 +128,8 @@ public class ReportRouteStatus {
         System.out.printf ("           # of nets with resource conflicts.. : %11d :\n", rrs.netsWithResourceConflicts);
         System.out.println("   ------------------------------------------- : ----------- :");
 
-        System.exit(rrs.isFullyRouted() ? 0 : 1);
+        if (!rrs.isFullyRouted()) {
+            throw new RuntimeException("Design is not fully routed");
+        }
     }
 }
