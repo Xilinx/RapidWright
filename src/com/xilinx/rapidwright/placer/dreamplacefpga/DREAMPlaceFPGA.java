@@ -29,13 +29,16 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.interchange.DeviceResourcesWriter;
 import com.xilinx.rapidwright.interchange.Interchange;
+import com.xilinx.rapidwright.interchange.LogNetlistWriter;
 import com.xilinx.rapidwright.interchange.PhysNetlistReader;
 import com.xilinx.rapidwright.interchange.PhysicalNetlistToDcp;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -49,6 +52,7 @@ public class DREAMPlaceFPGA {
 
     public static final String INTERCHANGE_NETLIST = "interchange_netlist";
     public static final String INTERCHANGE_DEVICE = "interchange_device";
+    public static final String RESULT_DIR = "result_dir";
     public static final String IO_PL = "io_pl";
     public static final String GPU = "gpu";
     public static final String NUM_BINS_X = "num_bins_x";
@@ -59,7 +63,6 @@ public class DREAMPlaceFPGA {
     public static final String RANDOM_SEED = "random_seed";
     public static final String SCALE_FACTOR = "scale_factor";
     public static final String GLOBAL_PLACE_FLAG = "global_place_flag";
-    public static final String PLACE_SOL = "place_sol";
     public static final String ROUTABILITY_OPT_FLAG = "routability_opt_flag";
     public static final String LEGALIZE_FLAG = "legalize_flag";
     public static final String DETAILED_PLACE_FLAG = "detailed_place_flag";
@@ -70,6 +73,7 @@ public class DREAMPlaceFPGA {
     public static final String ENABLE_IF = "enable_if";
     public static final String ENABLE_SITE_ROUTING = "enable_site_routing";
 
+    public static final String IO_PL_DEFAULT = "";
     public static final boolean GPU_DEFAULT = false;
     public static final int NUM_BINS_X_DEFAULT = 512;
     public static final int NUM_BINS_Y_DEFAULT = 512;
@@ -93,13 +97,15 @@ public class DREAMPlaceFPGA {
     public static final int NUM_THREADS_DEFAULT = 8;
     public static final boolean DETERMINISTIC_FLAG_DEFAULT = true;
     public static final boolean ENABLE_IF_DEFAULT = true;
-    public static final boolean ENABLE_SITE_ROUTING_DEFAULT = true;
+    public static final boolean ENABLE_SITE_ROUTING_DEFAULT = false;
 
-    public static final String dreamPlaceFPGAExec = "DREAMPlaceFPGA";
+    // public static final String dreamPlaceFPGAExec = "DREAMPlaceFPGA";
+    public static final String dreamPlaceFPGAExec = "dreamplacefpga";
 
     public static Map<String, Object> getSettingsMap() {
         Map<String, Object> map = new HashMap<>();
 
+        map.put(IO_PL, IO_PL_DEFAULT);
         map.put(GPU, GPU_DEFAULT);
         map.put(NUM_BINS_X, NUM_BINS_X_DEFAULT);
         map.put(NUM_BINS_Y, NUM_BINS_Y_DEFAULT);
@@ -149,7 +155,7 @@ public class DREAMPlaceFPGA {
         }
     }
 
-    public static Design placeDesign(Design design, Path workDir, boolean makeOutOfContext) {
+    public static Design placeDesign(Design design, Path workDir, boolean makeOutOfContext) throws IOException {
         boolean removeWorkDir = false;
         if (workDir == null) {
             workDir = Paths.get("DREAMPlaceFPGAWorkdir" + FileTools.getUniqueProcessAndHostID());
@@ -158,8 +164,9 @@ public class DREAMPlaceFPGA {
         }
 
         // Create interchange netlist file
-        String interchangeRootFile = workDir.toString() + File.separator + "design";
-        Interchange.writeDesignToInterchange(design, interchangeRootFile);
+        String inputLogNetlistName = "input" + Interchange.LOG_NETLIST_EXT;
+        String inputLogNetlistPath = workDir.resolve(inputLogNetlistName).toString();
+        LogNetlistWriter.writeLogNetlist(design.getNetlist(), inputLogNetlistPath);
 
         // Create device file if it doesn't already exist
         String deviceName = design.getDevice().getName();
@@ -175,26 +182,38 @@ public class DREAMPlaceFPGA {
         }
 
         // Create JSON file for DREAMPlaceFPGA
-        Path jsonFile = workDir.resolve("design.json");
-        Map<String, Object> settings = getSettingsMap();
-        settings.put(INTERCHANGE_DEVICE, deviceFile.toString());
-        settings.put(INTERCHANGE_NETLIST, workDir.relativize(Paths.get(interchangeRootFile + Interchange.LOG_NETLIST_EXT)).toString());
-        writeJSONForDREAMPlaceFPGA(jsonFile, settings);
+        // Path jsonFile = workDir.resolve("design.json");
+        // Map<String, Object> settings = getSettingsMap();
+        // settings.put(INTERCHANGE_DEVICE, deviceFile.toString());
+        // settings.put(INTERCHANGE_NETLIST, workDir.relativize(Paths.get(inputRoot + Interchange.LOG_NETLIST_EXT)).toString());
+        // settings.put(RESULT_DIR, workDir.toString());
+        // writeJSONForDREAMPlaceFPGA(jsonFile, settings);
 
         // Run DREAMPlaceFPGA
-        String exec = dreamPlaceFPGAExec + " " + workDir.relativize(jsonFile);
+        // String exec = dreamPlaceFPGAExec + " " + workDir.relativize(jsonFile);
+
+        // Run DREAMPlaceFPGA
+        List<String> exec = new ArrayList<>();
+        exec.add(dreamPlaceFPGAExec);
+        exec.add("-interchange_netlist");
+        exec.add(inputLogNetlistName);
+        exec.add("-interchange_device");
+        exec.add(deviceFile.toString());
+        exec.add("-result_dir");
+        exec.add(".");
+
         boolean verbose = true;
         String[] environ = null;
-        Integer exitCode = FileTools.runCommand(exec, verbose, environ, workDir.toFile());
+        Integer exitCode = FileTools.runCommand(exec.toArray(new String[0]), verbose, environ, workDir.toFile());
         if (exitCode != 0) {
             throw new RuntimeException("DREAMPlaceFPGA with code: " + exitCode);
         }
 
         // Load placed result
         Design placedDesign = null;
-        String interchangeResultFile = workDir.toString() + File.separator + "results/design/design";
+        String outputPhysNetlistPath = workDir.resolve("design/design.phys").toString();
         try {
-            placedDesign = PhysNetlistReader.readPhysNetlist(interchangeResultFile + Interchange.PHYS_NETLIST_EXT,
+            placedDesign = PhysNetlistReader.readPhysNetlist(outputPhysNetlistPath,
                     design.getNetlist());
             if (makeOutOfContext) {
                 placedDesign.setAutoIOBuffers(false);
@@ -210,7 +229,7 @@ public class DREAMPlaceFPGA {
         return placedDesign;
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         // Usage: <input DCP> <output DCP> [--out_of_context] [work directory]
         if (args.length < 2 || args.length > 4) {
             System.out.println("USAGE: <input DCP> <output DCP> [" 
