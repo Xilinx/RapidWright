@@ -73,8 +73,17 @@ public class YosysTools {
     public static EDIFNetlist synthXilinxWithWorkDir(String flags, Path workDir, Path... paths) {
         final Path edf = workDir.resolve("output.edf");
         String command = SYNTH_XILINX;
-        command += SYNTH_XILINX_FLAG_EDIF + edf;
         command += flags;
+
+        // Workaround an issue in Yosys' EDIF writer where it may incorrectly emit $scopeinfo cells
+        // created during -flatten
+        // BEGIN WORKAROUND
+        command += "; delete t:$scopeinfo; ";
+        command += SYNTH_XILINX;
+        command += " -run edif:";
+        // END WORKAROUND
+
+        command += SYNTH_XILINX_FLAG_EDIF + edf;
         run(command, workDir, paths);
         return EDIFTools.readEdifFile(edf);
     }
