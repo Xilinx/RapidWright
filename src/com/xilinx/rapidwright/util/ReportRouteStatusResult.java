@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Zak Nafziger, Advanced Micro Devices, Inc.
@@ -26,19 +26,20 @@ import java.util.List;
 
 public class ReportRouteStatusResult {
 
-    public final int logicalNets;
-    public final int netsWithNoPlacedPins;
-    public final int netsNotNeedingRouting;
-    public final int internallyRoutedNets;
-    public final int netsWithNoLoads;
-    public final int implicitlyRoutedPorts;
-    public final int routableNets;
-    public final int unroutedNets;
-    public final int fullyRoutedNets;
-    public final int netsWithNoDriver;
-    public final int netsWithRoutingErrors;
-    public final int netsWithSomeUnplacedPins;
-    public final int netsWithSomeUnroutedPins;
+    public int logicalNets;
+    public int netsWithNoPlacedPins;
+    public int netsNotNeedingRouting;
+    public int internallyRoutedNets;
+    public int netsWithNoLoads;
+    public int implicitlyRoutedPorts;
+    public int routableNets;
+    public int unroutedNets;
+    public int fullyRoutedNets;
+    public int netsWithNoDriver;
+    public int netsWithRoutingErrors;
+    public int netsWithSomeUnplacedPins;
+    public int netsWithSomeUnroutedPins;
+    public int netsWithResourceConflicts;
 
     private static int parseLog(List<String> log, String key) {
         List<String> matchingLines = VivadoTools.searchVivadoLog(log, key);
@@ -47,6 +48,9 @@ public class ReportRouteStatusResult {
         }
         // Consider first match only
         return Integer.parseInt(matchingLines.get(0).replaceAll("[^\\d]", ""));
+    }
+
+    public ReportRouteStatusResult() {
     }
 
     /**
@@ -69,10 +73,49 @@ public class ReportRouteStatusResult {
         netsWithRoutingErrors = parseLog(log, "# of nets with routing errors");
         netsWithSomeUnplacedPins = parseLog(log, "# of nets with some unplaced pins");
         netsWithSomeUnroutedPins = parseLog(log, "# of nets with some unrouted pins");
+        netsWithResourceConflicts = parseLog(log, "# of nets with resource conflicts");
     }
 
     public boolean isFullyRouted() {
         return logicalNets > 0 && unroutedNets == 0 && netsWithRoutingErrors == 0;
+    }
+
+    @Override
+    public String toString() {
+        return toString("Design Route Status");
+    }
+
+    public String toString(String title) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(title);
+        sb.append("\n");
+        sb.append("                                               :      # nets :\n");
+        sb.append("   ------------------------------------------- : ----------- :\n");
+        sb.append(String.format("   # of logical nets.......................... : %11d :\n", logicalNets));
+        sb.append(String.format("       # of nets not needing routing.......... : %11d :\n", netsNotNeedingRouting));
+        if (internallyRoutedNets > 0) {
+            sb.append(String.format("           # of internally routed nets........ : %11d :\n", internallyRoutedNets));
+        }
+        if (netsWithNoLoads > 0) {
+            sb.append(String.format("           # of nets with no loads............ : %11d :\n", netsWithNoLoads));
+        }
+        if (implicitlyRoutedPorts > 0) {
+            sb.append(String.format("           # of implicitly routed ports....... : %11d :\n", implicitlyRoutedPorts));
+        }
+        sb.append(String.format("       # of routable nets..................... : %11d :\n", routableNets));
+        if (unroutedNets > 0) {
+            sb.append(String.format("           # of unrouted nets................. : %11d :\n", unroutedNets));
+        }
+        sb.append(String.format("           # of fully routed nets............. : %11d :\n", fullyRoutedNets));
+        sb.append(String.format("       # of nets with routing errors.......... : %11d :\n", netsWithRoutingErrors));
+        if (netsWithSomeUnroutedPins > 0) {
+            sb.append(String.format("           # of nets with some unrouted pins.. : %11d :\n", netsWithSomeUnroutedPins));
+        }
+        if (netsWithResourceConflicts > 0) {
+            sb.append(String.format("           # of nets with resource conflicts.. : %11d :\n", netsWithResourceConflicts));
+        }
+        sb.append("   ------------------------------------------- : ----------- :");
+        return sb.toString();
     }
 
 }

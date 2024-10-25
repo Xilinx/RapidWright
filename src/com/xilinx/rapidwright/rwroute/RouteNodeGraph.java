@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
@@ -147,6 +148,7 @@ public class RouteNodeGraph {
         // Device.getArbitraryTileOfType() typically gives you the North-Western-most
         // tile (with minimum X, maximum Y). Analyze the tile just below that.
         intTile = intTile.getTileXYNeighbor(0, -1);
+        Series series = device.getSeries();
         for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
             Node baseNode = Node.getNode(intTile, wireIndex);
             if (baseNode == null) {
@@ -172,7 +174,8 @@ public class RouteNodeGraph {
             } else if (wireName.startsWith("INT_NODE_IMUX_") &&
                     // Do not block INT_NODE_IMUX node accessibility when LUT routethrus are considered
                     !lutRoutethru) {
-                assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
+                assert(((series == Series.UltraScale || series == Series.UltraScalePlus) && baseNode.getIntentCode() == IntentCode.NODE_LOCAL) ||
+                        (series == Series.Versal                                         && baseNode.getIntentCode() == IntentCode.NODE_INODE));
                 assert(baseTile == intTile);
                 assert(wireIndex == baseNode.getWireIndex());
                 // Downhill to BOUNCE_* in the above/below/target tile, BYPASS_* in the base tile, IMUX_* in target tile
@@ -190,6 +193,8 @@ public class RouteNodeGraph {
         accessibleWireOnlyIfAboveBelowTarget.put(intTile.getTileTypeEnum(), wires);
 
         if (lutRoutethru) {
+            assert(design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus);
+
             muxWires = new EnumMap<>(TileTypeEnum.class);
             for (TileTypeEnum tileTypeEnum : Utils.getCLBTileTypes()) {
                 Tile clbTile = device.getArbitraryTileOfType(tileTypeEnum);
@@ -308,8 +313,33 @@ public class RouteNodeGraph {
     }
 
     public void preserve(Net net, List<SitePinInst> pins) {
+        boolean isStaticNet = net.isStaticNet();
         for (SitePinInst pin : pins) {
             preserve(pin.getConnectedNode(), net);
+
+            if (isStaticNet && pin.isOutPin()) {
+                // When a LUT output is used as a static source, also preserve the other pin
+                // ([A-H]_O <-> [A-H]MUX) so that it can't be used by any other nets
+                SiteInst si = pin.getSiteInst();
+                if (!Utils.isSLICE(si)) {
+                    continue;
+                }
+
+                String pinName = pin.getName();
+                char lutLetter = pinName.charAt(0);
+                String otherPinName = null;
+                String otherPinNameSuffix = design.getSeries() == Series.Versal ? "Q" : "MUX";
+                if (pinName.endsWith(otherPinNameSuffix)) {
+                    otherPinName = lutLetter + "_O";
+                } else if (pinName.endsWith("_O")) {
+                    otherPinName = lutLetter + otherPinNameSuffix;
+                } else {
+                    throw new RuntimeException("ERROR: Unsupported site pin " + pin);
+                }
+
+                Node otherNode = si.getSite().getConnectedNode(otherPinName);
+                preserve(otherNode, net);
+            }
         }
 
         for (PIP pip : net.getPIPs()) {
@@ -370,11 +400,23 @@ public class RouteNodeGraph {
 
     private static final Set<TileTypeEnum> allowedTileEnums;
     static {
-        allowedTileEnums = EnumSet.of(TileTypeEnum.INT);
+        allowedTileEnums = EnumSet.noneOf(TileTypeEnum.class);
+        allowedTileEnums.add(TileTypeEnum.INT);
         allowedTileEnums.addAll(Utils.getLagunaTileTypes());
+
+        // Versal only: include tiles hosting BNODE/CNODEs
+        allowedTileEnums.add(TileTypeEnum.CLE_BC_CORE);
+        allowedTileEnums.add(TileTypeEnum.INTF_LOCF_TL_TILE);
+        allowedTileEnums.add(TileTypeEnum.INTF_LOCF_TR_TILE);
+        allowedTileEnums.add(TileTypeEnum.INTF_LOCF_BL_TILE);
+        allowedTileEnums.add(TileTypeEnum.INTF_LOCF_BR_TILE);
+        allowedTileEnums.add(TileTypeEnum.INTF_ROCF_TL_TILE);
+        allowedTileEnums.add(TileTypeEnum.INTF_ROCF_TR_TILE);
+        allowedTileEnums.add(TileTypeEnum.INTF_ROCF_BL_TILE);
+        allowedTileEnums.add(TileTypeEnum.INTF_ROCF_BR_TILE);
     }
 
-    protected boolean isExcludedTile(Node child) {
+    public static boolean isExcludedTile(Node child) {
         Tile tile = child.getTile();
         TileTypeEnum tileType = tile.getTileTypeEnum();
         return !allowedTileEnums.contains(tileType);
@@ -492,7 +534,21 @@ public class RouteNodeGraph {
     }
 
     protected RouteNode create(Node node, RouteNodeType type) {
-        return new RouteNode(this, node, type);
+        RouteNode rnode = new RouteNode(this, node, type);
+        // PINFEED_I should have zero length, except for on US/US+ where the PINFEED_I can be a PINBOUNCE node.
+        assert(rnode.getType() != RouteNodeType.PINFEED_I ||
+                rnode.getLength() == 0 ||
+                (rnode.getLength() == 1 && (design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus) &&
+                        rnode.getIntentCode() == IntentCode.NODE_PINBOUNCE));
+        // PINBOUNCE should have zero length, except for on US/US+
+        assert(rnode.getType() != RouteNodeType.PINBOUNCE ||
+                rnode.getLength() == 0 ||
+                (rnode.getLength() == 1 && design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus));
+        return rnode;
+    }
+
+    public RouteNode getOrCreate(Node node) {
+        return getOrCreate(node, null);
     }
 
     public RouteNode getOrCreate(Node node, RouteNodeType type) {

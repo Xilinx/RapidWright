@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -39,6 +39,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Part;
+import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
@@ -59,6 +62,7 @@ import com.xilinx.rapidwright.util.Job;
 import com.xilinx.rapidwright.util.JobQueue;
 import com.xilinx.rapidwright.util.LocalJob;
 import com.xilinx.rapidwright.util.ParallelismTools;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 /**
  * Test that we can write a DCP file and read it back in. We currently don't have a way to check designs for equality,
@@ -439,5 +443,76 @@ public class TestDesign {
         Net dout = design.getDevice().getSeries().equals(Series.UltraScalePlus) ? net
                 : design.getNet(ibufInst.getName() + "/O");
         Assertions.assertEquals(siteInst.getNetFromSiteWire("DOUT"), dout);
+    }
+
+    private void ensureDesignInSLR(Design d, int expectedSLR) {
+        for (SiteInst si : d.getSiteInsts()) {
+            Assertions.assertEquals(expectedSLR, si.getTile().getSLR().getId());
+        }
+        for (Net n : d.getNets()) {
+            for (PIP p : n.getPIPs()) {
+                Assertions.assertEquals(expectedSLR, p.getTile().getSLR().getId());
+            }
+        }
+    }
+
+    /**
+     * Tests relocating and retargeting a Picoblaze design from a vu3p to each of
+     * the three SLRs in a vu9p since all of the SLRs between the devices are
+     * relocation compatible.
+     * 
+     * @param tempDir Temp directory to write out results.
+     */
+    @Test
+    public void testRetargetPart(@TempDir Path tempDir) {
+        String targetPartName = "xcvu9p-flgb2104-2-i";
+        Part targetPart = PartNameTools.getPart(targetPartName);
+        Device targetDevice = Device.getDevice(targetPart);
+        for (int slr = 0; slr < targetDevice.getNumOfSLRs(); slr++) {
+            Design d = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+            Part origPart = d.getPart();
+            assert (d.getDevice().getName().equals("xcvu3p"));
+            int tileDX = 0;
+            int tileDY = slr * targetDevice.getMasterSLR().getNumOfClockRegionRows()
+                    * targetPart.getSeries().getCLEHeight();
+            Assertions.assertTrue(d.retargetPart(targetPart, tileDX, tileDY));
+            Path output = tempDir.resolve("retarget_" + slr + ".dcp");
+
+            Assertions.assertEquals(targetPartName, d.getPartName());
+            ensureDesignInSLR(d, slr);
+
+            d.writeCheckpoint(output);
+
+            Design d2 = Design.readCheckpoint(output);
+
+            Assertions.assertEquals(targetPartName, d2.getPartName());
+            ensureDesignInSLR(d2, slr);
+
+            // Try reversing the process to see if we get the original
+            d2.retargetPart(origPart, tileDX * -1, tileDY * -1);
+            assert (d2.getDevice().getName().equals(origPart.getDevice()));
+            ensureDesignInSLR(d2, 0);
+
+            // Just do a single sanity check that it opens ok in Vivado
+            if (slr == 1 && FileTools.isVivadoOnPath()) {
+                VivadoToolsHelper.assertFullyRouted(output);
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "picoblaze_ooc_X10Y235.dcp",            // Pre 2022.1 DCP
+            "picoblaze_ooc_X10Y235_2022_1.dcp",     // 2022.1 DCP
+    })
+    public void testNetOrder(String dcpFileName) {
+        Design design1 = RapidWrightDCP.loadDCP(dcpFileName);
+        Object[] nets1 = design1.getNets().toArray();
+
+        for (int i = 0; i < 10; i++) {
+            Design design2 = RapidWrightDCP.loadDCP(dcpFileName);
+            Object[] nets2 = design2.getNets().toArray();
+            Assertions.assertTrue(Arrays.equals(nets1, nets2));
+        }
     }
 }

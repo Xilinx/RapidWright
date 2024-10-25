@@ -35,6 +35,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -791,10 +792,22 @@ public class TestDesignTools {
         Design design = new Design("test", Device.KCU105);
 
         if (createLUT6) {
-            design.createAndPlaceCell("lut6", Unisim.LUT6, "SLICE_X0Y0/A6LUT");
+            Cell cell = design.createAndPlaceCell("lut6",
+                    (createLUT5) ? Unisim.LUT5 : Unisim.LUT6,
+                    "SLICE_X0Y0/A6LUT");
+            if (createLUT5) {
+                // Remove default pin mapping onto A6, move to A1 instead
+                String logicalPin = cell.removePinMapping("A6");
+                cell.addPinMapping("A1", logicalPin);
+            }
         }
         if (createLUT5) {
-            design.createAndPlaceCell("lut5", Unisim.LUT5, "SLICE_X0Y0/A5LUT");
+            Cell cell = design.createAndPlaceCell("lut5", Unisim.LUT5, "SLICE_X0Y0/A5LUT");
+            Assertions.assertNull(cell.getLogicalPinMapping("A6"));
+            // Set A6 sitewire to VCC
+            SiteInst si = cell.getSiteInst();
+            BELPin belPin = si.getBELPin("A6", "A6");
+            si.routeIntraSiteNet(design.getVccNet(), belPin, belPin);
         }
 
         DesignTools.createA1A6ToStaticNets(design);
@@ -1003,42 +1016,75 @@ public class TestDesignTools {
     @ParameterizedTest
     @CsvSource({
             // US+
-            Device.AWS_F1+",SLICE_X0Y0/AFF,SRST1,true",
-            Device.AWS_F1+",SLICE_X0Y0/AFF2,SRST1,false",
-            Device.AWS_F1+",SLICE_X1Y1/HFF,SRST2,true",
-            Device.AWS_F1+",SLICE_X1Y1/HFF2,SRST2,false",
+            Device.AWS_F1+",SLICE_X0Y0/AFF,FDRE,true",
+            Device.AWS_F1+",SLICE_X0Y0/AFF2,FDSE,false",
+            Device.AWS_F1+",SLICE_X1Y1/HFF,FDPE,true",
+            Device.AWS_F1+",SLICE_X1Y1/HFF2,FDCE,false",
+            Device.AWS_F1+",SLICE_X0Y0/AFF,LDCE,true",
+            Device.AWS_F1+",SLICE_X0Y0/AFF2,LDPE,false",
+            Device.AWS_F1+",SLICE_X1Y1/HFF,LDPE,true",
+            Device.AWS_F1+",SLICE_X1Y1/HFF2,LDCE,false",
             // US
-            Device.KCU105+",SLICE_X0Y0/AFF,SRST_B1,true",
-            Device.KCU105+",SLICE_X0Y0/AFF2,SRST_B1,false",
-            Device.KCU105+",SLICE_X1Y1/HFF,SRST_B2,true",
-            Device.KCU105+",SLICE_X1Y1/HFF2,SRST_B2,false",
+            Device.KCU105+",SLICE_X0Y0/AFF,FDRE,true",
+            Device.KCU105+",SLICE_X0Y0/AFF2,FDSE,false",
+            Device.KCU105+",SLICE_X1Y1/HFF,FDPE,true",
+            Device.KCU105+",SLICE_X1Y1/HFF2,FDCE,false",
             // Series7
-            Device.PYNQ_Z1+",SLICE_X0Y0/AFF,SR,true",
-            Device.PYNQ_Z1+",SLICE_X0Y0/A5FF,SR,false",
-            Device.PYNQ_Z1+",SLICE_X1Y1/DFF,SR,true",
-            Device.PYNQ_Z1+",SLICE_X1Y1/D5FF,SR,false",
+            Device.PYNQ_Z1+",SLICE_X0Y0/AFF,FDRE,true",
+            Device.PYNQ_Z1+",SLICE_X0Y0/A5FF,FDSE,false",
+            Device.PYNQ_Z1+",SLICE_X1Y1/DFF,FDPE,true",
+            Device.PYNQ_Z1+",SLICE_X1Y1/D5FF,FDCE,false",
+            // Versal
+            "xcvc1902,SLICE_X40Y0/AFF,FDRE,false",
+            "xcvc1902,SLICE_X40Y0/DFF2,FDSE,false",
+            "xcvc1902,SLICE_X40Y0/EFF,FDPE,false",
+            "xcvc1902,SLICE_X40Y0/HFF2,FDCE,false",
+            "xcvp1002,SLICE_X40Y0/AFF,FDRE,false",
+            "xcvp1002,SLICE_X40Y0/DFF2,FDSE,false",
+            "xcvp1002,SLICE_X40Y0/EFF,FDPE,false",
+            "xcvp1002,SLICE_X40Y0/HFF2,FDCE,false",
     })
-    public void testCreateCeSrRstPinsToVCC(String deviceName, String location, String sitePinName, boolean connectGnd) {
+    public void testCreateCeSrRstPinsToVCC(String deviceName, String location, String unisimName, boolean connectSrToGnd) {
         Design design = new Design("test", deviceName);
-        Cell c = design.createAndPlaceCell("ff", Unisim.FDRE, location);
-        BELPin sr = c.getBEL().getPin("SR");
+        Cell c = design.createAndPlaceCell("ff", Unisim.valueOf(unisimName), location);
         SiteInst si = c.getSiteInst();
+
+        BEL bel = c.getBEL();
+        BELPin ce = bel.getPin("CE");
+        Assertions.assertNull(si.getNetFromSiteWire(ce.getSiteWireName()));
+
+        BELPin sr = bel.getPin("SR");
         Assertions.assertNull(si.getNetFromSiteWire(sr.getSiteWireName()));
-        if (connectGnd) {
+        if (connectSrToGnd) {
             Net gnd = design.getGndNet();
             Assertions.assertTrue(si.routeIntraSiteNet(gnd, sr, sr));
         }
 
         DesignTools.createCeSrRstPinsToVCC(design);
 
-        SitePinInst spi = si.getSitePinInst(sitePinName);
-        if (design.getDevice().getSeries() == Series.Series7) {
-            // Nothing done for Series7
-            Assertions.assertNull(spi);
+        Series series = design.getDevice().getSeries();
+        Map<String, Pair<String, String>> pinMapping = DesignTools.belTypeSitePinNameMapping.get(series);
+        Pair<String, String> sitePinNames = pinMapping.get(bel.getName());
+        String ceSitePinName = sitePinNames.getFirst();
+        String srSitePinName = sitePinNames.getSecond();
+
+        Net vcc = design.getVccNet();
+        SitePinInst ceSpi = si.getSitePinInst(ceSitePinName);
+        if (series == Series.Series7) {
+            // Series7 have {CE,SR}USEDMUX which is used to supply VCC and GND respectively from inside the site
+            Assertions.assertNull(ceSpi);
         } else {
-            Assertions.assertNotNull(spi);
-            Net vcc = design.getVccNet();
-            Assertions.assertEquals(vcc, spi.getNet());
+            Assertions.assertNotNull(ceSpi);
+            Assertions.assertEquals(vcc, ceSpi.getNet());
+        }
+
+        SitePinInst srSpi = si.getSitePinInst(srSitePinName);
+        if (series == Series.Series7) {
+            // Series7 have {CE,SR}USEDMUX which is used to supply VCC and GND respectively from inside the site
+            Assertions.assertNull(srSpi);
+        } else {
+            Assertions.assertNotNull(srSpi);
+            Assertions.assertEquals(vcc, srSpi.getNet());
         }
     }
 
@@ -1049,6 +1095,38 @@ public class TestDesignTools {
         design.createAndPlaceCell("cell", Unisim.FDRE, "LAGUNA_X7Y341/RX_REG0");
 
         DesignTools.createCeSrRstPinsToVCC(design);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            // US+
+            Device.AWS_F1+",RAMB36_X0Y0/RAMB36E2,RAMB36E2,RSTREGBU,",
+            Device.AWS_F1+",RAMB36_X0Y0/RAMB36E2,RAMB36E2,RSTREGBL,",
+            Device.AWS_F1+",RAMB18_X0Y1/RAMB18E2_U,RAMB18E2,RSTREGBU,RSTREGBL",
+            Device.AWS_F1+",RAMB18_X0Y0/RAMB18E2_L,RAMB18E2,RSTREGBL,RSTREGBU",
+            // US
+            Device.KCU105+",RAMB36_X0Y0/RAMB36E2,RAMB36E2,RSTREGBU_X,",
+            Device.KCU105+",RAMB36_X0Y0/RAMB36E2,RAMB36E2,RSTREGBL_X,",
+            Device.KCU105+",RAMB18_X0Y1/RAMB18E2_U,RAMB18E2,RSTREGBU_X,RSTREGBL_X",
+            Device.KCU105+",RAMB18_X0Y0/RAMB18E2_L,RAMB18E2,RSTREGBL_X,RSTREGBU_X",
+    })
+    public void testCreateCeSrRstPinsToVccRAMB(String deviceName, String location, String unisimName, String sitePinNameVcc, String sitePinNameNotPresent) {
+        Design design = new Design("test", deviceName);
+        Cell c = design.createAndPlaceCell("ram", Unisim.valueOf(unisimName), location);
+
+        DesignTools.createCeSrRstPinsToVCC(design);
+
+        SiteInst si = c.getSiteInst();
+        SitePinInst spi = si.getSitePinInst(sitePinNameVcc);
+        Assertions.assertNotNull(spi);
+        Net vcc = design.getVccNet();
+        Assertions.assertEquals(vcc, spi.getNet());
+        Assertions.assertNotNull(spi.getConnectedNode());
+
+        if (sitePinNameNotPresent != null) {
+            spi = si.getSitePinInst(sitePinNameNotPresent);
+            Assertions.assertNull(spi);
+        }
     }
 
     @Test

@@ -55,6 +55,8 @@ public class Utils{
 
     private static Set<TileTypeEnum> lagunas;
 
+    private static Set<TileTypeEnum> clocking;
+
     private static Set<SiteTypeEnum> lockedSiteTypes;
 
     private static Set<SiteTypeEnum> moduleSiteTypes;
@@ -168,6 +170,10 @@ public class Utils{
         return lagunas.contains(type);
     }
 
+    public static boolean isClocking(TileTypeEnum type) {
+        return clocking.contains(type);
+    }
+
     public static boolean isLockedSiteType(SiteTypeEnum type) {
         return lockedSiteTypes.contains(type);
     }
@@ -202,6 +208,10 @@ public class Utils{
 
     public static Set<TileTypeEnum> getLagunaTileTypes() {
         return lagunas;
+    }
+
+    public static Set<TileTypeEnum> getClockingTileTypes() {
+        return clocking;
     }
 
     public static Set<SiteTypeEnum> getLockedSiteTypes() {
@@ -336,6 +346,14 @@ public class Utils{
         lagunas = EnumSet.of(
                 TileTypeEnum.LAG_LAG,       // UltraScale+
                 TileTypeEnum.LAGUNA_TILE    // UltraScale
+        );
+
+        clocking = EnumSet.of(
+                TileTypeEnum.RCLK_CLEM_CLKBUF_L,
+                // Versal
+                TileTypeEnum.CLK_REBUF_BUFGS_HSR_CORE,
+                TileTypeEnum.CLK_PLL_AND_PHY,
+                TileTypeEnum.CMT_MMCM
         );
 
         lockedSiteTypes = EnumSet.of(

@@ -1,3 +1,33 @@
+============= RapidWright 2024.1.3-beta released on 2024-10-02 ================
+Notes: 
+  - [RWRoute] Further cleanup (#1070)
+  - [PhysNetlistReader] Call SiteInst.setDesign() even for STATIC_SOURCEs (#1071)
+  - [GlobalSignalRouting] Fix VCC routing for UltraScale (#1068)
+  - [RWRoute] Cleanup static router and RouterHelper (#1059)
+  - [PartialRouter] Disable ripup in global/static routing (#1067)
+  - [TestDesign] Add test for net ordering of >= 2022.1 DCPs (#1054)
+  - [TestBEL] Add testDIFFsAreNotFF() (#1062)
+  - Test for Design.retargetPart() (#1061)
+  - [EDIF] Fixes rare bus renaming collision (#1065)
+  - [RWRoute] Always clear prev pointer of unpreserved RouteNode-s (#1056)
+  - [LaunchTestsOnLsf] Invoke java with assertions enabled (#1066)
+  - [LaunchTestsOnLsf] Invoke java with assertions enabled (#1063)
+  - Fix testRouteStaticNet() to avoid site pins, and fix golden values (#1064)
+  - [GitHub Actions] Migrate to upload-artifact@v4 (#1058)
+  - Add recursive partitioning ternary tree (RPTT) (#1055)
+  - Add support for vu19p tiles in bitstream
+  - [Design] createModuleInst() to not create duplicate STATIC_SOURCE-s
+  - Removes all instances of enum.hashCode()
+  - [Node] equals() to use instanceof for subclass-awareness
+  - Retarget & relocate an existing design to a new part and location
+  - Fixes issue related to non-deterministic Net order upon multi-threaded DCP load
+  - Fix BEL.isFF() based on BELTypes
+  - Fix missing Design.getSeries()
+
+API Additions:
+  - com.xilinx.rapidwright.design.Design "public boolean retargetPart(Part targetPart, int tileXOffset, int tileYOffset)"
+  
+  
 ============= RapidWright 2024.1.2-beta released on 2024-09-04 ================
 Notes:
   - Creating a standalone entry point to relocate DCPs (#1047)

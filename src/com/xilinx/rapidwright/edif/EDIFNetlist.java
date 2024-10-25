@@ -1597,9 +1597,9 @@ public class EDIFNetlist extends EDIFName {
     public List<EDIFHierPortInst> getPhysicalPins(Net net) {
         switch (net.getType()) {
             case GND:
-                return physicalGndPins;
+                return getPhysicalGndPins();
             case VCC:
-                return physicalVccPins;
+                return getPhysicalVccPins();
             default:
                 final EDIFHierNet hierNet = getHierNetFromName(net.getName());
                 return getPhysicalNetPinMap().get(hierNet);
