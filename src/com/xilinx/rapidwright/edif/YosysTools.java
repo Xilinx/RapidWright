@@ -139,6 +139,6 @@ public class YosysTools {
      * @return true if yosys is on current PATH, false otherwise.
      */
     public static boolean isYosysOnPath() {
-        return FileTools.isExecutableOnPath("yosys");
+        return FileTools.isExecutableOnPath(yosysExec);
     }
 }
