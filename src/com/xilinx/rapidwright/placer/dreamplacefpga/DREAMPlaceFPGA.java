@@ -36,6 +36,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.interchange.DeviceResourcesWriter;
 import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.interchange.LogNetlistWriter;
@@ -102,6 +105,8 @@ public class DREAMPlaceFPGA {
     // public static final String dreamPlaceFPGAExec = "DREAMPlaceFPGA";
     public static final String dreamPlaceFPGAExec = "dreamplacefpga";
 
+    public static final String MAKE_DCP_OUT_OF_CONTEXT = PhysicalNetlistToDcp.MAKE_DCP_OUT_OF_CONTEXT;
+
     public static Map<String, Object> getSettingsMap() {
         Map<String, Object> map = new HashMap<>();
 
@@ -155,7 +160,11 @@ public class DREAMPlaceFPGA {
         }
     }
 
-    public static Design placeDesign(Design design, Path workDir, boolean makeOutOfContext) throws IOException {
+    public static Design placeDesign(EDIFNetlist netlist) throws IOException {
+        return placeDesign(netlist, null, false);
+    }
+
+    public static Design placeDesign(EDIFNetlist netlist, Path workDir, boolean makeOutOfContext) throws IOException {
         boolean removeWorkDir = false;
         if (workDir == null) {
             workDir = Paths.get("DREAMPlaceFPGAWorkdir" + FileTools.getUniqueProcessAndHostID());
@@ -166,15 +175,16 @@ public class DREAMPlaceFPGA {
         // Create interchange netlist file
         String inputLogNetlistName = "input" + Interchange.LOG_NETLIST_EXT;
         String inputLogNetlistPath = workDir.resolve(inputLogNetlistName).toString();
-        LogNetlistWriter.writeLogNetlist(design.getNetlist(), inputLogNetlistPath);
+        LogNetlistWriter.writeLogNetlist(netlist, inputLogNetlistPath);
 
         // Create device file if it doesn't already exist
-        String deviceName = design.getDevice().getName();
+        String partName = EDIFTools.getPartName(netlist);
+        Device device = netlist.getDevice();
         Path deviceDir = FileTools.getUserSpecificRapidWrightDataPath();
-        Path deviceFile = deviceDir.resolve(deviceName + ".device");
+        Path deviceFile = deviceDir.resolve(device.getName() + ".device");
         if (!Files.exists(deviceFile)) {
             try {
-                DeviceResourcesWriter.writeDeviceResourcesFile(design.getPartName(), design.getDevice(),
+                DeviceResourcesWriter.writeDeviceResourcesFile(partName, device,
                         new CodePerfTracker("Create IF Device"), deviceFile.toString(), true);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
@@ -214,14 +224,17 @@ public class DREAMPlaceFPGA {
         String outputPhysNetlistPath = workDir.resolve("design/design.phys").toString();
         try {
             placedDesign = PhysNetlistReader.readPhysNetlist(outputPhysNetlistPath,
-                    design.getNetlist());
-            if (makeOutOfContext) {
-                placedDesign.setAutoIOBuffers(false);
-                placedDesign.setDesignOutOfContext(true);
-            }
+                    netlist);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+
+        if (makeOutOfContext) {
+            placedDesign.setAutoIOBuffers(false);
+            placedDesign.setDesignOutOfContext(true);
+        }
+
+        placedDesign.routeSites();
 
         if (removeWorkDir) {
             FileTools.deleteFolder(workDir.toString());
@@ -233,14 +246,14 @@ public class DREAMPlaceFPGA {
         // Usage: <input DCP> <output DCP> [--out_of_context] [work directory]
         if (args.length < 2 || args.length > 4) {
             System.out.println("USAGE: <input DCP> <output DCP> [" 
-                            + PhysicalNetlistToDcp.MAKE_DCP_OUT_OF_CONTEXT + "] [work directory]");
+                            + MAKE_DCP_OUT_OF_CONTEXT + "] [work directory]");
             return;
         }
         Design input = Design.readCheckpoint(args[0]);
 
         boolean makeOutOfContext = false;
         if (args.length >= 3) {
-            if (args[2].equals(PhysicalNetlistToDcp.MAKE_DCP_OUT_OF_CONTEXT)) {
+            if (args[2].equals(MAKE_DCP_OUT_OF_CONTEXT)) {
                 makeOutOfContext = true;
             } 
         }
@@ -248,7 +261,7 @@ public class DREAMPlaceFPGA {
         Path workDir = args.length == 4 ? Paths.get(args[3]) :
                 args.length == 3 && !makeOutOfContext ? Paths.get(args[2]) :
                 null;
-        Design placed = placeDesign(input, workDir, makeOutOfContext);
+        Design placed = placeDesign(input.getNetlist(), workDir, makeOutOfContext);
         placed.writeCheckpoint(args[1]);
     }
 }
