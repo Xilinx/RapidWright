@@ -242,6 +242,14 @@ public class DREAMPlaceFPGA {
         return placedDesign;
     }
 
+    /**
+     * Checks if dreamplacefpga is available on current PATH (uses unix 'which' or windows 'where').
+     * @return true if yosys is on current PATH, false otherwise.
+     */
+    public static boolean isDREAMPlaceFPGAOnPath() {
+        return FileTools.isExecutableOnPath(dreamPlaceFPGAExec);
+    }
+
     public static void main(String[] args) throws IOException {
         // Usage: <input DCP> <output DCP> [--out_of_context] [work directory]
         if (args.length < 2 || args.length > 4) {
