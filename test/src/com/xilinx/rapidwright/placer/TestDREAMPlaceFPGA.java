@@ -49,6 +49,7 @@ public class TestDREAMPlaceFPGA {
         DREAMPlaceFPGA.main(new String[]{inputDcp, outputDcp, DREAMPlaceFPGA.MAKE_DCP_OUT_OF_CONTEXT, tempDir.toString()});
 
         ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(Paths.get(outputDcp));
+        Assertions.assertEquals(0, rrs.netsWithNoPlacedPins);
         Assertions.assertEquals(3465, rrs.routableNets);
         Assertions.assertEquals(3465, rrs.unroutedNets);
         Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
@@ -72,6 +73,7 @@ public class TestDREAMPlaceFPGA {
         design.writeCheckpoint(outputDcp);
         boolean encrypted = !netlist.getEncryptedCells().isEmpty();
         ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(outputDcp, tempDir, encrypted);
+        Assertions.assertEquals(0, rrs.netsWithNoPlacedPins);
         Assertions.assertEquals(3465, rrs.routableNets);
         Assertions.assertEquals(3465, rrs.unroutedNets);
         Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
