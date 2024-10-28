@@ -41,6 +41,7 @@ public class TestYosysTools {
 
     @Test
     void testSynthXilinx(@TempDir Path workDir) {
+        // Skip test if yosys is not on PATH
         Assumptions.assumeTrue(YosysTools.isYosysOnPath());
 
         Path input = workDir.resolve("input.v");
@@ -89,6 +90,7 @@ public class TestYosysTools {
 
     @Test
     void testSynthXilinxMultiFile(@TempDir Path workDir) {
+        // Skip test if yosys is not on PATH
         Assumptions.assumeTrue(YosysTools.isYosysOnPath());
 
         Path input1 = workDir.resolve("input1.v");
