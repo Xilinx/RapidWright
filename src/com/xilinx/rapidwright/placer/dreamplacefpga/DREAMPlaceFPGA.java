@@ -179,6 +179,9 @@ public class DREAMPlaceFPGA {
 
         // Create device file if it doesn't already exist
         String partName = EDIFTools.getPartName(netlist);
+        if (partName == null) {
+            throw new RuntimeException("ERROR: Netlist has no part name");
+        }
         Device device = netlist.getDevice();
         Path deviceDir = FileTools.getUserSpecificRapidWrightDataPath();
         Path deviceFile = deviceDir.resolve(device.getName() + ".device");
