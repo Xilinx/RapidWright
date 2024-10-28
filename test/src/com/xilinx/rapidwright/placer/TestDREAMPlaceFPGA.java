@@ -61,7 +61,7 @@ public class TestDREAMPlaceFPGA {
 
         boolean skipXdef = true;
         Design design = RapidWrightDCP.loadDCP("gnl_2_4_3_1.3_gnl_3000_07_3_80_80_placed.dcp", skipXdef);
-        Assertions.assertTrue(design.getUsedSites().isEmpty());
+        Assertions.assertTrue(design.getSiteInsts().isEmpty());
         EDIFNetlist netlist = design.getNetlist();
         design = null;
 
