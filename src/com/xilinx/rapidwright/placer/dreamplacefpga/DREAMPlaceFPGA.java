@@ -53,117 +53,27 @@ import com.xilinx.rapidwright.util.FileTools;
  */
 public class DREAMPlaceFPGA {
 
-    public static final String INTERCHANGE_NETLIST = "interchange_netlist";
-    public static final String INTERCHANGE_DEVICE = "interchange_device";
-    public static final String RESULT_DIR = "result_dir";
-    public static final String IO_PL = "io_pl";
-    public static final String GPU = "gpu";
-    public static final String NUM_BINS_X = "num_bins_x";
-    public static final String NUM_BINS_Y = "num_bins_y";
-    public static final String GLOBAL_PLACE_STAGES = "global_place_stages";
-    public static final String TARGET_DENSITY = "target_density";
-    public static final String DENSITY_WEIGHT = "density_weight";
-    public static final String RANDOM_SEED = "random_seed";
-    public static final String SCALE_FACTOR = "scale_factor";
-    public static final String GLOBAL_PLACE_FLAG = "global_place_flag";
-    public static final String ROUTABILITY_OPT_FLAG = "routability_opt_flag";
-    public static final String LEGALIZE_FLAG = "legalize_flag";
-    public static final String DETAILED_PLACE_FLAG = "detailed_place_flag";
-    public static final String DTYPE = "dtype";
-    public static final String PLOT_FLAG = "plot_flag";
-    public static final String NUM_THREADS = "num_threads";
-    public static final String DETERMINISTIC_FLAG = "deterministic_flag";
-    public static final String ENABLE_IF = "enable_if";
-    public static final String ENABLE_SITE_ROUTING = "enable_site_routing";
-
-    public static final String IO_PL_DEFAULT = "";
-    public static final boolean GPU_DEFAULT = false;
-    public static final int NUM_BINS_X_DEFAULT = 512;
-    public static final int NUM_BINS_Y_DEFAULT = 512;
-    public static final String GLOBAL_PLACE_STAGES_DEFAULT = 
-            "[\n{\"num_bins_x\" : 512,"
-            + " \"num_bins_y\" : 512,"
-            + " \"iteration\" : 2000,"
-            + " \"learning_rate\" : 0.01,"
-            + " \"wirelength\" : \"weighted_average\","
-            + " \"optimizer\" : \"nesterov\"}\n]";
-    public static final double TARGET_DENSITY_DEFAULT = 1.0;
-    public static final double DENSITY_WEIGHT_DEFAULT = 8e-5;
-    public static final int RANDOM_SEED_DEFAULT = 1000;
-    public static final double SCALE_FACTOR_DEFAULT = 1.0;
-    public static final boolean GLOBAL_PLACE_FLAG_DEFAULT = true;
-    public static final boolean ROUTABILITY_OPT_FLAG_DEFAULT = false;
-    public static final boolean LEGALIZE_FLAG_DEFAULT = true;
-    public static final boolean DETAILED_PLACE_FLAG_DEFAULT = false;
-    public static final String DTYPE_DEFAULT = "float32";
-    public static final boolean PLOT_FLAG_DEFAULT = false;
-    public static final int NUM_THREADS_DEFAULT = 8;
-    public static final boolean DETERMINISTIC_FLAG_DEFAULT = true;
-    public static final boolean ENABLE_IF_DEFAULT = true;
-    public static final boolean ENABLE_SITE_ROUTING_DEFAULT = false;
-
-    // public static final String dreamPlaceFPGAExec = "DREAMPlaceFPGA";
     public static final String dreamPlaceFPGAExec = "dreamplacefpga";
 
     public static final String MAKE_DCP_OUT_OF_CONTEXT = PhysicalNetlistToDcp.MAKE_DCP_OUT_OF_CONTEXT;
 
-    public static Map<String, Object> getSettingsMap() {
-        Map<String, Object> map = new HashMap<>();
-
-        map.put(IO_PL, IO_PL_DEFAULT);
-        map.put(GPU, GPU_DEFAULT);
-        map.put(NUM_BINS_X, NUM_BINS_X_DEFAULT);
-        map.put(NUM_BINS_Y, NUM_BINS_Y_DEFAULT);
-        map.put(GLOBAL_PLACE_STAGES, GLOBAL_PLACE_STAGES_DEFAULT);
-        map.put(TARGET_DENSITY, TARGET_DENSITY_DEFAULT);
-        map.put(DENSITY_WEIGHT, DENSITY_WEIGHT_DEFAULT);
-        map.put(RANDOM_SEED, RANDOM_SEED_DEFAULT);
-        map.put(SCALE_FACTOR, SCALE_FACTOR_DEFAULT);
-        map.put(GLOBAL_PLACE_FLAG, GLOBAL_PLACE_FLAG_DEFAULT);
-        map.put(ROUTABILITY_OPT_FLAG, ROUTABILITY_OPT_FLAG_DEFAULT);
-        map.put(LEGALIZE_FLAG, LEGALIZE_FLAG_DEFAULT);
-        map.put(DETAILED_PLACE_FLAG, DETAILED_PLACE_FLAG_DEFAULT);
-        map.put(DTYPE, DTYPE_DEFAULT);
-        map.put(PLOT_FLAG, PLOT_FLAG_DEFAULT);
-        map.put(NUM_THREADS, NUM_THREADS_DEFAULT);
-        map.put(DETERMINISTIC_FLAG, DETERMINISTIC_FLAG_DEFAULT);
-        map.put(ENABLE_IF, ENABLE_IF_DEFAULT);
-        map.put(ENABLE_SITE_ROUTING, ENABLE_SITE_ROUTING_DEFAULT);
-
-        return map;
-    }
-
-    public static void writeJSONForDREAMPlaceFPGA(Path jsonPath, Map<String, Object> attributes) {
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(jsonPath.toFile()))) {
-            bw.write("{\n");
-            boolean first = true;
-            for (Entry<String, Object> e : attributes.entrySet()) {
-                if (first) {
-                    first = false;
-                } else {
-                    bw.write(",\n");
-                }
-                bw.write("    \"" + e.getKey() + "\"");
-                bw.write(" : ");
-                if (e.getValue() instanceof String && !e.getKey().equals(GLOBAL_PLACE_STAGES)) {
-                    bw.write("\"" + e.getValue().toString() + "\"");
-                } else if (e.getValue() instanceof Boolean) {
-                    bw.write((boolean) e.getValue() ? "1" : "0");
-                } else {
-                    bw.write(e.getValue().toString() + "");
-                }
-
-            }
-            bw.write("\n}\n");
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
+    /**
+     * Given a EDIFNetlist object, place it using DREAMPlaceFPGA.
+     * @param netlist EDIFNetlist object to be placed.
+     * @return Placed Design object.
+     * @throws IOException
+     */
     public static Design placeDesign(EDIFNetlist netlist) throws IOException {
         return placeDesign(netlist, null, false);
     }
 
+    /**
+     * Given a EDIFNetlist object, place it using DREAMPlaceFPGA.
+     * @param netlist EDIFNetlist object to be placed.
+     * @param workDir Path to working directory (null to use a temporary directory which gets deleted on return)
+     * @return Placed Design object.
+     * @throws IOException
+     */
     public static Design placeDesign(EDIFNetlist netlist, Path workDir, boolean makeOutOfContext) throws IOException {
         boolean removeWorkDir = false;
         if (workDir == null) {
@@ -194,17 +104,6 @@ public class DREAMPlaceFPGA {
             }
         }
 
-        // Create JSON file for DREAMPlaceFPGA
-        // Path jsonFile = workDir.resolve("design.json");
-        // Map<String, Object> settings = getSettingsMap();
-        // settings.put(INTERCHANGE_DEVICE, deviceFile.toString());
-        // settings.put(INTERCHANGE_NETLIST, workDir.relativize(Paths.get(inputRoot + Interchange.LOG_NETLIST_EXT)).toString());
-        // settings.put(RESULT_DIR, workDir.toString());
-        // writeJSONForDREAMPlaceFPGA(jsonFile, settings);
-
-        // Run DREAMPlaceFPGA
-        // String exec = dreamPlaceFPGAExec + " " + workDir.relativize(jsonFile);
-
         // Run DREAMPlaceFPGA
         List<String> exec = new ArrayList<>();
         exec.add(dreamPlaceFPGAExec);
@@ -223,7 +122,7 @@ public class DREAMPlaceFPGA {
         }
 
         // Load placed result
-        Design placedDesign = null;
+        Design placedDesign;
         String outputPhysNetlistPath = workDir.resolve("design/design.phys").toString();
         try {
             placedDesign = PhysNetlistReader.readPhysNetlist(outputPhysNetlistPath,
