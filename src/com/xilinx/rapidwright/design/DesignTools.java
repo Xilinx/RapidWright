@@ -4324,7 +4324,13 @@ public class DesignTools {
         }
 
         Queue<NetTools.NodeTree> queue = new ArrayDeque<>();
-        queue.addAll(NetTools.getRouteTrees(net));
+        for (NetTools.NodeTree node : NetTools.getRouteTrees(net)) {
+            if (node.fanouts.isEmpty()) {
+                // Skip source pins with no fanout
+                continue;
+            }
+            queue.add(node);
+        }
         while (!queue.isEmpty()) {
             NetTools.NodeTree node = queue.poll();
             SitePinInst spi = node2spi.get(node);
