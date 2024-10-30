@@ -353,7 +353,8 @@ public class LUTTools {
             boolean result = b.eval(i);
             if (result) init = setBit(init,i);
         }
-        return length + "'h" + String.format("%0" + ((length) >>> 2) + "x", init).toUpperCase();
+        int initLength = Integer.max(1, length >>> 2);
+        return length + "'h" + String.format("%0" + initLength + "x", init).toUpperCase();
     }
 
     /**
