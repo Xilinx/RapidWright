@@ -22,9 +22,16 @@
 
 package com.xilinx.rapidwright.design;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 
 public class NetTools {
@@ -45,5 +52,88 @@ public class NetTools {
             return false;        
         
         return clkSrcSiteTypeEnums.contains(srcSpi.getSiteTypeEnum());
+    }
+
+    public static class NodeTree extends Node {
+        public List<NodeTree> fanouts = Collections.emptyList();
+        public NodeTree(Node node) {
+            super(node);
+        }
+
+        public void addFanout(NodeTree node) {
+            if (fanouts.isEmpty()) {
+                fanouts = new ArrayList<>(1);
+            }
+            fanouts.add(node);
+        }
+
+        private void buildString(StringBuilder sb,
+                                 boolean subtreeStart,
+                                 boolean branchStart,
+                                 boolean branchEndIfNoFanouts,
+                                 boolean subTreeEndIfNoFanouts) {
+            sb.append("    ");
+            sb.append(subtreeStart ? "[" : " ");
+            sb.append(branchStart ? "{" : " ");
+            sb.append("   ");
+            boolean branchEnd = branchEndIfNoFanouts && fanouts.isEmpty();
+            sb.append(branchEnd ? "}" : " ");
+            boolean subtreeEnd = subTreeEndIfNoFanouts && branchEnd;
+            sb.append(subtreeEnd ? "]" : " ");
+            sb.append(String.format("  %30s", super.toString()));
+            sb.append("\n");
+
+            subtreeStart = false;
+            for (int i = 0; i < fanouts.size(); i++) {
+                NodeTree fanout = fanouts.get(i);
+                boolean lastFanout = (i == fanouts.size() - 1);
+                branchStart = !lastFanout && (fanouts.size() > 1);
+                branchEndIfNoFanouts = lastFanout || branchStart;
+                fanout.buildString(sb, subtreeStart, branchStart, branchEndIfNoFanouts,
+                        subTreeEndIfNoFanouts && !branchStart && lastFanout);
+            }
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+            boolean subtreeStart = true;
+            boolean branchStart = true;
+            boolean branchEndIfNoFanouts = true;
+            boolean subTreeEndIfNoFanouts = true;
+            buildString(sb, branchStart, subtreeStart, branchEndIfNoFanouts, subTreeEndIfNoFanouts);
+            return sb.toString();
+        }
+    }
+
+    public static List<NodeTree> getRouteTrees(Net net) {
+        List<NodeTree> subtrees = new ArrayList<>();
+        Map<Node, NodeTree> nodeMap = new HashMap<>();
+        for (PIP pip : net.getPIPs()) {
+            if (pip.isEndWireNull()) {
+                continue;
+            }
+            boolean isReversed = pip.isReversed();
+            NodeTree startNode = nodeMap.computeIfAbsent(isReversed ? pip.getEndNode() : pip.getStartNode(), NodeTree::new);
+            NodeTree endNode = nodeMap.computeIfAbsent(isReversed ? pip.getStartNode() : pip.getEndNode(), NodeTree::new);
+            startNode.addFanout(endNode);
+            if (!pip.isBidirectional()) {
+                if ((net.getType() == NetType.GND && startNode.isTiedToGnd()) ||
+                    (net.getType() == NetType.VCC && startNode.isTiedToVcc())) {
+                    subtrees.add(startNode);
+                }
+            }
+        }
+
+        for (SitePinInst spi : net.getPins()) {
+            if (!spi.isOutPin()) {
+                continue;
+            }
+            Node node = spi.getConnectedNode();
+            NodeTree nodeTree = nodeMap.computeIfAbsent(node, NodeTree::new);
+            subtrees.add(nodeTree);
+        }
+
+        return subtrees;
     }
 }
