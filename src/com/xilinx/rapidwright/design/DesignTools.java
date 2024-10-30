@@ -4317,49 +4317,21 @@ public class DesignTools {
             return;
         }
 
-        Queue<Node> queue = new ArrayDeque<>();
-        Map<Node, List<Node>> node2fanout = new HashMap<>();
-        for (PIP pip : net.getPIPs()) {
-            boolean isReversed = pip.isReversed();
-            Node startNode = isReversed ? pip.getEndNode() : pip.getStartNode();
-            Node endNode = isReversed ? pip.getStartNode() : pip.getEndNode();
-            node2fanout.computeIfAbsent(startNode, k -> new ArrayList<>())
-                    .add(endNode);
-            if (pip.isBidirectional()) {
-                node2fanout.computeIfAbsent(endNode, k -> new ArrayList<>())
-                        .add(startNode);
-            }
-
-            if ((net.getType() == NetType.GND && startNode.isTiedToGnd()) ||
-                    (net.getType() == NetType.VCC && startNode.isTiedToVcc())) {
-                queue.add(startNode);
-            }
-        }
-
         Map<Node, SitePinInst> node2spi = new HashMap<>();
         for (SitePinInst spi : net.getPins()) {
             Node node = spi.getConnectedNode();
-            if (spi.isOutPin()) {
-                if (node2fanout.get(node) == null) {
-                    // Skip source pins with no fanout
-                    continue;
-                }
-                queue.add(node);
-            }
             node2spi.put(node, spi);
         }
 
+        Queue<NetTools.NodeTree> queue = new ArrayDeque<>();
+        queue.addAll(NetTools.getRouteTrees(net));
         while (!queue.isEmpty()) {
-            Node node = queue.poll();
+            NetTools.NodeTree node = queue.poll();
             SitePinInst spi = node2spi.get(node);
             if (spi != null) {
                 spi.setRouted(true);
             }
-
-            List<Node> fanouts = node2fanout.remove(node);
-            if (fanouts != null) {
-                queue.addAll(fanouts);
-            }
+            queue.addAll(node.fanouts);
         }
     }
 
