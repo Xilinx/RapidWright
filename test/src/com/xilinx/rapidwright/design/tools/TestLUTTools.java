@@ -171,4 +171,16 @@ public class TestLUTTools {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "false");
         }
     }
+    
+    @ParameterizedTest
+    @CsvSource({
+            "O=I0 & !I1 & I2 & !I3 + !I0 & I1 & I2 & !I3 + I0 & !I1 & !I2 & I3 + !I0 & I1 & !I2 & I3,16'h0660,4",
+            "O=I0 & !I1 + !I0 & I1,4'h6,2",
+            "O=!I0 & !I1 & !I2 & !I3 + I0 & I1 & !I2 & !I3 + !I0 & !I1 & I2 & I3 + I0 & I1 & I2 & I3,16'h9009,4",
+            "O=I0 & I1 & I2 & I3 & I4 & I5,64'h8000000000000000,6",
+            "O=!I0 & !I1 & !I2 & !I3 & !I4 & !I5,64'h0000000000000001,6",
+    })
+    public void testGetLUTInitFromEquation(String equation, String init, int lutSize) {
+        Assertions.assertEquals(init, LUTTools.getLUTInitFromEquation(equation, lutSize));
+    }
 }
