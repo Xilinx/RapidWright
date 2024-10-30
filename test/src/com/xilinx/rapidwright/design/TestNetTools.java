@@ -117,7 +117,7 @@ public class TestNetTools {
     public void testGetRouteTrees() {
         Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
         Net net = design.getNet("processor/data_path_loop[0].output_data.sy_kk_mux_lut/O5");
-        List<NetTools.NodeTree> trees = NetTools.getRouteTrees(net);
+        List<NetTools.NodeTree> trees = NetTools.getNodeTrees(net);
         Assertions.assertEquals(1, trees.size());
 
         // Taken directly from Vivado's report_route_status

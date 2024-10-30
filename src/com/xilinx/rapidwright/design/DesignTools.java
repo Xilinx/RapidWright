@@ -4324,7 +4324,7 @@ public class DesignTools {
         }
 
         Queue<NetTools.NodeTree> queue = new ArrayDeque<>();
-        for (NetTools.NodeTree node : NetTools.getRouteTrees(net)) {
+        for (NetTools.NodeTree node : NetTools.getNodeTrees(net)) {
             if (node.fanouts.isEmpty()) {
                 // Skip source pins with no fanout
                 continue;
