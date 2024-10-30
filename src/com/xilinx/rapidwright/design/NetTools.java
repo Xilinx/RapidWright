@@ -72,6 +72,7 @@ public class NetTools {
                                  boolean branchStart,
                                  boolean branchEndIfNoFanouts,
                                  boolean subTreeEndIfNoFanouts) {
+            // Adopt the same spacing as Vivado's report_route_status
             sb.append("    ");
             sb.append(subtreeStart ? "[" : " ");
             sb.append(branchStart ? "{" : " ");
@@ -106,6 +107,13 @@ public class NetTools {
         }
     }
 
+    /**
+     * Compute the routing tree of the given Net by examining its PIPs.
+     * Note that this method: (a) assumes that no loops are present, (b) only discovers subtrees that start at an
+     * output SitePinInst or a node tied to VCC/GND (i.e. gaps and islands will be ignored).
+     * @param net Net to analyze
+     * @return A list of NodeTree objects, corresponding to the root of each subtree.
+     */
     public static List<NodeTree> getRouteTrees(Net net) {
         List<NodeTree> subtrees = new ArrayList<>();
         Map<Node, NodeTree> nodeMap = new HashMap<>();

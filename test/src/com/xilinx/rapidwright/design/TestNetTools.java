@@ -120,7 +120,7 @@ public class TestNetTools {
         List<NetTools.NodeTree> trees = NetTools.getRouteTrees(net);
         Assertions.assertEquals(1, trees.size());
 
-        // Taken directly from Vivado
+        // Taken directly from Vivado's report_route_status
         String[] expected = new String(
                 "    [{       CLEL_R_X10Y236/CLE_CLE_L_SITE_0_AMUX (65535) \n" +
                         "     {       INT_X10Y236/INT_NODE_SDQ_27_INT_OUT1 ( 3) INT_X10Y236/INT.LOGIC_OUTS_E21->INT_NODE_SDQ_27_INT_OUT1\n" +
