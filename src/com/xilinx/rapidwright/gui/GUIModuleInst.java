@@ -66,6 +66,8 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
     private ArrayList<Integer> occupiedTilesY;
     private ArrayList<GUIMultiNetLine> myLines;
 
+    public static int SNAPPING_DISTANCE = 100;
+
     public GUIModuleInst(ModuleInst modInst, TileScene scene, boolean movable) {
         this.moduleInst = modInst;
         this.scene = scene;
@@ -438,32 +440,22 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
     public Object itemChange(GraphicsItemChange change, Object value) {
         if (change == GraphicsItemChange.ItemSelectedHasChanged) {
             selected.emit(QVariant.toBoolean(value));
-        } else if (change == GraphicsItemChange.ItemPositionHasChanged
-                && scene() != null) {
+        } else if (change == GraphicsItemChange.ItemPositionHasChanged && scene() != null) {
             moved.emit();
-        } else if (change == GraphicsItemChange.ItemPositionChange
-                && scene() != null) {
+        } else if (change == GraphicsItemChange.ItemPositionChange && scene() != null) {
             // value is the new position.
-
             return makeValidPosition((QPointF) value);
         }
         return super.itemChange(change, value);
     }
 
     private Tile toTile(QPointF newPos) {
-
-        //newPos = newPos.subtract(grabOffset);
-
-
-
         QRectF rect = scene().sceneRect();
         double width = this.boundingRect().width();
         width = Math.floor(width / scene.tileSize);
         double height = this.boundingRect().height();
         height = Math.floor(height / scene.tileSize);
         QPointF p = rect.bottomRight();
-        //p.setX((fpScene.device.getColumns() - width) * fpScene.tileSize);
-        //p.setY((fpScene.device.getRows() - height) * fpScene.tileSize);
 
         p.setX((scene.cols - width) * scene.tileSize);
         p.setY((scene.rows - height) * scene.tileSize);
@@ -479,30 +471,24 @@ public class GUIModuleInst extends QGraphicsPolygonItem {
     }
 
     private QPointF makeValidPosition(QPointF newPos) {
-
         final Tile target = toTile(newPos);
         Tile result = null;
-        float bestDistance = Float.POSITIVE_INFINITY;
+        float closestValidPlacement = Float.POSITIVE_INFINITY;
 
         for (Site placement : moduleInst.getModule().getAllValidPlacements()) {
             float xDiff = placement.getTile().getColumn() - target.getColumn();
             float yDiff = placement.getTile().getRow() - target.getRow();
             float dist = xDiff * xDiff + yDiff * yDiff;
 
-            if (dist < bestDistance) {
-                bestDistance = dist;
+            if (dist < closestValidPlacement) {
+                closestValidPlacement = dist;
                 result = placement.getTile();
             }
         }
 
-        //Only snap to valid placement if it is close
-        if (bestDistance > 200) {
-            result = target;
-        }
-
-        return new QPointF(scene.getDrawnTileX(result)*scene.tileSize, scene.getDrawnTileY(result)*scene.tileSize)
-                .subtract(getAnchorOffset());
-
+        // Only snap to valid placement if it is close
+        return closestValidPlacement > SNAPPING_DISTANCE ? scene.getTilePoint(target)
+                : scene.getTilePoint(result).subtract(getAnchorOffset());
     }
 
     public boolean isGrabbed() {
