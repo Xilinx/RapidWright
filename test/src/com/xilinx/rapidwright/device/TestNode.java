@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.device;
 
 import java.util.ArrayDeque;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Queue;
@@ -83,45 +84,61 @@ public class TestNode {
     @ParameterizedTest
     @CsvSource({
             // UltraScale+ part
-            "xcvu3p,INT_X37Y220,BOUNCE_",
-            "xcvu3p,INT_X37Y220,BYPASS_",
-            "xcvu3p,INT_X37Y220,INT_NODE_GLOBAL_",
-            "xcvu3p,INT_X37Y220,INT_NODE_IMUX_",
-            "xcvu3p,INT_X37Y220,INODE_",
-            // These nodes fanout to NESW nodes in the tile above or below
-            // "xcvu3p,INT_X37Y220,SDQNODE_",
+            "xcvu3p,INT_X37Y220,BOUNCE_.*",
+            "xcvu3p,INT_X37Y220,BYPASS_.*",
+            "xcvu3p,INT_X37Y220,INT_NODE_GLOBAL_.*",
+            "xcvu3p,INT_X37Y220,INT_NODE_IMUX_.*",
+            "xcvu3p,INT_X37Y220,INODE_.*",
+            "xcvu3p,INT_X37Y220,INT_INT_SDQ_.*", // IntentCode.NODE_SINGLE
+            "xcvu3p,INT_X37Y220,INT_NODE_SDQ_.*",
+            "xcvu3p,INT_X37Y220,SDQNODE_.*",
+            "xcvu3p,INT_X37Y220,IMUX_.*",
+            "xcvu3p,INT_X37Y220,CTRL_.*",
+            "xcvu3p,CLEM_X37Y220,CLE_CLE_M_SITE_0_[A-H](_O|Q|Q2|MUX)",
 
             // UltraScale part
-            "xcvu065,INT_X38Y220,BOUNCE_",
-            "xcvu065,INT_X38Y220,BYPASS_",
-            "xcvu065,INT_X38Y220,INT_NODE_GLOBAL_",
-            "xcvu065,INT_X38Y220,INT_NODE_IMUX_",
-            "xcvu065,INT_X38Y220,INODE_",
-            // "xcvu065,INT_X38Y220,QLND",
-            // "xcvu065,INT_X38Y220,SDND",
+            "xcvu065,INT_X38Y220,BOUNCE_.*",
+            "xcvu065,INT_X38Y220,BYPASS_.*",
+            "xcvu065,INT_X38Y220,INT_NODE_GLOBAL_.*",
+            "xcvu065,INT_X38Y220,INT_NODE_IMUX_.*",
+            "xcvu065,INT_X38Y220,INODE_.*",
+            "xcvu065,INT_X38Y220,INT_INT_SINGLE_.*", // IntentCode.NODE_SINGLE
+            "xcvu065,INT_X38Y220,INT_NODE_SINGLE_DOUBLE_.*",
+            "xcvu065,INT_X38Y220,INT_NODE_QUAD_LONG_.*",
+            "xcvu065,INT_X38Y220,IMUX_.*",
+            "xcvu065,INT_X38Y220,CTRL_.*",
+            "xcvu065,INT_X38Y220,QLND.*",
+            "xcvu065,INT_X38Y220,SDND.*",
+            "xcvu065,CLE_M_X38Y220,CLE_CLE_M_SITE_0_[A-H](_O|Q|Q2|MUX)",
     })
-    public void testNodeReachabilityUltraScale(String partName, String tileName, String wirePrefix) {
+    public void testNodeReachabilityUltraScale(String partName, String tileName, String wireRegex) {
         Device device = Device.getDevice(partName);
         Tile baseTile = device.getTile(tileName);
         Queue<Node> queue = new ArrayDeque<>();
+        Set<IntentCode> intentCodes = EnumSet.noneOf(IntentCode.class);
         for (String wireName : baseTile.getWireNames()) {
-            if (!wireName.startsWith(wirePrefix)) {
+            if (!wireName.matches(wireRegex)) {
                 continue;
             }
-            queue.add(Node.getNode(baseTile, wireName));
+            Node node = Node.getNode(baseTile, wireName);
+            queue.add(node);
+            intentCodes.add(node.getIntentCode());
         }
         System.out.println("Initial queue.size() = " + queue.size());
+        System.out.println("Intent codes = " + intentCodes);
 
         // Print out the prefixes of nodes that are immediately uphill of these wire prefixes
         // (i.e. "BOUNCE_E_0_FT1" -> "BOUNCE_")
         System.out.println("Immediately uphill:");
-        queue.stream().map(Node::getAllUphillNodes).flatMap(List::stream).map(Node::getWireName)
-                .map(s -> s.replaceFirst("((BOUNCE|BYPASS|CTRL|INT_NODE_[^_]+|INODE)_).*", "$1"))
+        boolean ultraScalePlus = partName.endsWith("p");
+        queue.stream().map(Node::getAllUphillNodes).flatMap(List::stream)
+                .map(n -> n.getWireName() + " (" + n.getIntentCode() + ")")
+                .map(s -> s.replaceFirst("((BOUNCE|BYPASS|CTRL|INT_NODE_[^_]+|INODE|IMUX|SDQNODE)_)[^\\(]+", "$1"))
                 .map(s -> s.replaceFirst(
-                                                   // UltraScale+
-                        (partName.endsWith("p")) ? "((CLE_CLE_[LM]_SITE_0|CLK_LEAF_SITES|EE[124]|INT_INT_SDQ|NN[12]|SS[12]|WW[124])_).*"
-                                                   // UltraScale
-                                                 : "((CLE_CLE_[LM]_SITE_0|CLK_BUFCE_LEAF_X16_1_CLK|EE[124]|INT_INT_SINGLE|NN[12]|SS[12]|WW[124])_).*",
+                                       // UltraScale+
+                        ultraScalePlus ? "((CLE_CLE_[LM]_SITE_0|CLK_LEAF_SITES|INT_INT_SDQ|(NN|EE|SS|WW)(1|2|4|12))_)[^\\(]+"
+                                       // UltraScale
+                                       : "((CLE_CLE_[LM]_SITE_0|CLK_BUFCE_LEAF_X16_1_CLK|EE[124]|INT_INT_SINGLE|(NN|SS)(1|2|4|5|12|16)|(EE|WW)(1|2|4|12)|SDND[NS]W)_)[^\\(]+",
                         "$1"))
                 .distinct()
                 .sorted()
@@ -129,8 +146,15 @@ public class TestNode {
 
         // Print out the prefixes of nodes that are immediately downhill of these wire prefixes
         System.out.println("Immediately downhill:");
-        queue.stream().map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getWireName)
-                .map(s -> s.replaceFirst("((BOUNCE|BYPASS|CTRL|IMUX|INT_NODE_[^_]+|INODE)_).*", "$1"))
+        queue.stream().map(Node::getAllDownhillNodes).flatMap(List::stream)
+                .map(n -> n.getWireName() + " (" + n.getIntentCode() + ")")
+                .map(s -> s.replaceFirst("((BOUNCE|BYPASS|CTRL|IMUX|INT_NODE_[^_]+|INODE|SDQNODE)_)[^\\(]+", "$1"))
+                .map(s -> s.replaceFirst(
+                                       // UltraScale+
+                        ultraScalePlus ? "((CLE_CLE_[LM]_SITE_0|INT_INT_SDQ|(NN|EE|SS|WW)(1|2|4|12))_)[^\\(]+"
+                                       // UltraScale
+                                       : "((INT_INT_SINGLE|(NN|SS)(1|2|4|5|12|16)|(EE|WW)(1|2|4|12)|QLND(NW|SE)|SDND[NS]W)_)[^\\(]+",
+                        "$1"))
                 .distinct()
                 .sorted()
                 .forEachOrdered(s -> System.out.println("\t" + s));
@@ -138,6 +162,13 @@ public class TestNode {
         Set<Node> visited = new HashSet<>();
         while (!queue.isEmpty()) {
             Node node = queue.poll();
+            String wireName = node.getWireName();
+            if ((ultraScalePlus && wireName.matches("(INT_NODE_SDQ|SDQNODE)_.*")) ||                                      // UltraScale+
+                (!ultraScalePlus && wireName.matches("(INT_NODE_(SINGLE_DOUBLE|QUAD_LONG)|QLND(NW|SE|SW)|SDND[NS]W)_.*")) // UltraScale
+            ) {
+                // Do not desccend into SDQNODEs
+                continue;
+            }
             for (Node downhill : node.getAllDownhillNodes()) {
                 if (!visited.add(downhill)) {
                     continue;
