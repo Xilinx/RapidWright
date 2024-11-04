@@ -37,7 +37,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -109,9 +108,11 @@ public class RouteNodeGraph {
     /** Map indicating the wire indices corresponding to the [A-H]MUX output */
     protected final Map<TileTypeEnum, BitSet> muxWires;
 
-    /** Flag for whether LUT routethrus are to be considered
-     */
+    /** Flag for whether LUT routethrus are to be considered */
     protected final boolean lutRoutethru;
+
+    /** Flag for whether design targets the Versal series */
+    protected final boolean isVersal;
 
     public RouteNodeGraph(Design design, RWRouteConfig config) {
         this(design, config, new HashMap<>());
@@ -286,6 +287,8 @@ public class RouteNodeGraph {
             prevLagunaColumn = null;
             lagunaI = null;
         }
+
+        isVersal = design.getSeries() == Series.Versal;
     }
 
     public void initialize() {
@@ -328,7 +331,7 @@ public class RouteNodeGraph {
                 String pinName = pin.getName();
                 char lutLetter = pinName.charAt(0);
                 String otherPinName = null;
-                String otherPinNameSuffix = design.getSeries() == Series.Versal ? "Q" : "MUX";
+                String otherPinNameSuffix = isVersal ? "Q" : "MUX";
                 if (pinName.endsWith(otherPinNameSuffix)) {
                     otherPinName = lutLetter + "_O";
                 } else if (pinName.endsWith("_O")) {
@@ -573,6 +576,56 @@ public class RouteNodeGraph {
     }
 
     public boolean isAccessible(RouteNode childRnode, Connection connection) {
+        if (isVersal) {
+            RouteNode sinkRnode = connection.getSinkRnode();
+            Tile sinkTile = sinkRnode.getTile();
+            IntentCode childIntentCode = childRnode.getIntentCode();
+            switch (childIntentCode) {
+                case NODE_INODE:
+                    // Block access to all INODEs outside the sink tile, since NODE_INODE -> NODE_IMUX -> NODE_PINFEED (or NODE_INODE _> NODE_PINBOUNCE)
+                    if (childRnode.getTile() != sinkTile) {
+                        return false;
+                    }
+                    assert(sinkRnode.getIntentCode() == IntentCode.NODE_IMUX || sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
+                    break;
+                case NODE_CLE_CNODE:
+                    // Block access to all CNODEs outside the sink tile, since NODE_CLE_CNODE -> NODE_CLE_CTRL
+                    if (childRnode.getTile() != sinkTile) {
+                        return false;
+                    }
+                    assert(sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL);
+                    break;
+                case NODE_INTF_CNODE:
+                    // Block access to all CNODEs outside the sink tile, since NODE_INTF_CNODE -> NODE_INTF_CTRL
+                    if (childRnode.getTile() != sinkTile) {
+                        return false;
+                    }
+                    assert(sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL);
+                    break;
+                default:
+                    break;
+            }
+
+            // TODO: Do we want to block NODE_PINBOUNCE if not in the sink INT tile?
+            // We have already blocked them in RWRoute.isAccessiblePinbounce.
+
+            // TODO: Do we want to block all exploration of TileTypeEnum.CLE_BC_CORE and TileTypeEnum.INTF_[LR]OCF_[TB][LR]_TILE
+            //       unless our sink is in that tile? (or is this already done by NODE_{CLE,INTF}_CNODE blocking above)
+            // No, we also need to take those neighbor CLE_BC_CORE tiles of the source tile.
+            // Furthermore, even if we don't take them into consideration, this is done by blocking CNODEs and BNODEs.
+
+            // TODO: Is there any value in blocking NODE_{CLE,INTF}_BNODEs?
+            // We have already done this. Here is an invariant that NODE_{CLE, INTF}_BNODE -> {NODE_INODE, NODE_CLE_CTRL},
+            // where NODE_CLE_CTRL must be a node that connects to the sink control pin.
+            // Since the sink rnode must not be the target, we only have INODEs here. However, those INODEs not located in the sink tile have been blocked.
+
+            // TODO: What's special about nodes with wirename INT/OUT_[NESW]NODE_[EW]_*?
+            // Nothing special is found yet.
+            return true;
+        }
+
+        assert(design.getDevice().getSeries() == Series.UltraScale || design.getDevice().getSeries() == Series.UltraScalePlus);
+
         Tile childTile = childRnode.getTile();
         TileTypeEnum childTileType = childTile.getTileTypeEnum();
         BitSet bs = accessibleWireOnlyIfAboveBelowTarget.get(childTileType);
@@ -592,59 +645,6 @@ public class RouteNodeGraph {
         }
 
         return Math.abs(childTile.getTileYCoordinate() - sinkTile.getTileYCoordinate()) <= 1;
-    }
-
-    public boolean isAccessibleINODEAndCNODEOnVersal(RouteNode rnode, RouteNode childRnode, Connection connection){
-        // Below situations should not be skipped
-        if (design.getSeries() != Series.Versal) {
-            return true;
-        }
-
-        RouteNode sinkRnode = connection.getSinkRnode();
-        Tile sinkTile = sinkRnode.getTile();
-        IntentCode childIntentCode = childRnode.getIntentCode();
-        switch (childIntentCode) {
-            case NODE_INODE:
-                // Block access to all INODEs outside the sink tile, since NODE_INODE -> NODE_IMUX -> NODE_PINFEED (or NODE_INODE _> NODE_PINBOUNCE)
-                if (childRnode.getTile() != sinkTile) {
-                    return false;
-                }
-                assert(sinkRnode.getIntentCode() == IntentCode.NODE_IMUX || sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
-                break;
-            case NODE_CLE_CNODE:
-                // Block access to all CNODEs outside the sink tile, since NODE_CLE_CNODE -> NODE_CLE_CTRL
-                if (childRnode.getTile() != sinkTile) {
-                    return false;
-                }
-                assert(sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL);
-                break;
-            case NODE_INTF_CNODE:
-                // Block access to all CNODEs outside the sink tile, since NODE_INTF_CNODE -> NODE_INTF_CTRL
-                if (childRnode.getTile() != sinkTile) {
-                    return false;
-                }
-                assert(sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL);
-                break;
-            default:
-                break;
-        }
-
-        // TODO: Do we want to block NODE_PINBOUNCE if not in the sink INT tile?
-        // We have already blocked them in RWRoute.isAccessiblePinbounce.
-
-        // TODO: Do we want to block all exploration of TileTypeEnum.CLE_BC_CORE and TileTypeEnum.INTF_[LR]OCF_[TB][LR]_TILE
-        //       unless our sink is in that tile? (or is this already done by NODE_{CLE,INTF}_CNODE blocking above)
-        // No, we also need to take those neighbor CLE_BC_CORE tiles of the source tile. 
-        // Furthermore, even if we don't take them into consideration, this is done by blocking CNODEs and BNODEs.
-
-        // TODO: Is there any value in blocking NODE_{CLE,INTF}_BNODEs?
-        // We have already done this. Here is an invariant that NODE_{CLE, INTF}_BNODE -> {NODE_INODE, NODE_CLE_CTRL},
-        // where NODE_CLE_CTRL must be a node that connects to the sink control pin.
-        // Since the sink rnode must not be the target, we only have INODEs here. However, those INODEs not located in the sink tile have been blocked.
-
-        // TODO: What's special about nodes with wirename INT/OUT_[NESW]NODE_[EW]_*?
-        // Nothing special is found yet.
-        return true;
     }
 
     protected boolean allowRoutethru(Node head, Node tail) {

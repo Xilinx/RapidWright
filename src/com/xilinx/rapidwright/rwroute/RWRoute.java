@@ -1802,9 +1802,6 @@ public class RWRoute {
                         if (!routingGraph.isAccessible(childRNode, connection)) {
                             continue;
                         }
-                        if (!routingGraph.isAccessibleINODEAndCNODEOnVersal(rnode, childRNode, connection)) {
-                            continue;
-                        }
                         if (!config.isUseUTurnNodes() && childRNode.getDelay() > 10000) {
                             // To filter out those nodes that are considered to be excluded with the masking resource approach,
                             // such as U-turn shape nodes near the boundary
