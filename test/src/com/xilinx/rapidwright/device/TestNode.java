@@ -145,8 +145,71 @@ public class TestNode {
                 if (!Utils.isInterConnect(downhill.getTile().getTileTypeEnum())) {
                     continue;
                 }
+                // Check that they are all in the same column
                 Assertions.assertEquals(baseTile.getTileXCoordinate(),
                         downhill.getTile().getTileXCoordinate());
+                queue.add(downhill);
+            }
+        }
+        System.out.println("visited.size() = " + visited.size());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvp1002,INT_X38Y220,NODE_PINBOUNCE",
+            "xcvp1002,INT_X38Y220,NODE_INODE",
+            "xcvp1002,INT_X38Y220,NODE_IMUX",
+            "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_BNODE",
+            "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_CNODE",
+    })
+    public void testNodeReachabilityVersal(String partName, String tileName, String intentCodeName) {
+        Device device = Device.getDevice(partName);
+        Tile baseTile = device.getTile(tileName);
+        Queue<Node> queue = new ArrayDeque<>();
+        IntentCode ic = IntentCode.valueOf(intentCodeName);
+        for (int wireIdx = 0; wireIdx < baseTile.getWireCount(); wireIdx++) {
+            if (baseTile.getWireIntentCode(wireIdx) != ic) {
+                continue;
+            }
+            queue.add(Node.getNode(baseTile, wireIdx));
+        }
+        System.out.println("Initial queue.size() = " + queue.size());
+        System.out.println("Initial queue = " + queue);
+
+        // Print out the intent code of nodes that are immediately uphill of this intent code
+        System.out.println("Immediately uphill:");
+        queue.stream().map(Node::getAllUphillNodes).flatMap(List::stream).map(Node::getIntentCode)
+                .distinct()
+                .sorted()
+                .forEachOrdered(s -> System.out.println("\t" + s));
+
+        // Print out the intent code of nodes that are immediately downhill of this intent code
+        System.out.println("Immediately downhill:");
+        queue.stream().map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getIntentCode)
+                .distinct()
+                .sorted()
+                .forEachOrdered(s -> System.out.println("\t" + s));
+
+        Set<Node> visited = new HashSet<>();
+        while (!queue.isEmpty()) {
+            Node node = queue.poll();
+            for (Node downhill : node.getAllDownhillNodes()) {
+                if (!visited.add(downhill)) {
+                    continue;
+                }
+                if (!Utils.isInterConnect(downhill.getTile().getTileTypeEnum())) {
+                    continue;
+                }
+                // All INT-to-INT connections should be to the same tile
+                if (baseTile.getTileTypeEnum() == TileTypeEnum.CLE_BC_CORE) {
+                    // Except CLE_BC_CORE tiles which spans two adjacent INT tiles
+                    if (baseTile != downhill.getTile()) {
+                        Assertions.assertTrue(1 >= Math.abs(baseTile.getTileXCoordinate() - downhill.getTile().getTileXCoordinate()));
+                        Assertions.assertEquals(TileTypeEnum.INT, downhill.getTile().getTileTypeEnum());
+                    }
+                } else {
+                    Assertions.assertEquals(baseTile, downhill.getTile());
+                }
                 queue.add(downhill);
             }
         }
