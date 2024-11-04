@@ -582,7 +582,7 @@ public class RouteNodeGraph {
             IntentCode childIntentCode = childRnode.getIntentCode();
             switch (childIntentCode) {
                 case NODE_INODE:
-                    // Block access to all INODEs outside the sink tile, since NODE_INODE -> NODE_IMUX -> NODE_PINFEED (or NODE_INODE _> NODE_PINBOUNCE)
+                    // Block access to all INODEs outside the sink tile, since NODE_INODE -> NODE_IMUX -> NODE_PINFEED (or NODE_INODE -> NODE_PINBOUNCE)
                     if (childRnode.getTile() != sinkTile) {
                         return false;
                     }
