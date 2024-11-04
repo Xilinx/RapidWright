@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.device;
 
 import java.util.ArrayDeque;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Queue;
@@ -161,6 +162,8 @@ public class TestNode {
             "xcvp1002,INT_X38Y220,NODE_IMUX",
             "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_BNODE",
             "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_CNODE",
+            "xcvp1002,CLE_E_CORE_X38Y220,NODE_CLE_OUTPUT",
+            "xcvp1002,CLE_W_CORE_X38Y220,NODE_CLE_OUTPUT",
     })
     public void testNodeReachabilityVersal(String partName, String tileName, String intentCodeName) {
         Device device = Device.getDevice(partName);
@@ -190,6 +193,7 @@ public class TestNode {
                 .sorted()
                 .forEachOrdered(s -> System.out.println("\t" + s));
 
+        TileTypeEnum baseTileTypeEnum = baseTile.getTileTypeEnum();
         Set<Node> visited = new HashSet<>();
         while (!queue.isEmpty()) {
             Node node = queue.poll();
@@ -200,8 +204,24 @@ public class TestNode {
                 if (!Utils.isInterConnect(downhill.getTile().getTileTypeEnum())) {
                     continue;
                 }
+                if (Utils.isCLB(baseTileTypeEnum)) {
+                    if (EnumSet.of(IntentCode.NODE_VLONG7, IntentCode.NODE_VLONG12, IntentCode.NODE_HLONG10, IntentCode.NODE_HLONG6).contains(downhill.getIntentCode())) {
+                        // Ignore long wires that obviously leave the tile
+                    } else {
+                        // All other wires should have the same X coordinate, if not the same Y
+                        Assertions.assertEquals(baseTile.getTileXCoordinate(), downhill.getTile().getTileXCoordinate());
+                        if (baseTile.getTileYCoordinate() != downhill.getTile().getTileYCoordinate()) {
+                            // Only exception for Y are specific NODE_SDQNODEs with the following wire name
+                            Assertions.assertTrue(downhill.getWireName().matches("OUT_[NEWS]NODE_[EW]_\\d+"));
+                            Assertions.assertEquals(IntentCode.NODE_SDQNODE, downhill.getIntentCode());
+                            Assertions.assertTrue(1 >= Math.abs(baseTile.getTileYCoordinate() - downhill.getTile().getTileYCoordinate()));
+                        }
+                    }
+                    // Do not descend further
+                    continue;
+                }
                 // All INT-to-INT connections should be to the same tile
-                if (baseTile.getTileTypeEnum() == TileTypeEnum.CLE_BC_CORE) {
+                if (baseTileTypeEnum == TileTypeEnum.CLE_BC_CORE) {
                     // Except CLE_BC_CORE tiles which spans two adjacent INT tiles
                     if (baseTile != downhill.getTile()) {
                         Assertions.assertTrue(1 >= Math.abs(baseTile.getTileXCoordinate() - downhill.getTile().getTileXCoordinate()));
