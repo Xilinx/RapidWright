@@ -132,7 +132,7 @@ public class RouteNodeInfo {
             case NODE_LOCAL: { // US/US+
                 assert(node.getTile().getTileTypeEnum() == TileTypeEnum.INT);
                 if (routingGraph != null) {
-                    BitSet bs = routingGraph.nonLocalWires.get(node.getTile().getTileTypeEnum());
+                    BitSet bs = routingGraph.ultraScaleNonLocalWires.get(node.getTile().getTileTypeEnum());
                     if (!bs.get(node.getWireIndex())) {
                         return RouteNodeType.LOCAL;
                     }
