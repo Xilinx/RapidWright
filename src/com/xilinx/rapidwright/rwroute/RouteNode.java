@@ -27,6 +27,7 @@ package com.xilinx.rapidwright.rwroute;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.RuntimeTracker;
@@ -92,13 +93,13 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
 
     protected RouteNode(RouteNodeGraph routingGraph, Node node, RouteNodeType type) {
         super(node);
-        RouteNodeInfo nodeInfo = RouteNodeInfo.get(this, routingGraph.lagunaI);
+        RouteNodeInfo nodeInfo = RouteNodeInfo.get(this, routingGraph);
         this.type = (type == null) ? nodeInfo.type : type;
         endTileXCoordinate = nodeInfo.endTileXCoordinate;
         endTileYCoordinate = nodeInfo.endTileYCoordinate;
         length = nodeInfo.length;
         children = null;
-        setBaseCost();
+        setBaseCost(routingGraph.design.getSeries());
         presentCongestionCost = initialPresentCongestionCost;
         historicalCongestionCost = initialHistoricalCongestionCost;
         usersConnectionCounts = null;
@@ -115,10 +116,24 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         return (int) Math.signum(this.lowerBoundTotalPathCost - that.lowerBoundTotalPathCost);
     }
 
-    private void setBaseCost() {
+    private void setBaseCost(Series series) {
         baseCost = 0.4f;
         switch (type) {
-            case LAGUNA_I:
+            case EXCLUSIVE_SOURCE:
+                assert(length == 0 ||
+                        (length <= 3 && series == Series.Versal));
+                break;
+            case EXCLUSIVE_SINK:
+            case LOCAL:
+                assert(length == 0 ||
+                       (length == 1 && (series == Series.UltraScalePlus || series == Series.UltraScale) &&
+                               (getIntentCode() == IntentCode.NODE_PINBOUNCE ||
+                               (series == Series.UltraScalePlus && type == RouteNodeType.LOCAL && getWireName().matches("INODE_[EW]_\\d+_FT[01]")) ||
+                               (series == Series.UltraScale && type == RouteNodeType.LOCAL && getWireName().matches("INODE_[12]_[EW]_\\d+_FT[NS]"))
+                       ))
+                   );
+                break;
+            case LAGUNA_PINFEED:
                 // Make all approaches to SLLs zero-cost to encourage exploration
                 // Assigning a base cost of zero would normally break congestion resolution
                 // (since RWroute.getNodeCost() would return zero) but doing it here should be
@@ -129,7 +144,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 assert(length == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
                 baseCost = 0.3f * length;
                 break;
-            case WIRE:
+            case NON_LOCAL:
                 // NOTE: IntentCode is device-dependent
                 IntentCode ic = getIntentCode();
                 switch(ic) {
@@ -139,10 +154,10 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_LAGUNA_OUTPUT: // LAG_LAG.{LAG_MUX_ATOM_*_TXOUT,RXD*} (US+)
                     case NODE_LAGUNA_DATA:   // LAG_LAG.UBUMP* super long lines for u-turns at the boundary of the device (US+)
                     case NODE_PINFEED:
+                    case INTENT_DEFAULT:     // INT.VCC_WIRE
                         assert(length == 0);
                         break;
-                    case NODE_LOCAL:    // US and US+
-                    case INTENT_DEFAULT:
+                    case NODE_LOCAL: // US and US+
                         assert(length <= 1);
                         break;
                     case NODE_VSINGLE: // Versal-only
@@ -214,12 +229,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     default:
                         throw new RuntimeException(ic.toString());
                 }
-                break;
-            case PINFEED_I:
-            case PINBOUNCE:
-                break;
-            case PINFEED_O:
-                baseCost = 1f;
                 break;
             default:
                 throw new RuntimeException(type.toString());
@@ -348,11 +357,11 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      */
     public void setType(RouteNodeType type) {
         assert(this.type == type ||
-                // Support demotion from PINFEED_I to PINBOUNCE since they have the same base cost
-                (this.type == RouteNodeType.PINFEED_I && type == RouteNodeType.PINBOUNCE) ||
-                // Or promotion from PINBOUNCE to PINFEED_I (by PartialRouter when PINBOUNCE on
+                // Support demotion from EXCLUSIVE_SINK to LOCAL since they have the same base cost
+                (this.type == RouteNodeType.EXCLUSIVE_SINK && type == RouteNodeType.LOCAL) ||
+                // Or promotion from LOCAL to EXCLUSIVE_SINK (by PartialRouter when NODE_PINBOUNCE on
                 // preserved net needs to become a PINFEED_I)
-                (this.type == RouteNodeType.PINBOUNCE && type == RouteNodeType.PINFEED_I));
+                (this.type == RouteNodeType.LOCAL && type == RouteNodeType.EXCLUSIVE_SINK));
         this.type = type;
     }
 
