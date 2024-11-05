@@ -67,6 +67,9 @@ public class PBlock extends ArrayList<PBlockRange> {
         pblockTypes.add(SiteTypeEnum.SLICEM);
         pblockTypes.add(SiteTypeEnum.DSP48E1);
         pblockTypes.add(SiteTypeEnum.DSP48E2);
+        pblockTypes.add(SiteTypeEnum.DSP58_PRIMARY);
+        pblockTypes.add(SiteTypeEnum.DSP58);
+        pblockTypes.add(SiteTypeEnum.DSPFP);
         pblockTypes.add(SiteTypeEnum.RAMB180);
         pblockTypes.add(SiteTypeEnum.RAMB181);
         pblockTypes.add(SiteTypeEnum.RAMB18E1);
