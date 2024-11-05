@@ -129,9 +129,6 @@ public class RouteNodeInfo {
         // NOTE: IntentCode is device-dependent
         IntentCode ic = node.getIntentCode();
         switch (ic) {
-            case NODE_PINBOUNCE:
-                return RouteNodeType.PINBOUNCE;
-
             case NODE_LOCAL: {
                 assert(node.getTile().getTileTypeEnum() == TileTypeEnum.INT);
                 if (routingGraph != null) {
@@ -142,6 +139,9 @@ public class RouteNodeInfo {
                     break;
                 }
             }
+
+            case NODE_PINBOUNCE:
+                return RouteNodeType.LOCAL;
 
             case NODE_PINFEED: {
                 if (routingGraph != null && routingGraph.lagunaI != null) {
@@ -183,6 +183,6 @@ public class RouteNodeInfo {
                 break;
         }
 
-        return RouteNodeType.WIRE;
+        return RouteNodeType.NON_LOCAL;
     }
 }

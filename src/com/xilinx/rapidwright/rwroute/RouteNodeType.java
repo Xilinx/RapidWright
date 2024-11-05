@@ -29,21 +29,8 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 
 public enum RouteNodeType {
-    /**
-     * Denotes {@link RouteNode} objects that correspond to the output pins of {@link Net} Objects,
-     * typically the source {@link RouteNode} Objects of {@link Connection} Objects.
-     */
-    PINFEED_O,
-    /**
-     * Denotes {@link RouteNode} objects that correspond to input pins of {@link Net} Objects,
-     * typically the sink {@link RouteNode} Objects of {@link Connection} Objects.
-     */
-    PINFEED_I,
-    /**
-     * Denotes {@link RouteNode} objects that are created based on {@link Node} Objects
-     * that have an {@link IntentCode} of NODE_PINBOUNCE.
-     */
-    PINBOUNCE,
+    EXCLUSIVE_SOURCE,
+    EXCLUSIVE_SINK,
 
     /**
      * Denotes {@link RouteNode} objects that correspond to a super long line {@link Node},
@@ -57,11 +44,7 @@ public enum RouteNodeType {
      */
     LAGUNA_I,
 
-    /**
-     * Denotes other wiring {@link RouteNode} Objects
-     * that are created for routing {@link Connection} Objects.
-     */
-    WIRE,
+    NON_LOCAL,
 
     LOCAL
 }

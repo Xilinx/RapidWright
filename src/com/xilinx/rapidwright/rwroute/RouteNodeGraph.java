@@ -416,9 +416,9 @@ public class RouteNodeGraph {
             // PINFEEDs can lead to a site pin, or into a Laguna tile
             RouteNode childRnode = getNode(child);
             if (childRnode != null) {
-                assert(childRnode.getType() == RouteNodeType.PINFEED_I ||
+                assert(childRnode.getType() == RouteNodeType.EXCLUSIVE_SINK ||
                        childRnode.getType() == RouteNodeType.LAGUNA_I ||
-                        (lutRoutethru && childRnode.getType() == RouteNodeType.WIRE));
+                        (lutRoutethru && childRnode.getType() == RouteNodeType.NON_LOCAL));
             } else if (!lutRoutethru) {
                 // child does not already exist in our routing graph, meaning it's not a used site pin
                 // in our design, but it could be a LAGUNA_I
@@ -513,17 +513,7 @@ public class RouteNodeGraph {
     }
 
     protected RouteNode create(Node node, RouteNodeType type) {
-        RouteNode rnode = new RouteNode(this, node, type);
-        // PINFEED_I should have zero length, except for on US/US+ where the PINFEED_I can be a PINBOUNCE node.
-        assert(rnode.getType() != RouteNodeType.PINFEED_I ||
-                rnode.getLength() == 0 ||
-                (rnode.getLength() == 1 && (design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus) &&
-                        rnode.getIntentCode() == IntentCode.NODE_PINBOUNCE));
-        // PINBOUNCE should have zero length, except for on US/US+
-        assert(rnode.getType() != RouteNodeType.PINBOUNCE ||
-                rnode.getLength() == 0 ||
-                (rnode.getLength() == 1 && design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus));
-        return rnode;
+        return new RouteNode(this, node, type);
     }
 
     public RouteNode getOrCreate(Node node) {

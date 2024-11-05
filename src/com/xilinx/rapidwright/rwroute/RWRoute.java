@@ -588,7 +588,7 @@ public class RWRoute {
                 if (connection.getSourceRnode() == null) {
                     assert(sourceINTNode != null);
                     if (sourceINTRnode == null) {
-                        sourceINTRnode = routingGraph.getOrCreate(sourceINTNode, RouteNodeType.PINFEED_O);
+                        sourceINTRnode = routingGraph.getOrCreate(sourceINTNode, RouteNodeType.EXCLUSIVE_SOURCE);
                         // Where only a single primary source exists, always preserve
                         // its projected-to-INT source node, since it could
                         // be a projection from LAGUNA/RXQ* -> RXD* (node for INT/LOGIC_OUTS_*)
@@ -600,8 +600,8 @@ public class RWRoute {
                 }
 
                 indirectConnections.add(connection);
-                RouteNode sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.PINFEED_I);
-                sinkRnode.setType(RouteNodeType.PINFEED_I);
+                RouteNode sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK);
+                sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK);
                 connection.setSinkRnode(sinkRnode);
 
                 // Where appropriate, allow all 6 LUT pins to be swapped to begin with
@@ -650,8 +650,8 @@ public class RWRoute {
                     if (routingGraph.isPreserved(node)) {
                         continue;
                     }
-                    RouteNode altSinkRnode = routingGraph.getOrCreate(node, RouteNodeType.PINFEED_I);
-                    assert(altSinkRnode.getType() == RouteNodeType.PINFEED_I);
+                    RouteNode altSinkRnode = routingGraph.getOrCreate(node, RouteNodeType.EXCLUSIVE_SINK);
+                    assert(altSinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK);
                     connection.addAltSinkRnode(altSinkRnode);
                 }
 
@@ -1802,7 +1802,7 @@ public class RWRoute {
                             continue;
                         }
                         break;
-                    case WIRE:
+                    case NON_LOCAL:
                         if (!routingGraph.isAccessible(childRNode, connection)) {
                             continue;
                         }
@@ -1812,14 +1812,7 @@ public class RWRoute {
                             continue;
                         }
                         break;
-                    case PINBOUNCE:
-                        // A PINBOUNCE can only be a target if this connection has an alternate sink
-                        assert(!childRNode.isTarget() || connection.getAltSinkRnodes().isEmpty());
-                        if (!isAccessiblePinbounce(childRNode, connection)) {
-                            continue;
-                        }
-                        break;
-                    case PINFEED_I:
+                    case EXCLUSIVE_SINK:
                         if (!isAccessiblePinfeedI(childRNode, connection)) {
                             continue;
                         }
@@ -1858,25 +1851,13 @@ public class RWRoute {
         return !config.isUseBoundingBox() || child.isInConnectionBoundingBox(connection);
     }
 
-    /**
-     * Checks if a NODE_PINBOUNCE is suitable to be used for routing to a target.
-     * @param child The PINBOUNCE rnode in question.
-     * @param connection The connection to route.
-     * @return true, if the PINBOUNCE rnode is in the same column as the target and within one INT tile of the target.
-     */
-    protected boolean isAccessiblePinbounce(RouteNode child, Connection connection) {
-        assert(child.getType() == RouteNodeType.PINBOUNCE);
-
-        return routingGraph.isAccessible(child, connection);
-    }
-
     protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection) {
         // When LUT pin swapping is enabled, PINFEED_I are not exclusive anymore
         return isAccessiblePinfeedI(child, connection, !lutPinSwapping);
     }
 
     protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection, boolean assertOnOveruse) {
-        assert(child.getType() == RouteNodeType.PINFEED_I);
+        assert(child.getType() == RouteNodeType.EXCLUSIVE_SINK);
         assert(!assertOnOveruse || !child.isOverUsed());
 
         if (child.isTarget()) {
