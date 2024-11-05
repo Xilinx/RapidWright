@@ -23,10 +23,8 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
-import java.util.Collection;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -79,11 +77,6 @@ public class RouteNodeGraph {
      */
     private final CountUpDownLatch asyncPreserveOutstanding;
 
-    /**
-     * Visited rnodes data during connection routing
-     */
-    private final Collection<RouteNode> targets;
-
     private long createRnodeTime;
 
     public static final short SUPER_LONG_LINE_LENGTH_IN_TILES = 60;
@@ -124,7 +117,6 @@ public class RouteNodeGraph {
         preservedMap = new ConcurrentHashMap<>();
         preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
-        targets = new ArrayList<>();
         createRnodeTime = 0;
 
         Device device = design.getDevice();
@@ -290,7 +282,6 @@ public class RouteNodeGraph {
     }
 
     public void initialize() {
-        assert(targets.isEmpty());
     }
 
     protected Net preserve(Node node, Net net) {
@@ -434,24 +425,37 @@ public class RouteNodeGraph {
             }
         }
 
-        if (child.getIntentCode() == IntentCode.NODE_PINFEED) {
-            // PINFEEDs can lead to a site pin, or into a Laguna tile
-            RouteNode childRnode = getNode(child);
-            if (childRnode != null) {
-                assert(childRnode.getType() == RouteNodeType.EXCLUSIVE_SINK ||
-                       childRnode.getType() == RouteNodeType.LAGUNA_PINFEED ||
-                       (lutRoutethru && childRnode.getType() == RouteNodeType.LOCAL));
-            } else if (!lutRoutethru) {
-                // child does not already exist in our routing graph, meaning it's not a used site pin
-                // in our design, but it could be a LAGUNA_I
-                if (lagunaI == null) {
-                    // No LAGUNA_Is
-                    return true;
-                }
-                BitSet bs = lagunaI.get(child.getTile());
-                if (bs == null || !bs.get(child.getWireIndex())) {
-                    // Not a LAGUNA_I -- skip it
-                    return true;
+        IntentCode ic = child.getIntentCode();
+        if (isVersal) {
+            assert(ic != IntentCode.NODE_PINFEED); // This intent code should have been projected away
+
+            if ((!lutRoutethru && ic == IntentCode.NODE_IMUX) || ic == IntentCode.NODE_CLE_CTRL || ic == IntentCode.NODE_INTF_CTRL) {
+                // Disallow these site pin projections if they aren't already in the routing graph (as a potential sink)
+                RouteNode childRnode = getNode(child);
+                return childRnode == null;
+            }
+        } else {
+            assert(design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus);
+
+            if (ic == IntentCode.NODE_PINFEED) {
+                // PINFEEDs can lead to a site pin, or into a Laguna tile
+                RouteNode childRnode = getNode(child);
+                if (childRnode != null) {
+                    assert(childRnode.getType() == RouteNodeType.EXCLUSIVE_SINK ||
+                           childRnode.getType() == RouteNodeType.LAGUNA_PINFEED ||
+                           (lutRoutethru && childRnode.getType() == RouteNodeType.LOCAL));
+                } else if (!lutRoutethru) {
+                    // child does not already exist in our routing graph, meaning it's not a used site pin
+                    // in our design, but it could be a LAGUNA_I
+                    if (lagunaI == null) {
+                        // No LAGUNA_Is
+                        return true;
+                    }
+                    BitSet bs = lagunaI.get(child.getTile());
+                    if (bs == null || !bs.get(child.getWireIndex())) {
+                        // Not a LAGUNA_I -- skip it
+                        return true;
+                    }
                 }
             }
         }
@@ -583,11 +587,6 @@ public class RouteNodeGraph {
                 boolean childInInt = childTile.getTileTypeEnum() == TileTypeEnum.INT;
                 boolean sinkInInt = sinkTile.getTileTypeEnum() == TileTypeEnum.INT;
                 if (!childInInt && sinkInInt) {
-                    // FIXME: Eliminate these intent codes earlier
-                    if (childRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL || childRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL) {
-                        return false;
-                    }
-
                     // Allow CLE CNODE/BNODEs that reach into the sink INT tile
                     assert(EnumSet.of(IntentCode.NODE_CLE_BNODE, IntentCode.NODE_CLE_CNODE, IntentCode.NODE_INTF_BNODE, IntentCode.NODE_INTF_CNODE)
                             .contains(childRnode.getIntentCode()));
