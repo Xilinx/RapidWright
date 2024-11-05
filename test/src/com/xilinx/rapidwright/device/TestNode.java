@@ -94,6 +94,10 @@ public class TestNode {
             "xcvu3p,INT_X37Y220,SDQNODE_.*",
             "xcvu3p,INT_X37Y220,IMUX_.*",
             "xcvu3p,INT_X37Y220,CTRL_.*",
+            "xcvu3p,INT_X37Y220,(NN|EE|SS|WW)1_.*",
+            "xcvu3p,INT_X37Y220,(NN|EE|SS|WW)2_.*",
+            "xcvu3p,INT_X37Y220,(NN|EE|SS|WW)4_.*",
+            "xcvu3p,INT_X37Y220,(NN|EE|SS|WW)12_.*",
             "xcvu3p,CLEM_X37Y220,CLE_CLE_M_SITE_0_[A-H](_O|Q|Q2|MUX)",
 
             // UltraScale part
@@ -107,6 +111,12 @@ public class TestNode {
             "xcvu065,INT_X38Y220,INT_NODE_QUAD_LONG_.*",
             "xcvu065,INT_X38Y220,IMUX_.*",
             "xcvu065,INT_X38Y220,CTRL_.*",
+            "xcvu065,INT_X37Y220,(NN|EE|SS|WW)1_.*",
+            "xcvu065,INT_X37Y220,(NN|EE|SS|WW)2_.*",
+            "xcvu065,INT_X37Y220,(NN|EE|SS|WW)4_.*",
+            "xcvu065,INT_X37Y220,(NN|EE|SS|WW)5_.*",
+            "xcvu065,INT_X37Y220,(NN|EE|SS|WW)12_.*",
+            "xcvu065,INT_X37Y220,(NN|EE|SS|WW)16_.*",
             "xcvu065,INT_X38Y220,QLND.*",
             "xcvu065,INT_X38Y220,SDND.*",
             "xcvu065,CLE_M_X38Y220,CLE_CLE_M_SITE_0_[A-H](_O|Q|Q2|MUX)",
@@ -138,7 +148,7 @@ public class TestNode {
                                        // UltraScale+
                         ultraScalePlus ? "((CLE_CLE_[LM]_SITE_0|CLK_LEAF_SITES|INT_INT_SDQ|(NN|EE|SS|WW)(1|2|4|12))_)[^\\(]+"
                                        // UltraScale
-                                       : "((CLE_CLE_[LM]_SITE_0|CLK_BUFCE_LEAF_X16_1_CLK|EE[124]|INT_INT_SINGLE|(NN|SS)(1|2|4|5|12|16)|(EE|WW)(1|2|4|12)|SDND[NS]W)_)[^\\(]+",
+                                       : "((CLE_CLE_[LM]_SITE_0|CLK_BUFCE_LEAF_X16_1_CLK|EE[124]|INT_INT_SINGLE|(NN|SS)(1|2|4|5|12|16)|(EE|WW)(1|2|4|12)|QLND(NW|SE|SW)|SDND[NS]W)_)[^\\(]+",
                         "$1"))
                 .distinct()
                 .sorted()
@@ -153,7 +163,7 @@ public class TestNode {
                                        // UltraScale+
                         ultraScalePlus ? "((CLE_CLE_[LM]_SITE_0|INT_INT_SDQ|(NN|EE|SS|WW)(1|2|4|12))_)[^\\(]+"
                                        // UltraScale
-                                       : "((INT_INT_SINGLE|(NN|SS)(1|2|4|5|12|16)|(EE|WW)(1|2|4|12)|QLND(NW|SE)|SDND[NS]W)_)[^\\(]+",
+                                       : "((CLE_CLE_[LM]_SITE_0|INT_INT_SINGLE|(NN|SS)(1|2|4|5|12|16)|(EE|WW)(1|2|4|12)|QLND(NW|S[EW])|SDND[NS]W)_)[^\\(]+",
                         "$1"))
                 .distinct()
                 .sorted()
@@ -163,10 +173,11 @@ public class TestNode {
         while (!queue.isEmpty()) {
             Node node = queue.poll();
             String wireName = node.getWireName();
-            if ((ultraScalePlus && wireName.matches("(INT_NODE_SDQ|SDQNODE)_.*")) ||                                      // UltraScale+
-                (!ultraScalePlus && wireName.matches("(INT_NODE_(SINGLE_DOUBLE|QUAD_LONG)|QLND(NW|SE|SW)|SDND[NS]W)_.*")) // UltraScale
+            if ((ultraScalePlus && wireName.matches("(INT_NODE_SDQ|SDQNODE)_.*")) ||                                        // UltraScale+
+                (!ultraScalePlus && wireName.matches("(INT_NODE_(SINGLE_DOUBLE|QUAD_LONG)|QLND(NW|SE|SW)|SDND[NS]W)_.*") || // UltraScale
+                wireName.matches("(NN|EE|SS|WW)\\d+(_[EW])?_BEG\\d+"))
             ) {
-                // Do not desccend into SDQNODEs
+                // Do not desccend into SDQNODEs or SDQLs
                 continue;
             }
             for (Node downhill : node.getAllDownhillNodes()) {
