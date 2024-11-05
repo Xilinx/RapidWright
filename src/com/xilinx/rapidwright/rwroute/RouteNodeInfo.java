@@ -129,7 +129,7 @@ public class RouteNodeInfo {
         // NOTE: IntentCode is device-dependent
         IntentCode ic = node.getIntentCode();
         switch (ic) {
-            case NODE_LOCAL: {
+            case NODE_LOCAL: { // US/US+
                 assert(node.getTile().getTileTypeEnum() == TileTypeEnum.INT);
                 if (routingGraph != null) {
                     BitSet bs = routingGraph.nonLocalWires.get(node.getTile().getTileTypeEnum());

@@ -1803,8 +1803,11 @@ public class RWRoute {
                         }
                         break;
                     case NON_LOCAL:
+                        // LOCALs cannot connect to NON_LOCALs except via a LUT routethru
                         assert(rnode.getType() != RouteNodeType.LOCAL ||
-                                routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED);
+                               routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED ||
+                               // FIXME:
+                               design.getSeries() == Series.Versal);
 
                         if (!routingGraph.isAccessible(childRNode, connection)) {
                             continue;

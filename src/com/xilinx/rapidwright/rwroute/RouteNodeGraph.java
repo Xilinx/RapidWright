@@ -145,20 +145,23 @@ public class RouteNodeGraph {
         intTile = intTile.getTileXYNeighbor(0, -1);
         nonLocalWires.put(intTile.getTileTypeEnum(), wires);
         Series series = device.getSeries();
-        if (series == Series.UltraScale || series == Series.UltraScalePlus) {
-            for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
-                Node baseNode = Node.getNode(intTile, wireIndex);
-                if (baseNode == null) {
-                    continue;
-                }
-                if (baseNode.getIntentCode() != IntentCode.NODE_LOCAL) {
-                    continue;
-                }
-                String wireName = baseNode.getWireName();
+        boolean isUltraScale = series == Series.UltraScale;
+        boolean isUltraScalePlus = series == Series.UltraScalePlus;
+        boolean isVersal = series == Series.Versal;
+        for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
+            Node baseNode = Node.getNode(intTile, wireIndex);
+            if (baseNode == null) {
+                continue;
+            }
+            if (baseNode.getIntentCode() != IntentCode.NODE_LOCAL) {
+                continue;
+            }
+            Tile baseTile = baseNode.getTile();
+            String wireName = baseNode.getWireName();
+            if (isUltraScalePlus) {
                 if (!wireName.startsWith("INT_NODE_SDQ_") && !wireName.startsWith("SDQNODE_")) {
                     continue;
                 }
-                Tile baseTile = baseNode.getTile();
                 if (baseTile != intTile) {
                     if (wireName.endsWith("_FT0")) {
                         assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() - 1);
@@ -167,12 +170,28 @@ public class RouteNodeGraph {
                         assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
                     }
                 }
-                wires.set(baseNode.getWireIndex());
+            } else if (isUltraScale) {
+                if (!wireName.startsWith("INT_NODE_SINGLE_DOUBLE_") && !wireName.startsWith("SDND") &&
+                        !wireName.startsWith("INT_NODE_QUAD_LONG") && !wireName.startsWith("QLND")) {
+                    continue;
+                }
+                if (baseTile != intTile) {
+                    if (wireName.endsWith("_FTN")) {
+                        assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() - 1);
+                    } else {
+                        assert(wireName.endsWith("_FTS"));
+                        assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
+                    }
+                }
+            } else {
+                assert(isVersal);
+                continue;
             }
+            wires.set(baseNode.getWireIndex());
         }
 
         if (lutRoutethru) {
-            assert(design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus);
+            assert(isUltraScalePlus || isUltraScale);
 
             muxWires = new EnumMap<>(TileTypeEnum.class);
             for (TileTypeEnum tileTypeEnum : Utils.getCLBTileTypes()) {
@@ -199,9 +218,9 @@ public class RouteNodeGraph {
         }
 
         Tile[][] lagunaTiles;
-        if (device.getSeries() == Series.UltraScalePlus) {
+        if (isUltraScalePlus) {
             lagunaTiles = device.getTilesByRootName("LAG_LAG");
-        } else if (device.getSeries() == Series.UltraScale) {
+        } else if (isUltraScale) {
             lagunaTiles = device.getTilesByRootName("LAGUNA_TILE");
         } else {
             lagunaTiles = null;

@@ -120,13 +120,18 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         baseCost = 0.4f;
         switch (type) {
             case EXCLUSIVE_SOURCE:
-                assert(length == 0);
+                assert(length == 0 ||
+                        (length <= 3 && series == Series.Versal));
                 break;
             case EXCLUSIVE_SINK:
             case LOCAL:
                 assert(length == 0 ||
-                       length == 1 && (getIntentCode() == IntentCode.NODE_PINBOUNCE || (type == RouteNodeType.LOCAL && getWireName().matches("INODE_[EW]_\\d+_FT[01]")))
-                                   && (series == Series.UltraScale || series == Series.UltraScalePlus));
+                       (length == 1 && (series == Series.UltraScalePlus || series == Series.UltraScale) &&
+                               (getIntentCode() == IntentCode.NODE_PINBOUNCE ||
+                               (series == Series.UltraScalePlus && type == RouteNodeType.LOCAL && getWireName().matches("INODE_[EW]_\\d+_FT[01]")) ||
+                               (series == Series.UltraScale && type == RouteNodeType.LOCAL && getWireName().matches("INODE_[12]_[EW]_\\d+_FT[NS]"))
+                       ))
+                   );
                 break;
             case LAGUNA_PINFEED:
                 // Make all approaches to SLLs zero-cost to encourage exploration
