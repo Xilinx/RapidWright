@@ -141,6 +141,15 @@ public class RouteNodeInfo {
             }
 
             case NODE_PINBOUNCE:
+            // Versal only
+            case NODE_INODE:        // INT.INT_NODE_IMUX_ATOM_*_INT_OUT[01]
+            case NODE_IMUX:         // INT.IMUX_B_[EW]*
+            case NODE_CLE_CTRL:     // CLE_BC_CORE*.CTRL_[LR]_B*
+            case NODE_INTF_CTRL:    // INTF_[LR]OCF_[TB][LR]_TILE.INTF_IRI*
+            case NODE_CLE_BNODE:    // CLE_BC_CORE*.BNODE_OUTS_[EW]*
+            case NODE_CLE_CNODE:    // CLE_BC_CORE*.CNODE_OUTS_[EW]*
+            case NODE_INTF_BNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_BNODE_OUTS*
+            case NODE_INTF_CNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_CNODE_OUTS*
                 return RouteNodeType.LOCAL;
 
             case NODE_PINFEED: {

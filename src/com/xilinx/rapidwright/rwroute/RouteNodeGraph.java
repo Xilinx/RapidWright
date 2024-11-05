@@ -108,6 +108,9 @@ public class RouteNodeGraph {
     /** Map indicating the wire indices that have a local intent code, but is what RWRoute considers to be non-local */
     protected final Map<TileTypeEnum, BitSet> nonLocalWires;
 
+    /** Flag for whether design targets the Versal series */
+    protected final boolean isVersal;
+
     public RouteNodeGraph(Design design, RWRouteConfig config) {
         this(design, config, new HashMap<>());
     }
@@ -147,7 +150,7 @@ public class RouteNodeGraph {
         Series series = device.getSeries();
         boolean isUltraScale = series == Series.UltraScale;
         boolean isUltraScalePlus = series == Series.UltraScalePlus;
-        boolean isVersal = series == Series.Versal;
+        isVersal = series == Series.Versal;
         for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
             Node baseNode = Node.getNode(intTile, wireIndex);
             if (baseNode == null) {
@@ -284,8 +287,6 @@ public class RouteNodeGraph {
             prevLagunaColumn = null;
             lagunaI = null;
         }
-
-        isVersal = design.getSeries() == Series.Versal;
     }
 
     public void initialize() {
@@ -571,21 +572,46 @@ public class RouteNodeGraph {
 
         // (b) in the sink tile
         Tile childTile = childRnode.getTile();
-        Tile sinkTile = connection.getSinkRnode().getTile();
+        RouteNode sinkRnode = connection.getSinkRnode();
+        Tile sinkTile = sinkRnode.getTile();
         if (childTile == sinkTile) {
             return true;
+        }
+
+        if (isVersal) {
+            if (childTile.getTileYCoordinate() == sinkTile.getTileYCoordinate()) {
+                boolean childInInt = childTile.getTileTypeEnum() == TileTypeEnum.INT;
+                boolean sinkInInt = sinkTile.getTileTypeEnum() == TileTypeEnum.INT;
+                if (!childInInt && sinkInInt) {
+                    // FIXME: Eliminate these intent codes earlier
+                    if (childRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL || childRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL) {
+                        return false;
+                    }
+
+                    // Allow CLE CNODE/BNODEs that reach into the sink INT tile
+                    assert(EnumSet.of(IntentCode.NODE_CLE_BNODE, IntentCode.NODE_CLE_CNODE, IntentCode.NODE_INTF_BNODE, IntentCode.NODE_INTF_CNODE)
+                            .contains(childRnode.getIntentCode()));
+                    return childRnode.getEndTileXCoordinate() == sinkTile.getTileXCoordinate();
+                }
+
+                if (childInInt && !sinkInInt) {
+                    // Allow use of LOCALs inside the INT tile that (by way of being at most one X coordinate away) services the CLE_BC_CORE
+                    return Math.abs(childRnode.getEndTileXCoordinate() - sinkTile.getTileXCoordinate()) <= 1;
+                }
+            }
+
+            return false;
         }
 
         // (c) connection crosses SLR and this is a Laguna column
         int childX = childTile.getTileXCoordinate();
         if (connection.isCrossSLR() && nextLagunaColumn[childX] == childX) {
-
             return true;
         }
 
-        // (d) when in row above/below the sink tile
+        // (d) when in X as the sink tile, but Y +/- 1
         return childX == sinkTile.getTileXCoordinate() &&
-                Math.abs(childTile.getTileYCoordinate() - sinkTile.getTileYCoordinate()) <= 1;
+               Math.abs(childTile.getTileYCoordinate() - sinkTile.getTileYCoordinate()) <= 1;
     }
 
     protected boolean allowRoutethru(Node head, Node tail) {

@@ -33,6 +33,7 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -124,12 +125,15 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         (length <= 3 && series == Series.Versal));
                 break;
             case EXCLUSIVE_SINK:
+                assert(length == 0);
+                break;
             case LOCAL:
                 assert(length == 0 ||
-                       (length == 1 && (series == Series.UltraScalePlus || series == Series.UltraScale) &&
-                               (getIntentCode() == IntentCode.NODE_PINBOUNCE ||
-                               (series == Series.UltraScalePlus && type == RouteNodeType.LOCAL && getWireName().matches("INODE_[EW]_\\d+_FT[01]")) ||
-                               (series == Series.UltraScale && type == RouteNodeType.LOCAL && getWireName().matches("INODE_[12]_[EW]_\\d+_FT[NS]"))
+                       (length == 1 && (
+                               ((series == Series.UltraScalePlus || series == Series.UltraScale) && getIntentCode() == IntentCode.NODE_PINBOUNCE) ||
+                               (series == Series.UltraScalePlus && getWireName().matches("INODE_[EW]_\\d+_FT[01]")) ||
+                               (series == Series.UltraScale && getWireName().matches("INODE_[12]_[EW]_\\d+_FT[NS]")) ||
+                               (series == Series.Versal && EnumSet.of(IntentCode.NODE_CLE_BNODE, IntentCode.NODE_CLE_CNODE).contains(getIntentCode()))
                        ))
                    );
                 break;
@@ -211,20 +215,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         assert(length == 0 ||
                                // Feedthrough nodes to reach tiles immediately above/below
                                (length == 1 && getWireName().matches("OUT_[NESW]NODE_[EW]_\\d+")));
-                        break;
-                    case NODE_INODE:        // INT.INT_NODE_IMUX_ATOM_*_INT_OUT[01]
-                    case NODE_IMUX:         // INT.IMUX_B_[EW]*
-                    case NODE_CLE_CTRL:     // CLE_BC_CORE*.CTRL_[LR]_B*
-                    case NODE_INTF_CTRL:    // INTF_[LR]OCF_[TB][LR]_TILE.INTF_IRI*
-                        assert(length == 0);
-                        break;
-                    case NODE_CLE_BNODE:    // CLE_BC_CORE*.BNODE_OUTS_[EW]*
-                    case NODE_CLE_CNODE:    // CLE_BC_CORE*.CNODE_OUTS_[EW]*
-                    case NODE_INTF_BNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_BNODE_OUTS*
-                    case NODE_INTF_CNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_CNODE_OUTS*
-                        // length == 1 because one side of BCNODE-s are shared between CLE_W_CORE_XaYb and CLE_E_CORE_X(a+1)Yb
-                        // or CLE_W_CORE_X(a-1)Yb and CLE_E_CORE_XaYb
-                        assert(length <= 1);
                         break;
                     default:
                         throw new RuntimeException(ic.toString());

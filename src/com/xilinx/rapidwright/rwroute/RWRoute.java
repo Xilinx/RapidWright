@@ -1805,9 +1805,7 @@ public class RWRoute {
                     case NON_LOCAL:
                         // LOCALs cannot connect to NON_LOCALs except via a LUT routethru
                         assert(rnode.getType() != RouteNodeType.LOCAL ||
-                               routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED ||
-                               // FIXME:
-                               design.getSeries() == Series.Versal);
+                               routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED);
 
                         if (!routingGraph.isAccessible(childRNode, connection)) {
                             continue;
@@ -1819,7 +1817,7 @@ public class RWRoute {
                         }
                         break;
                     case EXCLUSIVE_SINK:
-                        if (!isAccessiblePinfeedI(childRNode, connection)) {
+                        if (!isAccessibleSink(childRNode, connection)) {
                             continue;
                         }
                         break;
@@ -1857,12 +1855,12 @@ public class RWRoute {
         return !config.isUseBoundingBox() || child.isInConnectionBoundingBox(connection);
     }
 
-    protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection) {
-        // When LUT pin swapping is enabled, PINFEED_I are not exclusive anymore
-        return isAccessiblePinfeedI(child, connection, !lutPinSwapping);
+    protected boolean isAccessibleSink(RouteNode child, Connection connection) {
+        // When LUT pin swapping is enabled, EXCLUSIVE_SINK-s are not exclusive anymore
+        return isAccessibleSink(child, connection, !lutPinSwapping);
     }
 
-    protected boolean isAccessiblePinfeedI(RouteNode child, Connection connection, boolean assertOnOveruse) {
+    protected boolean isAccessibleSink(RouteNode child, Connection connection, boolean assertOnOveruse) {
         assert(child.getType() == RouteNodeType.EXCLUSIVE_SINK);
         assert(!assertOnOveruse || !child.isOverUsed());
 
