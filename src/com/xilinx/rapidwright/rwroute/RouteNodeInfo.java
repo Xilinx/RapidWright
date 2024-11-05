@@ -92,7 +92,7 @@ public class RouteNodeInfo {
                 }
                 break;
             case INT:
-                if (type == RouteNodeType.LAGUNA_I) {
+                if (type == RouteNodeType.LAGUNA_PINFEED) {
                     assert(length == 0);
                 }
                 break;
@@ -111,7 +111,7 @@ public class RouteNodeInfo {
                 // fanout nodes of the SLL are marked as) unless it is a fanin (LAGUNA_I)
                 // (i.e. do not apply it to the fanout nodes).
                 // Nor apply it to VCC_WIREs since their end tiles are INT tiles.
-                if ((node.getIntentCode() != IntentCode.NODE_LAGUNA_OUTPUT || type == RouteNodeType.LAGUNA_I) &&
+                if ((node.getIntentCode() != IntentCode.NODE_LAGUNA_OUTPUT || type == RouteNodeType.LAGUNA_PINFEED) &&
                         !node.isTiedToVcc()) {
                     assert(baseTile.getTileXCoordinate() == endTileXCoordinate);
                     endTileXCoordinate++;
@@ -147,16 +147,16 @@ public class RouteNodeInfo {
                 if (routingGraph != null && routingGraph.lagunaI != null) {
                     BitSet bs = routingGraph.lagunaI.get(node.getTile());
                     if (bs != null && bs.get(node.getWireIndex())) {
-                        return RouteNodeType.LAGUNA_I;
+                        return RouteNodeType.LAGUNA_PINFEED;
                     }
                 }
-                break;
+                return RouteNodeType.LOCAL;
             }
 
             case NODE_LAGUNA_OUTPUT: // UltraScale+ only
                 assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);
                 if (node.getWireName().endsWith("_TXOUT")) {
-                    return RouteNodeType.LAGUNA_I;
+                    return RouteNodeType.LAGUNA_PINFEED;
                 }
                 break;
 
@@ -177,7 +177,7 @@ public class RouteNodeInfo {
                         return RouteNodeType.SUPER_LONG_LINE;
                     } else if (wireName.endsWith("_TXOUT")) {
                         // This is the inner LAGUNA_I, mark it so it gets a base cost discount
-                        return RouteNodeType.LAGUNA_I;
+                        return RouteNodeType.LAGUNA_PINFEED;
                     }
                 }
                 break;

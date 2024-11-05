@@ -24,8 +24,6 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 
 public enum RouteNodeType {
@@ -42,7 +40,7 @@ public enum RouteNodeType {
      * Denotes {@link RouteNode} objects that correspond to {@link Node} objects that enter
      * a Laguna tile from an INT tile, or those Laguna tile nodes leading to a SUPER_LONG_LINE.
      */
-    LAGUNA_I,
+    LAGUNA_PINFEED,
 
     NON_LOCAL,
 

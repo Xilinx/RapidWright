@@ -417,8 +417,8 @@ public class RouteNodeGraph {
             RouteNode childRnode = getNode(child);
             if (childRnode != null) {
                 assert(childRnode.getType() == RouteNodeType.EXCLUSIVE_SINK ||
-                       childRnode.getType() == RouteNodeType.LAGUNA_I ||
-                        (lutRoutethru && childRnode.getType() == RouteNodeType.NON_LOCAL));
+                       childRnode.getType() == RouteNodeType.LAGUNA_PINFEED ||
+                       (lutRoutethru && childRnode.getType() == RouteNodeType.LOCAL));
             } else if (!lutRoutethru) {
                 // child does not already exist in our routing graph, meaning it's not a used site pin
                 // in our design, but it could be a LAGUNA_I

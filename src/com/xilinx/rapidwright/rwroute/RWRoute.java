@@ -1803,6 +1803,9 @@ public class RWRoute {
                         }
                         break;
                     case NON_LOCAL:
+                        assert(rnode.getType() != RouteNodeType.LOCAL ||
+                                routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED);
+
                         if (!routingGraph.isAccessible(childRNode, connection)) {
                             continue;
                         }
@@ -1817,7 +1820,7 @@ public class RWRoute {
                             continue;
                         }
                         break;
-                    case LAGUNA_I:
+                    case LAGUNA_PINFEED:
                         if (!connection.isCrossSLR() ||
                             connection.getSinkRnode().getSLRIndex(routingGraph) == childRNode.getSLRIndex(routingGraph)) {
                             // Do not consider approaching a SLL if not needing to cross

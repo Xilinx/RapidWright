@@ -128,7 +128,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                        length == 1 && (getIntentCode() == IntentCode.NODE_PINBOUNCE || (type == RouteNodeType.LOCAL && getWireName().matches("INODE_[EW]_\\d+_FT[01]")))
                                    && (series == Series.UltraScale || series == Series.UltraScalePlus));
                 break;
-            case LAGUNA_I:
+            case LAGUNA_PINFEED:
                 // Make all approaches to SLLs zero-cost to encourage exploration
                 // Assigning a base cost of zero would normally break congestion resolution
                 // (since RWroute.getNodeCost() would return zero) but doing it here should be
