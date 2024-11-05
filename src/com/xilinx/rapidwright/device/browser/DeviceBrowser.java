@@ -159,7 +159,7 @@ public class DeviceBrowser extends QMainWindow{
         statusBar.addWidget(statusLabel);
         setStatusBar(statusBar);
 
-        // Set the opening default window size to 1024x768 pixels
+        // Set the opening default window size to 1280x1024 pixels
         resize(1280, 1024);
     }
 
@@ -315,14 +315,14 @@ public class DeviceBrowser extends QMainWindow{
 
     private void updateNodeItem(Node n, QTreeWidgetItem parent) {
         QTreeWidgetItem uphillItem = new QTreeWidgetItem(parent);
-        uphillItem.setText(0, "Uphill Nodes");
+        uphillItem.setText(0, UPHILL_NODES);
         for (Node up : n.getAllUphillNodes()) {
             QTreeWidgetItem upNodeItem = new QTreeWidgetItem(uphillItem);
             upNodeItem.setText(0, up.toString());
             nodeMap.put(upNodeItem.text(0), upNodeItem);
         }
         QTreeWidgetItem downhillItem = new QTreeWidgetItem(parent);
-        downhillItem.setText(0, "Downhill Nodes");
+        downhillItem.setText(0, DOWNHILL_NODES);
         for (Node down : n.getAllDownhillNodes()) {
             QTreeWidgetItem downNodeItem = new QTreeWidgetItem(downhillItem);
             downNodeItem.setText(0, down.toString());

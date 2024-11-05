@@ -271,8 +271,6 @@ public class DeviceBrowserScene extends TileScene{
         }
     }
 
-
-    
     @Override
     public boolean event(QEvent event) {
         boolean result = true;
