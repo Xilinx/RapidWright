@@ -124,12 +124,14 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         (length <= 3 && series == Series.Versal));
                 break;
             case EXCLUSIVE_SINK:
+                assert(length == 0);
+                break;
             case LOCAL:
                 assert(length == 0 ||
-                       (length == 1 && (series == Series.UltraScalePlus || series == Series.UltraScale) &&
-                               (getIntentCode() == IntentCode.NODE_PINBOUNCE ||
-                               (series == Series.UltraScalePlus && type == RouteNodeType.LOCAL && getWireName().matches("INODE_[EW]_\\d+_FT[01]")) ||
-                               (series == Series.UltraScale && type == RouteNodeType.LOCAL && getWireName().matches("INODE_[12]_[EW]_\\d+_FT[NS]"))
+                       (length == 1 && (
+                               ((series == Series.UltraScalePlus || series == Series.UltraScale) && getIntentCode() == IntentCode.NODE_PINBOUNCE) ||
+                               (series == Series.UltraScalePlus && getWireName().matches("INODE_[EW]_\\d+_FT[01]")) ||
+                               (series == Series.UltraScale && getWireName().matches("INODE_[12]_[EW]_\\d+_FT[NS]"))
                        ))
                    );
                 break;

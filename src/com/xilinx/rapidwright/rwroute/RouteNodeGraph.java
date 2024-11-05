@@ -23,10 +23,8 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
-import java.util.Collection;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -79,11 +77,6 @@ public class RouteNodeGraph {
      */
     private final CountUpDownLatch asyncPreserveOutstanding;
 
-    /**
-     * Visited rnodes data during connection routing
-     */
-    private final Collection<RouteNode> targets;
-
     private long createRnodeTime;
 
     public static final short SUPER_LONG_LINE_LENGTH_IN_TILES = 60;
@@ -121,7 +114,6 @@ public class RouteNodeGraph {
         preservedMap = new ConcurrentHashMap<>();
         preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
-        targets = new ArrayList<>();
         createRnodeTime = 0;
 
         Device device = design.getDevice();
@@ -287,7 +279,6 @@ public class RouteNodeGraph {
     }
 
     public void initialize() {
-        assert(targets.isEmpty());
     }
 
     protected Net preserve(Node node, Net net) {
@@ -581,9 +572,9 @@ public class RouteNodeGraph {
             return true;
         }
 
-        // (d) when in row above/below the sink tile
+        // (d) when in X as the sink tile, but Y +/- 1
         return childX == sinkTile.getTileXCoordinate() &&
-                Math.abs(childTile.getTileYCoordinate() - sinkTile.getTileYCoordinate()) <= 1;
+               Math.abs(childTile.getTileYCoordinate() - sinkTile.getTileYCoordinate()) <= 1;
     }
 
     protected boolean allowRoutethru(Node head, Node tail) {

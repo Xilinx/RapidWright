@@ -188,6 +188,7 @@ public class TestNode {
                 if (!Utils.isInterConnect(downhill.getTile().getTileTypeEnum())) {
                     continue;
                 }
+                // Check that they are all in the same column
                 Assertions.assertEquals(baseTile.getTileXCoordinate(),
                         downhill.getTile().getTileXCoordinate());
                 queue.add(downhill);
