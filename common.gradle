@@ -65,11 +65,7 @@ configurations.testFixturesImplementation.canBeResolved = true
 configurations.api.canBeResolved = true
 
 tasks.withType(Test) {
-  if (System.getenv("GITHUB_ACTION")) {
-    maxHeapSize = "5G"
-  } else {
-    maxHeapSize = "10G"
-  }
+  maxHeapSize = "10G"
   //Propagate JVM settings to test JVM
   jvmArgs applicationDefaultJvmArgs
 
