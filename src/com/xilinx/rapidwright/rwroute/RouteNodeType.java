@@ -61,6 +61,7 @@ public enum RouteNodeType {
      * Denotes other wiring {@link RouteNode} Objects
      * that are created for routing {@link Connection} Objects.
      */
-    WIRE
+    WIRE,
 
+    LOCAL
 }

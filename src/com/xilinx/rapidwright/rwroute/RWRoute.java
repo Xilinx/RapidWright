@@ -56,7 +56,6 @@ import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 import com.xilinx.rapidwright.util.RuntimeTrackerTree;
-import com.xilinx.rapidwright.util.Utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1798,6 +1797,11 @@ public class RWRoute {
                     continue;
                 }
                 switch (childRNode.getType()) {
+                    case LOCAL:
+                        if (!routingGraph.isAccessible(childRNode, connection)) {
+                            continue;
+                        }
+                        break;
                     case WIRE:
                         if (!routingGraph.isAccessible(childRNode, connection)) {
                             continue;

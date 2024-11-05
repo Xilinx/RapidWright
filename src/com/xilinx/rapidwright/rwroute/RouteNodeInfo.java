@@ -29,7 +29,6 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 
 import java.util.BitSet;
-import java.util.Map;
 
 public class RouteNodeInfo {
     public final RouteNodeType type;
@@ -47,7 +46,7 @@ public class RouteNodeInfo {
         this.length = length;
     }
 
-    public static RouteNodeInfo get(Node node, Map<Tile, BitSet> lagunaI) {
+    public static RouteNodeInfo get(Node node, RouteNodeGraph routingGraph) {
         Wire[] wires = node.getAllWiresInNode();
         Tile baseTile = node.getTile();
         TileTypeEnum baseTileType = baseTile.getTileTypeEnum();
@@ -66,7 +65,7 @@ public class RouteNodeInfo {
             endTile = node.getTile();
         }
 
-        RouteNodeType type = getType(node, endTile, lagunaI);
+        RouteNodeType type = getType(node, endTile, routingGraph);
         short endTileXCoordinate = getEndTileXCoordinate(node, type, (short) endTile.getTileXCoordinate());
         short endTileYCoordinate = (short) endTile.getTileYCoordinate();
         short length = getLength(baseTile, type, endTileXCoordinate, endTileYCoordinate);
@@ -126,19 +125,33 @@ public class RouteNodeInfo {
         return endTileXCoordinate;
     }
 
-    private static RouteNodeType getType(Node node, Tile endTile, Map<Tile,BitSet> lagunaI) {
+    private static RouteNodeType getType(Node node, Tile endTile, RouteNodeGraph routingGraph) {
         // NOTE: IntentCode is device-dependent
         IntentCode ic = node.getIntentCode();
         switch (ic) {
             case NODE_PINBOUNCE:
                 return RouteNodeType.PINBOUNCE;
 
-            case NODE_PINFEED:
-                BitSet bs = (lagunaI != null) ? lagunaI.get(node.getTile()) : null;
-                if (bs != null && bs.get(node.getWireIndex())) {
-                    return RouteNodeType.LAGUNA_I;
+            case NODE_LOCAL: {
+                assert(node.getTile().getTileTypeEnum() == TileTypeEnum.INT);
+                if (routingGraph != null) {
+                    BitSet bs = routingGraph.nonLocalWires.get(node.getTile().getTileTypeEnum());
+                    if (!bs.get(node.getWireIndex())) {
+                        return RouteNodeType.LOCAL;
+                    }
+                    break;
+                }
+            }
+
+            case NODE_PINFEED: {
+                if (routingGraph != null && routingGraph.lagunaI != null) {
+                    BitSet bs = routingGraph.lagunaI.get(node.getTile());
+                    if (bs != null && bs.get(node.getWireIndex())) {
+                        return RouteNodeType.LAGUNA_I;
+                    }
                 }
                 break;
+            }
 
             case NODE_LAGUNA_OUTPUT: // UltraScale+ only
                 assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);

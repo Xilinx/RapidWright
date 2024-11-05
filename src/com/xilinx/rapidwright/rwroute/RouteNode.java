@@ -92,7 +92,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
 
     protected RouteNode(RouteNodeGraph routingGraph, Node node, RouteNodeType type) {
         super(node);
-        RouteNodeInfo nodeInfo = RouteNodeInfo.get(this, routingGraph.lagunaI);
+        RouteNodeInfo nodeInfo = RouteNodeInfo.get(this, routingGraph);
         this.type = (type == null) ? nodeInfo.type : type;
         endTileXCoordinate = nodeInfo.endTileXCoordinate;
         endTileYCoordinate = nodeInfo.endTileYCoordinate;
@@ -118,6 +118,9 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     private void setBaseCost() {
         baseCost = 0.4f;
         switch (type) {
+            case LOCAL:
+                assert(length <= 1);
+                break;
             case LAGUNA_I:
                 // Make all approaches to SLLs zero-cost to encourage exploration
                 // Assigning a base cost of zero would normally break congestion resolution
@@ -139,10 +142,10 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_LAGUNA_OUTPUT: // LAG_LAG.{LAG_MUX_ATOM_*_TXOUT,RXD*} (US+)
                     case NODE_LAGUNA_DATA:   // LAG_LAG.UBUMP* super long lines for u-turns at the boundary of the device (US+)
                     case NODE_PINFEED:
+                    case INTENT_DEFAULT:     // INT.VCC_WIRE
                         assert(length == 0);
                         break;
-                    case NODE_LOCAL:    // US and US+
-                    case INTENT_DEFAULT:
+                    case NODE_LOCAL: // US and US+
                         assert(length <= 1);
                         break;
                     case NODE_VSINGLE: // Versal-only
