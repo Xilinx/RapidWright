@@ -175,7 +175,7 @@ public class TestNode {
             String wireName = node.getWireName();
             if ((ultraScalePlus && wireName.matches("(INT_NODE_SDQ|SDQNODE)_.*")) ||                                        // UltraScale+
                 (!ultraScalePlus && wireName.matches("(INT_NODE_(SINGLE_DOUBLE|QUAD_LONG)|QLND(NW|SE|SW)|SDND[NS]W)_.*") || // UltraScale
-                EnumSet.of(IntentCode.NODE_SINGLE, IntentCode.NODE_DOUBLE, IntentCode.NODE_HQUAD, IntentCode.VQUAD, IntentCode.HLONG, IntentCode. VLONG)
+                EnumSet.of(IntentCode.NODE_SINGLE, IntentCode.NODE_DOUBLE, IntentCode.NODE_HQUAD, IntentCode.NODE_VQUAD, IntentCode.NODE_HLONG, IntentCode.NODE_VLONG)
                         .contains(node.getIntentCode()))
             ) {
                 // Do not desccend into SDQNODEs or SDQLs
