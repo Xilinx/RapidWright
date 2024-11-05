@@ -124,7 +124,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         (length <= 3 && series == Series.Versal));
                 break;
             case EXCLUSIVE_SINK:
-                assert(length == 0);
+                assert(length == 0 ||
+                       (length == 1 && (series == Series.UltraScalePlus || series == Series.UltraScale) && getIntentCode() == IntentCode.NODE_PINBOUNCE));
                 break;
             case LOCAL:
                 assert(length == 0 ||
