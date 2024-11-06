@@ -24,23 +24,29 @@
 package com.xilinx.rapidwright.device.browser;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import com.trolltech.qt.core.QEvent;
 import com.trolltech.qt.core.QModelIndex;
 import com.trolltech.qt.core.Qt.DockWidgetArea;
 import com.trolltech.qt.core.Qt.ItemDataRole;
 import com.trolltech.qt.core.Qt.SortOrder;
 import com.trolltech.qt.gui.QApplication;
 import com.trolltech.qt.gui.QDockWidget;
+import com.trolltech.qt.gui.QDockWidget.DockWidgetFeature;
 import com.trolltech.qt.gui.QLabel;
 import com.trolltech.qt.gui.QMainWindow;
 import com.trolltech.qt.gui.QStatusBar;
 import com.trolltech.qt.gui.QTreeWidget;
 import com.trolltech.qt.gui.QTreeWidgetItem;
 import com.trolltech.qt.gui.QWidget;
-import com.trolltech.qt.gui.QDockWidget.DockWidgetFeature;
+import com.xilinx.rapidwright.design.tools.TileGroup;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
@@ -71,16 +77,25 @@ public class DeviceBrowser extends QMainWindow{
     private String currPart;
     /** This is the tree of parts to select */
     private QTreeWidget treeWidget;
+    /** This is the tree of nodes to select */
+    private QTreeWidget nodeTreeWidget;
     /** This is the list of primitive sites in the current tile selected */
     private QTreeWidget primitiveList;
     /** This is the list of wires in the current tile selected */
     private QTreeWidget wireList;
+
+    private Map<String, QTreeWidgetItem> nodeMap;
+    private Set<String> expandedItems;
+
     /** This is the current tile that has been selected */
     private Tile currTile = null;
 
     protected boolean hideTiles = false;
 
     protected boolean drawPrimitives = true;
+
+    protected static final String UPHILL_NODES = "Uphill Nodes";
+    protected static final String DOWNHILL_NODES = "Downhill Nodes";
     /**
      * Main method setting up the Qt environment for the program to run.
      * @param args
@@ -146,8 +161,8 @@ public class DeviceBrowser extends QMainWindow{
         statusBar.addWidget(statusLabel);
         setStatusBar(statusBar);
 
-        // Set the opening default window size to 1024x768 pixels
-        resize(1024, 768);
+        // Set the opening default window size to 1280x1024 pixels
+        resize(1280, 1024);
     }
 
     public DeviceBrowser(QWidget parent) {
@@ -182,6 +197,16 @@ public class DeviceBrowser extends QMainWindow{
         dockWidget2.setFeatures(DockWidgetFeature.DockWidgetMovable);
         addDockWidget(DockWidgetArea.LeftDockWidgetArea, dockWidget2);
 
+        // Create the node list window
+        nodeTreeWidget = new QTreeWidget();
+        nodeTreeWidget.setColumnCount(1);
+        nodeTreeWidget.setHeaderLabel("Nodes");
+        QDockWidget nodeWidget = new QDockWidget(tr("Node List"), this);
+        nodeWidget.setWidget(nodeTreeWidget);
+        nodeWidget.setFeatures(DockWidgetFeature.DockWidgetMovable);
+        addDockWidget(DockWidgetArea.LeftDockWidgetArea, nodeWidget);
+        nodeTreeWidget.itemClicked.connect(this, "nodeClicked(QTreeWidgetItem, Integer)");
+
         // Create the wire list window
         wireList = new QTreeWidget();
         wireList.setColumnCount(2);
@@ -215,12 +240,28 @@ public class DeviceBrowser extends QMainWindow{
     }
 
     /**
+     * Expands items in the node tree to add children nodes under uphill and
+     * downhill.
+     * 
+     * @param index
+     */
+    public void nodeClicked(QTreeWidgetItem item, Integer value) {
+        String currNodeName = item.text(value);
+        if (!expandedItems.contains(currNodeName) && !currNodeName.equals(DOWNHILL_NODES)
+                && !currNodeName.equals(UPHILL_NODES)) {
+            QTreeWidgetItem parent = nodeMap.get(item.text(value));
+            updateNodeItem(currTile.getDevice().getNode(currNodeName), parent);
+        }
+    }
+
+    /**
      * This method gets called each time a user double clicks on a tile.
      */
     protected void updateTile(Tile tile) {
         currTile = tile;
         updatePrimitiveList();
         updateWireList();
+        updateNodeTreeWidget();
     }
 
     /**
@@ -255,6 +296,43 @@ public class DeviceBrowser extends QMainWindow{
         wireList.sortByColumn(0, SortOrder.AscendingOrder);
     }
 
+    protected void updateNodeTreeWidget() {
+        nodeTreeWidget.clear();
+        nodeMap = new HashMap<>();
+        expandedItems = new HashSet<>();
+
+        if (currTile == null || currTile.getWireNames() == null)
+            return;
+        Device d = currTile.getDevice();
+        for (int i = 0; i < currTile.getWireCount(); i++) {
+            Node n = d.getNode(currTile.toString() + "/" + currTile.getWireName(i));
+            if (n == null || n.isInvalidNode())
+                continue;
+
+            QTreeWidgetItem treeItem = new QTreeWidgetItem(nodeTreeWidget);
+            treeItem.setText(0, n.toString());
+            updateNodeItem(n, treeItem);
+        }
+    }
+
+    private void updateNodeItem(Node n, QTreeWidgetItem parent) {
+        QTreeWidgetItem uphillItem = new QTreeWidgetItem(parent);
+        expandedItems.add(parent.text(0));
+        uphillItem.setText(0, UPHILL_NODES);
+        for (Node up : n.getAllUphillNodes()) {
+            QTreeWidgetItem upNodeItem = new QTreeWidgetItem(uphillItem);
+            upNodeItem.setText(0, up.toString());
+            nodeMap.put(upNodeItem.text(0), upNodeItem);
+        }
+        QTreeWidgetItem downhillItem = new QTreeWidgetItem(parent);
+        downhillItem.setText(0, DOWNHILL_NODES);
+        for (Node down : n.getAllDownhillNodes()) {
+            QTreeWidgetItem downNodeItem = new QTreeWidgetItem(downhillItem);
+            downNodeItem.setText(0, down.toString());
+            nodeMap.put(downNodeItem.text(0), downNodeItem);
+        }
+    }
+
     /**
      * This method loads a new device based on the part name selected in the
      * treeWidget.
@@ -265,12 +343,16 @@ public class DeviceBrowser extends QMainWindow{
         if ( data != null) {
             if (currPart.equals(data))
                 return;
-            currPart = (String) data;
-            device = Device.getDevice(currPart);
-            scene.setDevice(device);
-            scene.initializeScene(hideTiles, drawPrimitives);
-            statusLabel.setText("Loaded: "+currPart.toUpperCase());
+            setPart((String) data);
         }
+    }
+
+    private void setPart(String partName) {
+        currPart = partName;
+        device = Device.getDevice(currPart);
+        scene.setDevice(device);
+        scene.initializeScene(hideTiles, drawPrimitives);
+        statusLabel.setText("Loaded: " + currPart.toUpperCase());
     }
 
     /**
@@ -281,5 +363,75 @@ public class DeviceBrowser extends QMainWindow{
         statusLabel.setText(text);
         //currTile = tile;
         //System.out.println("currTile=" + tile);
+    }
+
+    public Device getDevice() {
+        return device;
+    }
+
+    public DeviceBrowserScene getScene() {
+        return scene;
+    }
+
+    /**
+     * Triggers an event on the scene to clear any highlighted tiles
+     */
+    public void clearHighlightedTiles() {
+        QEvent event = new QEvent(QEvent.Type.resolve(DeviceBrowserScene.CLEAR_HIGHLIGHTED_TILES));
+        QApplication.postEvent(scene, event);
+    }
+
+    /**
+     * Populates the scene with the tile group and triggers a highlight event on the
+     * scene object to highlight the perimeter tiles of the tile groups
+     * 
+     * @param tileGroup The tile group to highlight
+     */
+    public void highlightTileGroup(TileGroup tileGroup) {
+        List<TileGroup> tgs = new ArrayList<>();
+        tgs.add(tileGroup);
+        highlightTileGroups(tgs);
+    }
+
+    /**
+     * Populates the scene with the tile groups and triggers a highlight event on
+     * the scene object to highlight the perimeter tiles of the tile groups.
+     * 
+     * @param tileGroups The tile groups to highlight
+     */
+    public void highlightTileGroups(List<TileGroup> tileGroups) {
+        scene.tileGroups = tileGroups;
+        QEvent event = new QEvent(QEvent.Type.resolve(DeviceBrowserScene.HIGHLIGHT_TILE_GROUPS));
+        QApplication.postEvent(scene, event);
+    }
+
+    /** Static reference to a threaded instance */
+    private static ThreadedDeviceBrowser threadedBrowser;
+
+    /**
+     * Creates a new DeviceBrowser window in a separate thread so that it can be
+     * called interactively from an interpreter.
+     * 
+     * @param partName The device or part name to load
+     * @return The DeviceBrowser window object
+     * @throws InterruptedException
+     */
+    public static DeviceBrowser createWindow(String partName) throws InterruptedException {
+        if (threadedBrowser != null) {
+            System.err.println("ERROR: Only a single instance of the DeviceBrowser is currently supported");
+            return null;
+        }
+        threadedBrowser = new ThreadedDeviceBrowser(new String[] { partName });
+        threadedBrowser.start();
+        // Since start() returns immediately, we need to wait until the constructor has
+        // finished populating class member variables before continuting
+        while (threadedBrowser.getDeviceBrowser() == null) {
+            Thread.sleep(10);
+        }
+        return threadedBrowser.getDeviceBrowser();
+    }
+
+    public static void removeThreadedInstance() {
+        threadedBrowser = null;
     }
 }

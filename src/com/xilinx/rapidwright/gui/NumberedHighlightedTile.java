@@ -41,30 +41,34 @@ public class NumberedHighlightedTile  extends QGraphicsRectItem{
     protected static QFont font8 = new QFont("Arial", 8);
 
 
-    public NumberedHighlightedTile(Tile t, TileScene scene, int number) {
+    public NumberedHighlightedTile(Tile t, TileScene scene, Integer number) {
         super(0, 0, scene.tileSize - 2, scene.tileSize - 2);
         this.scene = scene;
-        this.text = new QGraphicsTextItem(Integer.toString(number));
         int x = scene.getDrawnTileX(t) * scene.tileSize;
         int y = scene.getDrawnTileY(t) * scene.tileSize;
-        text.setPos(x-4, y);
-        if (number < 100) {
-            text.setFont(font8);
-        } else if (number < 1000) {
-            text.setFont(font6);
-        } else {
-            text.setFont(font4);
-        }
 
         this.moveBy(x, y);
         this.scene.addItem(this);
-        this.scene.addItem(text);
 
-        this.text.setZValue(this.zValue() + 1);
+        if (number != null) {
+            this.text = new QGraphicsTextItem(Integer.toString(number));
+            text.setPos(x - 4, y);
+            if (number < 100) {
+                text.setFont(font8);
+            } else if (number < 1000) {
+                text.setFont(font6);
+            } else {
+                text.setFont(font4);
+            }
+            this.scene.addItem(text);
+            this.text.setZValue(this.zValue() + 1);
+        }
     }
 
     public void remove() {
-        scene.removeItem(text);
+        if (text != null) {
+            scene.removeItem(text);
+        }
         scene.removeItem(this);
     }
 }
