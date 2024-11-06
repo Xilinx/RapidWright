@@ -256,7 +256,7 @@ public class PartialRouter extends RWRoute {
             preservedNet = routingGraph.getPreservedNet(sinkRnode);
             if (preservedNet != null && preservedNet != net) {
                 unpreserveNets.add(preservedNet);
-                assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
+                assert(sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK);
             }
         }
 
@@ -598,8 +598,8 @@ public class PartialRouter extends RWRoute {
                 assert(!connection.isDirect());
                 RouteNode sourceRnode = connection.getSourceRnode();
                 RouteNode sinkRnode = connection.getSinkRnode();
-                assert(sourceRnode.getType() == RouteNodeType.PINFEED_O);
-                assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
+                assert(sourceRnode.getType() == RouteNodeType.EXCLUSIVE_SOURCE);
+                assert(sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK);
 
                 // Even though this connection is not expected to have any routing yet,
                 // perform a rip up anyway in order to release any exclusive sinks
