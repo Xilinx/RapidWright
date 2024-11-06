@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.device.browser;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -84,6 +85,7 @@ public class DeviceBrowser extends QMainWindow{
     private QTreeWidget wireList;
 
     private Map<String, QTreeWidgetItem> nodeMap;
+    private Set<String> expandedItems;
 
     /** This is the current tile that has been selected */
     private Tile currTile = null;
@@ -196,7 +198,6 @@ public class DeviceBrowser extends QMainWindow{
         addDockWidget(DockWidgetArea.LeftDockWidgetArea, dockWidget2);
 
         // Create the node list window
-        nodeMap = new HashMap<>();
         nodeTreeWidget = new QTreeWidget();
         nodeTreeWidget.setColumnCount(1);
         nodeTreeWidget.setHeaderLabel("Nodes");
@@ -204,9 +205,7 @@ public class DeviceBrowser extends QMainWindow{
         nodeWidget.setWidget(nodeTreeWidget);
         nodeWidget.setFeatures(DockWidgetFeature.DockWidgetMovable);
         addDockWidget(DockWidgetArea.LeftDockWidgetArea, nodeWidget);
-
-        // Draw wire connections when the wire name is double clicked
-        nodeTreeWidget.doubleClicked.connect(this, "nodeDoubleClicked(QModelIndex)");
+        nodeTreeWidget.itemClicked.connect(this, "nodeClicked(QTreeWidgetItem, Integer)");
 
         // Create the wire list window
         wireList = new QTreeWidget();
@@ -246,10 +245,11 @@ public class DeviceBrowser extends QMainWindow{
      * 
      * @param index
      */
-    public void nodeDoubleClicked(QModelIndex index) {
-        String currNodeName = index.data().toString();
-        if (!currNodeName.equals(DOWNHILL_NODES) && !currNodeName.equals(UPHILL_NODES)) {
-            QTreeWidgetItem parent = nodeMap.get(index.data().toString());
+    public void nodeClicked(QTreeWidgetItem item, Integer value) {
+        String currNodeName = item.text(value);
+        if (!expandedItems.contains(currNodeName) && !currNodeName.equals(DOWNHILL_NODES)
+                && !currNodeName.equals(UPHILL_NODES)) {
+            QTreeWidgetItem parent = nodeMap.get(item.text(value));
             updateNodeItem(currTile.getDevice().getNode(currNodeName), parent);
         }
     }
@@ -298,6 +298,8 @@ public class DeviceBrowser extends QMainWindow{
 
     protected void updateNodeTreeWidget() {
         nodeTreeWidget.clear();
+        nodeMap = new HashMap<>();
+        expandedItems = new HashSet<>();
 
         if (currTile == null || currTile.getWireNames() == null)
             return;
@@ -315,6 +317,7 @@ public class DeviceBrowser extends QMainWindow{
 
     private void updateNodeItem(Node n, QTreeWidgetItem parent) {
         QTreeWidgetItem uphillItem = new QTreeWidgetItem(parent);
+        expandedItems.add(parent.text(0));
         uphillItem.setText(0, UPHILL_NODES);
         for (Node up : n.getAllUphillNodes()) {
             QTreeWidgetItem upNodeItem = new QTreeWidgetItem(uphillItem);
