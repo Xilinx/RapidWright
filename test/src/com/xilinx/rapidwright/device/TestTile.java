@@ -35,7 +35,7 @@ public class TestTile {
             "xcku025,true",
             "xcku035,false"
     })
-    public void testGetWireConnections(String partName, boolean expectThrow) {
+    public void testGetWireConnectionsThrows(String partName, boolean expectThrow) {
         Device dev = Device.getDevice(partName);
         Tile tile = dev.getTile("RCLK_CLE_M_L_X31Y149");
         Executable e = () -> tile.getWireConnections(8);
@@ -45,6 +45,16 @@ public class TestTile {
         } else {
             Assertions.assertDoesNotThrow(e);
         }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvp1002,CLK_REBUF_VERT_VNOC_BAO_TILE_X30Y471,IF_WRAP_CLK_V_BOT_CLK_VDISTR21,[]",
+    })
+    public void testGetWireConnections(String partName, String tileName, String wireName, String wireConnections) {
+        Device dev = Device.getDevice(partName);
+        Tile tile = dev.getTile(tileName);
+        Assertions.assertEquals(wireConnections, tile.getWireConnections(wireName).toString());
     }
 
     @ParameterizedTest
