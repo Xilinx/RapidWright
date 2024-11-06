@@ -49,7 +49,11 @@ public class TestTile {
 
     @ParameterizedTest
     @CsvSource({
+            // get_nodes -downhill -of [get_nodes -of [get_wires CLK_REBUF_VERT_VNOC_BAO_TILE_X30Y471/IF_WRAP_CLK_V_BOT_CLK_VDISTR21]]
             "xcvp1002,CLK_REBUF_VERT_VNOC_BAO_TILE_X30Y471,IF_WRAP_CLK_V_BOT_CLK_VDISTR21,[]",
+            // get_nodes -downhill -of [get_nodes -of [get_wires CLK_REBUF_VERT_VNOC_ACO_TILE_X30Y279/IF_WRAP_CLK_V_BOT_CLK_VDISTR21]]
+            "xcvp1002,CLK_REBUF_VERT_VNOC_ACO_TILE_X30Y279,IF_WRAP_CLK_V_BOT_CLK_VDISTR21," +
+                    "'[RCLK_BRAM_CLKBUF_CORE_X24Y239/IF_HCLK_R_CLK_HDISTR21, CLK_VNOC_AAO_TILE_X30Y239/CLKE2_PD_OPT_DELAY_SSIT_142_I]'",
     })
     public void testGetWireConnections(String partName, String tileName, String wireName, String wireConnections) {
         Device dev = Device.getDevice(partName);
