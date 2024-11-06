@@ -99,7 +99,7 @@ public class RouteNodeGraph {
     protected final boolean lutRoutethru;
 
     /** Map indicating the wire indices that have a local intent code, but is what RWRoute considers to be non-local */
-    protected final Map<TileTypeEnum, BitSet> nonLocalWires;
+    protected final Map<TileTypeEnum, BitSet> ultraScaleNonLocalWires;
 
     /** Flag for whether design targets the Versal series */
     protected final boolean isVersal;
@@ -132,57 +132,61 @@ public class RouteNodeGraph {
             }
         }
 
-        nonLocalWires = new EnumMap<>(TileTypeEnum.class);
-        BitSet wires = new BitSet();
-        Tile intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
-        // Device.getArbitraryTileOfType() typically gives you the North-Western-most
-        // tile (with minimum X, maximum Y). Analyze the tile just below that.
-        intTile = intTile.getTileXYNeighbor(0, -1);
-        nonLocalWires.put(intTile.getTileTypeEnum(), wires);
         Series series = device.getSeries();
         boolean isUltraScale = series == Series.UltraScale;
         boolean isUltraScalePlus = series == Series.UltraScalePlus;
         isVersal = series == Series.Versal;
-        for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
-            Node baseNode = Node.getNode(intTile, wireIndex);
-            if (baseNode == null) {
-                continue;
-            }
-            if (baseNode.getIntentCode() != IntentCode.NODE_LOCAL) {
-                continue;
-            }
-            Tile baseTile = baseNode.getTile();
-            String wireName = baseNode.getWireName();
-            if (isUltraScalePlus) {
-                if (!wireName.startsWith("INT_NODE_SDQ_") && !wireName.startsWith("SDQNODE_")) {
+        if (isUltraScale || isUltraScalePlus) {
+            ultraScaleNonLocalWires = new EnumMap<>(TileTypeEnum.class);
+            BitSet wires = new BitSet();
+            Tile intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
+            // Device.getArbitraryTileOfType() typically gives you the North-Western-most
+            // tile (with minimum X, maximum Y). Analyze the tile just below that.
+            intTile = intTile.getTileXYNeighbor(0, -1);
+            ultraScaleNonLocalWires.put(intTile.getTileTypeEnum(), wires);
+            for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
+                Node baseNode = Node.getNode(intTile, wireIndex);
+                if (baseNode == null) {
                     continue;
                 }
-                if (baseTile != intTile) {
-                    if (wireName.endsWith("_FT0")) {
-                        assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() - 1);
-                    } else {
-                        assert(wireName.endsWith("_FT1"));
-                        assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
-                    }
-                }
-            } else if (isUltraScale) {
-                if (!wireName.startsWith("INT_NODE_SINGLE_DOUBLE_") && !wireName.startsWith("SDND") &&
-                        !wireName.startsWith("INT_NODE_QUAD_LONG") && !wireName.startsWith("QLND")) {
+                if (baseNode.getIntentCode() != IntentCode.NODE_LOCAL) {
                     continue;
                 }
-                if (baseTile != intTile) {
-                    if (wireName.endsWith("_FTN")) {
-                        assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() - 1);
-                    } else {
-                        assert(wireName.endsWith("_FTS"));
-                        assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
+
+                Tile baseTile = baseNode.getTile();
+                String wireName = baseNode.getWireName();
+                if (isUltraScalePlus) {
+                    if (!wireName.startsWith("INT_NODE_SDQ_") && !wireName.startsWith("SDQNODE_")) {
+                        continue;
+                    }
+                    if (baseTile != intTile) {
+                        if (wireName.endsWith("_FT0")) {
+                            assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() - 1);
+                        } else {
+                            assert(wireName.endsWith("_FT1"));
+                            assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
+                        }
+                    }
+                } else {
+                    assert(isUltraScale);
+
+                    if (!wireName.startsWith("INT_NODE_SINGLE_DOUBLE_") && !wireName.startsWith("SDND") &&
+                            !wireName.startsWith("INT_NODE_QUAD_LONG") && !wireName.startsWith("QLND")) {
+                        continue;
+                    }
+                    if (baseTile != intTile) {
+                        if (wireName.endsWith("_FTN")) {
+                            assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() - 1);
+                        } else {
+                            assert(wireName.endsWith("_FTS"));
+                            assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
+                        }
                     }
                 }
-            } else {
-                assert(isVersal);
-                continue;
+                wires.set(baseNode.getWireIndex());
             }
-            wires.set(baseNode.getWireIndex());
+        } else {
+            ultraScaleNonLocalWires = null;
         }
 
         if (lutRoutethru) {
@@ -194,7 +198,7 @@ public class RouteNodeGraph {
                 if (clbTile == null) {
                     continue;
                 }
-                wires = new BitSet();
+                BitSet wires = new BitSet();
                 for (int wireIndex = 0; wireIndex < clbTile.getWireCount(); wireIndex++) {
                     String wireName = clbTile.getWireName(wireIndex);
                     if (wireName.endsWith("MUX")) {

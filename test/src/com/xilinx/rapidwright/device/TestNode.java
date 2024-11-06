@@ -84,44 +84,44 @@ public class TestNode {
     @ParameterizedTest
     @CsvSource({
             // UltraScale+ part
-            "xcvu3p,INT_X37Y220,BOUNCE_.*",
-            "xcvu3p,INT_X37Y220,BYPASS_.*",
-            "xcvu3p,INT_X37Y220,INT_NODE_GLOBAL_.*",
-            "xcvu3p,INT_X37Y220,INT_NODE_IMUX_.*",
-            "xcvu3p,INT_X37Y220,INODE_.*",
-            "xcvu3p,INT_X37Y220,INT_INT_SDQ_.*", // IntentCode.NODE_SINGLE
-            "xcvu3p,INT_X37Y220,INT_NODE_SDQ_.*",
-            "xcvu3p,INT_X37Y220,SDQNODE_.*",
-            "xcvu3p,INT_X37Y220,IMUX_.*",
-            "xcvu3p,INT_X37Y220,CTRL_.*",
-            "xcvu3p,INT_X37Y220,(NN|EE|SS|WW)1_.*",
-            "xcvu3p,INT_X37Y220,(NN|EE|SS|WW)2_.*",
-            "xcvu3p,INT_X37Y220,(NN|EE|SS|WW)4_.*",
-            "xcvu3p,INT_X37Y220,(NN|EE|SS|WW)12_.*",
-            "xcvu3p,CLEM_X37Y220,CLE_CLE_M_SITE_0_[A-H](_O|Q|Q2|MUX)",
+            "xcvu3p,INT_X37Y220,BOUNCE_.*,true",
+            "xcvu3p,INT_X37Y220,BYPASS_.*,true",
+            "xcvu3p,INT_X37Y220,INT_NODE_GLOBAL_.*,true",
+            "xcvu3p,INT_X37Y220,INT_NODE_IMUX_.*,true",
+            "xcvu3p,INT_X37Y220,INODE_.*,true",
+            "xcvu3p,INT_X37Y220,INT_INT_SDQ_.*,false", // IntentCode.NODE_SINGLE
+            "xcvu3p,INT_X37Y220,INT_NODE_SDQ_.*,false",
+            "xcvu3p,INT_X37Y220,SDQNODE_.*,false",
+            "xcvu3p,INT_X37Y220,IMUX_.*,true",
+            "xcvu3p,INT_X37Y220,CTRL_.*,true",
+            "xcvu3p,INT_X37Y220,(NN|EE|SS|WW)1_.*,false",
+            "xcvu3p,INT_X37Y220,(NN|EE|SS|WW)2_.*,false",
+            "xcvu3p,INT_X37Y220,(NN|EE|SS|WW)4_.*,false",
+            "xcvu3p,INT_X37Y220,(NN|EE|SS|WW)12_.*,false",
+            "xcvu3p,CLEM_X37Y220,CLE_CLE_M_SITE_0_[A-H](_O|Q|Q2|MUX),false",
 
             // UltraScale part
-            "xcvu065,INT_X38Y220,BOUNCE_.*",
-            "xcvu065,INT_X38Y220,BYPASS_.*",
-            "xcvu065,INT_X38Y220,INT_NODE_GLOBAL_.*",
-            "xcvu065,INT_X38Y220,INT_NODE_IMUX_.*",
-            "xcvu065,INT_X38Y220,INODE_.*",
-            "xcvu065,INT_X38Y220,INT_INT_SINGLE_.*", // IntentCode.NODE_SINGLE
-            "xcvu065,INT_X38Y220,INT_NODE_SINGLE_DOUBLE_.*",
-            "xcvu065,INT_X38Y220,INT_NODE_QUAD_LONG_.*",
-            "xcvu065,INT_X38Y220,IMUX_.*",
-            "xcvu065,INT_X38Y220,CTRL_.*",
-            "xcvu065,INT_X37Y220,(NN|EE|SS|WW)1_.*",
-            "xcvu065,INT_X37Y220,(NN|EE|SS|WW)2_.*",
-            "xcvu065,INT_X37Y220,(NN|EE|SS|WW)4_.*",
-            "xcvu065,INT_X37Y220,(NN|EE|SS|WW)5_.*",
-            "xcvu065,INT_X37Y220,(NN|EE|SS|WW)12_.*",
-            "xcvu065,INT_X37Y220,(NN|EE|SS|WW)16_.*",
-            "xcvu065,INT_X38Y220,QLND.*",
-            "xcvu065,INT_X38Y220,SDND.*",
-            "xcvu065,CLE_M_X38Y220,CLE_CLE_M_SITE_0_[A-H](_O|Q|Q2|MUX)",
+            "xcvu065,INT_X38Y220,BOUNCE_.*,true",
+            "xcvu065,INT_X38Y220,BYPASS_.*,true",
+            "xcvu065,INT_X38Y220,INT_NODE_GLOBAL_.*,true",
+            "xcvu065,INT_X38Y220,INT_NODE_IMUX_.*,true",
+            "xcvu065,INT_X38Y220,INODE_.*,true",
+            "xcvu065,INT_X38Y220,INT_INT_SINGLE_.*,false", // IntentCode.NODE_SINGLE
+            "xcvu065,INT_X38Y220,INT_NODE_SINGLE_DOUBLE_.*,false",
+            "xcvu065,INT_X38Y220,INT_NODE_QUAD_LONG_.*,false",
+            "xcvu065,INT_X38Y220,IMUX_.*,true",
+            "xcvu065,INT_X38Y220,CTRL_.*,true",
+            "xcvu065,INT_X37Y220,(NN|EE|SS|WW)1_.*,false",
+            "xcvu065,INT_X37Y220,(NN|EE|SS|WW)2_.*,false",
+            "xcvu065,INT_X37Y220,(NN|EE|SS|WW)4_.*,false",
+            "xcvu065,INT_X37Y220,(NN|EE|SS|WW)5_.*,false",
+            "xcvu065,INT_X37Y220,(NN|EE|SS|WW)12_.*,false",
+            "xcvu065,INT_X37Y220,(NN|EE|SS|WW)16_.*,false",
+            "xcvu065,INT_X38Y220,QLND.*,false",
+            "xcvu065,INT_X38Y220,SDND.*,false",
+            "xcvu065,CLE_M_X38Y220,CLE_CLE_M_SITE_0_[A-H](_O|Q|Q2|MUX),false",
     })
-    public void testNodeReachabilityUltraScale(String partName, String tileName, String wireRegex) {
+    public void testNodeReachabilityUltraScale(String partName, String tileName, String wireRegex, boolean local) {
         Device device = Device.getDevice(partName);
         Tile baseTile = device.getTile(tileName);
         Queue<Node> queue = new ArrayDeque<>();
@@ -170,15 +170,17 @@ public class TestNode {
                 .forEachOrdered(s -> System.out.println("\t" + s));
 
         Set<Node> visited = new HashSet<>();
+        boolean exitsBaseTile = false;
         while (!queue.isEmpty()) {
             Node node = queue.poll();
             String wireName = node.getWireName();
             if ((ultraScalePlus && wireName.matches("(INT_NODE_SDQ|SDQNODE)_.*")) ||                                        // UltraScale+
                 (!ultraScalePlus && wireName.matches("(INT_NODE_(SINGLE_DOUBLE|QUAD_LONG)|QLND(NW|SE|SW)|SDND[NS]W)_.*") || // UltraScale
-                EnumSet.of(IntentCode.NODE_SINGLE, IntentCode.NODE_DOUBLE, IntentCode.NODE_HQUAD, IntentCode.VQUAD, IntentCode.HLONG, IntentCode. VLONG)
+                EnumSet.of(IntentCode.NODE_SINGLE, IntentCode.NODE_DOUBLE, IntentCode.NODE_HQUAD, IntentCode.NODE_VQUAD, IntentCode.NODE_HLONG, IntentCode.NODE_VLONG)
                         .contains(node.getIntentCode()))
             ) {
-                // Do not desccend into SDQNODEs or SDQLs
+                // Do not descend into SDQNODEs or SDQLs
+                exitsBaseTile = true;
                 continue;
             }
             for (Node downhill : node.getAllDownhillNodes()) {
@@ -195,38 +197,41 @@ public class TestNode {
             }
         }
         System.out.println("visited.size() = " + visited.size());
+
+        // Local nodes should never exit the tile
+        Assertions.assertNotEquals(local, exitsBaseTile);
     }
 
     @ParameterizedTest
     @CsvSource({
-            "xcvp1002,INT_X38Y220,NODE_PINBOUNCE",
-            "xcvp1002,INT_X38Y220,NODE_INODE",
-            "xcvp1002,INT_X38Y220,NODE_IMUX",
-            "xcvp1002,INT_X38Y220,NODE_SDQNODE",
-            "xcvp1002,INT_X38Y220,NODE_HSINGLE",
-            "xcvp1002,INT_X38Y220,NODE_VSINGLE",
-            "xcvp1002,INT_X38Y220,NODE_HDOUBLE",
-            "xcvp1002,INT_X38Y220,NODE_VDOUBLE",
-            "xcvp1002,INT_X38Y220,NODE_HQUAD",
-            "xcvp1002,INT_X38Y220,NODE_VQUAD",
-            "xcvp1002,INT_X38Y220,NODE_HLONG6",
-            "xcvp1002,INT_X38Y220,NODE_HLONG10",
-            "xcvp1002,INT_X38Y220,NODE_VLONG7",
-            "xcvp1002,INT_X38Y220,NODE_VLONG12",
-            "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_BNODE",
-            "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_CNODE",
-            "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_CTRL",
-            "xcvp1002,CLE_W_CORE_X38Y220,NODE_PINFEED",
-            "xcvp1002,CLE_E_CORE_X38Y220,NODE_CLE_OUTPUT",
-            "xcvp1002,CLE_W_CORE_X38Y220,NODE_CLE_OUTPUT",
+            "xcvp1002,INT_X38Y220,NODE_PINBOUNCE,true",
+            "xcvp1002,INT_X38Y220,NODE_INODE,true",
+            "xcvp1002,INT_X38Y220,NODE_IMUX,true",
+            "xcvp1002,INT_X38Y220,NODE_SDQNODE,false",
+            "xcvp1002,INT_X38Y220,NODE_HSINGLE,false",
+            "xcvp1002,INT_X38Y220,NODE_VSINGLE,false",
+            "xcvp1002,INT_X38Y220,NODE_HDOUBLE,false",
+            "xcvp1002,INT_X38Y220,NODE_VDOUBLE,false",
+            "xcvp1002,INT_X38Y220,NODE_HQUAD,false",
+            "xcvp1002,INT_X38Y220,NODE_VQUAD,false",
+            "xcvp1002,INT_X38Y220,NODE_HLONG6,false",
+            "xcvp1002,INT_X38Y220,NODE_HLONG10,false",
+            "xcvp1002,INT_X38Y220,NODE_VLONG7,false",
+            "xcvp1002,INT_X38Y220,NODE_VLONG12,false",
+            "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_BNODE,true",
+            "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_CNODE,true",
+            "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_CTRL,true",
+            "xcvp1002,CLE_W_CORE_X38Y220,NODE_PINFEED,true",
+            "xcvp1002,CLE_E_CORE_X38Y220,NODE_CLE_OUTPUT,false",
+            "xcvp1002,CLE_W_CORE_X38Y220,NODE_CLE_OUTPUT,false",
     })
-    public void testNodeReachabilityVersal(String partName, String tileName, String intentCodeName) {
+    public void testNodeReachabilityVersal(String partName, String tileName, String intentCodeName, boolean local) {
         Device device = Device.getDevice(partName);
         Tile baseTile = device.getTile(tileName);
+        IntentCode baseIntentCode = IntentCode.valueOf(intentCodeName);
         Queue<Node> queue = new ArrayDeque<>();
-        IntentCode ic = IntentCode.valueOf(intentCodeName);
         for (int wireIdx = 0; wireIdx < baseTile.getWireCount(); wireIdx++) {
-            if (baseTile.getWireIntentCode(wireIdx) != ic) {
+            if (baseTile.getWireIntentCode(wireIdx) != baseIntentCode) {
                 continue;
             }
             queue.add(Node.getNode(baseTile, wireIdx));
@@ -250,6 +255,7 @@ public class TestNode {
 
         TileTypeEnum baseTileTypeEnum = baseTile.getTileTypeEnum();
         Set<Node> visited = new HashSet<>();
+        boolean exitsBaseTile = false;
         while (!queue.isEmpty()) {
             Node node = queue.poll();
             if (EnumSet.of(IntentCode.NODE_SDQNODE, IntentCode.NODE_HSINGLE, IntentCode.NODE_VSINGLE,
@@ -257,7 +263,8 @@ public class TestNode {
                             IntentCode.NODE_HQUAD, IntentCode.NODE_VQUAD,
                             IntentCode.NODE_HLONG10, IntentCode.NODE_HLONG6,
                             IntentCode.NODE_VLONG12, IntentCode.NODE_VLONG7).contains(node.getIntentCode())) {
-                // Do not desccend into SDQNODEs or any SDQLs
+                // Do not descend into SDQNODEs or any SDQLs
+                exitsBaseTile = true;
                 continue;
             }
             for (Node downhill : node.getAllDownhillNodes()) {
@@ -280,11 +287,9 @@ public class TestNode {
                             Assertions.assertTrue(1 >= Math.abs(baseTile.getTileYCoordinate() - downhill.getTile().getTileYCoordinate()));
                         }
                     }
-                    // Do not descend further
-                    continue;
                 }
                 // All INT-to-INT connections should be to the same tile
-                if (baseTileTypeEnum == TileTypeEnum.CLE_BC_CORE) {
+                else if (baseTileTypeEnum == TileTypeEnum.CLE_BC_CORE) {
                     // Except CLE_BC_CORE tiles which spans two adjacent INT tiles
                     if (baseTile != downhill.getTile()) {
                         Assertions.assertTrue(1 >= Math.abs(baseTile.getTileXCoordinate() - downhill.getTile().getTileXCoordinate()));
@@ -297,6 +302,9 @@ public class TestNode {
             }
         }
         System.out.println("visited.size() = " + visited.size());
+
+        // Local nodes should never exit the tile
+        Assertions.assertNotEquals(local, exitsBaseTile);
     }
 
     @ParameterizedTest
