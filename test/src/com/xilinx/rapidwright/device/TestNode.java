@@ -84,16 +84,23 @@ public class TestNode {
     @ParameterizedTest
     @CsvSource({
             // UltraScale+ part
-            "xcvu3p,INT_X37Y220,BOUNCE_.*,true",
-            "xcvu3p,INT_X37Y220,BYPASS_.*,true",
+            "xcvu3p,INT_X37Y220,BOUNCE_E_.*,true",
+            "xcvu3p,INT_X37Y220,BOUNCE_W_.*,true",
+            "xcvu3p,INT_X37Y220,BYPASS_E.*,true",
+            "xcvu3p,INT_X37Y220,BYPASS_W.*,true",
             "xcvu3p,INT_X37Y220,INT_NODE_GLOBAL_.*,true",
-            "xcvu3p,INT_X37Y220,INT_NODE_IMUX_.*,true",
-            "xcvu3p,INT_X37Y220,INODE_.*,true",
+            "xcvu3p,INT_X37Y220,INT_NODE_IMUX_([0-9]|1[0-9]|2[0-9]|3[01])_.*,true",
+            "xcvu3p,INT_X37Y220,INT_NODE_IMUX_(3[2-9]|4[0-9]|5[0-9]|6[0-3])_.*,true",
+            "xcvu3p,INT_X37Y220,INODE_E_.*,true",
+            "xcvu3p,INT_X37Y220,INODE_W_.*,true",
             "xcvu3p,INT_X37Y220,INT_INT_SDQ_.*,false", // IntentCode.NODE_SINGLE
             "xcvu3p,INT_X37Y220,INT_NODE_SDQ_.*,false",
-            "xcvu3p,INT_X37Y220,SDQNODE_.*,false",
-            "xcvu3p,INT_X37Y220,IMUX_.*,true",
-            "xcvu3p,INT_X37Y220,CTRL_.*,true",
+            "xcvu3p,INT_X37Y220,SDQNODE_E_.*,false",
+            "xcvu3p,INT_X37Y220,SDQNODE_W_.*,false",
+            "xcvu3p,INT_X37Y220,IMUX_E.*,true",
+            "xcvu3p,INT_X37Y220,IMUX_W.*,true",
+            "xcvu3p,INT_X37Y220,CTRL_E.*,true",
+            "xcvu3p,INT_X37Y220,CTRL_W.*,true",
             "xcvu3p,INT_X37Y220,(NN|EE|SS|WW)1_.*,false",
             "xcvu3p,INT_X37Y220,(NN|EE|SS|WW)2_.*,false",
             "xcvu3p,INT_X37Y220,(NN|EE|SS|WW)4_.*,false",
@@ -101,16 +108,22 @@ public class TestNode {
             "xcvu3p,CLEM_X37Y220,CLE_CLE_M_SITE_0_[A-H](_O|Q|Q2|MUX),false",
 
             // UltraScale part
-            "xcvu065,INT_X38Y220,BOUNCE_.*,true",
-            "xcvu065,INT_X38Y220,BYPASS_.*,true",
+            "xcvu065,INT_X38Y220,BOUNCE_E_.*,true",
+            "xcvu065,INT_X38Y220,BOUNCE_W_.*,true",
+            "xcvu065,INT_X38Y220,BYPASS_E.*,true",
+            "xcvu065,INT_X38Y220,BYPASS_W.*,true",
             "xcvu065,INT_X38Y220,INT_NODE_GLOBAL_.*,true",
-            "xcvu065,INT_X38Y220,INT_NODE_IMUX_.*,true",
-            "xcvu065,INT_X38Y220,INODE_.*,true",
+            "xcvu065,INT_X38Y220,INT_NODE_IMUX_([0-9]|1[0-9]|2[0-9]|3[01]|6[4-9]|7[0-9]|8[0-9]|9[0-5])_.*,true",
+            "xcvu065,INT_X38Y220,INT_NODE_IMUX_(3[2-9]|4[0-9]|5[0-9]|6[0-3]|9[6-9]|10[0-9]|11[0-9]|12[0-7])_.*,true",
+            "xcvu065,INT_X38Y220,INODE_[12]_E_.*,true",
+            "xcvu065,INT_X38Y220,INODE_[12]_W_.*,true",
             "xcvu065,INT_X38Y220,INT_INT_SINGLE_.*,false", // IntentCode.NODE_SINGLE
             "xcvu065,INT_X38Y220,INT_NODE_SINGLE_DOUBLE_.*,false",
             "xcvu065,INT_X38Y220,INT_NODE_QUAD_LONG_.*,false",
-            "xcvu065,INT_X38Y220,IMUX_.*,true",
-            "xcvu065,INT_X38Y220,CTRL_.*,true",
+            "xcvu065,INT_X38Y220,IMUX_E.*,true",
+            "xcvu065,INT_X38Y220,IMUX_W.*,true",
+            "xcvu065,INT_X38Y220,CTRL_E.*,true",
+            "xcvu065,INT_X38Y220,CTRL_W.*,true",
             "xcvu065,INT_X37Y220,(NN|EE|SS|WW)1_.*,false",
             "xcvu065,INT_X37Y220,(NN|EE|SS|WW)2_.*,false",
             "xcvu065,INT_X37Y220,(NN|EE|SS|WW)4_.*,false",
@@ -143,13 +156,18 @@ public class TestNode {
         boolean ultraScalePlus = partName.endsWith("p");
         queue.stream().map(Node::getAllUphillNodes).flatMap(List::stream)
                 .map(n -> n.getWireName() + " (" + n.getIntentCode() + ")")
-                .map(s -> s.replaceFirst("((BOUNCE|BYPASS|CTRL|INT_NODE_[^_]+|INODE|IMUX|SDQNODE)_)[^\\(]+", "$1"))
+                .map(s -> s.replaceFirst("^((BOUNCE|BYPASS|CTRL|INODE(_[12])?|IMUX|SDQNODE)_([EW]_?)?)[^ ]+", "$1"))
+                .map(s -> s.replaceFirst("(INT_NODE_(GLOBAL|SDQ|SINGLE_DOUBLE|QUAD_LONG)_)[^ ]+", "$1"))
+                .map(s -> ultraScalePlus ? s.replaceFirst("(INT_NODE_IMUX_)([0-9]|1[0-9]|2[0-9]|3[01])_INT_OUT[01]?", "$1<0-31>")
+                        : s.replaceFirst("(INT_NODE_IMUX_)([0-9]|1[0-9]|2[0-9]|3[01]|6[4-9]|7[0-9]|8[0-9]|9[0-5])_INT_OUT", "$1<0-31,64-95>"))
+                .map(s -> ultraScalePlus ? s.replaceFirst("(INT_NODE_IMUX_)(3[2-9]|4[0-9]|5[0-9]|6[0-3])_INT_OUT[01]?", "$1<32-63>")
+                        : s.replaceFirst("(INT_NODE_IMUX_)(3[2-9]|4[0-9]|5[0-9]|6[0-3]|9[6-9]|10[0-9]|11[0-9]|12[0-7])_INT_OUT", "$1<32-63,96-127>"))
                 .map(s -> s.replaceFirst(
                                        // UltraScale+
-                        ultraScalePlus ? "((CLE_CLE_[LM]_SITE_0|CLK_LEAF_SITES|INT_INT_SDQ|(NN|EE|SS|WW)(1|2|4|12))_)[^\\(]+"
+                        ultraScalePlus ? "((CLE_CLE_[LM]_SITE_0|CLK_LEAF_SITES|INT_INT_SDQ|(NN|EE|SS|WW)(1|2|4|12)(_[EW])?)_)[^\\(]+"
                                        // UltraScale
-                                       : "((CLE_CLE_[LM]_SITE_0|CLK_BUFCE_LEAF_X16_1_CLK|EE[124]|INT_INT_SINGLE|(NN|SS)(1|2|4|5|12|16)|(EE|WW)(1|2|4|12)|QLND(NW|SE|SW)|SDND[NS]W)_)[^\\(]+",
-                        "$1"))
+                                       : "((CLE_CLE_[LM]_SITE_0|CLK_BUFCE_LEAF_X16_1_CLK|EE[124]|INT_INT_SINGLE|(NN|SS)(1|2|4|5|12|16)(_[EW])?|(EE|WW)(1|2|4|12)|QLND(NW|SE|SW)|SDND[NS]W)_)[^\\(]+",
+                        "$1 "))
                 .distinct()
                 .sorted()
                 .forEachOrdered(s -> System.out.println("\t" + s));
@@ -158,13 +176,18 @@ public class TestNode {
         System.out.println("Immediately downhill:");
         queue.stream().map(Node::getAllDownhillNodes).flatMap(List::stream)
                 .map(n -> n.getWireName() + " (" + n.getIntentCode() + ")")
-                .map(s -> s.replaceFirst("((BOUNCE|BYPASS|CTRL|IMUX|INT_NODE_[^_]+|INODE|SDQNODE)_)[^\\(]+", "$1"))
+                .map(s -> s.replaceFirst("^((BOUNCE|BYPASS|CTRL|INODE(_[12])?|IMUX|SDQNODE)_([EW]_?)?)[^ ]+", "$1"))
+                .map(s -> s.replaceFirst("(INT_NODE_(GLOBAL|SDQ|SINGLE_DOUBLE|QUAD_LONG)_)[^ ]+", "$1"))
+                .map(s -> ultraScalePlus ? s.replaceFirst("(INT_NODE_IMUX_)([0-9]|1[0-9]|2[0-9]|3[01])_INT_OUT[01]?", "$1<0-31>")
+                        : s.replaceFirst("(INT_NODE_IMUX_)([0-9]|1[0-9]|2[0-9]|3[01]|6[4-9]|7[0-9]|8[0-9]|9[0-5])_INT_OUT", "$1<0-31,64-95>"))
+                .map(s -> ultraScalePlus ? s.replaceFirst("(INT_NODE_IMUX_)(3[2-9]|4[0-9]|5[0-9]|6[0-3])_INT_OUT[01]?", "$1<32-63>")
+                        : s.replaceFirst("(INT_NODE_IMUX_)(3[2-9]|4[0-9]|5[0-9]|6[0-3]|9[6-9]|10[0-9]|11[0-9]|12[0-7])_INT_OUT", "$1<32-63,96-127>"))
                 .map(s -> s.replaceFirst(
                                        // UltraScale+
-                        ultraScalePlus ? "((CLE_CLE_[LM]_SITE_0|INT_INT_SDQ|(NN|EE|SS|WW)(1|2|4|12))_)[^\\(]+"
+                        ultraScalePlus ? "((CLE_CLE_[LM]_SITE_0|INT_INT_SDQ|(NN|EE|SS|WW)(1|2|4|12)(_[EW])?)_)[^\\(]+"
                                        // UltraScale
-                                       : "((CLE_CLE_[LM]_SITE_0|INT_INT_SINGLE|(NN|SS)(1|2|4|5|12|16)|(EE|WW)(1|2|4|12)|QLND(NW|S[EW])|SDND[NS]W)_)[^\\(]+",
-                        "$1"))
+                                       : "((CLE_CLE_[LM]_SITE_0|INT_INT_SINGLE|(NN|SS)(1|2|4|5|12|16)|(EE|WW)(1|2|4|12)(_[EW])?|QLND(NW|S[EW])|SDND[NS]W)_)[^\\(]+",
+                        "$1 "))
                 .distinct()
                 .sorted()
                 .forEachOrdered(s -> System.out.println("\t" + s));
