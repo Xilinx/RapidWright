@@ -588,19 +588,35 @@ public class RouteNodeGraph {
 
         if (isVersal) {
             if (childTile.getTileYCoordinate() == sinkTile.getTileYCoordinate()) {
+                // Same row as our sink tile
+
                 boolean childInInt = childTile.getTileTypeEnum() == TileTypeEnum.INT;
                 boolean sinkInInt = sinkTile.getTileTypeEnum() == TileTypeEnum.INT;
-                if (!childInInt && sinkInInt) {
-                    // Allow CLE CNODE/BNODEs that reach into the sink INT tile
+
+                if (!sinkInInt) {
+                    // Sink is a NODE_{CTRL,INTF}_CTRL
+
+                    if (!childInInt) {
+                        // Same row, but not the same exact CLE_BC_CORE tile, as our sink
+                        assert(childTile != sinkTile);
+                        return false;
+                    }
+
+                    // Allow use of LOCALs inside the two INT tiles that border this non-INT sink tile
+                    assert(childInInt);
+                    return Math.abs(childTile.getTileXCoordinate() - sinkTile.getTileXCoordinate()) <= 1;
+                }
+
+                if (!childInInt) {
+                    // Allow CNODE/BNODEs that reach into the sink INT tile
                     assert(EnumSet.of(IntentCode.NODE_CLE_BNODE, IntentCode.NODE_CLE_CNODE, IntentCode.NODE_INTF_BNODE, IntentCode.NODE_INTF_CNODE)
                             .contains(childRnode.getIntentCode()));
                     return childRnode.getEndTileXCoordinate() == sinkTile.getTileXCoordinate();
                 }
 
-                if (childInInt && !sinkInInt) {
-                    // Allow use of LOCALs inside the INT tile that (by way of being at most one X coordinate away) services the CLE_BC_CORE
-                    return Math.abs(childRnode.getEndTileXCoordinate() - sinkTile.getTileXCoordinate()) <= 1;
-                }
+                // Do not use LOCALs in any other INT tile but our sink's
+                assert(sinkInInt && childInInt);
+                assert(childTile != sinkTile);
             }
 
             return false;
