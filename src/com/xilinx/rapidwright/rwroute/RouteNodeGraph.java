@@ -578,95 +578,43 @@ public class RouteNodeGraph {
             return true;
         }
 
+        // (b) in the sink tile
         Tile childTile = childRnode.getTile();
         RouteNode sinkRnode = connection.getSinkRnode();
         Tile sinkTile = sinkRnode.getTile();
+        if (childTile == sinkTile) {
+            return true;
+        }
+
         if (isVersal) {
             IntentCode childIntentCode = childRnode.getIntentCode();
             switch (childIntentCode) {
                 case NODE_INODE:
                     // Block access to all INODEs outside the sink tile, since NODE_INODE -> NODE_IMUX -> NODE_PINFEED (or NODE_INODE _> NODE_PINBOUNCE)
-                    if (childRnode.getTile() != sinkTile) {
-                        return false;
-                    }
-                    assert(sinkRnode.getIntentCode() == IntentCode.NODE_IMUX || sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
-                    break;
+                    return false;
                 case NODE_CLE_CNODE:
                     // Block access to all CNODEs outside the sink tile, since NODE_CLE_CNODE -> NODE_CLE_CTRL
-                    if (childRnode.getTile() != sinkTile) {
-                        return false;
-                    }
-                    assert(sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL);
-                    break;
+                    return false;
                 case NODE_INTF_CNODE:
                     // Block access to all CNODEs outside the sink tile, since NODE_INTF_CNODE -> NODE_INTF_CTRL
-                    if (childRnode.getTile() != sinkTile) {
-                        return false;
-                    }
-                    assert(sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL);
-                    break;
+                    return false;
                 case NODE_PINBOUNCE:
                     // BOUNCEs are only accessible through INODEs, so transitively this node must be in the sink tile too
-                    assert(childRnode.getTile() == sinkTile);
-                    assert(sinkRnode.getIntentCode() == IntentCode.NODE_IMUX || sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
-                    break;
+                    return false;
                 case NODE_CLE_BNODE:
                 case NODE_INTF_BNODE:
                     IntentCode sinkIntentCode = sinkRnode.getIntentCode();
                     // For CTRL sinks, only allow BNODEs in the sink tile
                     if (sinkIntentCode == IntentCode.NODE_CLE_CTRL || sinkIntentCode == IntentCode.NODE_INTF_CTRL) {
-                        return childTile == sinkTile;
+                        return false;
                     }
                     // For other sinks, only allow if BNODE reaches into the sink tile
                     assert(sinkIntentCode == IntentCode.NODE_IMUX || sinkIntentCode == IntentCode.NODE_PINBOUNCE);
                     return childTile.getTileYCoordinate() == sinkTile.getTileYCoordinate() &&
                            childRnode.getEndTileXCoordinate() == sinkTile.getTileXCoordinate();
-                default:
-                    throw new RuntimeException("ERROR: Unhandled IntentCode: " + childIntentCode);
             }
-            return true;
+            throw new RuntimeException("ERROR: Unhandled IntentCode: " + childIntentCode);
         }
-
-        // (b) in the sink tile
-        if (childTile == sinkTile) {
-            return true;
-        }
-
-        // if (isVersal) {
-        //     if (childTile.getTileYCoordinate() == sinkTile.getTileYCoordinate()) {
-        //         // Same row as our sink tile
-        //
-        //         boolean childInInt = childTile.getTileTypeEnum() == TileTypeEnum.INT;
-        //         boolean sinkInInt = sinkTile.getTileTypeEnum() == TileTypeEnum.INT;
-        //
-        //         if (!sinkInInt) {
-        //             // Sink is a NODE_{CTRL,INTF}_CTRL
-        //
-        //             if (!childInInt) {
-        //                 // Same row, but not the same exact CLE_BC_CORE tile, as our sink
-        //                 assert(childTile != sinkTile);
-        //                 return false;
-        //             }
-        //
-        //             // Allow use of LOCALs inside the two INT tiles that border this non-INT sink tile
-        //             assert(childInInt);
-        //             return Math.abs(childTile.getTileXCoordinate() - sinkTile.getTileXCoordinate()) <= 1;
-        //         }
-        //
-        //         if (!childInInt) {
-        //             // Allow CNODE/BNODEs that reach into the sink INT tile
-        //             assert(EnumSet.of(IntentCode.NODE_CLE_BNODE, IntentCode.NODE_CLE_CNODE, IntentCode.NODE_INTF_BNODE, IntentCode.NODE_INTF_CNODE)
-        //                     .contains(childRnode.getIntentCode()));
-        //             return childRnode.getEndTileXCoordinate() == sinkTile.getTileXCoordinate();
-        //         }
-        //
-        //         // Do not use LOCALs in any other INT tile but our sink's
-        //         assert(sinkInInt && childInInt);
-        //         assert(childTile != sinkTile);
-        //     }
-        //
-        //     return false;
-        // }
 
         // (c) connection crosses SLR and this is a Laguna column
         int childX = childTile.getTileXCoordinate();
