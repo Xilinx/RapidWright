@@ -224,6 +224,8 @@ public class TestNode {
             "xcvp1002,CLE_W_CORE_X38Y220,NODE_PINFEED,true",
             "xcvp1002,CLE_E_CORE_X38Y220,NODE_CLE_OUTPUT,false",
             "xcvp1002,CLE_W_CORE_X38Y220,NODE_CLE_OUTPUT,false",
+            "xcvp1002,INTF_ROCF_TR_TILE_X39Y153,NODE_INTF_CNODE,true",
+            "xcvp1002,INTF_ROCF_TR_TILE_X39Y153,NODE_INTF_BNODE,true",
     })
     public void testNodeReachabilityVersal(String partName, String tileName, String intentCodeName, boolean local) {
         Device device = Device.getDevice(partName);
@@ -289,7 +291,16 @@ public class TestNode {
                     }
                 }
                 // All INT-to-INT connections should be to the same tile
-                else if (baseTileTypeEnum == TileTypeEnum.CLE_BC_CORE) {
+                else if (EnumSet.of(TileTypeEnum.CLE_BC_CORE,
+                        TileTypeEnum.INTF_LOCF_TL_TILE,
+                        TileTypeEnum.INTF_LOCF_TR_TILE,
+                        TileTypeEnum.INTF_LOCF_BL_TILE,
+                        TileTypeEnum.INTF_LOCF_BR_TILE,
+                        TileTypeEnum.INTF_ROCF_TL_TILE,
+                        TileTypeEnum.INTF_ROCF_TR_TILE,
+                        TileTypeEnum.INTF_ROCF_BL_TILE,
+                        TileTypeEnum.INTF_ROCF_BR_TILE)
+                            .contains(baseTileTypeEnum)) {
                     // Except CLE_BC_CORE tiles which spans two adjacent INT tiles
                     if (baseTile != downhill.getTile()) {
                         Assertions.assertTrue(1 >= Math.abs(baseTile.getTileXCoordinate() - downhill.getTile().getTileXCoordinate()));
