@@ -590,7 +590,7 @@ public class RouteNodeGraph {
             IntentCode childIntentCode = childRnode.getIntentCode();
             switch (childIntentCode) {
                 case NODE_INODE:
-                    // Block access to all INODEs outside the sink tile, since NODE_INODE -> NODE_IMUX -> NODE_PINFEED (or NODE_INODE _> NODE_PINBOUNCE)
+                    // Block access to all INODEs outside the sink tile, since NODE_INODE -> NODE_IMUX -> NODE_PINFEED (or NODE_INODE -> NODE_PINBOUNCE)
                     return false;
                 case NODE_CLE_CNODE:
                     // Block access to all CNODEs outside the sink tile, since NODE_CLE_CNODE -> NODE_CLE_CTRL
@@ -604,7 +604,7 @@ public class RouteNodeGraph {
                 case NODE_CLE_BNODE:
                 case NODE_INTF_BNODE:
                     IntentCode sinkIntentCode = sinkRnode.getIntentCode();
-                    // For CTRL sinks, only allow BNODEs in the sink tile
+                    // For CTRL sinks, block all BNODEs outside the sink tile
                     if (sinkIntentCode == IntentCode.NODE_CLE_CTRL || sinkIntentCode == IntentCode.NODE_INTF_CTRL) {
                         return false;
                     }
@@ -612,6 +612,17 @@ public class RouteNodeGraph {
                     assert(sinkIntentCode == IntentCode.NODE_IMUX || sinkIntentCode == IntentCode.NODE_PINBOUNCE);
                     return childTile.getTileYCoordinate() == sinkTile.getTileYCoordinate() &&
                            childRnode.getEndTileXCoordinate() == sinkTile.getTileXCoordinate();
+                case NODE_IMUX:
+                    // IMUXes that are not EXCLUSIVE_SINKs will have been isExcluded() from the graph unless LUT routethrus are enabled
+                    assert(lutRoutethru);
+                    return true;
+                case NODE_PINFEED:
+                    // Expected to be projected away
+                    break;
+                case NODE_CLE_CTRL:
+                case NODE_INTF_CTRL:
+                    // CTRL pins that are not EXCLUSIVE_SINKs will have been isExcluded() from the graph
+                    break;
             }
             throw new RuntimeException("ERROR: Unhandled IntentCode: " + childIntentCode);
         }
