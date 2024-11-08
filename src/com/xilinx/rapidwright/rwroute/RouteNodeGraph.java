@@ -208,13 +208,15 @@ public class RouteNodeGraph {
                         }
                     } else if (m.group(5) != null) {
                         int i = Integer.valueOf(m.group(5));
-                        if (i < 32) {
+                        if (i < 32 || (isUltraScale && (i >= 64 && i < 96))) {
                             eastWires.set(baseNode.getWireIndex());
                         } else {
-                            assert(i < 64);
+                            assert(i < 64 || (isUltraScale && (i >= 96 && i < 128)));
                             westWires.set(baseNode.getWireIndex());
                         }
                     }
+                } else {
+                    assert(baseWireName.matches("CTRL_[EW](_B)?\\d+|INT_NODE_GLOBAL_\\d+_INT_OUT[01]?"));
                 }
             }
         } else {
