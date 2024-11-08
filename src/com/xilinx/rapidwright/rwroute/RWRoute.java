@@ -620,6 +620,8 @@ public class RWRoute {
                 int numberOfSwappablePins = (lutPinSwapping && sink.isLUTInputPin())
                         ? LUTTools.MAX_LUT_SIZE : 0;
                 if (numberOfSwappablePins > 0) {
+                    assert(sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_EAST || sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_WEST);
+
                     for (Cell cell : DesignTools.getConnectedCells(sink)) {
                         BEL bel = cell.getBEL();
                         assert(bel.isLUT());
@@ -661,13 +663,7 @@ public class RWRoute {
                     if (routingGraph.isPreserved(node)) {
                         continue;
                     }
-                    RouteNode altSinkRnode;
-                    if (eastWestWires[0].get(sinkINTNode.getWireIndex())) {
-                        altSinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_EAST);
-                    } else {
-                        assert(eastWestWires[1].get(sinkINTNode.getWireIndex()));
-                        altSinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_WEST);
-                    }
+                    RouteNode altSinkRnode = routingGraph.getOrCreate(node, sinkRnode.getType());
                     assert(altSinkRnode.getType().isExclusiveSink());
                     connection.addAltSinkRnode(altSinkRnode);
                 }
