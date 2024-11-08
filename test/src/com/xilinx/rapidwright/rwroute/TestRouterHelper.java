@@ -59,6 +59,7 @@ public class TestRouterHelper {
             "xcvu3p,SLICE_X0Y0,A_O,CLEL_R_X0Y0/CLE_CLE_L_SITE_0_A_O",
             "xcvu3p,GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,null",
             "xcvu3p,IOB_X1Y95,I,INT_INTF_L_IO_X72Y109/LOGIC_OUTS_R23",
+            "xcvu3p,IOB_X1Y80,I,INT_INTF_L_IO_X72Y92/LOGIC_OUTS_R22",
             "xcvu3p,MMCM_X0Y0,LOCKED,INT_INTF_L_IO_X36Y54/LOGIC_OUTS_R0",
             "xcvp1002,MMCM_X2Y0,LOCKED,BLI_CLE_BOT_CORE_X27Y0/LOGIC_OUTS_D23"
     })
