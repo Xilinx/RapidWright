@@ -124,8 +124,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         (length <= 3 && series == Series.Versal));
                 break;
             case EXCLUSIVE_SINK:
-                assert(length == 0);
-                break;
             case EXCLUSIVE_SINK_EAST:
             case EXCLUSIVE_SINK_WEST:
                 assert(length == 0 ||

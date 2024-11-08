@@ -482,7 +482,7 @@ public class RouteNodeGraph {
             if (childRnode != null) {
                 assert(childRnode.getType().isExclusiveSink() ||
                        childRnode.getType() == RouteNodeType.LAGUNA_PINFEED ||
-                       (lutRoutethru && childRnode.getType() == RouteNodeType.LOCAL));
+                       (lutRoutethru && childRnode.getType().isLocal()));
             } else if (!lutRoutethru) {
                 // child does not already exist in our routing graph, meaning it's not a used site pin
                 // in our design, but it could be a LAGUNA_I
