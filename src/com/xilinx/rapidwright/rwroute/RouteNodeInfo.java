@@ -157,7 +157,7 @@ public class RouteNodeInfo {
                 }
                 // Fall through
             case NODE_PINBOUNCE:
-                if (routingGraph != null) {
+                if (routingGraph != null && routingGraph.eastWestWires != null) {
                     BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
                     if (eastWestWires[0].get(node.getWireIndex())) {
                         return RouteNodeType.LOCAL_EAST;

@@ -104,6 +104,7 @@ public class RouteNodeGraph {
     protected final Map<TileTypeEnum, BitSet> ultraScalesNonLocalWires;
 
     protected final Map<TileTypeEnum, BitSet[]> eastWestWires;
+    protected static final BitSet EMPTY_BITSET = new BitSet(0);
 
     public RouteNodeGraph(Design design, RWRouteConfig config) {
         this(design, config, new HashMap<>());
@@ -143,23 +144,23 @@ public class RouteNodeGraph {
         // tile (with minimum X, maximum Y). Analyze the tile just below that.
         intTile = intTile.getTileXYNeighbor(0, -1);
 
-        eastWestWires = new EnumMap<>(TileTypeEnum.class);
+        BitSet wires = new BitSet();
         BitSet eastWires = new BitSet();
         BitSet westWires = new BitSet();
-        eastWestWires.put(intTile.getTileTypeEnum(), new BitSet[]{eastWires, westWires});
-
-        BitSet wires = new BitSet();
         if (isUltraScale || isUltraScalePlus) {
             ultraScalesNonLocalWires = new EnumMap<>(TileTypeEnum.class);
             ultraScalesNonLocalWires.put(intTile.getTileTypeEnum(), wires);
             eastWestPattern = Pattern.compile("(((BOUNCE|BYPASS|IMUX|INODE)_([EW]))|INT_NODE_IMUX_(\\d+)_).*");
+
+            eastWestWires = new EnumMap<>(TileTypeEnum.class);
+            eastWestWires.put(intTile.getTileTypeEnum(), new BitSet[]{eastWires, westWires});
         } else {
             assert(series == Series.Versal);
             ultraScalesNonLocalWires = null;
 
             // FIXME:
             eastWestPattern = null;
-            eastWestWires.put(TileTypeEnum.CLE_BC_CORE, new BitSet[]{eastWires, westWires});
+            eastWestWires = null;
         }
 
         for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {

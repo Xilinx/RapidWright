@@ -601,12 +601,13 @@ public class RWRoute {
                 }
 
                 indirectConnections.add(connection);
-                BitSet[] eastWestWires = routingGraph.eastWestWires.get(sinkINTNode.getTile().getTileTypeEnum());
+                BitSet[] eastWestWires = (routingGraph.eastWestWires == null) ? null :
+                        routingGraph.eastWestWires.get(sinkINTNode.getTile().getTileTypeEnum());
                 RouteNode sinkRnode;
-                if (eastWestWires[0].get(sinkINTNode.getWireIndex())) {
+                if (eastWestWires != null && eastWestWires[0].get(sinkINTNode.getWireIndex())) {
                     sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_EAST);
                     sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK_EAST);
-                } else if (eastWestWires[1].get(sinkINTNode.getWireIndex())) {
+                } else if (eastWestWires != null && eastWestWires[1].get(sinkINTNode.getWireIndex())) {
                     sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_WEST);
                     sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK_WEST);
                 } else {
