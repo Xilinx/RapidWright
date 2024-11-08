@@ -629,17 +629,35 @@ public class RouteNodeGraph {
 
         // (c) on the same side as the sink
         RouteNodeType type = childRnode.getType();
-        RouteNodeType sinkType = sinkRnode.getType();
-        assert(sinkType.isExclusiveSink());
-        if ((type == RouteNodeType.LOCAL_EAST && sinkType != RouteNodeType.EXCLUSIVE_SINK_EAST) ||
-            (type == RouteNodeType.LOCAL_WEST && sinkType != RouteNodeType.EXCLUSIVE_SINK_WEST) ||
-            // Sinks without a side (e.g. CTRL) must only be approached from LOCAL nodes also without a side
-            (sinkType == RouteNodeType.EXCLUSIVE_SINK && type != RouteNodeType.LOCAL)) {
-            return false;
+        Tile sinkTile = sinkRnode.getTile();
+        switch (sinkRnode.getType()) {
+            case EXCLUSIVE_SINK_EAST:
+                if (type == RouteNodeType.LOCAL_WEST) {
+                    // West wires can never reach an east sink
+                    return false;
+                }
+                break;
+            case EXCLUSIVE_SINK_WEST:
+                if (type == RouteNodeType.LOCAL_EAST) {
+                    // East wires can never reach a west sink
+                    return false;
+                }
+                break;
+            case EXCLUSIVE_SINK:
+                // Only both-sided wires (e.g. INT_NODE_GLOBAL_*) can reach a both-sided sink (CTRL_*)
+                if (type != RouteNodeType.LOCAL) {
+                    return false;
+                }
+                if (design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus) {
+                    // This must be a CTRL sink; these can only be accessed from the sink tile rather than Y +/- 1 below
+                    return childTile == sinkTile;
+                }
+                break;
+            default:
+                throw new RuntimeException("ERROR: Unexpected sink type " + sinkRnode.getType());
         }
 
         // (d) in the sink tile
-        Tile sinkTile = sinkRnode.getTile();
         if (childTile == sinkTile) {
             return true;
         }
