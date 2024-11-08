@@ -2160,7 +2160,9 @@ public class RWRoute {
             printFormattedString("Num iterations:", routeIteration);
             printFormattedString("Connections routed:", connectionsRouted.get());
             printFormattedString("Nodes pushed:", nodesPushed.get());
-            printFormattedString("Nodes popped:", nodesPopped.get());
+        }
+        printFormattedString("Nodes popped:", nodesPopped.get());
+        if (config.isVerbose()) {
             System.out.printf("------------------------------------------------------------------------------\n");
         }
 
