@@ -633,7 +633,7 @@ public class RouteNodeGraph {
         assert(sinkType.isExclusiveSink());
         if ((type == RouteNodeType.LOCAL_EAST && sinkType != RouteNodeType.EXCLUSIVE_SINK_EAST) ||
             (type == RouteNodeType.LOCAL_WEST && sinkType != RouteNodeType.EXCLUSIVE_SINK_WEST) ||
-            // Sinks without a side (e.g. CTRL) can only be approached from LOCAL nodes also without a side
+            // Sinks without a side (e.g. CTRL) must only be approached from LOCAL nodes also without a side
             (sinkType == RouteNodeType.EXCLUSIVE_SINK && type != RouteNodeType.LOCAL)) {
             return false;
         }

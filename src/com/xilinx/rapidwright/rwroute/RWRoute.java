@@ -1820,7 +1820,7 @@ public class RWRoute {
                         break;
                     case NON_LOCAL:
                         // LOCALs cannot connect to NON_LOCALs except via a LUT routethru
-                        assert(rnode.getType() != RouteNodeType.LOCAL ||
+                        assert(!rnode.getType().isLocal() ||
                                routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED ||
                                // FIXME:
                                design.getSeries() == Series.Versal);
@@ -1837,6 +1837,9 @@ public class RWRoute {
                     case EXCLUSIVE_SINK:
                     case EXCLUSIVE_SINK_EAST:
                     case EXCLUSIVE_SINK_WEST:
+                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_EAST || rnode.getType() == RouteNodeType.LOCAL_EAST);
+                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_WEST || rnode.getType() == RouteNodeType.LOCAL_WEST);
+                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK || rnode.getType() == RouteNodeType.LOCAL);
                         if (!isAccessibleSink(childRNode, connection)) {
                             continue;
                         }
