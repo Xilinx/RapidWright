@@ -612,9 +612,18 @@ public class RouteNodeGraph {
             return true;
         }
 
-        // (b) on the same side as the sink
-        RouteNodeType type = childRnode.getType();
+        // (b) needs to cross an SLR and this is a Laguna column
+        Tile childTile = childRnode.getTile();
         RouteNode sinkRnode = connection.getSinkRnode();
+        int childX = childTile.getTileXCoordinate();
+        if (connection.isCrossSLR() &&
+                childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this) &&
+                nextLagunaColumn[childX] == childX) {
+            return true;
+        }
+
+        // (c) on the same side as the sink
+        RouteNodeType type = childRnode.getType();
         RouteNodeType sinkType = sinkRnode.getType();
         assert(sinkType.isExclusiveSink());
         if ((type == RouteNodeType.LOCAL_EAST && sinkType != RouteNodeType.EXCLUSIVE_SINK_EAST) ||
@@ -624,20 +633,13 @@ public class RouteNodeGraph {
             return false;
         }
 
-        // (c) in the sink tile
-        Tile childTile = childRnode.getTile();
+        // (d) in the sink tile
         Tile sinkTile = sinkRnode.getTile();
         if (childTile == sinkTile) {
             return true;
         }
 
-        // (d) connection crosses SLR and this is a Laguna column
-        int childX = childTile.getTileXCoordinate();
-        if (connection.isCrossSLR() && nextLagunaColumn[childX] == childX) {
-            return true;
-        }
-
-        // (e) when in X as the sink tile, but Y +/- 1
+        // (e) when in same X as the sink tile, but Y +/- 1
         return childX == sinkTile.getTileXCoordinate() &&
                Math.abs(childTile.getTileYCoordinate() - sinkTile.getTileYCoordinate()) <= 1;
     }
