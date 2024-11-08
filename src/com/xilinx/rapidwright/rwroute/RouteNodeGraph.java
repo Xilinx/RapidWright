@@ -94,17 +94,21 @@ public class RouteNodeGraph {
      */
     protected final Map<Tile, BitSet> lagunaI;
 
-    /** Map indicating the wire indices corresponding to the [A-H]MUX output */
-    protected final Map<TileTypeEnum, BitSet> muxWires;
+    /** Map indicating (for UltraScale/UltraScale+ only) the wire indices corresponding to the [A-H]MUX output
+     * to be blocked during LUT routethrus
+     */
+    protected final Map<TileTypeEnum, BitSet> ultraScalesMuxWiresToBlockWhenLutRoutethru;
 
     /** Flag for whether LUT routethrus are to be considered */
     protected final boolean lutRoutethru;
 
-    /** Map indicating the wire indices that have a local intent code, but is what RWRoute considers to be non-local */
+    /** Map indicating (for UltraScale/UltraScale+ only) the wire indices that have a local intent code,
+     *  but is what RWRoute will consider to be non-local, e.g. INT_NODE_SDQ_*
+     */
     protected final Map<TileTypeEnum, BitSet> ultraScalesNonLocalWires;
 
+    /** Map indicating the wire indices corresponding to the east/west side of interconnect tiles */
     protected final Map<TileTypeEnum, BitSet[]> eastWestWires;
-    protected static final BitSet EMPTY_BITSET = new BitSet(0);
 
     public RouteNodeGraph(Design design, RWRouteConfig config) {
         this(design, config, new HashMap<>());
@@ -240,7 +244,7 @@ public class RouteNodeGraph {
         if (lutRoutethru) {
             assert(isUltraScalePlus || isUltraScale);
 
-            muxWires = new EnumMap<>(TileTypeEnum.class);
+            ultraScalesMuxWiresToBlockWhenLutRoutethru = new EnumMap<>(TileTypeEnum.class);
             for (TileTypeEnum tileTypeEnum : Utils.getCLBTileTypes()) {
                 Tile clbTile = device.getArbitraryTileOfType(tileTypeEnum);
                 if (clbTile == null) {
@@ -258,10 +262,10 @@ public class RouteNodeGraph {
                 if (wires.isEmpty()) {
                     continue;
                 }
-                muxWires.put(tileTypeEnum, wires);
+                ultraScalesMuxWiresToBlockWhenLutRoutethru.put(tileTypeEnum, wires);
             }
         } else {
-            muxWires = null;
+            ultraScalesMuxWiresToBlockWhenLutRoutethru = null;
         }
 
         Tile[][] lagunaTiles;
@@ -655,7 +659,7 @@ public class RouteNodeGraph {
         }
         assert(PIP.getArbitraryPIP(head, tail).isRouteThru());
 
-        BitSet bs = muxWires.get(tail.getTile().getTileTypeEnum());
+        BitSet bs = ultraScalesMuxWiresToBlockWhenLutRoutethru.get(tail.getTile().getTileTypeEnum());
         if (bs != null && bs.get(tail.getWireIndex())) {
             // Disallow * -> [A-H]MUX routethrus since Vivado does not support the LUT
             // being fractured to support more than one routethru net
