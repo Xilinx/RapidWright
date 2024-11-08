@@ -159,9 +159,9 @@ public class TestNode {
                 .map(n -> n.getWireName() + " (" + n.getIntentCode() + ")")
                 .map(s -> s.replaceFirst("^((BOUNCE|BYPASS|CTRL|INODE(_[12])?|IMUX|SDQNODE)_([EW]_?)?)[^ ]+", "$1"))
                 .map(s -> s.replaceFirst("(INT_NODE_(GLOBAL|SDQ|SINGLE_DOUBLE|QUAD_LONG)_)[^ ]+", "$1"))
-                .map(s -> ultraScalePlus ? s.replaceFirst("(INT_NODE_IMUX_)([0-9]|1[0-9]|2[0-9]|3[01])_INT_OUT[01]?", "$1<0-31>")
+                .map(s -> ultraScalePlus ? s.replaceFirst("(INT_NODE_IMUX_)([0-9]|1[0-9]|2[0-9]|3[01])_INT_OUT[01]", "$1<0-31>")
                         : s.replaceFirst("(INT_NODE_IMUX_)([0-9]|1[0-9]|2[0-9]|3[01]|6[4-9]|7[0-9]|8[0-9]|9[0-5])_INT_OUT", "$1<0-31,64-95>"))
-                .map(s -> ultraScalePlus ? s.replaceFirst("(INT_NODE_IMUX_)(3[2-9]|4[0-9]|5[0-9]|6[0-3])_INT_OUT[01]?", "$1<32-63>")
+                .map(s -> ultraScalePlus ? s.replaceFirst("(INT_NODE_IMUX_)(3[2-9]|4[0-9]|5[0-9]|6[0-3])_INT_OUT[01]", "$1<32-63>")
                         : s.replaceFirst("(INT_NODE_IMUX_)(3[2-9]|4[0-9]|5[0-9]|6[0-3]|9[6-9]|10[0-9]|11[0-9]|12[0-7])_INT_OUT", "$1<32-63,96-127>"))
                 .map(s -> s.replaceFirst(
                                        // UltraScale+
@@ -179,16 +179,16 @@ public class TestNode {
                 .map(n -> n.getWireName() + " (" + n.getIntentCode() + ")")
                 .map(s -> s.replaceFirst("^((BOUNCE|BYPASS|CTRL|INODE(_[12])?|IMUX|SDQNODE)_([EW]_?)?)[^ ]+", "$1"))
                 .map(s -> s.replaceFirst("(INT_NODE_(GLOBAL|SDQ|SINGLE_DOUBLE|QUAD_LONG)_)[^ ]+", "$1"))
-                .map(s -> ultraScalePlus ? s.replaceFirst("(INT_NODE_IMUX_)([0-9]|1[0-9]|2[0-9]|3[01])_INT_OUT[01]?", "$1<0-31>")
+                .map(s -> ultraScalePlus ? s.replaceFirst("(INT_NODE_IMUX_)([0-9]|1[0-9]|2[0-9]|3[01])_INT_OUT[01]", "$1<0-31>")
                         : s.replaceFirst("(INT_NODE_IMUX_)([0-9]|1[0-9]|2[0-9]|3[01]|6[4-9]|7[0-9]|8[0-9]|9[0-5])_INT_OUT", "$1<0-31,64-95>"))
-                .map(s -> ultraScalePlus ? s.replaceFirst("(INT_NODE_IMUX_)(3[2-9]|4[0-9]|5[0-9]|6[0-3])_INT_OUT[01]?", "$1<32-63>")
+                .map(s -> ultraScalePlus ? s.replaceFirst("(INT_NODE_IMUX_)(3[2-9]|4[0-9]|5[0-9]|6[0-3])_INT_OUT[01]", "$1<32-63>")
                         : s.replaceFirst("(INT_NODE_IMUX_)(3[2-9]|4[0-9]|5[0-9]|6[0-3]|9[6-9]|10[0-9]|11[0-9]|12[0-7])_INT_OUT", "$1<32-63,96-127>"))
                 .map(s -> s.replaceFirst(
                                        // UltraScale+
                         ultraScalePlus ? "((CLE_CLE_[LM]_SITE_0|INT_INT_SDQ|(NN|EE|SS|WW)(1|2|4|12)(_[EW])?)_)[^\\(]+"
                                        // UltraScale
-                                       : "((CLE_CLE_[LM]_SITE_0|INT_INT_SINGLE|(NN|SS)(1|2|4|5|12|16)|(EE|WW)(1|2|4|12)(_[EW])?|QLND(NW|S[EW])|SDND[NS]W)_)[^\\(]+",
-                        "$1 "))
+                                       : "((CLE_CLE_[LM]_SITE_0|INT_INT_SINGLE|(NN|SS)(1|2|4|5|12|16)|(EE|WW)(1|2|4|12)(_[EW])?|QLND(NW|S[EW])|SDND[NS]W)_)[^ ]+",
+                        "$1"))
                 .distinct()
                 .sorted()
                 .forEachOrdered(s -> System.out.println("\t" + s));
@@ -228,30 +228,36 @@ public class TestNode {
 
     @ParameterizedTest
     @CsvSource({
-            "xcvp1002,INT_X38Y220,NODE_PINBOUNCE,true",
-            "xcvp1002,INT_X38Y220,NODE_INODE,true",
-            "xcvp1002,INT_X38Y220,NODE_IMUX,true",
-            "xcvp1002,INT_X38Y220,NODE_SDQNODE,false",
-            "xcvp1002,INT_X38Y220,NODE_HSINGLE,false",
-            "xcvp1002,INT_X38Y220,NODE_VSINGLE,false",
-            "xcvp1002,INT_X38Y220,NODE_HDOUBLE,false",
-            "xcvp1002,INT_X38Y220,NODE_VDOUBLE,false",
-            "xcvp1002,INT_X38Y220,NODE_HQUAD,false",
-            "xcvp1002,INT_X38Y220,NODE_VQUAD,false",
-            "xcvp1002,INT_X38Y220,NODE_HLONG6,false",
-            "xcvp1002,INT_X38Y220,NODE_HLONG10,false",
-            "xcvp1002,INT_X38Y220,NODE_VLONG7,false",
-            "xcvp1002,INT_X38Y220,NODE_VLONG12,false",
-            "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_BNODE,true",
-            "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_CNODE,true",
-            "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_CTRL,true",
-            "xcvp1002,CLE_W_CORE_X38Y220,NODE_PINFEED,true",
-            "xcvp1002,CLE_E_CORE_X38Y220,NODE_CLE_OUTPUT,false",
-            "xcvp1002,CLE_W_CORE_X38Y220,NODE_CLE_OUTPUT,false",
-            "xcvp1002,INTF_ROCF_TR_TILE_X39Y153,NODE_INTF_CNODE,true",
-            "xcvp1002,INTF_ROCF_TR_TILE_X39Y153,NODE_INTF_BNODE,true",
+            "xcvp1002,INT_X38Y220,NODE_PINBOUNCE,BOUNCE_E.*,true",
+            "xcvp1002,INT_X38Y220,NODE_PINBOUNCE,BOUNCE_W.*,true",
+            "xcvp1002,INT_X38Y220,NODE_INODE,INT_NODE_IMUX_ATOM_([0-9]|1[0-9]|2[0-9]|3[01]|6[4-9]|7[0-9]|8[0-9]|9[0-5])_.*,true",
+            "xcvp1002,INT_X38Y220,NODE_INODE,INT_NODE_IMUX_ATOM_(3[2-9]|4[0-9]|5[0-9]|6[0-3]|9[6-9]|10[0-9]|11[0-9]|12[0-7])_.*,true",
+            "xcvp1002,INT_X38Y220,NODE_IMUX,IMUX_B_E.*,true",
+            "xcvp1002,INT_X38Y220,NODE_IMUX,IMUX_B_W.*,true",
+            "xcvp1002,INT_X38Y220,NODE_SDQNODE,,false",
+            "xcvp1002,INT_X38Y220,NODE_HSINGLE,,false",
+            "xcvp1002,INT_X38Y220,NODE_VSINGLE,,false",
+            "xcvp1002,INT_X38Y220,NODE_HDOUBLE,,false",
+            "xcvp1002,INT_X38Y220,NODE_VDOUBLE,,false",
+            "xcvp1002,INT_X38Y220,NODE_HQUAD,,false",
+            "xcvp1002,INT_X38Y220,NODE_VQUAD,,false",
+            "xcvp1002,INT_X38Y220,NODE_HLONG6,,false",
+            "xcvp1002,INT_X38Y220,NODE_HLONG10,,false",
+            "xcvp1002,INT_X38Y220,NODE_VLONG7,,false",
+            "xcvp1002,INT_X38Y220,NODE_VLONG12,,false",
+            "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_BNODE,BNODE_OUTS_E.*,true",
+            "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_BNODE,BNODE_OUTS_W.*,true",
+            "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_CNODE,CNODE_OUTS_E.*,true",
+            "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_CNODE,CNODE_OUTS_W.*,true",
+            "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_CTRL,CTRL_L_B.*,true",
+            "xcvp1002,CLE_BC_CORE_X37Y220,NODE_CLE_CTRL,CTRL_R_B.*,true",
+            "xcvp1002,CLE_W_CORE_X38Y220,NODE_PINFEED,,true",
+            "xcvp1002,CLE_E_CORE_X38Y220,NODE_CLE_OUTPUT,,false",
+            "xcvp1002,CLE_W_CORE_X38Y220,NODE_CLE_OUTPUT,,false",
+            "xcvp1002,INTF_ROCF_TR_TILE_X39Y153,NODE_INTF_CNODE,,true",
+            "xcvp1002,INTF_ROCF_TR_TILE_X39Y153,NODE_INTF_BNODE,,true",
     })
-    public void testNodeReachabilityVersal(String partName, String tileName, String intentCodeName, boolean local) {
+    public void testNodeReachabilityVersal(String partName, String tileName, String intentCodeName, String wireNameRegex, boolean local) {
         Device device = Device.getDevice(partName);
         Tile baseTile = device.getTile(tileName);
         IntentCode baseIntentCode = IntentCode.valueOf(intentCodeName);
@@ -260,21 +266,48 @@ public class TestNode {
             if (baseTile.getWireIntentCode(wireIdx) != baseIntentCode) {
                 continue;
             }
-            queue.add(Node.getNode(baseTile, wireIdx));
+
+            Node node = Node.getNode(baseTile, wireIdx);
+            if (wireNameRegex != null && !node.getWireName().matches(wireNameRegex)) {
+                continue;
+            }
+            queue.add(node);
         }
         System.out.println("Initial queue.size() = " + queue.size());
         System.out.println("Initial queue = " + queue);
 
-        // Print out the intent code of nodes that are immediately uphill of this intent code
+        // Print out the prefixes of nodes that are immediately uphill of these wire prefixes
+        // (i.e. "BOUNCE_E_0_FT1" -> "BOUNCE_")
         System.out.println("Immediately uphill:");
-        queue.stream().map(Node::getAllUphillNodes).flatMap(List::stream).map(Node::getIntentCode)
+        boolean ultraScalePlus = partName.endsWith("p");
+        queue.stream().map(Node::getAllUphillNodes).flatMap(List::stream)
+                .map(n -> n.getWireName() + " (" + n.getIntentCode() + ")")
+                .map(s -> s.replaceFirst("^((BOUNCE|IMUX_B)_[EW])[^ ]+", "$1"))
+                .map(s -> s.replaceFirst("^(CTRL_[LR]_)B\\d+", "$1"))
+                .map(s -> s.replaceFirst("(INT_NODE_SDQ_|INT_SDQ_RED_ATOM_)[^ ]+", "$1"))
+                .map(s -> s.replaceFirst("(INT_NODE_IMUX_ATOM_)([0-9]|1[0-9]|2[0-9]|3[01]|6[4-9]|7[0-9]|8[0-9]|9[0-5])_INT_OUT[01]", "$1<0-31,64-95>"))
+                .map(s -> s.replaceFirst("(INT_NODE_IMUX_ATOM_)(3[2-9]|4[0-9]|5[0-9]|6[0-3]|9[6-9]|10[0-9]|11[0-9]|12[0-7])_INT_OUT[01]", "$1<32-63,96-127>"))
+                .map(s -> s.replaceFirst("([BC]NODE_OUTS_[EW])\\d+", "$1"))
+                .map(s -> s.replaceFirst("((CLE_SLICE[LM]_TOP_[01]|OUT_[NESW]NODE|(NN|EE|SS|WW)(1|2|4|6|7|10|12)(_[EW])?)_)[^ ]+", "$1"))
+                .map(s -> s.replaceFirst("(CLK_LEAF_SITES_)\\d+_O", "$1"))
+                .map(s -> s.replaceFirst("(VCC_WIRE)\\d+", "$1"))
                 .distinct()
                 .sorted()
                 .forEachOrdered(s -> System.out.println("\t" + s));
 
-        // Print out the intent code of nodes that are immediately downhill of this intent code
+        // Print out the prefixes of nodes that are immediately downhill of these wire prefixes
         System.out.println("Immediately downhill:");
-        queue.stream().map(Node::getAllDownhillNodes).flatMap(List::stream).map(Node::getIntentCode)
+        queue.stream().map(Node::getAllDownhillNodes).flatMap(List::stream)
+                .map(n -> n.getWireName() + " (" + n.getIntentCode() + ")")
+                .map(s -> s.replaceFirst("^((BOUNCE|IMUX_B)_[EW])[^ ]+", "$1"))
+                .map(s -> s.replaceFirst("^(CTRL_[LR]_)B\\d+", "$1"))
+                .map(s -> s.replaceFirst("(INT_NODE_SDQ_|INT_SDQ_RED_ATOM_)[^ ]+", "$1"))
+                .map(s -> s.replaceFirst("(INT_NODE_IMUX_ATOM_)([0-9]|1[0-9]|2[0-9]|3[01]|6[4-9]|7[0-9]|8[0-9]|9[0-5])_INT_OUT[01]", "$1<0-31,64-95>"))
+                .map(s -> s.replaceFirst("(INT_NODE_IMUX_ATOM_)(3[2-9]|4[0-9]|5[0-9]|6[0-3]|9[6-9]|10[0-9]|11[0-9]|12[0-7])_INT_OUT[01]", "$1<32-63,96-127>"))
+                .map(s -> s.replaceFirst("([BC]NODE_OUTS_[EW])\\d+", "$1"))
+                .map(s -> s.replaceFirst("((CLE_SLICE[LM]_TOP_[01]|OUT_[NESW]NODE|(NN|EE|SS|WW)(1|2|4|6|7|10|12)(_[EW])?)_)[^ ]+", "$1"))
+                .map(s -> s.replaceFirst("(IF_INT_BNODE_OUTS)\\d+", "$1"))
+                .map(s -> s.replaceFirst("(INTF_IRI_QUADRANT_(GREEN|RED))_\\d+_[^ ]+", "$1"))
                 .distinct()
                 .sorted()
                 .forEachOrdered(s -> System.out.println("\t" + s));
