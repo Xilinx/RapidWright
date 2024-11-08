@@ -59,6 +59,7 @@ import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -600,8 +601,16 @@ public class RWRoute {
                 }
 
                 indirectConnections.add(connection);
-                RouteNode sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK);
-                sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK);
+                BitSet[] eastWestWires = routingGraph.eastWestWires.get(sinkINTNode.getTile().getTileTypeEnum());
+                RouteNode sinkRnode;
+                if (eastWestWires[0].get(sinkINTNode.getWireIndex())) {
+                    sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_EAST);
+                    sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK_EAST);
+                } else {
+                    assert(eastWestWires[1].get(sinkINTNode.getWireIndex()));
+                    sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_WEST);
+                    sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK_WEST);
+                }
                 connection.setSinkRnode(sinkRnode);
 
                 // Where appropriate, allow all 6 LUT pins to be swapped to begin with
@@ -650,8 +659,14 @@ public class RWRoute {
                     if (routingGraph.isPreserved(node)) {
                         continue;
                     }
-                    RouteNode altSinkRnode = routingGraph.getOrCreate(node, RouteNodeType.EXCLUSIVE_SINK);
-                    assert(altSinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK);
+                    RouteNode altSinkRnode;
+                    if (eastWestWires[0].get(sinkINTNode.getWireIndex())) {
+                        altSinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_EAST);
+                    } else {
+                        assert(eastWestWires[1].get(sinkINTNode.getWireIndex()));
+                        altSinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_WEST);
+                    }
+                    assert(altSinkRnode.getType().isExclusiveSink());
                     connection.addAltSinkRnode(altSinkRnode);
                 }
 
@@ -1798,6 +1813,8 @@ public class RWRoute {
                 }
                 switch (childRNode.getType()) {
                     case LOCAL:
+                    case LOCAL_EAST:
+                    case LOCAL_WEST:
                         if (!routingGraph.isAccessible(childRNode, connection)) {
                             continue;
                         }
@@ -1818,7 +1835,8 @@ public class RWRoute {
                             continue;
                         }
                         break;
-                    case EXCLUSIVE_SINK:
+                    case EXCLUSIVE_SINK_EAST:
+                    case EXCLUSIVE_SINK_WEST:
                         if (!isAccessibleSink(childRNode, connection)) {
                             continue;
                         }
@@ -1863,7 +1881,7 @@ public class RWRoute {
     }
 
     protected boolean isAccessibleSink(RouteNode child, Connection connection, boolean assertOnOveruse) {
-        assert(child.getType() == RouteNodeType.EXCLUSIVE_SINK);
+        assert(child.getType().isExclusiveSink());
         assert(!assertOnOveruse || !child.isOverUsed());
 
         if (child.isTarget()) {

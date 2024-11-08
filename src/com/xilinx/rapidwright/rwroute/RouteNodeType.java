@@ -28,7 +28,8 @@ import com.xilinx.rapidwright.device.Node;
 
 public enum RouteNodeType {
     EXCLUSIVE_SOURCE,
-    EXCLUSIVE_SINK,
+    EXCLUSIVE_SINK_EAST,
+    EXCLUSIVE_SINK_WEST,
 
     /**
      * Denotes {@link RouteNode} objects that correspond to a super long line {@link Node},
@@ -44,5 +45,15 @@ public enum RouteNodeType {
 
     NON_LOCAL,
 
-    LOCAL
+    LOCAL,
+    LOCAL_EAST,
+    LOCAL_WEST;
+
+    public boolean isExclusiveSink() {
+        return this == EXCLUSIVE_SINK_EAST || this == EXCLUSIVE_SINK_WEST;
+    }
+
+    public boolean isLocal() {
+        return this == LOCAL || this == LOCAL_EAST || this == LOCAL_WEST;
+    }
 }

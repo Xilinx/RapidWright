@@ -35,6 +35,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -101,6 +103,8 @@ public class RouteNodeGraph {
     /** Map indicating the wire indices that have a local intent code, but is what RWRoute considers to be non-local */
     protected final Map<TileTypeEnum, BitSet> ultraScaleNonLocalWires;
 
+    protected final Map<TileTypeEnum, BitSet[]> eastWestWires;
+
     public RouteNodeGraph(Design design, RWRouteConfig config) {
         this(design, config, new HashMap<>());
     }
@@ -133,6 +137,8 @@ public class RouteNodeGraph {
         boolean isUltraScale = series == Series.UltraScale;
         boolean isUltraScalePlus = series == Series.UltraScalePlus;
         if (isUltraScale || isUltraScalePlus) {
+            Pattern eastWestPattern = Pattern.compile("(((BOUNCE|BYPASS|IMUX|INODE|CTRL)_([EW]))|INT_NODE_IMUX_(\\d+)_).*");
+
             ultraScaleNonLocalWires = new EnumMap<>(TileTypeEnum.class);
             BitSet wires = new BitSet();
             Tile intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
@@ -140,49 +146,80 @@ public class RouteNodeGraph {
             // tile (with minimum X, maximum Y). Analyze the tile just below that.
             intTile = intTile.getTileXYNeighbor(0, -1);
             ultraScaleNonLocalWires.put(intTile.getTileTypeEnum(), wires);
+
+            eastWestWires = new EnumMap<>(TileTypeEnum.class);
+            BitSet eastWires = new BitSet();
+            BitSet westWires = new BitSet();
+            eastWestWires.put(intTile.getTileTypeEnum(), new BitSet[]{eastWires, westWires});
+
             for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
                 Node baseNode = Node.getNode(intTile, wireIndex);
                 if (baseNode == null) {
                     continue;
                 }
-                if (baseNode.getIntentCode() != IntentCode.NODE_LOCAL) {
+
+                String baseWireName = baseNode.getWireName();
+                IntentCode baseIntentCode = baseNode.getIntentCode();
+                if (baseIntentCode == IntentCode.NODE_LOCAL) {
+                    Tile baseTile = baseNode.getTile();
+                    assert(baseTile.getTileTypeEnum() == intTile.getTileTypeEnum());
+                    if (isUltraScalePlus) {
+                        if (baseWireName.startsWith("INT_NODE_SDQ_") || baseWireName.startsWith("SDQNODE_")) {
+                            if (baseTile != intTile) {
+                                if (baseWireName.endsWith("_FT0")) {
+                                    assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() - 1);
+                                } else {
+                                    assert(baseWireName.endsWith("_FT1"));
+                                    assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
+                                }
+                            }
+                            wires.set(baseNode.getWireIndex());
+                            continue;
+                        }
+                    } else {
+                        assert(isUltraScale);
+
+                        if (baseWireName.startsWith("INT_NODE_SINGLE_DOUBLE_") || baseWireName.startsWith("SDND") ||
+                                baseWireName.startsWith("INT_NODE_QUAD_LONG") || baseWireName.startsWith("QLND")) {
+                            if (baseTile != intTile) {
+                                if (baseWireName.endsWith("_FTN")) {
+                                    assert (baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() - 1);
+                                } else {
+                                    assert (baseWireName.endsWith("_FTS"));
+                                    assert (baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
+                                }
+                            }
+                        }
+                        wires.set(baseNode.getWireIndex());
+                        continue;
+                    }
+                } else if (baseIntentCode != IntentCode.NODE_PINFEED && baseIntentCode != IntentCode.NODE_PINBOUNCE) {
                     continue;
                 }
 
-                Tile baseTile = baseNode.getTile();
-                String wireName = baseNode.getWireName();
-                if (isUltraScalePlus) {
-                    if (!wireName.startsWith("INT_NODE_SDQ_") && !wireName.startsWith("SDQNODE_")) {
-                        continue;
-                    }
-                    if (baseTile != intTile) {
-                        if (wireName.endsWith("_FT0")) {
-                            assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() - 1);
+                Matcher m = eastWestPattern.matcher(baseWireName);
+                if (m.matches()) {
+                    if (m.group(4) != null) {
+                        if (m.group(4).equals("E")) {
+                            eastWires.set(baseNode.getWireIndex());
                         } else {
-                            assert(wireName.endsWith("_FT1"));
-                            assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
+                            assert(m.group(4).equals("W"));
+                            westWires.set(baseNode.getWireIndex());
                         }
-                    }
-                } else {
-                    assert(isUltraScale);
-
-                    if (!wireName.startsWith("INT_NODE_SINGLE_DOUBLE_") && !wireName.startsWith("SDND") &&
-                            !wireName.startsWith("INT_NODE_QUAD_LONG") && !wireName.startsWith("QLND")) {
-                        continue;
-                    }
-                    if (baseTile != intTile) {
-                        if (wireName.endsWith("_FTN")) {
-                            assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() - 1);
+                    } else if (m.group(5) != null) {
+                        int i = Integer.valueOf(m.group(5));
+                        if (i < 32) {
+                            eastWires.set(baseNode.getWireIndex());
                         } else {
-                            assert(wireName.endsWith("_FTS"));
-                            assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
+                            assert(i < 64);
+                            westWires.set(baseNode.getWireIndex());
                         }
                     }
                 }
-                wires.set(baseNode.getWireIndex());
             }
         } else {
             ultraScaleNonLocalWires = null;
+            eastWestWires = null;
         }
 
         if (lutRoutethru) {
@@ -429,7 +466,7 @@ public class RouteNodeGraph {
             // PINFEEDs can lead to a site pin, or into a Laguna tile
             RouteNode childRnode = getNode(child);
             if (childRnode != null) {
-                assert(childRnode.getType() == RouteNodeType.EXCLUSIVE_SINK ||
+                assert(childRnode.getType().isExclusiveSink() ||
                        childRnode.getType() == RouteNodeType.LAGUNA_PINFEED ||
                        (lutRoutethru && childRnode.getType() == RouteNodeType.LOCAL));
             } else if (!lutRoutethru) {
@@ -557,25 +594,34 @@ public class RouteNodeGraph {
     public boolean isAccessible(RouteNode childRnode, Connection connection) {
         // Only consider LOCAL nodes when:
         // (a) considering LUT routethrus
-        if (childRnode.getType() != RouteNodeType.LOCAL || lutRoutethru) {
+        if (!childRnode.getType().isLocal() || lutRoutethru) {
             return true;
         }
 
-        // (b) in the sink tile
+        // (b) on the same side as the sink
+        RouteNodeType type = childRnode.getType();
+        RouteNode sinkRnode = connection.getSinkRnode();
+        RouteNodeType sinkType = sinkRnode.getType();
+        assert(sinkType.isExclusiveSink());
+        if ((type == RouteNodeType.LOCAL_EAST && sinkType != RouteNodeType.EXCLUSIVE_SINK_EAST) ||
+            (type == RouteNodeType.LOCAL_WEST && sinkType != RouteNodeType.EXCLUSIVE_SINK_WEST)) {
+            return false;
+        }
+
+        // (c) in the sink tile
         Tile childTile = childRnode.getTile();
-        Tile sinkTile = connection.getSinkRnode().getTile();
+        Tile sinkTile = sinkRnode.getTile();
         if (childTile == sinkTile) {
             return true;
         }
 
-        // (c) connection crosses SLR and this is a Laguna column
+        // (d) connection crosses SLR and this is a Laguna column
         int childX = childTile.getTileXCoordinate();
         if (connection.isCrossSLR() && nextLagunaColumn[childX] == childX) {
-
             return true;
         }
 
-        // (d) when in X as the sink tile, but Y +/- 1
+        // (e) when in X as the sink tile, but Y +/- 1
         return childX == sinkTile.getTileXCoordinate() &&
                Math.abs(childTile.getTileYCoordinate() - sinkTile.getTileYCoordinate()) <= 1;
     }

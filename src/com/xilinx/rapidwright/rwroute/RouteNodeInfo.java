@@ -128,40 +128,53 @@ public class RouteNodeInfo {
     private static RouteNodeType getType(Node node, Tile endTile, RouteNodeGraph routingGraph) {
         // NOTE: IntentCode is device-dependent
         IntentCode ic = node.getIntentCode();
+        TileTypeEnum tileTypeEnum = node.getTile().getTileTypeEnum();
         switch (ic) {
             case NODE_LOCAL: { // US/US+
-                assert(node.getTile().getTileTypeEnum() == TileTypeEnum.INT);
+                assert(tileTypeEnum == TileTypeEnum.INT);
                 if (routingGraph != null) {
-                    BitSet bs = routingGraph.ultraScaleNonLocalWires.get(node.getTile().getTileTypeEnum());
+                    BitSet bs = routingGraph.ultraScaleNonLocalWires.get(tileTypeEnum);
                     if (!bs.get(node.getWireIndex())) {
+                        BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
+                        if (eastWestWires[0].get(node.getWireIndex())) {
+                            return RouteNodeType.LOCAL_EAST;
+                        } else if (eastWestWires[1].get(node.getWireIndex())) {
+                            return RouteNodeType.LOCAL_WEST;
+                        }
                         return RouteNodeType.LOCAL;
                     }
                     break;
                 }
             }
 
-            case NODE_PINBOUNCE:
-                return RouteNodeType.LOCAL;
-
-            case NODE_PINFEED: {
+            case NODE_PINFEED:
                 if (routingGraph != null && routingGraph.lagunaI != null) {
                     BitSet bs = routingGraph.lagunaI.get(node.getTile());
                     if (bs != null && bs.get(node.getWireIndex())) {
                         return RouteNodeType.LAGUNA_PINFEED;
                     }
                 }
+                // Fall through
+            case NODE_PINBOUNCE:
+                if (routingGraph != null) {
+                    BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
+                    if (eastWestWires[0].get(node.getWireIndex())) {
+                        return RouteNodeType.LOCAL_EAST;
+                    }
+                    assert (eastWestWires[1].get(node.getWireIndex()));
+                    return RouteNodeType.LOCAL_WEST;
+                }
                 return RouteNodeType.LOCAL;
-            }
 
             case NODE_LAGUNA_OUTPUT: // UltraScale+ only
-                assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);
+                assert(tileTypeEnum == TileTypeEnum.LAG_LAG);
                 if (node.getWireName().endsWith("_TXOUT")) {
                     return RouteNodeType.LAGUNA_PINFEED;
                 }
                 break;
 
             case NODE_LAGUNA_DATA: // UltraScale+ only
-                assert(node.getTile().getTileTypeEnum() == TileTypeEnum.LAG_LAG);
+                assert(tileTypeEnum == TileTypeEnum.LAG_LAG);
                 if (node.getTile() != endTile) {
                     return RouteNodeType.SUPER_LONG_LINE;
                 }
@@ -170,7 +183,7 @@ public class RouteNodeInfo {
                 break;
 
             case INTENT_DEFAULT:
-                if (node.getTile().getTileTypeEnum() == TileTypeEnum.LAGUNA_TILE) { // UltraScale only
+                if (tileTypeEnum == TileTypeEnum.LAGUNA_TILE) { // UltraScale only
                     String wireName = node.getWireName();
                     if (wireName.startsWith("UBUMP")) {
                         assert(node.getTile() != endTile);
