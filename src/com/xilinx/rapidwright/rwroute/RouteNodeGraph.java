@@ -101,7 +101,7 @@ public class RouteNodeGraph {
     protected final boolean lutRoutethru;
 
     /** Map indicating the wire indices that have a local intent code, but is what RWRoute considers to be non-local */
-    protected final Map<TileTypeEnum, BitSet> ultraScaleNonLocalWires;
+    protected final Map<TileTypeEnum, BitSet> ultraScalesNonLocalWires;
 
     protected final Map<TileTypeEnum, BitSet[]> eastWestWires;
 
@@ -136,92 +136,104 @@ public class RouteNodeGraph {
         Series series = device.getSeries();
         boolean isUltraScale = series == Series.UltraScale;
         boolean isUltraScalePlus = series == Series.UltraScalePlus;
+        Pattern eastWestPattern;
+
+        Tile intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
+        // Device.getArbitraryTileOfType() typically gives you the North-Western-most
+        // tile (with minimum X, maximum Y). Analyze the tile just below that.
+        intTile = intTile.getTileXYNeighbor(0, -1);
+
+        eastWestWires = new EnumMap<>(TileTypeEnum.class);
+        BitSet eastWires = new BitSet();
+        BitSet westWires = new BitSet();
+        eastWestWires.put(intTile.getTileTypeEnum(), new BitSet[]{eastWires, westWires});
+
+        BitSet wires = new BitSet();
         if (isUltraScale || isUltraScalePlus) {
-            Pattern eastWestPattern = Pattern.compile("(((BOUNCE|BYPASS|IMUX|INODE)_([EW]))|INT_NODE_IMUX_(\\d+)_).*");
+            ultraScalesNonLocalWires = new EnumMap<>(TileTypeEnum.class);
+            ultraScalesNonLocalWires.put(intTile.getTileTypeEnum(), wires);
+            eastWestPattern = Pattern.compile("(((BOUNCE|BYPASS|IMUX|INODE)_([EW]))|INT_NODE_IMUX_(\\d+)_).*");
+        } else {
+            assert(series == Series.Versal);
+            ultraScalesNonLocalWires = null;
 
-            ultraScaleNonLocalWires = new EnumMap<>(TileTypeEnum.class);
-            BitSet wires = new BitSet();
-            Tile intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
-            // Device.getArbitraryTileOfType() typically gives you the North-Western-most
-            // tile (with minimum X, maximum Y). Analyze the tile just below that.
-            intTile = intTile.getTileXYNeighbor(0, -1);
-            ultraScaleNonLocalWires.put(intTile.getTileTypeEnum(), wires);
+            // FIXME:
+            eastWestPattern = null;
+            eastWestWires.put(TileTypeEnum.CLE_BC_CORE, new BitSet[]{eastWires, westWires});
+        }
 
-            eastWestWires = new EnumMap<>(TileTypeEnum.class);
-            BitSet eastWires = new BitSet();
-            BitSet westWires = new BitSet();
-            eastWestWires.put(intTile.getTileTypeEnum(), new BitSet[]{eastWires, westWires});
+        for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
+            Node baseNode = Node.getNode(intTile, wireIndex);
+            if (baseNode == null) {
+                continue;
+            }
 
-            for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
-                Node baseNode = Node.getNode(intTile, wireIndex);
-                if (baseNode == null) {
-                    continue;
-                }
-
-                String baseWireName = baseNode.getWireName();
-                IntentCode baseIntentCode = baseNode.getIntentCode();
-                if (baseIntentCode == IntentCode.NODE_LOCAL) {
-                    Tile baseTile = baseNode.getTile();
-                    assert(baseTile.getTileTypeEnum() == intTile.getTileTypeEnum());
-                    if (isUltraScalePlus) {
-                        if (baseWireName.startsWith("INT_NODE_SDQ_") || baseWireName.startsWith("SDQNODE_")) {
-                            if (baseTile != intTile) {
-                                if (baseWireName.endsWith("_FT0")) {
-                                    assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() - 1);
-                                } else {
-                                    assert(baseWireName.endsWith("_FT1"));
-                                    assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
-                                }
-                            }
-                            wires.set(baseNode.getWireIndex());
-                            continue;
-                        }
-                    } else {
-                        assert(isUltraScale);
-
-                        if (baseWireName.startsWith("INT_NODE_SINGLE_DOUBLE_") || baseWireName.startsWith("SDND") ||
-                                baseWireName.startsWith("INT_NODE_QUAD_LONG") || baseWireName.startsWith("QLND")) {
-                            if (baseTile != intTile) {
-                                if (baseWireName.endsWith("_FTN")) {
-                                    assert (baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() - 1);
-                                } else {
-                                    assert (baseWireName.endsWith("_FTS"));
-                                    assert (baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
-                                }
+            String baseWireName = baseNode.getWireName();
+            IntentCode baseIntentCode = baseNode.getIntentCode();
+            if (baseIntentCode == IntentCode.NODE_LOCAL) {
+                Tile baseTile = baseNode.getTile();
+                assert(baseTile.getTileTypeEnum() == intTile.getTileTypeEnum());
+                if (isUltraScalePlus) {
+                    if (baseWireName.startsWith("INT_NODE_SDQ_") || baseWireName.startsWith("SDQNODE_")) {
+                        if (baseTile != intTile) {
+                            if (baseWireName.endsWith("_FT0")) {
+                                assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() - 1);
+                            } else {
+                                assert(baseWireName.endsWith("_FT1"));
+                                assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
                             }
                         }
                         wires.set(baseNode.getWireIndex());
                         continue;
                     }
-                } else if (baseIntentCode != IntentCode.NODE_PINFEED && baseIntentCode != IntentCode.NODE_PINBOUNCE) {
-                    continue;
-                }
-
-                Matcher m = eastWestPattern.matcher(baseWireName);
-                if (m.matches()) {
-                    if (m.group(4) != null) {
-                        if (m.group(4).equals("E")) {
-                            eastWires.set(baseNode.getWireIndex());
-                        } else {
-                            assert(m.group(4).equals("W"));
-                            westWires.set(baseNode.getWireIndex());
-                        }
-                    } else if (m.group(5) != null) {
-                        int i = Integer.valueOf(m.group(5));
-                        if (i < 32 || (isUltraScale && (i >= 64 && i < 96))) {
-                            eastWires.set(baseNode.getWireIndex());
-                        } else {
-                            assert(i < 64 || (isUltraScale && (i >= 96 && i < 128)));
-                            westWires.set(baseNode.getWireIndex());
+                } else if (isUltraScale) {
+                    if (baseWireName.startsWith("INT_NODE_SINGLE_DOUBLE_") || baseWireName.startsWith("SDND") ||
+                            baseWireName.startsWith("INT_NODE_QUAD_LONG") || baseWireName.startsWith("QLND")) {
+                        if (baseTile != intTile) {
+                            if (baseWireName.endsWith("_FTN")) {
+                                assert (baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() - 1);
+                            } else {
+                                assert (baseWireName.endsWith("_FTS"));
+                                assert (baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
+                            }
                         }
                     }
-                } else {
-                    assert(baseWireName.matches("CTRL_[EW](_B)?\\d+|INT_NODE_GLOBAL_\\d+_INT_OUT[01]?"));
+                    wires.set(baseNode.getWireIndex());
+                    continue;
                 }
+            } else if (baseIntentCode != IntentCode.NODE_PINFEED && baseIntentCode != IntentCode.NODE_PINBOUNCE) {
+                continue;
             }
-        } else {
-            ultraScaleNonLocalWires = null;
-            eastWestWires = null;
+
+            if (eastWestPattern == null) {
+                // FIXME:
+                assert(series == Series.Versal);
+                continue;
+            }
+
+            Matcher m = eastWestPattern.matcher(baseWireName);
+            if (m.matches()) {
+                if (m.group(4) != null) {
+                    if (m.group(4).equals("E")) {
+                        eastWires.set(baseNode.getWireIndex());
+                    } else {
+                        assert(m.group(4).equals("W"));
+                        westWires.set(baseNode.getWireIndex());
+                    }
+                } else if (m.group(5) != null) {
+                    int i = Integer.valueOf(m.group(5));
+                    if (i < 32 || (isUltraScale && (i >= 64 && i < 96))) {
+                        eastWires.set(baseNode.getWireIndex());
+                    } else {
+                        assert(i < 64 || (isUltraScale && (i >= 96 && i < 128)));
+                        westWires.set(baseNode.getWireIndex());
+                    }
+                }
+            } else {
+                assert(baseWireName.matches("CTRL_[EW](_B)?\\d+|INT_NODE_GLOBAL_\\d+_INT_OUT[01]?")
+                        // FIXME:
+                        || series == Series.Versal);
+            }
         }
 
         if (lutRoutethru) {
@@ -233,7 +245,7 @@ public class RouteNodeGraph {
                 if (clbTile == null) {
                     continue;
                 }
-                BitSet wires = new BitSet();
+                wires = new BitSet();
                 for (int wireIndex = 0; wireIndex < clbTile.getWireCount(); wireIndex++) {
                     String wireName = clbTile.getWireName(wireIndex);
                     if (wireName.endsWith("MUX")) {

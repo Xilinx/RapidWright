@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
@@ -133,7 +134,7 @@ public class RouteNodeInfo {
             case NODE_LOCAL: { // US/US+
                 assert(tileTypeEnum == TileTypeEnum.INT);
                 if (routingGraph != null) {
-                    BitSet bs = routingGraph.ultraScaleNonLocalWires.get(tileTypeEnum);
+                    BitSet bs = routingGraph.ultraScalesNonLocalWires.get(tileTypeEnum);
                     if (!bs.get(node.getWireIndex())) {
                         BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
                         if (eastWestWires[0].get(node.getWireIndex())) {
@@ -163,7 +164,9 @@ public class RouteNodeInfo {
                     } else if (eastWestWires[1].get(node.getWireIndex())) {
                         return RouteNodeType.LOCAL_WEST;
                     }
-                    assert(node.getWireName().startsWith("CTRL_"));
+                    assert(node.getWireName().startsWith("CTRL_") ||
+                            // FIXME:
+                            routingGraph.design.getSeries() == Series.Versal);
                 }
                 return RouteNodeType.LOCAL;
 
