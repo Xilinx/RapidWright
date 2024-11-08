@@ -154,7 +154,7 @@ public class RouteNodeGraph {
         if (isUltraScale || isUltraScalePlus) {
             ultraScalesNonLocalWires = new EnumMap<>(TileTypeEnum.class);
             ultraScalesNonLocalWires.put(intTile.getTileTypeEnum(), wires);
-            eastWestPattern = Pattern.compile("(((BOUNCE|BYPASS|IMUX|INODE)_([EW]))|INT_NODE_IMUX_(\\d+)_).*");
+            eastWestPattern = Pattern.compile("(((BOUNCE|BYPASS|IMUX|INODE(_[12])?)_([EW]))|INT_NODE_IMUX_(\\d+)_).*");
 
             eastWestWires = new EnumMap<>(TileTypeEnum.class);
             eastWestWires.put(intTile.getTileTypeEnum(), new BitSet[]{eastWires, westWires});
@@ -202,9 +202,9 @@ public class RouteNodeGraph {
                                 assert (baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
                             }
                         }
+                        wires.set(baseNode.getWireIndex());
+                        continue;
                     }
-                    wires.set(baseNode.getWireIndex());
-                    continue;
                 }
             } else if (baseIntentCode != IntentCode.NODE_PINFEED && baseIntentCode != IntentCode.NODE_PINBOUNCE) {
                 continue;
@@ -218,15 +218,15 @@ public class RouteNodeGraph {
 
             Matcher m = eastWestPattern.matcher(baseWireName);
             if (m.matches()) {
-                if (m.group(4) != null) {
-                    if (m.group(4).equals("E")) {
+                if (m.group(5) != null) {
+                    if (m.group(5).equals("E")) {
                         eastWires.set(baseNode.getWireIndex());
                     } else {
-                        assert(m.group(4).equals("W"));
+                        assert(m.group(5).equals("W"));
                         westWires.set(baseNode.getWireIndex());
                     }
-                } else if (m.group(5) != null) {
-                    int i = Integer.valueOf(m.group(5));
+                } else if (m.group(6) != null) {
+                    int i = Integer.valueOf(m.group(6));
                     if (i < 32 || (isUltraScale && (i >= 64 && i < 96))) {
                         eastWires.set(baseNode.getWireIndex());
                     } else {
@@ -235,7 +235,7 @@ public class RouteNodeGraph {
                     }
                 }
             } else {
-                assert(baseWireName.matches("CTRL_[EW](_B)?\\d+|INT_NODE_GLOBAL_\\d+_INT_OUT[01]?")
+                assert(baseWireName.matches("CTRL_[EW](_B)?\\d+|INT_NODE_GLOBAL_\\d+(_INT)?_OUT[01]?")
                         // FIXME:
                         || series == Series.Versal);
             }
