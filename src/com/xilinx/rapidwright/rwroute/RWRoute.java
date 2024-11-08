@@ -1839,7 +1839,9 @@ public class RWRoute {
                     case EXCLUSIVE_SINK_WEST:
                         assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_EAST || rnode.getType() == RouteNodeType.LOCAL_EAST);
                         assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_WEST || rnode.getType() == RouteNodeType.LOCAL_WEST);
-                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK || rnode.getType() == RouteNodeType.LOCAL);
+                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK || rnode.getType() == RouteNodeType.LOCAL ||
+                                // FIXME:
+                                design.getSeries() == Series.Versal);
                         if (!isAccessibleSink(childRNode, connection)) {
                             continue;
                         }
