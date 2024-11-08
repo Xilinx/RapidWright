@@ -73,6 +73,7 @@ public class TestRouterHelper {
     @ParameterizedTest
     @CsvSource({
             "xcvu3p,MMCM_X0Y0,PSEN,INT_X36Y56/IMUX_W0",
+            "xcvu3p,BUFGCE_X0Y58,CLK_IN,INT_X36Y151/IMUX_W34",
             "xcvp1002,MMCM_X2Y0,PSEN,INT_X27Y0/IMUX_B_W24"
     })
     public void testProjectInputPinToINTNode(String partName, String siteName, String pinName, String nodeAsString) {
