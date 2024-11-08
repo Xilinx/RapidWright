@@ -24,7 +24,6 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Map;
 
