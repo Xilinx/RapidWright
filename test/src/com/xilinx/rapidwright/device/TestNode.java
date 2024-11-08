@@ -148,6 +148,7 @@ public class TestNode {
             intentCodes.add(node.getIntentCode());
         }
         System.out.println("Initial queue.size() = " + queue.size());
+        System.out.println("Initial queue = " + queue);
         System.out.println("Intent codes = " + intentCodes);
 
         // Print out the prefixes of nodes that are immediately uphill of these wire prefixes
