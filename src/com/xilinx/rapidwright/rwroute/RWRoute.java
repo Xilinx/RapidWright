@@ -606,10 +606,12 @@ public class RWRoute {
                 if (eastWestWires[0].get(sinkINTNode.getWireIndex())) {
                     sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_EAST);
                     sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK_EAST);
-                } else {
-                    assert(eastWestWires[1].get(sinkINTNode.getWireIndex()));
+                } else if (eastWestWires[1].get(sinkINTNode.getWireIndex())) {
                     sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_WEST);
                     sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK_WEST);
+                } else {
+                    sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK);
+                    sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK);
                 }
                 connection.setSinkRnode(sinkRnode);
 
@@ -1835,6 +1837,7 @@ public class RWRoute {
                             continue;
                         }
                         break;
+                    case EXCLUSIVE_SINK:
                     case EXCLUSIVE_SINK_EAST:
                     case EXCLUSIVE_SINK_WEST:
                         if (!isAccessibleSink(childRNode, connection)) {

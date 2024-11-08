@@ -160,9 +160,10 @@ public class RouteNodeInfo {
                     BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
                     if (eastWestWires[0].get(node.getWireIndex())) {
                         return RouteNodeType.LOCAL_EAST;
+                    } else if (eastWestWires[1].get(node.getWireIndex())) {
+                        return RouteNodeType.LOCAL_WEST;
                     }
-                    assert (eastWestWires[1].get(node.getWireIndex()));
-                    return RouteNodeType.LOCAL_WEST;
+                    assert(node.getWireName().startsWith("CTRL_"));
                 }
                 return RouteNodeType.LOCAL;
 

@@ -137,7 +137,7 @@ public class RouteNodeGraph {
         boolean isUltraScale = series == Series.UltraScale;
         boolean isUltraScalePlus = series == Series.UltraScalePlus;
         if (isUltraScale || isUltraScalePlus) {
-            Pattern eastWestPattern = Pattern.compile("(((BOUNCE|BYPASS|IMUX|INODE|CTRL)_([EW]))|INT_NODE_IMUX_(\\d+)_).*");
+            Pattern eastWestPattern = Pattern.compile("(((BOUNCE|BYPASS|IMUX|INODE)_([EW]))|INT_NODE_IMUX_(\\d+)_).*");
 
             ultraScaleNonLocalWires = new EnumMap<>(TileTypeEnum.class);
             BitSet wires = new BitSet();
@@ -604,7 +604,9 @@ public class RouteNodeGraph {
         RouteNodeType sinkType = sinkRnode.getType();
         assert(sinkType.isExclusiveSink());
         if ((type == RouteNodeType.LOCAL_EAST && sinkType != RouteNodeType.EXCLUSIVE_SINK_EAST) ||
-            (type == RouteNodeType.LOCAL_WEST && sinkType != RouteNodeType.EXCLUSIVE_SINK_WEST)) {
+            (type == RouteNodeType.LOCAL_WEST && sinkType != RouteNodeType.EXCLUSIVE_SINK_WEST) ||
+            // Sinks without a side (e.g. CTRL) can only be approached from LOCAL nodes also without a side
+            (sinkType == RouteNodeType.EXCLUSIVE_SINK && type != RouteNodeType.LOCAL)) {
             return false;
         }
 

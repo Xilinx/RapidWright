@@ -129,17 +129,7 @@ public class TimingAndWirelengthReport{
             if (sinkINTNode == null) {
                 connection.setDirect(true);
             } else {
-                BitSet[] eastWestWires = routingGraph.eastWestWires.get(sinkINTNode.getTile().getTileTypeEnum());
-                RouteNode sinkRnode;
-                if (eastWestWires[0].get(sinkINTNode.getWireIndex())) {
-                    sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_EAST);
-                    sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK_EAST);
-                } else {
-                    assert(eastWestWires[1].get(sinkINTNode.getWireIndex()));
-                    sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_WEST);
-                    sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK_WEST);
-                }
-                connection.setSinkRnode(sinkRnode);
+                connection.setSinkRnode(routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK));
                 if (sourceINTNode == null) {
                     sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
                 }
