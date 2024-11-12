@@ -93,7 +93,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
 
     protected RouteNode(RouteNodeGraph routingGraph, Node node, RouteNodeType type) {
         super(node);
-        RouteNodeInfo nodeInfo = RouteNodeInfo.get(this, routingGraph);
+        RouteNodeInfo nodeInfo = RouteNodeInfo.get(node, routingGraph);
         this.type = (type == null) ? nodeInfo.type : type;
         endTileXCoordinate = nodeInfo.endTileXCoordinate;
         endTileYCoordinate = nodeInfo.endTileYCoordinate;
@@ -124,10 +124,16 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         (length <= 3 && series == Series.Versal));
                 break;
             case EXCLUSIVE_SINK:
+            case EXCLUSIVE_SINK_EAST:
+            case EXCLUSIVE_SINK_WEST:
                 assert(length == 0 ||
                        (length == 1 && (series == Series.UltraScalePlus || series == Series.UltraScale) && getIntentCode() == IntentCode.NODE_PINBOUNCE));
                 break;
             case LOCAL:
+                assert(length == 0);
+                break;
+            case LOCAL_EAST:
+            case LOCAL_WEST:
                 assert(length == 0 ||
                        (length == 1 && (
                                ((series == Series.UltraScalePlus || series == Series.UltraScale) && getIntentCode() == IntentCode.NODE_PINBOUNCE) ||
@@ -361,10 +367,10 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     public void setType(RouteNodeType type) {
         assert(this.type == type ||
                 // Support demotion from EXCLUSIVE_SINK to LOCAL since they have the same base cost
-                (this.type == RouteNodeType.EXCLUSIVE_SINK && type == RouteNodeType.LOCAL) ||
+                (this.type.isExclusiveSink() && type == RouteNodeType.LOCAL) ||
                 // Or promotion from LOCAL to EXCLUSIVE_SINK (by PartialRouter when NODE_PINBOUNCE on
                 // a newly unpreserved net becomes a sink)
-                (this.type == RouteNodeType.LOCAL && type == RouteNodeType.EXCLUSIVE_SINK));
+                (this.type == RouteNodeType.LOCAL && type.isExclusiveSink()));
         this.type = type;
     }
 
