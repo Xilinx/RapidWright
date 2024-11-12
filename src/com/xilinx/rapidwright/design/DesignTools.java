@@ -289,7 +289,7 @@ public class DesignTools {
                     Net net = inst.getNetFromSiteWire(siteWireName);
                     if (net == null) continue;
                     if (net.isStaticNet()) continue;
-                    if (!cell.getUsedPhysicalPins().contains(pin.getName())) continue;
+                    if (!cell.usesPhysicalPin(pin.getName())) continue;
                     inputs.add(pin);
                 }
                 break;
@@ -325,7 +325,7 @@ public class DesignTools {
             if (net == null) continue;
             if (net.isStaticNet()) continue;
             if (net.getName().equals(Net.USED_NET)) continue;
-            if (!cell.getUsedPhysicalPins().contains(pin.getName()))
+            if (!cell.usesPhysicalPin(pin.getName()))
                 continue;
             outputs.add(pin);
         }
@@ -1564,7 +1564,7 @@ public class DesignTools {
                             if (otherCell.isRoutethru()) {
                                 BELPin otherPin = null;
                                 if (pin.isOutput()) {
-                                    assert (otherCell.getPhysicalPinMappingCount() == 1);
+                                    assert (otherCell.getUsedPhysicalPinsCount() == 1);
                                     otherPin = otherCell.getFirstPhysicalPinMapping().getFirst();
                                 } else {
                                     // Make sure we are coming in on the routed-thru pin

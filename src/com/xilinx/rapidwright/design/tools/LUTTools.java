@@ -391,7 +391,7 @@ public class LUTTools {
     public static String getLUTEquation(Cell c) {
         if (c.isRoutethru()) {
             BELPin rtEntry = c.getFirstPhysicalPinMapping().getFirst();
-            assert (c.getPhysicalPinMappingCount() == 1);
+            assert (c.getUsedPhysicalPinsCount() == 1);
             return "O" + c.getBELName().charAt(1) + "=" + rtEntry.getName();
         }
         return getLUTEquation(c.getEDIFCellInst());
