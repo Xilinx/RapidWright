@@ -59,6 +59,7 @@ import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -600,8 +601,19 @@ public class RWRoute {
                 }
 
                 indirectConnections.add(connection);
-                RouteNode sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK);
-                sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK);
+                BitSet[] eastWestWires = (routingGraph.eastWestWires == null) ? null :
+                        routingGraph.eastWestWires.get(sinkINTNode.getTile().getTileTypeEnum());
+                RouteNode sinkRnode;
+                if (eastWestWires != null && eastWestWires[0].get(sinkINTNode.getWireIndex())) {
+                    sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_EAST);
+                    sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK_EAST);
+                } else if (eastWestWires != null && eastWestWires[1].get(sinkINTNode.getWireIndex())) {
+                    sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_WEST);
+                    sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK_WEST);
+                } else {
+                    sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK);
+                    sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK);
+                }
                 connection.setSinkRnode(sinkRnode);
 
                 // Where appropriate, allow all 6 LUT pins to be swapped to begin with
@@ -609,6 +621,8 @@ public class RWRoute {
                 int numberOfSwappablePins = (lutPinSwapping && sink.isLUTInputPin())
                         ? LUTTools.MAX_LUT_SIZE : 0;
                 if (numberOfSwappablePins > 0) {
+                    assert(sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_EAST || sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_WEST);
+
                     for (Cell cell : DesignTools.getConnectedCells(sink)) {
                         BEL bel = cell.getBEL();
                         assert(bel.isLUT());
@@ -650,8 +664,8 @@ public class RWRoute {
                     if (routingGraph.isPreserved(node)) {
                         continue;
                     }
-                    RouteNode altSinkRnode = routingGraph.getOrCreate(node, RouteNodeType.EXCLUSIVE_SINK);
-                    assert(altSinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK);
+                    RouteNode altSinkRnode = routingGraph.getOrCreate(node, sinkRnode.getType());
+                    assert(altSinkRnode.getType().isExclusiveSink());
                     connection.addAltSinkRnode(altSinkRnode);
                 }
 
@@ -1798,6 +1812,8 @@ public class RWRoute {
                 }
                 switch (childRNode.getType()) {
                     case LOCAL:
+                    case LOCAL_EAST:
+                    case LOCAL_WEST:
                         if (!routingGraph.isAccessible(childRNode, connection)) {
                             continue;
                         }
@@ -1817,6 +1833,13 @@ public class RWRoute {
                         }
                         break;
                     case EXCLUSIVE_SINK:
+                    case EXCLUSIVE_SINK_EAST:
+                    case EXCLUSIVE_SINK_WEST:
+                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_EAST || rnode.getType() == RouteNodeType.LOCAL_EAST);
+                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_WEST || rnode.getType() == RouteNodeType.LOCAL_WEST);
+                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK || rnode.getType() == RouteNodeType.LOCAL ||
+                                // FIXME:
+                                design.getSeries() == Series.Versal);
                         if (!isAccessibleSink(childRNode, connection)) {
                             continue;
                         }
@@ -1861,7 +1884,7 @@ public class RWRoute {
     }
 
     protected boolean isAccessibleSink(RouteNode child, Connection connection, boolean assertOnOveruse) {
-        assert(child.getType() == RouteNodeType.EXCLUSIVE_SINK);
+        assert(child.getType().isExclusiveSink());
         assert(!assertOnOveruse || !child.isOverUsed());
 
         if (child.isTarget()) {
@@ -2140,7 +2163,9 @@ public class RWRoute {
             printFormattedString("Num iterations:", routeIteration);
             printFormattedString("Connections routed:", connectionsRouted.get());
             printFormattedString("Nodes pushed:", nodesPushed.get());
-            printFormattedString("Nodes popped:", nodesPopped.get());
+        }
+        printFormattedString("Nodes popped:", nodesPopped.get());
+        if (config.isVerbose()) {
             System.out.printf("------------------------------------------------------------------------------\n");
         }
 
