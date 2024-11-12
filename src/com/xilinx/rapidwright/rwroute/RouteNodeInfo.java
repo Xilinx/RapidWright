@@ -157,6 +157,9 @@ public class RouteNodeInfo {
                 }
                 // Fall through
             case NODE_PINBOUNCE:
+            case NODE_INODE:        // INT.INT_NODE_IMUX_ATOM_*_INT_OUT[01] (Versal only)
+            case NODE_IMUX:         // INT.IMUX_B_[EW]*                     (Versal only)
+            case NODE_CLE_BNODE:    // CLE_BC_CORE*.BNODE_OUTS_[EW]*        (Versal only)
                 if (routingGraph != null && routingGraph.eastWestWires != null) {
                     BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
                     if (eastWestWires[0].get(node.getWireIndex())) {
@@ -165,17 +168,13 @@ public class RouteNodeInfo {
                         return RouteNodeType.LOCAL_WEST;
                     }
                     assert(node.getWireName().startsWith("CTRL_") ||
-                            // FIXME:
-                            routingGraph.design.getSeries() == Series.Versal);
+                            (routingGraph.isVersal && ic == IntentCode.NODE_PINBOUNCE && node.getWireName().matches("BOUNCE_[EW](1[6-9]|2[0-9]|3[01])")));
                 }
                 return RouteNodeType.LOCAL;
 
             // Versal only
-            case NODE_INODE:        // INT.INT_NODE_IMUX_ATOM_*_INT_OUT[01]
-            case NODE_IMUX:         // INT.IMUX_B_[EW]*
             case NODE_CLE_CTRL:     // CLE_BC_CORE*.CTRL_[LR]_B*
             case NODE_INTF_CTRL:    // INTF_[LR]OCF_[TB][LR]_TILE.INTF_IRI*
-            case NODE_CLE_BNODE:    // CLE_BC_CORE*.BNODE_OUTS_[EW]*
             case NODE_CLE_CNODE:    // CLE_BC_CORE*.CNODE_OUTS_[EW]*
             case NODE_INTF_BNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_BNODE_OUTS*
             case NODE_INTF_CNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_CNODE_OUTS*

@@ -1817,6 +1817,12 @@ public class RWRoute {
                         if (!routingGraph.isAccessible(childRNode, connection)) {
                             continue;
                         }
+                        assert(rnode.getType() != RouteNodeType.LOCAL_EAST || childRNode.getType() == RouteNodeType.LOCAL_EAST
+                                // FIXME:
+                                || childRNode.getTile().getName().matches("INTF_[LR]OCF_[TB]R_TILE_.*"));
+                        assert(rnode.getType() != RouteNodeType.LOCAL_WEST || childRNode.getType() == RouteNodeType.LOCAL_WEST
+                                // FIXME:
+                                || childRNode.getTile().getName().matches("INTF_[LR]OCF_[TB]L_TILE_.*"));
                         break;
                     case NON_LOCAL:
                         // LOCALs cannot connect to NON_LOCALs except via a LUT routethru
@@ -1838,8 +1844,7 @@ public class RWRoute {
                         assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_EAST || rnode.getType() == RouteNodeType.LOCAL_EAST);
                         assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_WEST || rnode.getType() == RouteNodeType.LOCAL_WEST);
                         assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK || rnode.getType() == RouteNodeType.LOCAL ||
-                                // FIXME:
-                                design.getSeries() == Series.Versal);
+                                (routingGraph.isVersal && rnode.getIntentCode() == IntentCode.NODE_CLE_BNODE));
                         if (!isAccessibleSink(childRNode, connection)) {
                             continue;
                         }
