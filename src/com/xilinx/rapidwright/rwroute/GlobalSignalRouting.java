@@ -24,6 +24,17 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Queue;
+import java.util.Set;
+import java.util.function.Function;
+
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
@@ -38,6 +49,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
@@ -46,20 +58,12 @@ import com.xilinx.rapidwright.placer.blockplacer.SmallestEnclosingCircle;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
+import com.xilinx.rapidwright.router.VersalClockRouting;
 import com.xilinx.rapidwright.util.Utils;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Queue;
-import java.util.Set;
-import java.util.function.Function;
 
 /**
  * A collection of methods for routing global signals, i.e. GLOBAL_CLOCK, VCC and GND.
@@ -190,42 +194,130 @@ public class GlobalSignalRouting {
      *                      for same net as we're routing), or unavailable (preserved for other net).
      */
     public static void symmetricClkRouting(Net clk, Device device, Function<Node,NodeStatus> getNodeStatus) {
-        List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
-        ClockRegion centroid = findCentroid(clk, device);
+        if (device.getSeries() != Series.Versal) {
+            boolean debug = true;
+            List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
 
-        List<ClockRegion> upClockRegions = new ArrayList<>();
-        List<ClockRegion> downClockRegions = new ArrayList<>();
-        // divides clock regions into two groups
-        divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
+            ClockRegion centroid = findCentroid(clk, device);
+            if (debug) {
+                System.out.println("centroid CR: " + centroid);
+            }
 
-        RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
-        RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
+            List<ClockRegion> upClockRegions = new ArrayList<>();
+            List<ClockRegion> downClockRegions = new ArrayList<>();
+            // divides clock regions into two groups
+            divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
 
-        RouteNode vrouteUp = null;
-        RouteNode vrouteDown;
-        // Two VROUTEs going up and down
-        ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
-        if (aboveCentroid != null) {
-            vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
+            RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
+
+            if (debug) {
+                System.out.println("clkRoutingLine: " + clkRoutingLine);
+            }
+
+            RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
+
+            if (debug) {
+                System.out.println("centroidHRouteNode: " + centroidHRouteNode);
+            }
+            
+            RouteNode vrouteUp = null;
+            RouteNode vrouteDown;
+            // Two VROUTEs going up and down
+            ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
+            if (aboveCentroid != null) {
+                vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
+                if (debug) {
+                    System.out.println("vrouteUp: " + vrouteUp);
+                }
+            }
+            vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
+
+            if (debug) {
+                System.out.println("vrouteDown: " + vrouteDown);
+            }
+
+            List<RouteNode> upDownDistLines = new ArrayList<>();
+            if (aboveCentroid != null) {
+                List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false, getNodeStatus);
+                if (upLines != null) upDownDistLines.addAll(upLines);
+            }
+
+            List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
+            if (downLines != null) upDownDistLines.addAll(downLines);
+
+            Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk.getPins(), getNodeStatus);
+            UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
+
+            UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
+
+            Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
+            clk.setPIPs(clkPIPsWithoutDuplication);
         }
-        vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
+        else {
+            // Clock routing on Versal devices
+            // TODO: Tile.getWireConnections(int wire) is not working correctly on Versal devices,
+            // so the below clock routing flow goes in the "node way", which means we use Node.getAllDownhillNodes() to 
+            // go downhill instead of Tile.getWireConnections(int wire). This may lead to worse runtime.
 
-        List<RouteNode> upDownDistLines = new ArrayList<>();
-        if (aboveCentroid != null) {
-            List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false, getNodeStatus);
-            if (upLines != null) upDownDistLines.addAll(upLines);
+            List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
+            Map<ClockRegion, RouteNode> upDownDistLines = new HashMap<>();
+            SitePinInst source = clk.getSource();
+            SiteTypeEnum sourceTypeEnum = source.getSiteTypeEnum();
+            RouteNode sourceRouteNode = new RouteNode(source);
+            // In US/US+ clock routing, we use two VROUTE nodes to reach the clock regions above and below the centroid.
+            // However, we can see that Vivado only use one VROUTE node in the centroid clock region for versal clock routing,
+            // and reach the above and below clock regions by VDISTR nodes.
+            RouteNode vroute = null;
+            System.out.println("SiteTypeEnum of source: " + sourceTypeEnum);
+
+            // In FPGA '24 routing contest benchmarks, we found that there are only two types of source sites for the clock nets: BUFGCE and BUFG_FABRIC.
+            if (sourceTypeEnum == SiteTypeEnum.BUFG_FABRIC) {
+                // These source sites are located in the middle of the device. The path from the output pin to VROUTE matches the following pattern:
+                // NODE_GLOBAL_BUFG (the output node with a suffix "_O") -> 
+                // NODE_GLOBAL_BUFG (has a suffix "_O_PIN") -> 
+                // NODE_GLOBAL_GCLK ->
+                // NODE_GLOBAL_VROUTE (located in the same clock region of the source site)
+
+                // Notice that Vivado always use the above VROUTE node, there is no need to find a centroid clock region to route to.
+                
+                vroute = VersalClockRouting.routeToCentroid(clk, sourceRouteNode, source.getTile().getClockRegion(), true, false);
+            } else if (sourceTypeEnum == SiteTypeEnum.BUFGCE) {
+                // Most clock nets in FPGA '24 benchmarks have this type of source site.
+                // These source sites are located in the bottom of the device (Y=0). The path from the output pin to VROUTE matches the following pattern:
+                // NODE_GLOBAL_BUFG -> NODE_GLOBAL_BUFG -> NODE_GLOBAL_GCLK ->  NODE_GLOBAL_HROUTE_HSR -> NODE_GLOBAL_VROUTE
+                // which is similar to US/US+ clock routing.
+                // Notice that we have to quickly reach a NODE_GLOBAL_HROUTE_HSR node, and if we allow the Y coordinate of centroid to be bigger than 1,
+                // we may fail to do so. Thus, we need to force the Y-coordinate of centroid to be 1.
+                assert(source.getTile().getTileYCoordinate() == 0);
+                // And, in X-axis, Vivado doesn't go to the real centroid of target clock regions... it just uses a nearby VROUTE.
+                int centroidX = sourceRouteNode.getTile().getClockRegion().getColumn();
+                // VROUTE nodes are in the clock region where X is odd.
+                if (centroidX % 2 == 0) centroidX -= 1;
+                if (centroidX <= 0)     centroidX = 1;
+
+                ClockRegion centroid = device.getClockRegion(1, centroidX);
+                System.out.println("centroid: " + centroid);
+                RouteNode clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
+                System.out.println("clkRoutingLine: " + clkRoutingLine.getName());
+                RouteNode centroidHRouteNode = VersalClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
+                System.out.println("centroidHRouteNode: " + centroidHRouteNode.getName());
+                vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid, true, false);
+            } else {
+                throw new RuntimeException("RWRoute hasn't supported routing a clock net with source type " + sourceTypeEnum + " yet.");
+            }
+
+            System.out.println("vroute: " + vroute.getName());
+
+            upDownDistLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vroute, clockRegions, false, getNodeStatus);
+
+            Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk.getPins(), getNodeStatus);
+            VersalClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
+
+            VersalClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
+
+            Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
+            clk.setPIPs(clkPIPsWithoutDuplication);
         }
-
-        List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
-        if (downLines != null) upDownDistLines.addAll(downLines);
-
-        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk.getPins(), getNodeStatus);
-        UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
-
-        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
-
-        Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
-        clk.setPIPs(clkPIPsWithoutDuplication);
     }
 
     /**
@@ -272,31 +364,53 @@ public class GlobalSignalRouting {
             if (intNode == null) {
                 throw new RuntimeException("Unable to get INT tile for pin " + p);
             }
+            List<Node> startNodes = new ArrayList<>();
 
-            outer: for (Node prev : intNode.getAllUphillNodes()) {
-                NodeStatus prevNodeStatus = getNodeStatus.apply(prev);
-                if (prevNodeStatus == NodeStatus.UNAVAILABLE) {
-                    continue;
+            if (intNode.getIntentCode() == IntentCode.NODE_IMUX) {
+                // This node drives a LUT input pin. Vivado reaches this pin in pattern: 
+                // NODE_GLOBAL_LEAF -> NODE_CLE_CNODE -> NODE_INODE -> NODE_IMUX
+                // Need to go one more step to let prevPrev be a NODE_GLOBAL_LEAF node.
+
+                // And, it seems that each NODE_INODE node is driven by only one NODE_CLE_CNODE node,
+                // but not each NODE_CLE_CNODE node can find a uphill NODE_GLOBAL_LEAF node,
+                // thus here I add all NODE_INODE nodes to ensure that we can find candidates.
+                Tile intTile = intNode.getTile();
+                for (Node uphill: intNode.getAllUphillNodes()) {
+                    if (uphill.getIntentCode() == IntentCode.NODE_INODE && uphill.getTile() == intTile) {
+                        startNodes.add(uphill);
+                    }
                 }
+            } else {
+                assert(intNode.getIntentCode() == IntentCode.NODE_CLE_CTRL || intNode.getIntentCode() == IntentCode.NODE_INTF_CTRL);
+                startNodes.add(intNode);
+            }
 
-                for (Node prevPrev : prev.getAllUphillNodes()) {
-                    if (prevPrev.getIntentCode() != IntentCode.NODE_GLOBAL_LEAF) {
+            outer: for (Node startNode: startNodes) {
+                for (Node prev : startNode.getAllUphillNodes()) {
+                    NodeStatus prevNodeStatus = getNodeStatus.apply(prev);
+                    if (prevNodeStatus == NodeStatus.UNAVAILABLE) {
                         continue;
                     }
-
-                    NodeStatus prevPrevNodeStatus = getNodeStatus.apply(prevPrev);
-                    if (prevPrevNodeStatus == NodeStatus.UNAVAILABLE) {
-                        continue;
-                    }
-
-                    if (usedLcbs.contains(prevPrev) || prevPrevNodeStatus == NodeStatus.INUSE) {
-                        lcbCandidates.clear();
+    
+                    for (Node prevPrev : prev.getAllUphillNodes()) {
+                        if (prevPrev.getIntentCode() != IntentCode.NODE_GLOBAL_LEAF) {
+                            continue;
+                        }
+    
+                        NodeStatus prevPrevNodeStatus = getNodeStatus.apply(prevPrev);
+                        if (prevPrevNodeStatus == NodeStatus.UNAVAILABLE) {
+                            continue;
+                        }
+    
+                        if (usedLcbs.contains(prevPrev) || prevPrevNodeStatus == NodeStatus.INUSE) {
+                            lcbCandidates.clear();
+                            lcbCandidates.add(prevPrev);
+                            break outer;
+                        }
+    
+                        assert(prevPrevNodeStatus == NodeStatus.AVAILABLE);
                         lcbCandidates.add(prevPrev);
-                        break outer;
                     }
-
-                    assert(prevPrevNodeStatus == NodeStatus.AVAILABLE);
-                    lcbCandidates.add(prevPrev);
                 }
             }
 

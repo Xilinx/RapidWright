@@ -35,6 +35,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.rwroute.RouterHelper;
 
 
 /**
@@ -375,6 +376,19 @@ public class RouteNode implements Comparable<RouteNode> {
                         }
                     }
                 }
+            }
+            curr = curr.parent;
+        }
+        return pips;
+    }
+
+    public ArrayList<PIP> getPIPsBackToSourceByNodes() {
+        ArrayList<PIP> pips = new ArrayList<>();
+        RouteNode curr = this;
+        while (curr.parent != null) {
+            PIP pip = RouterHelper.findPIPbetweenNodes(Node.getNode(curr.parent), Node.getNode(curr));
+            if (pip != null) {
+                pips.add(pip);
             }
             curr = curr.parent;
         }
