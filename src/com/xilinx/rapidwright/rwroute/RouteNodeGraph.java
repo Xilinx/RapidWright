@@ -749,12 +749,13 @@ public class RouteNodeGraph {
                     IntentCode sinkIntentCode = sinkRnode.getIntentCode();
                     assert(sinkIntentCode == IntentCode.NODE_IMUX || sinkIntentCode == IntentCode.NODE_PINBOUNCE);
 
-                    // Experimentally, found this to lead to runtime increases
+                    // Experimentally found that considering the following led to runtime increases
                     // // Only allow CNODEs that reach into the sink tile
                     // return childTile.getTileYCoordinate() == sinkTile.getTileYCoordinate() &&
                     //        childRnode.getEndTileXCoordinate() == sinkTile.getTileXCoordinate();
 
-                    // Do not allow CNODEs when not targeting a CTRL pin
+                    // Do not allow CNODEs when not targeting a CTRL sink
+                    // Note: NODE_{CLE,INTF}_CNODE (x24) -> NODE_INODE arcs (128/328 PIPs, 128/154 nodes) will be ignored
                     return false;
                 }
                 case NODE_CLE_BNODE:
