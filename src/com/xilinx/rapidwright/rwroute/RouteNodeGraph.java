@@ -716,7 +716,7 @@ public class RouteNodeGraph {
                     assert(sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL || sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL);
 
                     if (childTile == sinkTile) {
-                        // CTRL sinks can be accessed directly from LOCAL_RESERVED nodes in the sink CLE_BC_CORE/INTF_* tile ...
+                        // CTRL sinks can be only accessed directly from LOCAL_RESERVED nodes in the sink CLE_BC_CORE/INTF_* tile ...
                         if (type != RouteNodeType.LOCAL_RESERVED) {
                             return false;
                         }
