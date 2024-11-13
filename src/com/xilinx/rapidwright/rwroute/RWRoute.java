@@ -332,7 +332,7 @@ public class RWRoute {
         if (routingGraph.isVersal) {
             for (Connection connection : indirectConnections) {
                 RouteNode sinkRnode = connection.getSinkRnode();
-                if (sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK) {
+                if (sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH) {
                     for (Node uphill : sinkRnode.getAllUphillNodes()) {
                         if (uphill.isTiedToVcc()) {
                             continue;
@@ -637,8 +637,8 @@ public class RWRoute {
                     sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_WEST);
                     sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK_WEST);
                 } else {
-                    sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK);
-                    sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK);
+                    sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_BOTH);
+                    sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK_BOTH);
                 }
                 connection.setSinkRnode(sinkRnode);
 
@@ -691,7 +691,7 @@ public class RWRoute {
                         continue;
                     }
                     RouteNode altSinkRnode = routingGraph.getOrCreate(node, sinkRnode.getType());
-                    assert(altSinkRnode.getType().isExclusiveSink());
+                    assert(altSinkRnode.getType().isAnyExclusiveSink());
                     connection.addAltSinkRnode(altSinkRnode);
                 }
 
@@ -1838,7 +1838,7 @@ public class RWRoute {
                 }
                 switch (childRNode.getType()) {
                     case LOCAL_RESERVED:
-                    case LOCAL:
+                    case LOCAL_BOTH:
                     case LOCAL_EAST:
                     case LOCAL_WEST:
                         if (!routingGraph.isAccessible(childRNode, connection)) {
@@ -1847,13 +1847,13 @@ public class RWRoute {
                         // Verify invariant that east/west wires stay east/west ...
                         assert(rnode.getType() != RouteNodeType.LOCAL_EAST || childRNode.getType() == RouteNodeType.LOCAL_EAST ||
                                 // ... unless it's an exclusive sink using a LOCAL_RESERVED node
-                                (childRNode.getType() == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK));
+                                (childRNode.getType() == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH));
                         assert(rnode.getType() != RouteNodeType.LOCAL_WEST || childRNode.getType() == RouteNodeType.LOCAL_WEST ||
-                                (childRNode.getType() == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK));
+                                (childRNode.getType() == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH));
                         break;
                     case NON_LOCAL:
                         // LOCALs cannot connect to NON_LOCALs except via a LUT routethru
-                        assert(!rnode.getType().isLocal() ||
+                        assert(!rnode.getType().isAnyLocal() ||
                                routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED);
 
                         if (!routingGraph.isAccessible(childRNode, connection)) {
@@ -1865,12 +1865,12 @@ public class RWRoute {
                             continue;
                         }
                         break;
-                    case EXCLUSIVE_SINK:
+                    case EXCLUSIVE_SINK_BOTH:
                     case EXCLUSIVE_SINK_EAST:
                     case EXCLUSIVE_SINK_WEST:
                         assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_EAST || rnode.getType() == RouteNodeType.LOCAL_EAST);
                         assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_WEST || rnode.getType() == RouteNodeType.LOCAL_WEST);
-                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK || rnode.getType() == RouteNodeType.LOCAL ||
+                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_BOTH || rnode.getType() == RouteNodeType.LOCAL_BOTH ||
                                // [BC]NODEs are LOCAL_{EAST,WEST} since they connect to INODEs, but also service CTRL sinks
                                (routingGraph.isVersal && EnumSet.of(IntentCode.NODE_CLE_BNODE, IntentCode.NODE_CLE_CNODE,
                                                                     IntentCode.NODE_INTF_BNODE, IntentCode.NODE_INTF_CNODE)
@@ -1919,7 +1919,7 @@ public class RWRoute {
     }
 
     protected boolean isAccessibleSink(RouteNode child, Connection connection, boolean assertOnOveruse) {
-        assert(child.getType().isExclusiveSink());
+        assert(child.getType().isAnyExclusiveSink());
         assert(!assertOnOveruse || !child.isOverUsed());
 
         if (child.isTarget()) {

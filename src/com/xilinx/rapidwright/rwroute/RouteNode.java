@@ -124,13 +124,13 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 assert(length == 0 ||
                         (length <= 3 && series == Series.Versal));
                 break;
-            case EXCLUSIVE_SINK:
+            case EXCLUSIVE_SINK_BOTH:
             case EXCLUSIVE_SINK_EAST:
             case EXCLUSIVE_SINK_WEST:
                 assert(length == 0 ||
                        (length == 1 && (series == Series.UltraScalePlus || series == Series.UltraScale) && getIntentCode() == IntentCode.NODE_PINBOUNCE));
                 break;
-            case LOCAL:
+            case LOCAL_BOTH:
                 assert(length == 0);
                 break;
             case LOCAL_EAST:
@@ -356,13 +356,13 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     public void setType(RouteNodeType type) {
         assert(this.type == type ||
                 // Support demotion from EXCLUSIVE_SINK to LOCAL since they have the same base cost
-                (this.type.isExclusiveSink() && type == RouteNodeType.LOCAL) ||
+                (this.type.isAnyExclusiveSink() && type == RouteNodeType.LOCAL_BOTH) ||
                 // Or promotion from LOCAL to EXCLUSIVE_SINK (by PartialRouter when NODE_PINBOUNCE on
                 // a newly unpreserved net becomes a sink)
-                (this.type == RouteNodeType.LOCAL && type.isExclusiveSink()) ||
+                (this.type == RouteNodeType.LOCAL_BOTH && type.isAnyExclusiveSink()) ||
                 // Or promotion for any LOCAL to a LOCAL_RESERVED (by determineRoutingTargets()
                 // for uphills of CTRL sinks)
-                (this.type.isLocal() && type == RouteNodeType.LOCAL_RESERVED));
+                (this.type.isAnyLocal() && type == RouteNodeType.LOCAL_RESERVED));
         this.type = type;
     }
 

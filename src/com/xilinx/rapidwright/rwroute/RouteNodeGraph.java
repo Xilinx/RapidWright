@@ -550,9 +550,9 @@ public class RouteNodeGraph {
                 // PINFEEDs can lead to a site pin, or into a Laguna tile
                 RouteNode childRnode = getNode(child);
                 if (childRnode != null) {
-                    assert(childRnode.getType().isExclusiveSink() ||
+                    assert(childRnode.getType().isAnyExclusiveSink() ||
                             childRnode.getType() == RouteNodeType.LAGUNA_PINFEED ||
-                            (lutRoutethru && childRnode.getType().isLocal()));
+                            (lutRoutethru && childRnode.getType().isAnyLocal()));
                 } else if (!lutRoutethru) {
                     // child does not already exist in our routing graph, meaning it's not a used site pin
                     // in our design, but it could be a LAGUNA_I
@@ -680,7 +680,7 @@ public class RouteNodeGraph {
         // Only consider LOCAL nodes when:
         // (a) considering LUT routethrus
         RouteNodeType type = childRnode.getType();
-        if (!type.isLocal() || lutRoutethru) {
+        if (!type.isAnyLocal() || lutRoutethru) {
             return true;
         }
 
@@ -709,7 +709,7 @@ public class RouteNodeGraph {
                     return false;
                 }
                 break;
-            case EXCLUSIVE_SINK:
+            case EXCLUSIVE_SINK_BOTH:
                 // This must be a CTRL sink that can be accessed from both east/west sides
 
                 if (isVersal) {
@@ -744,7 +744,7 @@ public class RouteNodeGraph {
                     }
 
                     // Only both-sided wires (e.g. INT_NODE_GLOBAL_*) can reach a both-sided sink (CTRL_*)
-                    if (type != RouteNodeType.LOCAL) {
+                    if (type != RouteNodeType.LOCAL_BOTH) {
                         return false;
                     }
                 }
@@ -760,7 +760,7 @@ public class RouteNodeGraph {
         }
 
         if (isVersal) {
-            assert(sinkRnode.getType() != RouteNodeType.EXCLUSIVE_SINK);
+            assert(sinkRnode.getType() != RouteNodeType.EXCLUSIVE_SINK_BOTH);
             assert(sinkRnode.getIntentCode() == IntentCode.NODE_IMUX || sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
 
             IntentCode childIntentCode = childRnode.getIntentCode();

@@ -28,7 +28,7 @@ import com.xilinx.rapidwright.device.Node;
 
 public enum RouteNodeType {
     EXCLUSIVE_SOURCE,
-    EXCLUSIVE_SINK,
+    EXCLUSIVE_SINK_BOTH,
     EXCLUSIVE_SINK_EAST,
     EXCLUSIVE_SINK_WEST,
 
@@ -46,17 +46,17 @@ public enum RouteNodeType {
 
     NON_LOCAL,
 
-    LOCAL,
+    LOCAL_BOTH,
     LOCAL_EAST,
     LOCAL_WEST,
 
     LOCAL_RESERVED;
 
-    public boolean isExclusiveSink() {
-        return this == EXCLUSIVE_SINK || this == EXCLUSIVE_SINK_EAST || this == EXCLUSIVE_SINK_WEST;
+    public boolean isAnyExclusiveSink() {
+        return this == EXCLUSIVE_SINK_BOTH || this == EXCLUSIVE_SINK_EAST || this == EXCLUSIVE_SINK_WEST;
     }
 
-    public boolean isLocal() {
-        return this == LOCAL || this == LOCAL_EAST || this == LOCAL_WEST || this == LOCAL_RESERVED;
+    public boolean isAnyLocal() {
+        return this == LOCAL_BOTH || this == LOCAL_EAST || this == LOCAL_WEST || this == LOCAL_RESERVED;
     }
 }

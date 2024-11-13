@@ -141,7 +141,7 @@ public class RouteNodeInfo {
                         } else if (eastWestWires[1].get(node.getWireIndex())) {
                             return RouteNodeType.LOCAL_WEST;
                         }
-                        return RouteNodeType.LOCAL;
+                        return RouteNodeType.LOCAL_BOTH;
                     }
                     break;
                 }
@@ -149,7 +149,7 @@ public class RouteNodeInfo {
 
             case NODE_PINFEED:
                 if (routingGraph == null || routingGraph.isVersal) {
-                    return RouteNodeType.LOCAL;
+                    return RouteNodeType.LOCAL_BOTH;
                 }
                 if (routingGraph.lagunaI != null) {
                     BitSet bs = routingGraph.lagunaI.get(node.getTile());
@@ -174,12 +174,12 @@ public class RouteNodeInfo {
                     }
                     assert(!routingGraph.isVersal && node.getWireName().startsWith("CTRL_"));
                 }
-                return RouteNodeType.LOCAL;
+                return RouteNodeType.LOCAL_BOTH;
 
             // Versal only
             case NODE_CLE_CTRL:     // CLE_BC_CORE*.CTRL_[LR]_B*
             case NODE_INTF_CTRL:    // INTF_[LR]OCF_[TB][LR]_TILE.INTF_IRI*
-                return RouteNodeType.LOCAL;
+                return RouteNodeType.LOCAL_BOTH;
 
             case NODE_LAGUNA_OUTPUT: // UltraScale+ only
                 assert(tileTypeEnum == TileTypeEnum.LAG_LAG);
