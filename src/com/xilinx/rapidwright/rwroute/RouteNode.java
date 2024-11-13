@@ -359,7 +359,10 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 (this.type.isExclusiveSink() && type == RouteNodeType.LOCAL) ||
                 // Or promotion from LOCAL to EXCLUSIVE_SINK (by PartialRouter when NODE_PINBOUNCE on
                 // a newly unpreserved net becomes a sink)
-                (this.type == RouteNodeType.LOCAL && type.isExclusiveSink()));
+                (this.type == RouteNodeType.LOCAL && type.isExclusiveSink()) ||
+                // Or promotion for any LOCAL to a LOCAL_RESERVED (by determineRoutingTargets()
+                // for uphills of CTRL sinks)
+                (this.type.isLocal() && type == RouteNodeType.LOCAL_RESERVED));
         this.type = type;
     }
 

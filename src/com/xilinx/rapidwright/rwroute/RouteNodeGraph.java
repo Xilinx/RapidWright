@@ -710,20 +710,38 @@ public class RouteNodeGraph {
                 }
                 break;
             case EXCLUSIVE_SINK:
-                // This must be a CTRL sink; these can only be accessed from LOCAL nodes in the sink tile (rather than Y +/- 1 below)
-                if (childTile != sinkTile) {
-                    return false;
-                }
+                // This must be a CTRL sink that can be accessed from both east/west sides
+
                 if (isVersal) {
                     assert(sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL || sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL);
 
-                    // NODE_(CLE|INTF)_CTRL can only be reached by LOCAL_RESERVED nodes
-                    if (type != RouteNodeType.LOCAL_RESERVED) {
-                        return false;
+                    if (childTile == sinkTile) {
+                        // CTRL sinks can be accessed directly from LOCAL_RESERVED nodes in the sink CLE_BC_CORE/INTF_* tile ...
+                        if (type != RouteNodeType.LOCAL_RESERVED) {
+                            return false;
+                        }
+                    } else {
+                        // ... or via LOCAL nodes in the two INT tiles either side
+                        if (childTile.getTileYCoordinate() != sinkTile.getTileYCoordinate() ||
+                                Math.abs(childTile.getTileXCoordinate() - sinkTile.getTileXCoordinate()) > 1) {
+                            return false;
+                        }
+                        if (childTile.getTileTypeEnum() != TileTypeEnum.INT) {
+                            // e.g. CLE_BC_CORE_X50Y4 and CLE_BC_CORE_1_X50Y4 on xcvc1502
+                            return false;
+                        }
+                        // Allow use of INODE + PINBOUNCEs in the two INT tiles on either side of sink
+                        assert(childRnode.getIntentCode() == IntentCode.NODE_INODE || childRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
+                        return true;
                     }
                 } else {
                     assert(design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus);
                     assert(sinkRnode.getWireName().startsWith("CTRL_"));
+
+                    // CTRL sinks can only be accessed from LOCAL nodes in the sink tile (rather than Y +/- 1 below)
+                    if (childTile != sinkTile) {
+                        return false;
+                    }
 
                     // Only both-sided wires (e.g. INT_NODE_GLOBAL_*) can reach a both-sided sink (CTRL_*)
                     if (type != RouteNodeType.LOCAL) {
@@ -742,32 +760,22 @@ public class RouteNodeGraph {
         }
 
         if (isVersal) {
+            assert(sinkRnode.getType() != RouteNodeType.EXCLUSIVE_SINK);
+            assert(sinkRnode.getIntentCode() == IntentCode.NODE_IMUX || sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
+
             IntentCode childIntentCode = childRnode.getIntentCode();
             switch (childIntentCode) {
                 case NODE_INODE:
                     // Block access to all INODEs outside the sink tile, since NODE_INODE -> NODE_IMUX -> NODE_PINFEED (or NODE_INODE -> NODE_PINBOUNCE)
+                    assert(childTile != sinkTile);
                     return false;
-                case NODE_CLE_CNODE:
-                case NODE_INTF_CNODE: {
-                    IntentCode sinkIntentCode = sinkRnode.getIntentCode();
-                    assert(sinkIntentCode == IntentCode.NODE_IMUX || sinkIntentCode == IntentCode.NODE_PINBOUNCE);
-
-                    // Only allow CNODEs that reach into the sink tile
-                    return childTile.getTileYCoordinate() == sinkTile.getTileYCoordinate() &&
-                           childRnode.getEndTileXCoordinate() == sinkTile.getTileXCoordinate();
-
-                    // // Do not allow CNODEs when not targeting a CTRL sink
-                    // // Note: NODE_{CLE,INTF}_CNODE (x24) -> NODE_INODE arcs (128/328 PIPs, 128/154 nodes) will be ignored
-                    // return false;
-                }
                 case NODE_CLE_BNODE:
-                case NODE_INTF_BNODE: {
-                    // Only allow BNODEs that reach into the sink tile
-                    IntentCode sinkIntentCode = sinkRnode.getIntentCode();
-                    assert(sinkIntentCode == IntentCode.NODE_IMUX || sinkIntentCode == IntentCode.NODE_PINBOUNCE);
+                case NODE_INTF_BNODE:
+                case NODE_CLE_CNODE:
+                case NODE_INTF_CNODE:
+                    // Only allow [BC]NODEs that reach into the sink tile
                     return childTile.getTileYCoordinate() == sinkTile.getTileYCoordinate() &&
                            childRnode.getEndTileXCoordinate() == sinkTile.getTileXCoordinate();
-                }
                 case NODE_PINBOUNCE:
                     // BOUNCEs are only accessible through INODEs, so transitively this intent code is unreachable
                     break;
