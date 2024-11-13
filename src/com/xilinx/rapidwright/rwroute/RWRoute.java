@@ -627,19 +627,16 @@ public class RWRoute {
                 }
 
                 indirectConnections.add(connection);
-                BitSet[] eastWestWires = (routingGraph.eastWestWires == null) ? null :
-                        routingGraph.eastWestWires.get(sinkINTNode.getTile().getTileTypeEnum());
-                RouteNode sinkRnode;
-                if (eastWestWires != null && eastWestWires[0].get(sinkINTNode.getWireIndex())) {
-                    sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_EAST);
-                    sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK_EAST);
-                } else if (eastWestWires != null && eastWestWires[1].get(sinkINTNode.getWireIndex())) {
-                    sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_WEST);
-                    sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK_WEST);
-                } else {
-                    sinkRnode = routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_BOTH);
-                    sinkRnode.setType(RouteNodeType.EXCLUSIVE_SINK_BOTH);
-                }
+
+                RouteNodeInfo rni = RouteNodeInfo.get(sinkINTNode, routingGraph);
+                assert(rni.type.isAnyLocal());
+                RouteNodeType sinkType = rni.type == RouteNodeType.LOCAL_EAST ? RouteNodeType.EXCLUSIVE_SINK_EAST :
+                                         rni.type == RouteNodeType.LOCAL_WEST ? RouteNodeType.EXCLUSIVE_SINK_WEST :
+                                         rni.type == RouteNodeType.LOCAL_BOTH ? RouteNodeType.EXCLUSIVE_SINK_BOTH :
+                                         null;
+                assert(sinkType != null);
+                RouteNode sinkRnode = routingGraph.getOrCreate(sinkINTNode, sinkType);
+                sinkRnode.setType(sinkType);
                 connection.setSinkRnode(sinkRnode);
 
                 // Where appropriate, allow all 6 LUT pins to be swapped to begin with
