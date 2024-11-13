@@ -679,7 +679,8 @@ public class RouteNodeGraph {
     public boolean isAccessible(RouteNode childRnode, Connection connection) {
         // Only consider LOCAL nodes when:
         // (a) considering LUT routethrus
-        if (!childRnode.getType().isLocal() || lutRoutethru) {
+        RouteNodeType type = childRnode.getType();
+        if (!type.isLocal() || lutRoutethru) {
             return true;
         }
 
@@ -694,17 +695,16 @@ public class RouteNodeGraph {
         }
 
         // (c) on the same side as the sink
-        RouteNodeType type = childRnode.getType();
         Tile sinkTile = sinkRnode.getTile();
         switch (sinkRnode.getType()) {
             case EXCLUSIVE_SINK_EAST:
-                if (type == RouteNodeType.LOCAL_WEST) {
+                if (type == RouteNodeType.LOCAL_WEST || type == RouteNodeType.LOCAL_RESERVED) {
                     // West wires can never reach an east sink
                     return false;
                 }
                 break;
             case EXCLUSIVE_SINK_WEST:
-                if (type == RouteNodeType.LOCAL_EAST) {
+                if (type == RouteNodeType.LOCAL_EAST || type == RouteNodeType.LOCAL_RESERVED) {
                     // East wires can never reach a west sink
                     return false;
                 }
@@ -715,9 +715,12 @@ public class RouteNodeGraph {
                     return false;
                 }
                 if (isVersal) {
-                    // NODE_(CLE|INTF)_CTRL can be reached by NODE_(CLE|INTF)_[BC]NODE which have type LOCAL_(EAST|WEST)
-                    assert((sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL && type != RouteNodeType.LOCAL) ||
-                           (sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL && type != RouteNodeType.LOCAL));
+                    assert(sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL || sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL);
+
+                    // NODE_(CLE|INTF)_CTRL can only be reached by LOCAL_RESERVED nodes
+                    if (type != RouteNodeType.LOCAL_RESERVED) {
+                        return false;
+                    }
                 } else {
                     assert(design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus);
                     assert(sinkRnode.getWireName().startsWith("CTRL_"));
@@ -749,14 +752,13 @@ public class RouteNodeGraph {
                     IntentCode sinkIntentCode = sinkRnode.getIntentCode();
                     assert(sinkIntentCode == IntentCode.NODE_IMUX || sinkIntentCode == IntentCode.NODE_PINBOUNCE);
 
-                    // Experimentally found that considering the following led to runtime increases
-                    // // Only allow CNODEs that reach into the sink tile
-                    // return childTile.getTileYCoordinate() == sinkTile.getTileYCoordinate() &&
-                    //        childRnode.getEndTileXCoordinate() == sinkTile.getTileXCoordinate();
+                    // Only allow CNODEs that reach into the sink tile
+                    return childTile.getTileYCoordinate() == sinkTile.getTileYCoordinate() &&
+                           childRnode.getEndTileXCoordinate() == sinkTile.getTileXCoordinate();
 
-                    // Do not allow CNODEs when not targeting a CTRL sink
-                    // Note: NODE_{CLE,INTF}_CNODE (x24) -> NODE_INODE arcs (128/328 PIPs, 128/154 nodes) will be ignored
-                    return false;
+                    // // Do not allow CNODEs when not targeting a CTRL sink
+                    // // Note: NODE_{CLE,INTF}_CNODE (x24) -> NODE_INODE arcs (128/328 PIPs, 128/154 nodes) will be ignored
+                    // return false;
                 }
                 case NODE_CLE_BNODE:
                 case NODE_INTF_BNODE: {

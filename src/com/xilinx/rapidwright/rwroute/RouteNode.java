@@ -135,6 +135,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 break;
             case LOCAL_EAST:
             case LOCAL_WEST:
+            case LOCAL_RESERVED:
                 assert(length == 0 ||
                        (length == 1 && (
                                ((series == Series.UltraScalePlus || series == Series.UltraScale) && getIntentCode() == IntentCode.NODE_PINBOUNCE) ||

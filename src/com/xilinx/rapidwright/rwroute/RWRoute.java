@@ -325,6 +325,32 @@ public class RWRoute {
 
         // Wait for all outstanding RouteNodeGraph.preserveAsync() calls to complete
         routingGraph.awaitPreserve();
+
+        // On Versal only, reserve all uphills of NODE_(CLE|INTF)_CTRL sinks since
+        // their [BC]NODEs can also be used to reach NODE_INODEs --- not applying this
+        // heuristic can lead to avoidable congestion
+        if (routingGraph.isVersal) {
+            for (Connection connection : indirectConnections) {
+                RouteNode sinkRnode = connection.getSinkRnode();
+                if (sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK) {
+                    for (Node uphill : sinkRnode.getAllUphillNodes()) {
+                        if (uphill.isTiedToVcc()) {
+                            continue;
+                        }
+                        Net preservedNet = routingGraph.getPreservedNet(uphill);
+                        if (preservedNet != null && preservedNet != connection.getNetWrapper().getNet()) {
+                            continue;
+                        }
+                        assert((sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL &&
+                                        (uphill.getIntentCode() == IntentCode.NODE_CLE_CNODE || uphill.getIntentCode() == IntentCode.NODE_CLE_BNODE)) ||
+                                (sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL &&
+                                        (uphill.getIntentCode() == IntentCode.NODE_INTF_CNODE || uphill.getIntentCode() == IntentCode.NODE_INTF_BNODE)));
+                        RouteNode rnode = routingGraph.getOrCreate(uphill, RouteNodeType.LOCAL_RESERVED);
+                        rnode.setType(RouteNodeType.LOCAL_RESERVED);
+                    }
+                }
+            }
+        }
     }
 
     private void categorizeNets() {
@@ -1811,15 +1837,19 @@ public class RWRoute {
                     continue;
                 }
                 switch (childRNode.getType()) {
+                    case LOCAL_RESERVED:
                     case LOCAL:
                     case LOCAL_EAST:
                     case LOCAL_WEST:
                         if (!routingGraph.isAccessible(childRNode, connection)) {
                             continue;
                         }
-                        // Verify invariant that east/west wires stay east/west
-                        assert(rnode.getType() != RouteNodeType.LOCAL_EAST || childRNode.getType() == RouteNodeType.LOCAL_EAST);
-                        assert(rnode.getType() != RouteNodeType.LOCAL_WEST || childRNode.getType() == RouteNodeType.LOCAL_WEST);
+                        // Verify invariant that east/west wires stay east/west ...
+                        assert(rnode.getType() != RouteNodeType.LOCAL_EAST || childRNode.getType() == RouteNodeType.LOCAL_EAST ||
+                                // ... unless it's an exclusive sink using a LOCAL_RESERVED node
+                                (childRNode.getType() == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK));
+                        assert(rnode.getType() != RouteNodeType.LOCAL_WEST || childRNode.getType() == RouteNodeType.LOCAL_WEST ||
+                                (childRNode.getType() == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK));
                         break;
                     case NON_LOCAL:
                         // LOCALs cannot connect to NON_LOCALs except via a LUT routethru

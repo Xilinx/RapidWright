@@ -48,13 +48,15 @@ public enum RouteNodeType {
 
     LOCAL,
     LOCAL_EAST,
-    LOCAL_WEST;
+    LOCAL_WEST,
+
+    LOCAL_RESERVED;
 
     public boolean isExclusiveSink() {
         return this == EXCLUSIVE_SINK || this == EXCLUSIVE_SINK_EAST || this == EXCLUSIVE_SINK_WEST;
     }
 
     public boolean isLocal() {
-        return this == LOCAL || this == LOCAL_EAST || this == LOCAL_WEST;
+        return this == LOCAL || this == LOCAL_EAST || this == LOCAL_WEST || this == LOCAL_RESERVED;
     }
 }
