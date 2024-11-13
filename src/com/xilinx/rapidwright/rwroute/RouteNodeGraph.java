@@ -171,7 +171,7 @@ public class RouteNodeGraph {
 
             ultraScalesNonLocalWires = null;
 
-            eastWestPattern = Pattern.compile("(((BOUNCE|IMUX_B|BNODE_OUTS)_(?<eastwest>[EW])(?<bounce>\\d+))|INT_NODE_IMUX_ATOM_(?<inode>\\d+)_).*");
+            eastWestPattern = Pattern.compile("(((BOUNCE|IMUX_B|[BC]NODE_OUTS)_(?<eastwest>[EW]))|INT_NODE_IMUX_ATOM_(?<inode>\\d+)_).*");
         }
 
         for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
@@ -223,7 +223,7 @@ public class RouteNodeGraph {
                 assert(isVersal);
 
                 if (!EnumSet.of(IntentCode.NODE_IMUX, IntentCode.NODE_PINBOUNCE, IntentCode.NODE_INODE,
-                        IntentCode.NODE_CLE_BNODE).contains(baseIntentCode)) {
+                        IntentCode.NODE_CLE_BNODE, IntentCode.NODE_CLE_CNODE).contains(baseIntentCode)) {
                     continue;
                 }
             }
@@ -237,17 +237,15 @@ public class RouteNodeGraph {
                 String ew = m.group("eastwest");
                 String inode;
                 if (ew != null) {
-                    assert(ew.equals("E") || ew.equals("W"));
-                    if (baseIntentCode == IntentCode.NODE_CLE_BNODE) {
+                    // [BC]NODEs connect to INODEs opposite to their wire name
+                    if (baseIntentCode == IntentCode.NODE_CLE_BNODE || baseIntentCode == IntentCode.NODE_CLE_CNODE) {
                         ew = ew.equals("E") ? "W" : "E";
                     }
-                    // Integer bounce = isVersal && baseIntentCode == IntentCode.NODE_PINBOUNCE ? Integer.valueOf(m.group("bounce")) : null;
-                    if (ew.equals("E") /*&& (bounce == null || bounce < 16)*/) {
+                    if (ew.equals("E")) {
                         eastWires.set(baseNode.getWireIndex());
-                    } else if (ew.equals("W") /*&& (bounce == null || bounce < 16)*/) {
-                        westWires.set(baseNode.getWireIndex());
                     } else {
-                        // assert(!isVersal || baseIntentCode == IntentCode.NODE_IMUX || (bounce >= 16 && bounce < 32));
+                        assert(ew.equals("W"));
+                        westWires.set(baseNode.getWireIndex());
                     }
                 } else {
                     if ((inode = m.group("inode")) != null) {
@@ -681,19 +679,24 @@ public class RouteNodeGraph {
                 }
                 break;
             case EXCLUSIVE_SINK:
-                // Only both-sided wires (e.g. INT_NODE_GLOBAL_*) can reach a both-sided sink (CTRL_*)
-                if (type != RouteNodeType.LOCAL) {
+                // This must be a CTRL sink; these can only be accessed from LOCAL nodes in the sink tile (rather than Y +/- 1 below)
+                if (childTile != sinkTile) {
                     return false;
                 }
-                // This must be a CTRL sink; these can only be accessed from the sink tile (rather than Y +/- 1 below)
                 if (isVersal) {
-                    assert(sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL ||
-                           sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL);
+                    assert((sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL && type != RouteNodeType.LOCAL) ||
+                           (sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL && type == RouteNodeType.LOCAL));
                 } else {
                     assert(design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus);
                     assert(sinkRnode.getWireName().startsWith("CTRL_"));
+
+                    // Only both-sided wires (e.g. INT_NODE_GLOBAL_*) can reach a both-sided sink (CTRL_*)
+                    if (type != RouteNodeType.LOCAL) {
+                        return false;
+                    }
                 }
-                return childTile == sinkTile;
+                assert(childTile == sinkTile);
+                break;
             default:
                 throw new RuntimeException("ERROR: Unexpected sink type " + sinkRnode.getType());
         }
@@ -711,15 +714,20 @@ public class RouteNodeGraph {
                     return false;
                 case NODE_CLE_CNODE:
                 case NODE_INTF_CNODE: {
-                    // CNODEs must only be used for CTRL sinks; must not be the case if we've reached here
-                    // FIXME
                     IntentCode sinkIntentCode = sinkRnode.getIntentCode();
-                    assert(sinkIntentCode != IntentCode.NODE_CLE_CTRL && sinkIntentCode != IntentCode.NODE_INTF_CTRL);
+                    assert(sinkIntentCode == IntentCode.NODE_IMUX || sinkIntentCode == IntentCode.NODE_PINBOUNCE);
+
+                    // Experimentally, found this to lead to runtime increases
+                    // // Only allow CNODEs that reach into the sink tile
+                    // return childTile.getTileYCoordinate() == sinkTile.getTileYCoordinate() &&
+                    //        childRnode.getEndTileXCoordinate() == sinkTile.getTileXCoordinate();
+
+                    // Do not allow CNODEs when not targeting a CTRL pin
                     return false;
                 }
                 case NODE_CLE_BNODE:
                 case NODE_INTF_BNODE: {
-                    // Sinks at this point must only, only allow if BNODE reaches into the sink tile
+                    // Only allow BNODEs that reach into the sink tile
                     IntentCode sinkIntentCode = sinkRnode.getIntentCode();
                     assert(sinkIntentCode == IntentCode.NODE_IMUX || sinkIntentCode == IntentCode.NODE_PINBOUNCE);
                     return childTile.getTileYCoordinate() == sinkTile.getTileYCoordinate() &&
