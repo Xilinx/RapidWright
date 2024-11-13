@@ -165,7 +165,7 @@ public class RouteNodeInfo {
             case NODE_CLE_BNODE:    // CLE_BC_CORE*.BNODE_OUTS_[EW]*                 (Versal only)
             case NODE_INTF_BNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_BNODE_OUTS* (Versal only)
             case NODE_INTF_CNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_CNODE_OUTS* (Versal only)
-                if (routingGraph != null && routingGraph.eastWestWires != null) {
+                if (routingGraph != null) {
                     BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
                     if (eastWestWires[0].get(node.getWireIndex())) {
                         return RouteNodeType.LOCAL_EAST;
