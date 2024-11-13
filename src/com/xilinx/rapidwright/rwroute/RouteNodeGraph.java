@@ -278,7 +278,7 @@ public class RouteNodeGraph {
                 BitSet westWires = eastWestWires[1];
                 for (int wireIndex = 0; wireIndex < intfTile.getWireCount(); wireIndex++) {
                     IntentCode baseIntentCode = intfTile.getWireIntentCode(wireIndex);
-                    if (baseIntentCode != IntentCode.NODE_INTF_BNODE) {
+                    if (baseIntentCode != IntentCode.NODE_INTF_BNODE && baseIntentCode != IntentCode.NODE_INTF_CNODE) {
                         continue;
                     }
 
@@ -715,12 +715,9 @@ public class RouteNodeGraph {
                     return false;
                 }
                 if (isVersal) {
-                    // CLE_CTRL can be reached by NODE_CLE_[BC]NODE which have type LOCAL_{EAST,WEST}
+                    // NODE_(CLE|INTF)_CTRL can be reached by NODE_(CLE|INTF)_[BC]NODE which have type LOCAL_(EAST|WEST)
                     assert((sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL && type != RouteNodeType.LOCAL) ||
-                           // INTF_CTRL can be reached by NODE_INTF_BNODE which have type LOCAL_{EAST,WEST},
-                           // but also NODE_INTF_CNODE which are currently LOCAL
-                           (sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL && (type != RouteNodeType.LOCAL ||
-                                   childRnode.getIntentCode() == IntentCode.NODE_INTF_CNODE)));
+                           (sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL && type != RouteNodeType.LOCAL));
                 } else {
                     assert(design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus);
                     assert(sinkRnode.getWireName().startsWith("CTRL_"));

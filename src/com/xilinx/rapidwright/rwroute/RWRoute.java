@@ -1842,7 +1842,9 @@ public class RWRoute {
                         assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_WEST || rnode.getType() == RouteNodeType.LOCAL_WEST);
                         assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK || rnode.getType() == RouteNodeType.LOCAL ||
                                // [BC]NODEs are LOCAL_{EAST,WEST} since they connect to INODEs, but also service CTRL sinks
-                               (routingGraph.isVersal && (rnode.getIntentCode() == IntentCode.NODE_CLE_BNODE || rnode.getIntentCode() == IntentCode.NODE_CLE_CNODE)));
+                               (routingGraph.isVersal && EnumSet.of(IntentCode.NODE_CLE_BNODE, IntentCode.NODE_CLE_CNODE,
+                                                                    IntentCode.NODE_INTF_BNODE, IntentCode.NODE_INTF_CNODE)
+                                       .contains(rnode.getIntentCode())));
                         if (!isAccessibleSink(childRNode, connection)) {
                             continue;
                         }
