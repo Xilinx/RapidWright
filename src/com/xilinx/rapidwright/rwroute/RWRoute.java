@@ -1817,6 +1817,7 @@ public class RWRoute {
                         if (!routingGraph.isAccessible(childRNode, connection)) {
                             continue;
                         }
+                        // Verify invariant that east/west wires stay east/west
                         assert(rnode.getType() != RouteNodeType.LOCAL_EAST || childRNode.getType() == RouteNodeType.LOCAL_EAST);
                         assert(rnode.getType() != RouteNodeType.LOCAL_WEST || childRNode.getType() == RouteNodeType.LOCAL_WEST);
                         break;
