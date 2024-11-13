@@ -1817,12 +1817,8 @@ public class RWRoute {
                         if (!routingGraph.isAccessible(childRNode, connection)) {
                             continue;
                         }
-                        assert(rnode.getType() != RouteNodeType.LOCAL_EAST || childRNode.getType() == RouteNodeType.LOCAL_EAST
-                                // FIXME:
-                                || childRNode.getTile().getName().matches("INTF_[LR]OCF_[TB]R_TILE_.*"));
-                        assert(rnode.getType() != RouteNodeType.LOCAL_WEST || childRNode.getType() == RouteNodeType.LOCAL_WEST
-                                // FIXME:
-                                || childRNode.getTile().getName().matches("INTF_[LR]OCF_[TB]L_TILE_.*"));
+                        assert(rnode.getType() != RouteNodeType.LOCAL_EAST || childRNode.getType() == RouteNodeType.LOCAL_EAST);
+                        assert(rnode.getType() != RouteNodeType.LOCAL_WEST || childRNode.getType() == RouteNodeType.LOCAL_WEST);
                         break;
                     case NON_LOCAL:
                         // LOCALs cannot connect to NON_LOCALs except via a LUT routethru

@@ -263,6 +263,38 @@ public class RouteNodeGraph {
             }
         }
 
+        if (isVersal) {
+            for (TileTypeEnum tte : Arrays.asList(TileTypeEnum.INTF_LOCF_TL_TILE,
+                    TileTypeEnum.INTF_LOCF_BL_TILE,
+                    TileTypeEnum.INTF_ROCF_TL_TILE,
+                    TileTypeEnum.INTF_ROCF_BL_TILE,
+                    TileTypeEnum.INTF_LOCF_TR_TILE,
+                    TileTypeEnum.INTF_LOCF_BR_TILE,
+                    TileTypeEnum.INTF_ROCF_TR_TILE,
+                    TileTypeEnum.INTF_ROCF_BR_TILE)) {
+                Tile intfTile = device.getArbitraryTileOfType(tte);
+                BitSet[] eastWestWires = this.eastWestWires.computeIfAbsent(tte,
+                        k -> new BitSet[]{new BitSet(), new BitSet()});
+                BitSet eastWires = eastWestWires[0];
+                BitSet westWires = eastWestWires[1];
+                for (int wireIndex = 0; wireIndex < intfTile.getWireCount(); wireIndex++) {
+                    IntentCode baseIntentCode = intfTile.getWireIntentCode(wireIndex);
+                    if (baseIntentCode != IntentCode.NODE_INTF_BNODE) {
+                        continue;
+                    }
+
+                    if (EnumSet.of(TileTypeEnum.INTF_LOCF_TR_TILE,
+                            TileTypeEnum.INTF_LOCF_BR_TILE,
+                            TileTypeEnum.INTF_ROCF_TR_TILE,
+                            TileTypeEnum.INTF_ROCF_BR_TILE).contains(tte)) {
+                        eastWires.set(wireIndex);
+                    } else {
+                        westWires.set(wireIndex);
+                    }
+                }
+            }
+        }
+
         if (lutRoutethru) {
             assert(isUltraScalePlus || isUltraScale);
 
@@ -684,8 +716,12 @@ public class RouteNodeGraph {
                     return false;
                 }
                 if (isVersal) {
+                    // CLE_CTRL can be reached by NODE_CLE_[BC]NODE which have type LOCAL_{EAST,WEST}
                     assert((sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL && type != RouteNodeType.LOCAL) ||
-                           (sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL && type == RouteNodeType.LOCAL));
+                           // INTF_CTRL can be reached by NODE_INTF_BNODE which have type LOCAL_{EAST,WEST},
+                           // but also NODE_INTF_CNODE which are currently LOCAL
+                           (sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL && (type != RouteNodeType.LOCAL ||
+                                   childRnode.getIntentCode() == IntentCode.NODE_INTF_CNODE)));
                 } else {
                     assert(design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus);
                     assert(sinkRnode.getWireName().startsWith("CTRL_"));

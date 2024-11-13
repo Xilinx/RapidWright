@@ -24,7 +24,6 @@ package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
@@ -157,10 +156,11 @@ public class RouteNodeInfo {
                 }
                 // Fall through
             case NODE_PINBOUNCE:
-            case NODE_INODE:        // INT.INT_NODE_IMUX_ATOM_*_INT_OUT[01] (Versal only)
-            case NODE_IMUX:         // INT.IMUX_B_[EW]*                     (Versal only)
-            case NODE_CLE_CNODE:    // CLE_BC_CORE*.CNODE_OUTS_[EW]*        (Versal only)
-            case NODE_CLE_BNODE:    // CLE_BC_CORE*.BNODE_OUTS_[EW]*        (Versal only)
+            case NODE_INODE:        // INT.INT_NODE_IMUX_ATOM_*_INT_OUT[01]          (Versal only)
+            case NODE_IMUX:         // INT.IMUX_B_[EW]*                              (Versal only)
+            case NODE_CLE_CNODE:    // CLE_BC_CORE*.CNODE_OUTS_[EW]*                 (Versal only)
+            case NODE_CLE_BNODE:    // CLE_BC_CORE*.BNODE_OUTS_[EW]*                 (Versal only)
+            case NODE_INTF_BNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_BNODE_OUTS* (Versal only)
                 if (routingGraph != null && routingGraph.eastWestWires != null) {
                     BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
                     if (eastWestWires[0].get(node.getWireIndex())) {
@@ -168,15 +168,13 @@ public class RouteNodeInfo {
                     } else if (eastWestWires[1].get(node.getWireIndex())) {
                         return RouteNodeType.LOCAL_WEST;
                     }
-                    assert((!routingGraph.isVersal && node.getWireName().startsWith("CTRL_") ||
-                            routingGraph.isVersal && ic == IntentCode.NODE_CLE_CNODE));
+                    assert(!routingGraph.isVersal && node.getWireName().startsWith("CTRL_"));
                 }
                 return RouteNodeType.LOCAL;
 
             // Versal only
             case NODE_CLE_CTRL:     // CLE_BC_CORE*.CTRL_[LR]_B*
             case NODE_INTF_CTRL:    // INTF_[LR]OCF_[TB][LR]_TILE.INTF_IRI*
-            case NODE_INTF_BNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_BNODE_OUTS*
             case NODE_INTF_CNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_CNODE_OUTS*
                 return RouteNodeType.LOCAL;
 
