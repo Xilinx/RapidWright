@@ -215,9 +215,8 @@ public class RouteNodeGraph {
                             continue;
                         }
                     }
-                    if (baseIntentCode != IntentCode.NODE_PINFEED && baseIntentCode != IntentCode.NODE_PINBOUNCE) {
-                        continue;
-                    }
+                } else if (baseIntentCode != IntentCode.NODE_PINFEED && baseIntentCode != IntentCode.NODE_PINBOUNCE) {
+                    continue;
                 }
             } else {
                 assert(isVersal);
