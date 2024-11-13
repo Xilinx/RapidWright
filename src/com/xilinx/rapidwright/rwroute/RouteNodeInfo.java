@@ -148,7 +148,10 @@ public class RouteNodeInfo {
             }
 
             case NODE_PINFEED:
-                if (routingGraph != null && routingGraph.lagunaI != null) {
+                if (routingGraph == null || routingGraph.isVersal) {
+                    return RouteNodeType.LOCAL;
+                }
+                if (routingGraph.lagunaI != null) {
                     BitSet bs = routingGraph.lagunaI.get(node.getTile());
                     if (bs != null && bs.get(node.getWireIndex())) {
                         return RouteNodeType.LAGUNA_PINFEED;
