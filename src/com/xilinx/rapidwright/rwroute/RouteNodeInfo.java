@@ -65,7 +65,8 @@ public class RouteNodeInfo {
             endTile = node.getTile();
         }
 
-        RouteNodeType type = getType(node, endTile, routingGraph);
+        boolean ignoreLaguna = false;
+        RouteNodeType type = getType(node, endTile, routingGraph, ignoreLaguna);
         short endTileXCoordinate = getEndTileXCoordinate(node, type, (short) endTile.getTileXCoordinate());
         short endTileYCoordinate = (short) endTile.getTileYCoordinate();
         short length = getLength(baseTile, type, endTileXCoordinate, endTileYCoordinate);
@@ -125,7 +126,7 @@ public class RouteNodeInfo {
         return endTileXCoordinate;
     }
 
-    private static RouteNodeType getType(Node node, Tile endTile, RouteNodeGraph routingGraph) {
+    public static RouteNodeType getType(Node node, Tile endTile, RouteNodeGraph routingGraph, boolean ignoreLaguna) {
         // NOTE: IntentCode is device-dependent
         IntentCode ic = node.getIntentCode();
         TileTypeEnum tileTypeEnum = node.getTile().getTileTypeEnum();
@@ -151,7 +152,7 @@ public class RouteNodeInfo {
                 if (routingGraph == null || routingGraph.isVersal) {
                     return RouteNodeType.LOCAL_BOTH;
                 }
-                if (routingGraph.lagunaI != null) {
+                if (routingGraph.lagunaI != null && !ignoreLaguna) {
                     BitSet bs = routingGraph.lagunaI.get(node.getTile());
                     if (bs != null && bs.get(node.getWireIndex())) {
                         return RouteNodeType.LAGUNA_PINFEED;
@@ -190,6 +191,7 @@ public class RouteNodeInfo {
 
             case NODE_LAGUNA_DATA: // UltraScale+ only
                 assert(tileTypeEnum == TileTypeEnum.LAG_LAG);
+                assert(endTile != null);
                 if (node.getTile() != endTile) {
                     return RouteNodeType.SUPER_LONG_LINE;
                 }
@@ -201,6 +203,7 @@ public class RouteNodeInfo {
                 if (tileTypeEnum == TileTypeEnum.LAGUNA_TILE) { // UltraScale only
                     String wireName = node.getWireName();
                     if (wireName.startsWith("UBUMP")) {
+                        assert(endTile != null);
                         assert(node.getTile() != endTile);
                         return RouteNodeType.SUPER_LONG_LINE;
                     } else if (wireName.endsWith("_TXOUT")) {

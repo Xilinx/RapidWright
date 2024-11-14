@@ -628,12 +628,13 @@ public class RWRoute {
 
                 indirectConnections.add(connection);
 
-                RouteNodeInfo rni = RouteNodeInfo.get(sinkINTNode, routingGraph);
-                assert(rni.type.isAnyLocal());
-                RouteNodeType sinkType = rni.type == RouteNodeType.LOCAL_EAST ? RouteNodeType.EXCLUSIVE_SINK_EAST :
-                                         rni.type == RouteNodeType.LOCAL_WEST ? RouteNodeType.EXCLUSIVE_SINK_WEST :
-                                         rni.type == RouteNodeType.LOCAL_BOTH ? RouteNodeType.EXCLUSIVE_SINK_BOTH :
-                                         null;
+                boolean ignoreLaguna = true;
+                RouteNodeType sinkType = RouteNodeInfo.getType(sinkINTNode, null, routingGraph, ignoreLaguna);
+                assert(sinkType.isAnyLocal());
+                sinkType = sinkType == RouteNodeType.LOCAL_EAST ? RouteNodeType.EXCLUSIVE_SINK_EAST :
+                           sinkType == RouteNodeType.LOCAL_WEST ? RouteNodeType.EXCLUSIVE_SINK_WEST :
+                           sinkType == RouteNodeType.LOCAL_BOTH ? RouteNodeType.EXCLUSIVE_SINK_BOTH :
+                           null;
                 assert(sinkType != null);
                 RouteNode sinkRnode = routingGraph.getOrCreate(sinkINTNode, sinkType);
                 sinkRnode.setType(sinkType);
