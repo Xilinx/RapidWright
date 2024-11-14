@@ -310,8 +310,11 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected void preserveNet(Net net, boolean async) {
-        List<SitePinInst> pinsToRoute = netToPins.get(net);
-        // Only preserve those pins that are not to be routed
+        List<SitePinInst> pinsToRoute = null;
+        if (!net.isStaticNet()) {
+            // Only preserve those pins that are not to be routed
+            pinsToRoute = netToPins.get(net);
+        }
         List<SitePinInst> pinsToPreserve;
         if (pinsToRoute == null) {
             pinsToPreserve = net.getPins();
