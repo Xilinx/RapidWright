@@ -1837,10 +1837,10 @@ public class RWRoute {
                     continue;
                 }
                 switch (childRNode.getType()) {
-                    case LOCAL_RESERVED:
                     case LOCAL_BOTH:
                     case LOCAL_EAST:
                     case LOCAL_WEST:
+                    case LOCAL_RESERVED:
                         if (!routingGraph.isAccessible(childRNode, connection)) {
                             continue;
                         }

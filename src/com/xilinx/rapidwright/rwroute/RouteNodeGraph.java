@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -146,6 +147,7 @@ public class RouteNodeGraph {
         boolean isUltraScalePlus = series == Series.UltraScalePlus;
         isVersal = series == Series.Versal;
         Tile intTile;
+        final Set<IntentCode> intTileIntentCodeCareSet;
         Pattern eastWestPattern;
         eastWestWires = new EnumMap<>(TileTypeEnum.class);
         BitSet wires = new BitSet();
@@ -154,6 +156,10 @@ public class RouteNodeGraph {
             // Device.getArbitraryTileOfType() typically gives you the North-Western-most
             // tile (with minimum X, maximum Y). Analyze the tile just below that.
             intTile = intTile.getTileXYNeighbor(0, -1);
+            intTileIntentCodeCareSet = EnumSet.of(
+                    IntentCode.NODE_PINFEED,
+                    IntentCode.NODE_PINBOUNCE,
+                    IntentCode.NODE_LOCAL);
 
             ultraScalesNonLocalWires = new EnumMap<>(TileTypeEnum.class);
             ultraScalesNonLocalWires.put(intTile.getTileTypeEnum(), wires);
@@ -168,6 +174,12 @@ public class RouteNodeGraph {
             // tile (with minimum X, maximum Y). Analyze the tile just below that.
             intTile = bcCoreTile.getTileNeighbor(2, 0);
             assert(intTile.getTileTypeEnum() == TileTypeEnum.INT);
+            intTileIntentCodeCareSet = EnumSet.of(
+                    IntentCode.NODE_IMUX,
+                    IntentCode.NODE_PINBOUNCE,
+                    IntentCode.NODE_INODE,
+                    IntentCode.NODE_CLE_BNODE,
+                    IntentCode.NODE_CLE_CNODE);
 
             ultraScalesNonLocalWires = null;
 
@@ -180,8 +192,12 @@ public class RouteNodeGraph {
                 continue;
             }
 
-            String baseWireName = baseNode.getWireName();
             IntentCode baseIntentCode = baseNode.getIntentCode();
+            if (!intTileIntentCodeCareSet.contains(baseIntentCode)) {
+                continue;
+            }
+
+            String baseWireName = baseNode.getWireName();
             if (isUltraScale || isUltraScalePlus) {
                 if (baseIntentCode == IntentCode.NODE_LOCAL) {
                     Tile baseTile = baseNode.getTile();
@@ -215,16 +231,11 @@ public class RouteNodeGraph {
                             continue;
                         }
                     }
-                } else if (baseIntentCode != IntentCode.NODE_PINFEED && baseIntentCode != IntentCode.NODE_PINBOUNCE) {
-                    continue;
+                } else {
+                    assert(baseIntentCode != IntentCode.NODE_PINFEED && baseIntentCode != IntentCode.NODE_PINBOUNCE);
                 }
             } else {
                 assert(isVersal);
-
-                if (!EnumSet.of(IntentCode.NODE_IMUX, IntentCode.NODE_PINBOUNCE, IntentCode.NODE_INODE,
-                        IntentCode.NODE_CLE_BNODE, IntentCode.NODE_CLE_CNODE).contains(baseIntentCode)) {
-                    continue;
-                }
             }
 
             Matcher m = eastWestPattern.matcher(baseWireName);
@@ -263,35 +274,35 @@ public class RouteNodeGraph {
         }
 
         if (isVersal) {
-            for (TileTypeEnum tte : Arrays.asList(TileTypeEnum.INTF_LOCF_TL_TILE,
-                    TileTypeEnum.INTF_LOCF_BL_TILE,
-                    TileTypeEnum.INTF_ROCF_TL_TILE,
-                    TileTypeEnum.INTF_ROCF_BL_TILE,
+            // With NODE_CLE_[BC]NODEs being handled as part of the INT tile above, compute east/west wires
+            // in INTF_* tiles here
+            BiConsumer<List<TileTypeEnum>, Boolean> lambda = (types, east) -> {
+                for (TileTypeEnum tte : types) {
+                    Tile intfTile = device.getArbitraryTileOfType(tte);
+                    BitSet eastWestWires = this.eastWestWires.computeIfAbsent(tte,
+                            k -> new BitSet[]{new BitSet(), new BitSet()})[east ? 0 : 1];
+                    for (int wireIndex = 0; wireIndex < intfTile.getWireCount(); wireIndex++) {
+                        IntentCode baseIntentCode = intfTile.getWireIntentCode(wireIndex);
+                        if (baseIntentCode != IntentCode.NODE_INTF_BNODE && baseIntentCode != IntentCode.NODE_INTF_CNODE) {
+                            continue;
+                        }
+                        assert(Node.getNode(intfTile, wireIndex).getTile() == intfTile);
+
+                        eastWestWires.set(wireIndex);
+                    }
+                }
+            };
+
+            lambda.accept(Arrays.asList(
                     TileTypeEnum.INTF_LOCF_TR_TILE,
                     TileTypeEnum.INTF_LOCF_BR_TILE,
                     TileTypeEnum.INTF_ROCF_TR_TILE,
-                    TileTypeEnum.INTF_ROCF_BR_TILE)) {
-                Tile intfTile = device.getArbitraryTileOfType(tte);
-                BitSet[] eastWestWires = this.eastWestWires.computeIfAbsent(tte,
-                        k -> new BitSet[]{new BitSet(), new BitSet()});
-                BitSet eastWires = eastWestWires[0];
-                BitSet westWires = eastWestWires[1];
-                for (int wireIndex = 0; wireIndex < intfTile.getWireCount(); wireIndex++) {
-                    IntentCode baseIntentCode = intfTile.getWireIntentCode(wireIndex);
-                    if (baseIntentCode != IntentCode.NODE_INTF_BNODE && baseIntentCode != IntentCode.NODE_INTF_CNODE) {
-                        continue;
-                    }
-
-                    if (EnumSet.of(TileTypeEnum.INTF_LOCF_TR_TILE,
-                            TileTypeEnum.INTF_LOCF_BR_TILE,
-                            TileTypeEnum.INTF_ROCF_TR_TILE,
-                            TileTypeEnum.INTF_ROCF_BR_TILE).contains(tte)) {
-                        eastWires.set(wireIndex);
-                    } else {
-                        westWires.set(wireIndex);
-                    }
-                }
-            }
+                    TileTypeEnum.INTF_ROCF_BR_TILE), true);
+            lambda.accept(Arrays.asList(
+                    TileTypeEnum.INTF_LOCF_TL_TILE,
+                    TileTypeEnum.INTF_LOCF_BL_TILE,
+                    TileTypeEnum.INTF_ROCF_TL_TILE,
+                    TileTypeEnum.INTF_ROCF_BL_TILE), false);
         }
 
         if (lutRoutethru) {
