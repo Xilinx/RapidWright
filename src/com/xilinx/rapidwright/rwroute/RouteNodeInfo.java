@@ -134,17 +134,17 @@ public class RouteNodeInfo {
             case NODE_LOCAL: { // US/US+
                 assert(tileTypeEnum == TileTypeEnum.INT);
                 if (routingGraph != null) {
-                    BitSet bs = routingGraph.ultraScalesNonLocalWires.get(tileTypeEnum);
+                    BitSet bs = routingGraph.ultraScalesLocalWires.get(tileTypeEnum);
                     if (!bs.get(node.getWireIndex())) {
-                        BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
-                        if (eastWestWires[0].get(node.getWireIndex())) {
-                            return RouteNodeType.LOCAL_EAST;
-                        } else if (eastWestWires[1].get(node.getWireIndex())) {
-                            return RouteNodeType.LOCAL_WEST;
-                        }
-                        return RouteNodeType.LOCAL_BOTH;
+                        break;
                     }
-                    break;
+                    BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
+                    if (eastWestWires[0].get(node.getWireIndex())) {
+                        return RouteNodeType.LOCAL_EAST;
+                    } else if (eastWestWires[1].get(node.getWireIndex())) {
+                        return RouteNodeType.LOCAL_WEST;
+                    }
+                    return RouteNodeType.LOCAL_BOTH;
                 }
             }
 

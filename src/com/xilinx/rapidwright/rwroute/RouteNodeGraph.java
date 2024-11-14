@@ -103,10 +103,10 @@ public class RouteNodeGraph {
     /** Flag for whether LUT routethrus are to be considered */
     protected final boolean lutRoutethru;
 
-    /** Map indicating (for UltraScale/UltraScale+ only) the wire indices that have a local intent code,
-     *  but is what RWRoute will consider to be non-local, e.g. INT_NODE_SDQ_*
+    /** Map indicating (for UltraScale/UltraScale+ only) the subset wire indices of a NODE_LOCAL that are
+     *  what RWRoute should assign a LOCAL_* type, e.g. excluding INT_NODE_SDQ_*
      */
-    protected final Map<TileTypeEnum, BitSet> ultraScalesNonLocalWires;
+    protected final Map<TileTypeEnum, BitSet> ultraScalesLocalWires;
 
     /** Map indicating the wire indices corresponding to the east/west side of interconnect tiles */
     protected final Map<TileTypeEnum, BitSet[]> eastWestWires;
@@ -150,7 +150,7 @@ public class RouteNodeGraph {
         final Set<IntentCode> intTileIntentCodeCareSet;
         Pattern eastWestPattern;
         eastWestWires = new EnumMap<>(TileTypeEnum.class);
-        BitSet wires = new BitSet();
+        BitSet localWires = new BitSet();
         if (isUltraScale || isUltraScalePlus) {
             intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
             // Device.getArbitraryTileOfType() typically gives you the North-Western-most
@@ -161,8 +161,8 @@ public class RouteNodeGraph {
                     IntentCode.NODE_PINBOUNCE,
                     IntentCode.NODE_LOCAL);
 
-            ultraScalesNonLocalWires = new EnumMap<>(TileTypeEnum.class);
-            ultraScalesNonLocalWires.put(intTile.getTileTypeEnum(), wires);
+            ultraScalesLocalWires = new EnumMap<>(TileTypeEnum.class);
+            ultraScalesLocalWires.put(intTile.getTileTypeEnum(), localWires);
 
             eastWestPattern = Pattern.compile("(((BOUNCE|BYPASS|IMUX|INODE(_[12])?)_(?<eastwest>[EW]))|INT_NODE_IMUX_(?<inode>\\d+)_).*");
         } else {
@@ -181,7 +181,7 @@ public class RouteNodeGraph {
                     IntentCode.NODE_CLE_BNODE,
                     IntentCode.NODE_CLE_CNODE);
 
-            ultraScalesNonLocalWires = null;
+            ultraScalesLocalWires = null;
 
             eastWestPattern = Pattern.compile("(((BOUNCE|IMUX_B|[BC]NODE_OUTS)_(?<eastwest>[EW]))|INT_NODE_IMUX_ATOM_(?<inode>\\d+)_).*");
         }
@@ -212,7 +212,6 @@ public class RouteNodeGraph {
                                     assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
                                 }
                             }
-                            wires.set(baseNode.getWireIndex());
                             continue;
                         }
                     } else {
@@ -227,13 +226,13 @@ public class RouteNodeGraph {
                                     assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
                                 }
                             }
-                            wires.set(baseNode.getWireIndex());
                             continue;
                         }
                     }
                 } else {
                     assert(baseIntentCode == IntentCode.NODE_PINFEED || baseIntentCode == IntentCode.NODE_PINBOUNCE);
                 }
+                localWires.set(baseNode.getWireIndex());
             } else {
                 assert(isVersal);
             }
@@ -314,19 +313,19 @@ public class RouteNodeGraph {
                 if (clbTile == null) {
                     continue;
                 }
-                wires = new BitSet();
+                localWires = new BitSet();
                 for (int wireIndex = 0; wireIndex < clbTile.getWireCount(); wireIndex++) {
                     String wireName = clbTile.getWireName(wireIndex);
                     if (wireName.endsWith("MUX")) {
                         assert(Node.getNode(clbTile, wireIndex).getTile() == clbTile &&
                                Node.getNode(clbTile, wireIndex).getWireIndex() == wireIndex);
-                        wires.set(wireIndex);
+                        localWires.set(wireIndex);
                     }
                 }
-                if (wires.isEmpty()) {
+                if (localWires.isEmpty()) {
                     continue;
                 }
-                ultraScalesMuxWiresToBlockWhenLutRoutethru.put(tileTypeEnum, wires);
+                ultraScalesMuxWiresToBlockWhenLutRoutethru.put(tileTypeEnum, localWires);
             }
         } else {
             ultraScalesMuxWiresToBlockWhenLutRoutethru = null;
