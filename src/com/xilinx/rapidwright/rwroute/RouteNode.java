@@ -367,10 +367,10 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     public void setType(RouteNodeType type) {
         assert(this.type == type ||
                 // Support demotion from EXCLUSIVE_SINK to LOCAL since they have the same base cost
-                (this.type.isExclusiveSink() && type == RouteNodeType.LOCAL) ||
+                (this.type.isExclusiveSink() && type.isLocal()) ||
                 // Or promotion from LOCAL to EXCLUSIVE_SINK (by PartialRouter when NODE_PINBOUNCE on
                 // a newly unpreserved net becomes a sink)
-                (this.type == RouteNodeType.LOCAL && type.isExclusiveSink()));
+                (this.type.isLocal() && type.isExclusiveSink()));
         this.type = type;
     }
 
