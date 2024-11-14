@@ -536,14 +536,26 @@ public class RWRoute {
         if (staticNetAndRoutingTargets.isEmpty())
             return;
 
-        List<SitePinInst> gndPins = staticNetAndRoutingTargets.get(design.getGndNet());
+        Net gndNet = design.getGndNet();
+        List<SitePinInst> gndPins = staticNetAndRoutingTargets.get(gndNet);
         if (gndPins != null) {
             boolean invertGndToVccForLutInputs = config.isInvertGndToVccForLutInputs();
             Set<SitePinInst> newVccPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins, invertGndToVccForLutInputs);
             if (!newVccPins.isEmpty()) {
                 gndPins.removeAll(newVccPins);
-                staticNetAndRoutingTargets.computeIfAbsent(design.getVccNet(), (net) -> new ArrayList<>())
+                if (gndPins.isEmpty()) {
+                    staticNetAndRoutingTargets.remove(gndNet);
+                }
+                Net vccNet = design.getVccNet();
+                staticNetAndRoutingTargets.computeIfAbsent(vccNet, (net) -> new ArrayList<>())
                         .addAll(newVccPins);
+                // Re-preserve these new VCC sinks
+                for (SitePinInst spi : newVccPins) {
+                    Node node = spi.getConnectedNode();
+                    assert(routingGraph.getPreservedNet(node) == gndNet);
+                    routingGraph.unpreserve(node);
+                    routingGraph.preserve(node, vccNet);
+                }
             }
         }
 
