@@ -605,8 +605,6 @@ public class GlobalSignalRouting {
             currNet.addPin(spi, updateSiteRouting);
             spi.setRouted(true);
         }
-
-        currNet.setPIPs(netPIPs);
     }
 
     /**
