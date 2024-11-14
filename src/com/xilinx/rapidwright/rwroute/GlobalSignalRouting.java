@@ -332,7 +332,7 @@ public class GlobalSignalRouting {
 
     /**
      * Routes a static net (GND or VCC).
-     * @param currNet The current static net to be routed.
+     * @param pins A list of static pins to be routed.
      * @param getNodeState Lambda to get a node's status (available, unavailable, already in-use).
      * @param design The {@link Design} instance to use.
      * @param routeThruHelper The {@link RouteThruHelper} instance to use.
