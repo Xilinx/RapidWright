@@ -401,26 +401,26 @@ public class TestRWRoute {
     @CsvSource({
             // One SLR crossing
             // (Too) Close
-            "SLICE_X9Y299,SLICE_X9Y300,500",    // On Laguna column
+            "SLICE_X9Y299,SLICE_X9Y300,400",    // On Laguna column
             "SLICE_X9Y300,SLICE_X9Y299,500",
             "SLICE_X0Y299,SLICE_X0Y300,200",    // Far from Laguna column
             "SLICE_X0Y300,SLICE_X0Y299,200",
             "SLICE_X53Y299,SLICE_X53Y300,200",  // Equidistant from two Laguna columns
-            "SLICE_X53Y300,SLICE_X53Y299,1300",
+            "SLICE_X53Y300,SLICE_X53Y299,700",
             // Perfect
-            "SLICE_X9Y241,SLICE_X9Y300,200",
+            "SLICE_X9Y241,SLICE_X9Y300,100",
             "SLICE_X9Y300,SLICE_X9Y241,100",
             "SLICE_X9Y358,SLICE_X9Y299,100",
             "SLICE_X9Y299,SLICE_X9Y358,200",
-            "SLICE_X53Y241,SLICE_X69Y300,600",
-            "SLICE_X53Y358,SLICE_X69Y299,600",
+            "SLICE_X53Y241,SLICE_X69Y300,500",
+            "SLICE_X53Y358,SLICE_X69Y299,400",
             // Far
             "SLICE_X9Y240,SLICE_X9Y359,100",    // On Laguna
             "SLICE_X9Y359,SLICE_X9Y240,200",
-            "SLICE_X162Y240,SLICE_X162Y430,200",
+            "SLICE_X162Y240,SLICE_X162Y430,100",
             "SLICE_X162Y430,SLICE_X162Y240,300",
-            "SLICE_X0Y240,SLICE_X12Y430,400",   // Far from Laguna
-            "SLICE_X0Y430,SLICE_X12Y240,200",
+            "SLICE_X0Y240,SLICE_X12Y430,300",   // Far from Laguna
+            "SLICE_X0Y430,SLICE_X12Y240,100",
 
             // Two SLR crossings
             "SLICE_X162Y299,SLICE_X162Y599,600",
@@ -428,10 +428,10 @@ public class TestRWRoute {
 
             // Three SLR crossings
             "SLICE_X79Y0,SLICE_X79Y899,200",    // Straight up: next to Laguna column
-            "SLICE_X0Y0,SLICE_X0Y899,600",      // Straight up: far from Laguna column
+            "SLICE_X0Y0,SLICE_X0Y899,500",      // Straight up: far from Laguna column
             "SLICE_X168Y0,SLICE_X168Y899,400",  // Straight up: far from Laguna column
-            "SLICE_X9Y0,SLICE_X162Y899,700",    // Up and right
-            "SLICE_X168Y162,SLICE_X9Y899,1200", // Up and left
+            "SLICE_X9Y0,SLICE_X162Y899,500",    // Up and right
+            "SLICE_X168Y162,SLICE_X9Y899,1100", // Up and left
     })
     public void testSLRCrossingNonTimingDriven(String srcSiteName, String dstSiteName, long nodesPoppedLimit) {
         testSingleConnectionHelper(Device.AWS_F1, srcSiteName, "AQ", dstSiteName, "A1", nodesPoppedLimit);
