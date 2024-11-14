@@ -405,7 +405,6 @@ public class GlobalSignalRouting {
         nodesToRoute.sort(Comparator.comparing((n) -> n.getTile().getUniqueAddress()));
 
         NetType netType = currNet.getType();
-        Set<PIP> netPIPs = new HashSet<>(currNet.getPIPs());
         for (Node node : nodesToRoute) {
             int watchdog = 10000;
             SitePinInst sink = nodeToRouteToSink.get(node);
@@ -566,8 +565,7 @@ public class GlobalSignalRouting {
                     // Note that the static net router goes backward from sinks to sources,
                     // requiring the srcToSinkOrder parameter to be set to true below
                     for (PIP pip : RouterHelper.getPIPsFromNodes(pathNodes, true)) {
-                        boolean added = netPIPs.add(pip);
-                        assert(added);
+                        currNet.addPIP(pip);
                     }
 
                     pathNodes.clear();
