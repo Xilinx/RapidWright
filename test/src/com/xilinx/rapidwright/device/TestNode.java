@@ -256,6 +256,7 @@ public class TestNode {
             "xcvp1002,CLE_W_CORE_X38Y220,NODE_CLE_OUTPUT,,false",
             "xcvp1002,INTF_ROCF_TR_TILE_X39Y153,NODE_INTF_CNODE,,true",
             "xcvp1002,INTF_ROCF_TR_TILE_X39Y153,NODE_INTF_BNODE,,true",
+            "xcvp1002,RCLK_CLE_CORE_X37Y239,NODE_GLOBAL_LEAF,CLK_LEAF_SITES_\\d+_O,false",
     })
     public void testNodeReachabilityVersal(String partName, String tileName, String intentCodeName, String wireNameRegex, boolean local) {
         Device device = Device.getDevice(partName);
@@ -289,7 +290,7 @@ public class TestNode {
                 .map(s -> s.replaceFirst("(INT_NODE_IMUX_ATOM_)(3[2-9]|4[0-9]|5[0-9]|6[0-3]|9[6-9]|10[0-9]|11[0-9]|12[0-7])_INT_OUT[01]", "$1<32-63,96-127>"))
                 .map(s -> s.replaceFirst("([BC]NODE_OUTS_[EW])\\d+", "$1"))
                 .map(s -> s.replaceFirst("((CLE_SLICE[LM]_TOP_[01]|OUT_[NESW]NODE|(NN|EE|SS|WW)(1|2|4|6|7|10|12)(_[EW])?)_)[^ ]+", "$1"))
-                .map(s -> s.replaceFirst("(CLK_LEAF_SITES_)\\d+_O", "$1"))
+                .map(s -> s.replaceFirst("(CLK_LEAF_SITES_)\\d+_O(_PIN)?", "$1"))
                 .map(s -> s.replaceFirst("(VCC_WIRE)\\d+", "$1"))
                 .distinct()
                 .sorted()
