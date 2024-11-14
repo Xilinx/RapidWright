@@ -338,7 +338,7 @@ public class RWRoute {
                             continue;
                         }
                         Net preservedNet = routingGraph.getPreservedNet(uphill);
-                        if (preservedNet != null && preservedNet != connection.getNetWrapper().getNet()) {
+                        if (preservedNet != null && preservedNet != connection.getNet()) {
                             continue;
                         }
                         assert((sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL &&
@@ -1443,7 +1443,7 @@ public class RWRoute {
     protected void ripUp(Connection connection) {
         List<RouteNode> rnodes = connection.getRnodes();
         if (rnodes.isEmpty()) {
-            assert(!connection.getSink().isRouted());
+            assert(!connection.isRouted());
             return;
         }
 
@@ -1474,7 +1474,7 @@ public class RWRoute {
     private void updateUsersAndPresentCongestionCost(Connection connection) {
         List<RouteNode> rnodes = connection.getRnodes();
         if (rnodes.isEmpty()) {
-            assert(!connection.getSink().isRouted());
+            assert(!connection.isRouted());
             return;
         }
 

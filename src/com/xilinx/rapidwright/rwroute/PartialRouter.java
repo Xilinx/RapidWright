@@ -236,7 +236,7 @@ public class PartialRouter extends RWRoute {
         // if so, unpreserve that blocking net
         Set<Net> unpreserveNets = new HashSet<>();
         for (Connection connection : indirectConnections) {
-            Net net = connection.getNetWrapper().getNet();
+            Net net = connection.getNet();
             Net preservedNet;
             assert((preservedNet = routingGraph.getPreservedNet(connection.getSourceRnode())) == null || preservedNet == net);
             RouteNode sinkRnode = connection.getSinkRnode();
@@ -271,7 +271,7 @@ public class PartialRouter extends RWRoute {
                         // routing
                         ripUp(connection);
                         connection.resetRoute();
-                        connection.getSink().setRouted(false);
+                        connection.setRouted(false);
                         break;
                     }
                 }
@@ -433,7 +433,7 @@ public class PartialRouter extends RWRoute {
         assert(rnodes.size() > 1);
 
         // Check if alternate source exists (without creating one if it doesn't)
-        if (connection.getNetWrapper().getNet().getAlternateSource() != null) {
+        if (connection.getNet().getAlternateSource() != null) {
             Pair<SitePinInst,RouteNode> altSourceAndRnode = connection.getOrCreateAlternateSource(routingGraph);
             assert(altSourceAndRnode != null);
             RouteNode altSourceRnode = altSourceAndRnode.getSecond();
