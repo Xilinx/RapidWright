@@ -314,8 +314,6 @@ public class GlobalSignalRouting {
             Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappingsOnVersal(clk, getNodeStatus);
             VersalClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
 
-            VersalClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
-
             Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
             clk.setPIPs(clkPIPsWithoutDuplication);
         }
@@ -446,7 +444,6 @@ public class GlobalSignalRouting {
             IntentCode.NODE_PINFEED,
             IntentCode.NODE_GLOBAL_LEAF
         );
-        Set<Node> used = new HashSet<>();
         Set<Node> visited = new HashSet<>();
         Queue<RouteNode> q = new LinkedList<>();
         Predicate<Node> isNodeUnavailable = (node) -> getNodeStatus.apply(node) == NodeStatus.UNAVAILABLE;
@@ -454,12 +451,12 @@ public class GlobalSignalRouting {
 
         nextPin: for (SitePinInst p: clk.getPins()) {
             if (p.isOutPin()) continue;
-            Node intNode = RouterHelper.projectInputPinToINTNode(p);
-            RouteNode intRouteNode = new RouteNode(intNode.getTile(), intNode.getWireIndex(), null, 0);
+            Node sinkNode = p.getConnectedNode();
+            RouteNode sinkRouteNode = new RouteNode(sinkNode.getTile(), sinkNode.getWireIndex(), null, 0);
             ClockRegion cr = p.getTile().getClockRegion();
 
             q.clear();
-            q.add(intRouteNode);
+            q.add(sinkRouteNode);
 
             while (!q.isEmpty()) {
                 RouteNode curr = q.poll();
@@ -469,11 +466,14 @@ public class GlobalSignalRouting {
                     if (!uphill.getTile().getClockRegion().equals(cr)) continue;
                     if (!allowedIntentCodes.contains(uphill.getIntentCode())) continue;
                     if (!visited.add(uphill)) continue;
-                    if (used.contains(uphill)) continue;
+                    // if (used.contains(uphill)) continue;
                     if (routeThruHelper.isRouteThru(uphill, currNode) && currNode.getIntentCode() != IntentCode.NODE_IRI) continue;
                     if (isNodeUnavailable.test(uphill)) continue;
                     if (uphill.getIntentCode() == IntentCode.NODE_GLOBAL_LEAF) {
-                        RouteNode rn = new RouteNode(uphill.getTile(), uphill.getWireIndex(), null, 0);
+                        RouteNode rn = new RouteNode(uphill.getTile(), uphill.getWireIndex(), curr, curr.getLevel()+1);
+                        clk.getPIPs().addAll(rn.getPIPsForwardToSinkByNodes());
+                        rn.setParent(null);
+                        rn.setLevel(0);
                         lcbMappings.computeIfAbsent(rn, (k) -> new ArrayList<>()).add(p);
                         visited.clear();
                         continue nextPin;

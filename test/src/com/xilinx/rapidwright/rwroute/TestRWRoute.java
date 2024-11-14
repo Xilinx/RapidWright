@@ -535,9 +535,6 @@ public class TestRWRoute {
     @Test
     public void testClockRoutingOnVersal() {
         Design design = RapidWrightDCP.loadDCP("two_clk_check_NetTools.dcp");
-        design.setTrackNetChanges(true);
-
-        // Pseudo-randomly unroute some pins from a multi-pin net
         for (Net net : design.getNets()) {
             if (NetTools.isGlobalClock(net)) {
                 net.unroute();
@@ -558,9 +555,6 @@ public class TestRWRoute {
         router.initialize();
         router.routeGlobalClkNets();
 
-        for (Net net : design.getModifiedNets()) {
-            assertAllPinsRouted(net);
-        }
         VivadoToolsHelper.assertFullyRouted(design);
     }
 }

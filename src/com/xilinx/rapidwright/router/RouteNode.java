@@ -395,6 +395,19 @@ public class RouteNode implements Comparable<RouteNode> {
         return pips;
     }
 
+    public ArrayList<PIP> getPIPsForwardToSinkByNodes() {
+        ArrayList<PIP> pips = new ArrayList<>();
+        RouteNode curr = this;
+        do {
+            PIP pip = RouterHelper.findPIPbetweenNodes(Node.getNode(curr), Node.getNode(curr.parent));
+            if (pip != null) {
+                pips.add(pip);
+            }
+            curr = curr.parent;
+        } while (curr.parent != null);
+        return pips;
+    }
+
     public Wire[] getWiresInNode() {
         return Node.getWiresInNode(getTile(),getWire());
     }
