@@ -171,7 +171,7 @@ public class NetWrapper{
                 return null;
             }
 
-            altSourceRnode = routingGraph.getOrCreate(altSourceNode, RouteNodeType.PINFEED_O);
+            altSourceRnode = routingGraph.getOrCreate(altSourceNode, RouteNodeType.EXCLUSIVE_SOURCE);
         }
         assert(altSourceRnode != null);
         return altSource;

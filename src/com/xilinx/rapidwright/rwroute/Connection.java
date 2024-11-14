@@ -296,9 +296,9 @@ public class Connection implements Comparable<Connection>{
         } else {
             assert(!altSinkRnodes.contains(sinkRnode));
         }
-        assert(sinkRnode.getType() == RouteNodeType.PINFEED_I ||
+        assert(sinkRnode.getType().isAnyExclusiveSink() ||
                // Can be a WIRE if node is not exclusive a sink
-               sinkRnode.getType() == RouteNodeType.WIRE);
+               sinkRnode.getType() == RouteNodeType.NON_LOCAL);
         altSinkRnodes.add(sinkRnode);
     }
 
@@ -481,8 +481,8 @@ public class Connection implements Comparable<Connection>{
                 // if it's not already in use by the current net to prevent the case
                 // where the same physical pin services more than one logical pin
                 if (rnode.countConnectionsOfUser(netWrapper) == 0 ||
-                    // Except if it is not a PINFEED_I
-                    rnode.getType() != RouteNodeType.PINFEED_I) {
+                    // Except if it is not an EXCLUSIVE_SINK
+                    rnode.getType().isAnyExclusiveSink()) {
                     assert(rnode.getIntentCode() != IntentCode.NODE_PINBOUNCE);
                     rnode.markTarget(state);
                 }

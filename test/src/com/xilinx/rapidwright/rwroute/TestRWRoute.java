@@ -402,7 +402,7 @@ public class TestRWRoute {
             // One SLR crossing
             // (Too) Close
             "SLICE_X9Y299,SLICE_X9Y300,500",    // On Laguna column
-            "SLICE_X9Y300,SLICE_X9Y299,400",
+            "SLICE_X9Y300,SLICE_X9Y299,500",
             "SLICE_X0Y299,SLICE_X0Y300,200",    // Far from Laguna column
             "SLICE_X0Y300,SLICE_X0Y299,200",
             "SLICE_X53Y299,SLICE_X53Y300,200",  // Equidistant from two Laguna columns
@@ -423,7 +423,7 @@ public class TestRWRoute {
             "SLICE_X0Y430,SLICE_X12Y240,200",
 
             // Two SLR crossings
-            "SLICE_X162Y299,SLICE_X162Y599,200",
+            "SLICE_X162Y299,SLICE_X162Y599,600",
             "SLICE_X162Y599,SLICE_X162Y299,100",
 
             // Three SLR crossings

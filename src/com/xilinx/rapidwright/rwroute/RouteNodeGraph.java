@@ -35,6 +35,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
@@ -88,31 +90,35 @@ public class RouteNodeGraph {
     public final int[] nextLagunaColumn;
     public final int[] prevLagunaColumn;
 
-    /** 
+    /**
      * Map indicating which wire indices within a Laguna-adjacent INT tile have
      * IntentCode.NODE_PINFEED that lead into the Laguna tile.
      */
     protected final Map<Tile, BitSet> lagunaI;
 
-    /** Map indicating which wire indices within an INT tile should be considered
-     * accessible only if it is within the same column (same X tile coordinate) as
-     * the target tile.
+    /** Map indicating (for UltraScale/UltraScale+ only) the wire indices corresponding to the [A-H]MUX output
+     * to be blocked during LUT routethrus
      */
-    protected final Map<TileTypeEnum, BitSet> accessibleWireOnlyIfAboveBelowTarget;
+    protected final Map<TileTypeEnum, BitSet> ultraScalesMuxWiresToBlockWhenLutRoutethru;
 
-    /** Map indicating the wire indices corresponding to the [A-H]MUX output */
-    protected final Map<TileTypeEnum, BitSet> muxWires;
-
-    /** Flag for whether LUT routethrus are to be considered
-     */
+    /** Flag for whether LUT routethrus are to be considered */
     protected final boolean lutRoutethru;
+
+    /** Map indicating (for UltraScale/UltraScale+ only) the wire indices that have a local intent code,
+     *  but is what RWRoute will consider to be non-local, e.g. INT_NODE_SDQ_*
+     */
+    protected final Map<TileTypeEnum, BitSet> ultraScalesNonLocalWires;
+
+    /** Map indicating the wire indices corresponding to the east/west side of interconnect tiles */
+    protected final Map<TileTypeEnum, BitSet[]> eastWestWires;
+
+    /** Flag for whether design targets the Versal series */
+    protected final boolean isVersal;
 
     protected final Map<TileTypeEnum, Integer> baseWireCounts;
 
     protected final static int MAX_OCCUPANCY = 256;
     protected final float[] presentCongestionCosts;
-
-    protected final boolean isVersal;
 
     protected static int getTileCount(Design design) {
         Device device = design.getDevice();
@@ -145,60 +151,163 @@ public class RouteNodeGraph {
             }
         }
 
-        accessibleWireOnlyIfAboveBelowTarget = new EnumMap<>(TileTypeEnum.class);
-        BitSet wires = new BitSet();
-        Tile intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
-        // Device.getArbitraryTileOfType() typically gives you the North-Western-most
-        // tile (with minimum X, maximum Y). Analyze the tile just below that.
-        intTile = intTile.getTileXYNeighbor(0, -1);
         Series series = device.getSeries();
+        boolean isUltraScale = series == Series.UltraScale;
+        boolean isUltraScalePlus = series == Series.UltraScalePlus;
+        isVersal = series == Series.Versal;
+        Tile intTile;
+        Pattern eastWestPattern;
+        eastWestWires = new EnumMap<>(TileTypeEnum.class);
+        BitSet wires = new BitSet();
+        if (isUltraScale || isUltraScalePlus) {
+            intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
+            // Device.getArbitraryTileOfType() typically gives you the North-Western-most
+            // tile (with minimum X, maximum Y). Analyze the tile just below that.
+            intTile = intTile.getTileXYNeighbor(0, -1);
+
+            ultraScalesNonLocalWires = new EnumMap<>(TileTypeEnum.class);
+            ultraScalesNonLocalWires.put(intTile.getTileTypeEnum(), wires);
+
+            eastWestPattern = Pattern.compile("(((BOUNCE|BYPASS|IMUX|INODE(_[12])?)_(?<eastwest>[EW]))|INT_NODE_IMUX_(?<inode>\\d+)_).*");
+        } else {
+            assert(isVersal);
+
+            // Find an INT tile adjacent to a CLE_BC_CORE tile since Versal devices may contain AIEs on their northern edge
+            Tile bcCoreTile = device.getArbitraryTileOfType(TileTypeEnum.CLE_BC_CORE);
+            // Device.getArbitraryTileOfType() typically gives you the North-Western-most
+            // tile (with minimum X, maximum Y). Analyze the tile just below that.
+            intTile = bcCoreTile.getTileNeighbor(2, 0);
+            assert(intTile.getTileTypeEnum() == TileTypeEnum.INT);
+
+            ultraScalesNonLocalWires = null;
+
+            eastWestPattern = Pattern.compile("(((BOUNCE|IMUX_B|[BC]NODE_OUTS)_(?<eastwest>[EW]))|INT_NODE_IMUX_ATOM_(?<inode>\\d+)_).*");
+        }
+
         for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
             Node baseNode = Node.getNode(intTile, wireIndex);
             if (baseNode == null) {
                 continue;
             }
-            Tile baseTile = baseNode.getTile();
-            String wireName = baseNode.getWireName();
-            if (wireName.startsWith("BOUNCE_")) {
-                assert(baseNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
-                assert(baseTile.getTileXCoordinate() == intTile.getTileXCoordinate());
-                // Uphill from INT_NODE_IMUX_* in tile above/below and INODE_* in above/target or below/target tiles
-                // Downhill to INT_NODE_IMUX_* and INODE_* to above/below tile
-            } else if (wireName.startsWith("BYPASS_")) {
-                assert(baseNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
-                assert(baseTile == intTile);
-                assert(wireIndex == baseNode.getWireIndex());
-                // Uphill and downhill are INT_NODE_IMUX_* in the target tile and INODE_* to above/below tiles
-            } else if (wireName.startsWith("INT_NODE_GLOBAL_")) {
-                assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
-                assert(baseTile == intTile);
-                assert(wireIndex == baseNode.getWireIndex());
-                // Downhill to CTRL_* in the target tile, INODE_* to above/below tile, INT_NODE_IMUX_* in target tile
-            } else if (wireName.startsWith("INT_NODE_IMUX_") &&
-                    // Do not block INT_NODE_IMUX node accessibility when LUT routethrus are considered
-                    !lutRoutethru) {
-                assert(((series == Series.UltraScale || series == Series.UltraScalePlus) && baseNode.getIntentCode() == IntentCode.NODE_LOCAL) ||
-                        (series == Series.Versal                                         && baseNode.getIntentCode() == IntentCode.NODE_INODE));
-                assert(baseTile == intTile);
-                assert(wireIndex == baseNode.getWireIndex());
-                // Downhill to BOUNCE_* in the above/below/target tile, BYPASS_* in the base tile, IMUX_* in target tile
-            } else if (wireName.startsWith("INODE_")) {
-                assert(baseNode.getIntentCode() == IntentCode.NODE_LOCAL);
-                assert(baseTile.getTileXCoordinate() == intTile.getTileXCoordinate());
-                // Uphill from nodes in above/target or below/target tiles
-                // Downhill to BOUNCE_*/BYPASS_*/IMUX_* in above/target or below/target tiles
+
+            String baseWireName = baseNode.getWireName();
+            IntentCode baseIntentCode = baseNode.getIntentCode();
+            if (isUltraScale || isUltraScalePlus) {
+                if (baseIntentCode == IntentCode.NODE_LOCAL) {
+                    Tile baseTile = baseNode.getTile();
+                    assert(baseTile.getTileTypeEnum() == intTile.getTileTypeEnum());
+                    if (isUltraScalePlus) {
+                        if (baseWireName.startsWith("INT_NODE_SDQ_") || baseWireName.startsWith("SDQNODE_")) {
+                            if (baseTile != intTile) {
+                                if (baseWireName.endsWith("_FT0")) {
+                                    assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() - 1);
+                                } else {
+                                    assert(baseWireName.endsWith("_FT1"));
+                                    assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
+                                }
+                            }
+                            wires.set(baseNode.getWireIndex());
+                            continue;
+                        }
+                    } else {
+                        assert(isUltraScale);
+                        if (baseWireName.startsWith("INT_NODE_SINGLE_DOUBLE_") || baseWireName.startsWith("SDND") ||
+                                baseWireName.startsWith("INT_NODE_QUAD_LONG") || baseWireName.startsWith("QLND")) {
+                            if (baseTile != intTile) {
+                                if (baseWireName.endsWith("_FTN")) {
+                                    assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() - 1);
+                                } else {
+                                    assert(baseWireName.endsWith("_FTS"));
+                                    assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
+                                }
+                            }
+                            wires.set(baseNode.getWireIndex());
+                            continue;
+                        }
+                    }
+                } else if (baseIntentCode != IntentCode.NODE_PINFEED && baseIntentCode != IntentCode.NODE_PINBOUNCE) {
+                    continue;
+                }
             } else {
-                continue;
+                assert(isVersal);
+
+                if (!EnumSet.of(IntentCode.NODE_IMUX, IntentCode.NODE_PINBOUNCE, IntentCode.NODE_INODE,
+                        IntentCode.NODE_CLE_BNODE, IntentCode.NODE_CLE_CNODE).contains(baseIntentCode)) {
+                    continue;
+                }
             }
 
-            wires.set(baseNode.getWireIndex());
+            Matcher m = eastWestPattern.matcher(baseWireName);
+            if (m.matches()) {
+                BitSet[] eastWestWires = this.eastWestWires.computeIfAbsent(baseNode.getTile().getTileTypeEnum(),
+                        k -> new BitSet[]{new BitSet(), new BitSet()});
+                BitSet eastWires = eastWestWires[0];
+                BitSet westWires = eastWestWires[1];
+                String ew = m.group("eastwest");
+                String inode;
+                if (ew != null) {
+                    // [BC]NODEs connect to INODEs opposite to their wire name
+                    if (baseIntentCode == IntentCode.NODE_CLE_BNODE || baseIntentCode == IntentCode.NODE_CLE_CNODE) {
+                        ew = ew.equals("E") ? "W" : "E";
+                    }
+                    if (ew.equals("E")) {
+                        eastWires.set(baseNode.getWireIndex());
+                    } else {
+                        assert(ew.equals("W"));
+                        westWires.set(baseNode.getWireIndex());
+                    }
+                } else {
+                    if ((inode = m.group("inode")) != null) {
+                        int i = Integer.valueOf(inode);
+                        if (i < 32 || ((isUltraScale || isVersal) && i >= 64 && i < 96)) {
+                            eastWires.set(baseNode.getWireIndex());
+                        } else {
+                            assert(i < 64 || (isUltraScale || isVersal && i >= 96 && i < 128));
+                            westWires.set(baseNode.getWireIndex());
+                        }
+                    }
+                }
+            } else {
+                assert((isUltraScale || isUltraScalePlus) && baseWireName.matches("CTRL_[EW](_B)?\\d+|INT_NODE_GLOBAL_\\d+(_INT)?_OUT[01]?"));
+            }
         }
-        accessibleWireOnlyIfAboveBelowTarget.put(intTile.getTileTypeEnum(), wires);
+
+        if (isVersal) {
+            for (TileTypeEnum tte : Arrays.asList(TileTypeEnum.INTF_LOCF_TL_TILE,
+                    TileTypeEnum.INTF_LOCF_BL_TILE,
+                    TileTypeEnum.INTF_ROCF_TL_TILE,
+                    TileTypeEnum.INTF_ROCF_BL_TILE,
+                    TileTypeEnum.INTF_LOCF_TR_TILE,
+                    TileTypeEnum.INTF_LOCF_BR_TILE,
+                    TileTypeEnum.INTF_ROCF_TR_TILE,
+                    TileTypeEnum.INTF_ROCF_BR_TILE)) {
+                Tile intfTile = device.getArbitraryTileOfType(tte);
+                BitSet[] eastWestWires = this.eastWestWires.computeIfAbsent(tte,
+                        k -> new BitSet[]{new BitSet(), new BitSet()});
+                BitSet eastWires = eastWestWires[0];
+                BitSet westWires = eastWestWires[1];
+                for (int wireIndex = 0; wireIndex < intfTile.getWireCount(); wireIndex++) {
+                    IntentCode baseIntentCode = intfTile.getWireIntentCode(wireIndex);
+                    if (baseIntentCode != IntentCode.NODE_INTF_BNODE && baseIntentCode != IntentCode.NODE_INTF_CNODE) {
+                        continue;
+                    }
+
+                    if (EnumSet.of(TileTypeEnum.INTF_LOCF_TR_TILE,
+                            TileTypeEnum.INTF_LOCF_BR_TILE,
+                            TileTypeEnum.INTF_ROCF_TR_TILE,
+                            TileTypeEnum.INTF_ROCF_BR_TILE).contains(tte)) {
+                        eastWires.set(wireIndex);
+                    } else {
+                        westWires.set(wireIndex);
+                    }
+                }
+            }
+        }
 
         if (lutRoutethru) {
-            assert(design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus);
+            assert(isUltraScalePlus || isUltraScale);
 
-            muxWires = new EnumMap<>(TileTypeEnum.class);
+            ultraScalesMuxWiresToBlockWhenLutRoutethru = new EnumMap<>(TileTypeEnum.class);
             for (TileTypeEnum tileTypeEnum : Utils.getCLBTileTypes()) {
                 Tile clbTile = device.getArbitraryTileOfType(tileTypeEnum);
                 if (clbTile == null) {
@@ -216,16 +325,16 @@ public class RouteNodeGraph {
                 if (wires.isEmpty()) {
                     continue;
                 }
-                muxWires.put(tileTypeEnum, wires);
+                ultraScalesMuxWiresToBlockWhenLutRoutethru.put(tileTypeEnum, wires);
             }
         } else {
-            muxWires = null;
+            ultraScalesMuxWiresToBlockWhenLutRoutethru = null;
         }
 
         Tile[][] lagunaTiles;
-        if (device.getSeries() == Series.UltraScalePlus) {
+        if (isUltraScalePlus) {
             lagunaTiles = device.getTilesByRootName("LAG_LAG");
-        } else if (device.getSeries() == Series.UltraScale) {
+        } else if (isUltraScale) {
             lagunaTiles = device.getTilesByRootName("LAGUNA_TILE");
         } else {
             lagunaTiles = null;
@@ -291,7 +400,6 @@ public class RouteNodeGraph {
         }
 
         presentCongestionCosts = new float[MAX_OCCUPANCY];
-        isVersal = series == Series.Versal;
     }
 
     public void initialize() {
@@ -461,24 +569,37 @@ public class RouteNodeGraph {
             }
         }
 
-        if (child.getIntentCode() == IntentCode.NODE_PINFEED) {
-            // PINFEEDs can lead to a site pin, or into a Laguna tile
-            RouteNode childRnode = getNode(child);
-            if (childRnode != null) {
-                assert(childRnode.getType() == RouteNodeType.PINFEED_I ||
-                       childRnode.getType() == RouteNodeType.LAGUNA_I ||
-                        (lutRoutethru && childRnode.getType() == RouteNodeType.WIRE));
-            } else if (!lutRoutethru) {
-                // child does not already exist in our routing graph, meaning it's not a used site pin
-                // in our design, but it could be a LAGUNA_I
-                if (lagunaI == null) {
-                    // No LAGUNA_Is
-                    return true;
-                }
-                BitSet bs = lagunaI.get(child.getTile());
-                if (bs == null || !bs.get(child.getWireIndex())) {
-                    // Not a LAGUNA_I -- skip it
-                    return true;
+        IntentCode ic = child.getIntentCode();
+        if (isVersal) {
+            assert(ic != IntentCode.NODE_PINFEED); // This intent code should have been projected away
+
+            if ((!lutRoutethru && ic == IntentCode.NODE_IMUX) || ic == IntentCode.NODE_CLE_CTRL || ic == IntentCode.NODE_INTF_CTRL) {
+                // Disallow these site pin projections if they aren't already in the routing graph (as a potential sink)
+                RouteNode childRnode = getNode(child);
+                return childRnode == null;
+            }
+        } else {
+            assert(design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus);
+
+            if (child.getIntentCode() == IntentCode.NODE_PINFEED) {
+                // PINFEEDs can lead to a site pin, or into a Laguna tile
+                RouteNode childRnode = getNode(child);
+                if (childRnode != null) {
+                    assert(childRnode.getType().isAnyExclusiveSink() ||
+                            childRnode.getType() == RouteNodeType.LAGUNA_PINFEED ||
+                            (lutRoutethru && childRnode.getType().isAnyLocal()));
+                } else if (!lutRoutethru) {
+                    // child does not already exist in our routing graph, meaning it's not a used site pin
+                    // in our design, but it could be a LAGUNA_I
+                    if (lagunaI == null) {
+                        // No LAGUNA_Is
+                        return true;
+                    }
+                    BitSet bs = lagunaI.get(child.getTile());
+                    if (bs == null || !bs.get(child.getWireIndex())) {
+                        // Not a LAGUNA_I -- skip it
+                        return true;
+                    }
                 }
             }
         }
@@ -585,17 +706,7 @@ public class RouteNodeGraph {
     }
 
     protected RouteNode create(Node node, RouteNodeType type) {
-        RouteNode rnode = new RouteNode(this, node, type);
-        // PINFEED_I should have zero length, except for on US/US+ where the PINFEED_I can be a PINBOUNCE node.
-        assert(rnode.getType() != RouteNodeType.PINFEED_I ||
-                rnode.getLength() == 0 ||
-                (rnode.getLength() == 1 && (design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus) &&
-                        rnode.getIntentCode() == IntentCode.NODE_PINBOUNCE));
-        // PINBOUNCE should have zero length, except for on US/US+
-        assert(rnode.getType() != RouteNodeType.PINBOUNCE ||
-                rnode.getLength() == 0 ||
-                (rnode.getLength() == 1 && design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus));
-        return rnode;
+        return new RouteNode(this, node, type);
     }
 
     public RouteNode getOrCreate(Node node) {
@@ -630,25 +741,126 @@ public class RouteNodeGraph {
     }
 
     public boolean isAccessible(RouteNode childRnode, Connection connection) {
+        // Only consider LOCAL nodes when:
+        // (a) considering LUT routethrus
+        RouteNodeType type = childRnode.getType();
+        if (!type.isAnyLocal() || lutRoutethru) {
+            return true;
+        }
+
+        // (b) needs to cross an SLR and this is a Laguna column
         Tile childTile = childRnode.getTile();
-        TileTypeEnum childTileType = childTile.getTileTypeEnum();
-        BitSet bs = accessibleWireOnlyIfAboveBelowTarget.get(childTileType);
-        if (bs == null || !bs.get(childRnode.getWireIndex())) {
-            return true;
-        }
-
+        RouteNode sinkRnode = connection.getSinkRnode();
         int childX = childTile.getTileXCoordinate();
-        if (connection.isCrossSLR() && nextLagunaColumn[childX] == childX) {
-            // Connection crosses SLR and this is a Laguna column
+        if (connection.isCrossSLR() &&
+                childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this) &&
+                nextLagunaColumn[childX] == childX) {
             return true;
         }
 
-        Tile sinkTile = connection.getSinkRnode().getTile();
-        if (childX != sinkTile.getTileXCoordinate()) {
-            return false;
+        // (c) on the same side as the sink
+        Tile sinkTile = sinkRnode.getTile();
+        switch (sinkRnode.getType()) {
+            case EXCLUSIVE_SINK_EAST:
+                if (type == RouteNodeType.LOCAL_WEST || type == RouteNodeType.LOCAL_RESERVED) {
+                    // West wires can never reach an east sink
+                    return false;
+                }
+                break;
+            case EXCLUSIVE_SINK_WEST:
+                if (type == RouteNodeType.LOCAL_EAST || type == RouteNodeType.LOCAL_RESERVED) {
+                    // East wires can never reach a west sink
+                    return false;
+                }
+                break;
+            case EXCLUSIVE_SINK_BOTH:
+                // This must be a CTRL sink that can be accessed from both east/west sides
+
+                if (isVersal) {
+                    assert(sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL || sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL);
+
+                    if (childTile == sinkTile) {
+                        // CTRL sinks can be only accessed directly from LOCAL_RESERVED nodes in the sink CLE_BC_CORE/INTF_* tile ...
+                        if (type != RouteNodeType.LOCAL_RESERVED) {
+                            return false;
+                        }
+                    } else {
+                        // ... or via LOCAL nodes in the two INT tiles either side
+                        if (childTile.getTileYCoordinate() != sinkTile.getTileYCoordinate() ||
+                                Math.abs(childTile.getTileXCoordinate() - sinkTile.getTileXCoordinate()) > 1) {
+                            return false;
+                        }
+                        if (childTile.getTileTypeEnum() != TileTypeEnum.INT) {
+                            // e.g. CLE_BC_CORE_X50Y4 and CLE_BC_CORE_1_X50Y4 on xcvc1502
+                            return false;
+                        }
+                        // Allow use of INODE + PINBOUNCEs in the two INT tiles on either side of sink
+                        assert(childRnode.getIntentCode() == IntentCode.NODE_INODE || childRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
+                        return true;
+                    }
+                } else {
+                    assert(design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus);
+                    assert(sinkRnode.getWireName().startsWith("CTRL_"));
+
+                    // CTRL sinks can only be accessed from LOCAL nodes in the sink tile (rather than Y +/- 1 below)
+                    if (childTile != sinkTile) {
+                        return false;
+                    }
+
+                    // Only both-sided wires (e.g. INT_NODE_GLOBAL_*) can reach a both-sided sink (CTRL_*)
+                    if (type != RouteNodeType.LOCAL_BOTH) {
+                        return false;
+                    }
+                }
+                assert(childTile == sinkTile);
+                break;
+            default:
+                throw new RuntimeException("ERROR: Unexpected sink type " + sinkRnode.getType());
         }
 
-        return Math.abs(childTile.getTileYCoordinate() - sinkTile.getTileYCoordinate()) <= 1;
+        // (d) in the sink tile
+        if (childTile == sinkTile) {
+            return true;
+        }
+
+        if (isVersal) {
+            assert(sinkRnode.getType() != RouteNodeType.EXCLUSIVE_SINK_BOTH);
+            assert(sinkRnode.getIntentCode() == IntentCode.NODE_IMUX || sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
+
+            IntentCode childIntentCode = childRnode.getIntentCode();
+            switch (childIntentCode) {
+                case NODE_INODE:
+                    // Block access to all INODEs outside the sink tile, since NODE_INODE -> NODE_IMUX -> NODE_PINFEED (or NODE_INODE -> NODE_PINBOUNCE)
+                    assert(childTile != sinkTile);
+                    return false;
+                case NODE_CLE_BNODE:
+                case NODE_INTF_BNODE:
+                case NODE_CLE_CNODE:
+                case NODE_INTF_CNODE:
+                    // Only allow [BC]NODEs that reach into the sink tile
+                    return childTile.getTileYCoordinate() == sinkTile.getTileYCoordinate() &&
+                           childRnode.getEndTileXCoordinate() == sinkTile.getTileXCoordinate();
+                case NODE_PINBOUNCE:
+                    // BOUNCEs are only accessible through INODEs, so transitively this intent code is unreachable
+                    break;
+                case NODE_IMUX:
+                    // IMUXes that are not our target EXCLUSIVE_SINK will have been isExcluded() from the graph unless LUT routethrus are enabled
+                    assert(lutRoutethru);
+                    break;
+                case NODE_PINFEED:
+                    // Expected to be projected away
+                    break;
+                case NODE_CLE_CTRL:
+                case NODE_INTF_CTRL:
+                    // CTRL pins that are not our target EXCLUSIVE_SINK will have been isExcluded() from the graph
+                    break;
+            }
+            throw new RuntimeException("ERROR: Unhandled IntentCode: " + childIntentCode);
+        }
+
+        // (e) when in same X as the sink tile, but Y +/- 1
+        return childX == sinkTile.getTileXCoordinate() &&
+               Math.abs(childTile.getTileYCoordinate() - sinkTile.getTileYCoordinate()) <= 1;
     }
 
     protected boolean allowRoutethru(Node head, Node tail) {
@@ -673,7 +885,7 @@ public class RouteNodeGraph {
         }
         assert(PIP.getArbitraryPIP(head, tail).isRouteThru());
 
-        BitSet bs = muxWires.get(tail.getTile().getTileTypeEnum());
+        BitSet bs = ultraScalesMuxWiresToBlockWhenLutRoutethru.get(tail.getTile().getTileTypeEnum());
         if (bs != null && bs.get(tail.getWireIndex())) {
             // Disallow * -> [A-H]MUX routethrus since Vivado does not support the LUT
             // being fractured to support more than one routethru net

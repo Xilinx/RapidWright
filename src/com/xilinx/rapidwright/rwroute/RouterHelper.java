@@ -179,9 +179,13 @@ public class RouterHelper {
      */
     public static Node projectInputPinToINTNode(SitePinInst input) {
         Node sink = input.getConnectedNode();
-        if (sink.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
+        TileTypeEnum sinkTileType = sink.getTile().getTileTypeEnum();
+        if (sinkTileType == TileTypeEnum.INT) {
             return sink;
         }
+        // Only block clocking tiles if source is not in a clock tile
+        final boolean blockClocking = !Utils.isClocking(sinkTileType);
+
         int watchdog = 40;
 
         // Starting from the SPI's connected node, perform an uphill breadth-first search
@@ -197,7 +201,7 @@ public class RouterHelper {
                         EnumSet.of(IntentCode.NODE_CLE_CTRL, IntentCode.NODE_INTF_CTRL).contains(uphill.getIntentCode())) {
                     return uphill;
                 }
-                if (Utils.isClocking(uphillTileType)) {
+                if (uphillTileType != sinkTileType && Utils.isClocking(uphillTileType)) {
                     continue;
                 }
                 queue.add(uphill);

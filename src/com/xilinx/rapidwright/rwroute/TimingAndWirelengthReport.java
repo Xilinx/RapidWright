@@ -25,7 +25,6 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import com.xilinx.rapidwright.design.Design;
@@ -35,7 +34,6 @@ import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
@@ -130,11 +128,11 @@ public class TimingAndWirelengthReport{
             if (sinkINTNode == null) {
                 connection.setDirect(true);
             } else {
-                connection.setSinkRnode(routingGraph.getOrCreate(sinkINTNode, RouteNodeType.PINFEED_I));
+                connection.setSinkRnode(routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_BOTH));
                 if (sourceINTNode == null) {
                     sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
                 }
-                connection.setSourceRnode(routingGraph.getOrCreate(sourceINTNode, RouteNodeType.PINFEED_O));
+                connection.setSourceRnode(routingGraph.getOrCreate(sourceINTNode, RouteNodeType.EXCLUSIVE_SOURCE));
                 connection.setDirect(false);
             }
         }

@@ -243,7 +243,7 @@ public class PartialRouter extends RWRoute {
             preservedNet = routingGraph.getPreservedNet(sinkRnode);
             if (preservedNet != null && preservedNet != net) {
                 unpreserveNets.add(preservedNet);
-                assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
+                assert(sinkRnode.getType().isAnyExclusiveSink());
             }
         }
 
@@ -262,7 +262,7 @@ public class PartialRouter extends RWRoute {
                     // this connection's used nodes (except for the first and last used node,
                     // corresponding to source and sink)
                     for (RouteNode rnode : rnodes.subList(1, rnodes.size() - 1)) {
-                        if (rnode.getType() != RouteNodeType.PINFEED_I || !rnode.isOverUsed()) {
+                        if (!rnode.getType().isAnyExclusiveSink() || !rnode.isOverUsed()) {
                             continue;
                         }
 
@@ -595,8 +595,8 @@ public class PartialRouter extends RWRoute {
                 assert(!connection.isDirect());
                 RouteNode sourceRnode = connection.getSourceRnode();
                 RouteNode sinkRnode = connection.getSinkRnode();
-                assert(sourceRnode.getType() == RouteNodeType.PINFEED_O);
-                assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
+                assert(sourceRnode.getType() == RouteNodeType.EXCLUSIVE_SOURCE);
+                assert(sinkRnode.getType().isAnyExclusiveSink());
 
                 finishRouteConnection(connection, sinkRnode);
             }

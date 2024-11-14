@@ -24,27 +24,13 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.NetType;
-import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 
 public enum RouteNodeType {
-    /**
-     * Denotes {@link RouteNode} objects that correspond to the output pins of {@link Net} Objects,
-     * typically the source {@link RouteNode} Objects of {@link Connection} Objects.
-     */
-    PINFEED_O,
-    /**
-     * Denotes {@link RouteNode} objects that correspond to input pins of {@link Net} Objects,
-     * typically the sink {@link RouteNode} Objects of {@link Connection} Objects.
-     */
-    PINFEED_I,
-    /**
-     * Denotes {@link RouteNode} objects that are created based on {@link Node} Objects
-     * that have an {@link IntentCode} of NODE_PINBOUNCE.
-     */
-    PINBOUNCE,
+    EXCLUSIVE_SOURCE,
+    EXCLUSIVE_SINK_BOTH,
+    EXCLUSIVE_SINK_EAST,
+    EXCLUSIVE_SINK_WEST,
 
     /**
      * Denotes {@link RouteNode} objects that correspond to a super long line {@link Node},
@@ -56,12 +42,15 @@ public enum RouteNodeType {
      * Denotes {@link RouteNode} objects that correspond to {@link Node} objects that enter
      * a Laguna tile from an INT tile, or those Laguna tile nodes leading to a SUPER_LONG_LINE.
      */
-    LAGUNA_I,
+    LAGUNA_PINFEED,
 
-    /**
-     * Denotes general purpose {@link RouteNode} objects.
-     */
-    WIRE,
+    NON_LOCAL,
+
+    LOCAL_BOTH,
+    LOCAL_EAST,
+    LOCAL_WEST,
+
+    LOCAL_RESERVED,
 
     /**
      * Denotes {@link RouteNode} objects that should be treated as being inaccessible and
@@ -71,4 +60,20 @@ public enum RouteNodeType {
     INACCESSIBLE;
 
     public static final RouteNodeType[] values = values();
+
+    public boolean isAnyExclusiveSink() {
+        return this == EXCLUSIVE_SINK_BOTH || this == EXCLUSIVE_SINK_EAST || this == EXCLUSIVE_SINK_WEST;
+    }
+
+    public static boolean isAnyExclusiveSink(int ordinal) {
+        return ordinal == EXCLUSIVE_SINK_BOTH.ordinal() || ordinal == EXCLUSIVE_SINK_EAST.ordinal() || ordinal == EXCLUSIVE_SINK_WEST.ordinal();
+    }
+
+    public boolean isAnyLocal() {
+        return this == LOCAL_BOTH || this == LOCAL_EAST || this == LOCAL_WEST || this == LOCAL_RESERVED;
+    }
+
+    public static boolean isAnyLocal(int ordinal) {
+        return ordinal == LOCAL_BOTH.ordinal() || ordinal == LOCAL_EAST.ordinal() || ordinal == LOCAL_WEST.ordinal() || ordinal == LOCAL_RESERVED.ordinal();
+    }
 }
