@@ -232,7 +232,7 @@ public class RouteNodeGraph {
                         }
                     }
                 } else {
-                    assert(baseIntentCode != IntentCode.NODE_PINFEED && baseIntentCode != IntentCode.NODE_PINBOUNCE);
+                    assert(baseIntentCode == IntentCode.NODE_PINFEED || baseIntentCode == IntentCode.NODE_PINBOUNCE);
                 }
             } else {
                 assert(isVersal);
