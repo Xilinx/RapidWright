@@ -405,6 +405,9 @@ public class RouteNodeGraph {
     public void initialize() {
     }
 
+    /*
+     * Return the maximum base wire index across all Nodes in this tile
+     */
     protected int getBaseWireCount(Tile tile, int startWireIndex) {
         return baseWireCounts.computeIfAbsent(tile.getTileTypeEnum(), (e) -> {
             // Check all wires in tile to find the index of the last base wire
@@ -870,10 +873,9 @@ public class RouteNodeGraph {
 
         if (tail.getIntentCode() == IntentCode.NODE_PINFEED) {
             assert(isVersal);
+            assert(!lutRoutethru);
             assert(head.getIntentCode() == IntentCode.NODE_IMUX ||
-                   head.getIntentCode() == IntentCode.NODE_PINBOUNCE ||
-                   head.getIntentCode() == IntentCode.NODE_CLE_CTRL ||
-                   head.getIntentCode() == IntentCode.NODE_INTF_CTRL);
+                   head.getIntentCode() == IntentCode.NODE_PINBOUNCE);
             return false;
         }
 
