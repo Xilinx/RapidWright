@@ -551,10 +551,16 @@ public class RWRoute {
             Net staticNet = e.getKey();
             List<SitePinInst> pins = e.getValue();
 
+            // For some encrypted designs, it's possible that RapidWright cannot infer all SitePinInst-s leading to
+            // some site pins (e.g. CKEN) to default to a static net. Detect such cases -- when signal nets are
+            // already routed to and preserved at those uninferrable SitePinInst-s -- and remove them from being a
+            // static net sink
+            Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(staticNet, node);
+            pins.removeIf(spi -> gns.apply(spi.getConnectedNode()) == NodeStatus.UNAVAILABLE);
+
             System.out.println("INFO: Routing " + pins.size() + " pins of " + staticNet);
 
-            Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(staticNet, node);
-            GlobalSignalRouting.routeStaticNet(staticNet, gns, design, routethruHelper);
+            GlobalSignalRouting.routeStaticNet(pins, gns, design, routethruHelper);
 
             preserveNet(staticNet, false);
         }

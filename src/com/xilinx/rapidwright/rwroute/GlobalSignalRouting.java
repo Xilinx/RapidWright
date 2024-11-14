@@ -337,11 +337,9 @@ public class GlobalSignalRouting {
      * @param design The {@link Design} instance to use.
      * @param routeThruHelper The {@link RouteThruHelper} instance to use.
      */
-    public static void routeStaticNet(Net currNet,
+    public static void routeStaticNet(List<SitePinInst> pins,
                                       Function<Node,NodeStatus> getNodeState,
                                       Design design, RouteThruHelper routeThruHelper) {
-        NetType netType = currNet.getType();
-        Set<PIP> netPIPs = new HashSet<>(currNet.getPIPs());
         Queue<Node> q = new ArrayDeque<>();
         Set<Node> usedRoutingNodes = new HashSet<>();
         Map<Node, Node> prevNode = new HashMap<>();
@@ -381,12 +379,24 @@ public class GlobalSignalRouting {
         }
 
         // Collect all node-sink pairs to be routed
+        Net currNet = null;
         Map<Node,SitePinInst> nodeToRouteToSink = new HashMap<>();
-        for (SitePinInst sink : currNet.getPins()) {
+        for (SitePinInst sink : pins) {
+            if (currNet == null) {
+                currNet = sink.getNet();
+                assert(currNet != null);
+            } else {
+                assert(currNet == sink.getNet());
+            }
             if (sink.isRouted() || sink.isOutPin()) {
                 continue;
             }
-            nodeToRouteToSink.put(sink.getConnectedNode(), sink);
+
+            Node node = sink.getConnectedNode();
+            if (getNodeState.apply(node) == NodeStatus.UNAVAILABLE) {
+                throw new RuntimeException("ERROR: Site pin " + sink + " is not available for net " + currNet);
+            }
+            nodeToRouteToSink.put(node, sink);
         }
 
         // Sort them by their tile, ensuring that sinks in the same tile are routed in sequence
@@ -394,6 +404,8 @@ public class GlobalSignalRouting {
         List<Node> nodesToRoute = new ArrayList<>(nodeToRouteToSink.keySet());
         nodesToRoute.sort(Comparator.comparing((n) -> n.getTile().getUniqueAddress()));
 
+        NetType netType = currNet.getType();
+        Set<PIP> netPIPs = new HashSet<>(currNet.getPIPs());
         for (Node node : nodesToRoute) {
             int watchdog = 10000;
             SitePinInst sink = nodeToRouteToSink.get(node);
@@ -553,7 +565,10 @@ public class GlobalSignalRouting {
 
                     // Note that the static net router goes backward from sinks to sources,
                     // requiring the srcToSinkOrder parameter to be set to true below
-                    netPIPs.addAll(RouterHelper.getPIPsFromNodes(pathNodes, true));
+                    for (PIP pip : RouterHelper.getPIPsFromNodes(pathNodes, true)) {
+                        boolean added = netPIPs.add(pip);
+                        assert(added);
+                    }
 
                     pathNodes.clear();
                     sink.setRouted(true);

@@ -124,13 +124,13 @@ public class TestGlobalSignalRouting {
 
         RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
 
-        GlobalSignalRouting.routeStaticNet(gndNet, (n) -> getNodeState(design, NetType.GND, n), design, routeThruHelper);
+        GlobalSignalRouting.routeStaticNet(gndPins, (n) -> getNodeState(design, NetType.GND, n), design, routeThruHelper);
         gndPins = gndNet.getPins();
         Assertions.assertEquals(857, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
         Assertions.assertEquals(19010, gndPins.stream().filter((spi) -> !spi.isOutPin()).count());
         Assertions.assertEquals(33201, gndNet.getPIPs().size());
 
-        GlobalSignalRouting.routeStaticNet(vccNet, (n) -> getNodeState(design, NetType.VCC, n), design, routeThruHelper);
+        GlobalSignalRouting.routeStaticNet(vccPins, (n) -> getNodeState(design, NetType.VCC, n), design, routeThruHelper);
         vccPins = vccNet.getPins();
         Assertions.assertEquals(0, vccPins.stream().filter((spi) -> spi.isOutPin()).count());
         Assertions.assertEquals(23099, vccPins.stream().filter((spi) -> !spi.isOutPin()).count());
@@ -209,12 +209,12 @@ public class TestGlobalSignalRouting {
         RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
 
         Design finalDesign = design;
-        GlobalSignalRouting.routeStaticNet(gndNet, (n) -> getNodeState(finalDesign, NetType.GND, n), design, routeThruHelper);
+        GlobalSignalRouting.routeStaticNet(gndPins, (n) -> getNodeState(finalDesign, NetType.GND, n), design, routeThruHelper);
         Assertions.assertEquals(8, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
         Assertions.assertEquals(123, gndPins.stream().filter((spi) -> !spi.isOutPin()).count());
         Assertions.assertEquals(436, gndNet.getPIPs().size());
 
-        GlobalSignalRouting.routeStaticNet(vccNet, (n) -> getNodeState(finalDesign, NetType.VCC, n), design, routeThruHelper);
+        GlobalSignalRouting.routeStaticNet(vccPins, (n) -> getNodeState(finalDesign, NetType.VCC, n), design, routeThruHelper);
         Assertions.assertEquals(0, vccPins.stream().filter((spi) -> spi.isOutPin()).count());
         Assertions.assertEquals(232, vccPins.stream().filter((spi) -> !spi.isOutPin()).count());
         Assertions.assertEquals(464, vccNet.getPIPs().size());
