@@ -344,7 +344,7 @@ public class GlobalSignalRouting {
         Set<Node> usedRoutingNodes = new HashSet<>();
         Map<Node, Node> prevNode = new HashMap<>();
         List<Node> pathNodes = new ArrayList<>();
-        Set<SitePin> sitePinsToCreate = new HashSet<>();
+        List<SitePin> sitePinsToCreate = new ArrayList<>();
         final Node INVALID_NODE = new Node(null, Integer.MAX_VALUE);
         assert(INVALID_NODE.isInvalidNode());
 
@@ -577,6 +577,7 @@ public class GlobalSignalRouting {
             }
         }
 
+        assert(sitePinsToCreate.stream().distinct().count() == sitePinsToCreate.size());
         for (SitePin sitePin : sitePinsToCreate) {
             Site site = sitePin.getSite();
             SiteInst si = design.getSiteInstFromSite(site);
