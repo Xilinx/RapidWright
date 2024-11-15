@@ -530,19 +530,20 @@ public class RWRoute {
      * Routes static nets.
      */
     protected void routeStaticNets() {
-        if (staticNetAndRoutingTargets.isEmpty())
-            return;
-
         Net vccNet = design.getVccNet();
         Net gndNet = design.getGndNet();
-        List<SitePinInst> gndPins = staticNetAndRoutingTargets.get(gndNet);
-        if (gndPins != null) {
-            boolean invertGndToVccForLutInputs = config.isInvertGndToVccForLutInputs();
-            Set<SitePinInst> newVccPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins, invertGndToVccForLutInputs);
-            if (!newVccPins.isEmpty()) {
-                gndPins.removeAll(newVccPins);
-                staticNetAndRoutingTargets.computeIfAbsent(vccNet, (net) -> new ArrayList<>())
-                        .addAll(newVccPins);
+
+        boolean noStaticRouting = staticNetAndRoutingTargets.isEmpty();
+        if (!noStaticRouting) {
+            List<SitePinInst> gndPins = staticNetAndRoutingTargets.get(gndNet);
+            if (gndPins != null) {
+                boolean invertGndToVccForLutInputs = config.isInvertGndToVccForLutInputs();
+                Set<SitePinInst> newVccPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins, invertGndToVccForLutInputs);
+                if (!newVccPins.isEmpty()) {
+                    gndPins.removeAll(newVccPins);
+                    staticNetAndRoutingTargets.computeIfAbsent(vccNet, (net) -> new ArrayList<>())
+                            .addAll(newVccPins);
+                }
             }
         }
 
@@ -566,6 +567,10 @@ public class RWRoute {
                 return pins.isEmpty() ? null : pins;
             });
             preserveNet(staticNet, false);
+        }
+
+        if (noStaticRouting) {
+            return;
         }
 
         for (Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
