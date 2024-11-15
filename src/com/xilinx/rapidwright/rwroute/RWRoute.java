@@ -543,13 +543,6 @@ public class RWRoute {
                 gndPins.removeAll(newVccPins);
                 staticNetAndRoutingTargets.computeIfAbsent(vccNet, (net) -> new ArrayList<>())
                         .addAll(newVccPins);
-                // Re-preserve these new VCC sinks
-                for (SitePinInst spi : newVccPins) {
-                    Node node = spi.getConnectedNode();
-                    assert(routingGraph.getPreservedNet(node) == gndNet);
-                    routingGraph.unpreserve(node);
-                    routingGraph.preserve(node, vccNet);
-                }
             }
         }
 
