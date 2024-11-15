@@ -393,7 +393,7 @@ public class GlobalSignalRouting {
             }
 
             Node node = sink.getConnectedNode();
-            if (getNodeState.apply(node) == NodeStatus.UNAVAILABLE) {
+            if (getNodeState.apply(node) != NodeStatus.INUSE) {
                 throw new RuntimeException("ERROR: Site pin " + sink + " is not available for net " + currNet);
             }
             nodeToRouteToSink.put(node, sink);
@@ -531,18 +531,6 @@ public class GlobalSignalRouting {
                                 node = uphillNode;
                                 break search;
                             }
-
-                            // uphillNode must be a sink to be routed; preserve only the current routing, clear the queue,
-                            // and restart routing from this new sink to encourage reuse
-                            assert(!uphillSink.isRouted());
-                            do {
-                                usedRoutingNodes.add(node);
-                                node = prevNode.get(node);
-                            } while (node != INVALID_NODE);
-                            prevNode.keySet().removeIf((n) -> !usedRoutingNodes.contains(n) && !n.equals(uphillNode));
-                            q.clear();
-                            q.add(uphillNode);
-                            continue search;
                         }
 
                         q.add(uphillNode);
