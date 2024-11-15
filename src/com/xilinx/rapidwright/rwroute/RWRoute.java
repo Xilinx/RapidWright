@@ -66,6 +66,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -545,10 +546,12 @@ public class RWRoute {
                             .addAll(newVccPins);
                 }
             }
-        }
 
-        for (Net staticNet : Arrays.asList(vccNet, gndNet)) {
-            staticNetAndRoutingTargets.computeIfPresent(staticNet, (k,pins) -> {
+            Iterator<Map.Entry<Net,List<SitePinInst>>> it = staticNetAndRoutingTargets.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<Net,List<SitePinInst>> e = it.next();
+                Net staticNet = e.getKey();
+                List<SitePinInst> pins = e.getValue();
                 // For some encrypted designs, it's possible that RapidWright cannot infer all SitePinInst-s leading to
                 // some site pins (e.g. CKEN) defaulting those to static nets. Detect such cases -- when signal nets are
                 // already routed to and preserved at those uninferrable SitePinInst-s -- and remove them from being a
@@ -563,13 +566,26 @@ public class RWRoute {
                     assert(preservedNet != staticNet);
                     return true;
                 });
+
                 // Remove from map if empty
-                return pins.isEmpty() ? null : pins;
-            });
-            preserveNet(staticNet, false);
+                if (pins.isEmpty()) {
+                    it.remove();
+                }
+            }
+        }
+
+        // Preserve all static nets' sink pins regardless of whether any routing is necessary
+        for (Net staticNet : Arrays.asList(vccNet, gndNet)) {
+            for (SitePinInst spi : staticNet.getPins()) {
+                if (spi.isOutPin()) {
+                    continue;
+                }
+                routingGraph.preserve(spi.getConnectedNode(), staticNet);
+            }
         }
 
         if (noStaticRouting) {
+            // Now that all static nets have been fully preserved, return if no work to be done
             return;
         }
 

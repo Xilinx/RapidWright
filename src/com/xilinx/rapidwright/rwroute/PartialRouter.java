@@ -291,6 +291,16 @@ public class PartialRouter extends RWRoute {
     @Override
     protected void addStaticNetRoutingTargets(Net staticNet) {
         if (staticNet.hasPIPs()) {
+            // Preserve only the static net's PIPs and its output pins; its input pins will be
+            // preserved by routeStaticNets()
+            List<SitePinInst> outputPins = new ArrayList<>();
+            for (SitePinInst spi : staticNet.getPins()) {
+                if (!spi.isOutPin()) {
+                    continue;
+                }
+                outputPins.add(spi);
+            }
+            routingGraph.preserveAsync(staticNet, outputPins);
             numPreservedStaticNets++;
         }
 
