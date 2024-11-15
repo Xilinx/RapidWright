@@ -196,30 +196,16 @@ public class GlobalSignalRouting {
      */
     public static void symmetricClkRouting(Net clk, Device device, Function<Node,NodeStatus> getNodeStatus) {
         if (device.getSeries() != Series.Versal) {
-            boolean debug = true;
             List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
 
             ClockRegion centroid = findCentroid(clk, device);
-            if (debug) {
-                System.out.println("centroid CR: " + centroid);
-            }
-
             List<ClockRegion> upClockRegions = new ArrayList<>();
             List<ClockRegion> downClockRegions = new ArrayList<>();
             // divides clock regions into two groups
             divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
 
             RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
-
-            if (debug) {
-                System.out.println("clkRoutingLine: " + clkRoutingLine);
-            }
-
             RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
-
-            if (debug) {
-                System.out.println("centroidHRouteNode: " + centroidHRouteNode);
-            }
             
             RouteNode vrouteUp = null;
             RouteNode vrouteDown;
@@ -227,15 +213,8 @@ public class GlobalSignalRouting {
             ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
             if (aboveCentroid != null) {
                 vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
-                if (debug) {
-                    System.out.println("vrouteUp: " + vrouteUp);
-                }
             }
             vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
-
-            if (debug) {
-                System.out.println("vrouteDown: " + vrouteDown);
-            }
 
             List<RouteNode> upDownDistLines = new ArrayList<>();
             if (aboveCentroid != null) {
@@ -363,53 +342,31 @@ public class GlobalSignalRouting {
             if (intNode == null) {
                 throw new RuntimeException("Unable to get INT tile for pin " + p);
             }
-            List<Node> startNodes = new ArrayList<>();
 
-            if (intNode.getIntentCode() == IntentCode.NODE_IMUX) {
-                // This node drives a LUT input pin. Vivado reaches this pin in pattern: 
-                // NODE_GLOBAL_LEAF -> NODE_CLE_CNODE -> NODE_INODE -> NODE_IMUX
-                // Need to go one more step to let prevPrev be a NODE_GLOBAL_LEAF node.
-
-                // And, it seems that each NODE_INODE node is driven by only one NODE_CLE_CNODE node,
-                // but not each NODE_CLE_CNODE node can find a uphill NODE_GLOBAL_LEAF node,
-                // thus here I add all NODE_INODE nodes to ensure that we can find candidates.
-                Tile intTile = intNode.getTile();
-                for (Node uphill: intNode.getAllUphillNodes()) {
-                    if (uphill.getIntentCode() == IntentCode.NODE_INODE && uphill.getTile() == intTile) {
-                        startNodes.add(uphill);
-                    }
+            outer: for (Node prev : intNode.getAllUphillNodes()) {
+                NodeStatus prevNodeStatus = getNodeStatus.apply(prev);
+                if (prevNodeStatus == NodeStatus.UNAVAILABLE) {
+                    continue;
                 }
-            } else {
-                assert(intNode.getIntentCode() == IntentCode.NODE_CLE_CTRL || intNode.getIntentCode() == IntentCode.NODE_INTF_CTRL);
-                startNodes.add(intNode);
-            }
 
-            outer: for (Node startNode: startNodes) {
-                for (Node prev : startNode.getAllUphillNodes()) {
-                    NodeStatus prevNodeStatus = getNodeStatus.apply(prev);
-                    if (prevNodeStatus == NodeStatus.UNAVAILABLE) {
+                for (Node prevPrev : prev.getAllUphillNodes()) {
+                    if (prevPrev.getIntentCode() != IntentCode.NODE_GLOBAL_LEAF) {
                         continue;
                     }
-    
-                    for (Node prevPrev : prev.getAllUphillNodes()) {
-                        if (prevPrev.getIntentCode() != IntentCode.NODE_GLOBAL_LEAF) {
-                            continue;
-                        }
-    
-                        NodeStatus prevPrevNodeStatus = getNodeStatus.apply(prevPrev);
-                        if (prevPrevNodeStatus == NodeStatus.UNAVAILABLE) {
-                            continue;
-                        }
-    
-                        if (usedLcbs.contains(prevPrev) || prevPrevNodeStatus == NodeStatus.INUSE) {
-                            lcbCandidates.clear();
-                            lcbCandidates.add(prevPrev);
-                            break outer;
-                        }
-    
-                        assert(prevPrevNodeStatus == NodeStatus.AVAILABLE);
-                        lcbCandidates.add(prevPrev);
+
+                    NodeStatus prevPrevNodeStatus = getNodeStatus.apply(prevPrev);
+                    if (prevPrevNodeStatus == NodeStatus.UNAVAILABLE) {
+                        continue;
                     }
+
+                    if (usedLcbs.contains(prevPrev) || prevPrevNodeStatus == NodeStatus.INUSE) {
+                        lcbCandidates.clear();
+                        lcbCandidates.add(prevPrev);
+                        break outer;
+                    }
+
+                    assert(prevPrevNodeStatus == NodeStatus.AVAILABLE);
+                    lcbCandidates.add(prevPrev);
                 }
             }
 
