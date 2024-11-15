@@ -59,7 +59,6 @@ import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -67,6 +66,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -519,11 +519,9 @@ public class RWRoute {
         if (sinks.size() > 0) {
             staticNet.unroute();
             // Remove all output pins from unrouted net as those used will be repopulated
-            staticNet.getPins().removeIf(SitePinInst::isOutPin);
+            staticNet.setPins(sinks);
 
-            // Preserve all pins (e.g. in case of BOUNCE nodes that may serve as a site pin)
-            preserveNet(staticNet, true);
-            staticNetAndRoutingTargets.put(staticNet, sinks);
+            staticNetAndRoutingTargets.put(staticNet, new ArrayList<>(sinks));
         } else {
             numNotNeedingRoutingNets++;
         }
@@ -533,18 +531,62 @@ public class RWRoute {
      * Routes static nets.
      */
     protected void routeStaticNets() {
-        if (staticNetAndRoutingTargets.isEmpty())
-            return;
+        Net vccNet = design.getVccNet();
+        Net gndNet = design.getGndNet();
 
-        List<SitePinInst> gndPins = staticNetAndRoutingTargets.get(design.getGndNet());
-        if (gndPins != null) {
-            boolean invertGndToVccForLutInputs = config.isInvertGndToVccForLutInputs();
-            Set<SitePinInst> newVccPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins, invertGndToVccForLutInputs);
-            if (!newVccPins.isEmpty()) {
-                gndPins.removeAll(newVccPins);
-                staticNetAndRoutingTargets.computeIfAbsent(design.getVccNet(), (net) -> new ArrayList<>())
-                        .addAll(newVccPins);
+        boolean noStaticRouting = staticNetAndRoutingTargets.isEmpty();
+        if (!noStaticRouting) {
+            List<SitePinInst> gndPins = staticNetAndRoutingTargets.get(gndNet);
+            if (gndPins != null) {
+                boolean invertGndToVccForLutInputs = config.isInvertGndToVccForLutInputs();
+                Set<SitePinInst> newVccPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins, invertGndToVccForLutInputs);
+                if (!newVccPins.isEmpty()) {
+                    gndPins.removeAll(newVccPins);
+                    staticNetAndRoutingTargets.computeIfAbsent(vccNet, (net) -> new ArrayList<>())
+                            .addAll(newVccPins);
+                }
             }
+
+            Iterator<Map.Entry<Net,List<SitePinInst>>> it = staticNetAndRoutingTargets.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<Net,List<SitePinInst>> e = it.next();
+                Net staticNet = e.getKey();
+                List<SitePinInst> pins = e.getValue();
+                // For some encrypted designs, it's possible that RapidWright cannot infer all SitePinInst-s leading to
+                // some site pins (e.g. CKEN) defaulting those to static nets. Detect such cases -- when signal nets are
+                // already routed to and preserved at those uninferrable SitePinInst-s -- and remove them from being a
+                // static net sink
+                pins.removeIf(spi -> {
+                    Net preservedNet = routingGraph.getPreservedNet(spi.getConnectedNode());
+                    if (preservedNet == null) {
+                        // This sink is not preserved by any net, allow
+                        return false;
+                    }
+                    // Sink preserved by another net, abandon; check that it cannot have been preserved by this static net
+                    assert(preservedNet != staticNet);
+                    return true;
+                });
+
+                // Remove from map if empty
+                if (pins.isEmpty()) {
+                    it.remove();
+                }
+            }
+        }
+
+        // Preserve all static nets' sink pins regardless of whether any routing is necessary
+        for (Net staticNet : Arrays.asList(vccNet, gndNet)) {
+            for (SitePinInst spi : staticNet.getPins()) {
+                if (spi.isOutPin()) {
+                    continue;
+                }
+                routingGraph.preserve(spi.getConnectedNode(), staticNet);
+            }
+        }
+
+        if (noStaticRouting) {
+            // Now that all static nets have been fully preserved, return if no work to be done
+            return;
         }
 
         for (Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
@@ -554,7 +596,7 @@ public class RWRoute {
             System.out.println("INFO: Routing " + pins.size() + " pins of " + staticNet);
 
             Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(staticNet, node);
-            GlobalSignalRouting.routeStaticNet(staticNet, gns, design, routethruHelper);
+            GlobalSignalRouting.routeStaticNet(pins, gns, design, routethruHelper);
 
             preserveNet(staticNet, false);
         }
