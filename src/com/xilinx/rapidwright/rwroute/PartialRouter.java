@@ -317,7 +317,7 @@ public class PartialRouter extends RWRoute {
         }
         List<SitePinInst> pinsToPreserve;
         if (pinsToRoute == null) {
-            pinsToPreserve = net.getSinkPins();
+            pinsToPreserve = net.getPins();
         } else {
             pinsToPreserve = new ArrayList<>();
             Set<SitePinInst> pinsToRouteSet = new HashSet<>(pinsToRoute);
