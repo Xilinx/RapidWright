@@ -520,7 +520,7 @@ public class RWRoute {
             // Remove all output pins from unrouted net as those used will be repopulated
             staticNet.setPins(sinks);
 
-            staticNetAndRoutingTargets.put(staticNet, sinks);
+            staticNetAndRoutingTargets.put(staticNet, new ArrayList<>(sinks));
         } else {
             numNotNeedingRoutingNets++;
         }
