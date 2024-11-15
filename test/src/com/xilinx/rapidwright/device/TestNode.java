@@ -256,7 +256,7 @@ public class TestNode {
             "xcvp1002,CLE_W_CORE_X38Y220,NODE_CLE_OUTPUT,,false",
             "xcvp1002,INTF_ROCF_TR_TILE_X39Y153,NODE_INTF_CNODE,,true",
             "xcvp1002,INTF_ROCF_TR_TILE_X39Y153,NODE_INTF_BNODE,,true",
-            "xcvp1002,RCLK_CLE_CORE_X37Y239,NODE_GLOBAL_LEAF,CLK_LEAF_SITES_\\d+_O,false",
+            "xcvp1002,RCLK_CLE_CORE_X37Y239,NODE_GLOBAL_LEAF,CLK_LEAF_SITES_\\d+_O,true",
     })
     public void testNodeReachabilityVersal(String partName, String tileName, String intentCodeName, String wireNameRegex, boolean local) {
         Device device = Device.getDevice(partName);
