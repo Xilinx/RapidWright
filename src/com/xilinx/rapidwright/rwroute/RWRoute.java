@@ -56,6 +56,7 @@ import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 import com.xilinx.rapidwright.util.RuntimeTrackerTree;
+import com.xilinx.rapidwright.util.Utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -683,6 +684,16 @@ public class RWRoute {
                 RouteNode sinkRnode = routingGraph.getOrCreate(sinkINTNode, sinkType);
                 sinkRnode.setType(sinkType);
                 connection.setSinkRnode(sinkRnode);
+
+                if (sinkINTNode.getTile() != sink.getTile()) {
+                    TileTypeEnum sinkTileType = sink.getTile().getTileTypeEnum();
+                    if (Utils.isLaguna(sinkTileType)) {
+                        // Sinks in Laguna tiles must be Laguna registers (but will be projected into the INT tile)
+                        // however, it's possible for another net to use the sink node as a bounce -- prevent that here
+                        assert(sinkINTNode.getTile().getTileTypeEnum() == TileTypeEnum.INT);
+                        routingGraph.preserve(sink.getConnectedNode(), net);
+                    }
+                }
 
                 // Where appropriate, allow all 6 LUT pins to be swapped to begin with
                 char lutLetter = sink.getName().charAt(0);
