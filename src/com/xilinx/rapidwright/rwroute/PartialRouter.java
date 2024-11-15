@@ -311,7 +311,8 @@ public class PartialRouter extends RWRoute {
     protected void preserveNet(Net net, boolean async) {
         List<SitePinInst> pinsToRoute = null;
         if (!net.isStaticNet()) {
-            // Only preserve those pins that are not to be routed
+            // For signal nets, only preserve those pins that are not to be routed
+            // All sink pins must be preserved for static nets since the static router does not resolve conflicts
             pinsToRoute = netToPins.get(net);
         }
         List<SitePinInst> pinsToPreserve;
