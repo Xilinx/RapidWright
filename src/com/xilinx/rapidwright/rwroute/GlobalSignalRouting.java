@@ -388,7 +388,8 @@ public class GlobalSignalRouting {
             } else {
                 assert(currNet == sink.getNet());
             }
-            if (sink.isRouted() || sink.isOutPin()) {
+            assert(!sink.isOutPin());
+            if (sink.isRouted()) {
                 continue;
             }
 

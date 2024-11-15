@@ -290,7 +290,6 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected void addStaticNetRoutingTargets(Net staticNet) {
-        preserveNet(staticNet, true);
         if (staticNet.hasPIPs()) {
             numPreservedStaticNets++;
         }

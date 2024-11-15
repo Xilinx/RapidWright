@@ -59,7 +59,6 @@ import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -519,10 +518,8 @@ public class RWRoute {
         if (sinks.size() > 0) {
             staticNet.unroute();
             // Remove all output pins from unrouted net as those used will be repopulated
-            staticNet.getPins().removeIf(SitePinInst::isOutPin);
+            staticNet.setPins(sinks);
 
-            // Preserve all pins (e.g. in case of BOUNCE nodes that may serve as a site pin)
-            preserveNet(staticNet, true);
             staticNetAndRoutingTargets.put(staticNet, sinks);
         } else {
             numNotNeedingRoutingNets++;
@@ -536,6 +533,7 @@ public class RWRoute {
         if (staticNetAndRoutingTargets.isEmpty())
             return;
 
+        Net vccNet = design.getVccNet();
         Net gndNet = design.getGndNet();
         List<SitePinInst> gndPins = staticNetAndRoutingTargets.get(gndNet);
         if (gndPins != null) {
@@ -543,10 +541,6 @@ public class RWRoute {
             Set<SitePinInst> newVccPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndPins, invertGndToVccForLutInputs);
             if (!newVccPins.isEmpty()) {
                 gndPins.removeAll(newVccPins);
-                if (gndPins.isEmpty()) {
-                    staticNetAndRoutingTargets.remove(gndNet);
-                }
-                Net vccNet = design.getVccNet();
                 staticNetAndRoutingTargets.computeIfAbsent(vccNet, (net) -> new ArrayList<>())
                         .addAll(newVccPins);
                 // Re-preserve these new VCC sinks
@@ -559,6 +553,24 @@ public class RWRoute {
             }
         }
 
+        for (Net staticNet : Arrays.asList(vccNet, gndNet)) {
+            staticNetAndRoutingTargets.computeIfPresent(staticNet, (k,pins) -> {
+                pins.removeIf(spi -> {
+                    Net preservedNet = routingGraph.getPreservedNet(spi.getConnectedNode());
+                    if (preservedNet == null) {
+                        // This sink is not preserved by any net, allow
+                        return false;
+                    }
+                    // Sink preserved by another net, abandon; check that it cannot have been preserved by this static net
+                    assert(preservedNet != staticNet);
+                    return true;
+                });
+                // Remove from map if empty
+                return pins.isEmpty() ? null : pins;
+            });
+            preserveNet(staticNet, false);
+        }
+
         for (Map.Entry<Net,List<SitePinInst>> e : staticNetAndRoutingTargets.entrySet()) {
             Net staticNet = e.getKey();
             List<SitePinInst> pins = e.getValue();
@@ -568,8 +580,6 @@ public class RWRoute {
             // already routed to and preserved at those uninferrable SitePinInst-s -- and remove them from being a
             // static net sink
             Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(staticNet, node);
-            pins.removeIf(spi -> gns.apply(spi.getConnectedNode()) == NodeStatus.UNAVAILABLE);
-
             System.out.println("INFO: Routing " + pins.size() + " pins of " + staticNet);
 
             GlobalSignalRouting.routeStaticNet(pins, gns, design, routethruHelper);
