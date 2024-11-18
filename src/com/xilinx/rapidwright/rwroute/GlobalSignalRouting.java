@@ -331,16 +331,15 @@ public class GlobalSignalRouting {
     }
 
     /**
-     * Routes a static net (GND or VCC).
-     * @param currNet The current static net to be routed.
+     * Routes pins from a static net (GND or VCC).
+     * @param pins A list of static pins to be routed (must all be on the same net).
      * @param getNodeState Lambda to get a node's status (available, unavailable, already in-use).
      * @param design The {@link Design} instance to use.
      * @param routeThruHelper The {@link RouteThruHelper} instance to use.
      */
-    public static void routeStaticNet(Net currNet,
+    public static void routeStaticNet(List<SitePinInst> pins,
                                       Function<Node,NodeStatus> getNodeState,
                                       Design design, RouteThruHelper routeThruHelper) {
-        NetType netType = currNet.getType();
         Queue<Node> q = new ArrayDeque<>();
         Set<Node> usedRoutingNodes = new HashSet<>();
         Map<Node, Node> prevNode = new HashMap<>();
@@ -380,12 +379,25 @@ public class GlobalSignalRouting {
         }
 
         // Collect all node-sink pairs to be routed
+        Net currNet = null;
         Map<Node,SitePinInst> nodeToRouteToSink = new HashMap<>();
-        for (SitePinInst sink : currNet.getPins()) {
-            if (sink.isRouted() || sink.isOutPin()) {
+        for (SitePinInst sink : pins) {
+            if (currNet == null) {
+                currNet = sink.getNet();
+                assert(currNet != null);
+            } else {
+                assert(currNet == sink.getNet());
+            }
+            assert(!sink.isOutPin());
+            if (sink.isRouted()) {
                 continue;
             }
-            nodeToRouteToSink.put(sink.getConnectedNode(), sink);
+
+            Node node = sink.getConnectedNode();
+            if (getNodeState.apply(node) != NodeStatus.INUSE) {
+                throw new RuntimeException("ERROR: Site pin " + sink + " is not available for net " + currNet);
+            }
+            nodeToRouteToSink.put(node, sink);
         }
 
         // Sort them by their tile, ensuring that sinks in the same tile are routed in sequence
@@ -393,6 +405,7 @@ public class GlobalSignalRouting {
         List<Node> nodesToRoute = new ArrayList<>(nodeToRouteToSink.keySet());
         nodesToRoute.sort(Comparator.comparing((n) -> n.getTile().getUniqueAddress()));
 
+        NetType netType = currNet.getType();
         for (Node node : nodesToRoute) {
             int watchdog = 10000;
             SitePinInst sink = nodeToRouteToSink.get(node);
@@ -519,18 +532,6 @@ public class GlobalSignalRouting {
                                 node = uphillNode;
                                 break search;
                             }
-
-                            // uphillNode must be a sink to be routed; preserve only the current routing, clear the queue,
-                            // and restart routing from this new sink to encourage reuse
-                            assert(!uphillSink.isRouted());
-                            do {
-                                usedRoutingNodes.add(node);
-                                node = prevNode.get(node);
-                            } while (node != INVALID_NODE);
-                            prevNode.keySet().removeIf((n) -> !usedRoutingNodes.contains(n) && !n.equals(uphillNode));
-                            q.clear();
-                            q.add(uphillNode);
-                            continue search;
                         }
 
                         q.add(uphillNode);

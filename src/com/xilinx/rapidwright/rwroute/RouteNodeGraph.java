@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
+import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -104,10 +105,10 @@ public class RouteNodeGraph {
     /** Flag for whether LUT routethrus are to be considered */
     protected final boolean lutRoutethru;
 
-    /** Map indicating (for UltraScale/UltraScale+ only) the wire indices that have a local intent code,
-     *  but is what RWRoute will consider to be non-local, e.g. INT_NODE_SDQ_*
+    /** Map indicating (for UltraScale/UltraScale+ only) the subset wire indices of a NODE_LOCAL that are
+     *  what RWRoute should assign a LOCAL_* type, e.g. excluding INT_NODE_SDQ_*
      */
-    protected final Map<TileTypeEnum, BitSet> ultraScalesNonLocalWires;
+    protected final Map<TileTypeEnum, BitSet> ultraScalesLocalWires;
 
     /** Map indicating the wire indices corresponding to the east/west side of interconnect tiles */
     protected final Map<TileTypeEnum, BitSet[]> eastWestWires;
@@ -156,17 +157,22 @@ public class RouteNodeGraph {
         boolean isUltraScalePlus = series == Series.UltraScalePlus;
         isVersal = series == Series.Versal;
         Tile intTile;
+        final Set<IntentCode> intTileIntentCodeCareSet;
         Pattern eastWestPattern;
         eastWestWires = new EnumMap<>(TileTypeEnum.class);
-        BitSet wires = new BitSet();
+        BitSet localWires = new BitSet();
         if (isUltraScale || isUltraScalePlus) {
             intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
             // Device.getArbitraryTileOfType() typically gives you the North-Western-most
             // tile (with minimum X, maximum Y). Analyze the tile just below that.
             intTile = intTile.getTileXYNeighbor(0, -1);
+            intTileIntentCodeCareSet = EnumSet.of(
+                    IntentCode.NODE_PINFEED,
+                    IntentCode.NODE_PINBOUNCE,
+                    IntentCode.NODE_LOCAL);
 
-            ultraScalesNonLocalWires = new EnumMap<>(TileTypeEnum.class);
-            ultraScalesNonLocalWires.put(intTile.getTileTypeEnum(), wires);
+            ultraScalesLocalWires = new EnumMap<>(TileTypeEnum.class);
+            ultraScalesLocalWires.put(intTile.getTileTypeEnum(), localWires);
 
             eastWestPattern = Pattern.compile("(((BOUNCE|BYPASS|IMUX|INODE(_[12])?)_(?<eastwest>[EW]))|INT_NODE_IMUX_(?<inode>\\d+)_).*");
         } else {
@@ -178,8 +184,14 @@ public class RouteNodeGraph {
             // tile (with minimum X, maximum Y). Analyze the tile just below that.
             intTile = bcCoreTile.getTileNeighbor(2, 0);
             assert(intTile.getTileTypeEnum() == TileTypeEnum.INT);
+            intTileIntentCodeCareSet = EnumSet.of(
+                    IntentCode.NODE_IMUX,
+                    IntentCode.NODE_PINBOUNCE,
+                    IntentCode.NODE_INODE,
+                    IntentCode.NODE_CLE_BNODE,
+                    IntentCode.NODE_CLE_CNODE);
 
-            ultraScalesNonLocalWires = null;
+            ultraScalesLocalWires = null;
 
             eastWestPattern = Pattern.compile("(((BOUNCE|IMUX_B|[BC]NODE_OUTS)_(?<eastwest>[EW]))|INT_NODE_IMUX_ATOM_(?<inode>\\d+)_).*");
         }
@@ -190,8 +202,12 @@ public class RouteNodeGraph {
                 continue;
             }
 
-            String baseWireName = baseNode.getWireName();
             IntentCode baseIntentCode = baseNode.getIntentCode();
+            if (!intTileIntentCodeCareSet.contains(baseIntentCode)) {
+                continue;
+            }
+
+            String baseWireName = baseNode.getWireName();
             if (isUltraScale || isUltraScalePlus) {
                 if (baseIntentCode == IntentCode.NODE_LOCAL) {
                     Tile baseTile = baseNode.getTile();
@@ -206,7 +222,6 @@ public class RouteNodeGraph {
                                     assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
                                 }
                             }
-                            wires.set(baseNode.getWireIndex());
                             continue;
                         }
                     } else {
@@ -221,20 +236,15 @@ public class RouteNodeGraph {
                                     assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
                                 }
                             }
-                            wires.set(baseNode.getWireIndex());
                             continue;
                         }
                     }
-                } else if (baseIntentCode != IntentCode.NODE_PINFEED && baseIntentCode != IntentCode.NODE_PINBOUNCE) {
-                    continue;
+                } else {
+                    assert(baseIntentCode == IntentCode.NODE_PINFEED || baseIntentCode == IntentCode.NODE_PINBOUNCE);
                 }
+                localWires.set(baseNode.getWireIndex());
             } else {
                 assert(isVersal);
-
-                if (!EnumSet.of(IntentCode.NODE_IMUX, IntentCode.NODE_PINBOUNCE, IntentCode.NODE_INODE,
-                        IntentCode.NODE_CLE_BNODE, IntentCode.NODE_CLE_CNODE).contains(baseIntentCode)) {
-                    continue;
-                }
             }
 
             Matcher m = eastWestPattern.matcher(baseWireName);
@@ -273,35 +283,35 @@ public class RouteNodeGraph {
         }
 
         if (isVersal) {
-            for (TileTypeEnum tte : Arrays.asList(TileTypeEnum.INTF_LOCF_TL_TILE,
-                    TileTypeEnum.INTF_LOCF_BL_TILE,
-                    TileTypeEnum.INTF_ROCF_TL_TILE,
-                    TileTypeEnum.INTF_ROCF_BL_TILE,
+            // With NODE_CLE_[BC]NODEs being handled as part of the INT tile above, compute east/west wires
+            // in INTF_* tiles here
+            BiConsumer<List<TileTypeEnum>, Boolean> lambda = (types, east) -> {
+                for (TileTypeEnum tte : types) {
+                    Tile intfTile = device.getArbitraryTileOfType(tte);
+                    BitSet eastWestWires = this.eastWestWires.computeIfAbsent(tte,
+                            k -> new BitSet[]{new BitSet(), new BitSet()})[east ? 0 : 1];
+                    for (int wireIndex = 0; wireIndex < intfTile.getWireCount(); wireIndex++) {
+                        IntentCode baseIntentCode = intfTile.getWireIntentCode(wireIndex);
+                        if (baseIntentCode != IntentCode.NODE_INTF_BNODE && baseIntentCode != IntentCode.NODE_INTF_CNODE) {
+                            continue;
+                        }
+                        assert(Node.getNode(intfTile, wireIndex).getTile() == intfTile);
+
+                        eastWestWires.set(wireIndex);
+                    }
+                }
+            };
+
+            lambda.accept(Arrays.asList(
                     TileTypeEnum.INTF_LOCF_TR_TILE,
                     TileTypeEnum.INTF_LOCF_BR_TILE,
                     TileTypeEnum.INTF_ROCF_TR_TILE,
-                    TileTypeEnum.INTF_ROCF_BR_TILE)) {
-                Tile intfTile = device.getArbitraryTileOfType(tte);
-                BitSet[] eastWestWires = this.eastWestWires.computeIfAbsent(tte,
-                        k -> new BitSet[]{new BitSet(), new BitSet()});
-                BitSet eastWires = eastWestWires[0];
-                BitSet westWires = eastWestWires[1];
-                for (int wireIndex = 0; wireIndex < intfTile.getWireCount(); wireIndex++) {
-                    IntentCode baseIntentCode = intfTile.getWireIntentCode(wireIndex);
-                    if (baseIntentCode != IntentCode.NODE_INTF_BNODE && baseIntentCode != IntentCode.NODE_INTF_CNODE) {
-                        continue;
-                    }
-
-                    if (EnumSet.of(TileTypeEnum.INTF_LOCF_TR_TILE,
-                            TileTypeEnum.INTF_LOCF_BR_TILE,
-                            TileTypeEnum.INTF_ROCF_TR_TILE,
-                            TileTypeEnum.INTF_ROCF_BR_TILE).contains(tte)) {
-                        eastWires.set(wireIndex);
-                    } else {
-                        westWires.set(wireIndex);
-                    }
-                }
-            }
+                    TileTypeEnum.INTF_ROCF_BR_TILE), true);
+            lambda.accept(Arrays.asList(
+                    TileTypeEnum.INTF_LOCF_TL_TILE,
+                    TileTypeEnum.INTF_LOCF_BL_TILE,
+                    TileTypeEnum.INTF_ROCF_TL_TILE,
+                    TileTypeEnum.INTF_ROCF_BL_TILE), false);
         }
 
         if (lutRoutethru) {
@@ -313,19 +323,19 @@ public class RouteNodeGraph {
                 if (clbTile == null) {
                     continue;
                 }
-                wires = new BitSet();
+                localWires = new BitSet();
                 for (int wireIndex = 0; wireIndex < clbTile.getWireCount(); wireIndex++) {
                     String wireName = clbTile.getWireName(wireIndex);
                     if (wireName.endsWith("MUX")) {
                         assert(Node.getNode(clbTile, wireIndex).getTile() == clbTile &&
                                Node.getNode(clbTile, wireIndex).getWireIndex() == wireIndex);
-                        wires.set(wireIndex);
+                        localWires.set(wireIndex);
                     }
                 }
-                if (wires.isEmpty()) {
+                if (localWires.isEmpty()) {
                     continue;
                 }
-                ultraScalesMuxWiresToBlockWhenLutRoutethru.put(tileTypeEnum, wires);
+                ultraScalesMuxWiresToBlockWhenLutRoutethru.put(tileTypeEnum, localWires);
             }
         } else {
             ultraScalesMuxWiresToBlockWhenLutRoutethru = null;

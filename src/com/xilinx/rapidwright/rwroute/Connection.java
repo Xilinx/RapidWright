@@ -482,7 +482,7 @@ public class Connection implements Comparable<Connection>{
                 // where the same physical pin services more than one logical pin
                 if (rnode.countConnectionsOfUser(netWrapper) == 0 ||
                     // Except if it is not an EXCLUSIVE_SINK
-                    rnode.getType().isAnyExclusiveSink()) {
+                    !rnode.getType().isAnyExclusiveSink()) {
                     assert(rnode.getIntentCode() != IntentCode.NODE_PINBOUNCE);
                     rnode.markTarget(state);
                 }

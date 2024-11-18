@@ -299,8 +299,17 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected void addStaticNetRoutingTargets(Net staticNet) {
-        preserveNet(staticNet, true);
         if (staticNet.hasPIPs()) {
+            // Preserve only the static net's PIPs and its output pins; its input pins will be
+            // preserved by routeStaticNets()
+            List<SitePinInst> outputPins = new ArrayList<>();
+            for (SitePinInst spi : staticNet.getPins()) {
+                if (!spi.isOutPin()) {
+                    continue;
+                }
+                outputPins.add(spi);
+            }
+            routingGraph.preserveAsync(staticNet, outputPins);
             numPreservedStaticNets++;
         }
 
@@ -319,8 +328,12 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected void preserveNet(Net net, boolean async) {
-        List<SitePinInst> pinsToRoute = netToPins.get(net);
-        // Only preserve those pins that are not to be routed
+        List<SitePinInst> pinsToRoute = null;
+        if (!net.isStaticNet()) {
+            // For signal nets, only preserve those pins that are not to be routed
+            // All sink pins must be preserved for static nets since the static router does not resolve conflicts
+            pinsToRoute = netToPins.get(net);
+        }
         List<SitePinInst> pinsToPreserve;
         if (pinsToRoute == null) {
             pinsToPreserve = net.getPins();
