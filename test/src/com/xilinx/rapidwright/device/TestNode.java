@@ -228,8 +228,10 @@ public class TestNode {
 
     @ParameterizedTest
     @CsvSource({
-            "xcvp1002,INT_X38Y220,NODE_PINBOUNCE,BOUNCE_E.*,true",
-            "xcvp1002,INT_X38Y220,NODE_PINBOUNCE,BOUNCE_W.*,true",
+            "xcvp1002,INT_X38Y220,NODE_PINBOUNCE,BOUNCE_E([0-9]|1[0-5]),true",
+            "xcvp1002,INT_X38Y220,NODE_PINBOUNCE,BOUNCE_E(1[6-9]|2[0-9]|3[01]),true",
+            "xcvp1002,INT_X38Y220,NODE_PINBOUNCE,BOUNCE_W([0-9]|1[0-5]),true",
+            "xcvp1002,INT_X38Y220,NODE_PINBOUNCE,BOUNCE_W(1[6-9]|2[0-9]|3[01]),true",
             "xcvp1002,INT_X38Y220,NODE_INODE,INT_NODE_IMUX_ATOM_([0-9]|1[0-9]|2[0-9]|3[01]|6[4-9]|7[0-9]|8[0-9]|9[0-5])_.*,true",
             "xcvp1002,INT_X38Y220,NODE_INODE,INT_NODE_IMUX_ATOM_(3[2-9]|4[0-9]|5[0-9]|6[0-3]|9[6-9]|10[0-9]|11[0-9]|12[0-7])_.*,true",
             "xcvp1002,INT_X38Y220,NODE_IMUX,IMUX_B_E.*,true",

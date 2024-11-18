@@ -24,7 +24,6 @@ package com.xilinx.rapidwright.rwroute;
 
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
@@ -66,7 +65,8 @@ public class RouteNodeInfo {
             endTile = node.getTile();
         }
 
-        RouteNodeType type = getType(node, endTile, routingGraph);
+        boolean forceSink = false;
+        RouteNodeType type = getType(node, endTile, routingGraph, forceSink);
         short endTileXCoordinate = getEndTileXCoordinate(node, type, (short) endTile.getTileXCoordinate());
         short endTileYCoordinate = (short) endTile.getTileYCoordinate();
         short length = getLength(baseTile, type, endTileXCoordinate, endTileYCoordinate);
@@ -126,7 +126,7 @@ public class RouteNodeInfo {
         return endTileXCoordinate;
     }
 
-    private static RouteNodeType getType(Node node, Tile endTile, RouteNodeGraph routingGraph) {
+    public static RouteNodeType getType(Node node, Tile endTile, RouteNodeGraph routingGraph, boolean forceSink) {
         // NOTE: IntentCode is device-dependent
         IntentCode ic = node.getIntentCode();
         TileTypeEnum tileTypeEnum = node.getTile().getTileTypeEnum();
@@ -134,22 +134,25 @@ public class RouteNodeInfo {
             case NODE_LOCAL: { // US/US+
                 assert(tileTypeEnum == TileTypeEnum.INT);
                 if (routingGraph != null) {
-                    BitSet bs = routingGraph.ultraScalesNonLocalWires.get(tileTypeEnum);
+                    BitSet bs = routingGraph.ultraScalesLocalWires.get(tileTypeEnum);
                     if (!bs.get(node.getWireIndex())) {
-                        BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
-                        if (eastWestWires[0].get(node.getWireIndex())) {
-                            return RouteNodeType.LOCAL_EAST;
-                        } else if (eastWestWires[1].get(node.getWireIndex())) {
-                            return RouteNodeType.LOCAL_WEST;
-                        }
-                        return RouteNodeType.LOCAL;
+                        break;
                     }
-                    break;
+                    BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
+                    if (eastWestWires[0].get(node.getWireIndex())) {
+                        return RouteNodeType.LOCAL_EAST;
+                    } else if (eastWestWires[1].get(node.getWireIndex())) {
+                        return RouteNodeType.LOCAL_WEST;
+                    }
+                    return RouteNodeType.LOCAL_BOTH;
                 }
             }
 
             case NODE_PINFEED:
-                if (routingGraph != null && routingGraph.lagunaI != null) {
+                if (routingGraph == null || routingGraph.isVersal) {
+                    return RouteNodeType.LOCAL_BOTH;
+                }
+                if (routingGraph.lagunaI != null && !forceSink) {
                     BitSet bs = routingGraph.lagunaI.get(node.getTile());
                     if (bs != null && bs.get(node.getWireIndex())) {
                         return RouteNodeType.LAGUNA_PINFEED;
@@ -157,18 +160,27 @@ public class RouteNodeInfo {
                 }
                 // Fall through
             case NODE_PINBOUNCE:
-                if (routingGraph != null && routingGraph.eastWestWires != null) {
+            case NODE_INODE:        // INT.INT_NODE_IMUX_ATOM_*_INT_OUT[01]          (Versal only)
+            case NODE_IMUX:         // INT.IMUX_B_[EW]*                              (Versal only)
+            case NODE_CLE_CNODE:    // CLE_BC_CORE*.CNODE_OUTS_[EW]*                 (Versal only)
+            case NODE_CLE_BNODE:    // CLE_BC_CORE*.BNODE_OUTS_[EW]*                 (Versal only)
+            case NODE_INTF_BNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_BNODE_OUTS* (Versal only)
+            case NODE_INTF_CNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_CNODE_OUTS* (Versal only)
+                if (routingGraph != null) {
                     BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
                     if (eastWestWires[0].get(node.getWireIndex())) {
                         return RouteNodeType.LOCAL_EAST;
                     } else if (eastWestWires[1].get(node.getWireIndex())) {
                         return RouteNodeType.LOCAL_WEST;
                     }
-                    assert(node.getWireName().startsWith("CTRL_") ||
-                            // FIXME:
-                            routingGraph.design.getSeries() == Series.Versal);
+                    assert(!routingGraph.isVersal && node.getWireName().startsWith("CTRL_"));
                 }
-                return RouteNodeType.LOCAL;
+                return RouteNodeType.LOCAL_BOTH;
+
+            // Versal only
+            case NODE_CLE_CTRL:     // CLE_BC_CORE*.CTRL_[LR]_B*
+            case NODE_INTF_CTRL:    // INTF_[LR]OCF_[TB][LR]_TILE.INTF_IRI*
+                return RouteNodeType.LOCAL_BOTH;
 
             case NODE_LAGUNA_OUTPUT: // UltraScale+ only
                 assert(tileTypeEnum == TileTypeEnum.LAG_LAG);
@@ -179,6 +191,7 @@ public class RouteNodeInfo {
 
             case NODE_LAGUNA_DATA: // UltraScale+ only
                 assert(tileTypeEnum == TileTypeEnum.LAG_LAG);
+                assert(endTile != null);
                 if (node.getTile() != endTile) {
                     return RouteNodeType.SUPER_LONG_LINE;
                 }
@@ -190,6 +203,7 @@ public class RouteNodeInfo {
                 if (tileTypeEnum == TileTypeEnum.LAGUNA_TILE) { // UltraScale only
                     String wireName = node.getWireName();
                     if (wireName.startsWith("UBUMP")) {
+                        assert(endTile != null);
                         assert(node.getTile() != endTile);
                         return RouteNodeType.SUPER_LONG_LINE;
                     } else if (wireName.endsWith("_TXOUT")) {
