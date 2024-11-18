@@ -258,7 +258,7 @@ public class PartialRouter extends RWRoute {
                     if (rnodes.size() < 3) {
                         continue;
                     }
-                    // Look for overused exclusive sinks (with type PINFEED_I) within
+                    // Look for overused exclusive sinks within
                     // this connection's used nodes (except for the first and last used node,
                     // corresponding to source and sink)
                     for (RouteNode rnode : rnodes.subList(1, rnodes.size() - 1)) {
