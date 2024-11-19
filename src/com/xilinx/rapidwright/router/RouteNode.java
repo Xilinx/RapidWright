@@ -386,7 +386,7 @@ public class RouteNode implements Comparable<RouteNode> {
         ArrayList<PIP> pips = new ArrayList<>();
         RouteNode curr = this;
         while (curr.parent != null) {
-            PIP pip = RouterHelper.findPIPbetweenNodes(Node.getNode(curr.parent), Node.getNode(curr));
+            PIP pip = PIP.getArbitraryPIP(Node.getNode(curr.parent), Node.getNode(curr));
             if (pip != null) {
                 pips.add(pip);
             }
@@ -399,7 +399,7 @@ public class RouteNode implements Comparable<RouteNode> {
         ArrayList<PIP> pips = new ArrayList<>();
         RouteNode curr = this;
         do {
-            PIP pip = RouterHelper.findPIPbetweenNodes(Node.getNode(curr), Node.getNode(curr.parent));
+            PIP pip = PIP.getArbitraryPIP(Node.getNode(curr), Node.getNode(curr.parent));
             if (pip != null) {
                 pips.add(pip);
             }
