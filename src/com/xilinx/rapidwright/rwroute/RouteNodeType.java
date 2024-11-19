@@ -50,13 +50,30 @@ public enum RouteNodeType {
     LOCAL_EAST,
     LOCAL_WEST,
 
-    LOCAL_RESERVED;
+    LOCAL_RESERVED,
+
+    /**
+     * Denotes {@link RouteNode} objects that should be treated as being inaccessible and
+     * never queued for exploration during routing. Typically, these are routing nodes that
+     * have already been created but later discovered to not be needed (e.g. is a dead-end node).
+     */
+    INACCESSIBLE;
+
+    public static final RouteNodeType[] values = values();
 
     public boolean isAnyExclusiveSink() {
         return this == EXCLUSIVE_SINK_BOTH || this == EXCLUSIVE_SINK_EAST || this == EXCLUSIVE_SINK_WEST;
     }
 
+    public static boolean isAnyExclusiveSink(int ordinal) {
+        return ordinal == EXCLUSIVE_SINK_BOTH.ordinal() || ordinal == EXCLUSIVE_SINK_EAST.ordinal() || ordinal == EXCLUSIVE_SINK_WEST.ordinal();
+    }
+
     public boolean isAnyLocal() {
         return this == LOCAL_BOTH || this == LOCAL_EAST || this == LOCAL_WEST || this == LOCAL_RESERVED;
+    }
+
+    public static boolean isAnyLocal(int ordinal) {
+        return ordinal == LOCAL_BOTH.ordinal() || ordinal == LOCAL_EAST.ordinal() || ordinal == LOCAL_WEST.ordinal() || ordinal == LOCAL_RESERVED.ordinal();
     }
 }

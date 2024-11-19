@@ -27,7 +27,6 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.EnumMap;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -35,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -63,15 +63,17 @@ public class RouteNodeGraph {
     protected final Design design;
 
     /**
-     * A map of nodes to created rnodes
+     * A map of nodes to created rnodes. Assume that only a single
+     * thread will operate on each tile (first dimension) simultaneously
+     * (so no need for AtomicReferenceArray)
      */
-    protected final Map<Tile, RouteNode[]> nodesMap;
+    protected final RouteNode[][] nodesMap;
     private final AtomicInteger nodesMapSize;
 
     /**
      * A map of preserved nodes to their nets
      */
-    private final Map<Tile, Net[]> preservedMap;
+    private final AtomicReferenceArray<Net[]> preservedMap;
     private final AtomicInteger preservedMapSize;
 
     /**
@@ -89,7 +91,7 @@ public class RouteNodeGraph {
     public final int[] nextLagunaColumn;
     public final int[] prevLagunaColumn;
 
-    /** 
+    /**
      * Map indicating which wire indices within a Laguna-adjacent INT tile have
      * IntentCode.NODE_PINFEED that lead into the Laguna tile.
      */
@@ -114,20 +116,28 @@ public class RouteNodeGraph {
     /** Flag for whether design targets the Versal series */
     protected final boolean isVersal;
 
-    public RouteNodeGraph(Design design, RWRouteConfig config) {
-        this(design, config, new HashMap<>());
+    protected final Map<TileTypeEnum, Integer> baseWireCounts;
+
+    protected final static int MAX_OCCUPANCY = 256;
+    protected final float[] presentCongestionCosts;
+
+    protected static int getTileCount(Design design) {
+        Device device = design.getDevice();
+        return device.getColumns() * device.getRows();
     }
 
-    protected RouteNodeGraph(Design design, RWRouteConfig config, Map<Tile, RouteNode[]> nodesMap) {
+
+    public RouteNodeGraph(Design design, RWRouteConfig config) {
         this.design = design;
         lutRoutethru = config.isLutRoutethru();
 
-        this.nodesMap = nodesMap;
+        this.nodesMap = new RouteNode[getTileCount(design)][];
         nodesMapSize = new AtomicInteger();
-        preservedMap = new ConcurrentHashMap<>();
+        preservedMap = new AtomicReferenceArray<>(getTileCount(design));
         preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
         createRnodeTime = 0;
+        baseWireCounts = new ConcurrentHashMap<>();
 
         Device device = design.getDevice();
         intYToSLRIndex = new int[device.getRows()];
@@ -398,9 +408,28 @@ public class RouteNodeGraph {
             prevLagunaColumn = null;
             lagunaI = null;
         }
+
+        presentCongestionCosts = new float[MAX_OCCUPANCY];
     }
 
     public void initialize() {
+    }
+
+    /*
+     * Return the maximum base wire index across all Nodes in this tile
+     */
+    protected int getBaseWireCount(Tile tile, int startWireIndex) {
+        return baseWireCounts.computeIfAbsent(tile.getTileTypeEnum(), (e) -> {
+            // Check all wires in tile to find the index of the last base wire
+            int lastBaseWire = startWireIndex;
+            for (int i = lastBaseWire + 1; i < tile.getWireCount(); i++) {
+                Node node = Node.getNode(tile, i);
+                if (node != null && node.getTile() == tile && node.getWireIndex() == i) {
+                    lastBaseWire = i;
+                }
+            }
+            return lastBaseWire + 1;
+        });
     }
 
     protected Net preserve(Node node, Net net) {
@@ -414,7 +443,16 @@ public class RouteNodeGraph {
     private Net preserve(Tile tile, int wireIndex, Net net) {
         // Assumes that tile/wireIndex describes the base wire on the node
         // No need to synchronize access to 'nets' since collisions are not expected
-        Net[] nets = preservedMap.computeIfAbsent(tile, (t) -> new Net[t.getWireCount()]);
+        int tileAddress = tile.getUniqueAddress();
+        Net[] nets = preservedMap.get(tileAddress);
+        if (nets == null) {
+            int baseWireCount = getBaseWireCount(tile, wireIndex);
+            nets = new Net[baseWireCount];
+            if (!preservedMap.compareAndSet(tileAddress, null, nets)) {
+                // Another thread must have beat us to a compareAndSet, use that result
+                nets = preservedMap.get(tileAddress);
+            }
+        }
         Net oldNet = nets[wireIndex];
         // Do not clobber the old value
         if (oldNet == null) {
@@ -495,7 +533,7 @@ public class RouteNodeGraph {
 
     private boolean unpreserve(Tile tile, int wireIndex) {
         // Assumes that tile/wireIndex describes the base wire on its node
-        Net[] nets = preservedMap.get(tile);
+        Net[] nets = preservedMap.get(tile.getUniqueAddress());
         if (nets == null || nets[wireIndex] == null)
             return false;
         nets[wireIndex] = null;
@@ -505,7 +543,7 @@ public class RouteNodeGraph {
     public boolean isPreserved(Node node) {
         Tile tile = node.getTile();
         int wireIndex = node.getWireIndex();
-        Net[] nets = preservedMap.get(tile);
+        Net[] nets = preservedMap.get(tile.getUniqueAddress());
         return nets != null && nets[wireIndex] != null;
     }
 
@@ -596,7 +634,7 @@ public class RouteNodeGraph {
 
     private Net getPreservedNet(Tile tile, int wireIndex) {
         // Assumes that tile/wireIndex describes the base wire on its node
-        Net[] nets = preservedMap.get(tile);
+        Net[] nets = preservedMap.get(tile.getUniqueAddress());
         return nets != null ? nets[wireIndex] : null;
     }
 
@@ -608,45 +646,68 @@ public class RouteNodeGraph {
 
     private RouteNode getNode(Tile tile, int wireIndex) {
         // Assumes that tile/wireIndex describes the base wire on its node
-        RouteNode[] rnodes = nodesMap.get(tile);
+        RouteNode[] rnodes = nodesMap[tile.getUniqueAddress()];
         return rnodes != null ? rnodes[wireIndex] : null;
     }
 
     public Iterable<RouteNode> getRnodes() {
         return new Iterable<RouteNode>() {
-            final Iterator<Map.Entry<Tile, RouteNode[]>> it = nodesMap.entrySet().iterator();
-            RouteNode[] curr = it.hasNext() ? it.next().getValue() : null;
-            int index = 0;
+            int tileAddress = -1; // Start at -1 so that pre-increment advances
+            int wireIndex;
+            RouteNode[] curr;
+            int count = 0;
+
+            private boolean findNextWireInNextTile() {
+                while(++tileAddress < nodesMap.length) {
+                    curr = nodesMap[tileAddress];
+                    if (curr == null) {
+                        continue;
+                    }
+                    wireIndex = -1; // Start at -1 so that pre-increment advances
+                    if (findNextWireInSameTile()) {
+                        return true;
+                    }
+                }
+                assert(curr == null);
+                return false;
+            }
+
+            private boolean findNextWireInSameTile() {
+                assert(curr != null);
+                assert(wireIndex < curr.length);
+                while(++wireIndex < curr.length) {
+                    if (curr[wireIndex] != null) {
+                        return true;
+                    }
+                }
+                curr = null;
+                return false;
+            }
 
             @Override
             public Iterator<RouteNode> iterator() {
                 return new Iterator<RouteNode>() {
                     @Override
                     public boolean hasNext() {
-                        if (curr == null) {
-                            return false;
+                        if (curr != null && findNextWireInSameTile()) {
+                            count++;
+                            return true;
                         }
-                        while(true) {
-                            while (index < curr.length) {
-                                if (curr[index] != null) {
-                                    return true;
-                                }
-                                index++;
-                            }
-                            if (!it.hasNext()) {
-                                return false;
-                            }
-                            curr = it.next().getValue();
-                            assert(curr != null);
-                            index = 0;
+                        assert(curr == null);
+                        if (findNextWireInNextTile()) {
+                            count++;
+                            return true;
                         }
+                        assert(count == nodesMapSize.get());
+                        return false;
                     }
 
                     @Override
                     public RouteNode next() {
-                        hasNext();
-                        assert(curr[index] != null);
-                        return curr[index++];
+                        assert(curr != null);
+                        RouteNode routeNode = curr[wireIndex];
+                        assert(routeNode != null);
+                        return routeNode;
                     }
                 };
             }
@@ -668,7 +729,13 @@ public class RouteNodeGraph {
     public RouteNode getOrCreate(Node node, RouteNodeType type) {
         Tile tile = node.getTile();
         int wireIndex = node.getWireIndex();
-        RouteNode[] rnodes = nodesMap.computeIfAbsent(tile, (t) -> new RouteNode[t.getWireCount()]);
+        int tileAddress = tile.getUniqueAddress();
+        RouteNode[] rnodes = nodesMap[tileAddress];
+        if (rnodes == null) {
+            int baseWireCount = getBaseWireCount(tile, wireIndex);
+            rnodes = new RouteNode[baseWireCount];
+            nodesMap[tileAddress] = rnodes;
+        }
         RouteNode rnode = rnodes[wireIndex];
         if (rnode == null) {
             rnode = create(node, type);
@@ -814,6 +881,17 @@ public class RouteNodeGraph {
             return false;
         }
 
+        if (tail.getIntentCode() == IntentCode.NODE_PINFEED) {
+            assert(isVersal);
+            assert(!lutRoutethru);
+            assert(head.getIntentCode() == IntentCode.NODE_IMUX ||
+                   head.getIntentCode() == IntentCode.NODE_PINBOUNCE);
+            return false;
+        }
+
+        // Should not get to this point unless LUT routethru-s are enabled
+        assert(lutRoutethru);
+
         if (!RouteThruHelper.isRouteThruPIPAvailable(design, head, tail)) {
             return false;
         }
@@ -826,5 +904,20 @@ public class RouteNodeGraph {
             return false;
         }
         return true;
+    }
+
+    public void updatePresentCongestionCosts(float presentCongestionFactor) {
+        for (int occupancy = 0; occupancy < presentCongestionCosts.length; occupancy++) {
+            int overuse = occupancy - RouteNode.capacity;
+            if (overuse < 0) {
+                presentCongestionCosts[occupancy] = RouteNode.initialPresentCongestionCost;
+            } else {
+                presentCongestionCosts[occupancy] = RouteNode.initialPresentCongestionCost + (overuse + 1) * presentCongestionFactor;
+            }
+        }
+    }
+
+    public float getPresentCongestionCost(int occupancy) {
+        return presentCongestionCosts[occupancy];
     }
 }
