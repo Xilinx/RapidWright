@@ -242,7 +242,6 @@ public class GlobalSignalRouting {
             // In US/US+ clock routing, we use two VROUTE nodes to reach the clock regions above and below the centroid.
             // However, we can see that Vivado only use one VROUTE node in the centroid clock region for Versal clock routing,
             // and reach the above and below clock regions by VDISTR nodes.
-            System.out.println("SiteTypeEnum of source: " + sourceTypeEnum);
 
             ClockRegion centroid;
             RouteNode centroidHRouteNode;
@@ -273,17 +272,13 @@ public class GlobalSignalRouting {
                 if (centroidX <= 0)     centroidX = 1;
 
                 centroid = device.getClockRegion(1, centroidX);
-                System.out.println("centroid: " + centroid);
                 RouteNode clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
-                System.out.println("clkRoutingLine: " + clkRoutingLine.getName());
                 centroidHRouteNode = VersalClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true);
-                System.out.println("centroidHRouteNode: " + centroidHRouteNode.getName());
             } else {
                 throw new RuntimeException("RWRoute hasn't supported routing a clock net with source type " + sourceTypeEnum + " yet.");
             }
 
             RouteNode vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid, false);
-            System.out.println("vroute: " + vroute.getName());
 
             upDownDistLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vroute, clockRegions, false, getNodeStatus);
 
