@@ -84,10 +84,9 @@ public class VersalClockRouting {
      * @param clk The current clock net to contribute routing.
      * @param startingRouteNode The intermediate start point of the clock route.
      * @param clockRegion The center clock region or the clock region that is one row above or below the center.
-     * @param adjusted A flag to guard the default functionality when routing to centroid clock region.
      * @param findCentroidHroute The flag to indicate the returned RouteNode should be HROUTE in the center or VROUTE going up or down.
      */
-    public static RouteNode routeToCentroid(Net clk, RouteNode startingRouteNode, ClockRegion clockRegion, boolean adjusted, boolean findCentroidHroute) {
+    public static RouteNode routeToCentroid(Net clk, RouteNode startingRouteNode, ClockRegion clockRegion, boolean findCentroidHroute) {
         Queue<RouteNode> q = RouteNode.createPriorityQueue();
         startingRouteNode.setParent(null);
         q.add(startingRouteNode);
@@ -125,28 +124,25 @@ public class VersalClockRouting {
                        clockRegion.equals(currNode.getTile().getClockRegion()) &&
                        clockRegion.equals(parentNode.getTile().getClockRegion()) &&
                        parentNode.getWireName().contains("BOT")) {
-                        if (adjusted) {
-                            if (findCentroidHroute) {
-                                centroidHRouteNode = curr.getParent();
-                                while (centroidHRouteNode.getIntentCode() != IntentCode.NODE_GLOBAL_HROUTE_HSR) {
-                                    centroidHRouteNode = centroidHRouteNode.getParent();
-                                }
-                                clk.getPIPs().addAll(centroidHRouteNode.getPIPsBackToSourceByNodes());
-                                return centroidHRouteNode;
+                        if (findCentroidHroute) {
+                            centroidHRouteNode = curr.getParent();
+                            while (centroidHRouteNode.getIntentCode() != IntentCode.NODE_GLOBAL_HROUTE_HSR) {
+                                centroidHRouteNode = centroidHRouteNode.getParent();
                             }
-                            // assign PIPs based on which RouteNode returned, instead of curr
-                            clk.getPIPs().addAll(parent.getPIPsBackToSourceByNodes());
-                            return parent;
-                        } else {
-                            clk.getPIPs().addAll(curr.getPIPsBackToSourceByNodes());
-                            return curr;
+                            clk.getPIPs().addAll(centroidHRouteNode.getPIPsBackToSourceByNodes());
+                            return centroidHRouteNode;
                         }
+                        // assign PIPs based on which RouteNode returned, instead of curr
+                        clk.getPIPs().addAll(parent.getPIPsBackToSourceByNodes());
+                        return parent;
                     }
                 }
 
                 // Only using routing lines to get to centroid
-                if (!allowedIntentCodes.contains(downhill.getIntentCode())) continue;
-                if (adjusted && !findCentroidHroute && downhill.getIntentCode() == IntentCode.NODE_GLOBAL_HROUTE_HSR) {
+                if (!allowedIntentCodes.contains(downhill.getIntentCode())) {
+                    continue;
+                }
+                if (!findCentroidHroute && downhill.getIntentCode() == IntentCode.NODE_GLOBAL_HROUTE_HSR) {
                     continue;
                 }
                 if (visited.contains(downhill)) continue;
