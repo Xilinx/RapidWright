@@ -35,6 +35,7 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.rwroute.NodeStatus;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -721,5 +722,65 @@ public class VersalClockRouting {
         // // Remove duplicates
         // Set<PIP> uniquePIPs = new HashSet<>(clkNet.getPIPs());
         // clkNet.setPIPs(uniquePIPs);
+    }
+
+    public static Map<RouteNode, List<SitePinInst>> routeLCBsToSinks(Net clk,
+                                                                     Function<Node,NodeStatus> getNodeStatus) {
+        Map<RouteNode, List<SitePinInst>> lcbMappings = new HashMap<>();
+        Set<IntentCode> allowedIntentCodes = EnumSet.of(
+            IntentCode.NODE_CLE_CNODE,
+            IntentCode.NODE_INTF_CNODE,
+            IntentCode.NODE_INODE,
+            IntentCode.NODE_PINBOUNCE,
+            IntentCode.NODE_CLE_BNODE,
+            IntentCode.NODE_INTF_BNODE,
+            IntentCode.NODE_IMUX,
+            IntentCode.NODE_CLE_CTRL,
+            IntentCode.NODE_INTF_CTRL,
+            IntentCode.NODE_IRI,
+            IntentCode.NODE_PINFEED,
+            IntentCode.NODE_GLOBAL_LEAF
+        );
+        Set<Node> visited = new HashSet<>();
+        Queue<RouteNode> q = new LinkedList<>();
+        Predicate<Node> isNodeUnavailable = (node) -> getNodeStatus.apply(node) == NodeStatus.UNAVAILABLE;
+        RouteThruHelper routeThruHelper = new RouteThruHelper(clk.getDesign().getDevice());
+
+        nextPin: for (SitePinInst p: clk.getPins()) {
+            if (p.isOutPin()) continue;
+            Node sinkNode = p.getConnectedNode();
+            RouteNode sinkRouteNode = new RouteNode(sinkNode.getTile(), sinkNode.getWireIndex(), null, 0);
+            ClockRegion cr = p.getTile().getClockRegion();
+
+            q.clear();
+            q.add(sinkRouteNode);
+
+            while (!q.isEmpty()) {
+                RouteNode curr = q.poll();
+                Node currNode = Node.getNode(curr);
+
+                for (Node uphill : currNode.getAllUphillNodes()) {
+                    if (!uphill.getTile().getClockRegion().equals(cr)) continue;
+                    if (!allowedIntentCodes.contains(uphill.getIntentCode())) continue;
+                    if (!visited.add(uphill)) continue;
+                    // if (used.contains(uphill)) continue;
+                    if (routeThruHelper.isRouteThru(uphill, currNode) && currNode.getIntentCode() != IntentCode.NODE_IRI) continue;
+                    if (isNodeUnavailable.test(uphill)) continue;
+                    if (uphill.getIntentCode() == IntentCode.NODE_GLOBAL_LEAF) {
+                        RouteNode rn = new RouteNode(uphill.getTile(), uphill.getWireIndex(), curr, curr.getLevel()+1);
+                        clk.getPIPs().addAll(rn.getPIPsForwardToSinkByNodes());
+                        rn.setParent(null);
+                        rn.setLevel(0);
+                        lcbMappings.computeIfAbsent(rn, (k) -> new ArrayList<>()).add(p);
+                        visited.clear();
+                        continue nextPin;
+                    }
+                    q.add(new RouteNode(uphill.getTile(), uphill.getWireIndex(), curr, curr.getLevel()+1));
+                }
+            }
+            throw new RuntimeException("ERROR: Couldn't map Pin " + p + " to LCB.");
+        }
+
+        return lcbMappings;
     }
 }
