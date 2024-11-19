@@ -97,7 +97,6 @@ public class VersalClockRouting {
             IntentCode.NODE_GLOBAL_VROUTE,
             IntentCode.NODE_GLOBAL_VDISTR_LVL2
         );
-        // Tile approxTarget = clockRegion.getApproximateCenter();
         int watchDog = 10000000;
         RouteNode centroidHRouteNode = null;
         Set<Node> visited = new HashSet<>();
@@ -149,7 +148,7 @@ public class VersalClockRouting {
                 RouteNode rn = new RouteNode(downhill.getTile(), downhill.getWireIndex(), curr, curr.getLevel()+1);
                 
                 // The clockRegion.getApproximateCenter() may return an INVALID_* tile with huge coordinates.
-                // Here we use the manhatten distance to the target clock region as the cost.
+                // Here we use the Manhattan distance to the target clock region as the cost.
                 ClockRegion rnClockRegion = rn.getTile().getClockRegion();
                 int cost = Math.abs(rnClockRegion.getColumn() - clockRegion.getColumn()) + Math.abs(rnClockRegion.getRow() - clockRegion.getRow());
                 rn.setCost(cost);
@@ -242,7 +241,6 @@ public class VersalClockRouting {
         assert(vroute.getParent() == null);
         // Pattern: NODE_GLOBAL_VROUTE -> ... -> NODE_GLOBAL_VDISTR_LVL2 -> ... -> NODE_GLOBAL_VDISTR_LVL1 -> ... -> NODE_GLOBAL_VDISTR
         Set<IntentCode> allowedIntentCodes = EnumSet.of(
-            // IntentCode.NODE_GLOBAL_VROUTE,
             IntentCode.NODE_GLOBAL_VDISTR,
             IntentCode.NODE_GLOBAL_VDISTR_LVL1,
             IntentCode.NODE_GLOBAL_VDISTR_LVL2,
@@ -255,7 +253,6 @@ public class VersalClockRouting {
             Tile crTarget = cr.getApproximateCenter();
             while (!q.isEmpty()) {
                 RouteNode curr = q.poll();
-                // visited.add(curr);
                 Node currNode = Node.getNode(curr);
                 IntentCode c = currNode.getIntentCode();
                 ClockRegion currCR = currNode.getTile().getClockRegion();
@@ -264,7 +261,6 @@ public class VersalClockRouting {
                     if (getNodeStatus.apply(currNode) == NodeStatus.INUSE) {
                         startingPoints.add(curr);
                     } else {
-                        // List<PIP> pips = curr.getPIPsBackToSource();
                         List<PIP> pips = curr.getPIPsBackToSourceByNodes();
                         allPIPs.addAll(pips);
                         for (PIP p : pips) {
@@ -308,7 +304,6 @@ public class VersalClockRouting {
                                                                              Map<ClockRegion, RouteNode> vertDistLines,
                                                                              Collection<ClockRegion> clockRegions,
                                                                              Function<Node, NodeStatus> getNodeStatus) {
-        // List<RouteNode> distLines = new ArrayList<>();
         Map<ClockRegion, RouteNode> distLines = new HashMap<>();
         Queue<RouteNode> q = new LinkedList<>();
         Set<PIP> allPIPs = new HashSet<>();
@@ -320,17 +315,14 @@ public class VersalClockRouting {
             IntentCode.NODE_GLOBAL_HDISTR_LOCAL,
             IntentCode.NODE_GLOBAL_GCLK
         );
-        // nextClockRegion: for (Entry<ClockRegion,RouteNode> e : crMap.entrySet()) {
         nextClockRegion: for (ClockRegion targetCR : clockRegions) {
             q.clear();
             RouteNode vertDistLine = vertDistLines.get(targetCR);
-            // assert(vertDistLine.getParent() == null);
             vertDistLine.setParent(null);
             q.add(vertDistLine);
             visited.clear();
             visited.add(Node.getNode(vertDistLine));
             
-            // ClockRegion targetCR = e.getKey();
             while (!q.isEmpty()) {
                 RouteNode curr = q.poll();
                 IntentCode c = curr.getIntentCode();
@@ -339,7 +331,6 @@ public class VersalClockRouting {
                 if (targetCR.equals(curr.getTile().getClockRegion()) && 
                     c == IntentCode.NODE_GLOBAL_GCLK &&
                     parent.getIntentCode() == IntentCode.NODE_GLOBAL_HDISTR_LOCAL) {
-                    // List<PIP> pips = parent.getPIPsBackToSource();
                     List<PIP> pips = parent.getPIPsBackToSourceByNodes();
                     for (PIP pip : pips) {
                         allPIPs.add(pip);
@@ -490,7 +481,6 @@ public class VersalClockRouting {
                             currPIPs.add(pip);
                             NodeStatus status = getNodeStatus.apply(pip.getStartNode());
                             if (status == NodeStatus.INUSE) {
-                                // break;
                                 inuse = true;
                                 continue;
                             }
@@ -558,22 +548,8 @@ public class VersalClockRouting {
     public static void incrementalClockRouter(Design design,
                                               Net clkNet,
                                               Function<Node,NodeStatus> getNodeStatus) {
-        // TODO: hasn't supported incrementalClockRouter on Versal devices yet.
-        throw new RuntimeException("Hasn't supported incrementalClockRouter on Versal devices yet.");
-
-        // // Assume all existing site pins are already routed
-        // Set<SitePinInst> existingPins = new HashSet<>(clkNet.getSinkPins());
-
-        // // Find any missing site pins, to be used as target, routable sinks
-        // DesignTools.createMissingSitePinInsts(design, clkNet);
-
-        // List<SitePinInst> createdPins = new ArrayList<>(clkNet.getSinkPins());
-        // createdPins.removeAll(existingPins);
-
-        // if (createdPins.isEmpty())
-        //     return;
-
-        // incrementalClockRouter(clkNet, createdPins, getNodeStatus);
+        // TODO:
+        throw new RuntimeException("ERROR: incrementalClockRouter not yet support on Versal devices.");
     }
 
     /**
@@ -586,138 +562,8 @@ public class VersalClockRouting {
     public static void incrementalClockRouter(Net clkNet,
                                               List<SitePinInst> clkPins,
                                               Function<Node,NodeStatus> getNodeStatus) {
-        // TODO: hasn't supported incrementalClockRouter on Versal devices yet.
-        throw new RuntimeException("Hasn't supported incrementalClockRouter on Versal devices yet.");
-
-        // // Find all horizontal distribution lines to be used as starting points and create a map
-        // // lookup by clock region
-        // Map<ClockRegion,Set<RouteNode>> startingPoints = new HashMap<>();
-        // Set<Node> vroutesUp = new HashSet<>();
-        // Set<Node> vroutesDown = new HashSet<>();
-        // int centroidY = -1;
-        // for (PIP p : clkNet.getPIPs()) {
-        //     Node startNode = p.getStartNode();
-        //     Node endNode = p.getEndNode();
-        //     for (Node node : new Node[] {startNode, endNode}) {
-        //         if (node == null) continue;
-        //         IntentCode ic = node.getIntentCode();
-        //         if (ic == IntentCode.NODE_GLOBAL_HDISTR) {
-        //             for (Wire w : node.getAllWiresInNode()) {
-        //                 RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex());
-        //                 ClockRegion cr = w.getTile().getClockRegion();
-        //                 if (cr != null) {
-        //                     assert(rn.getParent() == null);
-        //                     startingPoints.computeIfAbsent(cr, n -> new HashSet<>())
-        //                             .add(rn);
-        //                 }
-        //             }
-        //         } else if (node == startNode && endNode.getIntentCode() == IntentCode.NODE_GLOBAL_VDISTR) {
-        //             if (ic == IntentCode.NODE_GLOBAL_VROUTE || ic == IntentCode.NODE_GLOBAL_HROUTE) {
-        //                 // Centroid lays where {HROUTE, VROUTE} -> VDISTR
-        //                 assert(centroidY == -1);
-        //                 centroidY = p.getTile().getTileYCoordinate();
-        //             } else {
-        //                 Tile startTile = startNode.getTile();
-        //                 Tile endTile = endNode.getTile();
-        //                 if (endTile == startTile) {
-        //                     for (Wire w : endNode.getAllWiresInNode()) {
-        //                         if (w.getTile() != endTile) {
-        //                             endTile = w.getTile();
-        //                             break;
-        //                         }
-        //                     }
-        //                 }
-
-        //                 int startTileY = startTile.getTileYCoordinate();
-        //                 int endTileY = endTile.getTileYCoordinate();
-        //                 if (endTileY > startTileY) {
-        //                     vroutesUp.add(endNode);
-        //                 } else if (endTileY < startTileY) {
-        //                     vroutesDown.add(endNode);
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
-        // assert(centroidY != -1);
-
-        // Node currNode = null;
-        // int currDelta = Integer.MAX_VALUE;
-        // for (Node node : vroutesUp) {
-        //     int delta = node.getTile().getTileYCoordinate() - centroidY;
-        //     assert(delta >= 0);
-        //     if (delta < currDelta) {
-        //         currDelta = delta;
-        //         currNode = node;
-        //     }
-        // }
-        // RouteNode vrouteUp = currNode != null ? new RouteNode(currNode.getTile(), currNode.getWireIndex()) : null;
-
-        // currNode = null;
-        // currDelta = Integer.MAX_VALUE;
-        // for (Node node : vroutesDown) {
-        //     int delta = centroidY - node.getTile().getTileYCoordinate();
-        //     assert(delta >= 0);
-        //     if (delta < currDelta) {
-        //         currDelta = delta;
-        //         currNode = node;
-        //     }
-        // }
-        // RouteNode vrouteDown = currNode != null ? new RouteNode(currNode.getTile(), currNode.getWireIndex()) : null;
-
-        // // Find the target leaf clock buffers (LCBs), route from horizontal dist lines to those
-        // Map<RouteNode, List<SitePinInst>> lcbMappings = GlobalSignalRouting.getLCBPinMappings(clkPins, getNodeStatus);
-
-        // final int finalCentroidY = centroidY;
-        // Set<ClockRegion> newUpClockRegions = new HashSet<>();
-        // Set<ClockRegion> newDownClockRegions = new HashSet<>();
-        // for (Map.Entry<RouteNode, List<SitePinInst>> e : lcbMappings.entrySet()) {
-        //     RouteNode lcb = e.getKey();
-        //     ClockRegion currCR = lcb.getTile().getClockRegion();
-        //     startingPoints.computeIfAbsent(currCR, n -> {
-        //         if (currCR.getUpperLeft().getTileYCoordinate() > finalCentroidY) {
-        //             newUpClockRegions.add(currCR);
-        //         } else {
-        //             newDownClockRegions.add(currCR);
-        //         }
-        //         return new HashSet<>();
-        //     });
-        // }
-        // if (!newUpClockRegions.isEmpty()) {
-        //     List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clkNet,
-        //             vrouteUp,
-        //             newUpClockRegions,
-        //             false,
-        //             getNodeStatus);
-        //     if (upLines != null) {
-        //         for (RouteNode rnode : upLines) {
-        //             rnode.setParent(null);
-        //             startingPoints.get(rnode.getTile().getClockRegion()).add(rnode);
-        //         }
-        //     }
-        // }
-        // if (!newDownClockRegions.isEmpty()) {
-        //     List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clkNet,
-        //             vrouteDown,
-        //             newDownClockRegions,
-        //             true,
-        //             getNodeStatus);
-        //     if (downLines != null) {
-        //         for (RouteNode rnode : downLines) {
-        //             rnode.setParent(null);
-        //             startingPoints.get(rnode.getTile().getClockRegion()).add(rnode);
-        //         }
-        //     }
-        // }
-
-        // UltraScaleClockRouting.routeToLCBs(clkNet, startingPoints, lcbMappings.keySet());
-
-        // // Last mile routing from LCBs to SLICEs
-        // UltraScaleClockRouting.routeLCBsToSinks(clkNet, lcbMappings, getNodeStatus);
-
-        // // Remove duplicates
-        // Set<PIP> uniquePIPs = new HashSet<>(clkNet.getPIPs());
-        // clkNet.setPIPs(uniquePIPs);
+        // TODO:
+        throw new RuntimeException("ERROR: incrementalClockRouter not yet support on Versal devices.");
     }
 
     public static Map<RouteNode, List<SitePinInst>> routeLCBsToSinks(Net clk,
@@ -759,7 +605,6 @@ public class VersalClockRouting {
                     if (!uphill.getTile().getClockRegion().equals(cr)) continue;
                     if (!allowedIntentCodes.contains(uphill.getIntentCode())) continue;
                     if (!visited.add(uphill)) continue;
-                    // if (used.contains(uphill)) continue;
                     if (routeThruHelper.isRouteThru(uphill, currNode) && currNode.getIntentCode() != IntentCode.NODE_IRI) continue;
                     if (isNodeUnavailable.test(uphill)) continue;
                     if (uphill.getIntentCode() == IntentCode.NODE_GLOBAL_LEAF) {
