@@ -32,6 +32,7 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
@@ -50,7 +51,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class TestGlobalSignalRouting {
     @ParameterizedTest
@@ -232,11 +235,18 @@ public class TestGlobalSignalRouting {
     public void testSymmetricClkRouting() {
         Design design = RapidWrightDCP.loadDCP("two_clk_check_NetTools.dcp");
         design.unrouteDesign();
+        // Simulate the preserve method
+        Set<Node> used = new HashSet<>();
 
         for (String netName : Arrays.asList("clk1_IBUF_BUFG", "clk2_IBUF_BUFG", "rst1", "rst2")) {
             Net net = design.getNet(netName);
             Assertions.assertTrue(NetTools.isGlobalClock(net));
-            GlobalSignalRouting.symmetricClkRouting(net, design.getDevice(), (n) -> NodeStatus.AVAILABLE);
+            GlobalSignalRouting.symmetricClkRouting(net, design.getDevice(), (n) -> used.contains(n) ? NodeStatus.UNAVAILABLE : NodeStatus.AVAILABLE);
+            for (PIP pip: net.getPIPs()) {
+                for (Node node: Arrays.asList(pip.getStartNode(), pip.getEndNode())) {
+                    if (node != null) used.add(node);
+                }
+            }
         }
 
         if (FileTools.isVivadoOnPath()) {
