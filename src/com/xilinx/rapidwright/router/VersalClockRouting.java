@@ -110,6 +110,7 @@ public class VersalClockRouting {
             Node currNode = Node.getNode(curr);
             RouteNode parent = curr.getParent();
             for (Node downhill : currNode.getAllDownhillNodes()) {
+                IntentCode intentCode = downhill.getIntentCode();
                 if (parent != null) {
                     Node parentNode = Node.getNode(parent);
                     if (parentNode.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE &&
@@ -117,7 +118,7 @@ public class VersalClockRouting {
                         // Disallow ability to go from VROUTE back to HROUTE
                         continue;
                     }
-                    if (downhill.getIntentCode()     == IntentCode.NODE_GLOBAL_VDISTR_LVL2 &&
+                    if (intentCode == IntentCode.NODE_GLOBAL_VDISTR_LVL2 &&
                        currNode.getIntentCode()   == IntentCode.NODE_GLOBAL_GCLK &&
                        parentNode.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE &&
                        clockRegion.equals(currNode.getTile().getClockRegion()) &&
@@ -138,13 +139,13 @@ public class VersalClockRouting {
                 }
 
                 // Only using routing lines to get to centroid
-                if (!allowedIntentCodes.contains(downhill.getIntentCode())) {
+                if (!intentCode.isVersalClocking()) {
                     continue;
                 }
-                if (!findCentroidHroute && downhill.getIntentCode() == IntentCode.NODE_GLOBAL_HROUTE_HSR) {
+                if (!findCentroidHroute && intentCode == IntentCode.NODE_GLOBAL_HROUTE_HSR) {
                     continue;
                 }
-                if (visited.contains(downhill)) continue;
+                if (!visited.add(downhill)) continue;
                 RouteNode rn = new RouteNode(downhill.getTile(), downhill.getWireIndex(), curr, curr.getLevel()+1);
                 
                 // The clockRegion.getApproximateCenter() may return an INVALID_* tile with huge coordinates.
@@ -153,7 +154,6 @@ public class VersalClockRouting {
                 int cost = Math.abs(rnClockRegion.getColumn() - clockRegion.getColumn()) + Math.abs(rnClockRegion.getRow() - clockRegion.getRow());
                 rn.setCost(cost);
                 q.add(rn);
-                visited.add(downhill);
             }
             if (watchDog-- == 0) {
                 throw new RuntimeException("ERROR: Could not route from " + startingRouteNode + " to clock region " + clockRegion);
@@ -296,30 +296,22 @@ public class VersalClockRouting {
      * Routes from a vertical distribution centroid to destination horizontal distribution lines
      * in the clock regions provided.
      * @param clk The current clock net
-     * @param vertDistLines A map of target clock regions and their respective vertical distribution lines
-     * @param clockRegions target clock regions
+     * @param crMap A map of target clock regions and their respective vertical distribution lines
      * @return The List of nodes from the centroid to the horizontal distribution line.
      */
     public static Map<ClockRegion, RouteNode> routeVerticalToHorizontalDistributionLines(Net clk,
-                                                                             Map<ClockRegion, RouteNode> vertDistLines,
-                                                                             Collection<ClockRegion> clockRegions,
-                                                                             Function<Node, NodeStatus> getNodeStatus) {
+                                                                                         Map<ClockRegion, RouteNode> crMap,
+                                                                                         Function<Node, NodeStatus> getNodeStatus) {
         Map<ClockRegion, RouteNode> distLines = new HashMap<>();
         Queue<RouteNode> q = new LinkedList<>();
         Set<PIP> allPIPs = new HashSet<>();
         Set<Node> visited = new HashSet<>();
-        Set<IntentCode> allowedIntentCodes = EnumSet.of(
-            IntentCode.NODE_GLOBAL_HDISTR,
-            IntentCode.NODE_GLOBAL_VDISTR,
-            IntentCode.NODE_PINFEED,
-            IntentCode.NODE_GLOBAL_HDISTR_LOCAL,
-            IntentCode.NODE_GLOBAL_GCLK
-        );
-        nextClockRegion: for (ClockRegion targetCR : clockRegions) {
+        nextClockRegion: for (Entry<ClockRegion,RouteNode> e : crMap.entrySet()) {
             q.clear();
-            RouteNode vertDistLine = vertDistLines.get(targetCR);
+            RouteNode vertDistLine = e.getValue();
             vertDistLine.setParent(null);
             q.add(vertDistLine);
+            ClockRegion targetCR = e.getKey();
             visited.clear();
             visited.add(Node.getNode(vertDistLine));
             
@@ -328,9 +320,8 @@ public class VersalClockRouting {
                 IntentCode c = curr.getIntentCode();
                 Node currNode = Node.getNode(curr);
                 RouteNode parent = curr.getParent();
-                if (targetCR.equals(curr.getTile().getClockRegion()) && 
-                    c == IntentCode.NODE_GLOBAL_GCLK &&
-                    parent.getIntentCode() == IntentCode.NODE_GLOBAL_HDISTR_LOCAL) {
+                if (targetCR.equals(curr.getTile().getClockRegion()) && c == IntentCode.NODE_GLOBAL_GCLK &&
+                        parent.getIntentCode() == IntentCode.NODE_GLOBAL_HDISTR_LOCAL) {
                     List<PIP> pips = parent.getPIPsBackToSourceByNodes();
                     for (PIP pip : pips) {
                         allPIPs.add(pip);
@@ -347,9 +338,9 @@ public class VersalClockRouting {
                 }
 
                 for (Node downhill: currNode.getAllDownhillNodes()) {
-                    if (!allowedIntentCodes.contains(downhill.getIntentCode())) continue;
-                    if (visited.contains(downhill)) continue;
-                    visited.add(downhill);
+                    IntentCode intentCode = downhill.getIntentCode();
+                    if (intentCode != IntentCode.NODE_PINFEED && !intentCode.isVersalClocking()) continue;
+                    if (!visited.add(downhill)) continue;
                     q.add(new RouteNode(downhill.getTile(), downhill.getWireIndex(), curr, curr.getLevel()+1));
                 }
             }
@@ -382,11 +373,6 @@ public class VersalClockRouting {
         Queue<RouteNode> q = RouteNode.createPriorityQueue();
         Set<PIP> allPIPs = new HashSet<>();
         HashSet<RouteNode> visited = new HashSet<>();
-        Set<IntentCode> allowedIntentCodes = EnumSet.of(
-            IntentCode.NODE_PINFEED,
-            IntentCode.NODE_GLOBAL_LEAF,
-            IntentCode.NODE_GLOBAL_GCLK
-        );
 
         nextLCB: for (RouteNode lcb : lcbTargets) {
             q.clear();
@@ -415,7 +401,8 @@ public class VersalClockRouting {
                 for (Node downhill : currNode.getAllDownhillNodes()) {
                     // Stay in this clock region
                     if (!currCR.equals(downhill.getTile().getClockRegion())) continue;
-                    if (!allowedIntentCodes.contains(downhill.getIntentCode())) continue;
+                    IntentCode intentCode = downhill.getIntentCode();
+                    if (intentCode != IntentCode.NODE_PINFEED && !intentCode.isVersalClocking()) continue;
                     RouteNode rn = new RouteNode(downhill.getTile(), downhill.getWireIndex(), curr, curr.getLevel()+1);
                     if (visited.contains(rn)) continue;
                     if (rn.getWireName().endsWith("_I_CASC_PIN")) continue;
@@ -531,8 +518,7 @@ public class VersalClockRouting {
         Map<ClockRegion, RouteNode> vertDistLines = routeVrouteToVerticalDistributionLines(clk, vroute, clockRegions, getNodeStatus);
 
         // Second step: start from the VDISTR node and try to find a HDISTR node in the target clock region.
-        Map<ClockRegion, RouteNode> horiDistLines = routeVerticalToHorizontalDistributionLines(clk, vertDistLines, clockRegions, getNodeStatus);
-        return horiDistLines;
+        return routeVerticalToHorizontalDistributionLines(clk, vertDistLines, getNodeStatus);
     }
 
     /**
