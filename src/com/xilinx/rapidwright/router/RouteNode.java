@@ -35,7 +35,6 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
-import com.xilinx.rapidwright.rwroute.RouterHelper;
 
 
 /**

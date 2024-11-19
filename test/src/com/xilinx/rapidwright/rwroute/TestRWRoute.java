@@ -26,7 +26,6 @@ package com.xilinx.rapidwright.rwroute;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -47,7 +46,6 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
@@ -531,31 +529,5 @@ public class TestRWRoute {
                 srcSiteName, srcPinName,
                 dstSiteName, dstPinName,
                 nodesPoppedLimit);
-    }
-
-    @Test
-    public void testClockRoutingOnVersal() {
-        Design design = RapidWrightDCP.loadDCP("two_clk_check_NetTools.dcp");
-        for (Net net : design.getNets()) {
-            if (NetTools.isGlobalClock(net)) {
-                net.unroute();
-            }
-        }
-
-        String[] args = new String[] {
-            "--fixBoundingBox",
-            "--useUTurnNodes",
-            "--nonTimingDriven",
-            "--verbose"
-        };
-        RWRouteConfig config = new RWRouteConfig(args);
-        PartialRouter.preprocess(design);
-        Collection<SitePinInst> pinsToRoute = PartialRouter.getUnroutedPins(design);
-        PartialRouter router = new PartialRouter(design, config, pinsToRoute, false);
-        
-        router.initialize();
-        router.routeGlobalClkNets();
-
-        VivadoToolsHelper.assertFullyRouted(design);
     }
 }

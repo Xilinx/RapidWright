@@ -229,9 +229,6 @@ public class GlobalSignalRouting {
             UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
 
             UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
-
-            Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
-            clk.setPIPs(clkPIPsWithoutDuplication);
         }
         else {
             // Clock routing on Versal devices
@@ -292,10 +289,10 @@ public class GlobalSignalRouting {
 
             Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappingsOnVersal(clk, getNodeStatus);
             VersalClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
-
-            Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
-            clk.setPIPs(clkPIPsWithoutDuplication);
         }
+
+        Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
+        clk.setPIPs(clkPIPsWithoutDuplication);
     }
 
     /**
