@@ -164,10 +164,6 @@ public enum IntentCode {
                 NODE_GLOBAL_GCLK == this || NODE_GLOBAL_LEAF == this || NODE_GLOBAL_BUFG == this;
     }
 
-    public boolean isVersalCnode() {
-        return NODE_CLE_CNODE == this || NODE_INTF_CNODE == this;
-    }
-
     private static final int SERIES7_START_IDX = 23;
     private static final int SERIES7_END_IDX = SERIES7_START_IDX + 33 - 1;
 
