@@ -2296,11 +2296,19 @@ public class DesignTools {
                     } else if (bel.isLUT() ||
                             bel.getBELType().endsWith("MUX") || // F[789]MUX
                             // Versal
+                            bel.isSliceFFClkMod() ||
                             bel.getName().endsWith("_IMR")) {
                         Cell possibleRouteThru = inst.getCell(bel);
-                        if (possibleRouteThru != null && possibleRouteThru.isRoutethru()) {
-                            String routeThru = possibleRouteThru.getPinMappingsP2L().keySet().iterator().next();
-                            queue.add(bel.getPin(routeThru));
+                        if (possibleRouteThru == null) {
+                            BELPin clkBelPin = bel.isSliceFFClkMod() ? bel.getPin("CLK") : null;
+                            if (clkBelPin != null && inst.getNetFromSiteWire(clkBelPin.getSiteWireName()) == net) {
+                                queue.add(clkBelPin);
+                            }
+                        } else {
+                            if (possibleRouteThru.isRoutethru()) {
+                                String routeThru = possibleRouteThru.getPinMappingsP2L().keySet().iterator().next();
+                                queue.add(bel.getPin(routeThru));
+                            }
                         }
                     }
                 }
