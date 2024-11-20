@@ -326,32 +326,6 @@ public class RWRoute {
 
         // Wait for all outstanding RouteNodeGraph.preserveAsync() calls to complete
         routingGraph.awaitPreserve();
-
-        // On Versal only, reserve all uphills of NODE_(CLE|INTF)_CTRL sinks since
-        // their [BC]NODEs can also be used to reach NODE_INODEs --- not applying this
-        // heuristic can lead to avoidable congestion
-        if (routingGraph.isVersal) {
-            for (Connection connection : indirectConnections) {
-                RouteNode sinkRnode = connection.getSinkRnode();
-                if (sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH) {
-                    for (Node uphill : sinkRnode.getAllUphillNodes()) {
-                        if (uphill.isTiedToVcc()) {
-                            continue;
-                        }
-                        Net preservedNet = routingGraph.getPreservedNet(uphill);
-                        if (preservedNet != null && preservedNet != connection.getNet()) {
-                            continue;
-                        }
-                        assert((sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL &&
-                                        (uphill.getIntentCode() == IntentCode.NODE_CLE_CNODE || uphill.getIntentCode() == IntentCode.NODE_CLE_BNODE)) ||
-                                (sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL &&
-                                        (uphill.getIntentCode() == IntentCode.NODE_INTF_CNODE || uphill.getIntentCode() == IntentCode.NODE_INTF_BNODE)));
-                        RouteNode rnode = routingGraph.getOrCreate(uphill, RouteNodeType.LOCAL_RESERVED);
-                        rnode.setType(RouteNodeType.LOCAL_RESERVED);
-                    }
-                }
-            }
-        }
     }
 
     private void categorizeNets() {
@@ -804,6 +778,32 @@ public class RWRoute {
         oneMinusTimingWeight = 1 - timingWeight;
         oneMinusWlWeight = 1 - wlWeight;
         printIterationHeader(config.isTimingDriven());
+
+        // On Versal only, reserve all uphills of NODE_(CLE|INTF)_CTRL sinks since
+        // their [BC]NODEs can also be used to reach NODE_INODEs --- not applying this
+        // heuristic can lead to avoidable congestion
+        if (routingGraph.isVersal) {
+            for (Connection connection : indirectConnections) {
+                RouteNode sinkRnode = connection.getSinkRnode();
+                if (sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH) {
+                    for (Node uphill : sinkRnode.getAllUphillNodes()) {
+                        if (uphill.isTiedToVcc()) {
+                            continue;
+                        }
+                        Net preservedNet = routingGraph.getPreservedNet(uphill);
+                        if (preservedNet != null && preservedNet != connection.getNet()) {
+                            continue;
+                        }
+                        assert((sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL &&
+                                (uphill.getIntentCode() == IntentCode.NODE_CLE_CNODE || uphill.getIntentCode() == IntentCode.NODE_CLE_BNODE)) ||
+                                (sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL &&
+                                        (uphill.getIntentCode() == IntentCode.NODE_INTF_CNODE || uphill.getIntentCode() == IntentCode.NODE_INTF_BNODE)));
+                        RouteNode rnode = routingGraph.getOrCreate(uphill, RouteNodeType.LOCAL_RESERVED);
+                        rnode.setType(RouteNodeType.LOCAL_RESERVED);
+                    }
+                }
+            }
+        }
     }
 
     /**
