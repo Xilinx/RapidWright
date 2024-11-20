@@ -458,9 +458,12 @@ public class RWRoute {
 
         RouteNode rnode = routingGraph.getNode(node);
         if (rnode != null) {
-            // A RouteNode will only be created if the net is necessary for
-            // a to-be-routed connection
-            return NodeStatus.UNAVAILABLE;
+            if (rnode.getType() != RouteNodeType.LOCAL_RESERVED) {
+                // Typically a RouteNode will only be created if the net is necessary for
+                // a to-be-routed connection
+                return NodeStatus.UNAVAILABLE;
+            }
+            assert(routingGraph.isVersal && rnode.getIntentCode().isVersalCnode());
         }
         return NodeStatus.AVAILABLE;
     }
