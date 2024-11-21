@@ -3272,7 +3272,24 @@ public class DesignTools {
                 }
 
                 String belName = bel.getName();
-                if ("SRL16E".equals(cell.getType()) || "SRLC32E".equals(cell.getType())) {
+                char fiveOrSix = belName.charAt(1);
+                if (fiveOrSix == '5') {
+                    // Assume that only 5LUT can use O5
+                    assert(cell.getLogicalPinMapping("O5") != null);
+                    if (LUTTools.getCompanionLUTCell(cell) != null)  {
+                        // 5LUT is used, but 6LUT also exists; let the 6LUT deal with things
+                        continue;
+                    }
+                } else {
+                    assert(fiveOrSix == '6');
+
+                    if (cell.getLogicalPinMapping("A6") != null) {
+                        // A6 pin is being used by LUT
+                        continue;
+                    }
+                }
+
+                if (("SRL16E".equals(cell.getType())) || "SRLC32E".equals(cell.getType())) {
                     String pinName = belName.charAt(0) + "1";
                     SitePinInst spi = si.getSitePinInst(pinName);
                     if (spi != null) {
@@ -3282,15 +3299,7 @@ public class DesignTools {
                     vccNet.createPin(pinName, si);
                 }
 
-                if (cell.getLogicalPinMapping("A6") != null) {
-                    // A6 pin is being used by LUT
-                    continue;
-                }
-
-                char fiveOrSix = belName.charAt(1);
-                assert(fiveOrSix == '5' || fiveOrSix == '6');
                 Net staticNet = vccNet;
-
                 BEL lut6Bel = (fiveOrSix == '5') ? si.getBEL(belName.charAt(0) + "6LUT") : bel;
                 Net a6Net = si.getNetFromSiteWire(lut6Bel.getPin("A6").getSiteWireName());
 
@@ -3310,15 +3319,7 @@ public class DesignTools {
 
                 if (cell.getLogicalPinMapping("O5") != null) {
                     // LUT output comes out on O5
-                    if (fiveOrSix == '5') {
-                        // It's a 5LUT
-                        if (si.getCell(belName.charAt(0) + "6LUT") != null) {
-                            // But 6LUT exists; let the 6LUT deal with it
-                            continue;
-                        }
-                    } else {
-                        throw new RuntimeException("Assumption that only 5LUTs can use O5 failed here.");
-                    }
+                    assert(fiveOrSix == '5');
                 } else {
                     if (fiveOrSix != '6') {
                         // Assume that O6 is only driven by 6LUT, even though possible for 5LUT, unless
@@ -3326,7 +3327,6 @@ public class DesignTools {
                         assert (cell.isRoutethru());
                         continue;
                     }
-
                     assert(fiveOrSix == '6');
                 }
 
