@@ -351,7 +351,7 @@ public class RouterHelper {
                 }
                 Collection<Cell> connectedCells = DesignTools.getConnectedCells(spiBelPin, si);
                 if (connectedCells.isEmpty()) {
-                    for (BELPin belPin : si.getSiteWirePins(siteWireName)) {
+                    for (BELPin belPin : si.getSiteWirePins(spiBelPin.getSiteWireName())) {
                         if (belPin.isSitePort()) {
                             continue;
                         }
