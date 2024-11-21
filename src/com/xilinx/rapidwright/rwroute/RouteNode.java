@@ -165,6 +165,12 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         break;
                     case NODE_VSINGLE: // Versal-only
                     case NODE_HSINGLE: // Versal-only
+                        if (length == 0 && getAllWiresInNode().length == 1) {
+                            assert(getAllDownhillPIPs().isEmpty() || // e.g. INT_X3Y383/OUT_NN1_E_BEG6 and INT_X19Y384/OUT_EE1_E_BEG8 on vp1002
+                                    getWireName().startsWith("INT_SDQ_RED_ATOM_"));
+                            break;
+                        }
+                        // Fall through
                     case NODE_SINGLE:  // US and US+
                         if (length <= 1) {
                             assert(!getAllDownhillPIPs().isEmpty());
@@ -175,6 +181,14 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         break;
                     case NODE_VDOUBLE: // Versal only
                     case NODE_HDOUBLE: // Versal only
+                        if (length == 0 && getAllWiresInNode().length == 1) {
+                            // e.g. INT_X2Y382/OUT_NN2_W_BEG2 and INT_X18Y384/OUT_WW2_W_BEG4 on vp1002
+                            assert(getAllDownhillPIPs().isEmpty());
+                            // This node has no downhill PIPs, mark these as inaccessible so that it will never be queued
+                            type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
+                            break;
+                        }
+                        // Fall through
                     case NODE_DOUBLE:  // US and US+
                         if (length == 0) {
                             assert(!getAllDownhillPIPs().isEmpty());
@@ -194,9 +208,9 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             }
                         }
                         break;
-                    case NODE_HQUAD:
+                    case NODE_HQUAD: // US/US+/Versal
                         if (length == 0) {
-                            // Since this node has zero length (and by extension no downhill PIPs)
+                            // Since this node has zero length (and asserted to have no downhill PIPs)
                             // mark it as being inacccessible so that it will never be queued
                             assert(getAllDownhillPIPs().isEmpty());
                             type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
@@ -204,9 +218,11 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             baseCost = 0.35f * length;
                         }
                         break;
-                    case NODE_VQUAD:
+                    case NODE_VQUAD: // US/US+/Versal
                         if (length == 0) {
-                            assert(!getAllDownhillPIPs().isEmpty());
+                            // On Versal, INT_X1Y380/OUT_NN4_W_BEG6 on vp1002 has no downhill PIPs
+                            assert((series == Series.Versal && getAllWiresInNode().length == 1) ||
+                                    !getAllDownhillPIPs().isEmpty());
                         } else {
                             // VQUADs have length 4 and 5
                             baseCost = 0.15f * length;
@@ -219,7 +235,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         break;
                     case NODE_HLONG: // US/US+
                         if (length == 0) {
-                            // Since this node has zero length (and by extension no downhill PIPs)
+                            // Since this node has zero length (and asserted to have no downhill PIPs)
                             // mark it as being inacccessible so that it will never be queued
                             assert(getAllDownhillPIPs().isEmpty());
                             type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
