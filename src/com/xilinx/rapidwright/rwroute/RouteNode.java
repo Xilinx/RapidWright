@@ -167,7 +167,10 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_HSINGLE: // Versal-only
                         if (length == 0 && getAllWiresInNode().length == 1) {
                             assert(getAllDownhillPIPs().isEmpty() || // e.g. INT_X3Y383/OUT_NN1_E_BEG6 and INT_X19Y384/OUT_EE1_E_BEG8 on vp1002
-                                    getWireName().startsWith("INT_SDQ_RED_ATOM_"));
+                                    (ic == IntentCode.NODE_HSINGLE && getWireName().startsWith("INT_SDQ_")));
+                            // HSINGLE nodes that have a wirename INT_SDQ_* do not travel to any other
+                            // tiles but still have downhill PIPs (and thus we cannot mark as being
+                            // inaccessible without checking getAllDownhillPIPs() or getWireName())
                             break;
                         }
                         // Fall through
