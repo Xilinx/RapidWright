@@ -412,6 +412,7 @@ public class RouterHelper {
                 BELPin[] belPins = si.getSiteWirePins(siteWireName);
                 if (belPins.length != 2) {
                     if (belPins.length == 3 && si.getSiteTypeEnum() == SiteTypeEnum.DSP58 && siteWireName.equals("RSTD")) {
+                        assert(isVersal);
                         assert(belPins[1].toString().equals("SRCMXINV.RSTAD_UNUSED"));
                     } else {
                         continue;
@@ -426,7 +427,8 @@ public class RouterHelper {
                     }
                     // Emulate Vivado's behaviour and do not invert CLK* site pins
                     if (Utils.isBRAM(spi.getSiteInst()) &&
-                            belPin.getBELName().startsWith("CLK")) {
+                            belPin.getBELName().startsWith("CLK") &&
+                            !isVersal) {
                         continue;
                     }
                     toInvertPins.add(spi);
