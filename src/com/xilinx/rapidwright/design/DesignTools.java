@@ -3275,7 +3275,7 @@ public class DesignTools {
                 char fiveOrSix = belName.charAt(1);
                 if (fiveOrSix == '5') {
                     // Assume that only 5LUT can use O5
-                    assert(cell.getLogicalPinMapping("O5") != null);
+                    assert(cell.getLogicalPinMapping("O5") != null || cell.isRoutethru());
                     if (LUTTools.getCompanionLUTCell(cell) != null)  {
                         // 5LUT is used, but 6LUT also exists; let the 6LUT deal with things
                         continue;
@@ -3283,38 +3283,51 @@ public class DesignTools {
                 } else {
                     assert(fiveOrSix == '6');
 
-                    if (cell.getLogicalPinMapping("A6") != null) {
-                        // A6 pin is being used by LUT
-                        continue;
+                    if ("SRLC32E".equals(cell.getType())) {
+                        // For SRLC32Es, only the A1 needs to be tied to VCC
+                        String pinName = belName.charAt(0) + "1";
+                        SitePinInst spi = si.getSitePinInst(pinName);
+                        if (spi == null) {
+                            vccNet.createPin(pinName, si);
+                        } else {
+                            assert(spi.getNet().isVCCNet());
+                        }
+                        // A6 is needed as a logical pin
+                        assert(cell.getLogicalPinMapping("A6") != null);
                     }
-                }
 
-                if (("SRL16E".equals(cell.getType())) || "SRLC32E".equals(cell.getType())) {
-                    String pinName = belName.charAt(0) + "1";
-                    SitePinInst spi = si.getSitePinInst(pinName);
-                    if (spi != null) {
-                        assert(spi.getNet().isVCCNet());
+                    if (cell.getLogicalPinMapping("A6") != null) {
+                        // A6 pin is being used by LUT/SRL; no need to tie it to VCC
                         continue;
                     }
-                    vccNet.createPin(pinName, si);
                 }
 
                 Net staticNet = vccNet;
                 BEL lut6Bel = (fiveOrSix == '5') ? si.getBEL(belName.charAt(0) + "6LUT") : bel;
                 Net a6Net = si.getNetFromSiteWire(lut6Bel.getPin("A6").getSiteWireName());
 
-                // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
-                if (cell.getType().equals("SRL16E") && "SRLC32E".equals(cell.getPropertyValueString("XILINX_LEGACY_PRIM"))) {
-                    staticNet = gndNet;
-                    // Expect sitewire to be VCC and GND
-                    if (!a6Net.isStaticNet()) {
-                        throw new RuntimeException("ERROR: Site pin " + si.getSiteName() + "/" + belName.charAt(0) + "6 is not a static net");
+                boolean expectGndNet = false;
+                if ("SRL16E".equals(cell.getType())) {
+                    String pinName = belName.charAt(0) + "1";
+                    SitePinInst spi = si.getSitePinInst(pinName);
+                    if (spi == null) {
+                        vccNet.createPin(pinName, si);
                     }
-                } else {
-                    // Tie A6 to staticNet only if sitewire says so
-                    if (a6Net != staticNet) {
-                        continue;
+
+                    // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
+                    if ("SRLC32E".equals(cell.getPropertyValueString("XILINX_LEGACY_PRIM"))) {
+                        expectGndNet = true;
+                        staticNet = gndNet;
+                        // Expect sitewire to be VCC or GND
+                        if (!a6Net.isStaticNet()) {
+                            throw new RuntimeException("ERROR: Site pin " + si.getSiteName() + "/" + belName.charAt(0) + "6 is not a static net");
+                        }
                     }
+                }
+
+                // Tie A6 to staticNet only if sitewire says so
+                if (a6Net != staticNet && !expectGndNet) {
+                    continue;
                 }
 
                 if (cell.getLogicalPinMapping("O5") != null) {
@@ -3324,7 +3337,7 @@ public class DesignTools {
                     if (fiveOrSix != '6') {
                         // Assume that O6 is only driven by 6LUT, even though possible for 5LUT, unless
                         // it's a routethru
-                        assert (cell.isRoutethru());
+                        assert(cell.isRoutethru());
                         continue;
                     }
                     assert(fiveOrSix == '6');
