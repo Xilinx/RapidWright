@@ -336,7 +336,6 @@ public class VersalClockRouting {
             q.addAll(starts);
             while (!q.isEmpty()) {
                 NodeWithPrevAndCost curr = q.poll();
-                visited.add(curr);
                 if (lcb.equals(curr)) {
                     List<Node> path = curr.getPrevPath();
                     allPIPs.addAll(RouterHelper.getPIPsFromNodes(path));
@@ -360,7 +359,7 @@ public class VersalClockRouting {
                     if (downhill.getWireName().endsWith("_I_CASC_PIN") || downhill.getWireName().endsWith("_CLR_B_PIN")) {
                         continue;
                     }
-                    if (visited.contains(downhill)) {
+                    if (!visited.add(downhill)) {
                         continue;
                     }
                     int cost = downhill.getTile().getManhattanDistance(lcbTile);
