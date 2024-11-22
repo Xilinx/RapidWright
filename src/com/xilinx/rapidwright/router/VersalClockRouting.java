@@ -265,17 +265,17 @@ public class VersalClockRouting {
                     curr.getIntentCode() == IntentCode.NODE_GLOBAL_GCLK &&
                     parent.getIntentCode() == IntentCode.NODE_GLOBAL_HDISTR_LOCAL) {
                     List<Node> path = curr.getPrevPath();
-                    int i;
-                    for (i = 1; i < path.size(); i++) {
+                    for (int i = 1; i < path.size(); i++) {
                         Node node = path.get(i);
                         NodeStatus status = getNodeStatus.apply(node);
                         if (status == NodeStatus.INUSE) {
                             break;
                         }
                         assert(status == NodeStatus.AVAILABLE);
+                        if (i > 1) {
+                            allPIPs.add(PIP.getArbitraryPIP(node, path.get(i-1)));
+                        }
                     }
-                    allPIPs.addAll(RouterHelper.getPIPsFromNodes(path.subList(1, i)));
-                    parent.setPrev(null);
                     distLines.put(targetCR, parent);
                     continue nextClockRegion;
                 }
@@ -304,21 +304,22 @@ public class VersalClockRouting {
      * @param lcbTargets The target LCB nodes to route the clock
      */
     public static void routeDistributionToLCBs(Net clk, Map<ClockRegion, Node> distLines, Set<Node> lcbTargets) {
-        Map<ClockRegion, Set<Node>> startingPoints = getStartingPoints(distLines);
+        Map<ClockRegion, Set<NodeWithPrevAndCost>> startingPoints = getStartingPoints(distLines);
         routeToLCBs(clk, startingPoints, lcbTargets);
     }
 
-    public static Map<ClockRegion, Set<Node>> getStartingPoints(Map<ClockRegion, Node> distLines) {
-        Map<ClockRegion, Set<Node>> startingPoints = new HashMap<>();
+    public static Map<ClockRegion, Set<NodeWithPrevAndCost>> getStartingPoints(Map<ClockRegion, Node> distLines) {
+        Map<ClockRegion, Set<NodeWithPrevAndCost>> startingPoints = new HashMap<>();
         for (Entry<ClockRegion, Node> e : distLines.entrySet()) {
             ClockRegion cr = e.getKey();
             Node distLine = e.getValue();
-            startingPoints.computeIfAbsent(cr, k -> new HashSet<>()).add(distLine);
+            startingPoints.computeIfAbsent(cr, k -> new HashSet<>())
+                    .add(new NodeWithPrevAndCost(distLine));
         }
         return startingPoints;
     }
 
-    public static void routeToLCBs(Net clk, Map<ClockRegion, Set<Node>> startingPoints, Set<Node> lcbTargets) {
+    public static void routeToLCBs(Net clk, Map<ClockRegion, Set<NodeWithPrevAndCost>> startingPoints, Set<Node> lcbTargets) {
         Queue<NodeWithPrevAndCost> q = new PriorityQueue<>();
         Set<PIP> allPIPs = new HashSet<>();
         Set<Node> visited = new HashSet<>();
@@ -328,19 +329,23 @@ public class VersalClockRouting {
             visited.clear();
             Tile lcbTile = lcb.getTile();
             ClockRegion currCR = lcbTile.getClockRegion();
-            for (Node node : startingPoints.getOrDefault(currCR, Collections.emptySet())) {
-                q.add(new NodeWithPrevAndCost(node));
+            Set<NodeWithPrevAndCost> starts = startingPoints.getOrDefault(currCR, Collections.emptySet());
+            for (NodeWithPrev n : starts) {
+                assert(n.getPrev() == null);
             }
+            q.addAll(starts);
             while (!q.isEmpty()) {
                 NodeWithPrevAndCost curr = q.poll();
                 visited.add(curr);
                 if (lcb.equals(curr)) {
-                    Set<Node> set = startingPoints.get(currCR);
                     List<Node> path = curr.getPrevPath();
-                    for (Node node : path) {
-                        set.add(node);
-                    }
                     allPIPs.addAll(RouterHelper.getPIPsFromNodes(path));
+
+                    Set<NodeWithPrevAndCost> s = startingPoints.get(currCR);
+                    for (Node n : path) {
+                        s.add(new NodeWithPrevAndCost(n));
+                    }
+
                     continue nextLCB;
                 }
                 for (Node downhill : curr.getAllDownhillNodes()) {
@@ -355,6 +360,9 @@ public class VersalClockRouting {
                     if (downhill.getWireName().endsWith("_I_CASC_PIN") || downhill.getWireName().endsWith("_CLR_B_PIN")) {
                         continue;
                     }
+                    // if (!visited.add(downhill)) {
+                    //     continue;
+                    // }
                     if (visited.contains(downhill)) {
                         continue;
                     }
@@ -409,14 +417,15 @@ public class VersalClockRouting {
                     if (target.equals(curr)) {
                         boolean inuse = false;
                         List<Node> path = curr.getPrevPath();
-                        int i;
-                        for (i = 1; i < path.size(); i++) {
+                        for (int i = 1; i < path.size(); i++) {
                             Node node = path.get(i);
                             if (inuse) {
                                 assert(getNodeStatus.apply(node) == NodeStatus.INUSE);
                                 continue;
                             }
-                            currPIPs.add(PIP.getArbitraryPIP(node, path.get(i-1)));
+                            if (i > 1) {
+                                currPIPs.add(PIP.getArbitraryPIP(node, path.get(i - 1)));
+                            }
                             NodeStatus status = getNodeStatus.apply(node);
                             if (status == NodeStatus.INUSE) {
                                 inuse = true;
@@ -424,7 +433,6 @@ public class VersalClockRouting {
                             }
                             assert(status == NodeStatus.AVAILABLE);
                         }
-                        currPIPs.addAll(RouterHelper.getPIPsFromNodes(path.subList(1, i)));
                         sink.setRouted(true);
                         visited.clear();
                         continue nextPin;
