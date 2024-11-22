@@ -235,7 +235,6 @@ public class GlobalSignalRouting {
             // go downhill instead of Tile.getWireConnections(int wire). This may lead to worse runtime.
 
             List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
-            Map<ClockRegion, Node> upDownDistLines;
             SitePinInst source = clk.getSource();
             SiteTypeEnum sourceTypeEnum = source.getSiteTypeEnum();
             // In US/US+ clock routing, we use two VROUTE nodes to reach the clock regions above and below the centroid.
@@ -279,9 +278,9 @@ public class GlobalSignalRouting {
 
             Node vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid, false);
 
-            upDownDistLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vroute, clockRegions, false, getNodeStatus);
+            Map<ClockRegion, Node> upDownDistLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vroute, clockRegions, false, getNodeStatus);
 
-            Map<RouteNode, List<SitePinInst>> lcbMappings = VersalClockRouting.routeLCBsToSinks(clk, getNodeStatus);
+            Map<Node, List<SitePinInst>> lcbMappings = VersalClockRouting.routeLCBsToSinks(clk, getNodeStatus);
             VersalClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
         }
 
