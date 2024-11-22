@@ -193,7 +193,7 @@ public class GlobalSignalRouting {
      *                      for same net as we're routing), or unavailable (preserved for other net).
      */
     public static void symmetricClkRouting(Net clk, Device device, Function<Node,NodeStatus> getNodeStatus) {
-        if (device.getSeries() != Series.Versal) {
+        if (device.getSeries() == Series.UltraScale || device.getSeries() == Series.UltraScalePlus) {
             List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
 
             ClockRegion centroid = findCentroid(clk, device);
@@ -227,12 +227,8 @@ public class GlobalSignalRouting {
             UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
 
             UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
-        }
-        else {
+        } else if (device.getSeries() == Series.Versal) {
             // Clock routing on Versal devices
-            // TODO: Tile.getWireConnections(int wire) is not working correctly on Versal devices,
-            // so the below clock routing flow goes in the "node way", which means we use Node.getAllDownhillNodes() to 
-            // go downhill instead of Tile.getWireConnections(int wire). This may lead to worse runtime.
 
             List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
             SitePinInst source = clk.getSource();
@@ -244,7 +240,6 @@ public class GlobalSignalRouting {
             ClockRegion centroid;
             Node centroidHRouteNode;
 
-            // In FPGA '24 routing contest benchmarks, we found that there are only two types of source sites for the clock nets: BUFGCE and BUFG_FABRIC.
             if (sourceTypeEnum == SiteTypeEnum.BUFG_FABRIC) {
                 // These source sites are located in the middle of the device. The path from the output pin to VROUTE matches the following pattern:
                 // NODE_GLOBAL_BUFG (the output node with a suffix "_O") -> 
@@ -256,9 +251,9 @@ public class GlobalSignalRouting {
                 centroid = source.getTile().getClockRegion();
                 centroidHRouteNode = source.getConnectedNode();
             } else if (sourceTypeEnum == SiteTypeEnum.BUFGCE) {
-                // Most clock nets in FPGA '24 benchmarks have this type of source site.
-                // These source sites are located in the bottom of the device (Y=0). The path from the output pin to VROUTE matches the following pattern:
-                // NODE_GLOBAL_BUFG -> NODE_GLOBAL_BUFG -> NODE_GLOBAL_GCLK ->  NODE_GLOBAL_HROUTE_HSR -> NODE_GLOBAL_VROUTE
+                // Assume that these source sites are located in the bottom of the device (Y=0).
+                // The path from the output pin to VROUTE matches the following pattern:
+                //   NODE_GLOBAL_BUFG -> NODE_GLOBAL_BUFG -> NODE_GLOBAL_GCLK ->  NODE_GLOBAL_HROUTE_HSR -> NODE_GLOBAL_VROUTE
                 // which is similar to US/US+ clock routing.
                 // Notice that we have to quickly reach a NODE_GLOBAL_HROUTE_HSR node, and if we allow the Y coordinate of centroid to be bigger than 1,
                 // we may fail to do so. Thus, we need to force the Y-coordinate of centroid to be 1.
@@ -268,12 +263,12 @@ public class GlobalSignalRouting {
                 // VROUTE nodes are in the clock region where X is odd.
                 if (centroidX % 2 == 0) centroidX -= 1;
                 if (centroidX <= 0)     centroidX = 1;
-
                 centroid = device.getClockRegion(1, centroidX);
+
                 Node clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
                 centroidHRouteNode = VersalClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true);
             } else {
-                throw new RuntimeException("RWRoute hasn't supported routing a clock net with source type " + sourceTypeEnum + " yet.");
+                throw new RuntimeException("ERROR: Routing clock net with source type " + sourceTypeEnum + " not supported.");
             }
 
             Node vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid, false);
@@ -282,6 +277,8 @@ public class GlobalSignalRouting {
 
             Map<Node, List<SitePinInst>> lcbMappings = VersalClockRouting.routeLCBsToSinks(clk, getNodeStatus);
             VersalClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
+        } else {
+            throw new RuntimeException("ERROR: GlobalSignalRouting.symmetricClkRouting() does not support the " + device.getSeries() + " series.");
         }
 
         Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
