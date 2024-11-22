@@ -235,16 +235,15 @@ public class GlobalSignalRouting {
             // go downhill instead of Tile.getWireConnections(int wire). This may lead to worse runtime.
 
             List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
-            Map<ClockRegion, RouteNode> upDownDistLines = new HashMap<>();
+            Map<ClockRegion, Node> upDownDistLines;
             SitePinInst source = clk.getSource();
             SiteTypeEnum sourceTypeEnum = source.getSiteTypeEnum();
-            RouteNode sourceRouteNode = new RouteNode(source);
             // In US/US+ clock routing, we use two VROUTE nodes to reach the clock regions above and below the centroid.
             // However, we can see that Vivado only use one VROUTE node in the centroid clock region for Versal clock routing,
             // and reach the above and below clock regions by VDISTR nodes.
 
             ClockRegion centroid;
-            RouteNode centroidHRouteNode;
+            Node centroidHRouteNode;
 
             // In FPGA '24 routing contest benchmarks, we found that there are only two types of source sites for the clock nets: BUFGCE and BUFG_FABRIC.
             if (sourceTypeEnum == SiteTypeEnum.BUFG_FABRIC) {
@@ -256,7 +255,7 @@ public class GlobalSignalRouting {
 
                 // Notice that Vivado always use the above VROUTE node, there is no need to find a centroid clock region to route to.
                 centroid = source.getTile().getClockRegion();
-                centroidHRouteNode = sourceRouteNode;
+                centroidHRouteNode = source.getConnectedNode();
             } else if (sourceTypeEnum == SiteTypeEnum.BUFGCE) {
                 // Most clock nets in FPGA '24 benchmarks have this type of source site.
                 // These source sites are located in the bottom of the device (Y=0). The path from the output pin to VROUTE matches the following pattern:
@@ -266,19 +265,19 @@ public class GlobalSignalRouting {
                 // we may fail to do so. Thus, we need to force the Y-coordinate of centroid to be 1.
                 assert(source.getTile().getTileYCoordinate() == 0);
                 // And, in X-axis, Vivado doesn't go to the real centroid of target clock regions... it just uses a nearby VROUTE.
-                int centroidX = sourceRouteNode.getTile().getClockRegion().getColumn();
+                int centroidX = source.getTile().getClockRegion().getColumn();
                 // VROUTE nodes are in the clock region where X is odd.
                 if (centroidX % 2 == 0) centroidX -= 1;
                 if (centroidX <= 0)     centroidX = 1;
 
                 centroid = device.getClockRegion(1, centroidX);
-                RouteNode clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
+                Node clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
                 centroidHRouteNode = VersalClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true);
             } else {
                 throw new RuntimeException("RWRoute hasn't supported routing a clock net with source type " + sourceTypeEnum + " yet.");
             }
 
-            RouteNode vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid, false);
+            Node vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid, false);
 
             upDownDistLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vroute, clockRegions, false, getNodeStatus);
 
