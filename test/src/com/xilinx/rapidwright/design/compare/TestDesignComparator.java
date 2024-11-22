@@ -149,7 +149,7 @@ public class TestDesignComparator {
         Assertions.assertTrue(net.hasPIPs());
         test2.removeNet(net);
 
-        compareDesign(22, 1, DesignDiffType.NET_MISSING, dc, gold, test2);
+        compareDesign(28, 1, DesignDiffType.NET_MISSING, dc, gold, test2);
 
         Net extra = new Net("extraNet");
         for (PIP p : net.getPIPs()) {
@@ -157,17 +157,17 @@ public class TestDesignComparator {
         }
         test2.addNet(extra);
 
-        compareDesign(23, 1, DesignDiffType.NET_EXTRA, dc, gold, test2);
+        compareDesign(29, 1, DesignDiffType.NET_EXTRA, dc, gold, test2);
 
         Assertions.assertTrue(extra.hasPIPs());
         clk.addPIP(extra.getPIPs().get(0));
 
-        compareDesign(24, 1, DesignDiffType.PIP_EXTRA, dc, gold, test2);
+        compareDesign(30, 1, DesignDiffType.PIP_EXTRA, dc, gold, test2);
 
         clk.getPIPs().remove(clk.getPIPs().size() - 1);
         clk.getPIPs().remove(clk.getPIPs().size() - 1);
 
-        compareDesign(24, 1, DesignDiffType.PIP_MISSING, dc, gold, test2);
+        compareDesign(30, 1, DesignDiffType.PIP_MISSING, dc, gold, test2);
 
         if (dc.comparePIPFlags()) {
             clk.getPIPs().get(clk.getPIPs().size() - 1).setIsStub(true);
