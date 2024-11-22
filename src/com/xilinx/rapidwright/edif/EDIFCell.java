@@ -497,7 +497,7 @@ public class EDIFCell extends EDIFPropertyObject {
         this.library = library;
     }
 
-    protected void clearLibrary() {
+    public void clearLibrary() {
         this.library = null;
     }
 
