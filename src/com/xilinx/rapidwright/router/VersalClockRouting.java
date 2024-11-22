@@ -360,9 +360,6 @@ public class VersalClockRouting {
                     if (downhill.getWireName().endsWith("_I_CASC_PIN") || downhill.getWireName().endsWith("_CLR_B_PIN")) {
                         continue;
                     }
-                    // if (!visited.add(downhill)) {
-                    //     continue;
-                    // }
                     if (visited.contains(downhill)) {
                         continue;
                     }
@@ -373,102 +370,6 @@ public class VersalClockRouting {
             throw new RuntimeException("ERROR: Couldn't route to distribution line in clock region " + lcb);
         }
         clk.getPIPs().addAll(allPIPs);
-    }
-
-    /**
-     * @param clk
-     * @param lcbMappings
-     * @param getNodeStatus Lambda for indicating the status of a Node: available, in-use (preserved
-     *                      for same net as we're routing), or unavailable (preserved for other net).
-     */
-    public static void routeLCBsToSinks(Net clk, Map<Node, List<SitePinInst>> lcbMappings,
-                                        Function<Node, NodeStatus> getNodeStatus) {
-        Set<Node> used = new HashSet<>();
-        Set<Node> visited = new HashSet<>();
-        Queue<NodeWithPrev> q = new ArrayDeque<>();
-        
-        Predicate<Node> isNodeUnavailable = (node) -> getNodeStatus.apply(node) == NodeStatus.UNAVAILABLE;
-        Set<IntentCode> allowedIntentCodes = EnumSet.of(
-            IntentCode.NODE_CLE_CNODE,
-            IntentCode.NODE_INTF_CNODE,
-            IntentCode.NODE_CLE_CTRL,
-            IntentCode.NODE_INTF_CTRL,
-            IntentCode.NODE_IRI,
-            IntentCode.NODE_INODE,
-            IntentCode.NODE_PINBOUNCE,
-            IntentCode.NODE_CLE_BNODE,
-            IntentCode.NODE_IMUX,
-            IntentCode.NODE_PINFEED
-        );
-
-        RouteThruHelper routeThruHelper = new RouteThruHelper(clk.getDesign().getDevice());
-
-        for (Entry<Node,List<SitePinInst>> e : lcbMappings.entrySet()) {
-            Set<PIP> currPIPs = new HashSet<>();
-            Node lcb = e.getKey();
-
-            nextPin: for (SitePinInst sink : e.getValue()) {
-                Node target = sink.getConnectedNode();
-                q.clear();
-                q.add(new NodeWithPrev(lcb));
-
-                while (!q.isEmpty()) {
-                    NodeWithPrev curr = q.poll();
-                    if (target.equals(curr)) {
-                        boolean inuse = false;
-                        List<Node> path = curr.getPrevPath();
-                        for (int i = 1; i < path.size(); i++) {
-                            Node node = path.get(i);
-                            if (inuse) {
-                                assert(getNodeStatus.apply(node) == NodeStatus.INUSE);
-                                continue;
-                            }
-                            if (i > 1) {
-                                currPIPs.add(PIP.getArbitraryPIP(node, path.get(i - 1)));
-                            }
-                            NodeStatus status = getNodeStatus.apply(node);
-                            if (status == NodeStatus.INUSE) {
-                                inuse = true;
-                                continue;
-                            }
-                            assert(status == NodeStatus.AVAILABLE);
-                        }
-                        sink.setRouted(true);
-                        visited.clear();
-                        continue nextPin;
-                    }
-
-                    for (Node downhill : curr.getAllDownhillNodes()) {
-                        IntentCode downhillIntentCode = downhill.getIntentCode();
-                        if (!allowedIntentCodes.contains(downhillIntentCode)) {
-                            continue;
-                        }
-                        if (!visited.add(downhill)) {
-                            continue;
-                        }
-                        if (used.contains(downhill)) {
-                            continue;
-                        }
-                        // have to allow those routethru-s NODE_IRI -> *
-                        if (routeThruHelper.isRouteThru(curr, downhill) && downhillIntentCode != IntentCode.NODE_IRI) {
-                            continue;
-                        }
-                        if (isNodeUnavailable.test(downhill)) {
-                            continue;
-                        }
-                        q.add(new NodeWithPrev(downhill, curr));
-                    }
-                }
-                throw new RuntimeException("ERROR: Couldn't route LCB " + e.getKey() + " to Pin " + sink);
-            }
-
-            List<PIP> clkPIPs = clk.getPIPs();
-            for (PIP p : currPIPs) {
-                used.add(p.getStartNode());
-                used.add(p.getEndNode());
-                clkPIPs.add(p);
-            }
-        }
     }
 
     /**
@@ -506,7 +407,7 @@ public class VersalClockRouting {
                                               Net clkNet,
                                               Function<Node,NodeStatus> getNodeStatus) {
         // TODO:
-        throw new RuntimeException("ERROR: incrementalClockRouter not yet support on Versal devices.");
+        throw new RuntimeException("ERROR: Incremental clock routing not yet supported for Versal devices.");
     }
 
     /**
@@ -520,7 +421,7 @@ public class VersalClockRouting {
                                               List<SitePinInst> clkPins,
                                               Function<Node,NodeStatus> getNodeStatus) {
         // TODO:
-        throw new RuntimeException("ERROR: incrementalClockRouter not yet support on Versal devices.");
+        throw new RuntimeException("ERROR: Incremental clock routing not yet supported for Versal devices.");
     }
 
     public static Map<Node, List<SitePinInst>> routeLCBsToSinks(Net clk,
@@ -586,7 +487,7 @@ public class VersalClockRouting {
                     q.add(node);
                 }
             }
-            throw new RuntimeException("ERROR: Couldn't map Pin " + p + " to LCB.");
+            throw new RuntimeException("ERROR: Couldn't route pin " + sink + " to any LCB");
         }
 
         return lcbMappings;
