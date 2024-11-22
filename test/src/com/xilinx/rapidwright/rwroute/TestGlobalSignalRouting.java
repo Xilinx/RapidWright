@@ -30,6 +30,7 @@ import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.router.RouteThruHelper;
@@ -38,6 +39,7 @@ import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
 import com.xilinx.rapidwright.util.VivadoTools;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
@@ -47,8 +49,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.function.BiFunction;
 
 public class TestGlobalSignalRouting {
     @ParameterizedTest
@@ -124,13 +126,13 @@ public class TestGlobalSignalRouting {
 
         RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
 
-        GlobalSignalRouting.routeStaticNet(gndNet, (n) -> getNodeState(design, NetType.GND, n), design, routeThruHelper);
+        GlobalSignalRouting.routeStaticNet(gndPins, (n) -> getNodeState(design, NetType.GND, n), design, routeThruHelper);
         gndPins = gndNet.getPins();
-        Assertions.assertEquals(857, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
+        Assertions.assertEquals(737, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
         Assertions.assertEquals(19010, gndPins.stream().filter((spi) -> !spi.isOutPin()).count());
-        Assertions.assertEquals(33201, gndNet.getPIPs().size());
+        Assertions.assertEquals(33429, gndNet.getPIPs().size());
 
-        GlobalSignalRouting.routeStaticNet(vccNet, (n) -> getNodeState(design, NetType.VCC, n), design, routeThruHelper);
+        GlobalSignalRouting.routeStaticNet(vccPins, (n) -> getNodeState(design, NetType.VCC, n), design, routeThruHelper);
         vccPins = vccNet.getPins();
         Assertions.assertEquals(0, vccPins.stream().filter((spi) -> spi.isOutPin()).count());
         Assertions.assertEquals(23099, vccPins.stream().filter((spi) -> !spi.isOutPin()).count());
@@ -209,12 +211,12 @@ public class TestGlobalSignalRouting {
         RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
 
         Design finalDesign = design;
-        GlobalSignalRouting.routeStaticNet(gndNet, (n) -> getNodeState(finalDesign, NetType.GND, n), design, routeThruHelper);
+        GlobalSignalRouting.routeStaticNet(gndPins, (n) -> getNodeState(finalDesign, NetType.GND, n), design, routeThruHelper);
         Assertions.assertEquals(8, gndPins.stream().filter((spi) -> spi.isOutPin()).count());
         Assertions.assertEquals(123, gndPins.stream().filter((spi) -> !spi.isOutPin()).count());
         Assertions.assertEquals(436, gndNet.getPIPs().size());
 
-        GlobalSignalRouting.routeStaticNet(vccNet, (n) -> getNodeState(finalDesign, NetType.VCC, n), design, routeThruHelper);
+        GlobalSignalRouting.routeStaticNet(vccPins, (n) -> getNodeState(finalDesign, NetType.VCC, n), design, routeThruHelper);
         Assertions.assertEquals(0, vccPins.stream().filter((spi) -> spi.isOutPin()).count());
         Assertions.assertEquals(232, vccPins.stream().filter((spi) -> !spi.isOutPin()).count());
         Assertions.assertEquals(464, vccNet.getPIPs().size());
@@ -223,6 +225,96 @@ public class TestGlobalSignalRouting {
             ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
             Assertions.assertEquals(2, rrs.fullyRoutedNets);
             Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
+        }
+    }
+
+    // This is a minimized testcase from the result of GlobalSignalRouter
+    @ParameterizedTest
+    @CsvSource({
+            "false,false",
+            "true,false",
+            "false,true"
+    })
+    public void testMuxOutPinAsStaticSourceEvenWithLut6(boolean setCmuxCtag, boolean fullIntraSiteRouting) {
+        Assumptions.assumeTrue(FileTools.isVivadoOnPath());
+
+        Design design = RapidWrightDCP.loadDCP("optical-flow.dcp");
+        Device device = design.getDevice();
+        Net gndNet = design.getGndNet();
+        boolean srcToSinkOrder = true;
+        gndNet.setPIPs(RouterHelper.getPIPsFromNodes(Arrays.asList(
+                device.getNode("CLEM_X52Y123/CLE_CLE_M_SITE_0_CMUX"),
+                device.getNode("INT_X52Y123/INT_NODE_SDQ_90_INT_OUT1"),
+                device.getNode("INT_X52Y123/WW1_W_BEG7"),
+                device.getNode("INT_X51Y124/INODE_E_1_FT1"),
+                device.getNode("INT_X51Y123/IMUX_E15")
+        ), srcToSinkOrder));
+        SiteInst si = design.getSiteInstFromSiteName("SLICE_X81Y123");
+        Cell lut6 = si.getCell("C6LUT");
+        Assertions.assertEquals("LUT6", lut6.getType());
+        String const0 = "<const0>";
+        if (setCmuxCtag) {
+            if (!fullIntraSiteRouting) {
+                // Setting just the CMUX cTag
+                si.routeIntraSiteNet(gndNet, si.getBELPin("CMUX", "CMUX"), si.getBELPin("CMUX", "CMUX"));
+            } else {
+                // Full O5 -> OUTMUXC -> CMUX intra-site routing
+                si.routeIntraSiteNet(gndNet, si.getBELPin("C5LUT", "O5"), si.getBELPin("CMUX", "CMUX"));
+            }
+        }
+
+        String status = VivadoTools.reportRouteStatus(design, const0);
+        if (!setCmuxCtag) {
+            // Not setting the CMUX cTag correctly causes SLICE_X81Y123 to have invalid site programming
+            Assertions.assertEquals("CONFLICTS", status);
+        } else {
+            // In both cases, SLICE_X81Y123 does not exhibit invalid site programming and thus net appears partially routed
+            Assertions.assertEquals("PARTIAL", status);
+        }
+    }
+
+    // This is a minimized testcase from the result of GlobalSignalRouter
+    @ParameterizedTest
+    @CsvSource({
+            "false,false",
+            "true,false",
+            "false,true"
+    })
+    public void testMuxOutPinAsStaticSourceEvenWithLutRam(boolean setFmuxCtag, boolean fullIntraSiteRouting) {
+        Assumptions.assumeTrue(FileTools.isVivadoOnPath());
+
+        Design design = RapidWrightDCP.loadDCP("bnn.dcp");
+        Device device = design.getDevice();
+        Net gndNet = design.getGndNet();
+        boolean srcToSinkOrder = true;
+        gndNet.setPIPs(RouterHelper.getPIPsFromNodes(Arrays.asList(
+                device.getNode("CLEM_X52Y218/CLE_CLE_M_SITE_0_FMUX"),
+                device.getNode("INT_X52Y218/SDQNODE_W_2_FT1"),
+                device.getNode("INT_X52Y218/EE2_W_BEG0"),
+                device.getNode("INT_X53Y218/INODE_W_1_FT1"),
+                device.getNode("INT_X53Y217/IMUX_W46"),
+                device.getNode("BRAM_X53Y215/BRAM_BRAM_CORE_3_ADDRENAU_PIN")
+        ), srcToSinkOrder));
+        SiteInst si = design.getSiteInstFromSiteName("SLICE_X81Y218");
+        Cell lutRam = si.getCell("F6LUT");
+        Assertions.assertEquals("RAMS64E", lutRam.getType());
+        String const0 = "bd_0_i/hls_inst/inst/<const0>";
+        if (setFmuxCtag) {
+            if (!fullIntraSiteRouting) {
+                // Setting just the FMUX cTag
+                si.routeIntraSiteNet(gndNet, si.getBELPin("FMUX", "FMUX"), si.getBELPin("FMUX", "FMUX"));
+            } else {
+                // Full O5 -> OUTMUXF -> FMUX intra-site routing
+                si.routeIntraSiteNet(gndNet, si.getBELPin("F5LUT", "O5"), si.getBELPin("FMUX", "FMUX"));
+            }
+        }
+        String status = VivadoTools.reportRouteStatus(design, const0);
+        if (!setFmuxCtag) {
+            // Not setting the FMUX cTag correctly causes SLICE_X81Y218 to have invalid site programming
+            Assertions.assertEquals("CONFLICTS", status);
+        } else {
+            // In both cases, SLICE_X81Y218 does not exhibit invalid site programming and thus net appears partially routed
+            Assertions.assertEquals("PARTIAL", status);
         }
     }
 }

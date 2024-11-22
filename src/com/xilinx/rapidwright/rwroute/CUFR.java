@@ -82,7 +82,7 @@ public class CUFR extends RWRoute {
 
     public static class RouteNodeGraphCUFR extends RouteNodeGraph {
         public RouteNodeGraphCUFR(Design design, RWRouteConfig config) {
-            super(design, config, new ConcurrentHashMap<>());
+            super(design, config);
         }
 
         // Do not track createRnodeTime since it is meaningless when multithreading
@@ -92,7 +92,7 @@ public class CUFR extends RWRoute {
 
     public static class RouteNodeGraphCUFRTimingDriven extends RouteNodeGraphTimingDriven {
         public RouteNodeGraphCUFRTimingDriven(Design design, RWRouteConfig config, DelayEstimatorBase delayEstimator) {
-            super(design, config, delayEstimator, new ConcurrentHashMap<>());
+            super(design, config, delayEstimator);
         }
 
         // Do not track createRnodeTime since it is meaningless when multithreading

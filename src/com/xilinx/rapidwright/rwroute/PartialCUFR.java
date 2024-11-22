@@ -62,7 +62,7 @@ public class PartialCUFR extends PartialRouter {
 
     public static class RouteNodeGraphPartialCUFR extends RouteNodeGraphPartial {
         public RouteNodeGraphPartialCUFR(Design design, RWRouteConfig config) {
-            super(design, config, new ConcurrentHashMap<>());
+            super(design, config);
         }
 
         // Do not track createRnodeTime since it is meaningless when multithreading
@@ -72,7 +72,7 @@ public class PartialCUFR extends PartialRouter {
 
     public static class RouteNodeGraphPartialCUFRTimingDriven extends RouteNodeGraphPartialTimingDriven {
         public RouteNodeGraphPartialCUFRTimingDriven(Design design, RWRouteConfig config, DelayEstimatorBase delayEstimator) {
-            super(design, config, delayEstimator, new ConcurrentHashMap<>());
+            super(design, config, delayEstimator);
         }
 
         // Do not track createRnodeTime since it is meaningless when multithreading
@@ -137,9 +137,10 @@ public class PartialCUFR extends PartialRouter {
     }
 
     @Override
-    protected void unpreserveNet(Net net) {
-        super.unpreserveNet(net);
+    protected NetWrapper unpreserveNet(Net net) {
+        NetWrapper netWrapper = super.unpreserveNet(net);
         needsRepartitioning = true;
+        return netWrapper;
     }
 
     @Override
