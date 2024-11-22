@@ -35,8 +35,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import com.xilinx.rapidwright.device.BEL;
-import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -45,6 +43,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
+import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
@@ -53,6 +52,7 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -1201,7 +1201,7 @@ public class TestDesignTools {
 
             for(Cell c : cells) {
                 DesignTools.placeCell(c, d);
-                Assertions.assertFalse(c.getPinMappingsP2L().isEmpty());
+                Assertions.assertFalse(c.getUsedPhysicalPins().isEmpty());
                 Assertions.assertNotNull(c.getBEL());
                 Assertions.assertNotNull(c.getSiteInst());
             }

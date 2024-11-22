@@ -289,7 +289,7 @@ public class DesignTools {
                     Net net = inst.getNetFromSiteWire(siteWireName);
                     if (net == null) continue;
                     if (net.isStaticNet()) continue;
-                    if (!cell.getPinMappingsP2L().containsKey(pin.getName())) continue;
+                    if (!cell.usesPhysicalPin(pin.getName())) continue;
                     inputs.add(pin);
                 }
                 break;
@@ -325,7 +325,8 @@ public class DesignTools {
             if (net == null) continue;
             if (net.isStaticNet()) continue;
             if (net.getName().equals(Net.USED_NET)) continue;
-            if (!cell.getPinMappingsP2L().containsKey(pin.getName())) continue;
+            if (!cell.usesPhysicalPin(pin.getName()))
+                continue;
             outputs.add(pin);
         }
 
@@ -445,7 +446,7 @@ public class DesignTools {
         long oldVal = new BigInteger(hexValueStr, 16).longValue();
         int numLutRows = Integer.parseInt(numLutRowsStr);
         int numInput = (int)(Math.log(numLutRows)/Math.log(2));
-        String logicalPinName = lut.getPinMappingsP2L().get(physicalPinName);
+        String logicalPinName = lut.getLogicalPinMapping(physicalPinName);
         int invertCol = getInvertCol(logicalPinName.substring(logicalPinName.length()-1));
         if (invertCol == -1) {
             System.err.println("Inverted Column is -1 is Function DesignTools.invertLutInput");
@@ -1563,12 +1564,11 @@ public class DesignTools {
                             if (otherCell.isRoutethru()) {
                                 BELPin otherPin = null;
                                 if (pin.isOutput()) {
-                                    assert(otherCell.getPinMappingsP2L().size() == 1);
-                                    String otherPinName = otherCell.getPinMappingsP2L().keySet().iterator().next();
-                                    otherPin = pin.getBEL().getPin(otherPinName);
+                                    assert (otherCell.getUsedPhysicalPinsCount() == 1);
+                                    otherPin = otherCell.getFirstPhysicalPinMapping().getFirst();
                                 } else {
                                     // Make sure we are coming in on the routed-thru pin
-                                    String otherPinName = otherCell.getPinMappingsP2L().keySet().iterator().next();
+                                    String otherPinName = otherCell.getFirstPhysicalPinMapping().getFirst().getName();
                                     if (pin.getName().equals(otherPinName)) {
                                         otherPin = LUTTools.getLUTOutputPin(pin.getBEL());
                                     }
@@ -1777,7 +1777,8 @@ public class DesignTools {
             }
 
             // Remove all physical nets first
-            for (String logPin : c.getPinMappingsP2L().values()) {
+            for (String logPin : c.getPhysicalPinMappings()) {
+                if (logPin == null) continue;
                 List<SitePinInst> removePins = unrouteCellPinSiteRouting(c, logPin);
                 for (SitePinInst pin : removePins) {
                     pinsToRemove.computeIfAbsent(pin.getNet(), $ -> new HashSet<>()).add(pin);
@@ -1971,7 +1972,7 @@ public class DesignTools {
                     }
 
                     Cell newCell = c.copyCell(newCellName, cellInst);
-                    design.placeCell(newCell, newSiteInst.getSite(), c.getBEL(), c.getPinMappingsP2L());
+                    design.placeCell(newCell, newSiteInst.getSite(), c.getBEL(), c.getPhysicalPinMappings());
                 }
 
                 for (SitePIP sitePIP : si.getUsedSitePIPs()) {
@@ -2306,8 +2307,8 @@ public class DesignTools {
                             }
                         } else {
                             if (possibleRouteThru.isRoutethru()) {
-                                String routeThru = possibleRouteThru.getPinMappingsP2L().keySet().iterator().next();
-                                queue.add(bel.getPin(routeThru));
+                                BELPin routeThru = possibleRouteThru.getFirstPhysicalPinMapping().getFirst();
+                                queue.add(routeThru);
                             }
                         }
                     }
@@ -3005,14 +3006,19 @@ public class DesignTools {
         }
 
         EDIFHierCellInst cellInst = destNetlist.getHierCellInstFromName(copy.getName());
-        for (Entry<String,String> e : copy.getPinMappingsP2L().entrySet()) {
-            EDIFPortInst portInst = cellInst.getInst().getPortInst(e.getValue());
+        String[] physPinNames = copy.getPhysicalPinMappings();
+        for (int i = 0; i < physPinNames.length; i++) {
+            String logPinName = physPinNames[i];
+            if (logPinName == null) continue;
+            String physPinName = copy.getBEL().getPin(i).getName();
+
+            EDIFPortInst portInst = cellInst.getInst().getPortInst(logPinName);
             if (portInst == null) continue;
             EDIFNet edifNet = portInst.getNet();
 
             String netName = new EDIFHierNet(cellInst.getParent(), edifNet).getHierarchicalNetName();
 
-            String siteWireName = orig.getSiteWireNameFromPhysicalPin(e.getKey());
+            String siteWireName = orig.getSiteWireNameFromPhysicalPin(physPinName);
             Net origNet = origSiteInst.getNetFromSiteWire(siteWireName);
             if (origNet == null) continue;
             Net net = null;
@@ -3029,7 +3035,7 @@ public class DesignTools {
                 }
             }
 
-            BELPin curr = copy.getBEL().getPin(e.getKey());
+            BELPin curr = copy.getBEL().getPin(physPinName);
             dstSiteInst.routeIntraSiteNet(net, curr, curr);
             boolean routingForward = curr.isOutput();
             Queue<BELPin> q = new LinkedList<BELPin>();
@@ -3068,7 +3074,7 @@ public class DesignTools {
                             Cell rtCopy = tmpCell
                                     .copyCell(newCellName, tmpCell.getEDIFHierCellInst(), dstSiteInst);
                             dstSiteInst.getCellMap().put(belName, rtCopy);
-                            for (String belPinName : rtCopy.getPinMappingsP2L().keySet()) {
+                            for (String belPinName : rtCopy.getUsedPhysicalPins()) {
                                 BELPin tmp = rtCopy.getBEL().getPin(belPinName);
                                 if (tmp.isInput()) {
                                     curr = tmp;
