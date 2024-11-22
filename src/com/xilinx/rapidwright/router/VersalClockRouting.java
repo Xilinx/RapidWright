@@ -34,6 +34,8 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.rwroute.NodeStatus;
+import com.xilinx.rapidwright.rwroute.RouterHelper;
+import com.xilinx.rapidwright.rwroute.RouterHelper.NodeWithPrev;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -58,22 +60,24 @@ import java.util.function.Predicate;
  */
 public class VersalClockRouting {
 
-    public static RouteNode routeBUFGToNearestRoutingTrack(Net clk) {
-        Queue<RouteNode> q = new LinkedList<>();
-        q.add(new RouteNode(clk.getSource()));
+    public static Node routeBUFGToNearestRoutingTrack(Net clk) {
+        Queue<NodeWithPrev> q = new LinkedList<>();
+        q.add(new NodeWithPrev(clk.getSource().getConnectedNode()));
         int watchDog = 300;
         while (!q.isEmpty()) {
-            RouteNode curr = q.poll();
-            Node currNode = Node.getNode(curr);
-            IntentCode c = currNode.getIntentCode();
+            NodeWithPrev curr = q.poll();
+            IntentCode c = curr.getIntentCode();
             if (c == IntentCode.NODE_GLOBAL_HROUTE_HSR) {
-                clk.getPIPs().addAll(curr.getPIPsBackToSourceByNodes());
+                List<Node> path = curr.getPrevPath();
+                clk.getPIPs().addAll(RouterHelper.getPIPsFromNodes(path));
                 return curr;
             }
-            for (Node downhill: currNode.getAllDownhillNodes()) {
-                q.add(new RouteNode(downhill.getTile(), downhill.getWireIndex(), curr, curr.getLevel()+1));
+            for (Node downhill: curr.getAllDownhillNodes()) {
+                q.add(new NodeWithPrev(downhill, curr));
             }
-            if (watchDog-- == 0) break;
+            if (watchDog-- == 0) {
+                break;
+            }
         }
         return null;
     }
@@ -82,23 +86,15 @@ public class VersalClockRouting {
      * Routes a clock from a routing track to a transition point where the clock.
      * fans out and transitions from clock routing tracks to clock distribution.
      * @param clk The current clock net to contribute routing.
-     * @param startingRouteNode The intermediate start point of the clock route.
+     * @param startingNode The intermediate start point of the clock route.
      * @param clockRegion The center clock region or the clock region that is one row above or below the center.
      * @param findCentroidHroute The flag to indicate the returned RouteNode should be HROUTE in the center or VROUTE going up or down.
      */
-    public static RouteNode routeToCentroid(Net clk, RouteNode startingRouteNode, ClockRegion clockRegion, boolean findCentroidHroute) {
+    public static Node routeToCentroid(Net clk, Node startingNode, ClockRegion clockRegion, boolean findCentroidHroute) {
         Queue<RouteNode> q = RouteNode.createPriorityQueue();
-        startingRouteNode.setParent(null);
-        q.add(startingRouteNode);
-        Set<IntentCode> allowedIntentCodes = EnumSet.of(
-            IntentCode.NODE_GLOBAL_BUFG,
-            IntentCode.NODE_GLOBAL_GCLK,
-            IntentCode.NODE_GLOBAL_HROUTE_HSR,
-            IntentCode.NODE_GLOBAL_VROUTE,
-            IntentCode.NODE_GLOBAL_VDISTR_LVL2
-        );
+        q.add(new RouteNode(startingNode));
         int watchDog = 10000000;
-        RouteNode centroidHRouteNode = null;
+        RouteNode centroidHRouteNode;
         Set<Node> visited = new HashSet<>();
 
         // In Vivado solutions, we can always find the pattern:
@@ -130,11 +126,11 @@ public class VersalClockRouting {
                                 centroidHRouteNode = centroidHRouteNode.getParent();
                             }
                             clk.getPIPs().addAll(centroidHRouteNode.getPIPsBackToSourceByNodes());
-                            return centroidHRouteNode;
+                            return Node.getNode(centroidHRouteNode);
                         }
                         // assign PIPs based on which RouteNode returned, instead of curr
                         clk.getPIPs().addAll(parent.getPIPsBackToSourceByNodes());
-                        return parent;
+                        return Node.getNode(parent);
                     }
                 }
 
@@ -156,7 +152,7 @@ public class VersalClockRouting {
                 q.add(rn);
             }
             if (watchDog-- == 0) {
-                throw new RuntimeException("ERROR: Could not route from " + startingRouteNode + " to clock region " + clockRegion);
+                throw new RuntimeException("ERROR: Could not route from " + startingNode + " to clock region " + clockRegion);
             }
         }
 
@@ -227,18 +223,16 @@ public class VersalClockRouting {
         return crToVdist;
     }
 
-    public static Map<ClockRegion, RouteNode> routeVrouteToVerticalDistributionLines(Net clk,
-                                                                                     RouteNode vroute,
-                                                                                     Collection<ClockRegion> clockRegions,
-                                                                                     Function<Node, NodeStatus> getNodeStatus) {
-        Map<ClockRegion, RouteNode> crToVdist = new HashMap<>();
-        vroute.setParent(null);
+    public static Map<ClockRegion, Node> routeVrouteToVerticalDistributionLines(Net clk,
+                                                                                Node vroute,
+                                                                                Collection<ClockRegion> clockRegions,
+                                                                                Function<Node, NodeStatus> getNodeStatus) {
+        Map<ClockRegion, Node> crToVdist = new HashMap<>();
         Queue<RouteNode> q = RouteNode.createPriorityQueue();
         HashSet<Node> visited = new HashSet<>();
         Set<PIP> allPIPs = new HashSet<>();
         Set<RouteNode> startingPoints = new HashSet<>();
-        startingPoints.add(vroute);
-        assert(vroute.getParent() == null);
+        startingPoints.add(new RouteNode(vroute));
         // Pattern: NODE_GLOBAL_VROUTE -> ... -> NODE_GLOBAL_VDISTR_LVL2 -> ... -> NODE_GLOBAL_VDISTR_LVL1 -> ... -> NODE_GLOBAL_VDISTR
         Set<IntentCode> allowedIntentCodes = EnumSet.of(
             IntentCode.NODE_GLOBAL_VDISTR,
@@ -268,9 +262,7 @@ public class VersalClockRouting {
                             startingPoints.add(p.getEndRouteNode());
                         }
                     }
-                    RouteNode currBase = new RouteNode(currNode);
-                    currBase.setParent(null);
-                    crToVdist.put(cr, currBase);
+                    crToVdist.put(cr, currNode);
                     continue nextClockRegion;
                 }
 
@@ -288,7 +280,6 @@ public class VersalClockRouting {
             throw new RuntimeException("ERROR: Couldn't route to distribution line in clock region " + cr);
         }
         clk.getPIPs().addAll(allPIPs);
-        vroute.setParent(null);
         return crToVdist;
     }
 
@@ -299,21 +290,20 @@ public class VersalClockRouting {
      * @param crMap A map of target clock regions and their respective vertical distribution lines
      * @return The List of nodes from the centroid to the horizontal distribution line.
      */
-    public static Map<ClockRegion, RouteNode> routeVerticalToHorizontalDistributionLines(Net clk,
-                                                                                         Map<ClockRegion, RouteNode> crMap,
-                                                                                         Function<Node, NodeStatus> getNodeStatus) {
-        Map<ClockRegion, RouteNode> distLines = new HashMap<>();
+    public static Map<ClockRegion, Node> routeVerticalToHorizontalDistributionLines(Net clk,
+                                                                                    Map<ClockRegion, Node> crMap,
+                                                                                    Function<Node, NodeStatus> getNodeStatus) {
+        Map<ClockRegion, Node> distLines = new HashMap<>();
         Queue<RouteNode> q = new LinkedList<>();
         Set<PIP> allPIPs = new HashSet<>();
         Set<Node> visited = new HashSet<>();
-        nextClockRegion: for (Entry<ClockRegion,RouteNode> e : crMap.entrySet()) {
+        nextClockRegion: for (Entry<ClockRegion,Node> e : crMap.entrySet()) {
             q.clear();
-            RouteNode vertDistLine = e.getValue();
-            vertDistLine.setParent(null);
-            q.add(vertDistLine);
+            Node vertDistLine = e.getValue();
+            q.add(new RouteNode(vertDistLine));
             ClockRegion targetCR = e.getKey();
             visited.clear();
-            visited.add(Node.getNode(vertDistLine));
+            visited.add(vertDistLine);
             
             while (!q.isEmpty()) {
                 RouteNode curr = q.poll();
@@ -333,7 +323,7 @@ public class VersalClockRouting {
                     }
 
                     parent.setParent(null);
-                    distLines.put(targetCR, parent);
+                    distLines.put(targetCR, Node.getNode(parent));
                     continue nextClockRegion;
                 }
 
@@ -356,20 +346,22 @@ public class VersalClockRouting {
      * @param distLines A map of target clock regions and their respective horizontal distribution lines
      * @param lcbTargets The target LCB nodes to route the clock
      */
-    public static void routeDistributionToLCBs(Net clk, Map<ClockRegion, RouteNode> distLines, Set<RouteNode> lcbTargets) {
-        Map<ClockRegion, Set<RouteNode>> startingPoints = getStartingPoints(distLines);
+    public static void routeDistributionToLCBs(Net clk, Map<ClockRegion, Node> distLines, Set<RouteNode> lcbTargets) {
+        Map<ClockRegion, Set<Node>> startingPoints = getStartingPoints(distLines);
         routeToLCBs(clk, startingPoints, lcbTargets);
     }
 
-    public static Map<ClockRegion, Set<RouteNode>> getStartingPoints(Map<ClockRegion, RouteNode> distLines) {
-        Map<ClockRegion, Set<RouteNode>> startingPoints = new HashMap<>();
-        for (ClockRegion cr : distLines.keySet()) {
-            startingPoints.computeIfAbsent(cr, k -> new HashSet<>()).add(distLines.get(cr));
+    public static Map<ClockRegion, Set<Node>> getStartingPoints(Map<ClockRegion, Node> distLines) {
+        Map<ClockRegion, Set<Node>> startingPoints = new HashMap<>();
+        for (Entry<ClockRegion, Node> e : distLines.entrySet()) {
+            ClockRegion cr = e.getKey();
+            Node distLine = e.getValue();
+            startingPoints.computeIfAbsent(cr, k -> new HashSet<>()).add(distLine);
         }
         return startingPoints;
     }
 
-    public static void routeToLCBs(Net clk, Map<ClockRegion, Set<RouteNode>> startingPoints, Set<RouteNode> lcbTargets) {
+    public static void routeToLCBs(Net clk, Map<ClockRegion, Set<Node>> startingPoints, Set<RouteNode> lcbTargets) {
         Queue<RouteNode> q = RouteNode.createPriorityQueue();
         Set<PIP> allPIPs = new HashSet<>();
         HashSet<RouteNode> visited = new HashSet<>();
@@ -378,11 +370,10 @@ public class VersalClockRouting {
             q.clear();
             visited.clear();
             ClockRegion currCR = lcb.getTile().getClockRegion();
-            Set<RouteNode> starts = startingPoints.getOrDefault(currCR, Collections.emptySet());
-            for (RouteNode rn : starts) {
-                assert(rn.getParent() == null);
+            Set<Node> starts = startingPoints.getOrDefault(currCR, Collections.emptySet());
+            for (Node n : starts) {
+                q.add(new RouteNode(n));
             }
-            q.addAll(starts);
             while (!q.isEmpty()) {
                 RouteNode curr = q.poll();
                 visited.add(curr);
@@ -390,10 +381,10 @@ public class VersalClockRouting {
                     List<PIP> pips = curr.getPIPsBackToSource();
                     allPIPs.addAll(pips);
 
-                    Set<RouteNode> s = startingPoints.get(currCR);
+                    Set<Node> s = startingPoints.get(currCR);
                     for (PIP p : pips) {
-                        s.add(new RouteNode(p.getTile(),p.getStartWireIndex()));
-                        s.add(new RouteNode(p.getTile(),p.getEndWireIndex()));
+                        s.add(p.getStartNode());
+                        s.add(p.getEndNode());
                     }
                     continue nextLCB;
                 }
@@ -508,14 +499,14 @@ public class VersalClockRouting {
      * @param down To indicate if it is routing to the group of top clock regions.
      * @return A list of RouteNodes indicating the reached horizontal distribution lines.
      */
-    public static Map<ClockRegion, RouteNode> routeToHorizontalDistributionLines(Net clk,
-                                                                     RouteNode vroute,
-                                                                     Collection<ClockRegion> clockRegions,
-                                                                     boolean down,
-                                                                     Function<Node, NodeStatus> getNodeStatus) {
+    public static Map<ClockRegion, Node> routeToHorizontalDistributionLines(Net clk,
+                                                                            Node vroute,
+                                                                            Collection<ClockRegion> clockRegions,
+                                                                            boolean down,
+                                                                            Function<Node, NodeStatus> getNodeStatus) {
         // First step: map each clock region to a VDISTR node. 
         // The clock region of this VDISTR node should be in the same column of the centroid (X) and the same row of the target clock region (Y). 
-        Map<ClockRegion, RouteNode> vertDistLines = routeVrouteToVerticalDistributionLines(clk, vroute, clockRegions, getNodeStatus);
+        Map<ClockRegion, Node> vertDistLines = routeVrouteToVerticalDistributionLines(clk, vroute, clockRegions, getNodeStatus);
 
         // Second step: start from the VDISTR node and try to find a HDISTR node in the target clock region.
         return routeVerticalToHorizontalDistributionLines(clk, vertDistLines, getNodeStatus);
