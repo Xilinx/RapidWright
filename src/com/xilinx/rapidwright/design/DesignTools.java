@@ -3337,7 +3337,7 @@ public class DesignTools {
                     if (fiveOrSix != '6') {
                         // Assume that O6 is only driven by 6LUT, even though possible for 5LUT, unless
                         // it's a routethru
-                        assert(cell.isRoutethru());
+                        assert (cell.isRoutethru());
                         continue;
                     }
                     assert(fiveOrSix == '6');
