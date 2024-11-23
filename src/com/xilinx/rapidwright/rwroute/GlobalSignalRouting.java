@@ -501,15 +501,6 @@ public class GlobalSignalRouting {
                         }
 
                         IntentCode uphillIntentCode = uphillNode.getIntentCode();
-                        if (uphillIntentCode == IntentCode.NODE_CLE_CNODE && intentCode != IntentCode.NODE_CLE_CTRL) {
-                            assert(isVersal);
-                            // Only allow PIPs from NODE_CLE_CNODE to NODE_CLE_CTRL intent codes
-                            // (NODE_CLE_NODEs can also be used to re-enter the INT tile --- do not allow this
-                            // so that these precious resources are not consumed by the static router thereby
-                            // blocking the signal router from using them)
-                            continue;
-                        }
-
                         switch(uphillIntentCode) {
                             case NODE_GLOBAL_VDISTR:
                             case NODE_GLOBAL_HROUTE:
@@ -526,6 +517,20 @@ public class GlobalSignalRouting {
                             case NODE_VLONG7:
                             case NODE_VLONG12:
                                 continue;
+                            case NODE_CLE_CNODE:
+                                // Only allow PIPs from NODE_{CLE,INTF}_CNODE to NODE_{CLE,INTF}_CTRL intent codes
+                                // (NODE_CLE_NODEs can also be used to re-enter the INT tile --- do not allow this
+                                // so that these precious resources are not consumed by the static router thereby
+                                // blocking the signal router from using them)
+                                if (intentCode != IntentCode.NODE_CLE_CTRL) {
+                                    continue;
+                                }
+                                break;
+                            case NODE_INTF_CNODE:
+                                if (intentCode != IntentCode.NODE_INTF_CTRL) {
+                                    continue;
+                                }
+                                break;
 
                             // VCC net should never need to use S/D/Q nodes ...
                             case NODE_SINGLE:
