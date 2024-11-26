@@ -234,7 +234,7 @@ public class GlobalSignalRouting {
             SitePinInst source = clk.getSource();
             SiteTypeEnum sourceTypeEnum = source.getSiteTypeEnum();
             // In US/US+ clock routing, we use two VROUTE nodes to reach the clock regions above and below the centroid.
-            // However, we can see that Vivado only use one VROUTE node in the centroid clock region for Versal clock routing,
+            // However, we can see that Vivado only uses one VROUTE node in the centroid clock region for Versal clock routing,
             // and reach the above and below clock regions by VDISTR nodes.
 
             ClockRegion centroid;
@@ -247,7 +247,7 @@ public class GlobalSignalRouting {
                 // NODE_GLOBAL_GCLK ->
                 // NODE_GLOBAL_VROUTE (located in the same clock region of the source site)
 
-                // Notice that Vivado always use the above VROUTE node, there is no need to find a centroid clock region to route to.
+                // Notice that Vivado always uses the above VROUTE node, there is no need to find a centroid clock region to route to.
                 centroid = source.getTile().getClockRegion();
                 centroidHRouteNode = source.getConnectedNode();
             } else if (sourceTypeEnum == SiteTypeEnum.BUFGCE) {
