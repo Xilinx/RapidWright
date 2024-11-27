@@ -353,12 +353,12 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                         }
                     }
                 }
+                if (existingSiteInst != null) {
+                    unplace();
+                    return false;
+                }
             }
 
-            if (existingSiteInst != null && !allowOverlap) {
-                unplace();
-                return false;
-            }
 
             if (newSite == null || existingSiteInst != null) {
                 //MessageGenerator.briefError("ERROR: No matching site found." +
