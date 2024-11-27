@@ -237,11 +237,12 @@ public class VersalClockRouting {
     }
 
     /**
-     * Routes from a vertical distribution centroid to destination horizontal distribution lines
-     * in the clock regions provided.
+     * For each target clock region, route from the provided vertical distribution line to a
+     * horizontal distribution line that has a GLOBAL_GLK child node in this clock region.
+     * This simulates the behavior of Vivado.
      * @param clk The current clock net
      * @param crMap A map of target clock regions and their respective vertical distribution lines
-     * @return The List of nodes from the centroid to the horizontal distribution line.
+     * @return The map of target clock regions and their respective horizontal distribution lines.
      */
     public static Map<ClockRegion, Node> routeVerticalToHorizontalDistributionLines(Net clk,
                                                                                     Map<ClockRegion, Node> crMap,
@@ -366,7 +367,7 @@ public class VersalClockRouting {
                     q.add(new NodeWithPrevAndCost(downhill, curr, cost));
                 }
             }
-            throw new RuntimeException("ERROR: Couldn't route to distribution line in clock region " + lcb);
+            throw new RuntimeException("ERROR: Couldn't route to leaf clock buffer " + lcb);
         }
         clk.getPIPs().addAll(allPIPs);
     }
@@ -377,7 +378,7 @@ public class VersalClockRouting {
      * @param vroute The node to start the route.
      * @param clockRegions Target clock regions.
      * @param down To indicate if it is routing to the group of top clock regions.
-     * @return A list of RouteNodes indicating the reached horizontal distribution lines.
+     * @return The map of target clock regions and their respective horizontal distribution lines.
      */
     public static Map<ClockRegion, Node> routeToHorizontalDistributionLines(Net clk,
                                                                             Node vroute,

@@ -193,96 +193,112 @@ public class GlobalSignalRouting {
      *                      for same net as we're routing), or unavailable (preserved for other net).
      */
     public static void symmetricClkRouting(Net clk, Device device, Function<Node,NodeStatus> getNodeStatus) {
-        if (device.getSeries() == Series.UltraScale || device.getSeries() == Series.UltraScalePlus) {
-            List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
-
-            ClockRegion centroid = findCentroid(clk, device);
-            List<ClockRegion> upClockRegions = new ArrayList<>();
-            List<ClockRegion> downClockRegions = new ArrayList<>();
-            // divides clock regions into two groups
-            divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
-
-            RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
-            RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
-            
-            RouteNode vrouteUp = null;
-            RouteNode vrouteDown;
-            // Two VROUTEs going up and down
-            ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
-            if (aboveCentroid != null) {
-                vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
-            }
-            vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
-
-            List<RouteNode> upDownDistLines = new ArrayList<>();
-            if (aboveCentroid != null) {
-                List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false, getNodeStatus);
-                if (upLines != null) upDownDistLines.addAll(upLines);
-            }
-
-            List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
-            if (downLines != null) upDownDistLines.addAll(downLines);
-
-            Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk.getPins(), getNodeStatus);
-            UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
-
-            UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
-        } else if (device.getSeries() == Series.Versal) {
-            // Clock routing on Versal devices
-
-            List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
-            SitePinInst source = clk.getSource();
-            SiteTypeEnum sourceTypeEnum = source.getSiteTypeEnum();
-            // In US/US+ clock routing, we use two VROUTE nodes to reach the clock regions above and below the centroid.
-            // However, we can see that Vivado only use one VROUTE node in the centroid clock region for Versal clock routing,
-            // and reach the above and below clock regions by VDISTR nodes.
-
-            ClockRegion centroid;
-            Node centroidHRouteNode;
-
-            if (sourceTypeEnum == SiteTypeEnum.BUFG_FABRIC) {
-                // These source sites are located in the middle of the device. The path from the output pin to VROUTE matches the following pattern:
-                // NODE_GLOBAL_BUFG (the output node with a suffix "_O") -> 
-                // NODE_GLOBAL_BUFG (has a suffix "_O_PIN") -> 
-                // NODE_GLOBAL_GCLK ->
-                // NODE_GLOBAL_VROUTE (located in the same clock region of the source site)
-
-                // Notice that Vivado always use the above VROUTE node, there is no need to find a centroid clock region to route to.
-                centroid = source.getTile().getClockRegion();
-                centroidHRouteNode = source.getConnectedNode();
-            } else if (sourceTypeEnum == SiteTypeEnum.BUFGCE) {
-                // Assume that these source sites are located in the bottom of the device (Y=0).
-                // The path from the output pin to VROUTE matches the following pattern:
-                //   NODE_GLOBAL_BUFG -> NODE_GLOBAL_BUFG -> NODE_GLOBAL_GCLK ->  NODE_GLOBAL_HROUTE_HSR -> NODE_GLOBAL_VROUTE
-                // which is similar to US/US+ clock routing.
-                // Notice that we have to quickly reach a NODE_GLOBAL_HROUTE_HSR node, and if we allow the Y coordinate of centroid to be bigger than 1,
-                // we may fail to do so. Thus, we need to force the Y-coordinate of centroid to be 1.
-                assert(source.getTile().getTileYCoordinate() == 0);
-                // And, in X-axis, Vivado doesn't go to the real centroid of target clock regions... it just uses a nearby VROUTE.
-                int centroidX = source.getTile().getClockRegion().getColumn();
-                // VROUTE nodes are in the clock region where X is odd.
-                if (centroidX % 2 == 0) centroidX -= 1;
-                if (centroidX <= 0)     centroidX = 1;
-                centroid = device.getClockRegion(1, centroidX);
-
-                Node clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
-                centroidHRouteNode = VersalClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true);
-            } else {
-                throw new RuntimeException("ERROR: Routing clock net with source type " + sourceTypeEnum + " not supported.");
-            }
-
-            Node vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid, false);
-
-            Map<ClockRegion, Node> upDownDistLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vroute, clockRegions, false, getNodeStatus);
-
-            Map<Node, List<SitePinInst>> lcbMappings = VersalClockRouting.routeLCBsToSinks(clk, getNodeStatus);
-            VersalClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
-        } else {
-            throw new RuntimeException("ERROR: GlobalSignalRouting.symmetricClkRouting() does not support the " + device.getSeries() + " series.");
+        switch (device.getSeries()) {
+            case UltraScale:
+            case UltraScalePlus:
+                symmetricClockRoutingUltraScales(clk, device, getNodeStatus);
+                break;
+            case Versal:
+                symmetricClockRoutingVersal(clk, device, getNodeStatus);
+                break;
+            default:
+                throw new RuntimeException("ERROR: GlobalSignalRouting.symmetricClkRouting() does not support the " + device.getSeries() + " series.");
         }
 
         Set<PIP> clkPIPsWithoutDuplication = new HashSet<>(clk.getPIPs());
         clk.setPIPs(clkPIPsWithoutDuplication);
+    }
+
+    private static void symmetricClockRoutingUltraScales(Net clk, Device device, Function<Node, NodeStatus> getNodeStatus) {
+        // Clock routing on UltraScale/UltraScale+ devices
+        assert(device.getSeries() == Series.UltraScale || device.getSeries() == Series.UltraScalePlus);
+
+        List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
+
+        ClockRegion centroid = findCentroid(clk, device);
+        List<ClockRegion> upClockRegions = new ArrayList<>();
+        List<ClockRegion> downClockRegions = new ArrayList<>();
+        // divides clock regions into two groups
+        divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
+
+        RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
+        RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
+
+        RouteNode vrouteUp = null;
+        RouteNode vrouteDown;
+        // Two VROUTEs going up and down
+        ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
+        if (aboveCentroid != null) {
+            vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
+        }
+        vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
+
+        List<RouteNode> upDownDistLines = new ArrayList<>();
+        if (aboveCentroid != null) {
+            List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false, getNodeStatus);
+            if (upLines != null) upDownDistLines.addAll(upLines);
+        }
+
+        List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
+        if (downLines != null) upDownDistLines.addAll(downLines);
+
+        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk.getPins(), getNodeStatus);
+        UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
+
+        UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
+    }
+
+    private static void symmetricClockRoutingVersal(Net clk, Device device, Function<Node, NodeStatus> getNodeStatus) {
+        // Clock routing on Versal devices
+        assert(device.getSeries() == Series.Versal);
+
+        List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
+        SitePinInst source = clk.getSource();
+        SiteTypeEnum sourceTypeEnum = source.getSiteTypeEnum();
+        // In US/US+ clock routing, we use two VROUTE nodes to reach the clock regions above and below the centroid.
+        // However, we can see that Vivado only uses one VROUTE node in the centroid clock region for Versal clock routing,
+        // and reach the above and below clock regions by VDISTR nodes.
+
+        ClockRegion centroid;
+        Node centroidHRouteNode;
+
+        if (sourceTypeEnum == SiteTypeEnum.BUFG_FABRIC) {
+            // These source sites are located in the middle of the device. The path from the output pin to VROUTE matches the following pattern:
+            // NODE_GLOBAL_BUFG (the output node with a suffix "_O") ->
+            // NODE_GLOBAL_BUFG (has a suffix "_O_PIN") ->
+            // NODE_GLOBAL_GCLK ->
+            // NODE_GLOBAL_VROUTE (located in the same clock region of the source site)
+
+            // Notice that Vivado always uses the above VROUTE node, there is no need to find a centroid clock region to route to.
+            centroid = source.getTile().getClockRegion();
+            centroidHRouteNode = source.getConnectedNode();
+        } else if (sourceTypeEnum == SiteTypeEnum.BUFGCE) {
+            // Assume that these source sites are located in the bottom of the device (Y=0).
+            // The path from the output pin to VROUTE matches the following pattern:
+            //   NODE_GLOBAL_BUFG -> NODE_GLOBAL_BUFG -> NODE_GLOBAL_GCLK ->  NODE_GLOBAL_HROUTE_HSR -> NODE_GLOBAL_VROUTE
+            // which is similar to US/US+ clock routing.
+            // Notice that we have to quickly reach a NODE_GLOBAL_HROUTE_HSR node, and if we allow the Y coordinate of centroid to be bigger than 1,
+            // we may fail to do so. Thus, we need to force the Y-coordinate of centroid to be 1.
+            assert(source.getTile().getTileYCoordinate() == 0);
+            // And, in X-axis, Vivado doesn't go to the real centroid of target clock regions... it just uses a nearby VROUTE.
+            int centroidX = source.getTile().getClockRegion().getColumn();
+            // VROUTE nodes are in the clock region where X is odd.
+            if (centroidX % 2 == 0) centroidX -= 1;
+            if (centroidX <= 0)     centroidX = 1;
+            centroid = device.getClockRegion(1, centroidX);
+
+            Node clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
+            centroidHRouteNode = VersalClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true);
+        } else {
+            throw new RuntimeException("ERROR: Routing clock net with source type " + sourceTypeEnum + " not supported.");
+        }
+
+        Node vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid, false);
+
+        Map<ClockRegion, Node> upDownDistLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vroute, clockRegions, false, getNodeStatus);
+
+        Map<Node, List<SitePinInst>> lcbMappings = VersalClockRouting.routeLCBsToSinks(clk, getNodeStatus);
+        VersalClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
     }
 
     /**

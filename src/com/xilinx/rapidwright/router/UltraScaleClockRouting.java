@@ -437,7 +437,7 @@ public class UltraScaleClockRouting {
                     q.add(rn);
                 }
             }
-            throw new RuntimeException("ERROR: Couldn't route to distribution line in clock region " + lcb);
+            throw new RuntimeException("ERROR: Couldn't route to leaf clock buffer " + lcb);
         }
         clk.getPIPs().addAll(allPIPs);
     }
