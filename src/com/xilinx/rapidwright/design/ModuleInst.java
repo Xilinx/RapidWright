@@ -359,7 +359,6 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                 }
             }
 
-
             if (newSite == null || existingSiteInst != null) {
                 //MessageGenerator.briefError("ERROR: No matching site found." +
                 //    " (Template Site:"    + templateSite.getName() +
