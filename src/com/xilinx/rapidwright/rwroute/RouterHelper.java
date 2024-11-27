@@ -30,7 +30,9 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -53,6 +55,7 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
@@ -66,18 +69,33 @@ import com.xilinx.rapidwright.util.Utils;
  * A collection of supportive methods for the router.
  */
 public class RouterHelper {
-    static class NodeWithPrev extends Node {
+    public static class NodeWithPrev extends Node {
         protected NodeWithPrev prev;
-        NodeWithPrev(Node node) {
+        public NodeWithPrev(Node node) {
             super(node);
         }
 
-        void setPrev(NodeWithPrev prev) {
+        public NodeWithPrev(Node node, NodeWithPrev prev) {
+            super(node);
+            setPrev(prev);
+        }
+
+        public void setPrev(NodeWithPrev prev) {
             this.prev = prev;
         }
 
-        NodeWithPrev getPrev() {
+        public NodeWithPrev getPrev() {
             return prev;
+        }
+
+        public List<Node> getPrevPath() {
+            List<Node> path = new ArrayList<>();
+            NodeWithPrev curr = this;
+            while (curr != null) {
+                path.add(curr);
+                curr = curr.getPrev();
+            }
+            return path;
         }
     }
 
@@ -350,7 +368,7 @@ public class RouterHelper {
                 }
                 Collection<Cell> connectedCells = DesignTools.getConnectedCells(spiBelPin, si);
                 if (connectedCells.isEmpty()) {
-                    for (BELPin belPin : si.getSiteWirePins(siteWireName)) {
+                    for (BELPin belPin : si.getSiteWirePins(spiBelPin.getSiteWireName())) {
                         if (belPin.isSitePort()) {
                             continue;
                         }
@@ -410,7 +428,12 @@ public class RouterHelper {
             } else {
                 BELPin[] belPins = si.getSiteWirePins(siteWireName);
                 if (belPins.length != 2) {
-                    continue;
+                    if (belPins.length == 3 && si.getSiteTypeEnum() == SiteTypeEnum.DSP58 && siteWireName.equals("RSTD")) {
+                        assert(isVersal);
+                        assert(belPins[1].toString().equals("SRCMXINV.RSTAD_UNUSED"));
+                    } else {
+                        continue;
+                    }
                 }
                 for (BELPin belPin : belPins) {
                     if (belPin.isSitePort()) {
@@ -421,7 +444,8 @@ public class RouterHelper {
                     }
                     // Emulate Vivado's behaviour and do not invert CLK* site pins
                     if (Utils.isBRAM(spi.getSiteInst()) &&
-                            belPin.getBELName().startsWith("CLK")) {
+                            belPin.getBELName().startsWith("CLK") &&
+                            !isVersal) {
                         continue;
                     }
                     toInvertPins.add(spi);
@@ -540,14 +564,11 @@ public class RouterHelper {
      * @return A list of nodes making up the path.
      */
     public static List<Node> findPathBetweenNodes(Node source, Node sink) {
-        List<Node> path = new ArrayList<>();
         if (source.equals(sink)) {
-            return path; // for pins without additional projected int_node
+            return Collections.emptyList(); // for pins without additional projected int_node
         }
         if (source.getAllDownhillNodes().contains(sink)) {
-            path.add(sink);
-            path.add(source);
-            return path;
+            return Arrays.asList(sink, source);
         }
         NodeWithPrev sourcer = new NodeWithPrev(source);
         sourcer.setPrev(null);
@@ -559,16 +580,10 @@ public class RouterHelper {
                 !Utils.isClocking(sink.getTile().getTileTypeEnum());
 
         int watchdog = 10000;
-        boolean success = false;
         while (!queue.isEmpty()) {
             NodeWithPrev curr = queue.poll();
             if (curr.equals(sink)) {
-                while (curr != null) {
-                    path.add(curr);
-                    curr = curr.getPrev();
-                }
-                success = true;
-                break;
+                return curr.getPrevPath();
             }
             for (Node n : curr.getAllDownhillNodes()) {
                 if (blockClocking && Utils.isClocking(n.getTile().getTileTypeEnum())) {
@@ -584,11 +599,8 @@ public class RouterHelper {
             }
         }
 
-        if (!success) {
-            System.err.println("ERROR: Failed to find a path between two nodes: " + source + ", " + sink);
-            path.clear();
-        }
-        return path;
+        System.err.println("ERROR: Failed to find a path between two nodes: " + source + ", " + sink);
+        return Collections.emptyList();
     }
 
     /**

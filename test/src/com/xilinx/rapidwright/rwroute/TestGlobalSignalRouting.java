@@ -26,18 +26,21 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
 import com.xilinx.rapidwright.util.VivadoTools;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -50,7 +53,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class TestGlobalSignalRouting {
     @ParameterizedTest
@@ -315,6 +320,37 @@ public class TestGlobalSignalRouting {
         } else {
             // In both cases, SLICE_X81Y218 does not exhibit invalid site programming and thus net appears partially routed
             Assertions.assertEquals("PARTIAL", status);
+        }
+    }
+
+    @Test
+    public void testSymmetricClkRouting() {
+        Design design = RapidWrightDCP.loadDCP("two_clk_check_NetTools.dcp");
+        design.unrouteDesign();
+        // Simulate the preserve method
+        Set<Node> used = new HashSet<>();
+
+        for (String netName : Arrays.asList("clk1_IBUF_BUFG", "clk2_IBUF_BUFG", "rst1", "rst2")) {
+            Net net = design.getNet(netName);
+            Assertions.assertTrue(NetTools.isGlobalClock(net));
+            GlobalSignalRouting.symmetricClkRouting(net, design.getDevice(), (n) -> used.contains(n) ? NodeStatus.UNAVAILABLE : NodeStatus.AVAILABLE);
+            for (PIP pip: net.getPIPs()) {
+                for (Node node: Arrays.asList(pip.getStartNode(), pip.getEndNode())) {
+                    if (node != null) used.add(node);
+                }
+            }
+            DesignTools.updatePinsIsRouted(net);
+            for (SitePinInst spi : net.getPins()) {
+                Assertions.assertTrue(spi.isRouted());
+            }
+        }
+
+        if (FileTools.isVivadoOnPath()) {
+            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            Assertions.assertEquals(4, rrs.fullyRoutedNets);
+            Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
+        } else {
+            System.err.println("WARNING: vivado not on PATH");
         }
     }
 }

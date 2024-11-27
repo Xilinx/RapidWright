@@ -2297,11 +2297,19 @@ public class DesignTools {
                     } else if (bel.isLUT() ||
                             bel.getBELType().endsWith("MUX") || // F[789]MUX
                             // Versal
+                            bel.isSliceFFClkMod() ||
                             bel.getName().endsWith("_IMR")) {
                         Cell possibleRouteThru = inst.getCell(bel);
-                        if (possibleRouteThru != null && possibleRouteThru.isRoutethru()) {
-                            BELPin routeThru = possibleRouteThru.getFirstPhysicalPinMapping().getFirst();
-                            queue.add(routeThru);
+                        if (possibleRouteThru == null) {
+                            BELPin clkBelPin = bel.isSliceFFClkMod() ? bel.getPin("CLK") : null;
+                            if (clkBelPin != null && inst.getNetFromSiteWire(clkBelPin.getSiteWireName()) == net) {
+                                queue.add(clkBelPin);
+                            }
+                        } else {
+                            if (possibleRouteThru.isRoutethru()) {
+                                BELPin routeThru = possibleRouteThru.getFirstPhysicalPinMapping().getFirst();
+                                queue.add(routeThru);
+                            }
                         }
                     }
                 }
@@ -2310,20 +2318,40 @@ public class DesignTools {
                     if (!siteWires.contains(sink.getSiteWireName())) continue;
                     if (sink.isSitePort()) {
                         sitePins.add(sink.getName());
-                    } else if (sink.getBEL().getBELClass() == BELClass.RBEL) {
+                        continue;
+                    }
+                    BEL bel = sink.getBEL();
+                    if (bel.getBELClass() == BELClass.RBEL) {
                         // Check if the SitePIP is being used
-                        SitePIP sitePIP = inst.getUsedSitePIP(sink.getBELName());
-                        if (sitePIP == null) continue;
-                        // Don't proceed if it's configured for a different pin
-                        if (!sitePIP.getInputPinName().equals(sink.getName())) continue;
+                        SitePIP sitePIP = inst.getUsedSitePIP(sink);
+                        if (sitePIP == null) {
+                            continue;
+                        }
+                        assert(sitePIP.getInputPinName().equals(sink.getName()));
                         // Make this the new source to search from and keep looking...
                         queue.add(sitePIP.getOutputPin());
-                    } else if (sink.getBEL().isFF()) {
+                    } else if (bel.isFF()) {
                         // FF pass thru option (not a site PIP)
-                        siteWireName = sink.getBEL().getPin("Q").getSiteWireName();
+                        siteWireName = bel.getPin("Q").getSiteWireName();
                         if (siteWires.contains(siteWireName)) {
                             sitePins.add(siteWireName);
                         }
+                    } else if (bel.getBELType().equals("DSP_CAS_DELAY")) {
+                        // Versal only
+                        SitePIP sitePIP = inst.getUsedSitePIP(sink);
+                        if (sitePIP == null) {
+                            continue;
+                        }
+                        assert(sitePIP.getInputPinName().equals(sink.getName()));
+                        // For an unknown reason, it appears that the sitewire is not painted correctly ...
+                        // Make this the new source to search from and keep looking...
+                        // queue.add(sitePIP.getOutputPin());
+                        // ... so assume it is and workaround
+                        BELPin source = sitePIP.getOutputPin();
+                        assert(source.getSiteConns().size() == 1);
+                        BELPin port = source.getSiteConns().get(0);
+                        assert(port.isSitePort());
+                        sitePins.add(port.getName());
                     }
                 }
             }
@@ -3250,53 +3278,67 @@ public class DesignTools {
                 }
 
                 String belName = bel.getName();
-                if ("SRL16E".equals(cell.getType()) || "SRLC32E".equals(cell.getType())) {
-                    String pinName = belName.charAt(0) + "1";
-                    SitePinInst spi = si.getSitePinInst(pinName);
-                    if (spi != null) {
-                        assert(spi.getNet().isVCCNet());
+                char fiveOrSix = belName.charAt(1);
+                if (fiveOrSix == '5') {
+                    // Assume that only 5LUT can use O5
+                    assert(cell.getLogicalPinMapping("O5") != null || cell.isRoutethru());
+                    if (LUTTools.getCompanionLUTCell(cell) != null)  {
+                        // 5LUT is used, but 6LUT also exists; let the 6LUT deal with things
                         continue;
                     }
-                    vccNet.createPin(pinName, si);
+                } else {
+                    assert(fiveOrSix == '6');
+
+                    if ("SRLC32E".equals(cell.getType())) {
+                        // For SRLC32Es, only the A1 needs to be tied to VCC
+                        String pinName = belName.charAt(0) + "1";
+                        SitePinInst spi = si.getSitePinInst(pinName);
+                        if (spi == null) {
+                            vccNet.createPin(pinName, si);
+                        } else {
+                            assert(spi.getNet().isVCCNet());
+                        }
+                        // A6 is needed as a logical pin
+                        assert(cell.getLogicalPinMapping("A6") != null);
+                    }
+
+                    if (cell.getLogicalPinMapping("A6") != null) {
+                        // A6 pin is being used by LUT/SRL; no need to tie it to VCC
+                        continue;
+                    }
                 }
 
-                if (cell.getLogicalPinMapping("A6") != null) {
-                    // A6 pin is being used by LUT
-                    continue;
-                }
-
-                char fiveOrSix = belName.charAt(1);
-                assert(fiveOrSix == '5' || fiveOrSix == '6');
                 Net staticNet = vccNet;
-
                 BEL lut6Bel = (fiveOrSix == '5') ? si.getBEL(belName.charAt(0) + "6LUT") : bel;
                 Net a6Net = si.getNetFromSiteWire(lut6Bel.getPin("A6").getSiteWireName());
 
-                // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
-                if (cell.getType().equals("SRL16E") && "SRLC32E".equals(cell.getPropertyValueString("XILINX_LEGACY_PRIM"))) {
-                    staticNet = gndNet;
-                    // Expect sitewire to be VCC and GND
-                    if (!a6Net.isStaticNet()) {
-                        throw new RuntimeException("ERROR: Site pin " + si.getSiteName() + "/" + belName.charAt(0) + "6 is not a static net");
+                boolean expectGndNet = false;
+                if ("SRL16E".equals(cell.getType())) {
+                    String pinName = belName.charAt(0) + "1";
+                    SitePinInst spi = si.getSitePinInst(pinName);
+                    if (spi == null) {
+                        vccNet.createPin(pinName, si);
                     }
-                } else {
-                    // Tie A6 to staticNet only if sitewire says so
-                    if (a6Net != staticNet) {
-                        continue;
+
+                    // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
+                    if ("SRLC32E".equals(cell.getPropertyValueString("XILINX_LEGACY_PRIM"))) {
+                        expectGndNet = true;
+                        staticNet = gndNet;
+                        // Expect sitewire to be VCC or GND
+                        if (!a6Net.isStaticNet()) {
+                            throw new RuntimeException("ERROR: Site pin " + si.getSiteName() + "/" + belName.charAt(0) + "6 is not a static net");
+                        }
                     }
+                }
+
+                // Tie A6 to staticNet only if sitewire says so
+                if (a6Net != staticNet && !expectGndNet) {
+                    continue;
                 }
 
                 if (cell.getLogicalPinMapping("O5") != null) {
                     // LUT output comes out on O5
-                    if (fiveOrSix == '5') {
-                        // It's a 5LUT
-                        if (si.getCell(belName.charAt(0) + "6LUT") != null) {
-                            // But 6LUT exists; let the 6LUT deal with it
-                            continue;
-                        }
-                    } else {
-                        throw new RuntimeException("Assumption that only 5LUTs can use O5 failed here.");
-                    }
+                    assert(fiveOrSix == '5');
                 } else {
                     if (fiveOrSix != '6') {
                         // Assume that O6 is only driven by 6LUT, even though possible for 5LUT, unless
@@ -3304,7 +3346,6 @@ public class DesignTools {
                         assert (cell.isRoutethru());
                         continue;
                     }
-
                     assert(fiveOrSix == '6');
                 }
 
@@ -3376,14 +3417,16 @@ public class DesignTools {
                         Net net = si.getNetFromSiteWire(sitePinName);
                         if (net != null) {
                             if (belPinName == CE) {
+                                if (!net.isVCCNet()) {
+                                    continue;
+                                }
                                 // CE: it is possible for sitewire to be assigned to a non VCC net, but a SitePinInst to not yet exist
-                                assert(!net.isVCCNet());
-                                continue;
                             } else {
-                                // SR: it is possible for sitewire to be assigned the GND net, yet still be routed to VCC
+                                assert(belPinName == SR);
                                 if (!net.isStaticNet()) {
                                     continue;
                                 }
+                                // SR: it is possible for sitewire to be assigned the GND net, yet still be routed to VCC
                             }
                         }
 
