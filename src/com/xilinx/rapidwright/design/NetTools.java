@@ -144,4 +144,18 @@ public class NetTools {
 
         return subtrees;
     }
+    
+    /**
+     * Checks if the provided net drives a clock site pin input.
+     * 
+     * @param net The net to examine.
+     * @return True if the net has a site pin clock input, false otherwise.
+     */
+    public static boolean hasClockSinks(Net net) {
+        for (SitePinInst sink : net.getPins()) { 
+            if (sink.isOutPin()) continue;
+            if (sink.getName().contains("CLK")) return true;
+        }
+        return false;
+    }
 }

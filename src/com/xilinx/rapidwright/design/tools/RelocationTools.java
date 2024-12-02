@@ -39,6 +39,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.blocks.PBlock;
@@ -284,7 +285,7 @@ public class RelocationTools {
                 }
             }
 
-            boolean isClockNet = n.isClockNet() || n.hasGapRouting();
+            boolean isClockNet = n.isClockNet() || NetTools.hasClockSinks(n);
             n.getPIPs().removeIf((sp) -> {
                 Tile st = sp.getTile();
                 Tile dt = st.getTileXYNeighbor(tileColOffset, tileRowOffset);
