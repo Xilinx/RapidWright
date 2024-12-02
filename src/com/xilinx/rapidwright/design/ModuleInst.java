@@ -39,9 +39,6 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
-import com.xilinx.rapidwright.edif.EDIFNet;
-import com.xilinx.rapidwright.edif.EDIFPortInst;
-import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -355,6 +352,10 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                             break;
                         }
                     }
+                }
+                if (existingSiteInst != null) {
+                    unplace();
+                    return false;
                 }
             }
 
