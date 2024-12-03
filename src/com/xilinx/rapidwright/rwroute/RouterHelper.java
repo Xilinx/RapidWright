@@ -444,8 +444,7 @@ public class RouterHelper {
                     }
                     // Emulate Vivado's behaviour and do not invert CLK* site pins
                     if (Utils.isBRAM(spi.getSiteInst()) &&
-                            belPin.getBELName().startsWith("CLK") &&
-                            !isVersal) {
+                            belPin.getBELName().startsWith("CLK")) {
                         continue;
                     }
                     toInvertPins.add(spi);
