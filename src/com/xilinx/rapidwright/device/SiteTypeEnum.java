@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Advanced Micro Devices, Inc.
@@ -27,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Wed May 17 23:03:43 2023
+ * Generated on: Thu Nov 21 13:34:08 MST 2024
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  *
  * Enumeration of SiteTypeEnum type for all valid devices within Vivado.
@@ -124,6 +124,7 @@ public enum SiteTypeEnum {
     DCMAC,
     DDRMC,
     DDRMC5,
+    DDRMC5C,
     DDRMC_RIU,
     DFE_A,
     DFE_B,

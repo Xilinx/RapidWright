@@ -32,6 +32,7 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.Pair;
@@ -83,7 +84,7 @@ public class Connection implements Comparable<Connection>{
     /** To indicate if the route delay of a connection has been patched up, when there are consecutive long nodes */
     private boolean dlyPatched;
     /** true to indicate that a connection cross SLRs */
-    private boolean crossSLR;
+    private final boolean crossSLR;
     /** List of nodes assigned to a connection to form the path for generating PIPs */
     private List<Node> nodes;
 
@@ -96,6 +97,9 @@ public class Connection implements Comparable<Connection>{
         this.netWrapper = netWrapper;
         netWrapper.addConnection(this);
         crossSLR = !source.getTile().getSLR().equals(sink.getTile().getSLR());
+        if (crossSLR && source.getSiteInst().getDesign().getSeries() == Series.Versal) {
+            throw new RuntimeException("ERROR: Cross-SLR connections not yet supported on Versal.");
+        }
     }
 
     /**
@@ -212,19 +216,6 @@ public class Connection implements Comparable<Connection>{
     }
 
     /**
-     * Checks if a connection is routed through any rnodes that have multiple drivers.
-     * @return
-     */
-    public boolean useRnodesWithMultiDrivers() {
-        for (RouteNode rn : getRnodes()) {
-            if (rn.hasMultiDrivers()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
      * Add the give RouteNode to the list of those used by this Connection.
      * Expand the bounding box accordingly, since this node could describe an
      * existing routing path computed using a different bounding box.
@@ -295,15 +286,19 @@ public class Connection implements Comparable<Connection>{
         return altSinkRnodes == null ? Collections.emptyList() : altSinkRnodes;
     }
 
+    public boolean hasAltSinks() {
+        return altSinkRnodes != null && !altSinkRnodes.isEmpty();
+    }
+
     public void addAltSinkRnode(RouteNode sinkRnode) {
         if (altSinkRnodes == null) {
             altSinkRnodes = new ArrayList<>(1);
         } else {
             assert(!altSinkRnodes.contains(sinkRnode));
         }
-        assert(sinkRnode.getType() == RouteNodeType.PINFEED_I ||
+        assert(sinkRnode.getType().isAnyExclusiveSink() ||
                // Can be a WIRE if node is not exclusive a sink
-               sinkRnode.getType() == RouteNodeType.WIRE);
+               sinkRnode.getType() == RouteNodeType.NON_LOCAL);
         altSinkRnodes.add(sinkRnode);
     }
 
@@ -345,6 +340,10 @@ public class Connection implements Comparable<Connection>{
 
     public NetWrapper getNetWrapper() {
         return this.netWrapper;
+    }
+
+    public Net getNet() {
+        return netWrapper.getNet();
     }
 
     public SitePinInst getSource() {
@@ -465,7 +464,7 @@ public class Connection implements Comparable<Connection>{
     }
 
     public void setAllTargets(RWRoute.ConnectionState state) {
-        if (sinkRnode.countConnectionsOfUser(netWrapper) == 0 ||
+        if (sinkRnode.countConnectionsOfUser(netWrapper) == 1 ||
             sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE) {
             // Since this connection will have been ripped up, only mark a node
             // as a target if it's not already used by this net.
@@ -482,8 +481,8 @@ public class Connection implements Comparable<Connection>{
                 // if it's not already in use by the current net to prevent the case
                 // where the same physical pin services more than one logical pin
                 if (rnode.countConnectionsOfUser(netWrapper) == 0 ||
-                    // Except if it is not a PINFEED_I
-                    rnode.getType() != RouteNodeType.PINFEED_I) {
+                    // Except if it is not an EXCLUSIVE_SINK
+                    !rnode.getType().isAnyExclusiveSink()) {
                     assert(rnode.getIntentCode() != IntentCode.NODE_PINBOUNCE);
                     rnode.markTarget(state);
                 }
@@ -510,5 +509,13 @@ public class Connection implements Comparable<Connection>{
 
         assert(altSourceRnode != null);
         return new Pair<>(altSource, altSourceRnode);
+    }
+
+    public boolean isRouted() {
+        return sink.isRouted();
+    }
+
+    public void setRouted(boolean isRouted) {
+        sink.setRouted(isRouted);
     }
 }

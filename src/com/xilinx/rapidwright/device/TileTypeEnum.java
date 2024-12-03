@@ -27,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Wed May 01 19:57:08 MDT 2024
+ * Generated on: Thu Nov 21 13:34:08 MST 2024
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  *
  * Enumeration of TileTypeEnum type for all valid devices within Vivado.
@@ -533,6 +533,8 @@ public enum TileTypeEnum {
     CPM_G5N2X_TILE,
     CPM_G5_TILE,
     DCMAC_TILE,
+    DDRMC5C_DMC_CORE,
+    DDRMC5C_DMC_CORE_MY,
     DDRMC5_DMC_CORE,
     DDRMC5_DMC_CORE_MY,
     DDRMC_DMC_CORE,
@@ -1201,6 +1203,7 @@ public enum TileTypeEnum {
     NOC_XPIO_NCRB_CORE,
     NOC_XPIO_NCRB_CORE_MX,
     NPI2_NIR_TILE,
+    NPI2_RPTR_CORE,
     NPI_VNPI_BOT_NOLS_TILE,
     NPI_VNPI_BOT_TILE,
     NPI_VNPI_BOT_TILE_MY,
@@ -1339,6 +1342,7 @@ public enum TileTypeEnum {
     RBRK_XPIPE_CORE,
     RCLK_AMS_CFGIO,
     RCLK_BRAM_CLKBUF_CORE,
+    RCLK_BRAM_CLKBUF_NOPD_CORE,
     RCLK_BRAM_CORE,
     RCLK_BRAM_CORE_MY,
     RCLK_BRAM_INTF_L,
@@ -1567,6 +1571,7 @@ public enum TileTypeEnum {
     TERM_B_CIDB_CORE,
     TERM_B_CLE_LAG_CORE,
     TERM_B_CPIPE_CORE,
+    TERM_B_CPIPE_TERMR_CORE,
     TERM_B_CPIPE_TERMR_XPIO_CORE,
     TERM_B_DSP_CORE,
     TERM_B_GTCLK_CORE,

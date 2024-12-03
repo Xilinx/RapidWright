@@ -22,8 +22,10 @@
 package com.xilinx.rapidwright.design;
 
 import java.util.HashSet;
+import java.util.List;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -109,5 +111,87 @@ public class TestNetTools {
             System.out.println(clkName);
         }
         Assertions.assertEquals(globalClockNamesFromVivado,globalClockNamesFromNetTools);
+    }
+
+    @Test
+    public void testGetRouteTrees() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        Net net = design.getNet("processor/data_path_loop[0].output_data.sy_kk_mux_lut/O5");
+        List<NetTools.NodeTree> trees = NetTools.getNodeTrees(net);
+        Assertions.assertEquals(1, trees.size());
+
+        // Taken directly from Vivado's report_route_status
+        String[] expected = new String(
+                "    [{       CLEL_R_X10Y236/CLE_CLE_L_SITE_0_AMUX (65535) \n" +
+                        "     {       INT_X10Y236/INT_NODE_SDQ_27_INT_OUT1 ( 3) INT_X10Y236/INT.LOGIC_OUTS_E21->INT_NODE_SDQ_27_INT_OUT1\n" +
+                        "                     INT_X10Y236/SS1_E_BEG5 ( 0) INT_X10Y236/INT.INT_NODE_SDQ_27_INT_OUT1->>SS1_E_BEG5\n" +
+                        "     {       INT_X10Y235/INT_NODE_IMUX_16_INT_OUT0 ( 5) INT_X10Y235/INT.SS1_E_END5->>INT_NODE_IMUX_16_INT_OUT0\n" +
+                        "                     INT_X10Y235/BYPASS_E10 ( 3) INT_X10Y235/INT.INT_NODE_IMUX_16_INT_OUT0->>BYPASS_E10\n" +
+                        "     {       INT_X10Y235/INT_NODE_IMUX_9_INT_OUT1 ( 0) INT_X10Y235/INT.BYPASS_E10->>INT_NODE_IMUX_9_INT_OUT1\n" +
+                        "         }             INT_X10Y235/IMUX_E23 ( 6) INT_X10Y235/INT.INT_NODE_IMUX_9_INT_OUT1->>IMUX_E23\n" +
+                        "             INT_X10Y235/INT_NODE_IMUX_8_INT_OUT1 ( 0) INT_X10Y235/INT.BYPASS_E10->>INT_NODE_IMUX_8_INT_OUT1\n" +
+                        "         }             INT_X10Y235/IMUX_E26 ( 6) INT_X10Y235/INT.INT_NODE_IMUX_8_INT_OUT1->>IMUX_E26\n" +
+                        "     {       INT_X10Y235/INT_NODE_SDQ_28_INT_OUT0 ( 2) INT_X10Y235/INT.SS1_E_END5->INT_NODE_SDQ_28_INT_OUT0\n" +
+                        "                     INT_X10Y235/EE1_E_BEG4 ( 3) INT_X10Y235/INT.INT_NODE_SDQ_28_INT_OUT0->>EE1_E_BEG4\n" +
+                        "             INT_X11Y235/INT_NODE_IMUX_48_INT_OUT0 ( 1) INT_X11Y235/INT.EE1_E_END4->>INT_NODE_IMUX_48_INT_OUT0\n" +
+                        "         }             INT_X11Y235/IMUX_W37 ( 3) INT_X11Y235/INT.INT_NODE_IMUX_48_INT_OUT0->>IMUX_W37\n" +
+                        "             INT_X10Y235/INT_NODE_IMUX_16_INT_OUT1 ( 5) INT_X10Y235/INT.SS1_E_END5->>INT_NODE_IMUX_16_INT_OUT1\n" +
+                        "     {   }             INT_X10Y235/IMUX_E30 ( 3) INT_X10Y235/INT.INT_NODE_IMUX_16_INT_OUT1->>IMUX_E30\n" +
+                        "         }             INT_X10Y235/IMUX_E31 ( 3) INT_X10Y235/INT.INT_NODE_IMUX_16_INT_OUT1->>IMUX_E31\n" +
+                        "             INT_X10Y236/INT_NODE_SDQ_29_INT_OUT1 ( 1) INT_X10Y236/INT.LOGIC_OUTS_E21->INT_NODE_SDQ_29_INT_OUT1\n" +
+                        "     {               INT_X10Y236/NN2_E_BEG5 ( 0) INT_X10Y236/INT.INT_NODE_SDQ_29_INT_OUT1->>NN2_E_BEG5\n" +
+                        "     {       INT_X10Y238/INT_NODE_IMUX_18_INT_OUT1 ( 4) INT_X10Y238/INT.NN2_E_END5->>INT_NODE_IMUX_18_INT_OUT1\n" +
+                        "         }             INT_X10Y238/IMUX_E10 ( 4) INT_X10Y238/INT.INT_NODE_IMUX_18_INT_OUT1->>IMUX_E10\n" +
+                        "     {       INT_X10Y238/INT_NODE_SDQ_30_INT_OUT1 ( 2) INT_X10Y238/INT.NN2_E_END5->INT_NODE_SDQ_30_INT_OUT1\n" +
+                        "                     INT_X10Y238/EE1_E_BEG5 ( 0) INT_X10Y238/INT.INT_NODE_SDQ_30_INT_OUT1->>EE1_E_BEG5\n" +
+                        "     {       INT_X11Y238/INT_NODE_SDQ_79_INT_OUT0 ( 0) INT_X11Y238/INT.EE1_E_END5->INT_NODE_SDQ_79_INT_OUT0\n" +
+                        "                     INT_X11Y238/SS1_W_BEG5 ( 2) INT_X11Y238/INT.INT_NODE_SDQ_79_INT_OUT0->>SS1_W_BEG5\n" +
+                        "             INT_X11Y237/INT_NODE_IMUX_49_INT_OUT1 ( 4) INT_X11Y237/INT.SS1_W_END5->>INT_NODE_IMUX_49_INT_OUT1\n" +
+                        "                      INT_X11Y237/BYPASS_W8 ( 5) INT_X11Y237/INT.INT_NODE_IMUX_49_INT_OUT1->>BYPASS_W8\n" +
+                        "     {       INT_X11Y237/INT_NODE_IMUX_36_INT_OUT0 ( 0) INT_X11Y237/INT.BYPASS_W8->>INT_NODE_IMUX_36_INT_OUT0\n" +
+                        "         }              INT_X11Y237/IMUX_W6 ( 2) INT_X11Y237/INT.INT_NODE_IMUX_36_INT_OUT0->>IMUX_W6\n" +
+                        "     {       INT_X11Y237/INT_NODE_IMUX_37_INT_OUT0 ( 0) INT_X11Y237/INT.INT_NODE_IMUX_37_INT_OUT0<<->>BYPASS_W8\n" +
+                        "         }              INT_X11Y237/IMUX_W7 ( 1) INT_X11Y237/INT.INT_NODE_IMUX_37_INT_OUT0->>IMUX_W7\n" +
+                        "             INT_X11Y237/INT_NODE_IMUX_36_INT_OUT1 ( 0) INT_X11Y237/INT.BYPASS_W8->>INT_NODE_IMUX_36_INT_OUT1\n" +
+                        "     {   }              INT_X11Y237/IMUX_W2 ( 4) INT_X11Y237/INT.INT_NODE_IMUX_36_INT_OUT1->>IMUX_W2\n" +
+                        "     {   }              INT_X11Y237/IMUX_W3 ( 2) INT_X11Y237/INT.INT_NODE_IMUX_36_INT_OUT1->>IMUX_W3\n" +
+                        "                 INT_X11Y237/BOUNCE_W_2_FT1 ( 4) INT_X11Y237/INT.INT_NODE_IMUX_36_INT_OUT1->>BOUNCE_W_2_FT1\n" +
+                        "                 INT_X11Y236/INODE_W_58_FT0 ( 0) INT_X11Y236/INT.BOUNCE_W_BLS_2_FT0->>INODE_W_58_FT0\n" +
+                        "     {   }              INT_X11Y237/IMUX_W0 ( 4) INT_X11Y237/INT.INODE_W_BLN_58_FT1->>IMUX_W0\n" +
+                        "         }              INT_X11Y237/IMUX_W1 ( 2) INT_X11Y237/INT.INODE_W_BLN_58_FT1->>IMUX_W1\n" +
+                        "             INT_X11Y238/INT_NODE_IMUX_50_INT_OUT1 ( 1) INT_X11Y238/INT.EE1_E_END5->>INT_NODE_IMUX_50_INT_OUT1\n" +
+                        "     {               INT_X11Y238/BYPASS_W10 ( 4) INT_X11Y238/INT.INT_NODE_IMUX_50_INT_OUT1->>BYPASS_W10\n" +
+                        "             INT_X11Y238/INT_NODE_IMUX_40_INT_OUT1 ( 0) INT_X11Y238/INT.BYPASS_W10->>INT_NODE_IMUX_40_INT_OUT1\n" +
+                        "         }             INT_X11Y238/IMUX_W26 ( 4) INT_X11Y238/INT.INT_NODE_IMUX_40_INT_OUT1->>IMUX_W26\n" +
+                        "         }             INT_X11Y238/IMUX_W36 ( 4) INT_X11Y238/INT.INT_NODE_IMUX_50_INT_OUT1->>IMUX_W36\n" +
+                        "             INT_X10Y238/INT_NODE_SDQ_30_INT_OUT0 ( 3) INT_X10Y238/INT.NN2_E_END5->INT_NODE_SDQ_30_INT_OUT0\n" +
+                        "                     INT_X10Y238/NN1_E_BEG5 ( 2) INT_X10Y238/INT.INT_NODE_SDQ_30_INT_OUT0->>NN1_E_BEG5\n" +
+                        "             INT_X10Y239/INT_NODE_SDQ_30_INT_OUT0 ( 2) INT_X10Y239/INT.NN1_E_END5->INT_NODE_SDQ_30_INT_OUT0\n" +
+                        "                     INT_X10Y239/EE2_E_BEG5 ( 3) INT_X10Y239/INT.INT_NODE_SDQ_30_INT_OUT0->>EE2_E_BEG5\n" +
+                        "             INT_X11Y239/INT_NODE_SDQ_27_INT_OUT0 ( 0) INT_X11Y239/INT.EE2_E_END5->INT_NODE_SDQ_27_INT_OUT0\n" +
+                        "             INT_X11Y239/INT_INT_SDQ_74_INT_OUT0 ( 2) INT_X11Y239/INT.INT_NODE_SDQ_27_INT_OUT0->>INT_INT_SDQ_74_INT_OUT0\n" +
+                        "             INT_X11Y239/INT_NODE_SDQ_73_INT_OUT0 ( 0) INT_X11Y239/INT.INT_INT_SDQ_74_INT_OUT0->INT_NODE_SDQ_73_INT_OUT0\n" +
+                        "                     INT_X11Y239/SS1_W_BEG4 ( 3) INT_X11Y239/INT.INT_NODE_SDQ_73_INT_OUT0->>SS1_W_BEG4\n" +
+                        "             INT_X11Y238/INT_NODE_SDQ_72_INT_OUT0 ( 2) INT_X11Y238/INT.SS1_W_END4->INT_NODE_SDQ_72_INT_OUT0\n" +
+                        "                     INT_X11Y238/SS1_W_BEG4 ( 2) INT_X11Y238/INT.INT_NODE_SDQ_72_INT_OUT0->>SS1_W_BEG4\n" +
+                        "             INT_X11Y237/INT_NODE_IMUX_46_INT_OUT0 ( 4) INT_X11Y237/INT.SS1_W_END4->>INT_NODE_IMUX_46_INT_OUT0\n" +
+                        "     {   }             INT_X11Y237/IMUX_W10 ( 2) INT_X11Y237/INT.INT_NODE_IMUX_46_INT_OUT0->>IMUX_W10\n" +
+                        "         }             INT_X11Y237/IMUX_W11 ( 2) INT_X11Y237/INT.INT_NODE_IMUX_46_INT_OUT0->>IMUX_W11\n" +
+                        "             INT_X10Y236/INT_INT_SDQ_34_INT_OUT1 ( 0) INT_X10Y236/INT.INT_NODE_SDQ_29_INT_OUT1->>INT_INT_SDQ_34_INT_OUT1\n" +
+                        "             INT_X10Y236/INT_NODE_SDQ_82_INT_OUT0 ( 0) INT_X10Y236/INT.INT_INT_SDQ_34_INT_OUT1->INT_NODE_SDQ_82_INT_OUT0\n" +
+                        "             INT_X10Y236/INT_INT_SDQ_6_INT_OUT0 ( 2) INT_X10Y236/INT.INT_NODE_SDQ_82_INT_OUT0->>INT_INT_SDQ_6_INT_OUT0\n" +
+                        "     {       INT_X10Y236/INT_NODE_GLOBAL_6_INT_OUT1 ( 4) INT_X10Y236/INT.INT_INT_SDQ_6_INT_OUT0->>INT_NODE_GLOBAL_6_INT_OUT1\n" +
+                        "             INT_X10Y236/INT_NODE_IMUX_9_INT_OUT0 ( 2) INT_X10Y236/INT.INT_NODE_GLOBAL_6_INT_OUT1->>INT_NODE_IMUX_9_INT_OUT0\n" +
+                        "         }             INT_X10Y236/IMUX_E30 ( 6) INT_X10Y236/INT.INT_NODE_IMUX_9_INT_OUT0->>IMUX_E30\n" +
+                        "             INT_X10Y236/INT_NODE_IMUX_18_INT_OUT1 ( 1) INT_X10Y236/INT.INT_INT_SDQ_6_INT_OUT0->>INT_NODE_IMUX_18_INT_OUT1\n" +
+                        "         }]            INT_X10Y236/IMUX_E35 ( 3) INT_X10Y236/INT.INT_NODE_IMUX_18_INT_OUT1->>IMUX_E35\n").split("\n");
+        String[] actual = trees.get(0).toString().split("\n");
+        Assertions.assertEquals(expected.length, actual.length);
+        for (int i = 0; i < expected.length; i++) {
+            // Remove all text after the first round bracket
+            int firstRoundBracket = expected[i].indexOf("(");
+            String expectedNodeOnly = expected[i].substring(0, firstRoundBracket - 1);
+            Assertions.assertEquals(expectedNodeOnly, actual[i]);
+        }
     }
 }

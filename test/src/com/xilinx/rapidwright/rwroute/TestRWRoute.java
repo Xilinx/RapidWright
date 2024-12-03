@@ -293,6 +293,64 @@ public class TestRWRoute {
         VivadoToolsHelper.assertFullyRouted(design);
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testNonTimingDrivenRoutingOnVersalDevice(boolean partial) {
+        // Note: there are no global clocks in this design, just a local clock that doesn't use a BUFG
+        Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        design.setTrackNetChanges(true);
+
+        int expectedNetsModified = 290;
+        if (partial) {
+            // Pseudo-randomly unroute at least one pin from each net
+            Random random = new Random(0);
+            Net Z_NET = design.createNet(Net.Z_NET);
+            for (Net net : design.getNets()) {
+                List<SitePinInst> sinkPins = net.getSinkPins();
+                if (sinkPins.isEmpty()) {
+                    continue;
+                }
+
+                if (net.getName().equals("processor/address_loop[6].output_data.pc_vector_mux_lut/O6")) {
+                    // For one hand chosen net, unroute it entirely and block
+                    // all of its primary output's downhill PIPs such that 
+                    // the alternate output must be used
+                    net.unroute();
+                    Node sourcePinNode = net.getSource().getConnectedNode();        // CLE_W_CORE_X50Y6/CLE_SLICEL_TOP_0_D_O_PIN
+                    Node sourceNode = sourcePinNode.getAllDownhillNodes().get(0);   // CLE_W_CORE_X50Y6/CLE_SLICEL_TOP_0_D_O
+                    design.setTrackingChanges(false);
+                    for (PIP pip : sourceNode.getAllDownhillPIPs()) {
+                        Z_NET.addPIP(pip);
+                    }
+                    design.setTrackingChanges(true);
+                }
+
+                Collections.shuffle(sinkPins, random);
+                int numPinsToUnroute = random.nextInt(sinkPins.size()) + 1;
+                List<SitePinInst> sinkPinsToUnroute = sinkPins.subList(0, numPinsToUnroute);
+                DesignTools.unroutePins(net, sinkPinsToUnroute);
+            }
+
+            boolean softPreserve = false;
+            PartialRouter.routeDesignPartialNonTimingDriven(design, null, softPreserve);
+        } else {
+            RWRoute.routeDesignFullNonTimingDriven(design);
+        }
+
+        Assertions.assertEquals(expectedNetsModified, design.getModifiedNets().size());
+        for (Net net : design.getModifiedNets()) {
+            assertAllPinsRouted(net);
+        }
+
+        if (FileTools.isVivadoOnPath()) {
+            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            Assertions.assertEquals(290, rrs.fullyRoutedNets);
+            Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
+            Assertions.assertEquals(8, rrs.unroutedNets); // There are 8 nets driven from a blackbox cell;
+                                                                    // these are marked as routable despite not being so
+        }
+    }
+
     /**
      * Tests timing driven partial routing.
      * The picoblaze design is from one of the RapidWright tutorials with nets between computing kernels not routed.
@@ -335,44 +393,45 @@ public class TestRWRoute {
 
         Assertions.assertTrue(srcSpi.isRouted());
         Assertions.assertTrue(dstSpi.isRouted());
-        Assertions.assertTrue(Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped")) <= nodesPoppedLimit);
+        long nodesPopped = Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped"));
+        Assertions.assertTrue(nodesPopped >= (nodesPoppedLimit - 100) && nodesPopped <= nodesPoppedLimit);
     }
 
     @ParameterizedTest
     @CsvSource({
             // One SLR crossing
             // (Too) Close
-            "SLICE_X9Y299,SLICE_X9Y300,500",    // On Laguna column
-            "SLICE_X9Y300,SLICE_X9Y299,400",
+            "SLICE_X9Y299,SLICE_X9Y300,400",    // On Laguna column
+            "SLICE_X9Y300,SLICE_X9Y299,500",
             "SLICE_X0Y299,SLICE_X0Y300,200",    // Far from Laguna column
             "SLICE_X0Y300,SLICE_X0Y299,200",
             "SLICE_X53Y299,SLICE_X53Y300,200",  // Equidistant from two Laguna columns
             "SLICE_X53Y300,SLICE_X53Y299,700",
             // Perfect
-            "SLICE_X9Y241,SLICE_X9Y300,200",
+            "SLICE_X9Y241,SLICE_X9Y300,100",
             "SLICE_X9Y300,SLICE_X9Y241,100",
             "SLICE_X9Y358,SLICE_X9Y299,100",
             "SLICE_X9Y299,SLICE_X9Y358,200",
             "SLICE_X53Y241,SLICE_X69Y300,500",
-            "SLICE_X53Y358,SLICE_X69Y299,500",
+            "SLICE_X53Y358,SLICE_X69Y299,400",
             // Far
             "SLICE_X9Y240,SLICE_X9Y359,100",    // On Laguna
             "SLICE_X9Y359,SLICE_X9Y240,200",
-            "SLICE_X162Y240,SLICE_X162Y430,200",
+            "SLICE_X162Y240,SLICE_X162Y430,100",
             "SLICE_X162Y430,SLICE_X162Y240,300",
-            "SLICE_X0Y240,SLICE_X12Y430,400",   // Far from Laguna
-            "SLICE_X0Y430,SLICE_X12Y240,200",
+            "SLICE_X0Y240,SLICE_X12Y430,300",   // Far from Laguna
+            "SLICE_X0Y430,SLICE_X12Y240,100",
 
             // Two SLR crossings
-            "SLICE_X162Y299,SLICE_X162Y599,200",
+            "SLICE_X162Y299,SLICE_X162Y599,600",
             "SLICE_X162Y599,SLICE_X162Y299,100",
 
             // Three SLR crossings
             "SLICE_X79Y0,SLICE_X79Y899,200",    // Straight up: next to Laguna column
-            "SLICE_X0Y0,SLICE_X0Y899,600",      // Straight up: far from Laguna column
+            "SLICE_X0Y0,SLICE_X0Y899,500",      // Straight up: far from Laguna column
             "SLICE_X168Y0,SLICE_X168Y899,400",  // Straight up: far from Laguna column
-            "SLICE_X9Y0,SLICE_X162Y899,1000",   // Up and right
-            "SLICE_X168Y162,SLICE_X9Y899,600",  // Up and left
+            "SLICE_X9Y0,SLICE_X162Y899,500",    // Up and right
+            "SLICE_X168Y162,SLICE_X9Y899,1100", // Up and left
     })
     public void testSLRCrossingNonTimingDriven(String srcSiteName, String dstSiteName, long nodesPoppedLimit) {
         testSingleConnectionHelper(Device.AWS_F1, srcSiteName, "AQ", dstSiteName, "A1", nodesPoppedLimit);
@@ -457,10 +516,10 @@ public class TestRWRoute {
             "xcvu3p,GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,BUFG_GT_X0Y78,CLK_IN,0", // (dst pin can be projected to INT but not src pin)
 
             // Non-dedicated connections
-            "xcvu3p,IOB_X0Y47,I,SLICE_X77Y122,FX,600",
+            "xcvu3p,IOB_X0Y47,I,SLICE_X77Y122,FX,100",
 
             // 240 CLB height SLR, no LAG tiles on Y0 (since HBM on bottom edge)
-            "xcu50,SLICE_X38Y239,AQ,SLICE_X38Y240,A1,500"
+            "xcu50,SLICE_X38Y239,AQ,SLICE_X38Y240,A1,400"
     })
     public void testSingleConnection(String partName,
                                      String srcSiteName, String srcPinName,

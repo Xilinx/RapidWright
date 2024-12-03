@@ -28,31 +28,31 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
-import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.rwroute.RWRoute;
-import com.xilinx.rapidwright.rwroute.TestRWRoute;
-import com.xilinx.rapidwright.support.LargeTest;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.util.VivadoToolsHelper;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import com.xilinx.rapidwright.rwroute.RWRoute;
+import com.xilinx.rapidwright.rwroute.TestRWRoute;
+import com.xilinx.rapidwright.support.LargeTest;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 public class TestLUTTools {
 
@@ -90,9 +90,14 @@ public class TestLUTTools {
         SiteInst si = design.createSiteInst("SLICE_X0Y0");
         // Create and place on both A6LUT and A5LUT
         Cell cell6 = design.createAndPlaceCell("lut6", Unisim.LUT2, "SLICE_X0Y0/A6LUT");
-        cell6.getPinMappingsP2L().clear(); // Clear default pin mappings
+        // Clear default pin mappings
+        for (String physPin : cell6.getUsedPhysicalPins()) {
+            cell6.removePinMapping(physPin);
+        }
         Cell cell5 = design.createAndPlaceCell("lut5", Unisim.LUT2, "SLICE_X0Y0/A5LUT");
-        cell5.getPinMappingsP2L().clear();
+        for (String physPin : cell5.getUsedPhysicalPins()) {
+            cell5.removePinMapping(physPin);
+        }
 
         // Net with a single sink pin used by both LUTs that needs swapping
         Net netNeedsPinSwap = design.createNet("netNeedsPinSwap");
@@ -170,5 +175,17 @@ public class TestLUTTools {
         } finally {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "false");
         }
+    }
+    
+    @ParameterizedTest
+    @CsvSource({
+            "O=I0 & !I1 & I2 & !I3 + !I0 & I1 & I2 & !I3 + I0 & !I1 & !I2 & I3 + !I0 & I1 & !I2 & I3,16'h0660,4",
+            "O=I0 & !I1 + !I0 & I1,4'h6,2",
+            "O=!I0 & !I1 & !I2 & !I3 + I0 & I1 & !I2 & !I3 + !I0 & !I1 & I2 & I3 + I0 & I1 & I2 & I3,16'h9009,4",
+            "O=I0 & I1 & I2 & I3 & I4 & I5,64'h8000000000000000,6",
+            "O=!I0 & !I1 & !I2 & !I3 & !I4 & !I5,64'h0000000000000001,6",
+    })
+    public void testGetLUTInitFromEquation(String equation, String init, int lutSize) {
+        Assertions.assertEquals(init, LUTTools.getLUTInitFromEquation(equation, lutSize));
     }
 }

@@ -25,7 +25,6 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import com.xilinx.rapidwright.design.Design;
@@ -35,7 +34,6 @@ import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
@@ -82,7 +80,7 @@ public class TimingAndWirelengthReport{
         System.out.println("\n");
         System.out.println("Total nodes: " + usedNodes);
         System.out.println("Total wirelength: " + wirelength);
-        RWRoute.printNodeTypeUsageAndWirelength(true, nodeTypeUsage, nodeTypeLength);
+        RWRoute.printNodeTypeUsageAndWirelength(true, nodeTypeUsage, nodeTypeLength, design.getSeries());
     }
 
     /**
@@ -95,7 +93,9 @@ public class TimingAndWirelengthReport{
             if (net.getSource().toString().contains("CLK")) continue;
             NetWrapper netplus = createNetWrapper(net);
             for (Node node : RouterHelper.getNodesOfNet(net)) {
-                if (node.getTile().getTileTypeEnum() != TileTypeEnum.INT) continue;
+                if (RouteNodeGraph.isExcludedTile(node)) {
+                    continue;
+                }
                 usedNodes++;
                 int wl = RouteNode.getLength(node);
                 wirelength += wl;
@@ -124,15 +124,15 @@ public class TimingAndWirelengthReport{
                 }
             }
             Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
-            List<Node> nodes = RouterHelper.projectInputPinToINTNode(sink);
-            if (nodes.isEmpty()) {
+            Node sinkINTNode = RouterHelper.projectInputPinToINTNode(sink);
+            if (sinkINTNode == null) {
                 connection.setDirect(true);
             } else {
-                connection.setSinkRnode(routingGraph.getOrCreate(nodes.get(0), RouteNodeType.PINFEED_I));
+                connection.setSinkRnode(routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_BOTH));
                 if (sourceINTNode == null) {
                     sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
                 }
-                connection.setSourceRnode(routingGraph.getOrCreate(sourceINTNode, RouteNodeType.PINFEED_O));
+                connection.setSourceRnode(routingGraph.getOrCreate(sourceINTNode, RouteNodeType.EXCLUSIVE_SOURCE));
                 connection.setDirect(false);
             }
         }

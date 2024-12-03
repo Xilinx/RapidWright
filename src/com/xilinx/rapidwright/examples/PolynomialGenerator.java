@@ -42,7 +42,6 @@ import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
-import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -138,7 +137,7 @@ public class PolynomialGenerator {
 
 
         buildOperatorTree(left,d,inputA);
-        buildOperatorTree(right,d,inputB);
+        buildOperatorTree(right, d, inputB);
     }
 
     private static void ensureCellTypesSet(Module module) {
@@ -378,6 +377,10 @@ public class PolynomialGenerator {
         t.stop().start("Build Operator Tree");
 
         buildOperatorTree(p, d, results);
+
+        // This is redundant if the design will be routed later, but is necessary
+        // for correct visualization in the Hand Placer tool
+        RWRoute.preprocess(d);
 
         releaseOperators();
 

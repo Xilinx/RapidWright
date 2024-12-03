@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -60,7 +60,7 @@ public abstract class EDIFWriteLegalNameCache<T> {
         for (int i = 0; i < renames.length; i++) {
             renames[i] = renameSupplier.get();
         }
-        this.busCollisionRenames = new HashMap<>();
+        this.busCollisionRenames = renameSupplier.get();
     }
 
     protected abstract int getAndIncrement(String rename);

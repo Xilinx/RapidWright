@@ -1581,10 +1581,14 @@ public class FileTools {
 
     /**
      * A generic method to run a command from the system command line.
-     * @param command The command to execute.  This method blocks until the command finishes.
-     * @param verbose When true, it will first print to std.out the command and also all of the
-     * command's output (both std.out and std.err) to std.out.
-     * @return The return value of the process if it terminated, if there was a problem it returns null.
+     *
+     * @param command The command to execute. This method blocks until the command
+     *                finishes.
+     * @param verbose When true, it will first print to std.out the command and also
+     *                all of the command's output (both std.out and std.err) to
+     *                std.out.
+     * @return The return value of the process if it terminated, if there was a
+     *         problem it returns null.
      */
     public static Integer runCommand(String command, boolean verbose) {
         return runCommand(command, verbose, null, null);
@@ -1610,6 +1614,73 @@ public class FileTools {
      */
     public static Integer runCommand(String command, boolean verbose, String[] environ, File runDir) {
         if (verbose) System.out.println(command);
+        int returnValue = 0;
+        Process p = null;
+        try {
+            p = Runtime.getRuntime().exec(command, environ, runDir);
+            StreamGobbler input = new StreamGobbler(p.getInputStream(), verbose);
+            StreamGobbler err = new StreamGobbler(p.getErrorStream(), verbose);
+            input.start();
+            err.start();
+            returnValue = p.waitFor();
+        } catch (IOException e) {
+            e.printStackTrace();
+            MessageGenerator.briefError("ERROR: In running the command \"" + command + "\"");
+            return null;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            MessageGenerator.briefError("ERROR: The command was interrupted: \"" + command + "\"");
+            return null;
+        } finally {
+            if (p != null) p.destroyForcibly();
+        }
+        return returnValue;
+    }
+
+    /**
+     * A generic method to run a command from the system command line.
+     *
+     * @param command The command (as an array of strings) to execute. This method
+     *                blocks until the command finishes.
+     * @param verbose When true, it will first print to std.out the command and also
+     *                all of the command's output (both std.out and std.err) to
+     *                std.out.
+     * @return The return value of the process if it terminated, if there was a
+     *         problem it returns null.
+     */
+    public static Integer runCommand(String[] command, boolean verbose) {
+        return runCommand(command, verbose, null, null);
+    }
+
+    /**
+     * A generic method to run a command from the system command line.
+     *
+     * @param command The command (as an array of strings) to execute. This method
+     *                blocks until the command finishes.
+     * @param verbose When true, it will first print to std.out the command and also
+     *                all of the command's output (both std.out and std.err) to
+     *                std.out.
+     * @param environ array of strings, each element of which has environment
+     *                variable settings in the format name=value, or null if the
+     *                subprocess should inherit the environment of the current
+     *                process.
+     * @param runDir  the working directory of the subprocess, or null if the
+     *                subprocess should inherit the working directory of the current
+     *                process.
+     * @return The return value of the process if it terminated, if there was a
+     *         problem it returns null.
+     */
+    public static Integer runCommand(String[] command, boolean verbose, String[] environ, File runDir) {
+        if (verbose) {
+            for (String c : command) {
+                if (c.contains(" ")) {
+                    System.out.print(" \"" + c.replace("\"", "\\\"") + "\"");
+                } else {
+                    System.out.print(" " + c);
+                }
+            }
+            System.out.println();
+        }
         int returnValue = 0;
         Process p = null;
         try {
@@ -1865,17 +1936,27 @@ public class FileTools {
     }
 
     /**
+     * Gets the full path to an executable if it is set in the PATH
+     * environment variable. Works for Windows and Linux.
+     * @param exe Executable to search for (e.g. vivado)
+     * @return Full path to executable, or throws RuntimeException if not found.
+     */
+    public static String getExecutablePath(String exe) {
+        String[] cmd = new String[]{isWindows() ? "where" : "which", exe};
+        final List<String> fullOutput = execCommandGetOutput(true, cmd);
+        if (fullOutput.isEmpty() || fullOutput.get(0).contains("INFO:") || fullOutput.get(0).contains("which: no")) {
+            throw new RuntimeException("ERROR: Couldn't find " + exe + " on PATH");
+        }
+        return fullOutput.get(0).trim().replace("\\", "/");
+    }
+
+    /**
      * Gets the full path to the vivado executable if it is set in the PATH
      * environment variable. Works for Windows and Linux.
      * @return Full path to vivado executable, or throws RuntimeException if not found.
      */
     public static String getVivadoPath() {
-        String[] cmd = new String[]{isWindows() ? "where" : "which",isWindows() ? "vivado.bat" : "vivado"};
-        final List<String> fullOutput = execCommandGetOutput(true, cmd);
-        if (fullOutput.isEmpty() || fullOutput.get(0).contains("INFO:") || fullOutput.get(0).contains("which: no")) {
-            throw new RuntimeException("ERROR: Couldn't find vivado on PATH");
-        }
-        return fullOutput.get(0).trim().replace("\\", "/");
+        return getExecutablePath(isWindows() ? "vivado.bat" : "vivado");
     }
 
     private static String currentOS = null;

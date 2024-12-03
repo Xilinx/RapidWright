@@ -2,7 +2,7 @@
  * Copyright (c) 2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Chris Lavin, Advanced Micro Devices, Inc.
+ * Author: Chris Lavin, AMD Research and Advanced Development.
  *
  * This file is part of RapidWright.
  *
@@ -20,28 +20,24 @@
  *
  */
 
-/**
- *
- */
-package com.xilinx.rapidwright.device;
-
+package com.xilinx.rapidwright.design.tools;
 
 /**
- * Generated on: Thu Nov 21 13:34:08 MST 2024
- * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
- *
- * Enumeration of IOBankType type for all valid devices within Vivado.
+ * Describes the edge types of rectangles when composed of tiles.
  */
-public enum IOBankType {
-    BT_ADC,
-    BT_DAC,
-    BT_HIGH_DENSITY,
-    BT_HIGH_PERFORMANCE,
-    BT_HIGH_RANGE,
-    BT_MGT,
-    BT_NO_USER_IO,
-    BT_PSS,
-    BT_X5,
-    BT_X5IO,
-    BT_XP,
+public enum Edge {
+    NORTH,
+    EAST,
+    SOUTH,
+    WEST,
+    NORTH_EAST,
+    SOUTH_EAST,
+    SOUTH_WEST,
+    NORTH_WEST,
+    INTERNAL,
+    EXTERNAL;
+
+    public boolean isEdgeCrossing() {
+        return this != INTERNAL && this != EXTERNAL;
+    }
 }

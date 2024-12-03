@@ -353,7 +353,8 @@ public class LUTTools {
             boolean result = b.eval(i);
             if (result) init = setBit(init,i);
         }
-        return length + "'h" + Long.toUnsignedString(init, 16).toUpperCase();
+        int initLength = Integer.max(1, length >>> 2);
+        return length + "'h" + String.format("%0" + initLength + "x", init).toUpperCase();
     }
 
     /**
@@ -389,9 +390,9 @@ public class LUTTools {
      */
     public static String getLUTEquation(Cell c) {
         if (c.isRoutethru()) {
-            Set<Entry<String, String>> entrySet = c.getPinMappingsP2L().entrySet();
-            assert (entrySet.size() == 1);
-            return "O" + c.getBELName().charAt(1) + "=" + entrySet.iterator().next().getKey();
+            BELPin rtEntry = c.getFirstPhysicalPinMapping().getFirst();
+            assert (c.getUsedPhysicalPinsCount() == 1);
+            return "O" + c.getBELName().charAt(1) + "=" + rtEntry.getName();
         }
         return getLUTEquation(c.getEDIFCellInst());
     }

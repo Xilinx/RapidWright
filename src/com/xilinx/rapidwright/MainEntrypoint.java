@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -103,6 +103,7 @@ import com.xilinx.rapidwright.util.MakeBlackBox;
 import com.xilinx.rapidwright.util.PartPrinter;
 import com.xilinx.rapidwright.util.PerformanceExplorer;
 import com.xilinx.rapidwright.util.ReplaceEDIFInDCP;
+import com.xilinx.rapidwright.util.ReportRouteStatus;
 import com.xilinx.rapidwright.util.StringTools;
 import com.xilinx.rapidwright.util.Unzip;
 import com.xilinx.rapidwright.util.performance_evaluation.PerformanceEvaluation;
@@ -186,6 +187,7 @@ public class MainEntrypoint {
         addFunction("RelocationTools", RelocationTools::main);
         addFunction("ReplaceEDIFInDCP", ReplaceEDIFInDCP::main);
         addFunction("ReportDevicePerformance", ReportDevicePerformance::main);
+        addFunction("ReportRouteStatus", ReportRouteStatus::main);
         addFunction("ReportTimingExample", ReportTimingExample::main);
         addFunction("Router", Router::main);
         addFunction("RouteThruHelper", RouteThruHelper::main);

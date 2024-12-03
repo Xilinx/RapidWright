@@ -82,7 +82,7 @@ public class CUFR extends RWRoute {
 
     public static class RouteNodeGraphCUFR extends RouteNodeGraph {
         public RouteNodeGraphCUFR(Design design, RWRouteConfig config) {
-            super(design, config, new ConcurrentHashMap<>());
+            super(design, config);
         }
 
         // Do not track createRnodeTime since it is meaningless when multithreading
@@ -92,7 +92,7 @@ public class CUFR extends RWRoute {
 
     public static class RouteNodeGraphCUFRTimingDriven extends RouteNodeGraphTimingDriven {
         public RouteNodeGraphCUFRTimingDriven(Design design, RWRouteConfig config, DelayEstimatorBase delayEstimator) {
-            super(design, config, delayEstimator, new ConcurrentHashMap<>());
+            super(design, config, delayEstimator);
         }
 
         // Do not track createRnodeTime since it is meaningless when multithreading
@@ -163,7 +163,28 @@ public class CUFR extends RWRoute {
     }
 
     /**
-     * Routes a {@link Design} instance.
+     * Routes a design in the full timing-driven routing mode using CUFR.
+     * @param design The {@link Design} instance to be routed.
+     */
+    public static Design routeDesignFullTimingDriven(Design design) {
+        return routeDesignWithUserDefinedArguments(design, new String[] {
+                "--hus"
+        });
+    }
+
+    /**
+     * Routes a design in the full non-timing-driven routing mode using CUFR.
+     * @param design The {@link Design} instance to be routed.
+     */
+    public static Design routeDesignFullNonTimingDriven(Design design) {
+        return routeDesignWithUserDefinedArguments(design, new String[] {
+                "--hus",
+                "--nonTimingDriven"
+        });
+    }
+
+    /**
+     * Routes a {@link Design} instance using CUFR.
      * @param design The {@link Design} instance to be routed.
      * @param args An array of string arguments, can be null.
      * If null, the design will be routed in the full timing-driven routing mode with default a {@link RWRouteConfig} instance.
@@ -174,6 +195,11 @@ public class CUFR extends RWRoute {
         // Instantiates a RWRouteConfig Object and parses the arguments.
         // Uses the default configuration if basic usage only.
         RWRouteConfig config = new RWRouteConfig(args);
+
+        if (!config.isHus()) {
+            System.err.println("WARNING: Hybrid Updating Strategy (HUS) is not enabled.");
+        }
+
         return routeDesign(design, new CUFR(design, config));
     }
 

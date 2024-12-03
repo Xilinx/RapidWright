@@ -62,7 +62,7 @@ public class PartialCUFR extends PartialRouter {
 
     public static class RouteNodeGraphPartialCUFR extends RouteNodeGraphPartial {
         public RouteNodeGraphPartialCUFR(Design design, RWRouteConfig config) {
-            super(design, config, new ConcurrentHashMap<>());
+            super(design, config);
         }
 
         // Do not track createRnodeTime since it is meaningless when multithreading
@@ -72,7 +72,7 @@ public class PartialCUFR extends PartialRouter {
 
     public static class RouteNodeGraphPartialCUFRTimingDriven extends RouteNodeGraphPartialTimingDriven {
         public RouteNodeGraphPartialCUFRTimingDriven(Design design, RWRouteConfig config, DelayEstimatorBase delayEstimator) {
-            super(design, config, delayEstimator, new ConcurrentHashMap<>());
+            super(design, config, delayEstimator);
         }
 
         // Do not track createRnodeTime since it is meaningless when multithreading
@@ -137,9 +137,10 @@ public class PartialCUFR extends PartialRouter {
     }
 
     @Override
-    protected void unpreserveNet(Net net) {
-        super.unpreserveNet(net);
+    protected NetWrapper unpreserveNet(Net net) {
+        NetWrapper netWrapper = super.unpreserveNet(net);
         needsRepartitioning = true;
+        return netWrapper;
     }
 
     @Override
@@ -148,6 +149,53 @@ public class PartialCUFR extends PartialRouter {
         RuntimeTracker routeConnectionsTimer = routerTimer.getRuntimeTracker("route connections");
         routeConnectionsTimer.setTime(routeConnectionsTimer.getTime() - partitionTimer.getTime());
         super.printRoutingStatistics();
+    }
+
+    /**
+     * Routes a design in the partial non-timing-driven routing mode.
+     * @param design The {@link Design} instance to be routed.
+     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all unrouted pins in the design.
+     */
+    public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute) {
+        boolean softPreserve = false;
+        return routeDesignPartialNonTimingDriven(design, pinsToRoute, softPreserve);
+    }
+
+    /**
+     * Routes a design in the partial non-timing-driven routing mode using CUFR.
+     * @param design The {@link Design} instance to be routed.
+     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all unrouted pins in the design.
+     * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
+     */
+    public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
+        return routeDesignWithUserDefinedArguments(design, new String[] {
+                        "--hus",
+                        "--fixBoundingBox",
+                        // use U-turn nodes and no masking of nodes cross RCLK
+                        // Pros: maximum routability
+                        // Con: might result in delay optimism and a slight increase in runtime
+                        "--useUTurnNodes",
+                        "--nonTimingDriven",
+                        "--verbose"},
+                pinsToRoute, softPreserve);
+    }
+
+    /**
+     * Routes a design in the partial timing-driven routing mode using CUFR.
+     * @param design The {@link Design} instance to be routed.
+     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all unrouted pins in the design.
+     * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
+     */
+    public static Design routeDesignPartialTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
+        return routeDesignWithUserDefinedArguments(design, new String[] {
+                        "--hus",
+                        "--fixBoundingBox",
+                        // use U-turn nodes and no masking of nodes cross RCLK
+                        // Pros: maximum routability
+                        // Con: might result in delay optimism and a slight increase in runtime
+                        "--useUTurnNodes",
+                        "--verbose"},
+                pinsToRoute, softPreserve);
     }
 
     /**
@@ -191,6 +239,10 @@ public class PartialCUFR extends PartialRouter {
 
         if (config.isMaskNodesCrossRCLK()) {
             System.out.println("WARNING: Masking nodes across RCLK for partial routing could result in routability problems.");
+        }
+
+        if (!config.isHus()) {
+            System.err.println("WARNING: Hybrid Updating Strategy (HUS) is not enabled.");
         }
 
         return routeDesign(design, new PartialCUFR(design, config, pinsToRoute, softPreserve));

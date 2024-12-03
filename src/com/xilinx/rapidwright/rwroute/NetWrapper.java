@@ -171,7 +171,7 @@ public class NetWrapper{
                 return null;
             }
 
-            altSourceRnode = routingGraph.getOrCreate(altSourceNode, RouteNodeType.PINFEED_O);
+            altSourceRnode = routingGraph.getOrCreate(altSourceNode, RouteNodeType.EXCLUSIVE_SOURCE);
         }
         assert(altSourceRnode != null);
         return altSource;
@@ -179,5 +179,35 @@ public class NetWrapper{
 
     public RouteNode getAltSourceRnode() {
         return altSourceRnode;
+    }
+
+    public boolean hasMultipleDrivers(int sequence) {
+        for (Connection connection : connections) {
+            List<RouteNode> rnodes = connection.getRnodes();
+            if (rnodes.isEmpty()) {
+                continue;
+            }
+
+            RouteNode driver = rnodes.get(rnodes.size() - 2);
+            for (int i = rnodes.size() - 1; i >= 0; i--) {
+                assert(driver != null);
+                RouteNode rnode = rnodes.get(i);
+                if (rnode.isVisited(sequence)) {
+                    // Rnode has already been visited by a prior connection;
+                    // check if driver is same as this connection
+                    RouteNode prev = rnode.getPrev();
+                    if (prev != driver) {
+                        return true;
+                    }
+                } else {
+                    // Rnode has not been visited by this net yet,
+                    // set initial prev
+                    rnode.setVisited(sequence);
+                    rnode.setPrev(driver);
+                }
+                driver = rnode;
+            }
+        }
+        return false;
     }
 }
