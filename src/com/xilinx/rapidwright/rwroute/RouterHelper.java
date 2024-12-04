@@ -348,7 +348,8 @@ public class RouterHelper {
                                                                   List<SitePinInst> pins,
                                                                   boolean invertLutInputs) {
         final boolean isVersal = (design.getSeries() == Series.Versal);
-        Net gndNet = design.getGndNet();
+        final Net gndNet = design.getGndNet();
+        final Net vccNet = design.getVccNet();
         Set<SitePinInst> toInvertPins = new HashSet<>();
         nextSitePin: for (SitePinInst spi : pins) {
             if (!spi.getNet().equals(gndNet))
@@ -408,6 +409,9 @@ public class RouterHelper {
                 }
 
                 toInvertPins.add(spi);
+                // Re-paint the intra-site routing from GND to VCC
+                // (no intra site routing will occur during Net.addPin() later)
+                si.routeIntraSiteNet(vccNet, spi.getBELPin(), spiBelPin);
 
                 for (Cell cell : connectedCells) {
                     // Find the logical pin name
@@ -449,6 +453,8 @@ public class RouterHelper {
                         continue;
                     }
                     toInvertPins.add(spi);
+                    // Unpaint the sitewire ahead of pin being added below
+                    si.unrouteIntraSiteNet(spi.getBELPin(), spi.getBELPin());
                 }
             }
         }
@@ -460,12 +466,10 @@ public class RouterHelper {
         // as we are simply moving the SPI from one net to another
         gndNet.getPins().removeAll(toInvertPins);
 
-        Net vccNet = design.getVccNet();
         for (SitePinInst toinvert : toInvertPins) {
             assert(toinvert.getSiteInst() != null);
-            SiteInst si = toinvert.getSiteInst();
-            si.unrouteIntraSiteNet(toinvert.getBELPin(), toinvert.getBELPin());
-            if (!vccNet.addPin(toinvert, false)) {
+            boolean updateSiteRouting = false;
+            if (!vccNet.addPin(toinvert, updateSiteRouting)) {
                   throw new RuntimeException("ERROR: Couldn't invert site pin " +
                           toinvert);
             }
