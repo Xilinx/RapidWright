@@ -461,9 +461,11 @@ public class RouterHelper {
         gndNet.getPins().removeAll(toInvertPins);
 
         Net vccNet = design.getVccNet();
-        for (SitePinInst toinvert:toInvertPins) {
+        for (SitePinInst toinvert : toInvertPins) {
             assert(toinvert.getSiteInst() != null);
-            if (!vccNet.addPin(toinvert)) {
+            SiteInst si = toinvert.getSiteInst();
+            si.unrouteIntraSiteNet(toinvert.getBELPin(), toinvert.getBELPin());
+            if (!vccNet.addPin(toinvert, false)) {
                   throw new RuntimeException("ERROR: Couldn't invert site pin " +
                           toinvert);
             }
