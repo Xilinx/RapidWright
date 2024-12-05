@@ -1573,7 +1573,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                     physPinName = cell.getPhysicalPinMapping(portName);
                 } else {
                     BEL lut = cell.getBEL();
-                    for (String pin : cell.getPinMappingsP2L().keySet()) {
+                    for (String pin : cell.getUsedPhysicalPins()) {
                         BELPin belPin = lut.getPin(pin);
                         if (belPin.isInput()) {
                             physPinName = belPin.getConnectedSitePinName();

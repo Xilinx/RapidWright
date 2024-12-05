@@ -26,29 +26,25 @@
 package com.xilinx.rapidwright.tests;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
+import com.xilinx.rapidwright.design.Cell;
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.VivadoProp;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
-
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFDesign;
-import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
-
-import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.Cell;
-import com.xilinx.rapidwright.design.Unisim;
-import com.xilinx.rapidwright.design.SiteInst;
-import com.xilinx.rapidwright.design.VivadoProp;
 
 public class PinMapTester {
 
@@ -127,13 +123,14 @@ public class PinMapTester {
 
         System.out.printf("Cell type %s at %s/%s in part %s, pin map:\n",
                 cellTypeName, site.getName(), belName, partName);
-        for (Map.Entry<String, String> pinMap : physCell.getPinMappingsP2L().entrySet()) {
-            System.out.printf(" - %s <= %s\n", pinMap.getKey(), pinMap.getValue());
+        String[] physPinNames = physCell.getPhysicalPinMappings();
+        for (int i = 0; i < physPinNames.length; i++) {
+            String logPinName = physPinNames[i];
+            if (logPinName == null)
+                continue;
+            String physPinName = physCell.getBEL().getPin(i).getName();
+            System.out.printf(" - %s <= %s\n", physPinName, logPinName);
         }
-
-        //for (Map.Entry<String, Set<String>> pinMap : physCell.getPinMappingsL2P().entrySet()) {
-        //    System.out.printf("
-        //}
     }
 }
 

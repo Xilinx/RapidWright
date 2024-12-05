@@ -348,7 +348,7 @@ public class TestDesign {
         Assertions.assertTrue(si.routeIntraSiteNet(oldNet, si.getBELPin("A1", "A1"),
                 si.getBELPin(unisim.toString(), "DI0")));
         Assertions.assertEquals("[IN SLICE_X32Y73.A1, OUT SLICE_X32Y73.HQ]", oldNet.getPins().toString());
-        Assertions.assertEquals("[A1, HQ, A5LUT_O5]", si.getSiteWiresFromNet(oldNet).toString());
+        Assertions.assertEquals("[A1, A5LUT_O5, HQ]", si.getSiteWiresFromNet(oldNet).toString());
 
         Net newNet = d.createNet("newNet");
         SitePinInst h6 = newNet.createPin("H6", si);
@@ -362,7 +362,7 @@ public class TestDesign {
         Assertions.assertNull(d.getNet(oldNet.getName()));
         Assertions.assertSame(newNet, d.getNet(newNet.getName()));
         Assertions.assertEquals("[IN SLICE_X32Y73.H6, IN SLICE_X32Y73.A1, OUT SLICE_X32Y73.HQ]", newNet.getPins().toString());
-        Assertions.assertEquals("[H6, A1, HQ, A5LUT_O5]", si.getSiteWiresFromNet(newNet).toString());
+        Assertions.assertEquals("[A1, A5LUT_O5, H6, HQ]", si.getSiteWiresFromNet(newNet).toString());
         Assertions.assertEquals("[INT_X21Y73/INT.VCC_WIRE->>IMUX_E47]", newNet.getPIPs().toString());
     }
 
@@ -389,7 +389,7 @@ public class TestDesign {
         Assertions.assertNull(d.getNet(oldNet.getName()));
         Assertions.assertSame(newNet, d.getNet(newNet.getName()));
         Assertions.assertEquals("[IN SLICE_X32Y73.H6]", newNet.getPins().toString());
-        Assertions.assertEquals("[H6, B_O, FFMUXB1_OUT1]", si.getSiteWiresFromNet(newNet).toString());
+        Assertions.assertEquals("[B_O, FFMUXB1_OUT1, H6]", si.getSiteWiresFromNet(newNet).toString());
         Assertions.assertTrue(newNet.getPIPs().isEmpty());
     }
 

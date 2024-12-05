@@ -36,4 +36,17 @@ public class TestSite {
         Site site = device.getSite(siteName);
         Assertions.assertEquals(intTileName, site.getIntTile().getName());
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvp1902,SLICE_S0X36Y0,SLR0",
+            "xcvp1902,SLICE_S1X36Y0,SLR1",
+            "xcvp1902,SLICE_S2X36Y0,SLR2",
+            "xcvp1902,SLICE_S3X36Y0,SLR3",
+    })
+    public void testGetSLR(String deviceName, String siteName, String slrName) {
+        Device device = Device.getDevice(deviceName);
+        Site site = device.getSite(siteName);
+        Assertions.assertEquals(slrName, site.getTile().getSLR().getName());
+    }
 }
