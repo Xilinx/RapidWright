@@ -3331,8 +3331,8 @@ public class DesignTools {
 
                     spi = si.getSitePinInst(belName.charAt(0) + "6");
                     if (spi != null) {
-                        // [A-H]6 input already a static net
-                        assert(spi.getNet() == a6Net);
+                        // [A-H]6 input already a static net (which may not match the sitewire)
+                        assert(spi.getNet().isStaticNet());
                         assert(a6Net.isStaticNet());
                         continue;
                     }
