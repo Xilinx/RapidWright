@@ -29,7 +29,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Generated on: Thu Nov 21 18:52:53 MST 2024
+ * Generated on: Wed Dec 04 17:06:07 MST 2024
  * by: com.xilinx.rapidwright.release.UploadFilesToAzure
  *
  * Versioned list of data files to use in current RapidWright environment
@@ -271,6 +271,7 @@ public class DataVersions {
         dataVersionMap.put("data/devices/virtexuplus58g/xcvu27p_db.dat", new Pair<>("xcvu27p-db-dat", "2aaca971db9f3a2d30b9aab08adfb53b"));
         dataVersionMap.put("data/devices/virtexuplus58g/xcvu29p_CIV_db.dat", new Pair<>("xcvu29p-civ-db-dat", "d704df04735b4e7d319d5dca23a7e600"));
         dataVersionMap.put("data/devices/virtexuplus58g/xcvu29p_db.dat", new Pair<>("xcvu29p-db-dat", "d2002671bc66b73ac5a227d228b415d6"));
+        dataVersionMap.put("data/devices/virtexuplushbm/xcu280_db.dat", new Pair<>("xcu280-db-dat", "855d7ddd2da77a90bc71f90684ab0553"));
         dataVersionMap.put("data/devices/virtexuplushbm/xcu50_db.dat", new Pair<>("xcu50-db-dat", "9f492044506ac76537b31578b624e8d7"));
         dataVersionMap.put("data/devices/virtexuplushbm/xcu55c_db.dat", new Pair<>("xcu55c-db-dat", "71afb75ee5e960b6dd55dd62e9847c00"));
         dataVersionMap.put("data/devices/virtexuplushbm/xcu55n_db.dat", new Pair<>("xcu55n-db-dat", "d17a34026add98ab0756ef7510ff0ea9"));
@@ -381,8 +382,8 @@ public class DataVersions {
         dataVersionMap.put("data/devices/zynquplusrfsoc/xqzu49dr_db.dat", new Pair<>("xqzu49dr-db-dat", "121002535288bc59b298aea6823a7189"));
         dataVersionMap.put("data/devices/zynquplusrfsoc/xqzu65dr_db.dat", new Pair<>("xqzu65dr-db-dat", "cd430b324d1801f503f11d8ade614f70"));
         dataVersionMap.put("data/devices/zynquplusrfsoc/xqzu67dr_db.dat", new Pair<>("xqzu67dr-db-dat", "107b58bf104f30ed8a69147cad05040e"));
-        dataVersionMap.put("data/partdump.csv", new Pair<>("partdump-csv", "cf81a1101fd8aaba1d5e4864dd3b366b"));
-        dataVersionMap.put("data/parts.db", new Pair<>("parts-db", "fba61ed264bbf6bdc918edf7c523c990"));
+        dataVersionMap.put("data/partdump.csv", new Pair<>("partdump-csv", "3c1ce062e3be22a954d29e362c1ac748"));
+        dataVersionMap.put("data/parts.db", new Pair<>("parts-db", "6f923c9c866204a74eb6ab801ab7809a"));
         dataVersionMap.put("data/unisim_data.dat", new Pair<>("unisim-data-dat", "c0c3f68aaef35bf7a7942f90f51b037f"));
     }
 }
