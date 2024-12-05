@@ -3312,8 +3312,8 @@ public class DesignTools {
                 BEL lut6Bel = (fiveOrSix == '5') ? si.getBEL(belName.charAt(0) + "6LUT") : bel;
                 Net a6Net = si.getNetFromSiteWire(lut6Bel.getPin("A6").getSiteWireName());
 
-                boolean expectGndNet = false;
                 if ("SRL16E".equals(cell.getType())) {
+                    // SRL16s require A1 to be VCC
                     String pinName = belName.charAt(0) + "1";
                     SitePinInst spi = si.getSitePinInst(pinName);
                     if (spi == null) {
@@ -3322,18 +3322,25 @@ public class DesignTools {
 
                     // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
                     if ("SRLC32E".equals(cell.getPropertyValueString("XILINX_LEGACY_PRIM"))) {
-                        expectGndNet = true;
                         staticNet = gndNet;
                         // Expect sitewire to be VCC or GND
                         if (!a6Net.isStaticNet()) {
                             throw new RuntimeException("ERROR: Site pin " + si.getSiteName() + "/" + belName.charAt(0) + "6 is not a static net");
                         }
                     }
-                }
 
-                // Tie A6 to staticNet only if sitewire says so
-                if (a6Net != staticNet && !expectGndNet) {
-                    continue;
+                    spi = si.getSitePinInst(belName.charAt(0) + "6");
+                    if (spi != null) {
+                        // [A-H]6 input already a static net (which may not match the sitewire)
+                        assert(spi.getNet().isStaticNet());
+                        assert(a6Net.isStaticNet());
+                        continue;
+                    }
+                } else {
+                    // Tie A6 to staticNet only if sitewire says so
+                    if (a6Net != staticNet) {
+                        continue;
+                    }
                 }
 
                 if (cell.getLogicalPinMapping("O5") != null) {
@@ -3385,74 +3392,77 @@ public class DesignTools {
             // In Versal, sitewires for a SLICE's CE pins are not assigned to the VCC net
             // Assume that the lack of sitewire for a placed FF indicates VCC
             for (SiteInst si : design.getSiteInsts()) {
-                if (!Utils.isSLICE(si)) {
-                    continue;
-                }
-                for (Cell cell : si.getCells()) {
-                    BEL bel = cell.getBEL();
-                    if (bel == null || !bel.isFF()) {
-                        continue;
-                    }
-
-                    if (!bel.getBELType().equals("FF")) {
-                        assert(bel.getBELType().matches("(SLICE_IMI|SLICE[LM]_IMC)_FF(_T)?"));
-                        continue;
-                    }
-
-                    Pair<String, String> sitePinNames = pinMapping.get(bel.getName());
-                    for (String belPinName : belPinNames) {
-                        String sitePinName = (belPinName == CE) ? sitePinNames.getFirst() : sitePinNames.getSecond();
-                        SitePinInst spi = si.getSitePinInst(sitePinName);
-                        if (spi != null) {
-                            if (belPinName == CE) {
-                                // CE
-                                continue;
-                            }
-                            // SR
-                            if (!spi.getNet().isGNDNet()) {
-                                continue;
-                            }
+                if (Utils.isSLICE(si)) {
+                    for (Cell cell : si.getCells()) {
+                        BEL bel = cell.getBEL();
+                        if (bel == null || !bel.isFF()) {
+                            continue;
                         }
 
-                        Net net = si.getNetFromSiteWire(sitePinName);
-                        if (net != null) {
-                            if (belPinName == CE) {
-                                if (!net.isVCCNet()) {
-                                    continue;
-                                }
-                                // CE: it is possible for sitewire to be assigned to a non VCC net, but a SitePinInst to not yet exist
-                            } else {
-                                assert(belPinName == SR);
-                                if (!net.isStaticNet()) {
-                                    continue;
-                                }
-                                // SR: it is possible for sitewire to be assigned the GND net, yet still be routed to VCC
-                            }
+                        if (!bel.getBELType().equals("FF")) {
+                            assert(bel.getBELType().matches("(SLICE_IMI|SLICE[LM]_IMC)_FF(_T)?"));
+                            continue;
                         }
 
-                        if (assertionsEnabled) {
-                            BELPin belPin = bel.getPin(belPinName);
-                            Net belPinNet = si.getNetFromSiteWire(belPin.getSiteWireName());
-                            if (belPinNet != null) {
+                        Pair<String, String> sitePinNames = pinMapping.get(bel.getName());
+                        for (String belPinName : belPinNames) {
+                            String sitePinName = (belPinName == CE) ? sitePinNames.getFirst() : sitePinNames.getSecond();
+                            SitePinInst spi = si.getSitePinInst(sitePinName);
+                            if (spi != null) {
                                 if (belPinName == CE) {
                                     // CE
-                                    assert(belPinNet.isVCCNet());
-                                } else {
-                                    // SR
-                                    assert(belPinNet.isStaticNet());
+                                    continue;
+                                }
+                                // SR
+                                if (!spi.getNet().isGNDNet()) {
+                                    continue;
                                 }
                             }
-                        }
 
-                        if (spi != null) {
-                            assert(belPinName == SR);
-                            // Move the SR pin from GND to VCC
-                            spi.setNet(vccNet);
-                        } else {
-                            spi = new SitePinInst(false, sitePinName, si);
+                            Net net = si.getNetFromSiteWire(sitePinName);
+                            if (net != null) {
+                                if (belPinName == CE) {
+                                    if (!net.isVCCNet()) {
+                                        continue;
+                                    }
+                                    // CE: it is possible for sitewire to be assigned to a non VCC net, but a SitePinInst to not yet exist
+                                } else {
+                                    assert(belPinName == SR);
+                                    if (!net.isStaticNet()) {
+                                        continue;
+                                    }
+                                    // SR: it is possible for sitewire to be assigned the GND net, yet still be routed to VCC
+                                }
+                            }
+
+                            if (assertionsEnabled) {
+                                BELPin belPin = bel.getPin(belPinName);
+                                Net belPinNet = si.getNetFromSiteWire(belPin.getSiteWireName());
+                                if (belPinNet != null) {
+                                    if (belPinName == CE) {
+                                        // CE
+                                        assert(belPinNet.isVCCNet());
+                                    } else {
+                                        // SR
+                                        assert(belPinNet.isStaticNet());
+                                    }
+                                }
+                            }
+
+                            if (spi != null) {
+                                assert(belPinName == SR);
+                                // Move the SR pin from GND to VCC
+                                spi.setNet(vccNet);
+                            } else {
+                                spi = new SitePinInst(false, sitePinName, si);
+                            }
+                            boolean updateSiteRouting = false;
+                            vccNet.addPin(spi, updateSiteRouting);
                         }
-                        boolean updateSiteRouting = false;
-                        vccNet.addPin(spi, updateSiteRouting);
+                    }
+                } else if (si.getSiteTypeEnum() == SiteTypeEnum.MMCM) {
+                    for (String sitePinName : new String[]{"CLKFBIN", "CLKIN2"}) {
+                        maybeCreateVccPin(si, sitePinName, vccNet);
                     }
                 }
             }

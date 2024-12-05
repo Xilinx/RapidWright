@@ -427,7 +427,9 @@ public class GlobalSignalRouting {
         assertIntentCodeOfPoppedNodesOnVcc = EnumSet.of(
                 IntentCode.NODE_PINFEED,
                 IntentCode.NODE_PINBOUNCE,
-                IntentCode.INTENT_DEFAULT);
+                IntentCode.INTENT_DEFAULT,
+                IntentCode.NODE_GLOBAL_GCLK // e.g. MMCM_CLKIN2, MMCM_CLKFBIN
+        );
         boolean isVersal = false;
         if (series == Series.UltraScale) {
             // On UltraScale, certain site pins (e.g. SLICE/CKEN_B1[1-4], SLICE/SRST_B[12])
