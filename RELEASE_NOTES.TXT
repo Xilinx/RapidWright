@@ -1,3 +1,62 @@
+============= RapidWright 2024.2.0-beta released on 2024-12-04 ================
+Notes: 
+  - Remove reliance on gap routing test (#1117)
+  - [ModuleInst] Fix placement behavior when requesting no overlaps (#1108)
+  - [RWRoute] Clock router for Versal architecture (#1102)
+  - Various preprocessing fixes for Versal routing (#1115)
+  - [CUFR] CUFR and PartialCUFR to default to --hus (#1111)
+  - [TestNet] Improve testSetPinsMultiSrcStatic to track many sources (#1082)
+  - Changes to support new array-based cell pin mappings (#1101)
+  - Update tests to reflect bug fixes and minor behavior changes (#1110)
+  - [RWRoute] Yet more cleanup (#1107)
+  - [RWRoute] Preserve nodes of Laguna sinks (#1104)
+  - [GlobalSignalRouting] routeStaticNets() to take a list of static pins (#1105)
+  - [RWRoute] Fix typo -- not an exclusive sink (#1106)
+  - [RWRoute] Versal optimizations (#1093)
+  - [RWRoute] RouteNode.setType() to accept any locals (#1103)
+  - [RWRoute] Further divide LOCAL nodes into EAST/WEST for UltraScale(+) (#1098)
+  - [Utils] isClocking() to include TileTypeEnum.CMT_L (#1100)
+  - TileGroup and DeviceBrowser Improvements (#1094)
+  - [RWRoute] Divide nodes into LOCAL and NON_LOCAL (#1095)
+  - Update actions and do not limit to 5G RAM (#1092)
+  - [HandPlacer] Cleanup snapping code in hand placer (#1091)
+  - [LUTTools] Add zero padding to LUT INIT strings (#1090)
+  - [NetTools] Add getNodeTrees() method and NodeTree class (#1089)
+  - [YosysTools] Add synthXilinx() wrapper for Yosys (#1086)
+  - [EDIFWriteLegalNameCache] busCollisionRenames to be a ConcurrentHashMap (#1088)
+  - Add ReportRouteStatus utility (#1087)
+  - [RWRoute] Signal router for Versal architecture (#1077)
+  - [FileTools] Add runCommand(String[] ...) & getExecutablePath(String) (#1085)
+  - [RouterHelper] findPathBetweenNodes() allow clocking if src/sink is so (#1083)
+  - [RouterHelper] projectOutputPinToINTNode() to breadth-first-search (#1081)
+  - [RouterHelper] projectInputPinToINTNode() to return solitary node (#1080)
+  - [RouterHelper] findPathBetweenNodes() to ignore clocking tiles (#1079)
+  - [RouterHelper] invertPossibleGndPinsToVccPins() to support Versal LUTs (#1078)
+  - [DesignTools] Fix createCeSrRstPinsToVCC() for US BRAMs (#1075)
+  - [DesignTools] Add LDCE/LDPE to types that need VCC (#1076)
+  - [NetTools] Add NetTools.isGlobalClock() (#1057)
+  - Static router for Versal architecture (#1073)
+  - [EDIFNetlist] getPhysicalPins() to call getPhysical{Gnd,Vcc}Pins() (#1074)
+  - Fix Null SLR References in Tiles in xcvp1902
+  - Add Implements Serializable to All RapidWright Classes
+  - [SiteInst] Improve memory usage of site routing using array instead of maps
+  - [Cell] Changes pin mappings from a map to an array to improve memory usage
+  - [BEL] Deprecate isSRIMR() in favour of more general isIMR()
+  - [Tile] Add getMaxUniqueAddress()
+  - [Net] Add support for multiple output sources
+
+API Additions:
+  - com.xilinx.rapidwright.design.Cell "public Pair<BELPin, String> getFirstPhysicalPinMapping()"
+  - com.xilinx.rapidwright.design.Cell "public int getUsedPhysicalPinsCount()"
+  - com.xilinx.rapidwright.design.Cell "public Set<String> getUsedPhysicalPins()"
+  - com.xilinx.rapidwright.design.Cell "public String[] getPhysicalPinMappings()"
+  - com.xilinx.rapidwright.design.Cell "public boolean usesPhysicalPin(String physicalPinName)"
+  - com.xilinx.rapidwright.design.Design "public boolean placeCell(Cell c, Site site, BEL bel, String[] physPinMappings)"
+  - com.xilinx.rapidwright.design.Net "public List<SitePinInst> getAlternateSources()"
+  - com.xilinx.rapidwright.device.BEL "public boolean isIMR()"
+  - com.xilinx.rapidwright.device.Tile "public int getMaxUniqueAddress()"
+
+
 ============= RapidWright 2024.1.3-beta released on 2024-10-02 ================
 Notes: 
   - [RWRoute] Further cleanup (#1070)
