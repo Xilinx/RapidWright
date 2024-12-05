@@ -3324,16 +3324,13 @@ public class DesignTools {
                     if ("SRLC32E".equals(cell.getPropertyValueString("XILINX_LEGACY_PRIM"))) {
                         expectGndNet = true;
                         staticNet = gndNet;
-                        // Expect sitewire to be VCC or GND
-                        if (!a6Net.isStaticNet()) {
-                            throw new RuntimeException("ERROR: Site pin " + si.getSiteName() + "/" + belName.charAt(0) + "6 is not a static net");
-                        }
+                        assert(a6Net.isGNDNet());
                     }
 
                     // [A-H]6 input already has a (static) net
                     spi = si.getSitePinInst(belName.charAt(0) + "6");
                     if (spi != null) {
-                        assert(spi.getNet().isStaticNet());
+                        assert(LUTTools.getCompanionLUT(cell) != null ? a6Net.isVCCNet() : a6Net.isGNDNet());
                         continue;
                     }
                 }
