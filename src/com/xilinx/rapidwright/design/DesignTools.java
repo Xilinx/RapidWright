@@ -3312,8 +3312,8 @@ public class DesignTools {
                 BEL lut6Bel = (fiveOrSix == '5') ? si.getBEL(belName.charAt(0) + "6LUT") : bel;
                 Net a6Net = si.getNetFromSiteWire(lut6Bel.getPin("A6").getSiteWireName());
 
-                boolean expectGndNet = false;
                 if ("SRL16E".equals(cell.getType())) {
+                    // SRL16s require A1 to be VCC
                     String pinName = belName.charAt(0) + "1";
                     SitePinInst spi = si.getSitePinInst(pinName);
                     if (spi == null) {
@@ -3322,22 +3322,24 @@ public class DesignTools {
 
                     // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
                     if ("SRLC32E".equals(cell.getPropertyValueString("XILINX_LEGACY_PRIM"))) {
-                        expectGndNet = true;
                         staticNet = gndNet;
-                        assert(a6Net.isGNDNet());
+                        // Expect sitewire to be VCC or GND
+                        if (!a6Net.isStaticNet()) {
+                            throw new RuntimeException("ERROR: Site pin " + si.getSiteName() + "/" + belName.charAt(0) + "6 is not a static net");
+                        }
                     }
 
-                    // [A-H]6 input already has a (static) net
                     spi = si.getSitePinInst(belName.charAt(0) + "6");
                     if (spi != null) {
-                        assert(LUTTools.getCompanionLUT(cell) != null ? a6Net.isVCCNet() : a6Net.isGNDNet());
+                        // [A-H]6 input already has this static net
+                        assert(a6Net == staticNet);
                         continue;
                     }
-                }
-
-                // Tie A6 to staticNet only if sitewire says so
-                if (a6Net != staticNet && !expectGndNet) {
-                    continue;
+                } else {
+                    // Tie A6 to staticNet only if sitewire says so
+                    if (a6Net != staticNet) {
+                        continue;
+                    }
                 }
 
                 if (cell.getLogicalPinMapping("O5") != null) {
