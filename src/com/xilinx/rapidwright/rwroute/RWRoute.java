@@ -2285,15 +2285,14 @@ public class RWRoute {
             System.out.println("WARNING: Not masking nodes across RCLK could result in delay optimism.");
         }
 
-        return routeDesign(design, new RWRoute(design, config));
+        return routeDesign(new RWRoute(design, config));
     }
 
     /**
      * Routes a design after pre-processing.
-     * @param design The {@link Design} instance to be routed.
      * @param router A {@link RWRoute} object to be used to route the design.
      */
-    protected static Design routeDesign(Design design, RWRoute router) {
+    protected static Design routeDesign(RWRoute router) {
         router.preprocess();
 
         // Initialize router object
@@ -2325,7 +2324,7 @@ public class RWRoute {
 
         // Reads in a design and routes it
         String[] rwrouteArgs = Arrays.copyOfRange(args, 2, args.length);
-        Design input = null;
+        Design input;
         if (Interchange.isInterchangeFile(args[0])) {
             input = Interchange.readInterchangeDesign(args[0]);
         } else {
