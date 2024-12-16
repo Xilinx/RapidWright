@@ -27,6 +27,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.PinType;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
@@ -487,5 +488,107 @@ public class TestECOTools {
             // Physical nets are also present
             Assertions.assertNotNull(design.getNet(netName));
         }
+    }
+
+    @Test
+    public void testRemoveCellVersal() {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+
+        SiteInst si = d.getSiteInst("SLICE_X145Y0");
+
+        Assertions.assertNotNull(si.getUsedSitePIP("OUTMUXB2"));
+        Assertions.assertNotNull(si.getUsedSitePIP("OUTMUXA2"));
+        Assertions.assertNotNull(si.getUsedSitePIP("FFMUXB2"));
+        Assertions.assertNotNull(si.getUsedSitePIP("FFMUXA2"));
+        Assertions.assertEquals("in_port[0]", si.getNetFromSiteWire("BFF2_Q").getName());
+        Assertions.assertEquals("in_port[0]", si.getNetFromSiteWire("BQ2").getName());
+
+        Assertions.assertEquals("in_port[1]", si.getNetFromSiteWire("AFF2_Q").getName());
+        Assertions.assertEquals("in_port[1]", si.getNetFromSiteWire("AQ2").getName());
+        Assertions.assertEquals("processor/D[0]", si.getNetFromSiteWire("FFMUXB2_OUT2").getName());
+        Assertions.assertEquals("processor/D[1]", si.getNetFromSiteWire("FFMUXA2_OUT2").getName());
+
+        Assertions.assertEquals(Net.GND_NET, si.getNetFromSiteWire("SR_IMR_Q").getName());
+        Assertions.assertEquals(Net.VCC_NET, si.getNetFromSiteWire("CE1_IMR_Q").getName());
+
+        Assertions.assertEquals("clk_IBUF", si.getNetFromSiteWire("FF_CLK_MOD_CLK_OUT").getName());
+
+        Cell rt = si.getCell("SR_IMR");
+        Assertions.assertNotNull(rt);
+        Assertions.assertTrue(rt.isFFRoutethruCell());
+        Assertions.assertEquals(Net.GND_NET, si.getNetFromSiteWire("RST").getName());
+        Assertions.assertNotNull(si.getUsedSitePIP("RSTINV"));
+
+        rt = si.getCell("CE1_IMR");
+        Assertions.assertNotNull(rt);
+        Assertions.assertTrue(rt.isFFRoutethruCell());
+        Assertions.assertEquals(Net.VCC_NET, si.getNetFromSiteWire("CKEN1").getName());
+
+        Assertions.assertEquals("clk_IBUF", si.getNetFromSiteWire("CLKINV_OUT").getName());
+        Assertions.assertEquals("clk_IBUF", si.getNetFromSiteWire("CLK").getName());
+        Assertions.assertNotNull(si.getUsedSitePIP("CLKINV"));
+
+        Cell cell = d.getCell("in_port_reg[0]");
+        ECOTools.removeCell(d, Collections.singletonList(cell.getEDIFHierCellInst()), null);
+
+        Assertions.assertNull(si.getUsedSitePIP("OUTMUXB2"));
+        Assertions.assertNotNull(si.getUsedSitePIP("OUTMUXA2"));
+        Assertions.assertNotNull(si.getUsedSitePIP("FFMUXA2"));
+        Assertions.assertNull(si.getNetFromSiteWire("BFF2_Q"));
+        Assertions.assertNull(si.getNetFromSiteWire("BQ2"));
+
+        Assertions.assertEquals("in_port[1]", si.getNetFromSiteWire("AFF2_Q").getName());
+        Assertions.assertEquals("in_port[1]", si.getNetFromSiteWire("AQ2").getName());
+        Assertions.assertEquals("processor/D[1]", si.getNetFromSiteWire("FFMUXA2_OUT2").getName());
+
+        Assertions.assertEquals(Net.GND_NET, si.getNetFromSiteWire("SR_IMR_Q").getName());
+        Assertions.assertEquals(Net.VCC_NET, si.getNetFromSiteWire("CE1_IMR_Q").getName());
+
+        Assertions.assertEquals("clk_IBUF", si.getNetFromSiteWire("FF_CLK_MOD_CLK_OUT").getName());
+
+        rt = si.getCell("SR_IMR");
+        Assertions.assertNotNull(rt);
+        Assertions.assertTrue(rt.isFFRoutethruCell());
+        Assertions.assertEquals(Net.GND_NET, si.getNetFromSiteWire("RST").getName());
+        Assertions.assertNotNull(si.getUsedSitePIP("RSTINV"));
+
+        rt = si.getCell("CE1_IMR");
+        Assertions.assertNotNull(rt);
+        Assertions.assertTrue(rt.isFFRoutethruCell());
+        Assertions.assertEquals(Net.VCC_NET, si.getNetFromSiteWire("CKEN1").getName());
+
+        Assertions.assertEquals("clk_IBUF", si.getNetFromSiteWire("CLKINV_OUT").getName());
+        Assertions.assertEquals("clk_IBUF", si.getNetFromSiteWire("CLK").getName());
+        Assertions.assertNotNull(si.getUsedSitePIP("CLKINV"));
+
+        cell = d.getCell("in_port_reg[1]");
+        ECOTools.removeCell(d, Collections.singletonList(cell.getEDIFHierCellInst()), null);
+
+        Assertions.assertNull(si.getUsedSitePIP("OUTMUXB2"));
+        Assertions.assertNull(si.getUsedSitePIP("OUTMUXA2"));
+        Assertions.assertNull(si.getNetFromSiteWire("BFF2_Q"));
+        Assertions.assertNull(si.getNetFromSiteWire("BQ2"));
+
+        Assertions.assertNull(si.getNetFromSiteWire("AFF2_Q"));
+        Assertions.assertNull(si.getNetFromSiteWire("AQ2"));
+
+        Assertions.assertNull(si.getNetFromSiteWire("SR_IMR_Q"));
+        Assertions.assertNull(si.getNetFromSiteWire("CE1_IMR_Q"));
+
+        Assertions.assertNull(si.getNetFromSiteWire("FF_CLK_MOD_CLK_OUT"));
+
+        rt = si.getCell("SR_IMR");
+        Assertions.assertNull(rt);
+        Assertions.assertNull(si.getNetFromSiteWire("RST"));
+        Assertions.assertNull(si.getUsedSitePIP("RSTINV"));
+
+        rt = si.getCell("CE1_IMR");
+        Assertions.assertNull(rt);
+        Assertions.assertNull(si.getNetFromSiteWire("CKEN1"));
+
+        Assertions.assertNull(si.getNetFromSiteWire("CLKINV_OUT"));
+        Assertions.assertNull(si.getNetFromSiteWire("CLK"));
+        Assertions.assertNull(si.getUsedSitePIP("CLKINV"));
+
     }
 }
