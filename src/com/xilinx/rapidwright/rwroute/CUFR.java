@@ -200,7 +200,7 @@ public class CUFR extends RWRoute {
             System.err.println("WARNING: Hybrid Updating Strategy (HUS) is not enabled.");
         }
 
-        return routeDesign(design, new CUFR(design, config));
+        return routeDesign(new CUFR(design, config));
     }
 
     /**
@@ -229,7 +229,10 @@ public class CUFR extends RWRoute {
         } else {
             input = Design.readCheckpoint(args[0]);
         }
-        Design routed = routeDesignWithUserDefinedArguments(input, rwrouteArgs);
+
+        RWRouteConfig config = new RWRouteConfig(rwrouteArgs);
+        config.setHus(true);
+        Design routed = routeDesign(new CUFR(input, config));
 
         // Writes out the routed design checkpoint
         routed.writeCheckpoint(routedDCPfileName,t);
