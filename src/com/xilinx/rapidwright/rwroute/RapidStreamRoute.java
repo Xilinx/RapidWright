@@ -181,6 +181,6 @@ public class RapidStreamRoute extends PartialRouter {
                 "--enlargeBoundingBox",
                 "--useUTurnNodes",
                 "--verbose"});
-        return routeDesign(design, new RapidStreamRoute(design, config, pinsToRoute));
+        return routeDesign(new RapidStreamRoute(design, config, pinsToRoute));
     }
 }

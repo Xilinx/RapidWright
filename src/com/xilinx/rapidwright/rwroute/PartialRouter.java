@@ -381,7 +381,7 @@ public class PartialRouter extends RWRoute {
 
                     // Do not include arcs that the router wouldn't explore
                     // e.g. those that leave the INT tile, since we project pins to their INT tile
-                    if (routingGraph.isExcludedTile(end)) {
+                    if (RouteNodeGraph.isExcludedTile(end)) {
                         continue;
                     }
 
@@ -554,7 +554,7 @@ public class PartialRouter extends RWRoute {
 
                 // Do not include arcs that the router wouldn't explore
                 // e.g. those that leave the INT tile, since we project pins to their INT tile
-                if (routingGraph.isExcludedTile(end))
+                if (RouteNodeGraph.isExcludedTile(end))
                     continue;
 
                 // Since net already exists, all the nodes it uses must already
@@ -585,7 +585,7 @@ public class PartialRouter extends RWRoute {
 
                 // Do not include arcs that the router wouldn't explore
                 // e.g. those that leave the INT tile, since we project pins to their INT tile
-                if (routingGraph.isExcludedTile(end))
+                if (RouteNodeGraph.isExcludedTile(end))
                     continue;
 
                 boolean startPreserved = routingGraph.unpreserve(start);
@@ -712,7 +712,7 @@ public class PartialRouter extends RWRoute {
             System.out.println("WARNING: Masking nodes across RCLK for partial routing could result in routability problems.");
         }
 
-        return routeDesign(design, new PartialRouter(design, config, pinsToRoute, softPreserve));
+        return routeDesign(new PartialRouter(design, config, pinsToRoute, softPreserve));
     }
 
     /**
