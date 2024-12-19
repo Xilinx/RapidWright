@@ -23,6 +23,15 @@
 
 package com.xilinx.rapidwright.design;
 
+import java.nio.file.Path;
+import java.util.Arrays;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
@@ -30,14 +39,6 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.VivadoToolsHelper;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-
-import java.nio.file.Path;
-import java.util.Arrays;
 
 public class TestSiteInst {
 
@@ -400,5 +401,16 @@ public class TestSiteInst {
         Design design = RapidWrightDCP.loadDCP("gnl_2_4_3_1.3_gnl_3000_07_3_80_80_placed.dcp");
         design.routeSites();
         VivadoToolsHelper.assertRoutedSuccessfullyByVivado(design, dir);
+    }
+
+    @Test
+    public void testIsEmpty() {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        for (SiteInst si : d.getSiteInsts()) {
+            Assertions.assertFalse(si.isEmpty());
+        }
+
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X40Y10"));
+        Assertions.assertTrue(si.isEmpty());
     }
 }
