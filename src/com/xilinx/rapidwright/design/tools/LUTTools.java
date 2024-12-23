@@ -51,6 +51,7 @@ import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.edif.EDIFCell;
@@ -481,6 +482,7 @@ public class LUTTools {
      */
     public static int swapMultipleLutPins(Map<SitePinInst, String> oldPinToNewPins) {
         Map<String,Map<String,PinSwap>> pinSwaps = new HashMap<>();
+        Boolean isVersal = null;
 
         for (Map.Entry<SitePinInst, String> e : oldPinToNewPins.entrySet()) {
             SitePinInst oldSinkSpi = e.getKey();
@@ -495,7 +497,18 @@ public class LUTTools {
                 continue;
             }
 
+            if (isVersal == null) {
+                isVersal = si.getDesign().getSeries() == Series.Versal;
+            }
+
             Set<Cell> cells = DesignTools.getConnectedCells(oldSinkSpi);
+            if (isVersal) {
+                assert(cells.size() == 1);
+                Cell cell = cells.iterator().next();
+                BEL bel = cell.getBEL();
+                assert(bel.isIMR());
+                cells = DesignTools.getConnectedCells(bel.getPin("Q"), si);
+            }
             if (cells.isEmpty()) {
                 continue;
             }
@@ -595,7 +608,7 @@ public class LUTTools {
             String oldPhysicalPin = oPins[i];
             String newPhysicalPin = ePins[i];
             Cell c = emptySlots.get(newPhysicalPin).getCell();
-            String newNetPinName = c.getSiteWireNameFromPhysicalPin(newPhysicalPin);
+            String newNetPinName = c.getBELName().substring(0, 1) + newPhysicalPin.charAt(1);
             // Handles special cases
             if (c.getLogicalPinMapping(oldPhysicalPin) == null) {
                 Cell neighborLUT = emptySlots.get(newPhysicalPin).checkForCompanionCell();
@@ -632,17 +645,27 @@ public class LUTTools {
             copyOnWritePinSwaps.add(ps);
         }
 
+        Boolean isVersal = null;
         // Prepares pins for swapping by removing them
         Queue<SitePinInst> q = new LinkedList<>();
         for (PinSwap ps : copyOnWritePinSwaps) {
             Cell cell = ps.getCell();
-            String oldSitePinName = cell.getSiteWireNameFromPhysicalPin(ps.getOldPhysicalName());
             SiteInst si = cell.getSiteInst();
+            if (isVersal == null) {
+                isVersal = si.getDesign().getSeries() == Series.Versal;
+            }
+            String oldSitePinName;
+            if (isVersal) {
+                oldSitePinName = cell.getBELName().substring(0, 1) + ps.getOldPhysicalName().charAt(1);
+            } else {
+                oldSitePinName = cell.getSiteWireNameFromPhysicalPin(ps.getOldPhysicalName());
+            }
             SitePinInst pinToMove = si.getSitePinInst(oldSitePinName);
             q.add(pinToMove);
             if (pinToMove == null) {
                 continue;
             }
+            si.unrouteIntraSiteNet(pinToMove.getBELPin(), cell.getBEL().getPin(ps.getOldPhysicalName()));
             pinToMove.setSiteInst(null,true);
             // Removes pin mappings to prepare for new pin mappings
             cell.removePinMapping(ps.getOldPhysicalName());
@@ -672,7 +695,10 @@ public class LUTTools {
                 continue;
             }
             pinToMove.setPinName(ps.getNewNetPinName());
-            pinToMove.setSiteInst(cell.getSiteInst());
+            SiteInst si = cell.getSiteInst();
+            pinToMove.setSiteInst(si);
+            Net net = pinToMove.getNet();
+            si.routeIntraSiteNet(net, pinToMove.getBELPin(), cell.getBEL().getPin(ps.getNewPhysicalName()));
         }
 
         assert(q.isEmpty());
