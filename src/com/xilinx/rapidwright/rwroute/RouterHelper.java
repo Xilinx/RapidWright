@@ -360,13 +360,7 @@ public class RouterHelper {
             SiteInst si = spi.getSiteInst();
             String siteWireName = spi.getSiteWireName();
             if (invertLutInputs && spi.isLUTInputPin()) {
-                BELPin spiBelPin;
-                if (isVersal) {
-                    // Walk through IMR before checking for connected cells
-                    spiBelPin = si.getBELPin(spi.getSiteWireName() + "_IMR", "Q");
-                } else {
-                    spiBelPin = spi.getBELPin();
-                }
+                BELPin spiBelPin = spi.getBELPin();
                 Collection<Cell> connectedCells = DesignTools.getConnectedCells(spiBelPin, si);
                 if (connectedCells.isEmpty()) {
                     for (BELPin belPin : si.getSiteWirePins(spiBelPin.getSiteWireName())) {
