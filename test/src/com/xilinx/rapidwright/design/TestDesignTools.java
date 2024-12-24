@@ -1451,6 +1451,70 @@ public class TestDesignTools {
         }
     }
 
+    @Test
+    public void testGetConnectedCellsVersal() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        SiteInst si = design.getSiteInstFromSiteName("SLICE_X140Y3");
+        {
+            SitePinInst spi = si.getSitePinInst("F6");
+            Assertions.assertEquals("[processor/address_loop[5].upper_pc.high_int_vector.pc_lut(BEL: F6LUT)]",
+                    DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
+        }
+        {
+            SitePinInst spi = si.getSitePinInst("D3");
+            Assertions.assertEquals("[processor/init_zero_muxcy_CARRY4_CARRY8_LUT6CY_3/LUTCY1_INST(BEL: D5LUT), processor/init_zero_muxcy_CARRY4_CARRY8_LUT6CY_3/LUTCY2_INST(BEL: D6LUT)]",
+                    DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
+        }
+        {
+            SitePinInst spi = si.getSitePinInst("EX");
+            Assertions.assertEquals("[processor/carry_flag_flop(BEL: EFF)]",
+                    DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
+        }
+        {
+            SitePinInst spi = si.getSitePinInst("CKEN2");
+            Assertions.assertEquals("[processor/zero_flag_flop(BEL: DFF2)]",
+                    DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
+        }
+        // This design has no site routing for CLK
+        // {
+        //     SitePinInst spi = si.getSitePinInst("CLK");
+        //     Assertions.assertEquals("[]",
+        //             DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
+        // }
+    }
+
+    @Test
+    public void testGetConnectedBELPinsVersal() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        SiteInst si = design.getSiteInstFromSiteName("SLICE_X140Y3");
+        {
+            SitePinInst spi = si.getSitePinInst("F6");
+            Assertions.assertEquals("[F6LUT.A6]",
+                    DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
+        }
+        {
+            SitePinInst spi = si.getSitePinInst("D3");
+            Assertions.assertEquals("[D5LUT.A3, D6LUT.A3]",
+                    DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
+        }
+        {
+            SitePinInst spi = si.getSitePinInst("EX");
+            Assertions.assertEquals("[EFF.D]",
+                    DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
+        }
+        {
+            SitePinInst spi = si.getSitePinInst("CKEN2");
+            Assertions.assertEquals("[DFF2.CE]",
+                    DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
+        }
+        // This design has no site routing for CLK
+        // {
+        //     SitePinInst spi = si.getSitePinInst("CLK");
+        //     Assertions.assertEquals("[]",
+        //             DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
+        // }
+    }
+
     @ParameterizedTest
     @CsvSource({
             // Cell pin placed onto a D6LUT/O6 -- its net does exit the site
