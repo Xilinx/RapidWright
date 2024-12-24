@@ -4414,14 +4414,17 @@ public class DesignTools {
      * Update the SitePinInst.isRouted() value of all sink pins in the given
      * Design. See {@link #updatePinsIsRouted(Net)}.
      * @param design Design in which pins are to be updated.
-     * @return Number of unrouted sink pins across design.
+     * @return Number of unrouted sink pins (not driven by hierarchical ports) across design.
      */
     public static int updatePinsIsRouted(Design design) {
-        int numUnroutedSinkPins = 0;
+        int totalUnroutedSinkPins = 0;
         for (Net net : design.getNets()) {
-            numUnroutedSinkPins += updatePinsIsRouted(net);
+            int numUnroutedSinkPins = updatePinsIsRouted(net);
+            if (!DesignTools.isNetDrivenByHierPort(net)) {
+                totalUnroutedSinkPins += numUnroutedSinkPins;
+            }
         }
-        return numUnroutedSinkPins;
+        return totalUnroutedSinkPins;
     }
 
     /**
