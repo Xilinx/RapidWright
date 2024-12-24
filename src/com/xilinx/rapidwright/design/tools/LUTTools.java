@@ -482,7 +482,6 @@ public class LUTTools {
      */
     public static int swapMultipleLutPins(Map<SitePinInst, String> oldPinToNewPins) {
         Map<String,Map<String,PinSwap>> pinSwaps = new HashMap<>();
-        Boolean isVersal = null;
 
         for (Map.Entry<SitePinInst, String> e : oldPinToNewPins.entrySet()) {
             SitePinInst oldSinkSpi = e.getKey();
@@ -497,18 +496,7 @@ public class LUTTools {
                 continue;
             }
 
-            if (isVersal == null) {
-                isVersal = si.getDesign().getSeries() == Series.Versal;
-            }
-
             Set<Cell> cells = DesignTools.getConnectedCells(oldSinkSpi);
-            if (isVersal) {
-                assert(cells.size() == 1);
-                Cell cell = cells.iterator().next();
-                BEL bel = cell.getBEL();
-                assert(bel.isIMR());
-                cells = DesignTools.getConnectedCells(bel.getPin("Q"), si);
-            }
             if (cells.isEmpty()) {
                 continue;
             }
