@@ -2305,8 +2305,7 @@ public class DesignTools {
                     } else if (bel.isLUT() ||
                             bel.getBELType().endsWith("MUX") || // F[789]MUX
                             // Versal
-                            bel.isSliceFFClkMod() ||
-                            bel.getName().endsWith("_IMR")) {
+                            bel.isSliceFFClkMod() || bel.isIMR() || bel.isSRIMR() || bel.isCEIMR()) {
                         Cell possibleRouteThru = inst.getCell(bel);
                         if (possibleRouteThru == null) {
                             BELPin clkBelPin = bel.isSliceFFClkMod() ? bel.getPin("CLK") : null;
