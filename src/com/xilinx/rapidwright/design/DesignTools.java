@@ -2020,9 +2020,7 @@ public class DesignTools {
                     p = pip.getInputPin().getSiteConns().get(0);
                     action.accept(p);
                 } else {
-                    for (BELPin snk : pip.getOutputPin().getSiteConns()) {
-                        action.accept(snk);
-                    }
+                    foreachConnectedBELPin(pip.getOutputPin(), si, action);
                 }
             } else {
                 Cell c = si.getCell(p.getBELName());
