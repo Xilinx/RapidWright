@@ -360,10 +360,9 @@ public class RouterHelper {
             SiteInst si = spi.getSiteInst();
             String siteWireName = spi.getSiteWireName();
             if (invertLutInputs && spi.isLUTInputPin()) {
-                BELPin spiBelPin = spi.getBELPin();
-                Collection<Cell> connectedCells = DesignTools.getConnectedCells(spiBelPin, si);
+                Collection<Cell> connectedCells = DesignTools.getConnectedCells(spi);
                 if (connectedCells.isEmpty()) {
-                    for (BELPin belPin : si.getSiteWirePins(spiBelPin.getSiteWireName())) {
+                    for (BELPin belPin : si.getSiteWirePins(spi.getSiteWireName())) {
                         if (belPin.isSitePort()) {
                             continue;
                         }
@@ -405,7 +404,7 @@ public class RouterHelper {
                 toInvertPins.add(spi);
                 // Re-paint the intra-site routing from GND to VCC
                 // (no intra site routing will occur during Net.addPin() later)
-                si.routeIntraSiteNet(vccNet, spi.getBELPin(), spiBelPin);
+                si.routeIntraSiteNet(vccNet, spi.getBELPin(), spi.getBELPin());
 
                 for (Cell cell : connectedCells) {
                     // Find the logical pin name

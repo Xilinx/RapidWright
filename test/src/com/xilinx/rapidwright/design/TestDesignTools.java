@@ -1446,6 +1446,7 @@ public class TestDesignTools {
         {
             DesignTools.createMissingSitePinInsts(design, design.getNet("clk"));
             SitePinInst spi = si.getSitePinInst("CLK2");
+            Assertions.assertNull(si.getCell("EF2"));
             Assertions.assertEquals("[EFF.CLK, FFF.CLK, FFF2.CLK, GFF.CLK, GFF2.CLK, HFF.CLK, HFF2.CLK]",
                     DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
         }
