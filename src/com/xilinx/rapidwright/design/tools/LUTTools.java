@@ -645,21 +645,12 @@ public class LUTTools {
             copyOnWritePinSwaps.add(ps);
         }
 
-        Boolean isVersal = null;
         // Prepares pins for swapping by removing them
         Queue<SitePinInst> q = new LinkedList<>();
         for (PinSwap ps : copyOnWritePinSwaps) {
             Cell cell = ps.getCell();
+            String oldSitePinName = cell.getBELName().substring(0, 1) + ps.getOldPhysicalName().charAt(1);
             SiteInst si = cell.getSiteInst();
-            if (isVersal == null) {
-                isVersal = si.getDesign().getSeries() == Series.Versal;
-            }
-            String oldSitePinName;
-            if (isVersal) {
-                oldSitePinName = cell.getBELName().substring(0, 1) + ps.getOldPhysicalName().charAt(1);
-            } else {
-                oldSitePinName = cell.getSiteWireNameFromPhysicalPin(ps.getOldPhysicalName());
-            }
             SitePinInst pinToMove = si.getSitePinInst(oldSitePinName);
             q.add(pinToMove);
             if (pinToMove == null) {
@@ -697,8 +688,7 @@ public class LUTTools {
             pinToMove.setPinName(ps.getNewNetPinName());
             SiteInst si = cell.getSiteInst();
             pinToMove.setSiteInst(si);
-            Net net = pinToMove.getNet();
-            si.routeIntraSiteNet(net, pinToMove.getBELPin(), cell.getBEL().getPin(ps.getNewPhysicalName()));
+            si.routeIntraSiteNet(pinToMove.getNet(), pinToMove.getBELPin(), cell.getBEL().getPin(ps.getNewPhysicalName()));
         }
 
         assert(q.isEmpty());
