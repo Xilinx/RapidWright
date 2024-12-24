@@ -2026,7 +2026,17 @@ public class DesignTools {
                 }
             } else {
                 Cell c = si.getCell(p.getBELName());
-                if (c != null && c.getLogicalPinMapping(p.getName()) != null) {
+                if (c == null) {
+                    continue;
+                }
+                if (c.getLogicalPinMapping(p.getName()) == null) {
+                    continue;
+                }
+                BEL bel = c.getBEL();
+                if ((bel.isIMR() || bel.isSRIMR() || bel.isCEIMR()) && c.isRoutethru()) {
+                    // Walk through IMR registers
+                    foreachConnectedBELPin(bel.getPin("Q"), si, action);
+                } else {
                     action.accept(p);
                 }
             }
