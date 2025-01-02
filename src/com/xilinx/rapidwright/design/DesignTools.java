@@ -4367,13 +4367,18 @@ public class DesignTools {
      * tied to GND or VCC) when following the Net's PIPs.
      * A source pin will be marked as being routed if it drives at least one PIP.
      * @param net Net on which pins are to be updated.
+     * @return Number of unrouted sink pins on net.
      */
-    public static void updatePinsIsRouted(Net net) {
+    public static int updatePinsIsRouted(Net net) {
+        int numUnroutedSinkPins = 0;
         for (SitePinInst spi : net.getPins()) {
             spi.setRouted(false);
+            if (!spi.isOutPin()) {
+                numUnroutedSinkPins++;
+            }
         }
         if (!net.hasPIPs()) {
-            return;
+            return numUnroutedSinkPins;
         }
 
         Map<Node, SitePinInst> node2spi = new HashMap<>();
@@ -4392,23 +4397,34 @@ public class DesignTools {
         }
         while (!queue.isEmpty()) {
             NetTools.NodeTree node = queue.poll();
-            SitePinInst spi = node2spi.get(node);
+            SitePinInst spi = node2spi.remove(node);
             if (spi != null) {
                 spi.setRouted(true);
+                if (!spi.isOutPin()) {
+                    assert(numUnroutedSinkPins > 0);
+                    numUnroutedSinkPins--;
+                }
             }
             queue.addAll(node.fanouts);
         }
+        return numUnroutedSinkPins;
     }
 
     /**
      * Update the SitePinInst.isRouted() value of all sink pins in the given
      * Design. See {@link #updatePinsIsRouted(Net)}.
      * @param design Design in which pins are to be updated.
+     * @return Number of unrouted sink pins (not driven by hierarchical ports) across design.
      */
-    public static void updatePinsIsRouted(Design design) {
+    public static int updatePinsIsRouted(Design design) {
+        int totalUnroutedSinkPins = 0;
         for (Net net : design.getNets()) {
-            updatePinsIsRouted(net);
+            int numUnroutedSinkPins = updatePinsIsRouted(net);
+            if (!DesignTools.isNetDrivenByHierPort(net)) {
+                totalUnroutedSinkPins += numUnroutedSinkPins;
+            }
         }
+        return totalUnroutedSinkPins;
     }
 
     /**

@@ -339,7 +339,7 @@ public class TestGlobalSignalRouting {
                     if (node != null) used.add(node);
                 }
             }
-            DesignTools.updatePinsIsRouted(net);
+            Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(net));
             for (SitePinInst spi : net.getPins()) {
                 Assertions.assertTrue(spi.isRouted());
             }
