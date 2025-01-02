@@ -367,6 +367,12 @@ public class RouterHelper {
                             continue;
                         }
                         BEL bel = belPin.getBEL();
+                        if (isVersal && bel.isIMR()) {
+                            // Since DesignTools.getConnectedCells() will only return cells
+                            // for which a logical pin mapping exists, for the purpose of
+                            // identifying SRL16s walk through this IMR
+                            bel = si.getBEL(bel.getName().substring(0,1) + "6LUT");
+                        }
                         Cell cell = si.getCell(bel);
                         if (cell == null) {
                             continue;

@@ -2044,7 +2044,7 @@ public class DesignTools {
     }
 
     /**
-     * Looks in the site instance for cells connected to this BEL pin and SiteInst.
+     * Looks in the site instance for cells connected (i.e. with a logical pin mapping) to this BEL pin and SiteInst.
      * Will walk through used SitePIPs and routethru cells (e.g. LUTs, IMR registers, etc.)
      * @param pin The BELPin to examine for connected cells.
      * @param si The SiteInst to examine for connected cells.
@@ -2062,7 +2062,7 @@ public class DesignTools {
     }
 
     /**
-     * Looks in the site instance for cells connected to this site pin.
+     * Looks in the site instance for cells connected (i.e. with a logical pin mapping) to this site pin.
      * Will walk through used SitePIPs and routethru cells (e.g. LUTs, IMR registers, etc.)
      * @param pin The SitePinInst to examine for connected cells.
      * @return Set of connected cells to this pin.
