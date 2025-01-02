@@ -1476,12 +1476,8 @@ public class TestDesignTools {
             Assertions.assertEquals("[processor/zero_flag_flop(BEL: DFF2)]",
                     DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
         }
-        // This design has no site routing for CLK
-        // {
-        //     SitePinInst spi = si.getSitePinInst("CLK");
-        //     Assertions.assertEquals("[]",
-        //             DesignTools.getConnectedCells(spi).stream().map(Cell::toString).sorted().collect(Collectors.toList()).toString());
-        // }
+        // This design has no intra-site routing for CLK so this test
+        // does not check for connected cells as done in other tests
     }
 
     @Test
@@ -1508,12 +1504,8 @@ public class TestDesignTools {
             Assertions.assertEquals("[DFF2.CE]",
                     DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
         }
-        // This design has no site routing for CLK
-        // {
-        //     SitePinInst spi = si.getSitePinInst("CLK");
-        //     Assertions.assertEquals("[]",
-        //             DesignTools.getConnectedBELPins(spi).stream().map(BELPin::toString).sorted().collect(Collectors.toList()).toString());
-        // }
+        // This design has no intra-site routing for CLK so this test
+        // does not check for connected cells as done in other tests
     }
 
     @ParameterizedTest
