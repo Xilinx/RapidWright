@@ -188,7 +188,7 @@ public class TestECOTools {
         EDIFNetlist netlist = design.getNetlist();
         Map<Net, Set<SitePinInst>> deferredRemovals = new HashMap<>();
 
-        DesignTools.updatePinsIsRouted(design);
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(design));
 
         // Disconnect the ILA inputs
         List<EDIFHierPortInst> disconnectPins = new ArrayList<>();
@@ -254,7 +254,7 @@ public class TestECOTools {
         EDIFNetlist netlist = design.getNetlist();
         Map<Net, Set<SitePinInst>> deferredRemovals = new HashMap<>();
 
-        DesignTools.updatePinsIsRouted(design);
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(design));
 
         // Disconnect the outputs
         List<EDIFHierPortInst> disconnectPins = new ArrayList<>();
@@ -387,7 +387,7 @@ public class TestECOTools {
         Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
         EDIFNetlist netlist = design.getNetlist();
 
-        DesignTools.updatePinsIsRouted(design);
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(design));
 
         EDIFCell reference = netlist.getCell("kcpsm6");
         List<String> instNames = Arrays.asList("processor2", "processor3");
@@ -475,7 +475,7 @@ public class TestECOTools {
         Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
         EDIFNetlist netlist = design.getNetlist();
 
-        DesignTools.updatePinsIsRouted(design);
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(design));
 
         List<String> netNames = Arrays.asList("processor/foo", "your_program/bar");
         ECOTools.createNet(design, netNames);

@@ -515,4 +515,36 @@ public class TestDesign {
             Assertions.assertTrue(Arrays.equals(nets1, nets2));
         }
     }
+
+    @Test
+    public void testPlaceCellPinMappings() {
+        final EDIFNetlist netlist = TestEDIF.createEmptyNetlist();
+        final Design design = new Design(netlist);
+
+        final Cell myCell = design.createCell("myCell", Unisim.FDRE);
+        Assertions.assertTrue(myCell.getPinMappingsL2P().isEmpty());
+
+        final Site site = design.getDevice().getSite(SITE);
+        design.createSiteInst(site);
+        BEL bel = site.getBEL("AFF");
+        Assertions.assertNotNull(bel);
+        design.placeCell(myCell, site, bel);
+
+        // Check that L2P and P2L are consistent
+        for (String logPin : new String[]{"CE", "C", "D", "R", "Q"}) {
+            String physPin = myCell.getPhysicalPinMapping(logPin);
+            Assertions.assertEquals(logPin, myCell.getLogicalPinMapping(physPin));
+        }
+
+        // Move the Cell to another BEL
+        myCell.unplace();
+        bel = site.getBEL("BFF");
+        design.placeCell(myCell, site, bel);
+
+        // Check that L2P and P2L remain consistent
+        for (String logPin : new String[]{"CE", "C", "D", "R", "Q"}) {
+            String physPin = myCell.getPhysicalPinMapping(logPin);
+            Assertions.assertEquals(logPin, myCell.getLogicalPinMapping(physPin));
+        }
+    }
 }
