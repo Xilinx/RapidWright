@@ -360,20 +360,19 @@ public class RouterHelper {
             SiteInst si = spi.getSiteInst();
             String siteWireName = spi.getSiteWireName();
             if (invertLutInputs && spi.isLUTInputPin()) {
-                BELPin spiBelPin;
-                if (isVersal) {
-                    // Walk through IMR before checking for connected cells
-                    spiBelPin = si.getBELPin(spi.getSiteWireName() + "_IMR", "Q");
-                } else {
-                    spiBelPin = spi.getBELPin();
-                }
-                Collection<Cell> connectedCells = DesignTools.getConnectedCells(spiBelPin, si);
+                Collection<Cell> connectedCells = DesignTools.getConnectedCells(spi);
                 if (connectedCells.isEmpty()) {
-                    for (BELPin belPin : si.getSiteWirePins(spiBelPin.getSiteWireName())) {
+                    for (BELPin belPin : si.getSiteWirePins(spi.getSiteWireName())) {
                         if (belPin.isSitePort()) {
                             continue;
                         }
                         BEL bel = belPin.getBEL();
+                        if (isVersal && bel.isIMR()) {
+                            // Since DesignTools.getConnectedCells() will only return cells
+                            // for which a logical pin mapping exists, for the purpose of
+                            // identifying SRL16s walk through this IMR
+                            bel = si.getBEL(bel.getName().substring(0,1) + "6LUT");
+                        }
                         Cell cell = si.getCell(bel);
                         if (cell == null) {
                             continue;
@@ -411,7 +410,7 @@ public class RouterHelper {
                 toInvertPins.add(spi);
                 // Re-paint the intra-site routing from GND to VCC
                 // (no intra site routing will occur during Net.addPin() later)
-                si.routeIntraSiteNet(vccNet, spi.getBELPin(), spiBelPin);
+                si.routeIntraSiteNet(vccNet, spi.getBELPin(), spi.getBELPin());
 
                 for (Cell cell : connectedCells) {
                     // Find the logical pin name

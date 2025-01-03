@@ -2003,7 +2003,8 @@ public class DesignTools {
     }
 
     /**
-     * Looks in the site instance for BEL pins connected to this site pin.
+     * Looks in the site instance for used BEL pins connected to this site pin.
+     * Will walk through used SitePIPs and routethru cells (e.g. LUTs, IMR registers, etc.)
      * @param pin The BELPin to examine for connected BEL pins.
      * @param si The SiteInst to examine for connected cells.
      * @param action Perform this action on each connected BELPin.
@@ -2020,13 +2021,22 @@ public class DesignTools {
                     p = pip.getInputPin().getSiteConns().get(0);
                     action.accept(p);
                 } else {
-                    for (BELPin snk : pip.getOutputPin().getSiteConns()) {
-                        action.accept(snk);
-                    }
+                    // Walk through any used SitePIPs
+                    foreachConnectedBELPin(pip.getOutputPin(), si, action);
                 }
             } else {
                 Cell c = si.getCell(p.getBELName());
-                if (c != null && c.getLogicalPinMapping(p.getName()) != null) {
+                if (c == null) {
+                    continue;
+                }
+                if (c.getLogicalPinMapping(p.getName()) == null) {
+                    continue;
+                }
+                BEL bel = c.getBEL();
+                if ((bel.isIMR() || bel.isSRIMR() || bel.isCEIMR()) && c.isRoutethru()) {
+                    // Walk through IMR registers
+                    foreachConnectedBELPin(bel.getPin("Q"), si, action);
+                } else {
                     action.accept(p);
                 }
             }
@@ -2034,7 +2044,8 @@ public class DesignTools {
     }
 
     /**
-     * Looks in the site instance for cells connected to this BEL pin and SiteInst.
+     * Looks in the site instance for cells connected (i.e. with a logical pin mapping) to this BEL pin and SiteInst.
+     * Will walk through used SitePIPs and routethru cells (e.g. LUTs, IMR registers, etc.)
      * @param pin The BELPin to examine for connected cells.
      * @param si The SiteInst to examine for connected cells.
      * @return Set of connected cells to this pin.
@@ -2051,7 +2062,8 @@ public class DesignTools {
     }
 
     /**
-     * Looks in the site instance for cells connected to this site pin.
+     * Looks in the site instance for cells connected (i.e. with a logical pin mapping) to this site pin.
+     * Will walk through used SitePIPs and routethru cells (e.g. LUTs, IMR registers, etc.)
      * @param pin The SitePinInst to examine for connected cells.
      * @return Set of connected cells to this pin.
      */
@@ -2061,6 +2073,7 @@ public class DesignTools {
 
     /**
      * Looks in the site instance for BEL pins connected to this BEL pin and SiteInst.
+     * Will walk through used SitePIPs and routethru cells (e.g. LUTs, IMR registers, etc.)
      * @param pin The SitePinInst to examine for connected BEL pins.
      * @param si The SiteInst to examine for connected cells.
      * @return Set of BEL pins to this site pin.
@@ -2297,8 +2310,7 @@ public class DesignTools {
                     } else if (bel.isLUT() ||
                             bel.getBELType().endsWith("MUX") || // F[789]MUX
                             // Versal
-                            bel.isSliceFFClkMod() ||
-                            bel.getName().endsWith("_IMR")) {
+                            bel.isSliceFFClkMod() || bel.isIMR() || bel.isSRIMR() || bel.isCEIMR()) {
                         Cell possibleRouteThru = inst.getCell(bel);
                         if (possibleRouteThru == null) {
                             BELPin clkBelPin = bel.isSliceFFClkMod() ? bel.getPin("CLK") : null;
@@ -4367,13 +4379,18 @@ public class DesignTools {
      * tied to GND or VCC) when following the Net's PIPs.
      * A source pin will be marked as being routed if it drives at least one PIP.
      * @param net Net on which pins are to be updated.
+     * @return Number of unrouted sink pins on net.
      */
-    public static void updatePinsIsRouted(Net net) {
+    public static int updatePinsIsRouted(Net net) {
+        int numUnroutedSinkPins = 0;
         for (SitePinInst spi : net.getPins()) {
             spi.setRouted(false);
+            if (!spi.isOutPin()) {
+                numUnroutedSinkPins++;
+            }
         }
         if (!net.hasPIPs()) {
-            return;
+            return numUnroutedSinkPins;
         }
 
         Map<Node, SitePinInst> node2spi = new HashMap<>();
@@ -4392,23 +4409,34 @@ public class DesignTools {
         }
         while (!queue.isEmpty()) {
             NetTools.NodeTree node = queue.poll();
-            SitePinInst spi = node2spi.get(node);
+            SitePinInst spi = node2spi.remove(node);
             if (spi != null) {
                 spi.setRouted(true);
+                if (!spi.isOutPin()) {
+                    assert(numUnroutedSinkPins > 0);
+                    numUnroutedSinkPins--;
+                }
             }
             queue.addAll(node.fanouts);
         }
+        return numUnroutedSinkPins;
     }
 
     /**
      * Update the SitePinInst.isRouted() value of all sink pins in the given
      * Design. See {@link #updatePinsIsRouted(Net)}.
      * @param design Design in which pins are to be updated.
+     * @return Number of unrouted sink pins (not driven by hierarchical ports) across design.
      */
-    public static void updatePinsIsRouted(Design design) {
+    public static int updatePinsIsRouted(Design design) {
+        int totalUnroutedSinkPins = 0;
         for (Net net : design.getNets()) {
-            updatePinsIsRouted(net);
+            int numUnroutedSinkPins = updatePinsIsRouted(net);
+            if (!DesignTools.isNetDrivenByHierPort(net)) {
+                totalUnroutedSinkPins += numUnroutedSinkPins;
+            }
         }
+        return totalUnroutedSinkPins;
     }
 
     /**
