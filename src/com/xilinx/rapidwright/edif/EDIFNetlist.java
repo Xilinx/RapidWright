@@ -481,26 +481,41 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
-     * Migrates all cells in the provided library
-     * into the standard work library.
-     * @param library The library with cells to be migrated to work.
+     * Migrates all cells in the provided library into the standard work library.
+     * 
+     * @param library          The library with cells to be migrated to work.
+     * @param renameCollisions Flag to rename cells upon name collision
      */
-    public void migrateToWorkLibrary(String library) {
+    public void migrateToWorkLibrary(String library, boolean renameCollisions) {
         EDIFLibrary work = getWorkLibrary();
         EDIFLibrary oldWork = getLibrary(library);
         List<EDIFCell> toRemove = new ArrayList<>(oldWork.getCells());
         for (EDIFCell c : toRemove) {
             oldWork.removeCell(c);
-            work.addCell(c);
+            if (renameCollisions) {
+                work.addCellRenameDuplicates(c, "Work");
+            } else {
+                work.addCell(c);
+            }
         }
         removeLibrary(library);
     }
 
     /**
-     * Migrates all libraries except HDI primitives and work to
-     * the work library.
+     * Migrates all cells in the provided library into the standard work library.
+     * 
+     * @param library The library with cells to be migrated to work.
      */
-    public void consolidateAllToWorkLibrary() {
+    public void migrateToWorkLibrary(String library) {
+        migrateToWorkLibrary(library, false);
+    }
+
+    /**
+     * Migrates all libraries except HDI primitives and work to the work library.
+     * 
+     * @param renameCollisions Flag to rename cells upon name collision
+     */
+    public void consolidateAllToWorkLibrary(boolean renameCollisions) {
         List<EDIFLibrary> librariesToMigrate = new ArrayList<>();
         for (EDIFLibrary l : getLibraries()) {
             if (!l.isHDIPrimitivesLibrary() && !l.isWorkLibrary()) {
@@ -508,8 +523,15 @@ public class EDIFNetlist extends EDIFName {
             }
         }
         for (EDIFLibrary l : librariesToMigrate) {
-            migrateToWorkLibrary(l.getName());
+            migrateToWorkLibrary(l.getName(), renameCollisions);
         }
+    }
+
+    /**
+     * Migrates all libraries except HDI primitives and work to the work library.
+     */
+    public void consolidateAllToWorkLibrary() {
+        consolidateAllToWorkLibrary(false);
     }
 
     private EDIFCell migrateCellAndSubCellsWorker(EDIFCell cell) {
