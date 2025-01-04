@@ -84,4 +84,36 @@ public class TestBEL {
         Assertions.assertNotNull(b);
         Assertions.assertFalse(b.isFF());
     }
+    
+
+    @Test
+    public void testIMRFlags() {
+        Device d = Device.getDevice("xcv80");
+        String[] siteNames = new String[] { "IRI_QUAD_X34Y8", "IRI_QUAD_X34Y9", "SLICE_X48Y0",
+                                "SLICE_X49Y0" };
+
+        for (String siteName : siteNames) {
+            Site s = d.getSite(siteName);
+            for (BEL bel : s.getBELs()) {
+                Assertions.assertEquals(bel.isCEIMR(), bel.getBELType().endsWith("_IMC_FF")
+                        && (bel.getName().contains("CE") || bel.getName().contains("WE"))
+                        && bel.getName().contains("IMR"));
+
+                Assertions.assertEquals(bel.isSRIMR(), bel.getBELType().endsWith("_IMC_FF_T")
+                        && (bel.getName().contains("SR") || bel.getName().contains("RST"))
+                        && bel.getName().contains("IMR"));
+                
+                Assertions.assertEquals(bel.isIMR(), bel.getBELType().startsWith("SLICE_IMI_FF")
+                        && bel.getName().contains("IMR"));
+
+                Assertions.assertEquals(bel.isSliceFFClkMod(),
+                        bel.getBELType().equals("SLICE_FF_CLK_MOD")
+                                && bel.getName().contains("CLK_MOD"));
+
+                Assertions.assertEquals(bel.isSliceIMRClkMod(),
+                        bel.getBELType().equals("SLICE_IMR_CLK_MOD")
+                                && bel.getName().contains("CLK_MOD"));
+            }
+        }
+    }
 }
