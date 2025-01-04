@@ -24,10 +24,13 @@
 package com.xilinx.rapidwright.design.tools;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import com.xilinx.rapidwright.device.SitePIPStatus;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -175,6 +178,59 @@ public class TestLUTTools {
         } finally {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "false");
         }
+    }
+
+    @Test
+    public void testSwapMultipleLutPinsVersal() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        SiteInst si = design.getSiteInstFromSiteName("SLICE_X140Y3");
+        SitePinInst spiF6 = si.getSitePinInst("F6");
+        Net f6 = spiF6.getNet();
+        Assertions.assertEquals("processor/pc_mode1_lut/O5", f6.getName());
+        Assertions.assertSame(f6, si.getNetFromSiteWire("F6"));
+        Assertions.assertTrue(si.getCell("F6_IMR").isRoutethru());
+        Assertions.assertSame(f6, si.getNetFromSiteWire("F6_IMR_Q"));
+
+        SitePinInst spiF3 = si.getSitePinInst("F3");
+        Net f3 = spiF3.getNet();
+        Assertions.assertEquals("processor/address_loop[4].output_data.pc_vector_mux_lut/O6", f3.getName());
+        Assertions.assertSame(f3, si.getNetFromSiteWire("F3"));
+        Assertions.assertTrue(si.getCell("F3_IMR").isRoutethru());
+        Assertions.assertSame(f3, si.getNetFromSiteWire("F3_IMR_Q"));
+
+        SitePinInst spiF1 = si.getSitePinInst("F1");
+        Net f1 = spiF1.getNet();
+        Assertions.assertEquals("processor/address[5]", f1.getName());
+        Assertions.assertSame(f1, si.getNetFromSiteWire("F1"));
+        Assertions.assertTrue(si.getCell("F1_IMR").isRoutethru());
+        Assertions.assertSame(f1, si.getNetFromSiteWire("F1_IMR_Q"));
+
+        Map<SitePinInst, String> oldPinToNewPins = new HashMap<>();
+        oldPinToNewPins.put(spiF6, "F3");
+        oldPinToNewPins.put(spiF3, "F1");
+        oldPinToNewPins.put(spiF1, "F6");
+        LUTTools.swapMultipleLutPins(oldPinToNewPins);
+
+        spiF6 = si.getSitePinInst("F6");
+        Assertions.assertSame(f1, spiF6.getNet());
+        Assertions.assertSame(f1, si.getNetFromSiteWire("F6"));
+        Assertions.assertNull(si.getCell("F6_IMR"));
+        Assertions.assertEquals(SitePIPStatus.ON, si.getSitePIPStatus(si.getSitePIP("F6_IMR", "D")));
+        Assertions.assertSame(f1, si.getNetFromSiteWire("F6_IMR_Q"));
+
+        spiF3 = si.getSitePinInst("F3");
+        Assertions.assertSame(f6, spiF3.getNet());
+        Assertions.assertSame(f6, si.getNetFromSiteWire("F3"));
+        Assertions.assertNull(si.getCell("F3_IMR"));
+        Assertions.assertEquals(SitePIPStatus.ON, si.getSitePIPStatus(si.getSitePIP("F3_IMR", "D")));
+        Assertions.assertSame(f6, si.getNetFromSiteWire("F3_IMR_Q"));
+
+        spiF1 = si.getSitePinInst("F1");
+        Assertions.assertSame(f3, spiF1.getNet());
+        Assertions.assertSame(f3, si.getNetFromSiteWire("F1"));
+        Assertions.assertNull(si.getCell("F1_IMR"));
+        Assertions.assertEquals(SitePIPStatus.ON, si.getSitePIPStatus(si.getSitePIP("F1_IMR", "D")));
+        Assertions.assertSame(f3, si.getNetFromSiteWire("F1_IMR_Q"));
     }
     
     @ParameterizedTest
