@@ -401,4 +401,15 @@ public class TestSiteInst {
         design.routeSites();
         VivadoToolsHelper.assertRoutedSuccessfullyByVivado(design, dir);
     }
+
+    @Test
+    public void testIsEmpty() {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        for (SiteInst si : d.getSiteInsts()) {
+            Assertions.assertFalse(si.isEmpty());
+        }
+
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X40Y10"));
+        Assertions.assertTrue(si.isEmpty());
+    }
 }
