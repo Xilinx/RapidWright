@@ -208,12 +208,12 @@ public class DREAMPlaceFPGA {
         }
 
         // Create JSON file for DREAMPlaceFPGA
-        // Path jsonFile = workDir.resolve("design.json");
-        // Map<String, Object> settings = getSettingsMap();
-        // settings.put(INTERCHANGE_DEVICE, deviceFile.toString());
-        // settings.put(INTERCHANGE_NETLIST, workDir.relativize(Paths.get(inputRoot + Interchange.LOG_NETLIST_EXT)).toString());
-        // settings.put(RESULT_DIR, workDir.toString());
-        // writeJSONForDREAMPlaceFPGA(jsonFile, settings);
+        Path jsonFile = workDir.resolve("design.json");
+        Map<String, Object> settings = getSettingsMap();
+        settings.put(INTERCHANGE_DEVICE, deviceFile.toString());
+        settings.put(INTERCHANGE_NETLIST, inputLogNetlistName);
+        settings.put(RESULT_DIR, ".");
+        writeJSONForDREAMPlaceFPGA(jsonFile, settings);
 
         // Run DREAMPlaceFPGA
         // String exec = dreamPlaceFPGAExec + " " + workDir.relativize(jsonFile);
@@ -221,12 +221,8 @@ public class DREAMPlaceFPGA {
         // Run DREAMPlaceFPGA
         List<String> exec = new ArrayList<>();
         exec.add(dreamPlaceFPGAExec);
-        exec.add("-interchange_netlist");
-        exec.add(inputLogNetlistName);
-        exec.add("-interchange_device");
-        exec.add(deviceFile.toString());
-        exec.add("-result_dir");
-        exec.add(".");
+        exec.add("-json");
+        exec.add(jsonFile.toString());
 
         boolean verbose = true;
         String[] environ = null;
@@ -236,7 +232,7 @@ public class DREAMPlaceFPGA {
         }
 
         // Load placed result
-        Design placedDesign = null;
+        Design placedDesign;
         String outputPhysNetlistPath = workDir.resolve("design/design.phys").toString();
         try {
             placedDesign = PhysNetlistReader.readPhysNetlist(outputPhysNetlistPath,
