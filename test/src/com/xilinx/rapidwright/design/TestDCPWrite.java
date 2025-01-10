@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.design;
 
 import java.nio.file.Path;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -52,5 +53,37 @@ public class TestDCPWrite {
         if (FileTools.isVivadoAtLeastVersion(2024, 1)) {
             VivadoToolsHelper.assertFullyRouted(dcp);
         }
+    }
+
+    @Test
+    public void testAdvancedFlowFlags(@TempDir Path tempDir) {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+
+        // Should be true since it is targeting Versal
+        Assertions.assertTrue(design.isAdvancedFlow());
+        Path defaultDCPPath = tempDir.resolve("default.dcp");
+        design.writeCheckpoint(defaultDCPPath);
+
+        Design defaultDCP = Design.readCheckpoint(defaultDCPPath);
+        Assertions.assertTrue(defaultDCP.isAdvancedFlow());
+
+        design.setAdvancedFlow(false);
+        Assertions.assertFalse(design.isAdvancedFlow());
+        Path setFalseDCPPath = tempDir.resolve("false.dcp");
+        design.writeCheckpoint(setFalseDCPPath);
+
+        Design falseDCP = Design.readCheckpoint(setFalseDCPPath);
+        Assertions.assertFalse(falseDCP.isAdvancedFlow());
+
+        falseDCP.setAdvancedFlow(true);
+
+        Params.RW_DISABLE_WRITING_ADV_FLOW_DCPS = true;
+
+        Path overrideDCPPath = tempDir.resolve("override.dcp");
+        Assertions.assertTrue(falseDCP.isAdvancedFlow());
+        falseDCP.writeCheckpoint(overrideDCPPath);
+
+        Design overrideDCP = Design.readCheckpoint(overrideDCPPath);
+        Assertions.assertFalse(overrideDCP.isAdvancedFlow());
     }
 }
