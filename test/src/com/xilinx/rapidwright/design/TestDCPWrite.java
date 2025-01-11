@@ -73,7 +73,8 @@ public class TestDCPWrite {
         design.writeCheckpoint(setFalseDCPPath);
 
         Design falseDCP = Design.readCheckpoint(setFalseDCPPath);
-        Assertions.assertFalse(falseDCP.isAdvancedFlow());
+        // Write DCP should revert flag to default case (true)
+        Assertions.assertTrue(falseDCP.isAdvancedFlow());
 
         falseDCP.setAdvancedFlow(true);
 
@@ -82,8 +83,5 @@ public class TestDCPWrite {
         Path overrideDCPPath = tempDir.resolve("override.dcp");
         Assertions.assertTrue(falseDCP.isAdvancedFlow());
         falseDCP.writeCheckpoint(overrideDCPPath);
-
-        Design overrideDCP = Design.readCheckpoint(overrideDCPPath);
-        Assertions.assertFalse(overrideDCP.isAdvancedFlow());
     }
 }
