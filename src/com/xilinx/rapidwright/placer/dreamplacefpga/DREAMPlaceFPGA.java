@@ -216,9 +216,6 @@ public class DREAMPlaceFPGA {
         writeJSONForDREAMPlaceFPGA(jsonFile, settings);
 
         // Run DREAMPlaceFPGA
-        // String exec = dreamPlaceFPGAExec + " " + workDir.relativize(jsonFile);
-
-        // Run DREAMPlaceFPGA
         List<String> exec = new ArrayList<>();
         exec.add(dreamPlaceFPGAExec);
         exec.add("-json");
