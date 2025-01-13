@@ -78,10 +78,11 @@ public class TestDCPWrite {
 
         falseDCP.setAdvancedFlow(true);
 
-        Params.RW_DISABLE_WRITING_ADV_FLOW_DCPS = true;
-
         Path overrideDCPPath = tempDir.resolve("override.dcp");
+        Params.RW_DISABLE_WRITING_ADV_FLOW_DCPS = true;
         Assertions.assertTrue(falseDCP.isAdvancedFlow());
         falseDCP.writeCheckpoint(overrideDCPPath);
+        // Return to default for other tests
+        Params.RW_DISABLE_WRITING_ADV_FLOW_DCPS = false;
     }
 }
