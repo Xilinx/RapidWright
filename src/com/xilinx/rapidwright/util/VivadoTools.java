@@ -22,15 +22,15 @@
 
 package com.xilinx.rapidwright.util;
 
-import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.edif.EDIFTools;
-
 import java.io.File;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.edif.EDIFTools;
 
 /**
  * Utility methods to provide access to vivado and parse logs
@@ -115,12 +115,12 @@ public class VivadoTools {
         final String vivadoCmd = FileTools.getVivadoPath() + " -log " + outputLog.toString() + " -nojournal -mode batch -source "
                 + tclScript.toString();
         Integer exitCode = FileTools.runCommand(vivadoCmd, verbose, environ, runDir);
-        if (exitCode != 0) {
-            if (Files.exists(outputLog)) {
-                for (String l : FileTools.getLinesFromTextFile(outputLog.toString())) {
-                    System.out.println("FAILED OUTPUT> " + l);
-                }
+        if (Files.exists(outputLog)) {
+            for (String l : FileTools.getLinesFromTextFile(outputLog.toString())) {
+                System.out.println("VIVADO OUTPUT> " + l);
             }
+        }
+        if (exitCode != 0) {
             throw new RuntimeException("Vivado exited with code: " + exitCode);
         }
         return FileTools.getLinesFromTextFile(outputLog.toString());
