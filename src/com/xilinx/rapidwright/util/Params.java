@@ -36,6 +36,8 @@ public class Params {
 
     public static String RW_WRITE_DCP_2024_1_NAME = "RW_WRITE_DCP_2024_1";
 
+    public static String RW_DISABLE_WRITING_ADV_FLOW_DCPS_NAME = "RW_DISABLE_WRITING_ADV_FLOW_DCPS";
+
     /**
      * Flag to have RapidWright decompress gzipped EDIF files to disk prior to
      * parsing. This is a tradeoff where pre-decompression improves runtime over the
@@ -59,6 +61,14 @@ public class Params {
      * faster and will provide better support for the largest devices.
      */
     public static boolean RW_WRITE_DCP_2024_1 = isParamSet(RW_WRITE_DCP_2024_1_NAME);
+
+    /**
+     * Flag to disable RapidWright from writing any DCPs that target Vivado's
+     * Advanced Flow (starting in Vivado 2024.2). By default, RapidWright writes
+     * DCPs targeting Versal devices with the Advanced Flow compatibility flag set
+     * to true.
+     */
+    public static boolean RW_DISABLE_WRITING_ADV_FLOW_DCPS = isParamSet(RW_DISABLE_WRITING_ADV_FLOW_DCPS_NAME);
 
     /**
      * Checks if the named RapidWright parameter is set via an environment variable
