@@ -115,12 +115,12 @@ public class VivadoTools {
         final String vivadoCmd = FileTools.getVivadoPath() + " -log " + outputLog.toString() + " -nojournal -mode batch -source "
                 + tclScript.toString();
         Integer exitCode = FileTools.runCommand(vivadoCmd, verbose, environ, runDir);
-        if (Files.exists(outputLog)) {
-            for (String l : FileTools.getLinesFromTextFile(outputLog.toString())) {
-                System.out.println("VIVADO OUTPUT> " + l);
-            }
-        }
         if (exitCode != 0) {
+            if (Files.exists(outputLog)) {
+                for (String l : FileTools.getLinesFromTextFile(outputLog.toString())) {
+                    System.out.println("FAILED OUTPUT> " + l);
+                }
+            }
             throw new RuntimeException("Vivado exited with code: " + exitCode);
         }
         return FileTools.getLinesFromTextFile(outputLog.toString());
