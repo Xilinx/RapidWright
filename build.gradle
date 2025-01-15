@@ -212,8 +212,6 @@ task testPython(type:Test) {
       args = ['-m', 'pytest', '--junitxml', '$buildDir/test-results/testPython/testPython.xml', '--rootdir', 'python/test']
       // Enable verbose flag which prints out a pass/fail for every test
       args += ['-v']
-      // Prevent python/tests/... with the same namespace as in Java from clobbering
-      args += ['--import-mode=importlib']
       // Workaround from https://github.com/jpype-project/jpype/issues/842#issuecomment-847027355
       args += ['-p', 'no:faulthandler']
       if (!filter.commandLineIncludePatterns.isEmpty()) {
