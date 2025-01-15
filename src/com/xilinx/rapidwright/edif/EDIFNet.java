@@ -30,7 +30,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -241,7 +240,7 @@ public class EDIFNet extends EDIFPropertyObject {
      * Gets the sorted ArrayList of EDIFPortInsts on this net as a collection.
      * @return The collection of EDIFPortInsts on this net.
      */
-    public Collection<EDIFPortInst> getPortInsts() {
+    public List<EDIFPortInst> getPortInsts() {
         return portInsts == null ? Collections.emptyList() : portInsts;
     }
 

@@ -1,3 +1,27 @@
+============= RapidWright 2024.2.1-beta released on 2025-1-15 ================
+Notes: 
+  - Adds an Override Flag for Advanced Flow Settings in Designs (#1135)
+  - Test for SiteInst.isEmpty() (#1128)
+  - Tests for Versal BEL flags and site unrouting (#1125)
+  - [LUTTools] Versal pin swapping fixes (#1130)
+  - [DesignTools] foreachConnectedBELPin() to walk through Versal IMRs (#1129)
+  - [DesignTools] updatePinsIsRouted() to return num unrouted sinks (#1131)
+  - [TestDesign] Add testPlaceCellPinMappings() (#1122)
+  - [RWRoute] Small cleanup; enable CUFR by default (#1126)
+  - RWRoute preprocessing fixes (#1119)
+  - Enables setting Advanced Flow Flags for Designs
+  - Corrects and Adds BEL flags; fixes unroute site net for Versal
+  - [Cell] Fixes to P2L and L2P
+
+API Additions:
+  - com.xilinx.rapidwright.design.Cell "public void fixCell(boolean isFixed)"
+  - com.xilinx.rapidwright.design.Cell "public boolean isCellFixed()"
+  - com.xilinx.rapidwright.design.Design "public boolean isAdvancedFlow()"
+  - com.xilinx.rapidwright.design.Design "public void setAdvancedFlow(boolean val)"
+  - com.xilinx.rapidwright.design.SiteInst "public boolean isEmpty()"
+  - com.xilinx.rapidwright.device.BEL "public boolean isCEIMR()"
+  - com.xilinx.rapidwright.device.BEL "public boolean isSliceIMRClkMod()"
+
 ============= RapidWright 2024.2.0-beta released on 2024-12-04 ================
 Notes: 
   - Remove reliance on gap routing test (#1117)
