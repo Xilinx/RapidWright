@@ -1081,15 +1081,14 @@ public class DesignTools {
      */
     public static void unroutePins(Net net, Collection<SitePinInst> pins) {
         List<SitePinInst> sinkPins = new ArrayList<>(pins.size());
-        List<SitePinInst> srcPins = new ArrayList<>();
-        for (SitePinInst pin : pins) {
-            if (pin.isOutPin()) {
-                srcPins.add(pin);
+        pins.forEach((spi) -> {
+            if (spi.isOutPin()) {
+                // TODO - This can lead to a slow down in VCC and GND nets as it is not batched
+                DesignTools.unrouteSourcePin(spi);
             } else {
-                sinkPins.add(pin);
+                sinkPins.add(spi);
             }
-        }
-        DesignTools.unrouteSourcePins(srcPins);
+        });
         removePIPsFromNet(net,getTrimmablePIPsFromPins(net, sinkPins));
         for (SitePinInst pin : sinkPins) {
             pin.setRouted(false);
@@ -1114,62 +1113,41 @@ public class DesignTools {
      * @return The set of PIPs that were unrouted from the net.
      */
     public static Set<PIP> unrouteSourcePin(SitePinInst src) {
-        return unrouteSourcePins(Collections.singletonList(src));
-    }
+        if (!src.isOutPin() || src.getNet() == null) return Collections.emptySet();
+        Node srcNode = src.getConnectedNode();
+        Set<PIP> pipsToRemove = new HashSet<>();
 
-    /**
-     * Unroutes a list of source SitePinInst of a net. This is desirable when a net
-     * has multiple SitePinInst source pins (multiple outputs of a Site) and only a
-     * particular branch is desired to be unrouted. If the entire net is to be
-     * unrouted, a more efficient method is {@link Net#unroute()}.
-     * 
-     * @param srcs The list of source pins of the net from which to remove the
-     *             routing
-     * @return The set of PIPs that were unrouted from the net.
-     */
-    public static Set<PIP> unrouteSourcePins(List<SitePinInst> srcs) {
-        if (srcs == null || srcs.size() == 0) {
-            return Collections.emptySet();
-        }
-        Net net = srcs.get(0).getNet();
-        if (net == null) {
-            return Collections.emptySet();
-        }
         Map<Node, List<PIP>> pipMap = new HashMap<>();
-        for (PIP pip : net.getPIPs()) {
+        for (PIP pip : src.getNet().getPIPs()) {
             Node node = pip.isReversed() ? pip.getEndNode() : pip.getStartNode();
             pipMap.computeIfAbsent(node, k -> new ArrayList<>()).add(pip);
         }
 
         Map<Node,SitePinInst> sinkNodes = new HashMap<>();
-        for (SitePinInst sinkPin : net.getSinkPins()) {
+        for (SitePinInst sinkPin : src.getNet().getSinkPins()) {
             sinkNodes.put(sinkPin.getConnectedNode(), sinkPin);
         }
 
-        Set<PIP> pipsToRemove = new HashSet<>();
-        for (SitePinInst src : srcs) {
-            if (!src.isOutPin()) continue;
-            Queue<Node> q = new LinkedList<>();
-            q.add(src.getConnectedNode());
-            while (!q.isEmpty()) {
-                Node curr = q.poll();
-                List<PIP> pips = pipMap.get(curr);
-                if (pips != null) {
-                    for (PIP p : pips) {
-                        Node endNode = p.isReversed() ? p.getStartNode() : p.getEndNode();
-                        q.add(endNode);
-                        pipsToRemove.add(p);
-                        SitePinInst sink = sinkNodes.get(endNode);
-                        if (sink != null) {
-                            sink.setRouted(false);
-                        }
+        Queue<Node> q = new LinkedList<>();
+        q.add(srcNode);
+        while (!q.isEmpty()) {
+            Node curr = q.poll();
+            List<PIP> pips = pipMap.get(curr);
+            if (pips != null) {
+                for (PIP p : pips) {
+                    Node endNode = p.isReversed() ? p.getStartNode() : p.getEndNode();
+                    q.add(endNode);
+                    pipsToRemove.add(p);
+                    SitePinInst sink = sinkNodes.get(endNode);
+                    if (sink != null) {
+                        sink.setRouted(false);
                     }
                 }
             }
-
-            src.setRouted(false);
-            removePIPsFromNet(src.getNet(), pipsToRemove);
         }
+
+        src.setRouted(false);
+        removePIPsFromNet(src.getNet(), pipsToRemove);
         return pipsToRemove;
     }
 
@@ -1842,6 +1820,7 @@ public class DesignTools {
         // Rename nets if source was removed
         Set<String> netsToKeep = new HashSet<>();
         for (Entry<Net, String> e : netsToUpdate.entrySet()) {
+            EDIFHierNet newSource = d.getNetlist().getHierNetFromName(e.getValue());
             Net net = e.getKey();
             if (!net.rename(e.getValue())) {
                 throw new RuntimeException("ERROR: Failed to rename net '" + net.getName() + "'");
@@ -1861,7 +1840,7 @@ public class DesignTools {
         }
 
         for (SiteInst siteInst : siteInstsToRemove) {
-            d.removeSiteInst(siteInst, false, pinsToRemove);
+            d.removeSiteInst(siteInst);
         }
 
         // Remove any stray stubs on any remaining nets
