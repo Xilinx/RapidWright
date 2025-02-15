@@ -85,6 +85,7 @@ import com.xilinx.rapidwright.placer.handplacer.HandPlacer;
 import com.xilinx.rapidwright.placer.handplacer.ModuleOptimizer;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.Router;
+import com.xilinx.rapidwright.router.RoutingHeatMap;
 import com.xilinx.rapidwright.rwroute.CUFR;
 import com.xilinx.rapidwright.rwroute.PartialCUFR;
 import com.xilinx.rapidwright.rwroute.PartialRouter;
@@ -191,6 +192,7 @@ public class MainEntrypoint {
         addFunction("ReportTimingExample", ReportTimingExample::main);
         addFunction("Router", Router::main);
         addFunction("RouteThruHelper", RouteThruHelper::main);
+        addFunction("RoutingHeatMap", RoutingHeatMap::main);
         addFunction("RunSATRouterExample", RunSATRouterExample::main);
         addFunction("RWRoute", RWRoute::main);
         addFunction("SLRCrosserGenerator", SLRCrosserGenerator::main);
