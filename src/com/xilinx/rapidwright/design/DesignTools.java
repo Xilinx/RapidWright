@@ -1595,7 +1595,7 @@ public class DesignTools {
                                     if (pin.getName().equals(otherPinName)) {
                                         otherPin = LUTTools.getLUTOutputPin(pin.getBEL());
                                     }
-                                    }
+                                }
                                 if (otherPin != null) {
                                     Net otherNet = siteInst.getNetFromSiteWire(otherPin.getSiteWireName());
                                     if (otherNet != null && net.getName().equals(otherNet.getName())) {
@@ -1612,41 +1612,40 @@ public class DesignTools {
                                                     siteInst.removeCell(otherCell.getBEL());
                                                     siteInst.unrouteIntraSiteNet(pin, pin);
                                                 }
-                                                }
-
                                             }
-                                        } else {
-                                            // site routing terminates here or is invalid
+
                                         }
-                                    }
-
-                                } else if (otherCell != cell && otherCell.getLogicalPinMapping(pin.getName()) != null) {
-                                    // Don't search farther, we don't need to unroute anything else
-                                    if (pin.isInput() && belPin.isInput()) {
-                                        internalSinks.add(pin);
                                     } else {
-                                        internalTerminals.add(pin);
+                                        // site routing terminates here or is invalid
                                     }
-
                                 }
-                            }
-                            break;
-                        }
-                        case RBEL: {
-                            // We found a routing BEL, follow its sitepip
-                            SitePIP sitePIP = siteInst.getUsedSitePIP(pin);
-                            if (sitePIP != null) {
-                                BELPin otherPin = pin.isInput() ? sitePIP.getOutputPin() : sitePIP.getInputPin();
-                                Net otherNet = siteInst.getNetFromSiteWire(otherPin.getSiteWireName());
-                                if (otherNet != null && net.getName().equals(otherNet.getName())) {
-                                    queue.add(otherPin);
-                                    unrouteSegment = otherPin;
+                            } else if (otherCell != cell && otherCell.getLogicalPinMapping(pin.getName()) != null) {
+                                // Don't search farther, we don't need to unroute anything else
+                                if (pin.isInput() && belPin.isInput()) {
+                                    internalSinks.add(pin);
                                 } else {
-                                    // site routing terminates here or is invalid
+                                    internalTerminals.add(pin);
                                 }
+
                             }
-                            break;
                         }
+                        break;
+                    }
+                    case RBEL: {
+                        // We found a routing BEL, follow its sitepip
+                        SitePIP sitePIP = siteInst.getUsedSitePIP(pin);
+                        if (sitePIP != null) {
+                            BELPin otherPin = pin.isInput() ? sitePIP.getOutputPin() : sitePIP.getInputPin();
+                            Net otherNet = siteInst.getNetFromSiteWire(otherPin.getSiteWireName());
+                            if (otherNet != null && net.getName().equals(otherNet.getName())) {
+                                queue.add(otherPin);
+                                unrouteSegment = otherPin;
+                            } else {
+                                // site routing terminates here or is invalid
+                            }
+                        }
+                        break;
+                    }
                     }
                     visited.add(pin);
                 }
