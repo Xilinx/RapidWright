@@ -4356,7 +4356,7 @@ public class DesignTools {
             }
         }
 
-        // addProhibitConstraint(design, bels);
+        addProhibitConstraint(design, bels);
     }
 
     private static boolean isUsingSLICEGND(BELPin input, SiteInst si) {
