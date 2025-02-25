@@ -1542,38 +1542,39 @@ public class DesignTools {
      * @returns A list of site pins (if any) that should also be removed from inter-site routing to complete the unroute.
      */
     public static List<SitePinInst> unrouteCellPinSiteRouting(Cell cell, String logicalPinName) {
-        String physPinName = cell.getPhysicalPinMapping(logicalPinName);
-        if (physPinName == null) {
-            physPinName = cell.getDefaultPinMapping(logicalPinName);
-        }
-        if (physPinName == null) {
-            // Assume not routed
-            return Collections.emptyList();
-        }
-        BELPin belPin = cell.getBEL().getPin(physPinName);
-        SiteInst siteInst = cell.getSiteInst();
-        Net net = siteInst.getNetFromSiteWire(belPin.getSiteWireName());
-        if (net == null)
-            return Collections.emptyList();
+        List<SitePinInst> sitePinsToRemove = new ArrayList<>();
+        for (String physPinName : cell.getAllPhysicalPinMappings(logicalPinName)) {
+            if (physPinName == null) {
+                physPinName = cell.getDefaultPinMapping(logicalPinName);
+            }
+            if (physPinName == null) {
+                // Assume not routed
+                return Collections.emptyList();
+            }
+            BELPin belPin = cell.getBEL().getPin(physPinName);
+            SiteInst siteInst = cell.getSiteInst();
+            Net net = siteInst.getNetFromSiteWire(belPin.getSiteWireName());
+            if (net == null)
+                return Collections.emptyList();
 
-        List<String> sitePinNames = new ArrayList<>();
-        List<BELPin> internalTerminals = new ArrayList<>();
-        List<BELPin> internalSinks = new ArrayList<>();
-        Set<BELPin> visited = new HashSet<>();
-        Queue<BELPin> queue = new LinkedList<>();
-        queue.add(belPin);
+            List<String> sitePinNames = new ArrayList<>();
+            List<BELPin> internalTerminals = new ArrayList<>();
+            List<BELPin> internalSinks = new ArrayList<>();
+            Set<BELPin> visited = new HashSet<>();
+            Queue<BELPin> queue = new LinkedList<>();
+            queue.add(belPin);
 
-        while (!queue.isEmpty()) {
-            BELPin currPin = queue.poll();
-            visited.add(currPin);
-            BELPin unrouteSegment = null;
-            for (BELPin pin : siteInst.getSiteWirePins(currPin.getSiteWireIndex())) {
-                if (currPin == pin || visited.contains(pin)) {
-                    visited.add(pin);
-                    continue;
-                }
-                // Check if it is a site pin, cell pin, sitepip or routethru
-                switch (pin.getBEL().getBELClass()) {
+            while (!queue.isEmpty()) {
+                BELPin currPin = queue.poll();
+                visited.add(currPin);
+                BELPin unrouteSegment = null;
+                for (BELPin pin : siteInst.getSiteWirePins(currPin.getSiteWireIndex())) {
+                    if (currPin == pin || visited.contains(pin)) {
+                        visited.add(pin);
+                        continue;
+                    }
+                    // Check if it is a site pin, cell pin, sitepip or routethru
+                    switch (pin.getBEL().getBELClass()) {
                     case PORT: {
                         // We found a site pin, add it to solution set
                         sitePinNames.add(pin.getName());
@@ -1616,9 +1617,8 @@ public class DesignTools {
                                         }
                                     } else {
                                         // site routing terminates here or is invalid
-                                    }                                    
+                                    }
                                 }
-                                
                             } else if (otherCell != cell && otherCell.getLogicalPinMapping(pin.getName()) != null) {
                                 // Don't search farther, we don't need to unroute anything else
                                 if (pin.isInput() && belPin.isInput()) {
@@ -1646,49 +1646,49 @@ public class DesignTools {
                         }
                         break;
                     }
-                }
-                visited.add(pin);
-            }
-            if (unrouteSegment != null && unrouteSegment.isInput() && internalSinks.size() == 0) {
-                // Unroute this branch of the sitePIP
-                Net otherNet = siteInst.getNetFromSiteWire(unrouteSegment.getSiteWireName());
-                siteInst.unrouteIntraSiteNet(unrouteSegment, belPin);
-                siteInst.routeIntraSiteNet(otherNet, unrouteSegment, unrouteSegment);
-            }
-        }
-
-        List<SitePinInst> sitePinsToRemove = new ArrayList<>();
-
-        // This net is routed internally to the site
-        for (BELPin internalTerminal : internalTerminals) {
-            if (internalTerminal.isOutput() && internalSinks.size() > 0) {
-                continue;
-            }
-            if (belPin.isOutput()) {
-                siteInst.unrouteIntraSiteNet(belPin, internalTerminal);
-            } else {
-                siteInst.unrouteIntraSiteNet(internalTerminal, belPin);
-            }
-        }
-        if (internalSinks.size() == 0) {
-            for (String sitePinName : sitePinNames) {
-                SitePinInst pin = siteInst.getSitePinInst(sitePinName);
-                if (pin != null) {
-                    sitePinsToRemove.add(pin);
-                    if (belPin.isInput()) {
-                        siteInst.unrouteIntraSiteNet(pin.getBELPin(), belPin);
-                    } else {
-                        siteInst.unrouteIntraSiteNet(belPin, pin.getBELPin());
                     }
-                } else {
-                    // Vivado leaves dual output *MUX partially routed, unroute the site for this MUX pin
-                    // Could also be a cell with no loads
-                    siteInst.unrouteIntraSiteNet(belPin, siteInst.getBELPin(sitePinName, sitePinName));
+                    visited.add(pin);
+                }
+                if (unrouteSegment != null && unrouteSegment.isInput() && internalSinks.size() == 0) {
+                    // Unroute this branch of the sitePIP
+                    Net otherNet = siteInst.getNetFromSiteWire(unrouteSegment.getSiteWireName());
+                    siteInst.unrouteIntraSiteNet(unrouteSegment, belPin);
+                    siteInst.routeIntraSiteNet(otherNet, unrouteSegment, unrouteSegment);
                 }
             }
-            if (internalTerminals.size() == 0 && sitePinNames.size() == 0) {
-                // internal site route with no loads
-                siteInst.unrouteIntraSiteNet(belPin, belPin);
+
+            // This net is routed internally to the site
+            for (BELPin internalTerminal : internalTerminals) {
+                if (internalTerminal.isOutput() && internalSinks.size() > 0) {
+                    continue;
+                }
+                if (belPin.isOutput()) {
+                    siteInst.unrouteIntraSiteNet(belPin, internalTerminal);
+                } else {
+                    siteInst.unrouteIntraSiteNet(internalTerminal, belPin);
+                }
+            }
+            if (internalSinks.size() == 0) {
+                for (String sitePinName : sitePinNames) {
+                    SitePinInst pin = siteInst.getSitePinInst(sitePinName);
+                    if (pin != null) {
+                        sitePinsToRemove.add(pin);
+                        if (belPin.isInput()) {
+                            siteInst.unrouteIntraSiteNet(pin.getBELPin(), belPin);
+                        } else {
+                            siteInst.unrouteIntraSiteNet(belPin, pin.getBELPin());
+                        }
+                    } else {
+                        // Vivado leaves dual output *MUX partially routed, unroute the site for this
+                        // MUX pin
+                        // Could also be a cell with no loads
+                        siteInst.unrouteIntraSiteNet(belPin, siteInst.getBELPin(sitePinName, sitePinName));
+                    }
+                }
+                if (internalTerminals.size() == 0 && sitePinNames.size() == 0) {
+                    // internal site route with no loads
+                    siteInst.unrouteIntraSiteNet(belPin, belPin);
+                }
             }
         }
         return sitePinsToRemove;
