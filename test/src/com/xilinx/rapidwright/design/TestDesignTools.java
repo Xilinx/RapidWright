@@ -1534,4 +1534,18 @@ public class TestDesignTools {
         String sitePinName = DesignTools.getRoutedSitePin(cell, net, ehpi.getPortInst().getName());
         Assertions.assertEquals(expected, sitePinName == null ? "null" : sitePinName);
     }
+
+    @Test
+    public void testUnrouteCellPinSiteRoutingBRAMClkPins() {
+        Design d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
+        Cell c = d.getCell(
+                "base_mb_i/microblaze_0_local_memory/lmb_bram/U0/inst_blk_mem_gen/gnbram.gnative_mem_map_bmg.native_mem_map_blk_mem_gen/valid.cstr/ramloop[5].ram.r/prim_noinit.ram/DEVICE_8SERIES.WITH_BMM_INFO.TRUE_DP.SIMPLE_PRIM36.SERIES8_TDP_SP36_NO_ECC_ATTR.ram");
+
+        List<SitePinInst> unrouted = DesignTools.unrouteCellPinSiteRouting(c, "CLKARDCLK");
+        Assertions.assertEquals(2, unrouted.size());
+        for (SitePinInst p : unrouted) {
+            Assertions.assertTrue(p.getName().equals("CLKAU_X") || p.getName().equals("CLKAL_X"));
+        }
+
+    }
 }
