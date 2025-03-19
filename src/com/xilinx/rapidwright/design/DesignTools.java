@@ -1558,7 +1558,8 @@ public class DesignTools {
                 return Collections.emptyList();
             else {
                 // Check if net is connected to logical cell
-                EDIFPortInst portInst = cell.getEDIFCellInst().getPortInst(logicalPinName);
+                EDIFCellInst cellInst = cell.getEDIFCellInst();
+                EDIFPortInst portInst = cellInst != null ? cellInst.getPortInst(logicalPinName) : null;
                 if (portInst == null || portInst.getNet() == null) {
                     return Collections.emptyList();
                 }

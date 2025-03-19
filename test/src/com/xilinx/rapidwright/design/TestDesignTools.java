@@ -1325,9 +1325,7 @@ public class TestDesignTools {
         net5.connect(lut5, "O");
 
         Assertions.assertEquals(net5, carry5.getSiteInst().getNetFromSiteWire("D_O"));
-
         List<SitePinInst> pinsToRemove = DesignTools.unrouteCellPinSiteRouting(carry5, "S[3]");
-
         Assertions.assertEquals(0, pinsToRemove.size());
     }
 
