@@ -315,9 +315,30 @@ class TestEDIFNetlist {
         dstNetlist.copyCellAndSubCells(srcNetlist.getTopCell());
 
         RuntimeException e = Assertions.assertThrows(RuntimeException.class,
-                () -> dstNetlist.copyCellAndSubCells(srcNetlist.getTopCell()));
+                () -> dstNetlist.copyCellAndSubCells(srcNetlist.getTopCell(),
+                        /* uniquifyCollisions= */false));
         Assertions.assertEquals("ERROR: Destination netlist already contains EDIFCell named 'picoblaze_top' in library 'work'",
                 e.getMessage());
+
+        Assertions.assertEquals(dstNetlist.getHDIPrimitivesLibrary().getCellMap().size(),
+                srcNetlist.getHDIPrimitivesLibrary().getCellMap().size());
+        Assertions.assertEquals(dstNetlist.getWorkLibrary().getCellMap().size() - 1,
+                srcNetlist.getWorkLibrary().getCellMap().size());
+
+        dstNetlist.copyCellAndSubCells(srcNetlist.getTopCell(), /* uniquifyCollisions= */true);
+
+        Assertions.assertEquals(dstNetlist.getHDIPrimitivesLibrary().getCellMap().size(),
+                srcNetlist.getHDIPrimitivesLibrary().getCellMap().size());
+        Assertions.assertEquals(dstNetlist.getWorkLibrary().getCellMap().size() - 1,
+                2 * srcNetlist.getWorkLibrary().getCellMap().size());
+
+        dstNetlist.copyCellAndSubCells(srcNetlist.getTopCell(), /* uniquifyCollisions= */true);
+
+        Assertions.assertEquals(dstNetlist.getHDIPrimitivesLibrary().getCellMap().size(),
+                srcNetlist.getHDIPrimitivesLibrary().getCellMap().size());
+        Assertions.assertEquals(dstNetlist.getWorkLibrary().getCellMap().size() - 1,
+                3 * srcNetlist.getWorkLibrary().getCellMap().size());
+
     }
 
     @ParameterizedTest
