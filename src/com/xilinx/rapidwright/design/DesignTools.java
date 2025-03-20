@@ -1556,6 +1556,14 @@ public class DesignTools {
             Net net = siteInst.getNetFromSiteWire(belPin.getSiteWireName());
             if (net == null)
                 return Collections.emptyList();
+            else {
+                // Check if net is connected to logical cell
+                EDIFCellInst cellInst = cell.getEDIFCellInst();
+                EDIFPortInst portInst = cellInst != null ? cellInst.getPortInst(logicalPinName) : null;
+                if (portInst == null || portInst.getNet() == null) {
+                    return Collections.emptyList();
+                }
+            }
 
             List<String> sitePinNames = new ArrayList<>();
             List<BELPin> internalTerminals = new ArrayList<>();
@@ -4152,7 +4160,7 @@ public class DesignTools {
         lockRouting(design, false);
     }
 
-    /***
+    /**
      * Unroutes the GND net of a design and unroutes the site routing of any LUT GND
      * sources while leaving other site routing inputs intact.
      * 

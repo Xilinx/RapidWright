@@ -1317,6 +1317,16 @@ public class TestDesignTools {
         Assertions.assertNull(si4.getNetFromSiteWire("FFMUXB1_OUT1"));
         Assertions.assertNull(si4.getUsedSitePIP("FFMUXB1"));
         Assertions.assertNull(si4.getNetFromSiteWire("B_O"));
+
+        // Test false connection when logical pin is not connected
+        Cell carry5 = design.createAndPlaceCell("carry5", Unisim.CARRY8, "SLICE_X0Y5/CARRY8");
+        Cell lut5 = design.createAndPlaceCell("lut5", Unisim.LUT1, "SLICE_X0Y5/D6LUT");
+        Net net5 = design.createNet("lut5_output");
+        net5.connect(lut5, "O");
+
+        Assertions.assertEquals(net5, carry5.getSiteInst().getNetFromSiteWire("D_O"));
+        List<SitePinInst> pinsToRemove = DesignTools.unrouteCellPinSiteRouting(carry5, "S[3]");
+        Assertions.assertEquals(0, pinsToRemove.size());
     }
 
     @Test
