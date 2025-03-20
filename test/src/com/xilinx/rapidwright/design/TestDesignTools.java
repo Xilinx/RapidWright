@@ -1317,6 +1317,16 @@ public class TestDesignTools {
         Assertions.assertNull(si4.getNetFromSiteWire("FFMUXB1_OUT1"));
         Assertions.assertNull(si4.getUsedSitePIP("FFMUXB1"));
         Assertions.assertNull(si4.getNetFromSiteWire("B_O"));
+
+        // Test false connection when logical pin is not connected
+        Cell carry5 = design.createAndPlaceCell("carry5", Unisim.CARRY8, "SLICE_X0Y5/CARRY8");
+        Cell lut5 = design.createAndPlaceCell("lut5", Unisim.LUT1, "SLICE_X0Y5/D6LUT");
+        Net net5 = design.createNet("lut5_output");
+        net5.connect(lut5, "O");
+
+        Assertions.assertEquals(net5, carry5.getSiteInst().getNetFromSiteWire("D_O"));
+        List<SitePinInst> pinsToRemove = DesignTools.unrouteCellPinSiteRouting(carry5, "S[3]");
+        Assertions.assertEquals(0, pinsToRemove.size());
     }
 
     @Test
@@ -1533,5 +1543,19 @@ public class TestDesignTools {
         Net net = d.getNet(ehpi.getHierarchicalNetName());
         String sitePinName = DesignTools.getRoutedSitePin(cell, net, ehpi.getPortInst().getName());
         Assertions.assertEquals(expected, sitePinName == null ? "null" : sitePinName);
+    }
+
+    @Test
+    public void testUnrouteCellPinSiteRoutingBRAMClkPins() {
+        Design d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
+        Cell c = d.getCell(
+                "base_mb_i/microblaze_0_local_memory/lmb_bram/U0/inst_blk_mem_gen/gnbram.gnative_mem_map_bmg.native_mem_map_blk_mem_gen/valid.cstr/ramloop[5].ram.r/prim_noinit.ram/DEVICE_8SERIES.WITH_BMM_INFO.TRUE_DP.SIMPLE_PRIM36.SERIES8_TDP_SP36_NO_ECC_ATTR.ram");
+
+        List<SitePinInst> unrouted = DesignTools.unrouteCellPinSiteRouting(c, "CLKARDCLK");
+        Assertions.assertEquals(2, unrouted.size());
+        for (SitePinInst p : unrouted) {
+            Assertions.assertTrue(p.getName().equals("CLKAU_X") || p.getName().equals("CLKAL_X"));
+        }
+
     }
 }
