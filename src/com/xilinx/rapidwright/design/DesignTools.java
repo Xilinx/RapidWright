@@ -1300,8 +1300,12 @@ public class DesignTools {
                     Cell otherCell = siteInst.getCell(otherPin.getBEL());
                     if (otherCell == null) continue;
                     if (otherCell.isRoutethru()) {
-                        // This will be handled outside of the loop in SiteInst.unrouteIntraSiteNet()
-                        continue;
+                        // Ensure the routethru cell is servicing this cell's connection
+                        if (otherCell.getType().equals(cell.getType())
+                                && pin.getName().equals(otherCell.getFirstPhysicalPinMapping().getFirst().getName())) {
+                            // This will be handled outside of the loop in SiteInst.unrouteIntraSiteNet()
+                            continue;
+                        }
                     }
                     String logicalPinName = otherCell.getLogicalPinMapping(otherPin.getName());
                     if (logicalPinName == null) continue;
