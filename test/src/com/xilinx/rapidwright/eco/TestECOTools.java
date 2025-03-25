@@ -622,7 +622,7 @@ public class TestECOTools {
         remove.add(lut1.getEDIFHierCellInst());
         ECOTools.removeCell(d, remove, null);
 
-        // Ensure the net stays routed after LUT1 is remove from A6LUT
+        // Ensure the net stays routed after LUT1 is removed from A6LUT
         Assertions.assertEquals(si.getNetFromSiteWire("H6"), routethruNet);
     }
 }
