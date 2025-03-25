@@ -591,4 +591,38 @@ public class TestECOTools {
         Assertions.assertNull(si.getUsedSitePIP("CLKINV"));
 
     }
+
+    @Test
+    public void testRemoveCellNeighborRouteThru() {
+        // This is a corner case that involves a CARRY8 in US+ and a LUT removal from
+        // A6LUT that would prevent the routethru removal later when the CARRY8 was
+        // removed.
+        Design d = new Design("test", "xcku9p-ffve900-2-e");
+        String siteName = "SLICE_X96Y231";
+        Cell carry = d.createAndPlaceCell("carry", Unisim.CARRY8, siteName + "/CARRY8");
+        SiteInst si = carry.getSiteInst();
+        Cell lut1 = d.createAndPlaceCell("lut1", Unisim.LUT1, siteName + "/A6LUT");
+        Cell ff = d.createAndPlaceCell("ff", Unisim.FDRE, siteName + "/HFF");
+        Cell ff2 = d.createAndPlaceCell("ff2", Unisim.FDRE, siteName + "/AFF");
+        Net lut1Input = d.createNet("lut1Input");
+        lut1Input.connect(lut1, "I0");
+        lut1Input.connect(ff2, "Q");
+        si.routeIntraSiteNet(lut1Input, lut1.getBEL().getPin("A6"), si.getBELPin("A6", "A6"));
+        Net carryS0 = d.createNet("carryS0");
+        carryS0.connect(lut1, "O");
+        carryS0.connect(carry, "S[0]");
+        si.routeIntraSiteNet(carryS0, lut1.getBEL().getPin("O6"), carry.getBEL().getPin("S0"));
+        Net routethruNet = d.createNet("routethruNet");
+        routethruNet.connect(ff, "Q");
+        routethruNet.connect(carry, "S[7]");
+        si.routeIntraSiteNet(routethruNet, ff.getBEL().getPin("Q"), si.getBELPin("HQ", "HQ"));
+        si.routeIntraSiteNet(routethruNet, si.getBELPin("H6", "H6"), carry.getBEL().getPin("S7"));
+
+        List<EDIFHierCellInst> remove = new ArrayList<>();
+        remove.add(lut1.getEDIFHierCellInst());
+        ECOTools.removeCell(d, remove, null);
+
+        // Ensure the net stays routed after LUT1 is remove from A6LUT
+        Assertions.assertEquals(si.getNetFromSiteWire("H6"), routethruNet);
+    }
 }

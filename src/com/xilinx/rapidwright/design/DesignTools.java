@@ -1300,9 +1300,10 @@ public class DesignTools {
                     Cell otherCell = siteInst.getCell(otherPin.getBEL());
                     if (otherCell == null) continue;
                     if (otherCell.isRoutethru()) {
+                        String otherCellType = otherCell.getType();
                         // Ensure the routethru cell is servicing this cell's connection
-                        if (otherCell.getType().equals(cell.getType())
-                                && pin.getName().equals(otherCell.getFirstPhysicalPinMapping().getFirst().getName())) {
+                        if (otherCellType.equals(Cell.FF_ROUTETHRU_TYPE) || (otherCellType.equals(cell.getType())
+                                && pin.getName().equals(otherCell.getFirstPhysicalPinMapping().getFirst().getName()))) {
                             // This will be handled outside of the loop in SiteInst.unrouteIntraSiteNet()
                             continue;
                         }
