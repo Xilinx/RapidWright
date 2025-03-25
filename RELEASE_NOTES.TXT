@@ -8,6 +8,7 @@ Notes:
   - Fixes to enable BlockStitcher to run (#1134)
   - Enables batching of SitePinInst removals during MakeBlackBox (#1142)
   - Routing Heat Map Example (#1145)
+  - When adding Modules to Designs, make EDIF cell names unique if name collides
 
 API Additions:
   - com.xilinx.rapidwright.design.Design "public boolean removeSiteInst(SiteInst instance, boolean keepSitePinRouting,
