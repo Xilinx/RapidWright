@@ -639,13 +639,39 @@ public class EDIFNetlist extends EDIFName {
         }
     }
 
+    private int nameCollisionCount = 0;
+
+    private String getUniqueCellName(String currName, EDIFLibrary destLibTop) {
+        String currentCellName = currName;
+        while (destLibTop.containsCell(currentCellName)) {
+            currentCellName = currName + "_RW_UNIQ_" + Integer.toString(nameCollisionCount);
+            nameCollisionCount++;
+        }
+        return currentCellName;
+    }
+
+
     /**
      * This copies the cell and all of its descendants into this netlist.
      * @param cell The cell (and all its descendants) to copy into this netlist's libraries
      */
     public void copyCellAndSubCells(EDIFCell cell) {
         Set<EDIFCell> copiedCells = new HashSet<>();
-        copyCellAndSubCellsWorker(cell, copiedCells);
+        copyCellAndSubCellsWorker(cell, copiedCells, false);
+    }
+
+    /**
+     * This copies the cell and all of its descendants into this netlist.
+     * 
+     * @param cell               The cell (and all its descendants) to copy into
+     *                           this netlist's libraries
+     * @param uniquifyCollisions Flag that allows the method to create a uniquely
+     *                           named copy of a cell when the destination library
+     *                           already contains a cell with the same name.
+     */
+    public void copyCellAndSubCells(EDIFCell cell, boolean uniquifyCollisions) {
+        Set<EDIFCell> copiedCells = new HashSet<>();
+        copyCellAndSubCellsWorker(cell, copiedCells, uniquifyCollisions);
     }
 
     /**
@@ -655,12 +681,29 @@ public class EDIFNetlist extends EDIFName {
     public EDIFLibrary copyLibraryAndSubCells(EDIFLibrary library) {
         Set<EDIFCell> copiedCells = new HashSet<>();
         for (EDIFCell cell : library.getCells()) {
-            copyCellAndSubCellsWorker(cell, copiedCells);
+            copyCellAndSubCellsWorker(cell, copiedCells, false);
+        }
+        return getLibrary(library.getName());
+    }
+    
+    /**
+     * This copies the library and all of its cells into this netlist.
+     * 
+     * @param library            The library (and all its cells) to copy into this
+     *                           netlist's libraries
+     * @param uniquifyCollisions Flag that allows the method to create a uniquely
+     *                           named copy of a cell when the destination library
+     *                           already contains a cell with the same name.
+     */
+    public EDIFLibrary copyLibraryAndSubCells(EDIFLibrary library, boolean uniquifyCollisions) {
+        Set<EDIFCell> copiedCells = new HashSet<>();
+        for (EDIFCell cell : library.getCells()) {
+            copyCellAndSubCellsWorker(cell, copiedCells, uniquifyCollisions);
         }
         return getLibrary(library.getName());
     }
 
-    private EDIFCell copyCellAndSubCellsWorker(EDIFCell cell, Set<EDIFCell> copiedCells) {
+    private EDIFCell copyCellAndSubCellsWorker(EDIFCell cell, Set<EDIFCell> copiedCells, boolean uniquifyCollisions) {
         EDIFLibrary destLib = getLibrary(cell.getLibrary().getName());
         if (destLib == null) {
             if (cell.getLibrary().isHDIPrimitivesLibrary()) {
@@ -670,12 +713,14 @@ public class EDIFNetlist extends EDIFName {
             }
         }
 
-        EDIFCell existingCell = destLib.getCell(cell.getName());
+        String cellName = cell.getName();
+        EDIFCell existingCell = destLib.getCell(cellName);
         if (existingCell == null) {
-            EDIFCell newCell = new EDIFCell(destLib, cell, cell.getName());
+            EDIFCell newCell = new EDIFCell(destLib, cell, cellName);
             copiedCells.add(newCell);
             for (EDIFCellInst inst : newCell.getCellInsts()) {
-                inst.setCellType(copyCellAndSubCellsWorker(inst.getCellType(), copiedCells));
+                inst.setCellType(copyCellAndSubCellsWorker(inst.getCellType(), copiedCells,
+                        uniquifyCollisions));
                 //The view might have changed
                 inst.getViewref().setName(inst.getCellType().getView());
             }
@@ -683,9 +728,24 @@ public class EDIFNetlist extends EDIFName {
         } else {
             if (destLib.isHDIPrimitivesLibrary() || copiedCells.contains(existingCell) || cell == existingCell) {
                 return existingCell;
+            } else if (uniquifyCollisions) {
+                // We need to rename the cell to a unique name
+                String uniqueCellName = getUniqueCellName(cell.getName(), destLib);
+                EDIFCell newCell = new EDIFCell(destLib, cell, uniqueCellName);
+                copiedCells.add(newCell);
+                for (EDIFCellInst inst : newCell.getCellInsts()) {
+                    inst.setCellType(copyCellAndSubCellsWorker(inst.getCellType(), copiedCells,
+                            uniquifyCollisions));
+                    // The view might have changed
+                    inst.getViewref().setName(inst.getCellType().getView());
+                }
+                return newCell;
+
+            } else {
+                throw new RuntimeException(
+                        "ERROR: Destination netlist already contains EDIFCell named " + "'"
+                                + cell.getName() + "' in library '" + destLib.getName() + "'");
             }
-            throw new RuntimeException("ERROR: Destination netlist already contains EDIFCell named " +
-                    "'" + cell.getName() + "' in library '" + destLib.getName() + "'");
         }
     }
 
