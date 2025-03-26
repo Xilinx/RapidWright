@@ -1548,7 +1548,11 @@ public class DesignTools {
      */
     public static List<SitePinInst> unrouteCellPinSiteRouting(Cell cell, String logicalPinName) {
         List<SitePinInst> sitePinsToRemove = new ArrayList<>();
-        for (String physPinName : cell.getAllPhysicalPinMappings(logicalPinName)) {
+        Set<String> physPinNames = cell.getAllPhysicalPinMappings(logicalPinName);
+        if (physPinNames == null) {
+            physPinNames = Collections.singleton(cell.getDefaultPinMapping(logicalPinName));
+        }
+        for (String physPinName : physPinNames) {
             if (physPinName == null) {
                 physPinName = cell.getDefaultPinMapping(logicalPinName);
             }
