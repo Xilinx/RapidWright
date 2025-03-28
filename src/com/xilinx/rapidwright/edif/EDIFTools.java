@@ -641,7 +641,7 @@ public class EDIFTools {
                 snk = new EDIFHierPortInst(netInst.getParent(), upperNet.createPortInst(port, netInst.getInst()));
             }
         } else {
-            List<EDIFHierPortInst> sources = net.getSourcePortInsts(false);
+            List<EDIFHierPortInst> sources = net.getSourcePortInsts(true);
             if (!sources.isEmpty()) {
                 src = sources.get(0);
             } else {

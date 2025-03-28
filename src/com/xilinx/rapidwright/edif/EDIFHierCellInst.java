@@ -343,4 +343,21 @@ public class EDIFHierCellInst {
         }
         return true;
     }
+
+    /**
+     * Ensures that all ancestor instances are uniquified (one instance per cell
+     * type). If any ancestor instance is not uniquified, it will make the instance
+     * unique by creating a copy of the cell (in the same library) and referencing
+     * the copy to the ancestor instance.
+     */
+    public void ensureAncestorsAreUniquified() {
+        for (int i = cellInsts.length - 1; i > 0; i--) {
+            if (!cellInsts[i].isUniquified()) {
+                EDIFCell orig = cellInsts[i].getCellType();
+                String newCellTypeName = orig.getName() + EDIFTools.getUniqueSuffix();
+                EDIFCell copy = new EDIFCell(orig.getLibrary(), orig, newCellTypeName);
+                cellInsts[i].setCellType(copy);
+            }
+        }
+    }
 }
