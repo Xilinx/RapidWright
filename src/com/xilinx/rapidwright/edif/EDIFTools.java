@@ -625,7 +625,7 @@ public class EDIFTools {
             // Find an input portInst to use
             snk = null;
             for (EDIFHierPortInst pi : net.getPortInsts()) {
-                if (pi.isInput()) {
+                if (pi.isInput() || (pi.getPortInst().isTopLevelPort() && pi.isOutput())) {
                     snk = pi;
                     break;
                 }
