@@ -22,6 +22,20 @@
 
 package com.xilinx.rapidwright.eco;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
@@ -46,19 +60,6 @@ import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
 import com.xilinx.rapidwright.util.VivadoTools;
 import com.xilinx.rapidwright.util.VivadoToolsHelper;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 public class TestECOTools {
     @Test
@@ -624,5 +625,64 @@ public class TestECOTools {
 
         // Ensure the net stays routed after LUT1 is removed from A6LUT
         Assertions.assertEquals(si.getNetFromSiteWire("H6"), routethruNet);
+    }
+
+    private void testRefactorCell(Design d, String cellName, String newParentName) {
+        EDIFHierCellInst cell = d.getNetlist().getHierCellInstFromName(cellName);
+        EDIFHierCellInst newParent = d.getNetlist().getHierCellInstFromName(newParentName);
+
+        Map<String, Set<EDIFHierPortInst>> map = new HashMap<>();
+        for (EDIFHierPortInst i : cell.getHierPortInsts()) {
+            String portInstName = i.getPortInst().getName();
+            Set<EDIFHierPortInst> pins = new HashSet<>();
+            for (EDIFHierPortInst leafPin : i.getHierarchicalNet().getLeafHierPortInsts()) {
+                if (leafPin.equals(i)
+                        || leafPin.getFullHierarchicalInstName().equals(i.getFullHierarchicalInstName())) {
+                    continue;
+                }
+                pins.add(leafPin);
+            }
+            map.put(portInstName, pins);
+        }
+
+        EDIFHierCellInst refactored = ECOTools.refactorCell(d, cell, newParent);
+
+        Assertions.assertEquals(newParent, refactored.getParent());
+
+        for (EDIFHierPortInst i : refactored.getHierPortInsts()) {
+            String portInstName = i.getPortInst().getName();
+            Set<EDIFHierPortInst> leafPins = map.get(portInstName);
+            for (EDIFHierPortInst leafPin : i.getHierarchicalNet().getLeafHierPortInsts()) {
+                if (leafPin.equals(i)
+                        || leafPin.getFullHierarchicalInstName().equals(i.getFullHierarchicalInstName())) {
+                    continue;
+                }
+                Assertions.assertTrue(leafPins.remove(leafPin));
+            }
+            Assertions.assertEquals(0, leafPins.size());
+        }
+
+    }
+
+    @Test
+    public void testRefactorCell() {
+        Design d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks_2024.1.dcp");
+
+        String cellName = "base_mb_i/microblaze_0/U0/MicroBlaze_Core_I/Performance.Core/Decode_I/PreFetch_Buffer_I1/Instruction_Prefetch_Mux[9].Gen_Instr_DFF/EX_Op3[2]_i_2";
+        String newParentName = "dbg_hub/inst";
+
+        testRefactorCell(d, cellName, newParentName);
+
+        cellName = "base_mb_i/microblaze_0/U0/MicroBlaze_Core_I/Performance.Core/Use_DLMB.wb_dlmb_valid_read_data_reg[1]";
+        newParentName = "base_mb_i/microblaze_0/U0/MicroBlaze_Core_I/Performance.Core/Decode_I/PreFetch_Buffer_I1/Instruction_Prefetch_Mux[9].Gen_Instr_DFF";
+
+        testRefactorCell(d, cellName, newParentName);
+
+        cellName = "base_mb_i/microblaze_0/U0/MicroBlaze_Core_I/Performance.Core/Data_Flow_I/Zero_Detect_I/Part_Of_Zero_Carry_Start/Using_FPGA.Native_CARRY4_CARRY8";
+        newParentName = "";
+
+        testRefactorCell(d, cellName, newParentName);
+
+        VivadoToolsHelper.assertFullyRouted(d);
     }
 }

@@ -625,7 +625,7 @@ public class EDIFTools {
             // Find an input portInst to use
             snk = null;
             for (EDIFHierPortInst pi : net.getPortInsts()) {
-                if (pi.isInput()) {
+                if (pi.isInput() || (pi.getPortInst().isTopLevelPort() && pi.isOutput())) {
                     snk = pi;
                     break;
                 }
@@ -641,7 +641,7 @@ public class EDIFTools {
                 snk = new EDIFHierPortInst(netInst.getParent(), upperNet.createPortInst(port, netInst.getInst()));
             }
         } else {
-            List<EDIFHierPortInst> sources = net.getSourcePortInsts(false);
+            List<EDIFHierPortInst> sources = net.getSourcePortInsts(true);
             if (!sources.isEmpty()) {
                 src = sources.get(0);
             } else {
