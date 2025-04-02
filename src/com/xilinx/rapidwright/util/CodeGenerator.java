@@ -44,7 +44,6 @@ import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
-import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 
@@ -188,13 +187,14 @@ public class CodeGenerator {
         }
     }
 
-    public static void addCellPinMappings(Cell c, String... pinMappings) {
-        for (String pinMapping : pinMappings) {
-            int colonIdx = pinMapping.indexOf(':');
-            c.addPinMapping(pinMapping.substring(0, colonIdx), pinMapping.substring(colonIdx + 1));
-        }
-    }
-
+    /**
+     * Shorthand method to route site wires with a particular net in a site
+     * instance.
+     * 
+     * @param si        The site instance to target
+     * @param n         The net to be site routed
+     * @param siteWires The list of site wire names to route
+     */
     public static void routeSiteNet(SiteInst si, Net n, String... siteWires) {
         for (String siteWire : siteWires) {
             BELPin bp = si.getSiteWirePins(siteWire)[0];
@@ -202,6 +202,13 @@ public class CodeGenerator {
         }
     }
     
+    /**
+     * Shorthand method for turning on site PIPs in a site instance.
+     * 
+     * @param si       The target site instance.
+     * @param sitePIPs The list of site PIPs (of the format <BEL name>:<input pin
+     *                 name>) to turn on.
+     */
     public static void addSitePIPs(SiteInst si, String... sitePIPs) {
         for (String sitePIP : sitePIPs) {
             int colonIdx = sitePIP.indexOf(':');
@@ -209,6 +216,20 @@ public class CodeGenerator {
         }
     }
 
+    /**
+     * Shorthand method for creating a placed cell inside a site instance. This is
+     * mostly useful for constructing test case scenarios.
+     * 
+     * @param si          The target site instance
+     * @param name        Name of the cell to create
+     * @param isRoutethru Flag indicating if the cell should be a routethru
+     * @param type        The type of the cell (Unisim or special field)
+     * @param bel         The name of the BEL where the cell should be placed
+     * @param pinMaps     A variable number of pin mappings for the cell where each
+     *                    string is of the format <physical pin name>:<logical pin
+     *                    name>
+     * @return The created cell.
+     */
     public static Cell genCell(SiteInst si, String name, boolean isRoutethru, String type, String bel,
             String... pinMaps) {
         Cell c = null;
@@ -244,7 +265,6 @@ public class CodeGenerator {
      */
     public static void genCodeForTestSite(SiteInst inst, PrintStream ps, boolean includeRouting) {
         Design design = inst.getDesign();
-        EDIFNetlist netlist = design.getNetlist();
         String part = design.getPartName();
         String siteName = inst.getSiteName();
         Map<String, String> nameMap = new HashMap<>();
@@ -258,87 +278,70 @@ public class CodeGenerator {
                                                                 + siteName + "\"));");
         ps.println("        EDIFNetlist netlist = design.getNetlist();");
         ps.println("        EDIFCell top = netlist.getTopCell();");
-        String tab = "            ";
+        String tab = "        ";
         for (Cell c : inst.getCells()) {
             String newCellName = nameMap.computeIfAbsent(c.getName(), n -> ("cell" + uniqueCount++));
             nameMap.put(c.getName(), newCellName);
-            ps.println("        {");
 
-            ps.print(tab + "Cell c = CodeGenerator.genCell(si, \"" + newCellName + "\", " + c.isRoutethru() + ", \""
+            String varName = newCellName + ((c.isRoutethru() || c.getType().startsWith("<")) ? "_" + c.getBELName() : "");
+            
+            ps.print(tab + "Cell "+varName+" = CodeGenerator.genCell(si, \"" + newCellName + "\", " + c.isRoutethru() + ", \""
                     + c.getType() + "\", \"" + c.getBELName() + "\"");
 
-//            if (!c.isRoutethru() && !c.isFFRoutethruCell() && c.getType() != null) {
-//                ps.println(tab + "Cell c = design.createAndPlaceCell(\"" + newCellName + "\", Unisim." + c.getType()
-//                        + ", \"" + siteName + "/" + c.getBELName() + "\");");
-//
-//            } else {
-//                ps.println(tab + "Cell c = new Cell(\"" + newCellName + "\", si.getBEL(\"" + c.getBELName() + "\"));");
-//                ps.println(tab + "c.setSiteInst(si);");
-//                ps.println(tab + "c.setType(\"" + c.getType() + "\");");
-//            }
-//
-//            ps.print(tab + "CodeGenerator.addCellPinMappings(c");
-//            for (Entry<String, String> pm : c.getPinMappingsP2L().entrySet()) {
-//                ps.print(", \"" + pm.getKey() + ":" + pm.getValue() + "\"");
-//            }
-//            ps.println(");");
-//
             for (Entry<String, String> pm : c.getPinMappingsP2L().entrySet()) {
                 ps.print(", \"" + pm.getKey() + ":" + pm.getValue() + "\"");
             }
             ps.println(");");
 
             for (Entry<String,AltPinMapping> apm : c.getAltPinMappings().entrySet()) {
-                ps.println(tab + "c.addAltPinMapping(\"" + apm.getKey() + "\",new AltPinMapping(\""
+                ps.println(tab + varName + ".addAltPinMapping(\"" + apm.getKey() + "\",new AltPinMapping(\""
                                                     +apm.getValue().getLogicalName()+"\", \""
                                                     +nameMap.computeIfAbsent(apm.getValue().getAltCellName(), n -> ("cell" + uniqueCount++))+"\",\""
                                                     +apm.getValue().getAltCellType()+"\"));");    
             }
             if (!c.isRoutethru()) {
                 for (Entry<String, EDIFPropertyValue> e : c.getProperties().entrySet()) {
-                    ps.println(tab + "c.addProperty(\"" + e.getKey() + "\", \"" + e.getValue().getValue()
+                    ps.println(tab + varName + ".addProperty(\"" + e.getKey() + "\", \"" + e.getValue().getValue()
                             + "\", EDIFValueType." + e.getValue().getType().name() + ");");
                 }
             }
             for (String fixPin : c.getPhysicalPinMappings()) {
                 if (c.isPinFixed(fixPin)) {
-                    ps.println(tab + "c.fixPin(\""+fixPin+"\");");
+                    ps.println(tab + varName + ".fixPin(\""+fixPin+"\");");
                 }
             }
             SiteTypeEnum altBlockedType = c.getAltBlockedSiteType();
             if (altBlockedType != null) {
-                ps.println(tab + "c.setAltBlockedSiteType(SiteTypeEnum." + altBlockedType.name()+");");
+                ps.println(tab + varName + ".setAltBlockedSiteType(SiteTypeEnum." + altBlockedType.name()+");");
             }
 
-            if (c.isBELFixed()) ps.println(tab + "c.setBELFixed(true);");
-            if (c.isLocked()) ps.println(tab + "c.setLocked(true);");
-            if (c.isNullBEL()) ps.println(tab + "c.setNullBEL(true);");
-            if (c.isSiteFixed()) ps.println(tab + "c.setSiteFixed(true);");
-            ps.println("        }");
+            if (c.isBELFixed()) ps.println(tab + varName + ".setBELFixed(true);");
+            if (c.isLocked()) ps.println(tab + varName + ".setLocked(true);");
+            if (c.isNullBEL()) ps.println(tab + varName + ".setNullBEL(true);");
+            if (c.isSiteFixed()) ps.println(tab + varName + ".setSiteFixed(true);");
         }
 
+        ps.println();
         List<SitePIP> usedSitePIPs = inst.getUsedSitePIPs();
         for (int i = 0; i < usedSitePIPs.size(); i++) {
             SitePIP p = usedSitePIPs.get(i);
-            ps.print(i == 0 ? "CodeGenerator.addSitePIPs(si, " : ", ");
+            ps.print(i == 0 ? tab + "CodeGenerator.addSitePIPs(si, " : ", ");
             ps.print("\"" + p.getBELName() + ":" + p.getInputPinName() + "\"");
             if (i == usedSitePIPs.size() - 1) {
                 ps.println(");");
             }
         }
-
-//        for (SitePIP sPIP : inst.getUsedSitePIPs()) {
-//            ps.println(tab + "si.addSitePIP(\"" + sPIP.getBELName() + "\", \"" + sPIP.getInputPinName() + "\");");
-//        }
+        ps.println();
 
         for (Entry<Net, List<String>> e : inst.getNetToSiteWiresMap().entrySet()) {
             Net n = e.getKey();
             boolean hasSrc = false;
             boolean hasSnk = false;
             String newNetName = n.isStaticNet() ? null : nameMap.computeIfAbsent(n.getName(), p -> ("net" + uniqueCount++));
-            ps.println("        {");
             if (newNetName == null) {
-                ps.println(tab + "Net n = design." + (n.isVCCNet() ? "getVccNet()" : "getGndNet()") + ";");
+                newNetName = n.isVCCNet() ? "vcc" : "gnd";
+                ps.println(tab + "Net " + newNetName + " = design." + (n.isVCCNet() ? "getVccNet()" : "getGndNet()")
+                        + ";");
                 for (Cell c : inst.getCells()) {
                     if (!c.isRoutethru()) {
                         EDIFHierCellInst ci = c.getEDIFHierCellInst();
@@ -346,20 +349,21 @@ public class CodeGenerator {
                             if ((pi.getNet().isVCC() && n.isVCCNet()) || (pi.getNet().isGND() && n.isGNDNet())) {
                                 
                                 ps.println(tab + "EDIFTools.getStaticNet(NetType." + (pi.getNet().isVCC() ? "VCC" : "GND") 
-                                        + ", top, netlist).createPortInst(\"" + pi.getName() + "\", design.getCell(\""
-                                        + nameMap.get(c.getName()) + "\"));");
+                                        + ", top, netlist).createPortInst(\"" + pi.getName() + "\", "
+                                        + nameMap.get(c.getName()) + ");");
                             }
                         }
                     }
                 }
             } else {
-                ps.println(tab + "Net n = design.createNet(\""+newNetName+"\");");
+                ps.println(tab + "Net " + newNetName + " = design.createNet(\"" + newNetName + "\");");
                 if (n.getLogicalHierNet() != null) {
                     for (EDIFHierPortInst pi : n.getLogicalHierNet().getLeafHierPortInsts()) {
                         String newCellName = nameMap.get(pi.getFullHierarchicalInstName());
                         if (newCellName != null) {
-                            ps.println(tab + "n.getLogicalNet().createPortInst(\"" + pi.getPortInst().getName()
-                                    + "\", design.getCell(\"" + newCellName + "\"));");
+                            ps.println(tab + newNetName + ".getLogicalNet().createPortInst(\""
+                                    + pi.getPortInst().getName()
+                                    + "\", " + newCellName + ");");
                             if (pi.isOutput()) {
                                 hasSrc = true;
                             } else {
@@ -378,26 +382,23 @@ public class CodeGenerator {
                 }
             }
 
-            
-            
             for (SitePinInst pin : n.getPins()) {
                 if (pin.getSiteInst() == inst) {
-                    ps.println(tab + "n.createPin(\"" + pin.getName() + "\", si);");
+                    ps.println(tab + newNetName + ".createPin(\"" + pin.getName() + "\", si);");
                 }
             }
             if (includeRouting) {
-                ps.println(tab + "CodeGenerator.addPIPs(n, new String[] {");
+                ps.println(tab + "CodeGenerator.addPIPs(" + newNetName + ", new String[] {");
                 for (PIP p : n.getPIPs()) {
                     ps.println(tab + "\"" + p.toString() + "\",");
                 }                                        
                 ps.println(tab + "});");
             }
-            ps.print(tab + "CodeGenerator.routeSiteNet(si, n ");
+            ps.print(tab + "CodeGenerator.routeSiteNet(si, " + newNetName + " ");
             for (String siteWire : e.getValue()) {
                 ps.print(", \"" + siteWire + "\"");
             }
             ps.println(");");
-            ps.println("        }");
         }
         
         ps.println("    return design;");
