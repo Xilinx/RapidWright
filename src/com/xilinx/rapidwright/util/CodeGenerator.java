@@ -22,18 +22,31 @@
 
 package com.xilinx.rapidwright.util;
 
+import java.io.FileNotFoundException;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
+import com.xilinx.rapidwright.design.AltPinMapping;
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.SitePIP;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 
 /**
  * This utility class is used to create RapidWright code from a DCP file that is tedious to create by hand.
@@ -173,5 +186,250 @@ public class CodeGenerator {
         for (String pip : pips) {
             net.addPIP(device.getPIP(pip));
         }
+    }
+
+    /**
+     * Shorthand method to route site wires with a particular net in a site
+     * instance.
+     * 
+     * @param si        The site instance to target
+     * @param n         The net to be site routed
+     * @param siteWires The list of site wire names to route
+     */
+    public static void routeSiteNet(SiteInst si, Net n, String... siteWires) {
+        for (String siteWire : siteWires) {
+            BELPin bp = si.getSiteWirePins(siteWire)[0];
+            si.routeIntraSiteNet(n, bp, bp);
+        }
+    }
+    
+    /**
+     * Shorthand method for turning on site PIPs in a site instance.
+     * 
+     * @param si       The target site instance.
+     * @param sitePIPs The list of site PIPs (of the format <BEL name>:<input pin
+     *                 name>) to turn on.
+     */
+    public static void addSitePIPs(SiteInst si, String... sitePIPs) {
+        for (String sitePIP : sitePIPs) {
+            int colonIdx = sitePIP.indexOf(':');
+            si.addSitePIP(sitePIP.substring(0, colonIdx), sitePIP.substring(colonIdx + 1));
+        }
+    }
+
+    /**
+     * Shorthand method for creating a placed cell inside a site instance. This is
+     * mostly useful for constructing test case scenarios.
+     * 
+     * @param si          The target site instance
+     * @param name        Name of the cell to create
+     * @param isRoutethru Flag indicating if the cell should be a routethru
+     * @param type        The type of the cell (Unisim or special field)
+     * @param bel         The name of the BEL where the cell should be placed
+     * @param pinMaps     A variable number of pin mappings for the cell where each
+     *                    string is of the format <physical pin name>:<logical pin
+     *                    name>
+     * @return The created cell.
+     */
+    public static Cell genCell(SiteInst si, String name, boolean isRoutethru, String type, String bel,
+            String... pinMaps) {
+        Cell c = null;
+        if (isRoutethru || type.startsWith("<")) {
+            c = new Cell(name, si.getBEL(bel));
+            c.setSiteInst(si);
+            si.getCellMap().put(bel, c);
+            c.setType(type);
+            c.setRoutethru(isRoutethru);
+        } else {
+            c = si.getDesign().createAndPlaceCell(si.getDesign().getTopEDIFCell(), name, Unisim.valueOf(type),
+                    si.getSite(), si.getBEL(bel));
+        }
+        for (String pinMap : pinMaps) {
+            int colonIdx = pinMap.indexOf(':');
+            c.addPinMapping(pinMap.substring(0, colonIdx), pinMap.substring(colonIdx + 1));
+        }
+        return c;
+    }
+
+    private static int uniqueCount = 0;
+    
+    public static String TEST_SITE_INST_CLASS_NAME = "GenTestSiteInstDesign";
+    public static String TEST_SITE_INST_METHOD_NAME = "genTestSiteInstDesign";
+
+    /**
+     * Creates boilerplate code for a test by re-creating a SiteInst's configuration
+     * from scratch in RapidWright APIs. This is useful for testing when only a
+     * small context is necessary to reproduce a specific scenario.
+     * 
+     * @param inst          The instance to replicate in the test
+     * @param ps            The PrintStream (System.out, or a file-based
+     *                      PrintStream, for example).
+     * @param simplifyNames Flag indicating that the cell and and net names should
+     *                      be simplified.
+     */
+    public static void genCodeForTestSite(SiteInst inst, PrintStream ps, boolean includeRouting) {
+        Design design = inst.getDesign();
+        String part = design.getPartName();
+        String siteName = inst.getSiteName();
+        Map<String, String> nameMap = new HashMap<>();
+        
+        for (String c : new String[] {"design.AltPinMapping", "design.Cell", "design.Design", 
+                "design.Net", "design.NetType", "design.SiteInst", "device.Device", 
+                "device.SiteTypeEnum", "edif.EDIFCell", "edif.EDIFDirection", "edif.EDIFHierCellInst",
+                "edif.EDIFHierPortInst", "edif.EDIFNetlist", "edif.EDIFTools", "edif.EDIFValueType",
+                "util.CodeGenerator" }) {
+            ps.println("import com.xilinx.rapidwright."+c+";");
+        }
+
+        ps.println("");
+        ps.println("public class " + TEST_SITE_INST_CLASS_NAME + " {");
+        ps.println("    public Design " + TEST_SITE_INST_METHOD_NAME + "() {");
+        ps.println("        Design design = new Design(\"test\", \"" + part + "\");");
+        ps.println("        Device device = design.getDevice();");
+        ps.println("        SiteInst si = design.createSiteInst(\"" + siteName + "\", SiteTypeEnum." 
+                                                                + inst.getSiteTypeEnum() 
+                                                                + ", device.getSite(\"" 
+                                                                + siteName + "\"));");
+        ps.println("        EDIFNetlist netlist = design.getNetlist();");
+        ps.println("        EDIFCell top = netlist.getTopCell();");
+        String tab = "        ";
+        for (Cell c : inst.getCells()) {
+            String newCellName = nameMap.computeIfAbsent(c.getName(), n -> ("cell" + uniqueCount++));
+            nameMap.put(c.getName(), newCellName);
+
+            String varName = newCellName + ((c.isRoutethru() || c.getType().startsWith("<")) ? "_" + c.getBELName() : "");
+            
+            ps.print(tab + "Cell "+varName+" = CodeGenerator.genCell(si, \"" + newCellName + "\", " + c.isRoutethru() + ", \""
+                    + c.getType() + "\", \"" + c.getBELName() + "\"");
+
+            String[] physPinMappings = c.getPhysicalPinMappings();
+            for (int i = 0; i < physPinMappings.length; i++) {
+                String physPinName = c.getBEL().getPin(i).getName();
+                String logPinName = physPinMappings[i];
+                ps.print(", \"" + physPinName + ":" + logPinName + "\"");
+            }
+            ps.println(");");
+
+            for (Entry<String,AltPinMapping> apm : c.getAltPinMappings().entrySet()) {
+                ps.println(tab + varName + ".addAltPinMapping(\"" + apm.getKey() + "\",new AltPinMapping(\""
+                                                    +apm.getValue().getLogicalName()+"\", \""
+                                                    +nameMap.computeIfAbsent(apm.getValue().getAltCellName(), n -> ("cell" + uniqueCount++))+"\",\""
+                                                    +apm.getValue().getAltCellType()+"\"));");    
+            }
+            if (!c.isRoutethru()) {
+                for (Entry<String, EDIFPropertyValue> e : c.getProperties().entrySet()) {
+                    ps.println(tab + varName + ".addProperty(\"" + e.getKey() + "\", \"" + e.getValue().getValue()
+                            + "\", EDIFValueType." + e.getValue().getType().name() + ");");
+                }
+            }
+            for (String fixPin : c.getPhysicalPinMappings()) {
+                if (c.isPinFixed(fixPin)) {
+                    ps.println(tab + varName + ".fixPin(\""+fixPin+"\");");
+                }
+            }
+            SiteTypeEnum altBlockedType = c.getAltBlockedSiteType();
+            if (altBlockedType != null) {
+                ps.println(tab + varName + ".setAltBlockedSiteType(SiteTypeEnum." + altBlockedType.name()+");");
+            }
+
+            if (c.isBELFixed()) ps.println(tab + varName + ".setBELFixed(true);");
+            if (c.isLocked()) ps.println(tab + varName + ".setLocked(true);");
+            if (c.isNullBEL()) ps.println(tab + varName + ".setNullBEL(true);");
+            if (c.isSiteFixed()) ps.println(tab + varName + ".setSiteFixed(true);");
+        }
+
+        ps.println();
+        List<SitePIP> usedSitePIPs = inst.getUsedSitePIPs();
+        for (int i = 0; i < usedSitePIPs.size(); i++) {
+            SitePIP p = usedSitePIPs.get(i);
+            ps.print(i == 0 ? tab + "CodeGenerator.addSitePIPs(si, " : ", ");
+            ps.print("\"" + p.getBELName() + ":" + p.getInputPinName() + "\"");
+            if (i == usedSitePIPs.size() - 1) {
+                ps.println(");");
+            }
+        }
+        ps.println();
+
+        for (Entry<Net, List<String>> e : inst.getNetToSiteWiresMap().entrySet()) {
+            Net n = e.getKey();
+            boolean hasSrc = false;
+            boolean hasSnk = false;
+            String newNetName = (n.isStaticNet() || n.isUsedNet()) ? null
+                    : nameMap.computeIfAbsent(n.getName(), p -> ("net" + uniqueCount++));
+            if (newNetName == null) {
+                if (n.isStaticNet()) {
+                    newNetName = n.isVCCNet() ? "vcc" : "gnd";
+                    ps.println(tab + "Net " + newNetName + " = design." + (n.isVCCNet() ? "getVccNet()" : "getGndNet()")
+                            + ";");
+                    for (Cell c : inst.getCells()) {
+                        if (!c.isRoutethru()) {
+                            EDIFHierCellInst ci = c.getEDIFHierCellInst();
+                            for (EDIFPortInst pi : ci.getInst().getPortInsts()) {
+                                if ((pi.getNet().isVCC() && n.isVCCNet()) || (pi.getNet().isGND() && n.isGNDNet())) {
+
+                                    ps.println(tab + "EDIFTools.getStaticNet(NetType."
+                                            + (pi.getNet().isVCC() ? "VCC" : "GND")
+                                            + ", top, netlist).createPortInst(\"" + pi.getName() + "\", "
+                                            + nameMap.get(c.getName()) + ");");
+                                }
+                            }
+                        }
+                    }
+                } else if (n.isUsedNet()) {
+                    newNetName = "usedNet";
+                    ps.println(tab + "Net " + newNetName + " = design.createNet(Net.USED_NET);");
+                } else {
+                    throw new RuntimeException("ERROR: Unhandled Net type");
+                }
+            } else {
+                ps.println(tab + "Net " + newNetName + " = design.createNet(\"" + newNetName + "\");");
+                if (n.getLogicalHierNet() != null) {
+                    for (EDIFHierPortInst pi : n.getLogicalHierNet().getLeafHierPortInsts()) {
+                        String newCellName = nameMap.get(pi.getFullHierarchicalInstName());
+                        if (newCellName != null) {
+                            ps.println(tab + newNetName + ".getLogicalNet().createPortInst(\""
+                                    + pi.getPortInst().getName()
+                                    + "\", " + newCellName + ");");
+                            if (pi.isOutput()) {
+                                hasSrc = true;
+                            } else {
+                                hasSnk = true;
+                            }
+                        }
+                    }
+                    if (!hasSrc) {
+                        ps.println(tab + "top.getNet(\"" + newNetName + "\").createPortInst(top.createPort(\"port"
+                                + (uniqueCount++) + "\", EDIFDirection.INPUT, 1));");
+                    }
+                    if (!hasSnk) {
+                        ps.println(tab + "top.getNet(\"" + newNetName + "\").createPortInst(top.createPort(\"port"
+                                + (uniqueCount++) + "\", EDIFDirection.OUTPUT, 1));");
+                    }
+                }
+            }
+
+            for (SitePinInst pin : n.getPins()) {
+                if (pin.getSiteInst() == inst) {
+                    ps.println(tab + newNetName + ".createPin(\"" + pin.getName() + "\", si);");
+                }
+            }
+            if (includeRouting) {
+                ps.println(tab + "CodeGenerator.addPIPs(" + newNetName + ", new String[] {");
+                for (PIP p : n.getPIPs()) {
+                    ps.println(tab + "\"" + p.toString() + "\",");
+                }                                        
+                ps.println(tab + "});");
+            }
+            ps.print(tab + "CodeGenerator.routeSiteNet(si, " + newNetName + " ");
+            for (String siteWire : e.getValue()) {
+                ps.print(", \"" + siteWire + "\"");
+            }
+            ps.println(");");
+        }
+        ps.println(tab + "design.setDesignOutOfContext(true);");
+        ps.println(tab + "design.setAutoIOBuffers(false);");
+        ps.println(tab + "return design;");
+        ps.println("    }");
+        ps.println("}");
     }
 }
