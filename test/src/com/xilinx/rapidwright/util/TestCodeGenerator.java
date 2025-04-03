@@ -141,7 +141,7 @@ public class TestCodeGenerator {
         try (PrintStream ps = new PrintStream(javaFile.toString())) {
             CodeGenerator.genCodeForTestSite(si, ps, false);
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         }
 
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
