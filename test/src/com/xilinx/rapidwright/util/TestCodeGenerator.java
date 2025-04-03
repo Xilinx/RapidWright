@@ -22,12 +22,31 @@
 
 package com.xilinx.rapidwright.util;
 
+import java.io.FileNotFoundException;
+import java.io.PrintStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map.Entry;
+
+import javax.tools.JavaCompiler;
+import javax.tools.ToolProvider;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import com.xilinx.rapidwright.design.Cell;
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestCodeGenerator {
@@ -111,5 +130,66 @@ public class TestCodeGenerator {
                 "net1.createPin(\"A3\", si2);\n"
                 + "\n";
         Assertions.assertEquals(expectedString, actualString);
+    }
+
+    @Test
+    public void testGenCodeForTestSite(@TempDir Path tempDir) {
+        Design d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
+        SiteInst si = d.getSiteInstFromSiteName("SLICE_X36Y97");
+
+        Path javaFile = tempDir.resolve(CodeGenerator.TEST_SITE_INST_CLASS_NAME + ".java");
+        try (PrintStream ps = new PrintStream(javaFile.toString())) {
+            CodeGenerator.genCodeForTestSite(si, ps, false);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        // Compiler should return 0 if code compiled successfully
+        Assertions.assertEquals(0, compiler.run(null, null, null, javaFile.toString()));
+
+        try {
+            // Run the generated code and extract the Design object
+            URLClassLoader classLoader = URLClassLoader.newInstance(new URL[] { tempDir.toFile().toURI().toURL() });
+            Class<?> testClass = Class.forName(CodeGenerator.TEST_SITE_INST_CLASS_NAME, true, classLoader);
+            Method testMethod = testClass.getMethod(CodeGenerator.TEST_SITE_INST_METHOD_NAME);
+            Design testDesign = (Design) testMethod.invoke(testClass.getDeclaredConstructor().newInstance());
+
+            // Compare against the original SiteInst
+            SiteInst testSiteInst = testDesign.getSiteInstFromSiteName(si.getSiteName());
+            Assertions.assertNotNull(testSiteInst);
+            Assertions.assertEquals(si.getCells().size(), testSiteInst.getCells().size());
+            for (Cell c : si.getCells()) {
+                BEL bel = c.getBEL();
+                Cell testCell = testSiteInst.getCell(bel);
+                Assertions.assertEquals(c.getType(), testCell.getType());
+
+                Assertions.assertEquals(Arrays.toString(c.getPhysicalPinMappings()),
+                        Arrays.toString(testCell.getPhysicalPinMappings()));
+                for (Entry<String, String> e : c.getPinMappingsP2L().entrySet()) {
+                    Assertions.assertEquals(e.getValue(), testCell.getLogicalPinMapping(e.getKey()));
+                }
+                Assertions.assertEquals(c.isBELFixed(), testCell.isBELFixed());
+                Assertions.assertEquals(c.isSiteFixed(), testCell.isSiteFixed());
+                Assertions.assertEquals(c.isCellFixed(), testCell.isCellFixed());
+                Assertions.assertEquals(c.isRoutethru(), testCell.isRoutethru());
+            }
+
+            for (Entry<Net, List<String>> e : si.getNetToSiteWiresMap().entrySet()) {
+                // Net names will not match, so we just match the site wire sets
+                Net equivalentNet = testSiteInst.getNetFromSiteWire(e.getValue().get(0));
+                List<String> testSiteWires = testSiteInst.getSiteWiresFromNet(equivalentNet);
+                String[] gold = e.getValue().toArray(new String[e.getValue().size()]);
+                Arrays.sort(gold);
+                String[] test = testSiteWires.toArray(new String[testSiteWires.size()]);
+                Arrays.sort(test);
+                Assertions.assertTrue(Arrays.deepEquals(gold, test));
+            }
+
+        } catch (MalformedURLException | ClassNotFoundException | NoSuchMethodException | SecurityException
+                | IllegalAccessException | IllegalArgumentException | InvocationTargetException
+                | InstantiationException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
