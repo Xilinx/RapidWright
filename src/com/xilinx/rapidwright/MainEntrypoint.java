@@ -50,6 +50,7 @@ import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.examples.AddSubGenerator;
 import com.xilinx.rapidwright.examples.CopyMMCMCell;
+import com.xilinx.rapidwright.examples.CountRoutedNets;
 import com.xilinx.rapidwright.examples.CustomRouting;
 import com.xilinx.rapidwright.examples.DecomposeLUT;
 import com.xilinx.rapidwright.examples.ExampleNetlistCreation;
@@ -131,6 +132,7 @@ public class MainEntrypoint {
         addFunction("CheckAccuracyUsingGnlDesigns", CheckAccuracyUsingGnlDesigns::main);
         addFunction("CompareRouteStatusReports", CompareRouteStatusReports::main);
         addFunction("CopyMMCMCell", CopyMMCMCell::main);
+        addFunction("CountRoutedNets", CountRoutedNets::main);
         addFunction("CUFR", CUFR::main);
         addFunction("CustomRouting", CustomRouting::main);
         addFunction("DcpToInterchange", DcpToInterchange::main);
