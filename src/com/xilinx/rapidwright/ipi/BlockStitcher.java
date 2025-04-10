@@ -107,16 +107,17 @@ public class BlockStitcher {
     private ArrayList<EDIFHierPortInst> getPassThruPortInsts(Port port, EDIFHierPortInst curr) {
         ArrayList<EDIFHierPortInst> list = new ArrayList<>();
         for (String name : port.getPassThruPortNames()) {
-            EDIFPortInst passThruInst = curr.getPortInst().getCellInst().getPortInst(name);
+            EDIFHierCellInst hierInst = curr.getHierarchicalInst();
+            EDIFPortInst passThruInst = hierInst.getInst().getPortInst(name);
             if (passThruInst == null) {
-                String unconnected = curr.getPortInst().getCellInst().getName() + EDIFTools.EDIF_HIER_SEP + name;
+                String unconnected = hierInst.getInst().getName() + EDIFTools.EDIF_HIER_SEP + name;
                 if (!reportedUnconnects.contains(unconnected)) {
                     System.out.println("INFO: Port " + unconnected + " is unconnected");
                     reportedUnconnects.add(unconnected);
                 }
                 continue;
             }
-            EDIFHierPortInst passThru = new EDIFHierPortInst(curr.getHierarchicalInst(), passThruInst);
+            EDIFHierPortInst passThru = new EDIFHierPortInst(hierInst.getParent(), passThruInst);
             list.add(passThru);
         }
         return list;
@@ -462,7 +463,7 @@ public class BlockStitcher {
         }
         t.stop().start("Reading Top Level EDIF");
         EDIFNetlist topEdifNetlist = EDIFTools.readEdifFile(args[1]);
-        Design stitched = new Design("top_stitched", stitcher.partName);
+        Design stitched = new Design(topEdifNetlist.getName(), stitcher.partName);
         stitched.setNetlist(topEdifNetlist);
         t.stop().start("Implement Blocks");
         stitcher.populateModuleInstMaps(topEdifNetlist);
@@ -534,7 +535,7 @@ public class BlockStitcher {
             }
             //System.out.println(modInstName + " " + implementationIndex);
             EDIFNetlist tmp = stitched.getNetlist();
-            stitched.setNetlist(null);
+            stitched.setNetlist(EDIFTools.createNewNetlist("dummy"));
             ModuleInst mi = stitched.createModuleInst(modInstName, modImpls.get(implementationIndex));
             stitched.setNetlist(tmp);
             miMap.put(mi, modImpls.getNetlist());
@@ -590,18 +591,19 @@ public class BlockStitcher {
             inst.setCellType(cellType);
         }
 
-        for (EDIFCell c : stitched.getNetlist().getLibrary("IP_Integrator_Lib").getCells()) {
-            work.addCell(c);
-        }
-
-        ArrayList<String> libsToRemove = new ArrayList<>();
-        for (EDIFLibrary lib : stitched.getNetlist().getLibraries()) {
-            if (lib.getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME) ||
-                    lib.getName().equals(EDIFTools.EDIF_LIBRARY_WORK_NAME)) continue;
-            libsToRemove.add(lib.getName());
-        }
-        for (String lib : libsToRemove) {
-            stitched.getNetlist().removeLibrary(lib);
+        // Move all cells to 'work' library
+        boolean renameCollisions = true;
+        stitched.getNetlist().consolidateAllToWorkLibrary(renameCollisions);
+        EDIFLibrary workLib = stitched.getNetlist().getWorkLibrary();
+        for (EDIFCell workCell : workLib.getCells()) {
+            for (EDIFCellInst inst : workCell.getCellInsts()) {
+                EDIFLibrary lib = inst.getCellType().getLibrary();
+                if (lib.isHDIPrimitivesLibrary() || lib == workLib) {
+                    continue;
+                } else {
+                    inst.setCellType(work.getCell(inst.getCellType().getName()));
+                }
+            }
         }
         t.stop();
         if (DUMP_SYNTH_DCP_ONLY) {

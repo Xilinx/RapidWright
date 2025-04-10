@@ -1,3 +1,21 @@
+============= RapidWright 2024.2.2-beta released on 2025-3-25 ================
+Notes: 
+  - [DesignTools] Fix routethru corner case in fullyUnplaceCellHelper() (#1157)
+  - Add option to uniquify copied cells (#1156)
+  - [DesignTools] Ensure cell pin has a logical connection before attempting to unroute it (#1154)
+  - [DesignTools] Unroutes both CLK pins on a BRAM when requested (#1151)
+  - [EDIF] Fix Export of Single Bit Busses (#1147)
+  - Fixes to enable BlockStitcher to run (#1134)
+  - Enables batching of SitePinInst removals during MakeBlackBox (#1142)
+  - Routing Heat Map Example (#1145)
+  - When adding Modules to Designs, make EDIF cell names unique if name collides
+
+API Additions:
+  - com.xilinx.rapidwright.design.Design "public boolean removeSiteInst(SiteInst instance, boolean keepSitePinRouting,
+  - com.xilinx.rapidwright.design.Design "public Map<SiteTypeEnum, Set<String>> getCompatiblePlacements(Unisim u)"
+  - com.xilinx.rapidwright.design.Design "public static Map<SiteTypeEnum, Set<String>> getCompatiblePlacements(FamilyType family, Unisim u)"
+
+
 ============= RapidWright 2024.2.1-beta released on 2025-1-15 ================
 Notes: 
   - Adds an Override Flag for Advanced Flow Settings in Designs (#1135)
