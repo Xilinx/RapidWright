@@ -671,6 +671,9 @@ public class TestECOTools {
 
     }
 
+    /**
+     * Generated with CodeGenerator.genCodeForTestSite()
+     */
     public Design genTestDesign() {
         Design design = new Design("test", "xcku060-ffva1517-2-i");
         Device device = design.getDevice();
