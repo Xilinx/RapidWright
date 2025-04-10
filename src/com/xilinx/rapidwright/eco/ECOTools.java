@@ -22,6 +22,18 @@
 
 package com.xilinx.rapidwright.eco;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.Set;
+
+import com.xilinx.rapidwright.design.AltPinMapping;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
@@ -46,16 +58,6 @@ import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.util.Pair;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 
 /**
  * A collection of methods for performing ECO operations.
@@ -1193,5 +1195,84 @@ public class ECOTools {
             assert(design.getNet(path) == null);
             design.createNet(path);
         }
+    }
+
+    /**
+     * Refactors or moves a cell's logical hierarchy from one parent cell to
+     * another. It keeps any placement and routing intact, but will refactor
+     * {@link Net} names accordingly. Note that if any cells in the path of the
+     * refactor are not unique, they will be made so in this process.
+     * 
+     * @param design    The current design.
+     * @param cell      The cell to refactor.
+     * @param newParent The new parent hierarchical cell.
+     * @return The refactored cell instance.
+     */
+    public static EDIFHierCellInst refactorCell(Design design, EDIFHierCellInst cell, EDIFHierCellInst newParent) {
+        // TODO - Support non-leaf cells
+        if (!cell.getCellType().isLeafCellOrBlackBox()) {
+            throw new RuntimeException("ERROR: cell refactor of a hierarchical cell not yet supported: " + cell);
+        }
+        EDIFHierCellInst currParent = cell.getParent();
+        if (currParent.equals(newParent)) {
+            // Same parent already
+            return cell;
+        }
+        currParent.ensureAncestorsAreUniquified();
+        newParent.ensureAncestorsAreUniquified();
+
+        // Create a copy of the instance in the destination, later delete the original
+        EDIFCellInst newInst = newParent.getCellType().addNewCellInstUniqueName(cell.getInst().getName(), cell.getCellType());
+        EDIFHierCellInst refactoredInst = newParent.getChild(newInst);
+
+        for (EDIFHierPortInst portInst : cell.getHierPortInsts()) {
+            String portInstName = portInst.getPortInst().getName();
+            refactoredInst.getInst().getOrCreatePortInst(portInstName);
+            EDIFHierPortInst newPortInst = refactoredInst.getPortInst(portInstName);
+            EDIFTools.connectPortInstsThruHier(portInst.getHierarchicalNet(), newPortInst, "rw_refactor");
+
+            // Update physical net name if necessary
+            if (portInst.isOutput()) {
+                EDIFHierNet newHierNet = newPortInst.getHierarchicalNet();
+                Net physNet = portInst.getRoutedPhysicalNet(design);
+                if (physNet != null) {
+                    physNet.updateName(newHierNet.getHierarchicalNetName());
+                }
+            }
+
+            // Disconnect port from original cell
+            portInst.getNet().removePortInst(portInst.getPortInst());
+        }
+
+        // Update physical cell name if placed
+        String origPhysCellName = cell.getFullHierarchicalInstName();
+        Cell physCell = design.getCell(origPhysCellName);
+
+        if (physCell != null) {
+            String newPhysCellName = refactoredInst.getFullHierarchicalInstName();
+            physCell.updateName(newPhysCellName);
+            physCell.setEDIFHierCellInst(refactoredInst);
+            design.removeCell(origPhysCellName);
+            design.addCell(physCell);
+            // TODO - Improve search for routethru with same origPhysCellName
+            for (Cell c : physCell.getSiteInst().getCells()) {
+                if (c.getName().equals(origPhysCellName)) {
+                    // Rename routethru to new cell name
+                    c.updateName(newPhysCellName);
+                }
+                if (c.getAltPinMappings().size() > 0) {
+                    for (Entry<String, AltPinMapping> p : c.getAltPinMappings().entrySet()) {
+                        AltPinMapping pm = p.getValue();
+                        if (pm.getAltCellName().equals(origPhysCellName)) {
+                            pm.setAltCellName(newPhysCellName);
+                        }
+                    }
+                }
+            }
+        }
+
+        currParent.getCellType().removeCellInst(cell.getInst());
+
+        return refactoredInst;
     }
 }

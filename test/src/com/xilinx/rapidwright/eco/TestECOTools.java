@@ -22,34 +22,6 @@
 
 package com.xilinx.rapidwright.eco;
 
-import com.xilinx.rapidwright.design.Cell;
-import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.DesignTools;
-import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.PinType;
-import com.xilinx.rapidwright.design.SiteInst;
-import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.design.Unisim;
-import com.xilinx.rapidwright.device.BEL;
-import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.edif.EDIFCell;
-import com.xilinx.rapidwright.edif.EDIFHierCellInst;
-import com.xilinx.rapidwright.edif.EDIFHierNet;
-import com.xilinx.rapidwright.edif.EDIFHierPortInst;
-import com.xilinx.rapidwright.edif.EDIFNet;
-import com.xilinx.rapidwright.edif.EDIFNetlist;
-import com.xilinx.rapidwright.edif.EDIFPortInst;
-import com.xilinx.rapidwright.router.Router;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.ReportRouteStatusResult;
-import com.xilinx.rapidwright.util.VivadoTools;
-import com.xilinx.rapidwright.util.VivadoToolsHelper;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -59,6 +31,42 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+
+import com.xilinx.rapidwright.design.AltPinMapping;
+import com.xilinx.rapidwright.design.Cell;
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.design.PinType;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.edif.EDIFValueType;
+import com.xilinx.rapidwright.router.Router;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.CodeGenerator;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.ReportRouteStatusResult;
+import com.xilinx.rapidwright.util.VivadoTools;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 public class TestECOTools {
     @Test
@@ -625,4 +633,327 @@ public class TestECOTools {
         // Ensure the net stays routed after LUT1 is removed from A6LUT
         Assertions.assertEquals(si.getNetFromSiteWire("H6"), routethruNet);
     }
+
+    private void testRefactorCellHelper(Design d, String cellName, String newParentName) {
+        EDIFHierCellInst cell = d.getNetlist().getHierCellInstFromName(cellName);
+        EDIFHierCellInst newParent = d.getNetlist().getHierCellInstFromName(newParentName);
+
+        Map<String, Set<EDIFHierPortInst>> map = new HashMap<>();
+        for (EDIFHierPortInst i : cell.getHierPortInsts()) {
+            String portInstName = i.getPortInst().getName();
+            Set<EDIFHierPortInst> pins = new HashSet<>();
+            for (EDIFHierPortInst leafPin : i.getHierarchicalNet().getLeafHierPortInsts()) {
+                if (leafPin.equals(i)
+                        || leafPin.getFullHierarchicalInstName().equals(i.getFullHierarchicalInstName())) {
+                    continue;
+                }
+                pins.add(leafPin);
+            }
+            map.put(portInstName, pins);
+        }
+
+        EDIFHierCellInst refactored = ECOTools.refactorCell(d, cell, newParent);
+
+        Assertions.assertEquals(newParent, refactored.getParent());
+
+        for (EDIFHierPortInst i : refactored.getHierPortInsts()) {
+            String portInstName = i.getPortInst().getName();
+            Set<EDIFHierPortInst> leafPins = map.get(portInstName);
+            for (EDIFHierPortInst leafPin : i.getHierarchicalNet().getLeafHierPortInsts()) {
+                if (leafPin.equals(i)
+                        || leafPin.getFullHierarchicalInstName().equals(i.getFullHierarchicalInstName())) {
+                    continue;
+                }
+                Assertions.assertTrue(leafPins.remove(leafPin));
+            }
+            Assertions.assertEquals(0, leafPins.size());
+        }
+
+    }
+
+    /**
+     * Generated with CodeGenerator.genCodeForTestSite()
+     */
+    public Design genTestDesign() {
+        Design design = new Design("test", "xcku060-ffva1517-2-i");
+        Device device = design.getDevice();
+        SiteInst si = design.createSiteInst("SLICE_X134Y49", SiteTypeEnum.SLICEL, device.getSite("SLICE_X134Y49"));
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = netlist.getTopCell();
+        Cell cell0 = CodeGenerator.genCell(si, "cell0", false, "FDRE", "AFF", "Q:Q", "CLK:C", "D:D", "SR:R");
+        cell0.addProperty("INIT", "1'b0", EDIFValueType.STRING);
+        Cell cell1 = CodeGenerator.genCell(si, "cell1", false, "FDRE", "CFF", "Q:Q", "CLK:C", "D:D", "SR:R");
+        cell1.addProperty("INIT", "1'b0", EDIFValueType.STRING);
+        Cell cell2 = CodeGenerator.genCell(si, "cell2", false, "FDRE", "BFF", "Q:Q", "CLK:C", "D:D", "SR:R");
+        cell2.addProperty("INIT", "1'b0", EDIFValueType.STRING);
+        Cell cell3 = CodeGenerator.genCell(si, "cell3", false, "FDRE", "EFF", "Q:Q", "CLK:C", "D:D", "SR:R");
+        cell3.addProperty("INIT", "1'b0", EDIFValueType.STRING);
+        Cell cell4 = CodeGenerator.genCell(si, "cell4", false, "FDRE", "DFF", "Q:Q", "CLK:C", "D:D", "SR:R");
+        cell4.addProperty("INIT", "1'b0", EDIFValueType.STRING);
+        Cell cell5 = CodeGenerator.genCell(si, "cell5", false, "FDRE", "GFF", "Q:Q", "CLK:C", "D:D", "SR:R");
+        cell5.addProperty("INIT", "1'b0", EDIFValueType.STRING);
+        Cell cell6 = CodeGenerator.genCell(si, "cell6", false, "FDRE", "FFF", "Q:Q", "CLK:C", "D:D", "SR:R");
+        cell6.addProperty("INIT", "1'b0", EDIFValueType.STRING);
+        Cell cell7 = CodeGenerator.genCell(si, "cell7", false, "FDRE", "HFF", "Q:Q", "CLK:C", "D:D", "SR:R");
+        cell7.addProperty("INIT", "1'b0", EDIFValueType.STRING);
+        Cell cell8_B6LUT = CodeGenerator.genCell(si, "cell8", true, "CARRY8", "B6LUT", "A6:S[1]");
+        Cell cell9 = CodeGenerator.genCell(si, "cell9", false, "FDRE", "FFF2", "Q:Q", "CLK:C", "D:D", "SR:R");
+        cell9.addProperty("INIT", "1'b0", EDIFValueType.STRING);
+        Cell cell10 = CodeGenerator.genCell(si, "cell10", false, "FDRE", "EFF2", "Q:Q", "CLK:C", "D:D", "SR:R");
+        cell10.addProperty("INIT", "1'b0", EDIFValueType.STRING);
+        Cell cell8_H6LUT = CodeGenerator.genCell(si, "cell8", true, "CARRY8", "H6LUT", "A6:S[7]");
+        Cell cell8_D6LUT = CodeGenerator.genCell(si, "cell8", true, "CARRY8", "D6LUT", "A6:S[3]");
+        Cell cell9_F6LUT = CodeGenerator.genCell(si, "cell9", true, "FDRE", "F6LUT", "A6:D");
+        cell9_F6LUT.addAltPinMapping("A6", new AltPinMapping("S[5]", "cell8", "CARRY8"));
+        Cell cell8_C6LUT = CodeGenerator.genCell(si, "cell8", true, "CARRY8", "C6LUT", "A6:S[2]");
+        Cell cell8 = CodeGenerator.genCell(si, "cell8", false, "CARRY8", "CARRY8", "S3:S[3]", "S4:S[4]", "O0:O[0]",
+                "S5:S[5]", "O1:O[1]", "S6:S[6]", "O2:O[2]", "S7:S[7]", "CO1:CO[1]", "O3:O[3]", "CO0:CO[0]", "O4:O[4]",
+                "CO3:CO[3]", "O5:O[5]", "CO2:CO[2]", "O6:O[6]", "CO5:CO[5]", "O7:O[7]", "CO4:CO[4]", "DI0:DI[0]",
+                "CO7:CO[7]", "CO6:CO[6]", "HX:DI[7]", "FX:DI[5]", "DX:DI[3]", "BX:DI[1]", "GX:DI[6]", "EX:DI[4]",
+                "CX:DI[2]", "AX:CI", "S0:S[0]", "S1:S[1]", "S2:S[2]");
+        cell8.addProperty("CARRY_TYPE", "SINGLE_CY8", EDIFValueType.STRING);
+        Cell cell8_A6LUT = CodeGenerator.genCell(si, "cell8", true, "CARRY8", "A6LUT", "A2:S[0]");
+        Cell cell8_E6LUT = CodeGenerator.genCell(si, "cell8", true, "CARRY8", "E6LUT", "A6:S[4]");
+        Cell cell8_G6LUT = CodeGenerator.genCell(si, "cell8", true, "CARRY8", "G6LUT", "A6:S[6]");
+
+        CodeGenerator.addSitePIPs(si, "CLK1INV:CLK", "CLK2INV:CLK", "FFMUXA1:XORIN", "FFMUXB1:XORIN", "FFMUXC1:XORIN",
+                "FFMUXD1:XORIN", "FFMUXE1:XORIN", "FFMUXE2:BYP", "FFMUXF1:XORIN", "FFMUXF2:D6", "FFMUXG1:XORIN",
+                "FFMUXH1:XORIN", "RST_ABCDINV:RST", "RST_EFGHINV:RST");
+
+        Net net11 = design.createNet("net11");
+        net11.getLogicalNet().createPortInst("Q", cell9);
+        top.getNet("net11").createPortInst(top.createPort("port12", EDIFDirection.OUTPUT, 1));
+        net11.createPin("FQ2", si);
+        CodeGenerator.routeSiteNet(si, net11, "FQ2");
+        Net net13 = design.createNet("net13");
+        net13.getLogicalNet().createPortInst("C", cell10);
+        net13.getLogicalNet().createPortInst("C", cell9);
+        net13.getLogicalNet().createPortInst("C", cell0);
+        net13.getLogicalNet().createPortInst("C", cell2);
+        net13.getLogicalNet().createPortInst("C", cell1);
+        net13.getLogicalNet().createPortInst("C", cell4);
+        net13.getLogicalNet().createPortInst("C", cell3);
+        net13.getLogicalNet().createPortInst("C", cell6);
+        net13.getLogicalNet().createPortInst("C", cell5);
+        net13.getLogicalNet().createPortInst("C", cell7);
+        top.getNet("net13").createPortInst(top.createPort("port14", EDIFDirection.INPUT, 1));
+        net13.createPin("CLK_B1", si);
+        net13.createPin("CLK_B2", si);
+        CodeGenerator.routeSiteNet(si, net13, "CLK1INV_OUT", "CLK2INV_OUT", "CLK_B1", "CLK_B2");
+        Net vcc = design.getVccNet();
+        EDIFTools.getStaticNet(NetType.VCC, top, netlist).createPortInst("CE", cell0);
+        EDIFTools.getStaticNet(NetType.VCC, top, netlist).createPortInst("CE", cell1);
+        EDIFTools.getStaticNet(NetType.VCC, top, netlist).createPortInst("CE", cell2);
+        EDIFTools.getStaticNet(NetType.VCC, top, netlist).createPortInst("CE", cell3);
+        EDIFTools.getStaticNet(NetType.VCC, top, netlist).createPortInst("CE", cell4);
+        EDIFTools.getStaticNet(NetType.VCC, top, netlist).createPortInst("CE", cell5);
+        EDIFTools.getStaticNet(NetType.VCC, top, netlist).createPortInst("CE", cell6);
+        EDIFTools.getStaticNet(NetType.VCC, top, netlist).createPortInst("CE", cell7);
+        EDIFTools.getStaticNet(NetType.VCC, top, netlist).createPortInst("CE", cell9);
+        EDIFTools.getStaticNet(NetType.VCC, top, netlist).createPortInst("CE", cell10);
+        vcc.createPin("A6", si);
+        CodeGenerator.routeSiteNet(si, vcc, "A6");
+        Net net15 = design.createNet("net15");
+        net15.getLogicalNet().createPortInst("D", cell5);
+        net15.getLogicalNet().createPortInst("O[6]", cell8);
+        CodeGenerator.routeSiteNet(si, net15, "CARRY8_O6", "FFMUXG1_OUT1");
+        Net net16 = design.createNet("net16");
+        net16.getLogicalNet().createPortInst("S[1]", cell8);
+        top.getNet("net16").createPortInst(top.createPort("port17", EDIFDirection.INPUT, 1));
+        net16.createPin("B6", si);
+        CodeGenerator.routeSiteNet(si, net16, "B6", "B_O");
+        Net net18 = design.createNet("net18");
+        net18.getLogicalNet().createPortInst("R", cell10);
+        net18.getLogicalNet().createPortInst("R", cell9);
+        net18.getLogicalNet().createPortInst("R", cell0);
+        net18.getLogicalNet().createPortInst("R", cell2);
+        net18.getLogicalNet().createPortInst("R", cell1);
+        net18.getLogicalNet().createPortInst("R", cell4);
+        net18.getLogicalNet().createPortInst("R", cell3);
+        net18.getLogicalNet().createPortInst("R", cell6);
+        net18.getLogicalNet().createPortInst("R", cell5);
+        net18.getLogicalNet().createPortInst("R", cell7);
+        top.getNet("net18").createPortInst(top.createPort("port19", EDIFDirection.INPUT, 1));
+        net18.createPin("SRST_B1", si);
+        net18.createPin("SRST_B2", si);
+        CodeGenerator.routeSiteNet(si, net18, "RST_ABCDINV_OUT", "RST_EFGHINV_OUT", "SRST_B1", "SRST_B2");
+        Net net20 = design.createNet("net20");
+        net20.getLogicalNet().createPortInst("D", cell3);
+        net20.getLogicalNet().createPortInst("O[4]", cell8);
+        CodeGenerator.routeSiteNet(si, net20, "CARRY8_O4", "FFMUXE1_OUT1");
+        Net net21 = design.createNet("net21");
+        net21.getLogicalNet().createPortInst("CI", cell8);
+        top.getNet("net21").createPortInst(top.createPort("port22", EDIFDirection.INPUT, 1));
+        net21.createPin("AX", si);
+        CodeGenerator.routeSiteNet(si, net21, "AX");
+        Net gnd = design.getGndNet();
+        EDIFTools.getStaticNet(NetType.GND, top, netlist).createPortInst("CI_TOP", cell8);
+        EDIFTools.getStaticNet(NetType.GND, top, netlist).createPortInst("DI[0]", cell8);
+        EDIFTools.getStaticNet(NetType.GND, top, netlist).createPortInst("DI[1]", cell8);
+        EDIFTools.getStaticNet(NetType.GND, top, netlist).createPortInst("DI[2]", cell8);
+        EDIFTools.getStaticNet(NetType.GND, top, netlist).createPortInst("DI[3]", cell8);
+        EDIFTools.getStaticNet(NetType.GND, top, netlist).createPortInst("DI[4]", cell8);
+        EDIFTools.getStaticNet(NetType.GND, top, netlist).createPortInst("DI[5]", cell8);
+        EDIFTools.getStaticNet(NetType.GND, top, netlist).createPortInst("DI[6]", cell8);
+        EDIFTools.getStaticNet(NetType.GND, top, netlist).createPortInst("DI[7]", cell8);
+        gnd.createPin("BX", si);
+        gnd.createPin("CX", si);
+        gnd.createPin("DX", si);
+        gnd.createPin("HX", si);
+        gnd.createPin("GX", si);
+        gnd.createPin("FX", si);
+        gnd.createPin("EX", si);
+        CodeGenerator.routeSiteNet(si, gnd, "A5LUT_O5", "BX", "CX", "DX", "EX", "FX", "GND_WIRE", "GX", "HX");
+        Net net23 = design.createNet("net23");
+        net23.getLogicalNet().createPortInst("D", cell1);
+        net23.getLogicalNet().createPortInst("O[2]", cell8);
+        CodeGenerator.routeSiteNet(si, net23, "CARRY8_O2", "FFMUXC1_OUT1");
+        Net net24 = design.createNet("net24");
+        net24.getLogicalNet().createPortInst("S[7]", cell8);
+        top.getNet("net24").createPortInst(top.createPort("port25", EDIFDirection.INPUT, 1));
+        net24.createPin("H6", si);
+        CodeGenerator.routeSiteNet(si, net24, "H6", "H_O");
+        Net net26 = design.createNet("net26");
+        net26.getLogicalNet().createPortInst("D", cell0);
+        net26.getLogicalNet().createPortInst("O[0]", cell8);
+        CodeGenerator.routeSiteNet(si, net26, "CARRY8_O0", "FFMUXA1_OUT1");
+        Net net27 = design.createNet("net27");
+        net27.getLogicalNet().createPortInst("D", cell9);
+        net27.getLogicalNet().createPortInst("S[5]", cell8);
+        top.getNet("net27").createPortInst(top.createPort("port28", EDIFDirection.INPUT, 1));
+        net27.createPin("F6", si);
+        CodeGenerator.routeSiteNet(si, net27, "F6", "FFMUXF2_OUT2", "F_O");
+        Net net29 = design.createNet("net29");
+        net29.getLogicalNet().createPortInst("S[3]", cell8);
+        top.getNet("net29").createPortInst(top.createPort("port30", EDIFDirection.INPUT, 1));
+        net29.createPin("D6", si);
+        CodeGenerator.routeSiteNet(si, net29, "D6", "D_O");
+        Net net31 = design.createNet("net31");
+        net31.getLogicalNet().createPortInst("Q", cell4);
+        top.getNet("net31").createPortInst(top.createPort("port32", EDIFDirection.OUTPUT, 1));
+        net31.createPin("DQ", si);
+        CodeGenerator.routeSiteNet(si, net31, "DQ");
+        Net net33 = design.createNet("net33");
+        net33.getLogicalNet().createPortInst("Q", cell6);
+        top.getNet("net33").createPortInst(top.createPort("port34", EDIFDirection.OUTPUT, 1));
+        net33.createPin("FQ", si);
+        CodeGenerator.routeSiteNet(si, net33, "FQ");
+        Net net35 = design.createNet("net35");
+        net35.getLogicalNet().createPortInst("Q", cell10);
+        top.getNet("net35").createPortInst(top.createPort("port36", EDIFDirection.OUTPUT, 1));
+        net35.createPin("EQ2", si);
+        CodeGenerator.routeSiteNet(si, net35, "EQ2");
+        Net net37 = design.createNet("net37");
+        CodeGenerator.routeSiteNet(si, net37, "AQ2", "BQ2", "CARRY8_CO0", "CARRY8_CO1", "CARRY8_CO2", "CARRY8_CO3",
+                "CARRY8_CO4", "CARRY8_CO5", "CARRY8_CO6", "CQ2", "DQ2", "F7MUX_AB_OUT", "F7MUX_CD_OUT", "F7MUX_EF_OUT",
+                "F7MUX_GH_OUT", "F8MUX_BOT_OUT", "F8MUX_TOP_OUT", "F9MUX_OUT", "GQ2", "HQ2");
+        Net net38 = design.createNet("net38");
+        net38.getLogicalNet().createPortInst("Q", cell2);
+        top.getNet("net38").createPortInst(top.createPort("port39", EDIFDirection.OUTPUT, 1));
+        net38.createPin("BQ", si);
+        CodeGenerator.routeSiteNet(si, net38, "BQ");
+        Net net40 = design.createNet("net40");
+        net40.getLogicalNet().createPortInst("Q", cell7);
+        top.getNet("net40").createPortInst(top.createPort("port41", EDIFDirection.OUTPUT, 1));
+        net40.createPin("HQ", si);
+        CodeGenerator.routeSiteNet(si, net40, "HQ");
+        Net net42 = design.createNet("net42");
+        net42.getLogicalNet().createPortInst("D", cell7);
+        net42.getLogicalNet().createPortInst("O[7]", cell8);
+        CodeGenerator.routeSiteNet(si, net42, "CARRY8_O7", "FFMUXH1_OUT1");
+        Net net43 = design.createNet("net43");
+        net43.getLogicalNet().createPortInst("D", cell6);
+        net43.getLogicalNet().createPortInst("O[5]", cell8);
+        CodeGenerator.routeSiteNet(si, net43, "CARRY8_O5", "FFMUXF1_OUT1");
+        Net net44 = design.createNet("net44");
+        net44.getLogicalNet().createPortInst("S[2]", cell8);
+        top.getNet("net44").createPortInst(top.createPort("port45", EDIFDirection.INPUT, 1));
+        net44.createPin("C6", si);
+        CodeGenerator.routeSiteNet(si, net44, "C6", "C_O");
+        Net net46 = design.createNet("net46");
+        net46.getLogicalNet().createPortInst("D", cell10);
+        top.getNet("net46").createPortInst(top.createPort("port47", EDIFDirection.INPUT, 1));
+        net46.createPin("E_I", si);
+        CodeGenerator.routeSiteNet(si, net46, "E_I", "FFMUXE2_OUT2");
+        Net net48 = design.createNet("net48");
+        net48.getLogicalNet().createPortInst("CO[7]", cell8);
+        top.getNet("net48").createPortInst(top.createPort("port49", EDIFDirection.OUTPUT, 1));
+        net48.createPin("COUT", si);
+        CodeGenerator.routeSiteNet(si, net48, "COUT");
+        Net net50 = design.createNet("net50");
+        net50.getLogicalNet().createPortInst("D", cell4);
+        net50.getLogicalNet().createPortInst("O[3]", cell8);
+        CodeGenerator.routeSiteNet(si, net50, "CARRY8_O3", "FFMUXD1_OUT1");
+        Net net51 = design.createNet("net51");
+        net51.getLogicalNet().createPortInst("S[0]", cell8);
+        top.getNet("net51").createPortInst(top.createPort("port52", EDIFDirection.INPUT, 1));
+        net51.createPin("A2", si);
+        CodeGenerator.routeSiteNet(si, net51, "A2", "A_O");
+        Net net53 = design.createNet("net53");
+        net53.getLogicalNet().createPortInst("D", cell2);
+        net53.getLogicalNet().createPortInst("O[1]", cell8);
+        CodeGenerator.routeSiteNet(si, net53, "CARRY8_O1", "FFMUXB1_OUT1");
+        Net net54 = design.createNet("net54");
+        net54.getLogicalNet().createPortInst("S[6]", cell8);
+        top.getNet("net54").createPortInst(top.createPort("port55", EDIFDirection.INPUT, 1));
+        net54.createPin("G6", si);
+        CodeGenerator.routeSiteNet(si, net54, "G6", "G_O");
+        Net net56 = design.createNet("net56");
+        net56.getLogicalNet().createPortInst("S[4]", cell8);
+        top.getNet("net56").createPortInst(top.createPort("port57", EDIFDirection.INPUT, 1));
+        net56.createPin("E6", si);
+        CodeGenerator.routeSiteNet(si, net56, "E6", "E_O");
+        Net net58 = design.createNet("net58");
+        net58.getLogicalNet().createPortInst("Q", cell3);
+        top.getNet("net58").createPortInst(top.createPort("port59", EDIFDirection.OUTPUT, 1));
+        net58.createPin("EQ", si);
+        CodeGenerator.routeSiteNet(si, net58, "EQ");
+        Net net60 = design.createNet("net60");
+        net60.getLogicalNet().createPortInst("Q", cell5);
+        top.getNet("net60").createPortInst(top.createPort("port61", EDIFDirection.OUTPUT, 1));
+        net60.createPin("GQ", si);
+        CodeGenerator.routeSiteNet(si, net60, "GQ");
+        Net net62 = design.createNet("net62");
+        net62.getLogicalNet().createPortInst("Q", cell0);
+        top.getNet("net62").createPortInst(top.createPort("port63", EDIFDirection.OUTPUT, 1));
+        net62.createPin("AQ", si);
+        CodeGenerator.routeSiteNet(si, net62, "AQ");
+        Net net64 = design.createNet("net64");
+        net64.getLogicalNet().createPortInst("Q", cell1);
+        top.getNet("net64").createPortInst(top.createPort("port65", EDIFDirection.OUTPUT, 1));
+        net64.createPin("CQ", si);
+        CodeGenerator.routeSiteNet(si, net64, "CQ");
+        return design;
+    }
+
+    @Test
+    public void testRefactorCell() {
+        // Test generated site instance design
+        Design d = genTestDesign();
+        d.getNetlist().getTopCell().createChildCellInst("dummy_parent_inst",
+                new EDIFCell(d.getNetlist().getWorkLibrary(), "dummy_parent"));
+
+        testRefactorCellHelper(d, "cell8", "dummy_parent_inst");
+
+        // Test microblaze design
+        d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks_2024.1.dcp");
+
+        String cellName = "base_mb_i/microblaze_0/U0/MicroBlaze_Core_I/Performance.Core/Decode_I/PreFetch_Buffer_I1/Instruction_Prefetch_Mux[9].Gen_Instr_DFF/EX_Op3[2]_i_2";
+        String newParentName = "dbg_hub/inst";
+
+        testRefactorCellHelper(d, cellName, newParentName);
+
+        cellName = "base_mb_i/microblaze_0/U0/MicroBlaze_Core_I/Performance.Core/Use_DLMB.wb_dlmb_valid_read_data_reg[1]";
+        newParentName = "base_mb_i/microblaze_0/U0/MicroBlaze_Core_I/Performance.Core/Decode_I/PreFetch_Buffer_I1/Instruction_Prefetch_Mux[9].Gen_Instr_DFF";
+
+        testRefactorCellHelper(d, cellName, newParentName);
+
+        cellName = "base_mb_i/microblaze_0/U0/MicroBlaze_Core_I/Performance.Core/Data_Flow_I/Zero_Detect_I/Part_Of_Zero_Carry_Start/Using_FPGA.Native_CARRY4_CARRY8";
+        newParentName = "";
+
+        testRefactorCellHelper(d, cellName, newParentName);
+
+        VivadoToolsHelper.assertFullyRouted(d);
+    }
+
 }
