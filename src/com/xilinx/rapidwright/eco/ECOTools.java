@@ -1200,7 +1200,8 @@ public class ECOTools {
     /**
      * Refactors or moves a cell's logical hierarchy from one parent cell to
      * another. It keeps any placement and routing intact, but will refactor
-     * {@link Net} names accordingly.
+     * {@link Net} names accordingly. Note that if any cells in the path of the
+     * refactor are not unique, they will be made so in this process.
      * 
      * @param design    The current design.
      * @param cell      The cell to refactor.
@@ -1209,7 +1210,9 @@ public class ECOTools {
      */
     public static EDIFHierCellInst refactorCell(Design design, EDIFHierCellInst cell, EDIFHierCellInst newParent) {
         // TODO - Support non-leaf cells
-        assert (cell.getCellType().isLeafCellOrBlackBox());
+        if (!cell.getCellType().isLeafCellOrBlackBox()) {
+            throw new RuntimeException("ERROR: cell refactor of a hierarchical cell not yet supported: " + cell);
+        }
         EDIFHierCellInst currParent = cell.getParent();
         if (currParent.equals(newParent)) {
             // Same parent already

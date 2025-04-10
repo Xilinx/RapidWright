@@ -634,7 +634,7 @@ public class TestECOTools {
         Assertions.assertEquals(si.getNetFromSiteWire("H6"), routethruNet);
     }
 
-    private void testRefactorCell(Design d, String cellName, String newParentName) {
+    private void testRefactorCellHelper(Design d, String cellName, String newParentName) {
         EDIFHierCellInst cell = d.getNetlist().getHierCellInstFromName(cellName);
         EDIFHierCellInst newParent = d.getNetlist().getHierCellInstFromName(newParentName);
 
@@ -930,7 +930,7 @@ public class TestECOTools {
         d.getNetlist().getTopCell().createChildCellInst("dummy_parent_inst",
                 new EDIFCell(d.getNetlist().getWorkLibrary(), "dummy_parent"));
 
-        testRefactorCell(d, "cell8", "dummy_parent_inst");
+        testRefactorCellHelper(d, "cell8", "dummy_parent_inst");
 
         // Test microblaze design
         d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks_2024.1.dcp");
@@ -938,17 +938,17 @@ public class TestECOTools {
         String cellName = "base_mb_i/microblaze_0/U0/MicroBlaze_Core_I/Performance.Core/Decode_I/PreFetch_Buffer_I1/Instruction_Prefetch_Mux[9].Gen_Instr_DFF/EX_Op3[2]_i_2";
         String newParentName = "dbg_hub/inst";
 
-        testRefactorCell(d, cellName, newParentName);
+        testRefactorCellHelper(d, cellName, newParentName);
 
         cellName = "base_mb_i/microblaze_0/U0/MicroBlaze_Core_I/Performance.Core/Use_DLMB.wb_dlmb_valid_read_data_reg[1]";
         newParentName = "base_mb_i/microblaze_0/U0/MicroBlaze_Core_I/Performance.Core/Decode_I/PreFetch_Buffer_I1/Instruction_Prefetch_Mux[9].Gen_Instr_DFF";
 
-        testRefactorCell(d, cellName, newParentName);
+        testRefactorCellHelper(d, cellName, newParentName);
 
         cellName = "base_mb_i/microblaze_0/U0/MicroBlaze_Core_I/Performance.Core/Data_Flow_I/Zero_Detect_I/Part_Of_Zero_Carry_Start/Using_FPGA.Native_CARRY4_CARRY8";
         newParentName = "";
 
-        testRefactorCell(d, cellName, newParentName);
+        testRefactorCellHelper(d, cellName, newParentName);
 
         VivadoToolsHelper.assertFullyRouted(d);
     }
