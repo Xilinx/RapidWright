@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -619,7 +619,7 @@ public class RWRoute {
                 if (altSourceAndRnode != null) {
                     SitePinInst altSource = altSourceAndRnode.getFirst();
                     RouteNode altSourceINTRnode = altSourceAndRnode.getSecond();
-                    connection.setSource(altSource);
+                    connection.setSource(new RouteSitePinInst(altSource));
                     connection.setSourceRnode(altSourceINTRnode);
                 }
             }
@@ -1032,8 +1032,8 @@ public class RWRoute {
                 !Boolean.getBoolean("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates")) {
             Map<SitePinInst, String> pinSwaps = new HashMap<>();
             for (Connection connection: indirectConnections) {
-                SitePinInst oldSinkSpi = connection.getSink();
-                if (!oldSinkSpi.isLUTInputPin() || !oldSinkSpi.isRouted()) {
+                RoutePinInterface oldSinkPin = connection.getSink();
+                if (!oldSinkPin.isLUTInputPin() || !oldSinkPin.isRouted()) {
                     continue;
                 }
 
@@ -1044,6 +1044,8 @@ public class RWRoute {
                 }
                 connection.setSinkRnode(newSinkRnode);
 
+                SitePinInst oldSinkSpi = oldSinkPin.getSitePinInst();
+                assert(oldSinkSpi != null);
                 SitePin newSitePin = newSinkRnode.getSitePin();
                 String existing = pinSwaps.put(oldSinkSpi, newSitePin.getPinName());
                 assert(existing == null);
@@ -1765,7 +1767,7 @@ public class RWRoute {
      * @return true, if the output pin has been swapped.
      */
     protected boolean swapOutputPin(Connection connection) {
-        SitePinInst source = connection.getSource();
+        RoutePinInterface source = connection.getSource();
         Pair<SitePinInst,RouteNode> altSourceAndRnode = connection.getOrCreateAlternateSource(routingGraph);
         if (altSourceAndRnode == null) {
             return false;
@@ -1773,7 +1775,7 @@ public class RWRoute {
 
         SitePinInst altSource = altSourceAndRnode.getFirst();
         System.out.println("INFO: Swap source from " + source + " to " + altSource + "\n");
-        connection.setSource(altSource);
+        connection.setSource(new RouteSitePinInst(altSource));
 
         RouteNode altSourceRnode = altSourceAndRnode.getSecond();
         connection.setSourceRnode(altSourceRnode);

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * This file is part of RapidWright.
@@ -1864,7 +1864,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     public void setTimingEdgesOfConnections(List<Connection> connections) {
         for (Connection connection : connections) {
             if (connection.isDirect()) continue;
-            List<EDIFHierPortInst> hportsFromSitePinInsts = DesignTools.getPortInstsFromSitePinInst(connection.getSink());
+            List<EDIFHierPortInst> hportsFromSitePinInsts = DesignTools.getPortInstsFromSitePinInst(connection.getSink().getSitePinInst());
             if (hportsFromSitePinInsts.isEmpty()) {
                 throw new RuntimeException("ERROR: Unable to find hierarchical logical cell pins from: " + connection.getSink());
             }

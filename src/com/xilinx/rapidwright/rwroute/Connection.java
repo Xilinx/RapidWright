@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -33,19 +33,20 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.Pair;
 
 /**
- * A Connection instance represents a pair of source-sink {@link SitePinInst} instances of a {@link Net} instance.
+ * A Connection instance represents a pair of source-sink {@link RoutePinInterface} instances of a {@link Net} instance.
  */
-public class Connection implements Comparable<Connection>{
+public class Connection implements Comparable<Connection> {
     /** A unique index of a connection */
     private final int id;
-    /** The source and sink {@link SitePinInst} instances of a connection */
-    private SitePinInst source;
-    private final SitePinInst sink;
+    /** The source and sink {@link RoutePinInterface} instances of a connection */
+    private RoutePinInterface source;
+    private final RoutePinInterface sink;
     /**
      * The source and sink {@link RouteNode} instances (rnodes) of a connection.
      * They are created based on the INT tile nodes the source and sink SitePinInsts connect to, respectively.
@@ -89,6 +90,10 @@ public class Connection implements Comparable<Connection>{
     private List<Node> nodes;
 
     public Connection(int id, SitePinInst source, SitePinInst sink, NetWrapper netWrapper) {
+        this(id, new RouteSitePinInst(source), new RouteSitePinInst(sink), netWrapper);
+    }
+
+    public Connection(int id, RoutePinInterface source, RoutePinInterface sink, NetWrapper netWrapper) {
         this.id = id;
         this.source = source;
         this.sink = sink;
@@ -96,8 +101,10 @@ public class Connection implements Comparable<Connection>{
         rnodes = new ArrayList<>();
         this.netWrapper = netWrapper;
         netWrapper.addConnection(this);
-        crossSLR = !source.getTile().getSLR().equals(sink.getTile().getSLR());
-        if (crossSLR && source.getSiteInst().getDesign().getSeries() == Series.Versal) {
+        Tile sourceTile = source.getTile();
+        Tile sinkTile = sink.getTile();
+        crossSLR = !sourceTile.getSLR().equals(sinkTile.getSLR());
+        if (crossSLR && sourceTile.getDevice().getSeries() == Series.Versal) {
             throw new RuntimeException("ERROR: Cross-SLR connections not yet supported on Versal.");
         }
     }
@@ -346,11 +353,11 @@ public class Connection implements Comparable<Connection>{
         return netWrapper.getNet();
     }
 
-    public SitePinInst getSource() {
+    public RoutePinInterface getSource() {
         return source;
     }
 
-    public void setSource(SitePinInst source) {
+    public void setSource(RoutePinInterface source) {
         assert(source != null);
         this.source = source;
     }
@@ -363,7 +370,7 @@ public class Connection implements Comparable<Connection>{
         this.direct = direct;
     }
 
-    public SitePinInst getSink() {
+    public RoutePinInterface getSink() {
         return sink;
     }
 
