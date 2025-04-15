@@ -283,6 +283,9 @@ public class RouterHelper {
             Node driver = connectionNodes.get(i + driverOffsetIdx);
             Node load = connectionNodes.get(i + loadOffsetIdx);
             PIP pip = PIP.getArbitraryPIP(driver, load);
+            if (load.isArcLocked()) {
+                pip.setIsPIPFixed(true);
+            }
             if (pip != null) {
                 connectionPIPs.add(pip);
             } else {
