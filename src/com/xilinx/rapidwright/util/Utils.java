@@ -349,8 +349,11 @@ public class Utils{
         );
 
         clocking = EnumSet.of(
-                TileTypeEnum.RCLK_CLEM_CLKBUF_L,
                 TileTypeEnum.CMT_L,
+                TileTypeEnum.RCLK_CLEM_L,
+                TileTypeEnum.RCLK_CLEM_CLKBUF_L,
+                TileTypeEnum.RCLK_DSP_INTF_L,
+                TileTypeEnum.RCLK_RCLK_XIPHY_INNER_FT,
                 // Versal
                 TileTypeEnum.CLK_REBUF_BUFGS_HSR_CORE,
                 TileTypeEnum.CLK_PLL_AND_PHY,
