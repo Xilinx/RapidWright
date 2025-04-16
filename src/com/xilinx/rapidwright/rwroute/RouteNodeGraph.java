@@ -493,6 +493,9 @@ public class RouteNodeGraph {
 
         for (PIP pip : net.getPIPs()) {
             preserve(pip.getStartNode(), net);
+            if (pip.isGapArc()) {
+                continue;
+            }
             preserve(pip.getEndNode(), net);
         }
     }
