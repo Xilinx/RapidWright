@@ -50,7 +50,6 @@ import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.Pair;
-import org.apache.commons.collections4.CollectionUtils;
 
 /**
  * A class extending {@link RWRoute} for partial routing.
@@ -435,7 +434,7 @@ public class PartialRouter extends RWRoute {
                         List<RouteNode> rnodesExcludingSource = rnodes.subList(0, rnodes.size() - 1);
                         if (lockedNodes.containsAll(rnodesExcludingSource)) {
                             usedLockedNodes.addAll(rnodesExcludingSource);
-                        } else if (CollectionUtils.containsAny(lockedNodes, rnodes)) {
+                        } else if (!Collections.disjoint(lockedNodes, rnodes)) {
                             System.out.println("WARNING: Routing for " +  connection + " is only partially fixed; ignoring.");
                         }
                     }
