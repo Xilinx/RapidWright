@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2024-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Wenhao Lin, Advanced Micro Devices, Inc.
@@ -43,6 +43,7 @@ public class NetTools {
         clkSrcSiteTypeEnums.add(SiteTypeEnum.BUFGCE_DIV);   // US/US+ and Versal
         clkSrcSiteTypeEnums.add(SiteTypeEnum.BUFG_GT);      // US/US+ and Versal
         clkSrcSiteTypeEnums.add(SiteTypeEnum.BUFG_PS);      // US/US+ and Versal
+        clkSrcSiteTypeEnums.add(SiteTypeEnum.BUFGCE_HDIO);  // US+ and Versal
         clkSrcSiteTypeEnums.add(SiteTypeEnum.BUFG_FABRIC);  // Versal
     }
 
