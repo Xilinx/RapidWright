@@ -89,7 +89,6 @@ public class NetTools {
             sb.append("    ");
             sb.append(subtreeStart ? "[" : " ");
             sb.append(branchStart ? "{" : " ");
-            sb.append(isArcLocked() ? "*" : " ");
             sb.append("  ");
             boolean notFirstTimeVisitingThisMultiplyDrivenNode = multiplyDriven && !multiplyDrivenNodesVisited.add(this);
             boolean branchEnd = (branchEndIfNoFanouts && fanouts.isEmpty()) || notFirstTimeVisitingThisMultiplyDrivenNode;
@@ -153,9 +152,6 @@ public class NetTools {
                 }
                 return v;
             });
-            if (pip.isPIPFixed()) {
-                endNode.setArcLocked(true);
-            }
             startNode.addFanout(endNode);
             if (!pip.isBidirectional()) {
                 if ((net.getType() == NetType.GND && startNode.isTiedToGnd()) ||
