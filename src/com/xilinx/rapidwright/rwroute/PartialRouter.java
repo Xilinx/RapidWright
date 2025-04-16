@@ -440,9 +440,11 @@ public class PartialRouter extends RWRoute {
                     }
                 }
 
-                lockedNodes.removeAll(usedLockedNodes);
-                if (!lockedNodes.isEmpty()) {
-                    System.out.println("WARNING: Net '" +  net.getName() + "' contains locked PIPs that were not part of a complete route; ignoring.");
+                if (lockedNodes != null) {
+                    lockedNodes.removeAll(usedLockedNodes);
+                    if (!lockedNodes.isEmpty()) {
+                        System.out.println("WARNING: Net '" +  net.getName() + "' contains locked PIPs that were not part of a complete route; ignoring.");
+                    }
                 }
             }
         }
