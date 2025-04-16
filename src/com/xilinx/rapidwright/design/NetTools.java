@@ -77,8 +77,7 @@ public class NetTools {
             sb.append("    ");
             sb.append(subtreeStart ? "[" : " ");
             sb.append(branchStart ? "{" : " ");
-            sb.append(isArcLocked() ? "*" : " ");
-            sb.append("  ");
+            sb.append("   ");
             boolean branchEnd = branchEndIfNoFanouts && fanouts.isEmpty();
             sb.append(branchEnd ? "}" : " ");
             boolean subtreeEnd = subTreeEndIfNoFanouts && branchEnd;
@@ -126,9 +125,6 @@ public class NetTools {
             boolean isReversed = pip.isReversed();
             NodeTree startNode = nodeMap.computeIfAbsent(isReversed ? pip.getEndNode() : pip.getStartNode(), NodeTree::new);
             NodeTree endNode = nodeMap.computeIfAbsent(isReversed ? pip.getStartNode() : pip.getEndNode(), NodeTree::new);
-            if (pip.isPIPFixed()) {
-                endNode.setArcLocked(true);
-            }
             startNode.addFanout(endNode);
             if (!pip.isBidirectional()) {
                 if ((net.getType() == NetType.GND && startNode.isTiedToGnd()) ||
