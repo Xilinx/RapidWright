@@ -178,8 +178,9 @@ public class FanOutOptimization {
     }
     
     public static void main(String[] args) {
-        if (args.length != 3) {
+        if (args.length != 4) {
             System.out.println("USAGE: <input.dcp> <high fanout net name> <split net by k> <output>");
+            return;
         }
 
 //        args = new String[] {"demo_corundum_25g_routed.dcp", 
