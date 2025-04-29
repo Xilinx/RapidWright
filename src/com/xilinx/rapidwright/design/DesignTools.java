@@ -2345,6 +2345,10 @@ public class DesignTools {
         SiteInst inst = cell.getSiteInst();
         List<String> sitePins = new ArrayList<>();
         Set<String> siteWires = new HashSet<>(inst.getSiteWiresFromNet(net));
+        if (net.isGNDNet()) {
+            // Since GND sitewires may be inverted for easier routing, also accept VCC sitewires
+            siteWires.addAll(inst.getSiteWiresFromNet(net.getDesign().getVccNet()));
+        }
         Queue<BELPin> queue = new LinkedList<>();
         queue.add(cell.getBEL().getPin(belPinName));
         while (!queue.isEmpty()) {
