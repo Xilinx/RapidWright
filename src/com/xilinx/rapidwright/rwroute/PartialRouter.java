@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -498,7 +498,7 @@ public class PartialRouter extends RWRoute {
             if (sourceRnode == altSourceRnode) {
                 // We backtracked to the alternate source
                 SitePinInst altSource = altSourceAndRnode.getFirst();
-                connection.setSource(new RouteSitePinInst(altSource));
+                connection.setSource(altSource);
                 connection.setSourceRnode(altSourceRnode);
                 return true;
             }
