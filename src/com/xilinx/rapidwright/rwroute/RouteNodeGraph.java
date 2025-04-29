@@ -830,6 +830,10 @@ public class RouteNodeGraph {
                 }
                 assert(childTile == sinkTile);
                 break;
+            case EXCLUSIVE_SINK_NON_LOCAL:
+                // No optimization
+                // e.g. womrhole sink
+                break;
             default:
                 throw new RuntimeException("ERROR: Unexpected sink type " + sinkRnode.getType());
         }

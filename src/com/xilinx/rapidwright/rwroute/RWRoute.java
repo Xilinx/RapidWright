@@ -1227,28 +1227,30 @@ public class RWRoute {
             if (sinkRnode == rnodes.get(0)) {
                 List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(sinkRnode, connection.getSink().getConnectedNode());
                 if (switchBoxToSink.size() >= 2) {
-                    for (int i = 0; i < switchBoxToSink.size() - 1; i++) {
-                        nodes.add(switchBoxToSink.get(i));
-                    }
+                    nodes.addAll(switchBoxToSink.subList(0, switchBoxToSink.size() - 1));
                 }
             } else {
-                // Routing must go to an alternate sink
-                assert(connection.hasAltSinks());
+                if (connection.hasAltSinks()) {
+                    // Routing must go to an alternate sink
+                } else {
+                    // sinkRnode must be a 'wormhole' sink; walk back from the actual sink following all locked arcs and check
+                    // that we arrive at sinkRnode
+                    RouteNode rnode = rnodes.get(0);
+                    assert(rnode.isArcLocked());
+                    while ((rnode = rnode.getPrev()) != null && rnode.isArcLocked()) {}
+                    assert(rnode == sinkRnode);
+                }
 
                 // Assume that it doesn't need unprojecting back to the sink pin
                 // since the sink node is a site pin
                 assert(rnodes.get(0).getSitePin() != null);
             }
 
-            for (RouteNode rnode : rnodes) {
-                nodes.add(rnode);
-            }
+            nodes.addAll(rnodes);
 
             List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(connection.getSource().getConnectedNode(), connection.getSourceRnode());
             if (sourceToSwitchBox.size() >= 2) {
-                for (int i = 1; i <= sourceToSwitchBox.size() - 1; i++) {
-                    nodes.add(sourceToSwitchBox.get(i));
-                }
+                nodes.addAll(sourceToSwitchBox.subList(1, sourceToSwitchBox.size()));
             }
         }
     }
@@ -1512,8 +1514,13 @@ public class RWRoute {
                 rnodes = rnodes.subList(1, rnodes.size() - 1);
             }
         } else {
-            // Sink is not exclusive
-            assert(connection.getAltSinkRnodes().contains(sinkRnode));
+            // Rip up all used nodes
+            assert(
+                    // Sink is not exclusive as there are alternates
+                    connection.getAltSinkRnodes().contains(sinkRnode) ||
+                    // Locked sink
+                    sinkRnode.isArcLocked()
+            );
         }
 
         NetWrapper netWrapper = connection.getNetWrapper();
@@ -1543,8 +1550,13 @@ public class RWRoute {
                 rnodes = rnodes.subList(1, rnodes.size() - 1);
             }
         } else {
-            // Sink is not exclusive
-            assert(connection.getAltSinkRnodes().contains(sinkRnode));
+            // Increment all used nodes
+            assert(
+                    // Sink is not exclusive as there are alternates
+                    connection.getAltSinkRnodes().contains(sinkRnode) ||
+                            // Locked sink
+                            sinkRnode.isArcLocked()
+            );
         }
 
         NetWrapper netWrapper = connection.getNetWrapper();
@@ -1571,6 +1583,12 @@ public class RWRoute {
             assert(net.getType() == NetType.WIRE && !NetTools.isGlobalClock(net));
 
             Set<PIP> newPIPs = new HashSet<>();
+            // Start by preserving all fixed PIPs
+            for (PIP pip : net.getPIPs()) {
+                if (pip.isPIPFixed()) {
+                    newPIPs.add(pip);
+                }
+            }
             for (Connection connection:netWrapper.getConnections()) {
                 List<PIP> pips = RouterHelper.getConnectionPIPs(connection);
                 newPIPs.addAll(pips);
@@ -1804,15 +1822,17 @@ public class RWRoute {
      */
     protected boolean saveRouting(Connection connection, RouteNode rnode) {
         RouteNode sinkRnode = connection.getSinkRnode();
-        List<RouteNode> altSinkRnodes = connection.getAltSinkRnodes();
-        if (rnode != sinkRnode && !altSinkRnodes.contains(rnode)) {
-            List<RouteNode> prevRouting = connection.getRnodes();
-            // Check that this is the sink path marked by prepareRouteConnection()
-            if (!connection.isRouted() || prevRouting.isEmpty() || !rnode.isTarget()) {
-                throw new RuntimeException("Unexpected rnode to backtrack from: " + rnode);
+        if (rnode != sinkRnode) {
+            List<RouteNode> altSinkRnodes = connection.getAltSinkRnodes();
+            if (!altSinkRnodes.contains(rnode) && !rnode.isArcLocked()) {
+                List<RouteNode> prevRouting = connection.getRnodes();
+                // Check that this is the sink path marked by prepareRouteConnection()
+                if (!connection.isRouted() || prevRouting.isEmpty() || !rnode.isTarget()) {
+                    throw new RuntimeException("Unexpected rnode to backtrack from: " + rnode);
+                }
+                // Backtrack from the sink used on that sink path
+                rnode = prevRouting.get(0);
             }
-            // Backtrack from the sink used on that sink path
-            rnode = prevRouting.get(0);
         }
 
         connection.resetRoute();
@@ -1909,6 +1929,7 @@ public class RWRoute {
                     case EXCLUSIVE_SINK_BOTH:
                     case EXCLUSIVE_SINK_EAST:
                     case EXCLUSIVE_SINK_WEST:
+                    case EXCLUSIVE_SINK_NON_LOCAL:
                         assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_EAST || rnode.getType() == RouteNodeType.LOCAL_EAST);
                         assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_WEST || rnode.getType() == RouteNodeType.LOCAL_WEST);
                         assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_BOTH || rnode.getType() == RouteNodeType.LOCAL_BOTH ||

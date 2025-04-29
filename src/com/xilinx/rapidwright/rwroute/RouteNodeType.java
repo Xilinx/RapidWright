@@ -31,6 +31,7 @@ public enum RouteNodeType {
     EXCLUSIVE_SINK_BOTH,
     EXCLUSIVE_SINK_EAST,
     EXCLUSIVE_SINK_WEST,
+    EXCLUSIVE_SINK_NON_LOCAL,
 
     /**
      * Denotes {@link RouteNode} objects that correspond to a super long line {@link Node},
@@ -62,7 +63,7 @@ public enum RouteNodeType {
     public static final RouteNodeType[] values = values();
 
     public boolean isAnyExclusiveSink() {
-        return this == EXCLUSIVE_SINK_BOTH || this == EXCLUSIVE_SINK_EAST || this == EXCLUSIVE_SINK_WEST;
+        return this == EXCLUSIVE_SINK_BOTH || this == EXCLUSIVE_SINK_EAST || this == EXCLUSIVE_SINK_WEST || this == EXCLUSIVE_SINK_NON_LOCAL;
     }
 
     public static boolean isAnyExclusiveSink(int ordinal) {
