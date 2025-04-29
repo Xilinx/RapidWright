@@ -445,7 +445,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
             long start = RuntimeTracker.now();
             List<Node> allDownHillNodes = getAllDownhillNodes();
             List<RouteNode> childrenList = new ArrayList<>(allDownHillNodes.size());
-            boolean lockedOnly = false;
             for (Node downhill : allDownHillNodes) {
                 if (isExcluded(routingGraph, downhill)) {
                     continue;
@@ -455,20 +454,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 if (child.getType() == RouteNodeType.INACCESSIBLE) {
                     continue;
                 }
-                if (child.isArcLocked()) {
-                    if (child.getPrev() != this) {
-                        // Downhill is a locked node that doesn't point to this node, skip
-                        continue;
-                    }
-                    // Downhill is a locked node that does point to this node
-                    if (!lockedOnly) {
-                        // First locked node encountered: clear all non-locked children
-                        lockedOnly = true;
-                        childrenList.clear();
-                    }
-                    // Fall-through
-                } else if (lockedOnly) {
-                    // Downhill is not a locked node, and we're only allowing locked nodes
+                if (child.isArcLocked() && child.getPrev() != this) {
+                    // Downhill is a locked node that doesn't point to this node, skip
                     continue;
                 }
                 childrenList.add(child);
