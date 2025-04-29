@@ -67,7 +67,7 @@ public enum RouteNodeType {
     }
 
     public static boolean isAnyExclusiveSink(int ordinal) {
-        return ordinal == EXCLUSIVE_SINK_BOTH.ordinal() || ordinal == EXCLUSIVE_SINK_EAST.ordinal() || ordinal == EXCLUSIVE_SINK_WEST.ordinal();
+        return ordinal == EXCLUSIVE_SINK_BOTH.ordinal() || ordinal == EXCLUSIVE_SINK_EAST.ordinal() || ordinal == EXCLUSIVE_SINK_WEST.ordinal() || ordinal == EXCLUSIVE_SINK_NON_LOCAL.ordinal();
     }
 
     public boolean isAnyLocal() {
