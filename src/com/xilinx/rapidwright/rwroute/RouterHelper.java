@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -283,6 +283,9 @@ public class RouterHelper {
             Node driver = connectionNodes.get(i + driverOffsetIdx);
             Node load = connectionNodes.get(i + loadOffsetIdx);
             PIP pip = PIP.getArbitraryPIP(driver, load);
+            if (load.isArcLocked()) {
+                pip.setIsPIPFixed(true);
+            }
             if (pip != null) {
                 connectionPIPs.add(pip);
             } else {

@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +67,8 @@ public class PartialRouter extends RWRoute {
     protected Set<NetWrapper> partiallyPreservedNets;
 
     protected Map<Net, List<SitePinInst>> netToPins;
+
+    protected Map<Node,RouteNode> wormholeSinks = Collections.emptyMap();
 
     protected static class RouteNodeGraphPartial extends RouteNodeGraph {
 
@@ -241,9 +244,19 @@ public class PartialRouter extends RWRoute {
             assert((preservedNet = routingGraph.getPreservedNet(connection.getSourceRnode())) == null || preservedNet == net);
             RouteNode sinkRnode = connection.getSinkRnode();
             preservedNet = routingGraph.getPreservedNet(sinkRnode);
-            if (preservedNet != null && preservedNet != net) {
-                unpreserveNets.add(preservedNet);
+            if (preservedNet != null) {
                 assert(sinkRnode.getType().isAnyExclusiveSink());
+                if (preservedNet != net) {
+                    // Unpreserve blocking net
+                    unpreserveNets.add(preservedNet);
+                } else {
+                    if (!connection.isRouted()) {
+                        // For same net on an unrouted connection => must be an inadvertently-preserved wormhole sink
+                        // Unpreserve it so that it is not excluded when building out the routing graph
+                        assert(wormholeSinks.containsKey(sinkRnode));
+                        routingGraph.unpreserve(sinkRnode);
+                    }
+                }
             }
         }
 
@@ -406,6 +419,9 @@ public class PartialRouter extends RWRoute {
 
                     RouteNode rstart = routingGraph.getOrCreate(start);
                     RouteNode rend = routingGraph.getOrCreate(end);
+                    if (pip.isPIPFixed()) {
+                        rend.setArcLocked(true);
+                    }
                     assert(rend.getPrev() == null);
                     rend.setPrev(rstart);
                 }
@@ -418,6 +434,36 @@ public class PartialRouter extends RWRoute {
 
                     RouteNode sinkRnode = connection.getSinkRnode();
                     finishRouteConnection(connection, sinkRnode);
+
+                    // For connections where routing could not be recovered, but which have a locked arc
+                    // to its sink, move the connection target back along all locked arcs
+                    if (!connection.isRouted() && sinkRnode.isArcLocked()) {
+                        RouteNode wormholeRnode = sinkRnode;
+                        while ((wormholeRnode = wormholeRnode.getPrev()) != null && wormholeRnode.isArcLocked()) {}
+                        assert(wormholeRnode != sinkRnode);
+                        if (wormholeSinks.isEmpty()) {
+                            wormholeSinks = new HashMap<>();
+                        }
+                        RouteNode oldValue = wormholeSinks.put(wormholeRnode, sinkRnode);
+                        assert(oldValue == null);
+
+                        // TODO: assert that it is for the same net
+                        assert(!connection.hasAltSinks());
+                        assert(sinkRnode.countConnectionsOfUser(netWrapper) == 1);
+                        assert(!sinkRnode.isOverUsed());
+
+                        // Replace connection's sink node with the first node on the locked path to the sink
+                        connection.setSinkRnode(wormholeRnode);
+                        wormholeRnode.incrementUser(netWrapper);
+
+                        switch (wormholeRnode.getType()) {
+                            case NON_LOCAL:
+                                wormholeRnode.setType(RouteNodeType.EXCLUSIVE_SINK_NON_LOCAL);
+                                break;
+                            default:
+                                throw new RuntimeException("TODO: " + wormholeRnode.getType().toString());
+                        }
+                    }
                 }
             }
         }
@@ -463,6 +509,12 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected void finishRouteConnection(Connection connection, RouteNode rnode) {
+        RouteNode sinkRnode = wormholeSinks.get(rnode);
+        if (sinkRnode != null) {
+            // This is a wormhole sink that leads to an actual sink; start routing recovery from that actual sink instead
+            rnode = sinkRnode;
+        }
+
         super.finishRouteConnection(connection, rnode);
 
         if (!connection.isRouted()) {
@@ -559,14 +611,20 @@ public class PartialRouter extends RWRoute {
 
                 // Since net already exists, all the nodes it uses must already
                 // have been created
+                RouteNode rend = routingGraph.getNode(end);
+                assert(rend != null);
+                if (pip.isPIPFixed()) {
+                    // Do not unpreserve locked nodes
+                    assert(rend.isArcLocked());
+                    continue;
+                }
+
                 RouteNode rstart = routingGraph.getNode(start);
                 assert(rstart != null);
                 boolean rstartAdded = rnodes.add(rstart);
                 boolean startPreserved = routingGraph.unpreserve(start);
                 assert(rstartAdded == startPreserved);
 
-                RouteNode rend = routingGraph.getNode(end);
-                assert(rend != null);
                 boolean rendAdded = rnodes.add(rend);
                 boolean endPreserved = routingGraph.unpreserve(end);
                 assert(rendAdded == endPreserved);
@@ -587,6 +645,13 @@ public class PartialRouter extends RWRoute {
                 // e.g. those that leave the INT tile, since we project pins to their INT tile
                 if (RouteNodeGraph.isExcludedTile(end))
                     continue;
+
+                if (pip.isPIPFixed()) {
+                    // Do not unpreserve locked nodes
+                    RouteNode rend = routingGraph.getNode(end);
+                    assert(rend == null);
+                    continue;
+                }
 
                 boolean startPreserved = routingGraph.unpreserve(start);
                 boolean endPreserved = routingGraph.unpreserve(end);

@@ -1,7 +1,7 @@
 /*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
  * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -349,8 +349,11 @@ public class Utils{
         );
 
         clocking = EnumSet.of(
-                TileTypeEnum.RCLK_CLEM_CLKBUF_L,
                 TileTypeEnum.CMT_L,
+                TileTypeEnum.RCLK_CLEM_L,
+                TileTypeEnum.RCLK_CLEM_CLKBUF_L,
+                TileTypeEnum.RCLK_DSP_INTF_L,
+                TileTypeEnum.RCLK_RCLK_XIPHY_INNER_FT,
                 // Versal
                 TileTypeEnum.CLK_REBUF_BUFGS_HSR_CORE,
                 TileTypeEnum.CLK_PLL_AND_PHY,

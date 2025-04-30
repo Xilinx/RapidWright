@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -493,6 +493,9 @@ public class RouteNodeGraph {
 
         for (PIP pip : net.getPIPs()) {
             preserve(pip.getStartNode(), net);
+            if (pip.isGapArc()) {
+                continue;
+            }
             preserve(pip.getEndNode(), net);
         }
     }
@@ -582,13 +585,13 @@ public class RouteNodeGraph {
             }
         }
 
+        RouteNode childRnode = getNode(child);
         IntentCode ic = child.getIntentCode();
         if (isVersal) {
             assert(ic != IntentCode.NODE_PINFEED); // This intent code should have been projected away
 
             if ((!lutRoutethru && ic == IntentCode.NODE_IMUX) || ic == IntentCode.NODE_CLE_CTRL || ic == IntentCode.NODE_INTF_CTRL) {
                 // Disallow these site pin projections if they aren't already in the routing graph (as a potential sink)
-                RouteNode childRnode = getNode(child);
                 return childRnode == null;
             }
         } else {
@@ -596,7 +599,6 @@ public class RouteNodeGraph {
 
             if (child.getIntentCode() == IntentCode.NODE_PINFEED) {
                 // PINFEEDs can lead to a site pin, or into a Laguna tile
-                RouteNode childRnode = getNode(child);
                 if (childRnode != null) {
                     assert(childRnode.getType().isAnyExclusiveSink() ||
                             childRnode.getType() == RouteNodeType.LAGUNA_PINFEED ||
@@ -615,6 +617,11 @@ public class RouteNodeGraph {
                     }
                 }
             }
+        }
+
+        if (childRnode != null && childRnode.isArcLocked() && childRnode.getPrev() != parent) {
+            // Downhill is a locked node that doesn't point back to this node, skip
+            return true;
         }
 
         return false;
@@ -762,6 +769,7 @@ public class RouteNodeGraph {
         }
 
         // (b) needs to cross an SLR and this is a Laguna column
+        // TODO: Check for Laguna rows too
         Tile childTile = childRnode.getTile();
         RouteNode sinkRnode = connection.getSinkRnode();
         int childX = childTile.getTileXCoordinate();
@@ -826,6 +834,12 @@ public class RouteNodeGraph {
                     }
                 }
                 assert(childTile == sinkTile);
+                break;
+            case EXCLUSIVE_SINK_NON_LOCAL:
+                if (type.isAnyLocal()) {
+                    // Local wires can never reach non-local when LUT routethrus are disabled
+                    return false;
+                }
                 break;
             default:
                 throw new RuntimeException("ERROR: Unexpected sink type " + sinkRnode.getType());
