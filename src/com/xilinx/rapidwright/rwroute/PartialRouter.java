@@ -514,7 +514,7 @@ public class PartialRouter extends RWRoute {
         RouteNode lockedSink = lockedSinks.get(connection);
         if (lockedSink != null) {
             // rnode is a 'wormhole' sink that leads to a locked sink; start routing recovery from that final sink instead
-            assert(connection.getSinkRnode() != rnode);
+            assert(connection.getSinkRnode() == rnode);
             rnode = lockedSink;
         }
 
