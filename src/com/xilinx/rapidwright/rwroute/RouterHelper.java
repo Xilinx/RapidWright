@@ -59,11 +59,11 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
-import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
-import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingManager;
@@ -428,10 +428,11 @@ public class RouterHelper {
                     String logicalPinName = cell.getLogicalPinMapping(physicalPinName);
 
                     // Check the logical pin connection
-                    EDIFCellInst eci = cell.getEDIFCellInst();
-                    EDIFPortInst epi = eci.getPortInst(logicalPinName);
-                    EDIFNet en = epi.getNet();
-                    if (!en.isGND()) {
+                    EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
+                    EDIFHierPortInst ehpi = ehci.getPortInst(logicalPinName);
+                    EDIFHierNet ehn = ehpi.getHierarchicalNet();
+                    EDIFHierNet parentEhn = netlist.getParentNet(ehn);
+                    if (parentEhn == null || !parentEhn.getNet().isGND()) {
                         throw new RuntimeException("ERROR: Cell " + cell + EDIFTools.EDIF_HIER_SEP + logicalPinName +
                                 " is not connected to GND");
                     }
@@ -447,8 +448,8 @@ public class RouterHelper {
                             .replace("!!", "");
                     LUTTools.configureLUT(cell, newLutEquation);
 
-                    EDIFNet const1 = EDIFTools.getStaticNet(NetType.VCC, eci.getParentCell(), netlist);
-                    epi.setParentNet(const1);
+                    EDIFNet const1 = EDIFTools.getStaticNet(NetType.VCC, ehci.getParent().getCellType(), netlist);
+                    ehpi.getPortInst().setParentNet(const1);
                 }
             } else {
                 BELPin[] belPins = si.getSiteWirePins(siteWireName);
