@@ -251,7 +251,7 @@ public class PartialRouter extends RWRoute {
                     unpreserveNets.add(preservedNet);
                 } else {
                     if (!connection.isRouted()) {
-                        // For same net on an unrouted connection => must be an inadvertently-preserved psuedo sink
+                        // For same net on an unrouted connection => must be an inadvertently-preserved wormhole sink
                         // Unpreserve it so that it is not excluded when building out the routing graph
                         assert(wormholeSinks.containsKey(sinkRnode));
                         routingGraph.unpreserve(sinkRnode);
@@ -461,7 +461,7 @@ public class PartialRouter extends RWRoute {
                                 wormholeRnode.setType(RouteNodeType.EXCLUSIVE_SINK_NON_LOCAL);
                                 break;
                             default:
-                                throw new RuntimeException(wormholeRnode.getType().toString());
+                                throw new RuntimeException("TODO: " + wormholeRnode.getType().toString());
                         }
                     }
                 }

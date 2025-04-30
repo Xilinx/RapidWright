@@ -769,6 +769,7 @@ public class RouteNodeGraph {
         }
 
         // (b) needs to cross an SLR and this is a Laguna column
+        // TODO: Check for Laguna rows too
         Tile childTile = childRnode.getTile();
         RouteNode sinkRnode = connection.getSinkRnode();
         int childX = childTile.getTileXCoordinate();
@@ -835,8 +836,10 @@ public class RouteNodeGraph {
                 assert(childTile == sinkTile);
                 break;
             case EXCLUSIVE_SINK_NON_LOCAL:
-                // No optimization
-                // e.g. womrhole sink
+                if (type.isAnyLocal()) {
+                    // Local wires can never reach non-local when LUT routethrus are disabled
+                    return false;
+                }
                 break;
             default:
                 throw new RuntimeException("ERROR: Unexpected sink type " + sinkRnode.getType());
