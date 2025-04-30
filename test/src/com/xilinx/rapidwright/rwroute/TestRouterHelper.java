@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Advanced Micro Devices, Inc.
@@ -31,6 +31,8 @@ import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.support.rwroute.RouterHelperSupport;
@@ -240,12 +242,16 @@ public class TestRouterHelper {
         Assertions.assertEquals("O=!I0", LUTTools.getLUTEquation(cell));
 
         Net gndNet = design.getGndNet();
-        gndNet.createPin("A6", cell.getSiteInst());
+        SitePinInst spi = gndNet.connect(cell, "I0");
+
+        EDIFCellInst eci = cell.getEDIFCellInst();
+        EDIFPortInst epi = eci.getPortInst("I0");
+        Assertions.assertTrue(epi.getNet().isGND());
 
         // Check A6 was inverted, and it was moved off gndNet
         Set<SitePinInst> invertedPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndNet.getPins(), invertLutInputs);
         if (invertLutInputs) {
-            Assertions.assertEquals("[IN SLICE_X0Y0.A6]", invertedPins.toString());
+            Assertions.assertEquals("[" + spi + "]", invertedPins.toString());
         } else {
             Assertions.assertTrue(invertedPins.isEmpty());
         }
@@ -253,22 +259,27 @@ public class TestRouterHelper {
 
         Net targetNet = invertLutInputs ? design.getVccNet() : design.getGndNet();
         Net sourceNet = !invertLutInputs ? design.getVccNet() : design.getGndNet();
-        Assertions.assertEquals("[IN SLICE_X0Y0.A6]", targetNet.getPins().toString());
+        Assertions.assertEquals("[" + spi + "]", targetNet.getPins().toString());
         Assertions.assertTrue(sourceNet.getPins().isEmpty());
         if (invertLutInputs) {
             // Must have moved onto vccNet, and the LUT mask inverted
             Assertions.assertEquals("O=I0", LUTTools.getLUTEquation(cell));
+
+            // Check logical connection too
+            Assertions.assertTrue(epi.getNet().isVCC());
 
             // Now undo this optimization by going from VCC pin back to GND pin
             RouterHelperSupport.invertVccLutPinsToGndPins(design, invertedPins);
 
             // Check that pin is back on the original VCC net
             Assertions.assertTrue(targetNet.getPins().isEmpty());
-            Assertions.assertEquals("[IN SLICE_X0Y0.A6]", sourceNet.getPins().toString());
+            Assertions.assertEquals("[" + spi + "]", sourceNet.getPins().toString());
         }
 
         // Check that LUT equation is back to normal
         Assertions.assertEquals("O=!I0", LUTTools.getLUTEquation(cell));
+        Assertions.assertTrue(spi.getNet().isGNDNet());
+        Assertions.assertTrue(epi.getNet().isGND());
     }
 
     @ParameterizedTest
