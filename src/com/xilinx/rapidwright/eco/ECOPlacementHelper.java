@@ -22,6 +22,17 @@
 
 package com.xilinx.rapidwright.eco;
 
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Set;
+
+import org.jetbrains.annotations.NotNull;
+
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
@@ -42,16 +53,6 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.util.Pair;
-import org.jetbrains.annotations.NotNull;
-
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Set;
 
 /**
  * Class for aiding with ECO placement activities.
@@ -249,7 +250,7 @@ public class ECOPlacementHelper {
      * @return Iterable<Site> of neighbouring sites.
      */
     public static Iterable<Site> spiralOutFrom(Site site) {
-        return spiralOutFrom(site);
+        return spiralOutFrom(site, null);
     }
 
     /**
