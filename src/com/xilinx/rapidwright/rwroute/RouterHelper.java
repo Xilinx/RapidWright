@@ -64,10 +64,7 @@ import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
-<<<<<<< HEAD
-=======
 import com.xilinx.rapidwright.edif.EDIFPortInst;
->>>>>>> invert_lut_input_log
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingManager;
