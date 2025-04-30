@@ -886,14 +886,32 @@ public class DesignTools {
     }
 
     /**
-     * NOTE: This method is not fully tested.
-     * Populates a black box in a netlist with the provided design. This method
-     * most closely resembles the Vivado command {@code read_checkpoint -cell <cell name> <DCP Name>}
-     * @param design The top level design
+     * NOTE: This method is not fully tested. Populates a black box in a netlist
+     * with the provided design. This method most closely resembles the Vivado
+     * command {@code read_checkpoint -cell <cell name> <DCP Name>}
+     * 
+     * @param design               The top level design
      * @param hierarchicalCellName Name of the black box in the design netlist.
-     * @param cell The 'guts' to be inserted into the black box
+     * @param cell                 The 'guts' to be inserted into the black box
+     * 
      */
     public static void populateBlackBox(Design design, String hierarchicalCellName, Design cell) {
+        populateBlackBox(design, hierarchicalCellName, cell, false);
+    }
+
+    /**
+     * NOTE: This method is not fully tested. Populates a black box in a netlist
+     * with the provided design. This method most closely resembles the Vivado
+     * command {@code read_checkpoint -cell <cell name> <DCP Name>}
+     * 
+     * @param design               The top level design
+     * @param hierarchicalCellName Name of the black box in the design netlist.
+     * @param cell                 The 'guts' to be inserted into the black box
+     * @param keepBoundaryRouting  Preserves the routing on the boundaries of the
+     *                             black box.
+     */
+    public static void populateBlackBox(Design design, String hierarchicalCellName, Design cell,
+            boolean keepBoundaryRouting) {
         EDIFNetlist netlist = design.getNetlist();
 
         // Populate Logical Netlist into cell
@@ -946,7 +964,7 @@ public class DesignTools {
         // Rectify boundary nets
         netlist.resetParentNetMap();
 
-        postBlackBoxCleanup(hierarchicalCellName, design);
+        postBlackBoxCleanup(hierarchicalCellName, design, keepBoundaryRouting);
 
         List<String> encryptedCells = cell.getNetlist().getEncryptedCells();
         if (encryptedCells != null && encryptedCells.size() > 0) {
@@ -955,12 +973,16 @@ public class DesignTools {
     }
 
     /**
-     * Attempts to rename boundary nets around the previous blackbox to follow naming convention
-     * (net is named after source).
-     * @param hierCellName The hierarchical cell instance that was previously a black box
-     * @param design The current design.
+     * Attempts to rename boundary nets around the previous blackbox to follow
+     * naming convention (net is named after source).
+     * 
+     * @param hierCellName        The hierarchical cell instance that was previously
+     *                            a black box
+     * @param design              The current design.
+     * @param keepBoundaryRouting Preserves the routing on the boundaries of the
+     *                            black box.
      */
-    public static void postBlackBoxCleanup(String hierCellName, Design design) {
+    public static void postBlackBoxCleanup(String hierCellName, Design design, boolean keepBoundaryRouting) {
         EDIFNetlist netlist = design.getNetlist();
         EDIFHierCellInst inst = netlist.getHierCellInstFromName(hierCellName);
         final EDIFHierCellInst parentInst = inst.getParent();
@@ -992,14 +1014,19 @@ public class DesignTools {
                             }
                         }
                     }
+                    if (keepBoundaryRouting) {
+                        for (PIP p : alias.getPIPs()) {
+                            parentNet.addPIP(p);
+                        }
+                    }
                     for (SitePinInst pin : new ArrayList<SitePinInst>(alias.getPins())) {
                         alias.removePin(pin);
                         parentNet.addPin(pin);
                     }
-                    alias.unroute();
+                    if (!keepBoundaryRouting) alias.unroute();
                 }
             }
-            parentNet.unroute();
+            if (!keepBoundaryRouting) parentNet.unroute();
         }
     }
 
@@ -2318,6 +2345,10 @@ public class DesignTools {
         SiteInst inst = cell.getSiteInst();
         List<String> sitePins = new ArrayList<>();
         Set<String> siteWires = new HashSet<>(inst.getSiteWiresFromNet(net));
+        if (net.isGNDNet()) {
+            // Since GND sitewires may be inverted for easier routing, also accept VCC sitewires
+            siteWires.addAll(inst.getSiteWiresFromNet(net.getDesign().getVccNet()));
+        }
         Queue<BELPin> queue = new LinkedList<>();
         queue.add(cell.getBEL().getPin(belPinName));
         while (!queue.isEmpty()) {
