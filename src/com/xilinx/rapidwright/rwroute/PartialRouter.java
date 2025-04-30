@@ -251,7 +251,8 @@ public class PartialRouter extends RWRoute {
                     unpreserveNets.add(preservedNet);
                 } else {
                     if (!connection.isRouted()) {
-                        // For same net on an unrouted connection => must be an inadvertently-preserved psuedo sinkk
+                        // For same net on an unrouted connection => must be an inadvertently-preserved psuedo sink
+                        // Unpreserve it so that it is not excluded when building out the routing graph
                         assert(wormholeSinks.containsKey(sinkRnode));
                         routingGraph.unpreserve(sinkRnode);
                     }

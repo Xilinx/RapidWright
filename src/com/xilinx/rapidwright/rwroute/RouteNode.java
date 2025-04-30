@@ -455,14 +455,9 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 }
 
                 RouteNode child = routingGraph.getOrCreate(downhill);
-                if (child.getType() == RouteNodeType.INACCESSIBLE) {
-                    continue;
+                if (child.getType() != RouteNodeType.INACCESSIBLE) {
+                    childrenList.add(child);
                 }
-                if (child.isArcLocked() && child.getPrev() != this) {
-                    // Downhill is a locked node that doesn't point to this node, skip
-                    continue;
-                }
-                childrenList.add(child);
             }
             if (!childrenList.isEmpty()) {
                 children = childrenList.toArray(EMPTY_ARRAY);

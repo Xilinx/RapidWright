@@ -585,13 +585,13 @@ public class RouteNodeGraph {
             }
         }
 
+        RouteNode childRnode = getNode(child);
         IntentCode ic = child.getIntentCode();
         if (isVersal) {
             assert(ic != IntentCode.NODE_PINFEED); // This intent code should have been projected away
 
             if ((!lutRoutethru && ic == IntentCode.NODE_IMUX) || ic == IntentCode.NODE_CLE_CTRL || ic == IntentCode.NODE_INTF_CTRL) {
                 // Disallow these site pin projections if they aren't already in the routing graph (as a potential sink)
-                RouteNode childRnode = getNode(child);
                 return childRnode == null;
             }
         } else {
@@ -599,7 +599,6 @@ public class RouteNodeGraph {
 
             if (child.getIntentCode() == IntentCode.NODE_PINFEED) {
                 // PINFEEDs can lead to a site pin, or into a Laguna tile
-                RouteNode childRnode = getNode(child);
                 if (childRnode != null) {
                     assert(childRnode.getType().isAnyExclusiveSink() ||
                             childRnode.getType() == RouteNodeType.LAGUNA_PINFEED ||
@@ -618,6 +617,11 @@ public class RouteNodeGraph {
                     }
                 }
             }
+        }
+
+        if (childRnode != null && childRnode.isArcLocked() && childRnode.getPrev() != parent) {
+            // Downhill is a locked node that doesn't point back to this node, skip
+            return true;
         }
 
         return false;
