@@ -68,7 +68,7 @@ public class PartialRouter extends RWRoute {
 
     protected Map<Net, List<SitePinInst>> netToPins;
 
-    protected Map<Node,RouteNode> wormholeSinks = Collections.emptyMap();
+    protected Map<Connection,RouteNode> lockedSinks = Collections.emptyMap();
 
     protected static class RouteNodeGraphPartial extends RouteNodeGraph {
 
@@ -251,9 +251,9 @@ public class PartialRouter extends RWRoute {
                     unpreserveNets.add(preservedNet);
                 } else {
                     if (!connection.isRouted()) {
-                        // For same net on an unrouted connection => must be an inadvertently-preserved wormhole sink
+                        // For same net on an unrouted connection => must be an inadvertently-preserved 'wormhole' sink
                         // Unpreserve it so that it is not excluded when building out the routing graph
-                        assert(wormholeSinks.containsKey(sinkRnode));
+                        assert(lockedSinks.containsKey(connection));
                         routingGraph.unpreserve(sinkRnode);
                     }
                 }
@@ -436,20 +436,20 @@ public class PartialRouter extends RWRoute {
                     finishRouteConnection(connection, sinkRnode);
 
                     // For connections where routing could not be recovered, but which have a locked arc
-                    // to its sink, move the connection target back along all locked arcs
+                    // to its sink, move the connection target (wormhole) back along all locked arcs
                     if (!connection.isRouted() && sinkRnode.isArcLocked()) {
                         RouteNode wormholeRnode = sinkRnode;
                         while ((wormholeRnode = wormholeRnode.getPrev()) != null && wormholeRnode.isArcLocked()) {}
                         assert(wormholeRnode != sinkRnode);
-                        if (wormholeSinks.isEmpty()) {
-                            wormholeSinks = new HashMap<>();
+                        if (lockedSinks.isEmpty()) {
+                            lockedSinks = new HashMap<>();
                         }
-                        RouteNode oldValue = wormholeSinks.put(wormholeRnode, sinkRnode);
+                        RouteNode oldValue = lockedSinks.put(connection, sinkRnode);
                         assert(oldValue == null);
 
                         // TODO: assert that it is for the same net
                         assert(!connection.hasAltSinks());
-                        assert(sinkRnode.countConnectionsOfUser(netWrapper) == 1);
+                        assert(sinkRnode.countConnectionsOfUser(netWrapper) > 0);
                         assert(!sinkRnode.isOverUsed());
 
                         // Replace connection's sink node with the first node on the locked path to the sink
@@ -460,6 +460,8 @@ public class PartialRouter extends RWRoute {
                             case NON_LOCAL:
                                 wormholeRnode.setType(RouteNodeType.EXCLUSIVE_SINK_NON_LOCAL);
                                 break;
+                            case EXCLUSIVE_SINK_NON_LOCAL:
+                                    break;
                             default:
                                 throw new RuntimeException("TODO: " + wormholeRnode.getType().toString());
                         }
@@ -509,10 +511,11 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected void finishRouteConnection(Connection connection, RouteNode rnode) {
-        RouteNode sinkRnode = wormholeSinks.get(rnode);
-        if (sinkRnode != null) {
-            // This is a wormhole sink that leads to an actual sink; start routing recovery from that actual sink instead
-            rnode = sinkRnode;
+        RouteNode lockedSink = lockedSinks.get(connection);
+        if (lockedSink != null) {
+            // rnode is a 'wormhole' sink that leads to a locked sink; start routing recovery from that final sink instead
+            assert(connection.getSinkRnode() != rnode);
+            rnode = lockedSink;
         }
 
         super.finishRouteConnection(connection, rnode);
