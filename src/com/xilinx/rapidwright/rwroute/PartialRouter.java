@@ -245,7 +245,7 @@ public class PartialRouter extends RWRoute {
             RouteNode sinkRnode = connection.getSinkRnode();
             preservedNet = routingGraph.getPreservedNet(sinkRnode);
             if (preservedNet != null) {
-                assert(sinkRnode.getType().isAnyExclusiveSink() || wormholeSinks.containsKey(sinkRnode));
+                assert(sinkRnode.getType().isAnyExclusiveSink());
                 if (preservedNet != net) {
                     // Unpreserve blocking net
                     unpreserveNets.add(preservedNet);
@@ -511,7 +511,7 @@ public class PartialRouter extends RWRoute {
     protected void finishRouteConnection(Connection connection, RouteNode rnode) {
         RouteNode sinkRnode = wormholeSinks.get(rnode);
         if (sinkRnode != null) {
-            // This is a psuedo-sink that leads to an actual sink; start routing recovery from that actual sink instead
+            // This is a wormhole sink that leads to an actual sink; start routing recovery from that actual sink instead
             rnode = sinkRnode;
         }
 
