@@ -46,6 +46,7 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.tools.LUTTools;
@@ -58,7 +59,12 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
@@ -350,6 +356,7 @@ public class RouterHelper {
         final boolean isVersal = (design.getSeries() == Series.Versal);
         final Net gndNet = design.getGndNet();
         final Net vccNet = design.getVccNet();
+        final EDIFNetlist netlist = design.getNetlist();
         Set<SitePinInst> toInvertPins = new HashSet<>();
         nextSitePin: for (SitePinInst spi : pins) {
             if (!spi.getNet().equals(gndNet))
@@ -417,6 +424,15 @@ public class RouterHelper {
                     String physicalPinName = "A" + spi.getName().charAt(1);
                     String logicalPinName = cell.getLogicalPinMapping(physicalPinName);
 
+                    // Check the logical pin connection
+                    EDIFCellInst eci = cell.getEDIFCellInst();
+                    EDIFPortInst epi = eci.getPortInst(logicalPinName);
+                    EDIFNet en = epi.getNet();
+                    if (!en.isGND()) {
+                        throw new RuntimeException("ERROR: Cell " + cell + EDIFTools.EDIF_HIER_SEP + logicalPinName +
+                                " is not connected to GND");
+                    }
+
                     // Get the LUT equation
                     String lutEquation = LUTTools.getLUTEquation(cell);
                     assert(lutEquation.contains(logicalPinName));
@@ -427,6 +443,9 @@ public class RouterHelper {
                             // (Note: LUTTools.getLUTEquation() only produces equations with '!' instead of '~')
                             .replace("!!", "");
                     LUTTools.configureLUT(cell, newLutEquation);
+
+                    EDIFNet const1 = EDIFTools.getStaticNet(NetType.VCC, eci.getParentCell(), netlist);
+                    epi.setParentNet(const1);
                 }
             } else {
                 BELPin[] belPins = si.getSiteWirePins(siteWireName);
