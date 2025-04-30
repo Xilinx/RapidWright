@@ -431,7 +431,7 @@ public class RouterHelper {
                     EDIFHierNet ehn = ehpi.getHierarchicalNet();
                     EDIFHierNet parentEhn = netlist.getParentNet(ehn);
                     if (parentEhn == null || !parentEhn.getNet().isGND()) {
-                        throw new RuntimeException("ERROR: Cell " + cell + EDIFTools.EDIF_HIER_SEP + logicalPinName +
+                        throw new RuntimeException("ERROR: Cell " + cell.getName() + EDIFTools.EDIF_HIER_SEP + logicalPinName +
                                 " is not connected to GND");
                     }
 
