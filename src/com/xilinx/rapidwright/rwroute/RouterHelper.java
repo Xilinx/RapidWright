@@ -64,6 +64,10 @@ import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+<<<<<<< HEAD
+=======
+import com.xilinx.rapidwright.edif.EDIFPortInst;
+>>>>>>> invert_lut_input_log
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingManager;
@@ -448,8 +452,11 @@ public class RouterHelper {
                             .replace("!!", "");
                     LUTTools.configureLUT(cell, newLutEquation);
 
+                    EDIFPortInst epi = ehpi.getPortInst();
+                    ehn.getNet().removePortInst(epi);
+
                     EDIFNet const1 = EDIFTools.getStaticNet(NetType.VCC, ehci.getParent().getCellType(), netlist);
-                    ehpi.getPortInst().setParentNet(const1);
+                    const1.addPortInst(epi);
                 }
             } else {
                 BELPin[] belPins = si.getSiteWirePins(siteWireName);
