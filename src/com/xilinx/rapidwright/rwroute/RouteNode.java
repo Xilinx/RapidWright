@@ -382,9 +382,9 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 // Or promotion for any LOCAL to a LOCAL_RESERVED (by determineRoutingTargets() for uphills of CTRL
                 // sinks, before routing)
                 (RouteNodeType.isAnyLocal(this.type) && type == RouteNodeType.LOCAL_RESERVED && this.visited == 0) ||
-                // Or all promotions to EXCLUSIVE_SINK_NON_LOCAL (by PartialRouter.determineRoutingTargets() for
-                // wormhole sinks, before routing)
-                (type == RouteNodeType.EXCLUSIVE_SINK_NON_LOCAL && this.visited == 0)
+                // Or promotions to EXCLUSIVE_SINK_NON_LOCAL from NON_LOCAL (by PartialRouter.determineRoutingTargets()
+                // for wormhole sinks, before routing)
+                (this.type == RouteNodeType.NON_LOCAL.ordinal() && type == RouteNodeType.EXCLUSIVE_SINK_NON_LOCAL && this.visited == 0)
         );
         this.type = (byte) type.ordinal();
     }
