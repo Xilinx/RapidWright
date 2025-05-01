@@ -217,7 +217,7 @@ public class VivadoTools {
             sb.append(tclPreamble);
             sb.append("; ");
         }
-        sb.append("write_bitstream ");
+        sb.append("write_bitstream -force ");
         if (rmCell != null) {
             sb.append("-cell " + rmCell + " ");
         }
