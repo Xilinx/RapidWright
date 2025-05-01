@@ -2135,7 +2135,7 @@ public class RWRoute {
 
         // Adds the source rnode to the queue
         RouteNode sourceRnode = connection.getSourceRnode();
-        assert(sourceRnode.getPrev() == null);
+        assert(sourceRnode.getPrev() == null || sourceRnode.isArcLocked());
         push(state, sourceRnode, 0, 0);
     }
 

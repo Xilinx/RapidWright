@@ -28,8 +28,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,6 +39,7 @@ import java.util.stream.Collectors;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.PartitionPin;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
@@ -69,6 +70,8 @@ public class PartialRouter extends RWRoute {
     protected Map<Net, List<SitePinInst>> netToPins;
 
     protected Map<Connection,RouteNode> lockedSinks = Collections.emptyMap();
+
+    protected Map<NetWrapper,RouteNode> lockedSources = Collections.emptyMap();
 
     protected static class RouteNodeGraphPartial extends RouteNodeGraph {
 
@@ -290,6 +293,46 @@ public class PartialRouter extends RWRoute {
                 }
             }
         }
+
+        Map<Net, List<RouteNode>> netToPartPins = new IdentityHashMap<>();
+        for (PartitionPin pp : design.getPartitionPins()) {
+            Node node = pp.getNode();
+            if (node.isInvalidNode()) {
+                continue;
+            }
+            RouteNode rnode = routingGraph.getNode(node);
+            if (rnode == null) {
+                continue;
+            }
+            if (rnode.getType().isAnyExclusiveSink()) {
+                continue;
+            }
+
+            Net net = design.getNetFromPartitionPin(pp);
+            netToPartPins.computeIfAbsent(net, k -> new ArrayList<>(1))
+                    .add(rnode);
+        }
+        for (Map.Entry<Net, List<RouteNode>> e : netToPartPins.entrySet()) {
+            NetWrapper netWrapper = nets.get(e.getKey());
+            if (netWrapper == null) {
+                continue;
+            }
+            assert(netWrapper.getAltSourceRnode() == null);
+
+            List<RouteNode> partPins = e.getValue();
+            if (partPins.size() > 1) {
+                throw new RuntimeException();
+            }
+            RouteNode lockedSourceRnode = partPins.get(0);
+            if (lockedSources.isEmpty()) {
+                lockedSources = new IdentityHashMap<>();
+            }
+            lockedSources.put(netWrapper, netWrapper.getSourceRnode());
+            for (Connection connection : netWrapper.getConnections()) {
+                assert(connection.getSourceRnode() == netWrapper.getSourceRnode());
+                connection.setSourceRnode(lockedSourceRnode);
+            }
+        }
     }
 
     @Override
@@ -442,7 +485,7 @@ public class PartialRouter extends RWRoute {
                         while ((wormholeRnode = wormholeRnode.getPrev()) != null && wormholeRnode.isArcLocked()) {}
                         assert(wormholeRnode != sinkRnode);
                         if (lockedSinks.isEmpty()) {
-                            lockedSinks = new HashMap<>();
+                            lockedSinks = new IdentityHashMap<>();
                         }
                         RouteNode oldValue = lockedSinks.put(connection, sinkRnode);
                         assert(oldValue == null);
@@ -506,6 +549,11 @@ public class PartialRouter extends RWRoute {
                 return true;
             }
         }
+
+        if (sourceRnode == lockedSources.get(connection.getNetWrapper())) {
+            return true;
+        }
+
         return false;
     }
 
@@ -523,6 +571,22 @@ public class PartialRouter extends RWRoute {
         if (!connection.isRouted()) {
             connection.resetRoute();
         }
+    }
+
+    @Override
+    protected void assignNodesToConnections() {
+        for (Connection connection : indirectConnections) {
+            RouteNode trueSource = lockedSources.get(connection.getNetWrapper());
+            if (trueSource != null) {
+                connection.setSourceRnode(trueSource);
+            }
+            RouteNode trueSink = lockedSinks.get(connection);
+            if (trueSink != null) {
+                connection.setSinkRnode(trueSink);
+            }
+        }
+
+        super.assignNodesToConnections();
     }
 
     /**
