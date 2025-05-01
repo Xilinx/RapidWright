@@ -4476,8 +4476,14 @@ public class DesignTools {
             }
             queue.add(node);
         }
+        
+        HashSet<NetTools.NodeTree> visited = new HashSet<>();
         while (!queue.isEmpty()) {
             NetTools.NodeTree node = queue.poll();
+            if (visited.contains(node)) {
+                continue;
+            }
+            visited.add(node);
             SitePinInst spi = node2spi.remove(node);
             if (spi != null) {
                 spi.setRouted(true);
