@@ -22,6 +22,17 @@
 
 package com.xilinx.rapidwright.eco;
 
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Set;
+
+import org.jetbrains.annotations.NotNull;
+
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
@@ -29,6 +40,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
@@ -41,16 +53,6 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.util.Pair;
-import org.jetbrains.annotations.NotNull;
-
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Set;
 
 /**
  * Class for aiding with ECO placement activities.
@@ -248,6 +250,21 @@ public class ECOPlacementHelper {
      * @return Iterable<Site> of neighbouring sites.
      */
     public static Iterable<Site> spiralOutFrom(Site site) {
+        return spiralOutFrom(site, null);
+    }
+
+    /**
+     * Given a home Site, return an Iterable that yields the neighbouring sites
+     * encountered when walking outwards in a spiral fashion. To be used in
+     * conjunction with {@link #getUnusedLUT(SiteInst)} and
+     * {@link #getUnusedFlop(SiteInst, Net)}.
+     * 
+     * @param site   Originating Site.
+     * @param pblock Also check to ensure the proposed sites are inside the provided
+     *               pblock.
+     * @return Iterable<Site> of neighbouring sites.
+     */
+    public static Iterable<Site> spiralOutFrom(Site site, PBlock pblock) {
         return new Iterable<Site>() {
             @NotNull
             @Override
@@ -295,8 +312,13 @@ public class ECOPlacementHelper {
                                 assert(nextSite == null);
                                 break;
                             }
-                        } while ((nextSite = home.getNeighborSite(dx, dy)) == null);
+                            nextSite = home.getNeighborSite(dx, dy);
+                        } while (nextSite == null || !insidePblock(nextSite));
                         return retSite;
+                    }
+
+                    private boolean insidePblock(Site nextSite) {
+                        return pblock == null ? true : pblock.containsTile(nextSite.getTile());
                     }
                 };
             }
