@@ -257,7 +257,8 @@ public class PartialRouter extends RWRoute {
                         // For same net on an unrouted connection => must be an inadvertently-preserved rnode of a
                         // locked path; unpreserve it so that it is not excluded when building out the routing graph
                         assert(connectionToBeginRnodeOfLockedPathToSink.containsKey(connection));
-                        routingGraph.unpreserve(sinkRnode);
+                        RouteNode beginOfLockedPath = sinkRnode;
+                        routingGraph.unpreserve(beginOfLockedPath);
                     }
                 }
             }
@@ -294,6 +295,8 @@ public class PartialRouter extends RWRoute {
             }
         }
 
+        // Examine all partition pins and discover those that are the end rnode of locked paths
+        // back to the source
         Map<Net, List<RouteNode>> netToPartPins = new IdentityHashMap<>();
         for (PartitionPin pp : design.getPartitionPins()) {
             Node node = pp.getNode();
@@ -313,7 +316,8 @@ public class PartialRouter extends RWRoute {
                     .add(rnode);
         }
         for (Map.Entry<Net, List<RouteNode>> e : netToPartPins.entrySet()) {
-            NetWrapper netWrapper = nets.get(e.getKey());
+            Net net = e.getKey();
+            NetWrapper netWrapper = nets.get(net);
             if (netWrapper == null) {
                 continue;
             }
@@ -323,14 +327,19 @@ public class PartialRouter extends RWRoute {
             if (partPins.size() > 1) {
                 throw new RuntimeException();
             }
-            RouteNode lockedSourceRnode = partPins.get(0);
+            RouteNode endOfLockedPath = partPins.get(0);
+            assert(endOfLockedPath.isArcLocked());
+            assert(routingGraph.getPreservedNet(endOfLockedPath) == net);
+            RouteNode sourceRnode = endOfLockedPath;
+            while ((sourceRnode = sourceRnode.getPrev()) != null && sourceRnode.isArcLocked()) {}
+            assert(sourceRnode == netWrapper.getSourceRnode());
             if (netToEndRnodeOfLockedPathFromSource.isEmpty()) {
                 netToEndRnodeOfLockedPathFromSource = new IdentityHashMap<>();
             }
             netToEndRnodeOfLockedPathFromSource.put(netWrapper, netWrapper.getSourceRnode());
             for (Connection connection : netWrapper.getConnections()) {
                 assert(connection.getSourceRnode() == netWrapper.getSourceRnode());
-                connection.setSourceRnode(lockedSourceRnode);
+                connection.setSourceRnode(endOfLockedPath);
             }
         }
     }
@@ -559,11 +568,11 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected void finishRouteConnection(Connection connection, RouteNode rnode) {
-        RouteNode lockedSink = connectionToBeginRnodeOfLockedPathToSink.get(connection);
-        if (lockedSink != null) {
+        RouteNode beginOfLockedPath = connectionToBeginRnodeOfLockedPathToSink.get(connection);
+        if (beginOfLockedPath != null) {
             // rnode is a the beginning of a locked path to the real sink; start routing recovery from that real sink instead
             assert(connection.getSinkRnode() == rnode);
-            rnode = lockedSink;
+            rnode = beginOfLockedPath;
         }
 
         super.finishRouteConnection(connection, rnode);
@@ -575,6 +584,7 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected void assignNodesToConnections() {
+        // Now that we've finished routing, revert all source/sink rnodes back to their original
         for (Connection connection : indirectConnections) {
             RouteNode trueSource = netToEndRnodeOfLockedPathFromSource.get(connection.getNetWrapper());
             if (trueSource != null) {
