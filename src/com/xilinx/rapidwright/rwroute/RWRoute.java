@@ -1517,7 +1517,7 @@ public class RWRoute {
             assert(
                     // Sink is not exclusive as there are alternates
                     connection.getAltSinkRnodes().contains(sinkRnode) ||
-                    // Locked sink
+                    // Begin node of a locked path to a real sink
                     sinkRnode.isArcLocked()
             );
         }
@@ -1553,8 +1553,8 @@ public class RWRoute {
             assert(
                     // Sink is not exclusive as there are alternates
                     connection.getAltSinkRnodes().contains(sinkRnode) ||
-                            // Locked sink
-                            sinkRnode.isArcLocked()
+                    // Begin node of a locked path to a real sink
+                    sinkRnode.isArcLocked()
             );
         }
 
@@ -2136,7 +2136,9 @@ public class RWRoute {
 
         // Adds the source rnode to the queue
         RouteNode sourceRnode = connection.getSourceRnode();
-        assert(sourceRnode.getPrev() == null || sourceRnode.isArcLocked());
+        assert(sourceRnode.getPrev() == null ||
+                // End node of a locked path from source
+                sourceRnode.isArcLocked());
         push(state, sourceRnode, 0, 0);
     }
 
