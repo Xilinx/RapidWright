@@ -1231,10 +1231,11 @@ public class RWRoute {
                 if (connection.hasAltSinks()) {
                     // Routing must go to an alternate sink
                 } else {
-                    // sinkRnode must be a 'wormhole' sink; walk back from the final sink following all locked arcs and check
-                    // that we arrive at sinkRnode
+                    // sinkRnode must be the begin of a locked path to the real sink
                     RouteNode rnode = rnodes.get(0);
                     assert(rnode.isArcLocked());
+
+                    // Check that walking back from the final sink following all locked arcs and check that we arrive at sinkRnode
                     while ((rnode = rnode.getPrev()) != null && rnode.isArcLocked()) {}
                     assert(rnode == sinkRnode);
                 }
