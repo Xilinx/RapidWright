@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -430,8 +430,8 @@ public class RouterHelper {
                     EDIFHierPortInst ehpi = ehci.getPortInst(logicalPinName);
                     EDIFHierNet ehn = ehpi.getHierarchicalNet();
                     EDIFHierNet parentEhn = netlist.getParentNet(ehn);
-                    if (parentEhn == null || !parentEhn.getNet().isGND()) {
-                        throw new RuntimeException("ERROR: Cell " + cell.getName() + EDIFTools.EDIF_HIER_SEP + logicalPinName +
+                    if (parentEhn != null && !parentEhn.getNet().isGND()) {
+                        throw new RuntimeException("ERROR: Pin " + cell.getName() + EDIFTools.EDIF_HIER_SEP + logicalPinName +
                                 " is not connected to GND");
                     }
 
