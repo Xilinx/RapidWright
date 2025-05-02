@@ -72,6 +72,15 @@ public class EDIFHierPortInst {
     }
 
     /**
+     * Gets the full instance, including the instance of the EDIFPortInst.
+     * 
+     * @return
+     */
+    public EDIFHierCellInst getFullHierarchicalInst() {
+        return hierarchicalInst.getChild(portInst.getCellInst());
+    }
+
+    /**
      * Gets the net on the port inst
      * @return The net on the port inst
      */
