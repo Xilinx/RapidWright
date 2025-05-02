@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.rwroute;
 
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.IdentityHashMap;
@@ -43,6 +44,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
@@ -54,6 +56,7 @@ import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.Utils;
+
 
 /**
  * Encapsulation of RWRoute's routing resource graph.
@@ -126,6 +129,7 @@ public class RouteNodeGraph {
         return device.getColumns() * device.getRows();
     }
 
+    protected final Set<Tile> allowedTiles;
 
     public RouteNodeGraph(Design design, RWRouteConfig config) {
         this.design = design;
@@ -410,6 +414,13 @@ public class RouteNodeGraph {
         }
 
         presentCongestionCosts = new float[MAX_OCCUPANCY];
+
+        // HARDCODED FOR FCCM'25 DEMO
+        // =========================
+        PBlock pblock = new PBlock(design.getDevice(), "SLICE_X0Y0:SLICE_X60Y119");
+        allowedTiles = Collections.newSetFromMap(new IdentityHashMap<>());
+        allowedTiles.addAll(pblock.getAllTiles());
+        // =========================
     }
 
     public void initialize() {
@@ -583,6 +594,10 @@ public class RouteNodeGraph {
             if (!allowRoutethru(parent, child)) {
                 return true;
             }
+        }
+
+        if (!allowedTiles.contains(child.getTile())) {
+            return true;
         }
 
         RouteNode childRnode = getNode(child);
