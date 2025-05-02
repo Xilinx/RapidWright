@@ -1231,10 +1231,11 @@ public class RWRoute {
                 if (connection.hasAltSinks()) {
                     // Routing must go to an alternate sink
                 } else {
-                    // sinkRnode must be a 'wormhole' sink; walk back from the final sink following all locked arcs and check
-                    // that we arrive at sinkRnode
+                    // sinkRnode must be the begin of a locked path to the real sink
                     RouteNode rnode = rnodes.get(0);
                     assert(rnode.isArcLocked());
+
+                    // Check that walking back from the final sink following all locked arcs and check that we arrive at sinkRnode
                     while ((rnode = rnode.getPrev()) != null && rnode.isArcLocked()) {}
                     assert(rnode == sinkRnode);
                 }
@@ -1516,7 +1517,7 @@ public class RWRoute {
             assert(
                     // Sink is not exclusive as there are alternates
                     connection.getAltSinkRnodes().contains(sinkRnode) ||
-                    // Locked sink
+                    // Begin node of a locked path to a real sink
                     sinkRnode.isArcLocked()
             );
         }
@@ -1552,8 +1553,8 @@ public class RWRoute {
             assert(
                     // Sink is not exclusive as there are alternates
                     connection.getAltSinkRnodes().contains(sinkRnode) ||
-                            // Locked sink
-                            sinkRnode.isArcLocked()
+                    // Begin node of a locked path to a real sink
+                    sinkRnode.isArcLocked()
             );
         }
 
@@ -2135,7 +2136,9 @@ public class RWRoute {
 
         // Adds the source rnode to the queue
         RouteNode sourceRnode = connection.getSourceRnode();
-        assert(sourceRnode.getPrev() == null || sourceRnode.isArcLocked());
+        assert(sourceRnode.getPrev() == null ||
+                // End node of a locked path from source
+                sourceRnode.isArcLocked());
         push(state, sourceRnode, 0, 0);
     }
 
