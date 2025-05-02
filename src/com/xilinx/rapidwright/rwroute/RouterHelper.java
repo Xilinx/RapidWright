@@ -395,6 +395,8 @@ public class RouterHelper {
                     }
                     throw new RuntimeException("ERROR: " + gndNet.getName() + " not connected to any Cells");
                 }
+
+                String physicalPinName = "A" + spi.getName().charAt(1);
                 for (Cell cell : connectedCells) {
                     if (!LUTTools.isCellALUT(cell)) {
                         continue nextSitePin;
@@ -413,6 +415,17 @@ public class RouterHelper {
                         // Thus, LUT6/LUT5 inside expanded LUT6_2 macros are not eligible for inversion.
                         continue nextSitePin;
                     }
+
+                    // Check the logical pin connection
+                    String logicalPinName = cell.getLogicalPinMapping(physicalPinName);
+                    EDIFHierPortInst ehpi = ehci.getPortInst(logicalPinName);
+                    EDIFHierNet ehn = ehpi.getHierarchicalNet();
+                    EDIFHierNet parentEhn = netlist.getParentNet(ehn);
+                    if (parentEhn == null || !parentEhn.getNet().isGND()) {
+                        // Unable to be confirm (e.g. due to a partially encrypted design) that this
+                        // pin is also logically connected to GND
+                        continue nextSitePin;
+                    }
                 }
 
                 toInvertPins.add(spi);
@@ -421,19 +434,7 @@ public class RouterHelper {
                 si.routeIntraSiteNet(vccNet, spi.getBELPin(), spi.getBELPin());
 
                 for (Cell cell : connectedCells) {
-                    // Find the logical pin name
-                    String physicalPinName = "A" + spi.getName().charAt(1);
                     String logicalPinName = cell.getLogicalPinMapping(physicalPinName);
-
-                    // Check the logical pin connection
-                    EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
-                    EDIFHierPortInst ehpi = ehci.getPortInst(logicalPinName);
-                    EDIFHierNet ehn = ehpi.getHierarchicalNet();
-                    EDIFHierNet parentEhn = netlist.getParentNet(ehn);
-                    if (parentEhn != null && !parentEhn.getNet().isGND()) {
-                        throw new RuntimeException("ERROR: Pin " + cell.getName() + EDIFTools.EDIF_HIER_SEP + logicalPinName +
-                                " is not connected to GND");
-                    }
 
                     // Get the LUT equation
                     String lutEquation = LUTTools.getLUTEquation(cell);
@@ -446,8 +447,11 @@ public class RouterHelper {
                             .replace("!!", "");
                     LUTTools.configureLUT(cell, newLutEquation);
 
+                    // Change the logical pin connection
+                    EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
+                    EDIFHierPortInst ehpi = ehci.getPortInst(logicalPinName);
                     EDIFPortInst epi = ehpi.getPortInst();
-                    ehn.getNet().removePortInst(epi);
+                    ehpi.getNet().removePortInst(epi);
 
                     EDIFNet const1 = EDIFTools.getStaticNet(NetType.VCC, ehci.getParent().getCellType(), netlist);
                     const1.addPortInst(epi);
