@@ -451,7 +451,7 @@ public class RouterHelper {
                     EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
                     EDIFHierPortInst ehpi = ehci.getPortInst(logicalPinName);
                     EDIFPortInst epi = ehpi.getPortInst();
-                    ehpi.getNet().removePortInst(epi);
+                    epi.getNet().removePortInst(epi);
 
                     EDIFNet const1 = EDIFTools.getStaticNet(NetType.VCC, ehci.getParent().getCellType(), netlist);
                     const1.addPortInst(epi);
