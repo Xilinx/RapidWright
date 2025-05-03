@@ -1323,8 +1323,7 @@ public class EDIFTools {
         // Don't uniqueify primitive cell instances
         instMap.remove(netlist.getHDIPrimitivesLibrary());
 
-        Map<EDIFCell, List<EDIFHierCellInst>> toUniqueify
-                                            = new HashMap<EDIFCell, List<EDIFHierCellInst>>();
+        Map<EDIFCell, List<String>> toUniqueify = new HashMap<EDIFCell, List<String>>();
 
         for (Entry<EDIFLibrary, Map<EDIFCell, List<EDIFHierCellInst>>> libEntry : instMap.entrySet()) {
             for (Entry<EDIFCell,List<EDIFHierCellInst>> e : libEntry.getValue().entrySet()) {
@@ -1332,7 +1331,11 @@ public class EDIFTools {
                 if (macros.containsCell(e.getKey())) continue;
                 // Identify multiple instantiated cells
                 if (e.getValue().size() > 1) {
-                    toUniqueify.put(e.getKey(),e.getValue());
+                    List<String> hierCellNames = new ArrayList<>(e.getValue().size());
+                    for (EDIFHierCellInst ehci : e.getValue()) {
+                        hierCellNames.add(ehci.getFullHierarchicalInstName());
+                    }
+                    toUniqueify.put(e.getKey(), hierCellNames);
                 }
             }
         }
@@ -1353,22 +1356,23 @@ public class EDIFTools {
     private static int unique = 1;
 
     private static void duplicateMultiInstCell(Design design, EDIFCell cell,
-                                    Map<EDIFCell, List<EDIFHierCellInst>> toUniqueify) {
+                                    Map<EDIFCell, List<String>> toUniqueify) {
         EDIFNetlist netlist = design.getNetlist();
         // Check that all higher level cells don't have multiple shared cell definitions, before
         // duplicating this one
-        List<EDIFHierCellInst> insts = toUniqueify.get(cell);
+        List<String> insts = toUniqueify.get(cell);
         if (insts == null) {
             // Already processed, or no duplicates
             return;
         }
-        for (EDIFHierCellInst inst : insts) {
+        for (String instName : insts) {
+            EDIFHierCellInst inst = netlist.getHierCellInstFromName(instName);
             String[] instParents = inst.getFullHierarchicalInstName().split(EDIF_HIER_SEP);
             StringBuilder sb = new StringBuilder(instParents[0]);
             for (int i=1; i < instParents.length; i++) {
                 EDIFCellInst parent = netlist.getCellInstFromHierName(sb.toString());
                 if (parent != null) {
-                    List<EDIFHierCellInst> parentDuplicates = toUniqueify.get(parent.getCellType());
+                    List<String> parentDuplicates = toUniqueify.get(parent.getCellType());
                     if (parentDuplicates != null) {
                         duplicateMultiInstCell(design, parent.getCellType(), toUniqueify);
                     }
@@ -1379,7 +1383,8 @@ public class EDIFTools {
 
         // Duplicate cell definitions for all but first instance
         boolean first = true;
-        for (EDIFHierCellInst cellInst : insts) {
+        for (String instName : insts) {
+            EDIFHierCellInst cellInst = netlist.getHierCellInstFromName(instName);
             if (first) {
                 first = false;
                 continue;
@@ -1389,17 +1394,7 @@ public class EDIFTools {
             EDIFCell newCell = new EDIFCell(origCell.getLibrary(), origCell, origCell.getName()
                     + "_RW" + unique++);
             cellInst.getInst().setCellType(newCell);
-            for (EDIFCellInst newInstCopy : newCell.getCellInsts()) {
-                List<EDIFHierCellInst> instsToUniqueify = toUniqueify.get(newInstCopy.getCellType());
-                if (instsToUniqueify == null) continue;
-                for (int i=0; i < instsToUniqueify.size(); i++) {
-                    EDIFHierCellInst hierInst = instsToUniqueify.get(i);
-                    if (newInstCopy.getName().equals(hierInst.getInst().getName())
-                            && hierInst.isDescendantOf(cellInst)) {
-                        instsToUniqueify.set(i, hierInst.getSibling(newInstCopy));
-                    }
-                }
-            }
+
             // Update any physical cell references
             for (EDIFCellInst inst : newCell.getCellInsts()) {
                 String potentialLeafCell = cellInst.getFullHierarchicalInstName()
