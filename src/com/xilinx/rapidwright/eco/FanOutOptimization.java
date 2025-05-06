@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.eco;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -34,15 +35,18 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.placer.blockplacer.Point;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.Utils;
 
 /**
  * Performs a fan out optimization of a high fan out net on a fully placed and
@@ -50,22 +54,59 @@ import com.xilinx.rapidwright.util.Pair;
  */
 public class FanOutOptimization {
 
-    private static Pair<Site, BEL> findValidPlacementOption(Design design, Cell srcFF) {
+    public static Site getCentroidOfNet(Net net, Set<SiteTypeEnum> targetSiteTypes) {
+        List<Point> points = new ArrayList<>();
+        for (SitePinInst i : net.getPins()) {
+            points.add(new Point(i.getTile().getColumn(), i.getTile().getRow()));
+        }
+        Point centroid = KMeans.calculateCentroid(points);
+        Tile centroidTile = net.getSourceTile().getDevice().getTile(centroid.y, centroid.x);
+        System.out.println(centroidTile);
+
+        // We need to snap to the closest site with the site type of interest from the
+        // centroid tile
+        Site closest = null;
+        int closetDist = Integer.MAX_VALUE;
+        int searchGridDim = 0;
+        while (closest == null) {
+            searchGridDim++;
+            for (int row = -searchGridDim; row < searchGridDim; row++) {
+                for (int col = -searchGridDim; col < searchGridDim; col++) {
+                    Tile neighbor = centroidTile.getTileNeighbor(col, row);
+                    if (neighbor != null) {
+                        for (Site s : neighbor.getSites()) {
+                            if (targetSiteTypes.contains(s.getSiteTypeEnum())) {
+                                int manDist = centroidTile.getManhattanDistance(neighbor);
+                                if (manDist < closetDist) {
+                                    closest = s;
+                                    closetDist = manDist;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return closest;
+    }
+
+    private static Pair<Site, BEL> findValidPlacementOption(Design design, Cell srcFF, Iterator<Site> itr) {
         SiteInst si = srcFF.getSiteInst();
-        ECOPlacementHelper h = new ECOPlacementHelper(design, null);
         Net clk = si.getNetFromSiteWire(srcFF.getSiteWireNameFromLogicalPin("C"));
         Net rst = si.getNetFromSiteWire(srcFF.getSiteWireNameFromLogicalPin("R"));
         Net ce = si.getNetFromSiteWire(srcFF.getSiteWireNameFromLogicalPin("CE"));
-        for (Site curr : ECOPlacementHelper.spiralOutFrom(si.getSite())) {
+        while (itr.hasNext()) {
+            Site curr = itr.next();
             SiteInst candidate = design.getSiteInst(curr.getName());
             if (candidate == null) {
                 // Empty site, let's use it
                 return new Pair<Site, BEL>(curr, curr.getBEL("AFF"));
             }
-            BEL bel = h.getUnusedFlop(si, clk, ce, rst);
-            if (bel != null) {
-                return new Pair<Site, BEL>(curr, bel);
-            }
+            // Perhaps it is better to only use empty sites?
+//            BEL bel = h.getUnusedFlop(si, clk, ce, rst);
+//            if (bel != null) {
+//                return new Pair<Site, BEL>(curr, bel);
+//            }
         }
         return null;
     }
@@ -110,14 +151,18 @@ public class FanOutOptimization {
         Net rst = si.getNetFromSiteWire(driverFlop.getSiteWireNameFromLogicalPin("R"));
         Net ce = si.getNetFromSiteWire(driverFlop.getSiteWireNameFromLogicalPin("CE"));
 
+        Site highFanoutNetCentroid = getCentroidOfNet(highFanoutNet, Utils.sliceTypes);
+
         EDIFCell parent = driverFlop.getParentCell();
         Unisim ffType = Unisim.valueOf(driverFlop.getType());
         List<Cell> sources = new ArrayList<>();
         sources.add(driverFlop);
         List<Net> sourceNets = new ArrayList<>();
         sourceNets.add(highFanoutNet);
+        Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(highFanoutNetCentroid).iterator();
+
         for (int i = 0; i < splitByCount - 1; i++) {
-            Pair<Site, BEL> loc = findValidPlacementOption(design, driverFlop);
+            Pair<Site, BEL> loc = findValidPlacementOption(design, driverFlop, siteItr);
             String copyName = driverFlop.getName() + "_copy" + i;
             Cell copy = design.createAndPlaceCell(parent, copyName, ffType, loc.getFirst(), loc.getSecond());
             copy.setPropertiesMap(driverFlop.getEDIFCellInst().createDuplicatePropertiesMap());
@@ -182,11 +227,6 @@ public class FanOutOptimization {
             System.out.println("USAGE: <input.dcp> <high fanout net name> <split net by k> <output>");
             return;
         }
-
-//        args = new String[] {"demo_corundum_25g_routed.dcp", 
-//                "pcie4_uscale_plus_inst/inst/pcie4_uscale_plus_0_pcie_4_0_pipe_inst/pcie4_0_512b_intfc_mod/pcie_4_0_512b_intfc_int_mod/pcie_4_0_512b_cc_intfc_mod/s_axis_cc_tvalid_reg_lower", 
-//                "4", 
-//                "demo_corundum_25g_fanout_opt.dcp"};
 
         Design d = Design.readCheckpoint(args[0]);
         Net n = d.getNet(args[1]);

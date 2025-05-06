@@ -83,7 +83,7 @@ public class KMeans {
         return nearestCentroidIdx;
     }
 
-    private static Point calculateCentroid(List<Point> cluster) {
+    public static Point calculateCentroid(List<Point> cluster) {
         Point centroid = new Point(0, 0);
         for (Point p : cluster) {
             centroid.x += p.x;
@@ -122,7 +122,7 @@ public class KMeans {
             }
 
             // Calculate new centroids based on current cluster assignments
-            Point[] newCentroids = new Point[4];
+            Point[] newCentroids = new Point[k];
             for (int i = 0; i < k; i++) {
                 List<Point> cluster = clusters.get(i);
                 newCentroids[i] = cluster.isEmpty() ? centroids[i] : calculateCentroid(cluster);
