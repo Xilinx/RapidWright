@@ -85,7 +85,7 @@ public class NetTools {
                                  boolean branchStart,
                                  boolean branchEndIfNoFanouts,
                                  boolean subTreeEndIfNoFanouts,
-                                 Set<Node> multiplyDrivenNodesVisited) {
+                                 Set<NetTools.NodeTree> multiplyDrivenNodesVisited) {
             // Adopt the same spacing as Vivado's report_route_status
             sb.append("    ");
             sb.append(subtreeStart ? "[" : " ");

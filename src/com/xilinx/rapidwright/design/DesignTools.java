@@ -4466,7 +4466,7 @@ public class DesignTools {
      * @return Number of unrouted sink pins on net.
      */
     public static int updatePinsIsRouted(Net net,
-                                         Set<Node> multiplyDrivenNodesVisited) {
+                                         Set<NetTools.NodeTree> multiplyDrivenNodesVisited) {
         int numUnroutedSinkPins = 0;
         for (SitePinInst spi : net.getPins()) {
             spi.setRouted(false);
@@ -4522,7 +4522,7 @@ public class DesignTools {
      */
     public static int updatePinsIsRouted(Design design) {
         int totalUnroutedSinkPins = 0;
-        Set<Node> multiplyDrivenNodesVisited = Collections.newSetFromMap(new IdentityHashMap<>());
+        Set<NetTools.NodeTree> multiplyDrivenNodesVisited = Collections.newSetFromMap(new IdentityHashMap<>());
         for (Net net : design.getNets()) {
             int numUnroutedSinkPins = updatePinsIsRouted(net, multiplyDrivenNodesVisited);
             if (!DesignTools.isNetDrivenByHierPort(net)) {
