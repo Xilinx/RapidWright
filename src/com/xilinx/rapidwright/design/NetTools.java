@@ -79,7 +79,6 @@ public class NetTools {
                     Collections.newSetFromMap(new IdentityHashMap<>()));
         }
 
-
         private void buildString(StringBuilder sb,
                                  boolean subtreeStart,
                                  boolean branchStart,
