@@ -28,6 +28,9 @@ package com.xilinx.rapidwright.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -77,6 +80,8 @@ public class PerformanceExplorer {
     /** Maps a pblock to optional named cell(s) to be constrained by the pblock */
     private Map<PBlock, String> pblocks;
 
+    private PBlock[] pblockLookup;
+
     private boolean containRouting;
 
     private boolean addEDIFAndMetadata;
@@ -94,6 +99,8 @@ public class PerformanceExplorer {
     private double clockUncertaintyStep = DEFAULT_STEP_CLK_UNCERT;
 
     private String vivadoPath = DEFAULT_VIVADO;
+
+    private boolean reusePreviousResults;
 
     public PerformanceExplorer(Design d, String testDir, String clkName, double targetPeriod) {
         init(d, testDir, clkName, targetPeriod, null);
@@ -262,6 +269,18 @@ public class PerformanceExplorer {
         this.addEDIFAndMetadata = addEDIFAndMetadata;
     }
 
+    public PBlock getPBlock(int i) {
+        return pblockLookup[i];
+    }
+
+    public void setReusePreviousResults(boolean value) {
+        this.reusePreviousResults = value;
+    }
+
+    public boolean reusePreviousResults() {
+        return reusePreviousResults;
+    }
+
     public ArrayList<String> createTclScript(String initialDcp, String instDirectory,
             PlacerDirective p, RouterDirective r, String clockUncertainty, Entry<PBlock, String> pblockEntry) {
         PBlock pblock = pblockEntry.getKey();
@@ -274,7 +293,8 @@ public class PerformanceExplorer {
             lines.add("create_pblock " + pblockName);
             lines.add("resize_pblock "+pblockName+" -add {"+pblock.toString()+"}");
             lines.add("add_cells_to_pblock "+pblockName+" " + (pblockCells == null ? "-top" : "[get_cells {"+ pblockCells +"}]" ));
-            if (containRouting) {
+            lines.add("set_property IS_SOFT 0 [get_pblocks " + pblockName + "]");
+            if (isContainRouting()) {
                 lines.add("set_property CONTAIN_ROUTING 1 [get_pblocks "+ pblockName+"]");
             }
         }
@@ -328,6 +348,7 @@ public class PerformanceExplorer {
         int pb = 0;
         int jobsStarted = 0;
         int maxConcurrentJobs = JobQueue.isLSFAvailable() ? JobQueue.MAX_LSF_CONCURRENT_JOBS : JobQueue.MAX_LOCAL_CONCURRENT_JOBS;
+        pblockLookup = new PBlock[pblocks.size()];
         for (Entry<PBlock, String> e : pblocks.entrySet()) {
             PBlock pblock = e.getKey();
             for (PlacerDirective p : getPlacerDirectives()) {
@@ -336,29 +357,31 @@ public class PerformanceExplorer {
                         String roundedC = printNS(c);
                         String uniqueID = p.name() + "_" + r.name() + "_" + roundedC;
                         if (pblock != null) {
-                            uniqueID = uniqueID + "_pblock" + pb + "_" + pblock.get(0).getLowerLeftSite() +"-";
+                            uniqueID = uniqueID + "_pblock" + pb + "_" + pblock.get(0).getLowerLeftSite() + "-";
                         }
                         System.out.println(uniqueID);
                         String instDir = runDirectory + File.separator + uniqueID;
                         FileTools.makeDir(instDir);
                         ArrayList<String> tcl = createTclScript(dcpName, instDir, p, r, roundedC, e);
                         String scriptName = instDir + File.separator + RUN_TCL_NAME;
-                        FileTools.writeLinesToTextFile(tcl, scriptName);
 
-                        Job j = JobQueue.createJob();
-                        j.setRunDir(instDir);
-                        j.setCommand(getVivadoPath() + " -mode batch -source " + scriptName);
-                        if (jobsStarted < maxConcurrentJobs) {
-                            j.launchJob();
-                            jobs.addRunningJob(j);
-                            jobsStarted++;
-                        } else {
-                            jobs.addJob(j);
+                        if (!reusePreviousResults) {
+                            FileTools.writeLinesToTextFile(tcl, scriptName);
+                            Job j = JobQueue.createJob();
+                            j.setRunDir(instDir);
+                            j.setCommand(getVivadoPath() + " -mode batch -source " + scriptName);
+                            if (jobsStarted < maxConcurrentJobs) {
+                                j.launchJob();
+                                jobs.addRunningJob(j);
+                                jobsStarted++;
+                            } else {
+                                jobs.addJob(j);
+                            }
                         }
                     }
                 }
             }
-            pb++;
+            pblockLookup[pb++] = pblock;
         }
 
         boolean success = jobs.runAllToCompletion(maxConcurrentJobs);
@@ -366,6 +389,54 @@ public class PerformanceExplorer {
         System.out.println("Performance Explorer " + (success ? "Finished Successfully." : "Failed!"));
     }
 
+    private Float parseWNSFromTimingReport(Path timingReport) {
+        for (String line : FileTools.getLinesFromTextFile(timingReport.toString())) {
+            if (line.contains("Slack ")) {
+                String[] values = line.split("\\s+");
+                assert (values.length >= 4);
+                String value = values[3].replace("ns", "");
+                return Float.parseFloat(value);
+            }
+        }
+        return null;
+    }
+
+    private static final String PBLOCK_SUFFIX = "_pblock";
+
+    public List<Pair<Path, Float>> getBestResultsPerPBlock() {
+        List<Pair<Path, Float>> results = new ArrayList<>();
+        for (int i = 0; i < pblocks.size(); i++) {
+            results.add(new Pair<Path, Float>(null, -1 * Float.MAX_VALUE));
+        }
+        Path runDir = Paths.get(runDirectory);
+        String[] runDirFiles = runDir.toFile().list();
+        for (String dirName : runDirFiles) {
+            Path dir = runDir.resolve(dirName);
+            int pblockIdx = 0;
+            int i = dirName.indexOf(PBLOCK_SUFFIX);
+            if (i >= 0) {
+                int start = i + PBLOCK_SUFFIX.length();
+                int end = dirName.indexOf('_', start);
+                String tmp = dirName.substring(start, end);
+                pblockIdx = Integer.parseInt(tmp);
+            }
+            if (Files.isDirectory(dir)) {
+                Path routeTiming = dir.resolve("route_timing.twr");
+                if (Files.exists(routeTiming)) {
+                    Float value = parseWNSFromTimingReport(routeTiming);
+                    Pair<Path,Float> bestFoundSoFar = results.get(pblockIdx);
+                    if (value > bestFoundSoFar.getSecond()) {
+                        bestFoundSoFar.setFirst(dir);
+                        bestFoundSoFar.setSecond(value);
+                    }
+                    Pair<Path, Float> curr = results.get(pblockIdx);
+                    curr.setFirst(dir);
+                    curr.setSecond(value);
+                }
+            }
+        }
+        return results;
+    }
 
     private static final String INPUT_DCP_OPT = "i";
     private static final String PBLOCK_FILE_OPT = "b";
