@@ -547,4 +547,10 @@ public class TestDesign {
             Assertions.assertEquals(logPin, myCell.getLogicalPinMapping(physPin));
         }
     }
+
+    @Test
+    public void testRouteSites() {
+        Design d = RapidWrightDCP.loadDCP("bug780.dcp");
+        d.routeSites();
+    }
 }
