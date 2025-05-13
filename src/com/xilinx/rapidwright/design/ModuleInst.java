@@ -763,6 +763,17 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
     }
 
     /**
+     * Connects a ModuleInst's single bit input port to GND or VCC
+     * 
+     * @param type     The static net type to connect the port to
+     * @param portName The name of the port
+     * 
+     */
+    public void connect(NetType type, String portName) {
+        connect(type, portName, -1);
+    }
+
+    /**
      * Connects a ModuleInst's input port to GND or VCC
      * 
      * @param type     The static net type to connect the port to
@@ -777,7 +788,8 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         Port input = getPort(busIndex == -1 ? portName : portName + "[" + busIndex + "]");
         if (input == null) {
             throw new RuntimeException(
-                    "ERROR: Couldn't find port" + portName + ", idx=" + busIndex + " on ModuleInst " + getName());
+                    "ERROR: Couldn't find port " + portName + ", idx=" + busIndex + " on ModuleInst "
+                            + getName());
         }
         if (input.isOutPort()) {
             throw new RuntimeException("ERROR: Port " + input.getName() + " on ModuleInst " + getName()
@@ -786,11 +798,13 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         Net physNet = type == NetType.GND ? getDesign().getGndNet() : getDesign().getVccNet();
         EDIFNet logNet = EDIFTools.getStaticNet(type, getCellInst().getParentCell(), getDesign().getNetlist());
         logNet.createPortInst(input.getName(), getCellInst());
+
         for (SitePinInst pin : input.getSitePinInsts()) {
-            if (pin.getNet() != null) {
-                pin.getNet().removePin(pin);
+            SitePinInst instPin = getCorrespondingPin(pin);
+            if (instPin.getNet() != null) {
+                instPin.getNet().removePin(pin);
             }
-            physNet.addPin(pin);
+            physNet.addPin(instPin);
         }
     }
 

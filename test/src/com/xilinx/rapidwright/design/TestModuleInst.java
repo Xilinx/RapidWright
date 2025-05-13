@@ -30,6 +30,8 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPort;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import org.junit.jupiter.api.Assertions;
@@ -219,6 +221,61 @@ public class TestModuleInst {
         mi1.connect("output_port_x", 0, mi2, "input_port_a", 0);
         Assertions.assertEquals("[OUT SLICE_X15Y237.HQ2, IN SLICE_X16Y233.A2]", net1.getPins().toString());
         Assertions.assertTrue(net2.getPins().isEmpty());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "GND", "VCC" })
+    public void testConnectGNDVCC(String staticTypeName) {
+        NetType staticType = NetType.valueOf(staticTypeName);
+
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+
+        Design newDesign = new Design("newDesign", design.getPartName());
+
+        // Need metadata for ports
+        String metaPath = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.metadata");
+        Module module = new Module(design, metaPath, false);
+        design = null;
+
+        ModuleInst mi1 = newDesign.createModuleInst("inst1", module);
+        mi1.place(module.getAnchor());
+
+        int count = 0;
+        for (EDIFPort port : mi1.getCellInst().getCellPorts()) {
+            if (port.isOutput())
+                continue;
+            if (port.isBus()) {
+                for (int i = 0; i < port.getWidth(); i++) {
+                    mi1.connect(staticType, port.getBusName(), i);
+                    count++;
+                }
+            } else {
+                mi1.connect(staticType, port.getName());
+                count++;
+            }
+        }
+
+        EDIFNet net = newDesign.getTopEDIFCell()
+                .getNet("<const" + (staticType == NetType.VCC ? 1 : 0) + ">");
+        for (EDIFPortInst pi : net.getPortInsts()) {
+            if (pi.isInput()) {
+                Assertions.assertEquals(pi.getCellInst(), mi1.getCellInst());
+                count--;
+            } else {
+                Assertions.assertEquals(pi.getCellInst().getName(), staticTypeName);
+            }
+        }
+        Assertions.assertEquals(0, count);
+
+        Net staticNet = staticType == NetType.VCC ? newDesign.getVccNet() : newDesign.getGndNet();
+        for (Port p : mi1.getModule().getPorts()) {
+            if (p.isOutPort()) {
+                continue;
+            }
+            for (SitePinInst i : mi1.getCorrespondingPins(p)) {
+                Assertions.assertEquals(staticNet, i.getNet());
+            }
+        }
     }
 
     @Test
