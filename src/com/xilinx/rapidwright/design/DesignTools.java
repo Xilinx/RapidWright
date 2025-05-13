@@ -1825,7 +1825,7 @@ public class DesignTools {
 
             // Check for VCC on A6 and remove if needed
             if (bel != null && bel.isLUT() && bel.getName().endsWith("5LUT")) {
-                SitePinInst vcc = c.getSiteInst().getSitePinInst(c.getBELName().charAt(0) + "6");
+                SitePinInst vcc = si.getSitePinInst(bel.getName().charAt(0) + "6");
                 if (vcc != null && vcc.getNet().getName().equals(Net.VCC_NET)) {
                     boolean hasOtherSink = false;
                     for (BELPin otherSink : si.getSiteWirePins(vcc.getBELPin().getSiteWireIndex())) {
