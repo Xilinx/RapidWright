@@ -89,7 +89,7 @@ public class NetTools {
             sb.append("    ");
             sb.append(subtreeStart ? "[" : " ");
             sb.append(branchStart ? "{" : " ");
-            sb.append("  ");
+            sb.append("   ");
             boolean notFirstTimeVisitingThisMultiplyDrivenNode = multiplyDriven && !multiplyDrivenNodesVisited.add(this);
             boolean branchEnd = (branchEndIfNoFanouts && fanouts.isEmpty()) || notFirstTimeVisitingThisMultiplyDrivenNode;
             sb.append(branchEnd ? "}" : " ");
