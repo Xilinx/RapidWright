@@ -276,6 +276,23 @@ public class TestModuleInst {
                 Assertions.assertEquals(staticNet, i.getNet());
             }
         }
+
+        // Ensure proper behavior when port is already connected
+        ModuleInst mi2 = newDesign.createModuleInst("inst2", module);
+        mi2.place(newDesign.getDevice().getSite("SLICE_X16Y227"));
+        String inputPortName = "input_port_a";
+        int index = 0;
+        mi2.connect(inputPortName, mi1, "output_port_w", index);
+
+        mi2.connect(staticType, inputPortName, index);
+
+        // Check logical pin
+        inputPortName = inputPortName + "[" + index + "]";
+        Assertions.assertEquals(net, mi2.getCellInst().getPortInst(inputPortName).getNet());
+        // Check physical pins
+        for (SitePinInst spi : mi2.getCorrespondingPins(mi2.getPort(inputPortName))) {
+            Assertions.assertEquals(staticNet, spi.getNet());
+        }
     }
 
     @Test

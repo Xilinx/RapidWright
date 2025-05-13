@@ -40,6 +40,7 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
@@ -774,7 +775,9 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
     }
 
     /**
-     * Connects a ModuleInst's input port to GND or VCC
+     * Connects a ModuleInst's input port to GND or VCC. If the port is already
+     * connected to another net, this will disconnect it and connect it to the
+     * specified static net.
      * 
      * @param type     The static net type to connect the port to
      * @param portName The name of the port
@@ -797,6 +800,10 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         }
         Net physNet = type == NetType.GND ? getDesign().getGndNet() : getDesign().getVccNet();
         EDIFNet logNet = EDIFTools.getStaticNet(type, getCellInst().getParentCell(), getDesign().getNetlist());
+        EDIFPortInst currPortInst = getCellInst().getPortInst(input.getName());
+        if (currPortInst != null) {
+            currPortInst.getNet().removePortInst(currPortInst);
+        }
         logNet.createPortInst(input.getName(), getCellInst());
 
         for (SitePinInst pin : input.getSitePinInsts()) {
