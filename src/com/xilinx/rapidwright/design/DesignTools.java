@@ -1824,8 +1824,8 @@ public class DesignTools {
             SiteInst si = c.getSiteInst();
 
             // Check for VCC on A6 and remove if needed
-            if (c.getBEL().isLUT() && c.getBELName().endsWith("5LUT")) {
-                SitePinInst vcc = c.getSiteInst().getSitePinInst(c.getBELName().charAt(0) + "6");
+            if (bel != null && bel.isLUT() && bel.getName().endsWith("5LUT")) {
+                SitePinInst vcc = si.getSitePinInst(bel.getName().charAt(0) + "6");
                 if (vcc != null && vcc.getNet().getName().equals(Net.VCC_NET)) {
                     boolean hasOtherSink = false;
                     for (BELPin otherSink : si.getSiteWirePins(vcc.getBELPin().getSiteWireIndex())) {
@@ -1851,11 +1851,12 @@ public class DesignTools {
                     pinsToRemove.computeIfAbsent(pin.getNet(), $ -> new HashSet<>()).add(pin);
                 }
             }
-            touched.add(c.getSiteInst());
+            if (si != null) {
+                touched.add(si);
+            }
 
             c.unplace();
             d.removeCell(c.getName());
-            si.removeCell(bel);
         }
 
         t.stop().start("cleanup t-prims");
