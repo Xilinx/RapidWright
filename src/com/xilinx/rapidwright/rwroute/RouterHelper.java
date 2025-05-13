@@ -397,6 +397,7 @@ public class RouterHelper {
                 }
 
                 String physicalPinName = "A" + spi.getName().charAt(1);
+                BELPin cellBelPin = null;
                 for (Cell cell : connectedCells) {
                     if (!LUTTools.isCellALUT(cell)) {
                         continue nextSitePin;
@@ -426,12 +427,16 @@ public class RouterHelper {
                         // pin is also logically connected to GND
                         continue nextSitePin;
                     }
+
+                    if (cellBelPin == null) {
+                        cellBelPin = cell.getBELPin(ehpi);
+                    }
                 }
 
                 toInvertPins.add(spi);
                 // Re-paint the intra-site routing from GND to VCC
                 // (no intra site routing will occur during Net.addPin() later)
-                si.routeIntraSiteNet(vccNet, spi.getBELPin(), spi.getBELPin());
+                si.routeIntraSiteNet(vccNet, spi.getBELPin(), cellBelPin);
 
                 for (Cell cell : connectedCells) {
                     String logicalPinName = cell.getLogicalPinMapping(physicalPinName);
