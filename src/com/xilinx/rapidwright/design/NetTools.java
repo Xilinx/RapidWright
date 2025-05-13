@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2024-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Wenhao Lin, Advanced Micro Devices, Inc.
@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -60,6 +61,7 @@ public class NetTools {
         public NodeTree(Node node) {
             super(node);
         }
+        public boolean multiplyDriven = false;
 
         public void addFanout(NodeTree node) {
             if (fanouts.isEmpty()) {
@@ -73,17 +75,32 @@ public class NetTools {
                                  boolean branchStart,
                                  boolean branchEndIfNoFanouts,
                                  boolean subTreeEndIfNoFanouts) {
+            buildString(sb, subtreeStart, branchStart, branchEndIfNoFanouts, subTreeEndIfNoFanouts,
+                    Collections.newSetFromMap(new IdentityHashMap<>()));
+        }
+
+        private void buildString(StringBuilder sb,
+                                 boolean subtreeStart,
+                                 boolean branchStart,
+                                 boolean branchEndIfNoFanouts,
+                                 boolean subTreeEndIfNoFanouts,
+                                 Set<NetTools.NodeTree> multiplyDrivenNodesVisited) {
             // Adopt the same spacing as Vivado's report_route_status
             sb.append("    ");
             sb.append(subtreeStart ? "[" : " ");
             sb.append(branchStart ? "{" : " ");
             sb.append("   ");
-            boolean branchEnd = branchEndIfNoFanouts && fanouts.isEmpty();
+            boolean notFirstTimeVisitingThisMultiplyDrivenNode = multiplyDriven && !multiplyDrivenNodesVisited.add(this);
+            boolean branchEnd = (branchEndIfNoFanouts && fanouts.isEmpty()) || notFirstTimeVisitingThisMultiplyDrivenNode;
             sb.append(branchEnd ? "}" : " ");
             boolean subtreeEnd = subTreeEndIfNoFanouts && branchEnd;
             sb.append(subtreeEnd ? "]" : " ");
             sb.append(String.format("  %30s", super.toString()));
             sb.append("\n");
+
+            if (notFirstTimeVisitingThisMultiplyDrivenNode) {
+                return;
+            }
 
             subtreeStart = false;
             for (int i = 0; i < fanouts.size(); i++) {
@@ -92,7 +109,8 @@ public class NetTools {
                 branchStart = !lastFanout && (fanouts.size() > 1);
                 branchEndIfNoFanouts = lastFanout || branchStart;
                 fanout.buildString(sb, subtreeStart, branchStart, branchEndIfNoFanouts,
-                        subTreeEndIfNoFanouts && !branchStart && lastFanout);
+                        subTreeEndIfNoFanouts && !branchStart && lastFanout,
+                        multiplyDrivenNodesVisited);
             }
         }
 
@@ -110,9 +128,10 @@ public class NetTools {
 
     /**
      * Compute the node routing tree of the given Net by examining its PIPs.
-     * Note that this method: (a) assumes that no loops are present, (b) only discovers subtrees that start at an
-     * output SitePinInst or a node tied to VCC/GND (i.e. gaps and islands will be ignored).
-     * @param net Net to analyze
+     * Note that this method only discovers subtrees that start at an output SitePinInst or a node tied to VCC/GND
+     * (i.e. gaps and islands will be ignored).
+     * Nodes that are multiply-driven (indicative of routing loops) will have their NodeTree.multiplyDriven flag set.
+     * @param net Net to analyze.
      * @return A list of NodeTree objects, corresponding to the root of each subtree.
      */
     public static List<NodeTree> getNodeTrees(Net net) {
@@ -124,7 +143,15 @@ public class NetTools {
             }
             boolean isReversed = pip.isReversed();
             NodeTree startNode = nodeMap.computeIfAbsent(isReversed ? pip.getEndNode() : pip.getStartNode(), NodeTree::new);
-            NodeTree endNode = nodeMap.computeIfAbsent(isReversed ? pip.getStartNode() : pip.getEndNode(), NodeTree::new);
+            NodeTree endNode = nodeMap.compute(isReversed ? pip.getStartNode() : pip.getEndNode(), (k,v) -> {
+                if (v == null) {
+                    v = new NodeTree(k);
+                } else {
+                    // This node already exists in our map thus must be multiply-driven
+                    v.multiplyDriven = true;
+                }
+                return v;
+            });
             startNode.addFanout(endNode);
             if (!pip.isBidirectional()) {
                 if ((net.getType() == NetType.GND && startNode.isTiedToGnd()) ||

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -35,6 +35,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.xilinx.rapidwright.device.Node;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -1343,6 +1344,40 @@ public class TestDesignTools {
                 Assertions.assertTrue(spi.isOutPin() || spi.isRouted());
             }
         }
+    }
+
+    @Test
+    public void testUpdatePinsIsRoutedLoop() {
+        Design design = new Design("top", "xcvu3p");
+
+        Net net = design.createNet("net");
+        SiteInst si = design.createSiteInst("SLICE_X13Y235");
+        net.createPin("A_O", si);
+        SitePinInst sinkSpi = net.createPin("AX", si);
+
+        String nodesPath =
+                // find_routing_path -from [get_site_pins SLICE_X13Y235/A_O] -to [get_site_pins SLICE_X13Y235/AX]
+                "CLEM_X9Y235/CLE_CLE_M_SITE_0_A_O INT_X9Y235/INODE_W_1_FT1 INT_X9Y235/BOUNCE_W_0_FT1 " +
+                // find_routing_path -from [get_site_pins SLICE_X13Y235/AX] -to [get_nodes INT_X9Y235/INODE_E_1_FT1]
+                "INT_X9Y235/BOUNCE_W_0_FT1 INT_X9Y234/INT_NODE_IMUX_55_INT_OUT1 INT_X9Y234/BYPASS_W10 INT_X9Y234/INT_NODE_IMUX_40_INT_OUT0 INT_X9Y234/BYPASS_W9 INT_X9Y234/INODE_W_54_FT0 INT_X9Y235/BYPASS_W1 INT_X9Y235/INT_NODE_IMUX_39_INT_OUT1 INT_X9Y235/BYPASS_W4 INT_X9Y235/INODE_W_1_FT1";
+                // ^^^^^^^^^^^^^^^^^^^^^^^^^ duplicate (will get skipped below)
+
+        Device device = design.getDevice();
+        List<Node> nodes = Arrays.stream(nodesPath.split(" ")).map(device::getNode).collect(Collectors.toList());
+        Node startNode = nodes.get(0);
+        for (Node endNode : nodes.subList(1, nodes.size())) {
+            if (!startNode.equals(endNode)) {
+                PIP pip = PIP.getArbitraryPIP(startNode, endNode);
+                net.addPIP(pip);
+            } else {
+                // Skip duplicated nodes
+            }
+            startNode = endNode;
+        }
+
+        int numUnroutedPins = DesignTools.updatePinsIsRouted(net);
+        Assertions.assertEquals(0, numUnroutedPins);
+        Assertions.assertTrue(sinkSpi.isRouted());
     }
 
     @Test
