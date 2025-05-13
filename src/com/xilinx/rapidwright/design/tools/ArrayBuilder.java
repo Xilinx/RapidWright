@@ -41,19 +41,30 @@ import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetTools;
+import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockGenerator;
 import com.xilinx.rapidwright.design.blocks.PBlockRange;
+import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.edif.EDIFValueType;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
@@ -82,6 +93,7 @@ public class ArrayBuilder {
     private static final List<String> TARGET_CLK_NAME_OPTS = Arrays.asList("n", "clk-name");
     private static final List<String> REUSE_RESULTS_OPTS = Arrays.asList("r", "reuse");
     private static final List<String> SKIP_IMPL_OPTS = Arrays.asList("k", "skip-impl");
+    private static final List<String> LIMIT_INSTS_OPTS = Arrays.asList("l", "limit-inst-count");
 
     private Design design;
 
@@ -96,6 +108,8 @@ public class ArrayBuilder {
     private String outputName;
 
     private CodePerfTracker t;
+
+    private int instCountLimit = Integer.MAX_VALUE;
 
     public static final double DEFAULT_CLK_PERIOD_TARGET = 2.0;
 
@@ -114,6 +128,7 @@ public class ArrayBuilder {
                 acceptsAll(TARGET_CLK_NAME_OPTS, "Target Clock Name").withRequiredArg();
                 acceptsAll(REUSE_RESULTS_OPTS, "Reuse Previous Implementation Results");
                 acceptsAll(SKIP_IMPL_OPTS, "Skip Implementation of the Kernel");
+                acceptsAll(LIMIT_INSTS_OPTS, "Limit number of instance copies").withRequiredArg();
                 acceptsAll(HELP_OPTS, "Print this help message").forHelp();
             }
         };
@@ -183,18 +198,20 @@ public class ArrayBuilder {
         this.skipImpl = skipImpl;
     }
 
-    /**
-     * @return the outputName
-     */
     public String getOutputName() {
         return outputName;
     }
 
-    /**
-     * @param outputName the outputName to set
-     */
     public void setOutputName(String outputName) {
         this.outputName = outputName;
+    }
+
+    public int getInstCountLimit() {
+        return instCountLimit;
+    }
+
+    public void setInstCountLimit(int instCountLimit) {
+        this.instCountLimit = instCountLimit;
     }
 
     private void initializeArrayBuilder(OptionSet options) {
@@ -281,6 +298,16 @@ public class ArrayBuilder {
             setClockName(((String) options.valueOf(TARGET_CLK_NAME_OPTS.get(0))));
         } else {
             setClockName(ClockTools.getClockFromDesign(getDesign()).toString());
+        }
+
+        if (options.has(OUTPUT_DESIGN_OPTS.get(0))) {
+            setOutputName((String) options.valueOf(OUTPUT_DESIGN_OPTS.get(0)));
+        } else {
+            setOutputName("array.dcp");
+        }
+        
+        if (options.has(LIMIT_INSTS_OPTS.get(0))) {
+            setInstCountLimit(Integer.parseInt((String) options.valueOf(LIMIT_INSTS_OPTS.get(0))));
         }
 
     }
@@ -402,21 +429,147 @@ public class ArrayBuilder {
                     curr = array.createModuleInst("inst_" + i++, module);
                 }
                 if (curr.place(anchor, true, false)) {
-                    curr = null;
+                    if (straddlesClockRegion(curr)) {
+                        curr.unplace();
+                        continue;
+                    }
                     placed++;
-                    System.out.println("  ** PLACED: " + placed + " " + anchor + " " + module.getName());
+                    System.out.println("  ** PLACED: " + placed + " " + anchor + " " + curr.getName());
+                    curr = null;
+                    if (placed >= ab.getInstCountLimit()) {
+                        break outer;
+                    }
                 }
             }
         }
+
 
         List<Net> unrouted = NetTools.unrouteNetsWithOverlappingNodes(array);
         if (unrouted.size() > 0) {
             System.out.println("Found " + unrouted.size() + " overlapping nets, that were unrouted.");
         }
 
+        if (ab.isSkipImpl()) {
+            EDIFCell top = array.getTopEDIFCell();
+            if (array.getNet(ab.getClockName()) == null) {
+                // Create BUFG and clock net, then connect to all instances
+                Cell bufg = createBUFGCE(array, top, "bufg", array.getDevice().getSite("BUFGCE_X2Y0"));
+                Net clk = array.createNet(ab.getClockName());
+                clk.connect(bufg, "O");
+                Net clkIn = array.createNet(ab.getClockName() + "_in");
+                clkIn.connect(bufg, "I");
+                EDIFPort clkInPort = top.createPort(ab.getClockName(), EDIFDirection.INPUT, 1);
+                clkIn.getLogicalNet().createPortInst(clkInPort);
+                EDIFNet logClkNet = clk.getLogicalNet();
+                for (EDIFCellInst inst : top.getCellInsts()) {
+                    EDIFPort port = inst.getPort(ab.getClockName());
+                    if (port != null) {
+                        logClkNet.createPortInst(port, inst);
+                    }
+                }
+            }
+
+            // Port up unconnected inputs
+            for (EDIFPort topPort : modules.get(0).getNetlist().getTopCell().getPorts()) {
+                if (topPort.isInput()) {
+                    if (top.getPort(topPort.getName()) == null) {
+                        EDIFPort port = top.createPort(topPort);
+                        if (port.isBus()) {
+                            for (int j = 0; j < port.getWidth(); j++) {
+                                EDIFNet net = top.createNet(port.getPortInstNameFromPort(j));
+                                net.createPortInst(port, j);
+                                for (ModuleInst mi : array.getModuleInsts()) {
+                                    net.createPortInst(port, j, mi.getCellInst());
+                                }
+                            }
+                        } else {
+                            EDIFNet net = top.createNet(port.getName());
+                            net.createPortInst(port);
+                            for (ModuleInst mi : array.getModuleInsts()) {
+                                net.createPortInst(port, mi.getCellInst());
+                            }
+                        }
+                    }
+                }
+            }
+
+            PerformanceExplorer.updateClockPeriodConstraint(array, ab.getClockName(), ab.getClockPeriod());
+            array.setDesignOutOfContext(true);
+            array.setAutoIOBuffers(false);
+        }
+
         array.getNetlist().consolidateAllToWorkLibrary();
         t.stop().start("Write DCP");
-        array.writeCheckpoint("array.dcp", CodePerfTracker.SILENT);
+        array.writeCheckpoint(ab.getOutputName(), CodePerfTracker.SILENT);
         t.stop().printSummary();
+    }
+
+    public static Cell createBUFGCE(Design design, EDIFCell parent, String name, Site location) {
+        Cell bufgce = design.createAndPlaceCell(parent, name, Unisim.BUFGCE, location, location.getBEL("BUFCE"));
+
+        bufgce.addProperty("CE_TYPE", "ASYNC", EDIFValueType.STRING);
+
+        // Ensure a VCC cell source in the current cell
+        EDIFTools.getStaticNet(NetType.VCC, parent, design.getNetlist());
+
+        bufgce.getSiteInst().addSitePIP("CEINV", "CE_PREINV");
+        bufgce.getSiteInst().addSitePIP("IINV", "I_PREINV");
+
+        if (design.getSeries() == Series.Versal) {
+            BEL ceinv = bufgce.getSite().getBEL("CEINV");
+            bufgce.getSiteInst().routeIntraSiteNet(design.getVccNet(), ceinv.getPin("CE"), ceinv.getPin("CE_PREINV"));
+            design.getVccNet().addPin(new SitePinInst(false, "CE", bufgce.getSiteInst()));
+        } else if (design.getSeries() == Series.UltraScalePlus) {
+            // TODO
+        }
+        // Remove CE:VCC entry for CE:CE
+        bufgce.removePinMapping("CE");
+        bufgce.addPinMapping("CE", "CE");
+
+        return bufgce;
+    }
+
+    private static boolean straddlesClockRegion(ModuleInst mi) {
+        ClockRegion cr = mi.getAnchor().getSite().getClockRegion();
+        for (SiteInst si : mi.getSiteInsts()) {
+            if (si.getSite().getClockRegion() != cr) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean straddlesClockRegionOrRCLK(ModuleInst mi) {
+        ClockRegion cr = mi.getAnchor().getSite().getClockRegion();
+        int centerRow = getRCLKRowIndex(cr);
+        boolean inTop = false;
+        boolean inBot = false;
+        for (SiteInst si : mi.getSiteInsts()) {
+            inTop |= si.getTile().getRow() > centerRow;
+            inBot |= si.getTile().getRow() < centerRow;
+            if ((inTop && inBot) || si.getSite().getClockRegion() != cr) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static int getRCLKRowIndex(ClockRegion cr) {
+        Tile center = cr.getApproximateCenter();
+        int searchGridDim = 0;
+        outer: while (!center.getName().startsWith("RCLK_")) {
+            searchGridDim++;
+            for (int row = -searchGridDim; row < searchGridDim; row++) {
+                for (int col = -searchGridDim; col < searchGridDim; col++) {
+                    Tile neighbor = center.getTileNeighbor(col, row);
+                    if (neighbor != null) {
+                        neighbor.getName().startsWith("RCLK_");
+                        center = neighbor;
+                        break outer;
+                    }
+                }
+            }
+        }
+        return center.getRow();
     }
 }

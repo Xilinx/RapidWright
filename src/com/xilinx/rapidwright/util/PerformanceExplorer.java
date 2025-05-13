@@ -316,6 +316,25 @@ public class PerformanceExplorer {
         return lines;
     }
 
+    public static void updateClockPeriodConstraint(Design design, String clkName, double period) {
+        // Update clock period constraint
+        boolean foundExistingConstraint = false;
+        for (ConstraintGroup g : ConstraintGroup.values()) {
+            List<String> xdcList = design.getXDCConstraints(g);
+            for (int i = 0; i < xdcList.size(); i++) {
+                String xdc = xdcList.get(i);
+                if (xdc.contains("create_clock")
+                        && (xdc.contains("-name " + clkName) || xdc.contains("[get_ports " + clkName + "]"))) {
+                    // TODO This may overwrite other existing options
+                    xdcList.set(i, "create_clock -period " + period + " [get_ports " + clkName + "]");
+                    foundExistingConstraint = true;
+                }
+            }
+        }
+        if (!foundExistingConstraint) {
+            design.addXDCConstraint("create_clock -period " + period + " [get_ports " + clkName + "]");
+        }
+    }
 
     public void explorePerformance() {
         if (vivadoPath.equals(DEFAULT_VIVADO) && !FileTools.isVivadoOnPath()) {
@@ -326,16 +345,7 @@ public class PerformanceExplorer {
         FileTools.makeDirs(runDirectory);
         runDirectory = new File(runDirectory).getAbsolutePath();
         String dcpName = runDirectory + File.separator + INITIAL_DCP_NAME;
-        // Update clock period constraint
-        for (ConstraintGroup g : ConstraintGroup.values()) {
-            List<String> xdcList = design.getXDCConstraints(g);
-            for (int i=0; i < xdcList.size(); i++) {
-                String xdc = xdcList.get(i);
-                if (xdc.contains("create_clock") && xdc.contains("-name " + clkName)) {
-                    // TODO - For now, user will need to update DCP beforehand
-                }
-            }
-        }
+        updateClockPeriodConstraint(design, getClkName(), getTargetPeriod());
 
         design.writeCheckpoint(dcpName);
         JobQueue jobs = new JobQueue();
