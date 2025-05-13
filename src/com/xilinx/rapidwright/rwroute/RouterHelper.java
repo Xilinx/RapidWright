@@ -422,7 +422,7 @@ public class RouterHelper {
                     EDIFHierNet ehn = ehpi.getHierarchicalNet();
                     EDIFHierNet parentEhn = netlist.getParentNet(ehn);
                     if (parentEhn == null || !parentEhn.getNet().isGND()) {
-                        // Unable to be confirm (e.g. due to a partially encrypted design) that this
+                        // Unable to be sure (e.g. due to a partially encrypted design) that this
                         // pin is also logically connected to GND
                         continue nextSitePin;
                     }
