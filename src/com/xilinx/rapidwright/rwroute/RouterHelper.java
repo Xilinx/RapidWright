@@ -431,7 +431,7 @@ public class RouterHelper {
                     if (cellBelPin == null) {
                         cellBelPin = cell.getBELPin(ehpi);
                     } else {
-                        assert(cellBelPin == cell.getBELPin(ehpi));
+                        assert(cellBelPin.getSiteWireIndex() == cell.getBELPin(ehpi).getSiteWireIndex());
                     }
                 }
 
