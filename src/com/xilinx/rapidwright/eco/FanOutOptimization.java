@@ -61,7 +61,6 @@ public class FanOutOptimization {
         }
         Point centroid = KMeans.calculateCentroid(points);
         Tile centroidTile = net.getSourceTile().getDevice().getTile(centroid.y, centroid.x);
-        System.out.println(centroidTile);
 
         // We need to snap to the closest site with the site type of interest from the
         // centroid tile
