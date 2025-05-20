@@ -201,7 +201,8 @@ public class ECOPlacementHelper {
                     }
                 }
 
-                // Check that CE and SR are VCC and GND respectively
+                // Check that CE and SR are already connected to the
+                // required nets (if null, to VCC and GND respectively)
                 Pair<String, String> p = belTypeSitePinNameMapping.get(belFlop);
                 Net existingCE = siteInst.getNetFromSiteWire(p.getFirst());
                 if (existingCE != null) {
