@@ -1,7 +1,7 @@
 /*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
  * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -348,14 +348,13 @@ public class Utils{
                 TileTypeEnum.LAGUNA_TILE    // UltraScale
         );
 
-        clocking = EnumSet.of(
-                TileTypeEnum.RCLK_CLEM_CLKBUF_L,
-                TileTypeEnum.CMT_L,
-                // Versal
-                TileTypeEnum.CLK_REBUF_BUFGS_HSR_CORE,
-                TileTypeEnum.CLK_PLL_AND_PHY,
-                TileTypeEnum.CMT_MMCM
-        );
+        clocking = EnumSet.noneOf(TileTypeEnum.class);
+        for (TileTypeEnum type : TileTypeEnum.values()) {
+            String typeName = type.toString();
+            if (typeName.startsWith("CMT_") || typeName.startsWith("CLK_") || typeName.startsWith("RCLK_")) {
+                clocking.add(type);
+            }
+        }
 
         lockedSiteTypes = EnumSet.of(
             SiteTypeEnum.CONFIG_SITE,
