@@ -150,8 +150,6 @@ public class ECOPlacementHelper {
     /**
      * Given a SiteInst and a clock net, find an unused flop BEL that can host a new cell.
      * This flop BEL will have its bypass pin ([A-H](X|_I)) available.
-     * Assumes that CE and SR of flop to be placed is going to be held at VCC and GND
-     * respectively.
      *
      * @param siteInst SiteInst object to search inside.
      * @param clk      Desired clock net for flop cell.
