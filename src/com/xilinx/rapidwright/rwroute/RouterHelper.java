@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -46,6 +46,7 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.tools.LUTTools;
@@ -59,6 +60,12 @@ import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
@@ -350,6 +357,7 @@ public class RouterHelper {
         final boolean isVersal = (design.getSeries() == Series.Versal);
         final Net gndNet = design.getGndNet();
         final Net vccNet = design.getVccNet();
+        final EDIFNetlist netlist = design.getNetlist();
         Set<SitePinInst> toInvertPins = new HashSet<>();
         nextSitePin: for (SitePinInst spi : pins) {
             if (!spi.getNet().equals(gndNet))
@@ -387,6 +395,9 @@ public class RouterHelper {
                     }
                     throw new RuntimeException("ERROR: " + gndNet.getName() + " not connected to any Cells");
                 }
+
+                String physicalPinName = "A" + spi.getName().charAt(1);
+                BELPin cellBelPin = null;
                 for (Cell cell : connectedCells) {
                     if (!LUTTools.isCellALUT(cell)) {
                         continue nextSitePin;
@@ -405,16 +416,31 @@ public class RouterHelper {
                         // Thus, LUT6/LUT5 inside expanded LUT6_2 macros are not eligible for inversion.
                         continue nextSitePin;
                     }
+
+                    // Check the logical pin connection
+                    String logicalPinName = cell.getLogicalPinMapping(physicalPinName);
+                    EDIFHierPortInst ehpi = ehci.getPortInst(logicalPinName);
+                    EDIFHierNet ehn = ehpi.getHierarchicalNet();
+                    EDIFHierNet parentEhn = netlist.getParentNet(ehn);
+                    if (parentEhn == null || !parentEhn.getNet().isGND()) {
+                        // Unable to be sure (e.g. due to a partially encrypted design) that this
+                        // pin is also logically connected to GND
+                        continue nextSitePin;
+                    }
+
+                    if (cellBelPin == null) {
+                        cellBelPin = cell.getBELPin(ehpi);
+                    } else {
+                        assert(cellBelPin.getSiteWireIndex() == cell.getBELPin(ehpi).getSiteWireIndex());
+                    }
                 }
 
                 toInvertPins.add(spi);
                 // Re-paint the intra-site routing from GND to VCC
                 // (no intra site routing will occur during Net.addPin() later)
-                si.routeIntraSiteNet(vccNet, spi.getBELPin(), spi.getBELPin());
+                si.routeIntraSiteNet(vccNet, spi.getBELPin(), cellBelPin);
 
                 for (Cell cell : connectedCells) {
-                    // Find the logical pin name
-                    String physicalPinName = "A" + spi.getName().charAt(1);
                     String logicalPinName = cell.getLogicalPinMapping(physicalPinName);
 
                     // Get the LUT equation
@@ -427,6 +453,15 @@ public class RouterHelper {
                             // (Note: LUTTools.getLUTEquation() only produces equations with '!' instead of '~')
                             .replace("!!", "");
                     LUTTools.configureLUT(cell, newLutEquation);
+
+                    // Change the logical pin connection
+                    EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
+                    EDIFHierPortInst ehpi = ehci.getPortInst(logicalPinName);
+                    EDIFPortInst epi = ehpi.getPortInst();
+                    epi.getNet().removePortInst(epi);
+
+                    EDIFNet const1 = EDIFTools.getStaticNet(NetType.VCC, ehci.getParent().getCellType(), netlist);
+                    const1.addPortInst(epi);
                 }
             } else {
                 BELPin[] belPins = si.getSiteWirePins(siteWireName);
