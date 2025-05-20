@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -546,5 +546,11 @@ public class TestDesign {
             String physPin = myCell.getPhysicalPinMapping(logPin);
             Assertions.assertEquals(logPin, myCell.getLogicalPinMapping(physPin));
         }
+    }
+
+    @Test
+    public void testRouteSites() {
+        Design d = RapidWrightDCP.loadDCP("bug780.dcp");
+        d.routeSites();
     }
 }
