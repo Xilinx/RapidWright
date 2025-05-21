@@ -82,7 +82,6 @@ public class DesignObfuscator {
         dontObfuscate.add(Net.VCC_NET);
         dontObfuscate.add(Net.USED_NET);
         dontObfuscate.add(Net.Z_NET);
-        dontObfuscate.add("ap_clk");
     }
 
     public String hash(String name) {
