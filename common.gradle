@@ -125,7 +125,7 @@ tasks.withType(Test) {
 }
 
 task testJar(type: Jar) {
-    classifier = 'tests'
+    archiveClassifier = 'tests'
     from sourceSets.test.output
     dependsOn project.tasks.findByName('testFixturesJar')
     dependsOn project.tasks.findByName('jar')
