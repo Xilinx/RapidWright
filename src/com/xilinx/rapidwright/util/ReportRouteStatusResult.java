@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Zak Nafziger, Advanced Micro Devices, Inc.
@@ -33,6 +33,8 @@ public class ReportRouteStatusResult {
     public int netsWithNoLoads;
     public int implicitlyRoutedPorts;
     public int routableNets;
+    public int netsWithFixedRouting;
+    public int netsWithExplicitGaps;
     public int unroutedNets;
     public int fullyRoutedNets;
     public int netsWithNoDriver;
@@ -67,6 +69,8 @@ public class ReportRouteStatusResult {
         netsWithNoLoads = parseLog(log, "# of nets with no loads");
         implicitlyRoutedPorts = parseLog(log, "# of implicitly routed ports");
         routableNets = parseLog(log, "# of routable nets");
+        netsWithFixedRouting = parseLog(log, "# of nets with fixed routing");
+        netsWithExplicitGaps = parseLog(log, "# of nets with explicit gaps");
         unroutedNets = parseLog(log, "# of unrouted nets");
         fullyRoutedNets = parseLog(log, "# of fully routed nets");
         netsWithNoDriver = parseLog(log, "# of nets with no driver");
@@ -103,6 +107,12 @@ public class ReportRouteStatusResult {
             sb.append(String.format("           # of implicitly routed ports....... : %11d :\n", implicitlyRoutedPorts));
         }
         sb.append(String.format("       # of routable nets..................... : %11d :\n", routableNets));
+        if (netsWithFixedRouting > 0) {
+            sb.append(String.format("           # of nets with fixed routing....... : %11d :\n", netsWithFixedRouting));
+        }
+        if (netsWithExplicitGaps > 0) {
+            sb.append(String.format("           # of nets with explicit gaps....... : %11d :\n", netsWithExplicitGaps));
+        }
         if (unroutedNets > 0) {
             sb.append(String.format("           # of unrouted nets................. : %11d :\n", unroutedNets));
         }
