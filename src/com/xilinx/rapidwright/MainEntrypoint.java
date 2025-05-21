@@ -37,6 +37,7 @@ import com.xilinx.rapidwright.design.blocks.ImplGuide;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockGenerator;
 import com.xilinx.rapidwright.design.merge.MergeDesigns;
+import com.xilinx.rapidwright.design.tools.ArrayBuilder;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.design.tools.RelocationTools;
 import com.xilinx.rapidwright.device.IntentCode;
@@ -125,6 +126,7 @@ public class MainEntrypoint {
 
     static {
         addFunction("AddSubGenerator", AddSubGenerator::main);
+        addFunction("ArrayBuilder", ArrayBuilder::main);
         addFunction("BlockCreator", BlockCreator::main);
         addFunction("BlockStitcher", BlockStitcher::main);
         addFunction("BlockUpdater", BlockUpdater::main);
