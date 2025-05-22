@@ -11,7 +11,12 @@ plugins {
 
 apply from: 'common.gradle'
 
-mainClassName = "com.xilinx.rapidwright.MainEntrypoint"
+def mainEntrypointClassName = "com.xilinx.rapidwright.MainEntrypoint"
+
+application {
+    mainClass = mainEntrypointClassName
+}
+
 def standaloneClassName = "com.xilinx.rapidwright.StandaloneEntrypoint"
 def preserveDir = ".preserveBin"
 
@@ -88,9 +93,9 @@ run.dependsOn(restoreScripts)
 
 task mainJar(type: Jar, dependsOn: classes) {
     archiveBaseName = 'main'
-    from sourceSets.main.output include mainClassName
+    from sourceSets.main.output include mainEntrypointClassName
     manifest {
-        attributes 'Main-Class': mainClassName
+        attributes 'Main-Class': mainEntrypointClassName
         attributes 'Class-Path': ([destinationDirectory.get().getAsFile().toPath().relativize(sourceSets.main.java.destinationDirectory.get().getAsFile().toPath()).toString() + File.separator]
             + configurations.implementation.collect { destinationDirectory.get().getAsFile().toPath().relativize(projectDir.toPath()).resolve('jars').resolve(it.getName()) }).join(' ')
     }
