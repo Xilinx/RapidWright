@@ -1209,9 +1209,9 @@ public class ECOTools {
      * @return The refactored cell instance.
      */
     public static EDIFHierCellInst refactorCell(Design design, EDIFHierCellInst cell, EDIFHierCellInst newParent) {
-        // TODO - Support non-leaf cells
-        if (!cell.getCellType().isLeafCellOrBlackBox()) {
-            throw new RuntimeException("ERROR: cell refactor of a hierarchical cell not yet supported: " + cell);
+        // TODO - Support non-leaf cells in implemented contexts
+        if (!cell.getCellType().isLeafCellOrBlackBox() && design.getSiteInsts().size() > 0) {
+            throw new RuntimeException("ERROR: Refactor of a non-leaf cell in a placed/routed design not yet supported: " + cell);
         }
         EDIFHierCellInst currParent = cell.getParent();
         if (currParent.equals(newParent)) {
