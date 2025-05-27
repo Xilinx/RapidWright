@@ -532,8 +532,9 @@ public class EDIFTools {
             EDIFHierCellInst hierParentInst = hierPortInst.getHierarchicalInst();
             EDIFNet currNet = hierPortInst.getNet();
             if (currNet == null && !(hierParentInst.equals(commonAncestor) && hierPortInst == snk)) {
-                // The snk pin is not connected to a net, let's start with the common ancestor
-                // and search downward
+                // When operating on the snk pin, we've found that it is not connected to a net.  Instead of trying to
+                // connect through the hierarchy starting at the snk, start from the common ancestor and leverage
+                // as much existing connectivity as possible.
                 List<EDIFCellInst> sinkHier = snk.getFullHierarchicalInst().getFullHierarchy();
                 boolean foundPath = false;
                 do {
