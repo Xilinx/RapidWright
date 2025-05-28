@@ -29,6 +29,8 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
 
+import com.xilinx.rapidwright.util.ReportRouteStatusResult;
+import com.xilinx.rapidwright.util.VivadoTools;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -549,8 +551,14 @@ public class TestDesign {
     }
 
     @Test
-    public void testRouteSites() {
+    public void testRouteSites(@TempDir Path tempDir) {
         Design d = RapidWrightDCP.loadDCP("bug780.dcp");
+        d.unrouteSites();
         d.routeSites();
+        if (FileTools.isVivadoOnPath()) {
+            ReportRouteStatusResult rrs = VivadoTools.routeDesignAndGetStatus(d, tempDir);
+            Assertions.assertTrue(rrs.isFullyRouted());
+            Assertions.assertTrue(rrs.routableNets > 0);
+        }
     }
 }
