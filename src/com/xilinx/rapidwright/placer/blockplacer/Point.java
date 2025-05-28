@@ -44,6 +44,10 @@ public class Point implements Comparable<Point> {
         this.y = tile.getTileYCoordinate();
     }
 
+    public int getManhattanDistance(Point p) {
+        return Math.abs(this.x - p.x) + Math.abs(this.y - p.y);
+    }
+
     @Override
     public int compareTo(Point point) {
         if ((this.x - point.x) == 0)
