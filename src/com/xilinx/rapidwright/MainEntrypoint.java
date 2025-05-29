@@ -44,6 +44,7 @@ import com.xilinx.rapidwright.device.PseudoPIPHelper;
 import com.xilinx.rapidwright.device.browser.DeviceBrowser;
 import com.xilinx.rapidwright.device.browser.PBlockGenDebugger;
 import com.xilinx.rapidwright.device.helper.TileColumnPattern;
+import com.xilinx.rapidwright.eco.FanOutOptimization;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFParser;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
@@ -149,6 +150,7 @@ public class MainEntrypoint {
         addFunction("EDIFTools", EDIFTools::main);
         addFunction("EnumerateCellBelMapping", EnumerateCellBelMapping::main);
         addFunction("ExampleNetlistCreation", ExampleNetlistCreation::main);
+        addFunction("FanOutOptimization", FanOutOptimization::main);
         addFunction("FileTools", FileTools::main);
         addFunction("GenerateInterchangeDevices", GenerateInterchangeDevices::main);
         addFunction("HandPlacer", HandPlacer::main);

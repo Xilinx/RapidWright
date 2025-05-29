@@ -1,3 +1,36 @@
+============= RapidWright 2024.2.3-beta released on 2025-5-29 ================
+Notes: 
+  - Add testcase for #780 (Design.routeSites()) (#1191)
+  - Post-route fanout optimization (#1178)
+  - Updating Gradle to support Java 21 (#1197)
+  - [RouterHelper] getPIPsFromNodes() to propagate locked state (#1189)
+  - Modify API to enable netlist regrouping on non-implemented netlists (#1199)
+  - [EDIFTools] Enables downward hierarchy traversal when connecting logical nets (#1180)
+  - [RouterHelper] Invert logical connection of LUT input pins (#1176)
+  - [Utils] isClocking() to recognize all {CMT,CLK,RCLK}_* tile types (#1190)
+  - [ModuleInst] Connect port to GND or VCC (#1182)
+  - [MakeBlackBox] Fixes for unplaced designs (#1164)
+  - [EDIFTools] uniqueifyNetlist() to use hier paths to cells (#1181)
+  - LUT1 Insertion Tool (for DFX/Abstract Shell designs) (#1174)
+  - Add option for DFX bitstreams (#1179)
+  - [DesignTools] updatePinIsRouted() to handle routing loops (#1185)
+  - [EDIFTools] UniqueifyNetlist() to reset parent net map (#1175)
+  - [DesignTools] getAllRoutedSitePinsFromPhysicalPin() fix (#1173)
+  - [NetTools] Recognize BUFGCE_HDIO as a clock src site (#1172)
+  - Adds option to preserve routing upon populateBlackBox() (#1171)
+  - [ReportRouteStatusResult] Parse # of fixed/explicit gap net (#1166)
+  - [Actions] Update test-rapidwright-wrapper to setup-java@v4 (#1167)
+  - [ECOTools] Refactor cell from one hier to another (#1159)
+  - modify affiliation, revise input argv, and rename class name (#1162)
+  - [CodeGenerator] Creates Java Code to Construct a Test Design With a Single Example SiteInst (#1160)
+  - Net.connect() Improvements - Better support for hierarchy and connecting to GND/VCC
+  - Fixes two issues related to reproducing routing in DCPs
+  - Fix roundtrip DCP routing issue related to partially routed clock net with gap routing
+
+API Additions:
+  - com.xilinx.rapidwright.design.Design "public List<PartitionPin> getPartitionPins(Net net)"
+  - com.xilinx.rapidwright.design.Design "public Net getNetFromPartitionPin(PartitionPin p)"
+
 ============= RapidWright 2024.2.2-beta released on 2025-3-25 ================
 Notes: 
   - [DesignTools] Fix routethru corner case in fullyUnplaceCellHelper() (#1157)
