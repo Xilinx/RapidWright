@@ -2281,7 +2281,7 @@ public class DesignTools {
                             parentEhn = netlist.getParentNet(net.getLogicalHierNet());
                         }
                         EDIFHierNet parentSiteWireEhn = netlist.getParentNet(siteWireNet.getLogicalHierNet());
-                        if (!parentSiteWireEhn.equals(parentEhn)) {
+                        if (parentSiteWireEhn != null && !parentSiteWireEhn.equals(parentEhn)) {
                             // Site wire net is not an alias of the net
                             throw new RuntimeException("ERROR: Net on " + si.getSiteName() + "/" + belPin +
                                     "'" + siteWireNet.getName() + "' is not an alias of " +
@@ -2349,7 +2349,7 @@ public class DesignTools {
         Set<String> siteWires = new HashSet<>(inst.getSiteWiresFromNet(net));
         if (net.isGNDNet()) {
             // Since GND sitewires may be inverted for easier routing, also accept VCC sitewires
-            siteWires.addAll(inst.getSiteWiresFromNet(net.getDesign().getVccNet()));
+            siteWires.addAll(inst.getSiteWiresFromNet(cell.getSiteInst().getDesign().getVccNet()));
         }
         Queue<BELPin> queue = new LinkedList<>();
         queue.add(cell.getBEL().getPin(belPinName));
