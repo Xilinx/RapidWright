@@ -294,6 +294,9 @@ public class RouterHelper {
                 pip.setIsPIPFixed(true);
             }
             if (pip != null) {
+                if (load.isArcLocked()) {
+                    pip.setIsPIPFixed(true);
+                }
                 connectionPIPs.add(pip);
             } else {
                 System.err.println("ERROR: Null PIP connecting these two nodes: " + driver+ ", " + load);
@@ -400,6 +403,7 @@ public class RouterHelper {
                 }
 
                 String physicalPinName = "A" + spi.getName().charAt(1);
+                BELPin cellBelPin = null;
                 for (Cell cell : connectedCells) {
                     if (!LUTTools.isCellALUT(cell)) {
                         continue nextSitePin;
@@ -425,16 +429,22 @@ public class RouterHelper {
                     EDIFHierNet ehn = ehpi.getHierarchicalNet();
                     EDIFHierNet parentEhn = netlist.getParentNet(ehn);
                     if (parentEhn == null || !parentEhn.getNet().isGND()) {
-                        // Unable to be confirm (e.g. due to a partially encrypted design) that this
+                        // Unable to be sure (e.g. due to a partially encrypted design) that this
                         // pin is also logically connected to GND
                         continue nextSitePin;
+                    }
+
+                    if (cellBelPin == null) {
+                        cellBelPin = cell.getBELPin(ehpi);
+                    } else {
+                        assert(cellBelPin.getSiteWireIndex() == cell.getBELPin(ehpi).getSiteWireIndex());
                     }
                 }
 
                 toInvertPins.add(spi);
                 // Re-paint the intra-site routing from GND to VCC
                 // (no intra site routing will occur during Net.addPin() later)
-                si.routeIntraSiteNet(vccNet, spi.getBELPin(), spi.getBELPin());
+                si.routeIntraSiteNet(vccNet, spi.getBELPin(), cellBelPin);
 
                 for (Cell cell : connectedCells) {
                     String logicalPinName = cell.getLogicalPinMapping(physicalPinName);
