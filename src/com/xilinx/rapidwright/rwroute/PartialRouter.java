@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -406,6 +406,9 @@ public class PartialRouter extends RWRoute {
 
                     RouteNode rstart = routingGraph.getOrCreate(start);
                     RouteNode rend = routingGraph.getOrCreate(end);
+                    if (pip.isPIPFixed()) {
+                        rend.setArcLocked(true);
+                    }
                     assert(rend.getPrev() == null);
                     rend.setPrev(rstart);
                 }
@@ -559,14 +562,20 @@ public class PartialRouter extends RWRoute {
 
                 // Since net already exists, all the nodes it uses must already
                 // have been created
+                RouteNode rend = routingGraph.getNode(end);
+                assert(rend != null);
+                if (pip.isPIPFixed()) {
+                    // Do not unpreserve locked nodes
+                    assert(rend.isArcLocked());
+                    continue;
+                }
+
                 RouteNode rstart = routingGraph.getNode(start);
                 assert(rstart != null);
                 boolean rstartAdded = rnodes.add(rstart);
                 boolean startPreserved = routingGraph.unpreserve(start);
                 assert(rstartAdded == startPreserved);
 
-                RouteNode rend = routingGraph.getNode(end);
-                assert(rend != null);
                 boolean rendAdded = rnodes.add(rend);
                 boolean endPreserved = routingGraph.unpreserve(end);
                 assert(rendAdded == endPreserved);
@@ -587,6 +596,13 @@ public class PartialRouter extends RWRoute {
                 // e.g. those that leave the INT tile, since we project pins to their INT tile
                 if (RouteNodeGraph.isExcludedTile(end))
                     continue;
+
+                if (pip.isPIPFixed()) {
+                    // Do not unpreserve locked nodes
+                    RouteNode rend = routingGraph.getNode(end);
+                    assert(rend == null);
+                    continue;
+                }
 
                 boolean startPreserved = routingGraph.unpreserve(start);
                 boolean endPreserved = routingGraph.unpreserve(end);
