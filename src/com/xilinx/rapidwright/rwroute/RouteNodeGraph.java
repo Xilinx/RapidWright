@@ -415,12 +415,14 @@ public class RouteNodeGraph {
 
         presentCongestionCosts = new float[MAX_OCCUPANCY];
 
-        // HARDCODED FOR FCCM'25 DEMO
-        // =========================
-        PBlock pblock = new PBlock(design.getDevice(), "SLICE_X0Y0:SLICE_X60Y119");
-        allowedTiles = Collections.newSetFromMap(new IdentityHashMap<>());
-        allowedTiles.addAll(pblock.getAllTiles());
-        // =========================
+        String pblockString = config.getPBlock();
+        if (pblockString != null) {
+            PBlock pblock = new PBlock(design.getDevice(), "SLICE_X0Y0:SLICE_X60Y119");
+            allowedTiles = Collections.newSetFromMap(new IdentityHashMap<>());
+            allowedTiles.addAll(pblock.getAllTiles());
+        } else {
+            allowedTiles = Collections.emptySet();
+        }
     }
 
     public void initialize() {
@@ -585,6 +587,10 @@ public class RouteNodeGraph {
         return !allowedTileEnums.contains(tileType);
     }
 
+    public boolean isAllowedTile(Node child) {
+        return allowedTiles.contains(child.getTile());
+    }
+
     protected boolean isExcluded(RouteNode parent, Node child) {
         if (isPreserved(child)) {
             return true;
@@ -594,9 +600,7 @@ public class RouteNodeGraph {
             if (!allowRoutethru(parent, child)) {
                 return true;
             }
-        }
-
-        if (!allowedTiles.contains(child.getTile())) {
+        } else if (!isAllowedTile(child)) {
             return true;
         }
 

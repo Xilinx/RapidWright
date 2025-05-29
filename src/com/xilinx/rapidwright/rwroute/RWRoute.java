@@ -532,7 +532,13 @@ public class RWRoute {
                 // already routed to and preserved at those uninferrable SitePinInst-s -- and remove them from being a
                 // static net sink
                 pins.removeIf(spi -> {
-                    Net preservedNet = routingGraph.getPreservedNet(spi.getConnectedNode());
+                    Node node = spi.getConnectedNode();
+                    if (!routingGraph.isAllowedTile(node)) {
+                        // If sink is not in an allowed tile (e.g. outside routing PBlock) drop it silently
+                        return true;
+                    }
+
+                    Net preservedNet = routingGraph.getPreservedNet(node);
                     if (preservedNet == null) {
                         // This sink is not preserved by any net, allow
                         return false;
@@ -2120,6 +2126,8 @@ public class RWRoute {
         // Adds the source rnode to the queue
         RouteNode sourceRnode = connection.getSourceRnode();
         push(state, sourceRnode, 0, 0);
+
+        assert(routingGraph.isAllowedTile(connection.getSinkRnode()));
     }
 
     /**
