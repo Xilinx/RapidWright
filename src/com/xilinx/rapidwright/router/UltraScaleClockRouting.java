@@ -572,10 +572,8 @@ public class UltraScaleClockRouting {
         Map<ClockRegion,Set<RouteNode>> startingPoints = new HashMap<>();
         Set<Node> vroutesUp = new HashSet<>();
         Set<Node> vroutesDown = new HashSet<>();
-        boolean gapArcFound = false;
         int centroidY = -1;
         for (PIP p : clkNet.getPIPs()) {
-            gapArcFound |= p.isGapArc();
             Node startNode = p.getStartNode();
             Node endNode = p.getEndNode();
             for (Node node : new Node[] {startNode, endNode}) {
@@ -591,7 +589,7 @@ public class UltraScaleClockRouting {
                                     .add(rn);
                         }
                     }
-                } else if (node == startNode && endNode != null && endNode.getIntentCode() == IntentCode.NODE_GLOBAL_VDISTR) {
+                } else if (node == startNode && endNode.getIntentCode() == IntentCode.NODE_GLOBAL_VDISTR) {
                     if (ic == IntentCode.NODE_GLOBAL_VROUTE || ic == IntentCode.NODE_GLOBAL_HROUTE) {
                         // Centroid lays where {HROUTE, VROUTE} -> VDISTR
                         assert(centroidY == -1);
@@ -695,21 +693,8 @@ public class UltraScaleClockRouting {
         // Last mile routing from LCBs to SLICEs
         UltraScaleClockRouting.routeLCBsToSinks(clkNet, lcbMappings, getNodeStatus);
 
-        // Remove duplicates and any gap arcs corresponding to routed pins
-        Set<PIP> uniquePIPs = new HashSet<>();
-        Set<Node> clkPinNodes = (gapArcFound) ? new HashSet<>() : null;
-        if (clkPinNodes != null) {
-            for (SitePinInst spi : clkPins) {
-                clkPinNodes.add(spi.getConnectedNode());
-            }
-        }
-        clkNet.getPIPs().removeIf(pip -> {
-            if (clkPinNodes != null && pip.isGapArc()) {
-                if (clkPinNodes.contains(pip.getStartNode())) {
-                    return true;
-                }
-            }
-            return !uniquePIPs.add(pip);
-        });
+        // Remove duplicates
+        Set<PIP> uniquePIPs = new HashSet<>(clkNet.getPIPs());
+        clkNet.setPIPs(uniquePIPs);
     }
 }
