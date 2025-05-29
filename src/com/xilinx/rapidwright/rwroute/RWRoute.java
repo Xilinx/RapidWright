@@ -1582,7 +1582,7 @@ public class RWRoute {
             assert(net.getType() == NetType.WIRE && !NetTools.isGlobalClock(net));
 
             Set<PIP> newPIPs = new HashSet<>();
-            // Start by preserving all fixed PIPs
+            // Start by carrying over all fixed PIPs (even if they don't get used)
             for (PIP pip : net.getPIPs()) {
                 if (pip.isPIPFixed()) {
                     newPIPs.add(pip);
