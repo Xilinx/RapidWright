@@ -421,7 +421,7 @@ public class RouteNodeGraph {
             allowedTiles = Collections.newSetFromMap(new IdentityHashMap<>());
             allowedTiles.addAll(pblock.getAllTiles());
         } else {
-            allowedTiles = Collections.emptySet();
+            allowedTiles = null;
         }
     }
 
@@ -585,7 +585,7 @@ public class RouteNodeGraph {
     }
 
     public boolean isAllowedTile(Node child) {
-        return allowedTiles.contains(child.getTile());
+        return allowedTiles == null || allowedTiles.contains(child.getTile());
     }
 
     protected boolean isExcluded(RouteNode parent, Node child) {

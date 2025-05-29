@@ -422,6 +422,11 @@ public class RWRoute {
      * @return NodeStatus result.
      */
     protected NodeStatus getGlobalRoutingNodeStatus(Net net, Node node) {
+        if (!routingGraph.isAllowedTile(node)) {
+            // Outside of PBlock
+            return NodeStatus.UNAVAILABLE;
+        }
+
         Net preservedNet = routingGraph.getPreservedNet(node);
         if (preservedNet == net) {
             return NodeStatus.INUSE;
