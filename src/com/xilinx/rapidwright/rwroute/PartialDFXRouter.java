@@ -184,6 +184,21 @@ public class PartialDFXRouter extends PartialRouter {
     }
 
     @Override
+    protected boolean isValidSink(Connection connection, RouteNode rnode) {
+        if (super.isValidSink(connection, rnode)) {
+            return true;
+        }
+
+        RouteNode beginOfLockedPath = connectionToBeginRnodeOfLockedPathToSink.get(connection);
+        if (beginOfLockedPath == rnode) {
+            // This is the rnode of a locked path that does lead to this connection's sink
+            return true;
+        }
+
+        return false;
+    }
+
+    @Override
     protected boolean saveRouting(Connection connection, RouteNode rnode) {
         if (super.saveRouting(connection, rnode)) {
             return true;

@@ -1228,17 +1228,8 @@ public class RWRoute {
                     nodes.addAll(switchBoxToSink.subList(0, switchBoxToSink.size() - 1));
                 }
             } else {
-                if (connection.hasAltSinks()) {
-                    // Routing must go to an alternate sink
-                } else {
-                    // sinkRnode must be the begin of a locked path to the real sink
-                    RouteNode rnode = rnodes.get(0);
-                    assert(rnode.isArcLocked());
-
-                    // Check that walking back from the final sink following all locked arcs and check that we arrive at sinkRnode
-                    while ((rnode = rnode.getPrev()) != null && rnode.isArcLocked()) {}
-                    assert(rnode == sinkRnode);
-                }
+                // sinkRnode could be an alternate sink
+                assert(isValidSink(connection, sinkRnode));
 
                 // Assume that it doesn't need unprojecting back to the sink pin
                 // since the sink node is a site pin
@@ -1513,13 +1504,9 @@ public class RWRoute {
                 rnodes = rnodes.subList(1, rnodes.size() - 1);
             }
         } else {
+            // sinkRnode could be an alternate sink (in which case it is not exclusive)
+            assert(isValidSink(connection, sinkRnode));
             // Rip up all used nodes
-            assert(
-                    // Sink is not exclusive as there are alternates
-                    connection.getAltSinkRnodes().contains(sinkRnode) ||
-                    // Begin node of a locked path to a real sink
-                    sinkRnode.isArcLocked()
-            );
         }
 
         NetWrapper netWrapper = connection.getNetWrapper();
@@ -1549,13 +1536,9 @@ public class RWRoute {
                 rnodes = rnodes.subList(1, rnodes.size() - 1);
             }
         } else {
+            // sinkRnode could be an alternate sink (in which case it is not exclusive)
+            assert(isValidSink(connection, sinkRnode));
             // Increment all used nodes
-            assert(
-                    // Sink is not exclusive as there are alternates
-                    connection.getAltSinkRnodes().contains(sinkRnode) ||
-                    // Begin node of a locked path to a real sink
-                    sinkRnode.isArcLocked()
-            );
         }
 
         NetWrapper netWrapper = connection.getNetWrapper();
@@ -1582,7 +1565,7 @@ public class RWRoute {
             assert(net.getType() == NetType.WIRE && !NetTools.isGlobalClock(net));
 
             Set<PIP> newPIPs = new HashSet<>();
-            // Start by carrying over all fixed PIPs (even if they don't get used)
+            // Start by carrying over all fixed PIPs (even those that didn't get used)
             for (PIP pip : net.getPIPs()) {
                 if (pip.isPIPFixed()) {
                     newPIPs.add(pip);
@@ -1813,6 +1796,10 @@ public class RWRoute {
         }
     }
 
+    protected boolean isValidSink(Connection connection, RouteNode rnode) {
+        return connection.getSinkRnode() == rnode || connection.getAltSinkRnodes().contains(rnode);
+    }
+
     /**
      * Traces back for a connection from its sink rnode to its source, in order to build and store the routing path.
      * @param connection: The connection that is being routed.
@@ -1820,18 +1807,14 @@ public class RWRoute {
      * @return True if backtracking successful.
      */
     protected boolean saveRouting(Connection connection, RouteNode rnode) {
-        RouteNode sinkRnode = connection.getSinkRnode();
-        if (rnode != sinkRnode) {
-            List<RouteNode> altSinkRnodes = connection.getAltSinkRnodes();
-            if (!altSinkRnodes.contains(rnode) && !rnode.isArcLocked()) {
-                List<RouteNode> prevRouting = connection.getRnodes();
-                // Check that this is the sink path marked by prepareRouteConnection()
-                if (!connection.isRouted() || prevRouting.isEmpty() || !rnode.isTarget()) {
-                    throw new RuntimeException("Unexpected rnode to backtrack from: " + rnode);
-                }
-                // Backtrack from the sink used on that sink path
-                rnode = prevRouting.get(0);
+        if (!isValidSink(connection, rnode)) {
+            List<RouteNode> prevRouting = connection.getRnodes();
+            // Check that this is the sink path marked by prepareRouteConnection()
+            if (!connection.isRouted() || prevRouting.isEmpty() || !rnode.isTarget()) {
+                throw new RuntimeException("Unexpected rnode to backtrack from: " + rnode);
             }
+            // Backtrack from the sink used on that sink path
+            rnode = prevRouting.get(0);
         }
 
         connection.resetRoute();
@@ -2136,9 +2119,6 @@ public class RWRoute {
 
         // Adds the source rnode to the queue
         RouteNode sourceRnode = connection.getSourceRnode();
-        assert(sourceRnode.getPrev() == null ||
-                // End node of a locked path from source
-                sourceRnode.isArcLocked());
         push(state, sourceRnode, 0, 0);
     }
 
