@@ -253,8 +253,9 @@ public class PartialRouter extends RWRoute {
                     // Unpreserve blocking net
                     unpreserveNets.add(preservedNet);
                 } else {
+                    // Sink is exclusively preserved for the net to be routed
                     if (!connection.isRouted()) {
-                        // For same net on an unrouted connection => must be an inadvertently-preserved rnode of a
+                        // Connection is not routed though => must be an inadvertently-preserved rnode of a
                         // locked path; unpreserve it so that it is not excluded when building out the routing graph
                         assert(connectionToBeginRnodeOfLockedPathToSink.containsKey(connection));
                         RouteNode beginOfLockedPath = sinkRnode;
