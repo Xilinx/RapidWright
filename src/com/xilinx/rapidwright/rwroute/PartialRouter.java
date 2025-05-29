@@ -686,7 +686,7 @@ public class PartialRouter extends RWRoute {
     }
 
     /**
-     * Partially routes a {@link Design} instance; specifically, all nets with no routing PIPs already present.
+     * Partially routes all unrouted sinks in a {@link Design} instance; fully-routed sinks will have their routing preserved.
      * @param design The {@link Design} instance to be routed.
      * @param args An array of string arguments, can be null.
      * If null, the design will be routed in the full timing-driven routing mode with default a {@link RWRouteConfig} instance.
@@ -697,13 +697,13 @@ public class PartialRouter extends RWRoute {
         boolean softPreserve = false;
         List<SitePinInst> pinsToRoute = null;
 
-        // Instantiates a RWRouteConfig Object and parses the arguments.
         // Uses the default configuration if basic usage only.
         return routeDesignWithUserDefinedArguments(design, args, pinsToRoute, softPreserve);
     }
 
     /**
-     * Partially routes a {@link Design} instance; specifically, all nets with no routing PIPs already present.
+     * Partially routes all given sinks in a {@link Design} instance; fully-routed sinks will have their routing preserved
+     * if "softPreserve" is false, otherwise such sinks may be lazily-rerouted when attempting to route other congested sinks.
      * @param design The {@link Design} instance to be routed.
      * @param args An array of string arguments, can be null.
      * If null, the design will be routed in the full timing-driven routing mode with default a {@link RWRouteConfig} instance.
@@ -811,7 +811,8 @@ public class PartialRouter extends RWRoute {
     /**
      * The main interface of {@link PartialRouter} that reads in a {@link Design} checkpoint,
      * and parses the arguments for the {@link RWRouteConfig} object of the router.
-     * Specifically, all nets with no routing PIPs already present will be partially routed.
+     * Specifically, only unrouted sinks will be tackled; all routed sinks will have their routing preserved
+     * and not be re-routed.
      * @param args An array of strings that are used to create a {@link RWRouteConfig} object for the router.
      */
     public static void main(String[] args) {
