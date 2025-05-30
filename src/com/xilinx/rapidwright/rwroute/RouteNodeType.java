@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -31,6 +31,7 @@ public enum RouteNodeType {
     EXCLUSIVE_SINK_BOTH,
     EXCLUSIVE_SINK_EAST,
     EXCLUSIVE_SINK_WEST,
+    EXCLUSIVE_SINK_NON_LOCAL,
 
     /**
      * Denotes {@link RouteNode} objects that correspond to a super long line {@link Node},
@@ -62,11 +63,11 @@ public enum RouteNodeType {
     public static final RouteNodeType[] values = values();
 
     public boolean isAnyExclusiveSink() {
-        return this == EXCLUSIVE_SINK_BOTH || this == EXCLUSIVE_SINK_EAST || this == EXCLUSIVE_SINK_WEST;
+        return this == EXCLUSIVE_SINK_BOTH || this == EXCLUSIVE_SINK_EAST || this == EXCLUSIVE_SINK_WEST || this == EXCLUSIVE_SINK_NON_LOCAL;
     }
 
     public static boolean isAnyExclusiveSink(int ordinal) {
-        return ordinal == EXCLUSIVE_SINK_BOTH.ordinal() || ordinal == EXCLUSIVE_SINK_EAST.ordinal() || ordinal == EXCLUSIVE_SINK_WEST.ordinal();
+        return ordinal == EXCLUSIVE_SINK_BOTH.ordinal() || ordinal == EXCLUSIVE_SINK_EAST.ordinal() || ordinal == EXCLUSIVE_SINK_WEST.ordinal() || ordinal == EXCLUSIVE_SINK_NON_LOCAL.ordinal();
     }
 
     public boolean isAnyLocal() {

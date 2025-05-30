@@ -378,10 +378,14 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 (RouteNodeType.isAnyExclusiveSink(this.type) && type.isAnyLocal()) ||
                 // Or promotion from LOCAL to EXCLUSIVE_SINK (by PartialRouter when NODE_PINBOUNCE on
                 // a newly unpreserved net becomes a sink)
-                (RouteNodeType.isAnyLocal(this.type) && type.isAnyExclusiveSink())) ||
-                // Or promotion for any LOCAL to a LOCAL_RESERVED (by determineRoutingTargets()
-                // for uphills of CTRL sinks)
-                (RouteNodeType.isAnyLocal(this.type) && type == RouteNodeType.LOCAL_RESERVED);
+                (RouteNodeType.isAnyLocal(this.type) && type.isAnyExclusiveSink()) ||
+                // Or promotion for any LOCAL to a LOCAL_RESERVED (by determineRoutingTargets() for uphills of CTRL
+                // sinks, before any routing)
+                (RouteNodeType.isAnyLocal(this.type) && type == RouteNodeType.LOCAL_RESERVED && visited == 0) ||
+                // Or promotions to EXCLUSIVE_SINK_NON_LOCAL from NON_LOCAL (by PartialRouter.determineRoutingTargets()
+                // for the begin node of a locked path to sinks, before any routing)
+                (this.type == RouteNodeType.NON_LOCAL.ordinal() && type == RouteNodeType.EXCLUSIVE_SINK_NON_LOCAL && visited == 0)
+        );
         this.type = (byte) type.ordinal();
     }
 
