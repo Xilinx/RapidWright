@@ -1824,8 +1824,8 @@ public class DesignTools {
             SiteInst si = c.getSiteInst();
 
             // Check for VCC on A6 and remove if needed
-            if (c.getBEL().isLUT() && c.getBELName().endsWith("5LUT")) {
-                SitePinInst vcc = c.getSiteInst().getSitePinInst(c.getBELName().charAt(0) + "6");
+            if (bel != null && bel.isLUT() && bel.getName().endsWith("5LUT")) {
+                SitePinInst vcc = si.getSitePinInst(bel.getName().charAt(0) + "6");
                 if (vcc != null && vcc.getNet().getName().equals(Net.VCC_NET)) {
                     boolean hasOtherSink = false;
                     for (BELPin otherSink : si.getSiteWirePins(vcc.getBELPin().getSiteWireIndex())) {
@@ -1851,11 +1851,12 @@ public class DesignTools {
                     pinsToRemove.computeIfAbsent(pin.getNet(), $ -> new HashSet<>()).add(pin);
                 }
             }
-            touched.add(c.getSiteInst());
+            if (si != null) {
+                touched.add(si);
+            }
 
             c.unplace();
             d.removeCell(c.getName());
-            si.removeCell(bel);
         }
 
         t.stop().start("cleanup t-prims");
@@ -2280,7 +2281,7 @@ public class DesignTools {
                             parentEhn = netlist.getParentNet(net.getLogicalHierNet());
                         }
                         EDIFHierNet parentSiteWireEhn = netlist.getParentNet(siteWireNet.getLogicalHierNet());
-                        if (!parentSiteWireEhn.equals(parentEhn)) {
+                        if (parentSiteWireEhn != null && !parentSiteWireEhn.equals(parentEhn)) {
                             // Site wire net is not an alias of the net
                             throw new RuntimeException("ERROR: Net on " + si.getSiteName() + "/" + belPin +
                                     "'" + siteWireNet.getName() + "' is not an alias of " +
@@ -2348,7 +2349,7 @@ public class DesignTools {
         Set<String> siteWires = new HashSet<>(inst.getSiteWiresFromNet(net));
         if (net.isGNDNet()) {
             // Since GND sitewires may be inverted for easier routing, also accept VCC sitewires
-            siteWires.addAll(inst.getSiteWiresFromNet(net.getDesign().getVccNet()));
+            siteWires.addAll(inst.getSiteWiresFromNet(cell.getSiteInst().getDesign().getVccNet()));
         }
         Queue<BELPin> queue = new LinkedList<>();
         queue.add(cell.getBEL().getPin(belPinName));

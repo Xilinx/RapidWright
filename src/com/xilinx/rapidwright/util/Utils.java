@@ -61,7 +61,7 @@ public class Utils{
 
     private static Set<SiteTypeEnum> moduleSiteTypes;
 
-    private static Set<SiteTypeEnum> sliceTypes;
+    public static Set<SiteTypeEnum> sliceTypes;
 
     public static Set<SiteTypeEnum> dspTypes;
 
@@ -348,17 +348,13 @@ public class Utils{
                 TileTypeEnum.LAGUNA_TILE    // UltraScale
         );
 
-        clocking = EnumSet.of(
-                TileTypeEnum.CMT_L,
-                TileTypeEnum.RCLK_CLEM_L,
-                TileTypeEnum.RCLK_CLEM_CLKBUF_L,
-                TileTypeEnum.RCLK_DSP_INTF_L,
-                TileTypeEnum.RCLK_RCLK_XIPHY_INNER_FT,
-                // Versal
-                TileTypeEnum.CLK_REBUF_BUFGS_HSR_CORE,
-                TileTypeEnum.CLK_PLL_AND_PHY,
-                TileTypeEnum.CMT_MMCM
-        );
+        clocking = EnumSet.noneOf(TileTypeEnum.class);
+        for (TileTypeEnum type : TileTypeEnum.values()) {
+            String typeName = type.toString();
+            if (typeName.startsWith("CMT_") || typeName.startsWith("CLK_") || typeName.startsWith("RCLK_")) {
+                clocking.add(type);
+            }
+        }
 
         lockedSiteTypes = EnumSet.of(
             SiteTypeEnum.CONFIG_SITE,

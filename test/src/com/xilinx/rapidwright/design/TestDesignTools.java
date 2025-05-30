@@ -376,6 +376,39 @@ public class TestDesignTools {
         }
     }
 
+    @Test
+    public void testBlackBoxCreationUnplaced() {
+        Design design = RapidWrightDCP.loadDCP("bnn.dcp");
+        String hierCellName = "bd_0_i/hls_inst/inst/dmem_V_U";
+
+        design.unplaceDesign();
+
+        List<EDIFHierCellInst> leafCells = design.getNetlist().getAllLeafDescendants(hierCellName);
+        Set<String> cellsInBlackBox = new HashSet<>();
+        for (EDIFHierCellInst inst : leafCells) {
+            String name = inst.getFullHierarchicalInstName();
+            Cell cell = design.getCell(name);
+            if (cell != null) {
+                cellsInBlackBox.add(name);
+            }
+        }
+        Set<String> allOtherCells = new HashSet<>();
+        for (Cell cell : design.getCells()) {
+            if (cellsInBlackBox.contains(cell.getName()))
+                continue;
+            allOtherCells.add(cell.getName());
+        }
+
+        DesignTools.makeBlackBox(design, hierCellName);
+        Assertions.assertTrue(design.getNetlist().getCellInstFromHierName(hierCellName).isBlackBox());
+        for (String cellName : cellsInBlackBox) {
+            Assertions.assertNull(design.getCell(cellName));
+        }
+        for (String cellName : allOtherCells) {
+            Assertions.assertNotNull(design.getCell(cellName));
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"DX", "D_I"})
     public void testGetTrimmablePIPsFromPins(String pinName) {

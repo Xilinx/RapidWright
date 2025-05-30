@@ -532,9 +532,41 @@ public class EDIFTools {
             EDIFHierCellInst hierParentInst = hierPortInst.getHierarchicalInst();
             EDIFNet currNet = hierPortInst.getNet();
             if (currNet == null && !(hierParentInst.equals(commonAncestor) && hierPortInst == snk)) {
-                if (hierPortInst == src) createdSrcNet = true;
-                currNet = createUniqueNet(hierParentInst.getCellType(), newName);
-                currNet.addPortInst(hierPortInst.getPortInst());
+                // When operating on the snk pin, we've found that it is not connected to a net.  Instead of trying to
+                // connect through the hierarchy starting at the snk, start from the common ancestor and leverage
+                // as much existing connectivity as possible.
+                List<EDIFCellInst> sinkHier = snk.getFullHierarchicalInst().getFullHierarchy();
+                boolean foundPath = false;
+                do {
+                    foundPath = false;
+                    EDIFCellInst nextTargetInst = sinkHier.get(commonAncestor.getDepth());
+                    EDIFNet evalNet = finalSrc.getPortInst().getNet();
+                    if (evalNet != null) {
+                        for (EDIFPortInst pi : evalNet.getEDIFPortInstList()) {
+                            // Does this net connect to the next instance in hierarchy?
+                            if (pi.getCellInst() == nextTargetInst) {
+                                EDIFNet internalNet = pi.getInternalNet();
+                                // Is there a net inside the cell we can follow?
+                                if (internalNet != null) {
+                                    EDIFHierCellInst nextParent = finalSrc.getHierarchicalInst()
+                                            .getChild(pi.getCellInst());
+                                    EDIFPortInst internalPortInst = internalNet.getPortInst(null, pi.getName());
+                                    finalSrc = new EDIFHierPortInst(nextParent, internalPortInst);
+                                    commonAncestor = commonAncestor.getChild(pi.getCellInst());
+                                    foundPath = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } while (foundPath && snk.getHierarchicalInst().getInst() != finalSrc.getHierarchicalInst().getInst());
+                if (!foundPath) {
+                    // We still need to create some ports to get us to the end
+                    if (hierPortInst == src)
+                        createdSrcNet = true;
+                    currNet = createUniqueNet(hierParentInst.getCellType(), newName);
+                    currNet.addPortInst(hierPortInst.getPortInst());
+                }
             }
 
             while (hierParentInst.getInst() != commonAncestor.getInst()) {

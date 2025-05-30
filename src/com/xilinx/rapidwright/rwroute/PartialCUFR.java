@@ -199,7 +199,7 @@ public class PartialCUFR extends PartialRouter {
     }
 
     /**
-     * Partially routes a {@link Design} instance; specifically, all nets with no routing PIPs already present.
+     * Partially routes all unrouted sinks in a {@link Design} instance; fully-routed sinks will have their routing preserved.
      * @param design The {@link Design} instance to be routed.
      * @param config The {@link RWRouteConfig} instance to use.
      * If null, the design will be routed in the full timing-driven routing mode with default a {@link RWRouteConfig} instance.
@@ -215,7 +215,8 @@ public class PartialCUFR extends PartialRouter {
     }
 
     /**
-     * Partially routes a {@link Design} instance; specifically, all nets with no routing PIPs already present.
+     * Partially routes all given sinks in a {@link Design} instance; fully-routed sinks will have their routing preserved
+     * if "softPreserve" is false, otherwise such sinks may be lazily-rerouted when attempting to route other congested sinks.
      * @param design The {@link Design} instance to be routed.
      * @param config The {@link RWRouteConfig} instance to use.
      * If null, the design will be routed in the full timing-driven routing mode with default a {@link RWRouteConfig} instance.
@@ -247,7 +248,8 @@ public class PartialCUFR extends PartialRouter {
     }
 
     /**
-     * Partially routes a {@link Design} instance; specifically, all nets with no routing PIPs already present.
+     * Partially routes all given sinks in a {@link Design} instance; fully-routed sinks will have their routing preserved
+     * if "softPreserve" is false, otherwise such sinks may be lazily-rerouted when attempting to route other congested sinks.
      * @param design The {@link Design} instance to be routed.
      * @param args An array of string arguments, can be null.
      * If null, the design will be routed in the full timing-driven routing mode with default a {@link RWRouteConfig} instance.

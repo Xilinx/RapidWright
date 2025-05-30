@@ -294,6 +294,9 @@ public class RouterHelper {
                 pip.setIsPIPFixed(true);
             }
             if (pip != null) {
+                if (load.isArcLocked()) {
+                    pip.setIsPIPFixed(true);
+                }
                 connectionPIPs.add(pip);
             } else {
                 System.err.println("ERROR: Null PIP connecting these two nodes: " + driver+ ", " + load);
@@ -433,6 +436,8 @@ public class RouterHelper {
 
                     if (cellBelPin == null) {
                         cellBelPin = cell.getBELPin(ehpi);
+                    } else {
+                        assert(cellBelPin.getSiteWireIndex() == cell.getBELPin(ehpi).getSiteWireIndex());
                     }
                 }
 

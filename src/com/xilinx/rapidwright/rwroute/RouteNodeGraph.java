@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.rwroute;
 
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.IdentityHashMap;
@@ -43,6 +44,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
@@ -54,6 +56,7 @@ import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.Utils;
+
 
 /**
  * Encapsulation of RWRoute's routing resource graph.
@@ -126,6 +129,7 @@ public class RouteNodeGraph {
         return device.getColumns() * device.getRows();
     }
 
+    protected final Set<Tile> allowedTiles;
 
     public RouteNodeGraph(Design design, RWRouteConfig config) {
         this.design = design;
@@ -410,6 +414,15 @@ public class RouteNodeGraph {
         }
 
         presentCongestionCosts = new float[MAX_OCCUPANCY];
+
+        String pblockString = config.getPBlock();
+        if (pblockString != null) {
+            PBlock pblock = new PBlock(design.getDevice(), "SLICE_X0Y0:SLICE_X60Y119");
+            allowedTiles = Collections.newSetFromMap(new IdentityHashMap<>());
+            allowedTiles.addAll(pblock.getAllTiles());
+        } else {
+            allowedTiles = null;
+        }
     }
 
     public void initialize() {
@@ -574,6 +587,10 @@ public class RouteNodeGraph {
         return !allowedTileEnums.contains(tileType);
     }
 
+    public boolean isAllowedTile(Node child) {
+        return allowedTiles == null || allowedTiles.contains(child.getTile());
+    }
+
     protected boolean isExcluded(RouteNode parent, Node child) {
         if (isPreserved(child)) {
             return true;
@@ -583,15 +600,17 @@ public class RouteNodeGraph {
             if (!allowRoutethru(parent, child)) {
                 return true;
             }
+        } else if (!isAllowedTile(child)) {
+            return true;
         }
 
+        RouteNode childRnode = getNode(child);
         IntentCode ic = child.getIntentCode();
         if (isVersal) {
             assert(ic != IntentCode.NODE_PINFEED); // This intent code should have been projected away
 
             if ((!lutRoutethru && ic == IntentCode.NODE_IMUX) || ic == IntentCode.NODE_CLE_CTRL || ic == IntentCode.NODE_INTF_CTRL) {
                 // Disallow these site pin projections if they aren't already in the routing graph (as a potential sink)
-                RouteNode childRnode = getNode(child);
                 return childRnode == null;
             }
         } else {
@@ -599,7 +618,6 @@ public class RouteNodeGraph {
 
             if (child.getIntentCode() == IntentCode.NODE_PINFEED) {
                 // PINFEEDs can lead to a site pin, or into a Laguna tile
-                RouteNode childRnode = getNode(child);
                 if (childRnode != null) {
                     assert(childRnode.getType().isAnyExclusiveSink() ||
                             childRnode.getType() == RouteNodeType.LAGUNA_PINFEED ||
@@ -618,6 +636,11 @@ public class RouteNodeGraph {
                     }
                 }
             }
+        }
+
+        if (childRnode != null && childRnode.isArcLocked() && childRnode.getPrev() != parent) {
+            // Downhill is a locked node that doesn't point back to this node, skip
+            return true;
         }
 
         return false;
@@ -765,6 +788,7 @@ public class RouteNodeGraph {
         }
 
         // (b) needs to cross an SLR and this is a Laguna column
+        // TODO: Check for Laguna rows too
         Tile childTile = childRnode.getTile();
         RouteNode sinkRnode = connection.getSinkRnode();
         int childX = childTile.getTileXCoordinate();
@@ -829,6 +853,12 @@ public class RouteNodeGraph {
                     }
                 }
                 assert(childTile == sinkTile);
+                break;
+            case EXCLUSIVE_SINK_NON_LOCAL:
+                if (type.isAnyLocal()) {
+                    // Local wires can never reach non-local when LUT routethrus are disabled
+                    return false;
+                }
                 break;
             default:
                 throw new RuntimeException("ERROR: Unexpected sink type " + sinkRnode.getType());

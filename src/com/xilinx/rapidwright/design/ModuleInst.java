@@ -39,6 +39,9 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -757,6 +760,58 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                 oldPhysicalNet.removePin(inPin, true);
             }
             physicalNet.addPin(inPin);
+        }
+    }
+
+    /**
+     * Connects a ModuleInst's single bit input port to GND or VCC
+     * 
+     * @param type     The static net type to connect the port to
+     * @param portName The name of the port
+     * 
+     */
+    public void connect(NetType type, String portName) {
+        connect(type, portName, -1);
+    }
+
+    /**
+     * Connects a ModuleInst's input port to GND or VCC. If the port is already
+     * connected to another net, this will disconnect it and connect it to the
+     * specified static net.
+     * 
+     * @param type     The static net type to connect the port to
+     * @param portName The name of the port
+     * @param busIndex The index of bit into the port, or -1 if it is a single bit
+     *                 port
+     */
+    public void connect(NetType type, String portName, int busIndex) {
+        if (type != NetType.GND && type != NetType.VCC) {
+            throw new RuntimeException("ERROR: Invalid NetType, should be GND or VCC, found: " + type);
+        }
+        Port input = getPort(busIndex == -1 ? portName : portName + "[" + busIndex + "]");
+        if (input == null) {
+            throw new RuntimeException(
+                    "ERROR: Couldn't find port " + portName + ", idx=" + busIndex + " on ModuleInst "
+                            + getName());
+        }
+        if (input.isOutPort()) {
+            throw new RuntimeException("ERROR: Port " + input.getName() + " on ModuleInst " + getName()
+                    + " is an output, cannot connect it to " + type);
+        }
+        Net physNet = type == NetType.GND ? getDesign().getGndNet() : getDesign().getVccNet();
+        EDIFNet logNet = EDIFTools.getStaticNet(type, getCellInst().getParentCell(), getDesign().getNetlist());
+        EDIFPortInst currPortInst = getCellInst().getPortInst(input.getName());
+        if (currPortInst != null) {
+            currPortInst.getNet().removePortInst(currPortInst);
+        }
+        logNet.createPortInst(input.getName(), getCellInst());
+
+        for (SitePinInst pin : input.getSitePinInsts()) {
+            SitePinInst instPin = getCorrespondingPin(pin);
+            if (instPin.getNet() != null) {
+                instPin.getNet().removePin(pin);
+            }
+            physNet.addPin(instPin);
         }
     }
 
