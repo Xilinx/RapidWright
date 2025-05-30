@@ -144,6 +144,20 @@ public class ECOPlacementHelper {
      * @return Unused flop BEL.
      */
     public BEL getUnusedFlop(SiteInst siteInst, Net clk) {
+        return getUnusedFlop(siteInst, clk, null, null);
+    }
+
+    /**
+     * Given a SiteInst and a clock net, find an unused flop BEL that can host a new cell.
+     * This flop BEL will have its bypass pin ([A-H](X|_I)) available.
+     *
+     * @param siteInst SiteInst object to search inside.
+     * @param clk      Desired clock net for flop cell.
+     * @param ce       Desired clock enable net for flop cell (null for VCC).
+     * @param rst      Desired reset net for flop cell (null for GND).
+     * @return Unused flop BEL.
+     */
+    public BEL getUnusedFlop(SiteInst siteInst, Net clk, Net ce, Net rst) {
         Site site = siteInst.getSite();
         Set<Site> flopLessSites = flopLessSitesByClk.get(clk);
         if (flopLessSites != null && flopLessSites.contains(site)) {
@@ -185,15 +199,20 @@ public class ECOPlacementHelper {
                     }
                 }
 
-                // Check that CE and SR are VCC and GND respectively
+                // Check that CE and SR are already connected to the
+                // required nets (if null, to VCC and GND respectively)
                 Pair<String, String> p = belTypeSitePinNameMapping.get(belFlop);
                 Net existingCE = siteInst.getNetFromSiteWire(p.getFirst());
-                if (existingCE != null && existingCE.getType() != NetType.VCC) {
-                    continue;
+                if (existingCE != null) {
+                    if ((ce == null && existingCE.getType() != NetType.VCC) || !ce.equals(existingCE)) {
+                        continue;
+                    }
                 }
                 Net existingSR = siteInst.getNetFromSiteWire(p.getSecond());
-                if (existingSR != null && existingSR.getType() != NetType.GND) {
-                    continue;
+                if (existingSR != null) {
+                    if ((rst == null && existingSR.getType() != NetType.GND) || !rst.equals(existingSR)) {
+                        continue;
+                    }
                 }
 
                 // Compatible BEL found! Return.

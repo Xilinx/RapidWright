@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2024-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Advanced Micro Devices, Inc.
@@ -24,15 +24,22 @@ package com.xilinx.rapidwright.support.rwroute;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFTools;
 
 import java.util.Set;
 
 public class RouterHelperSupport {
     public static void invertVccLutPinsToGndPins(Design design, Set<SitePinInst> pins) {
+        final EDIFNetlist netlist = design.getNetlist();
         for (SitePinInst spi : pins) {
             assert (spi.getNet() == design.getVccNet());
             SiteInst si = spi.getSiteInst();
@@ -46,6 +53,11 @@ public class RouterHelperSupport {
                         String logInput = lut.getLogicalPinMapping(bp.getName());
                         if (logInput != null) {
                             LUTTools.configureLUT(lut, eq.replace(logInput, "(~" + logInput + ")"));
+
+                            EDIFCellInst eci = lut.getEDIFCellInst();
+                            EDIFPortInst epi = eci.getPortInst(logInput);
+                            EDIFNet const0 = EDIFTools.getStaticNet(NetType.GND, eci.getParentCell(), netlist);
+                            epi.setParentNet(const0);
                         } else {
                             // Doesn't look like this pin is used by this [65]LUT,
                             // could be used by the other [56]LUT
