@@ -204,13 +204,15 @@ public class ECOPlacementHelper {
                 Pair<String, String> p = belTypeSitePinNameMapping.get(belFlop);
                 Net existingCE = siteInst.getNetFromSiteWire(p.getFirst());
                 if (existingCE != null) {
-                    if ((ce == null && existingCE.getType() != NetType.VCC) || !ce.equals(existingCE)) {
+                    if ((ce == null && existingCE.getType() != NetType.VCC) ||
+                            (ce != null && !ce.equals(existingCE))) {
                         continue;
                     }
                 }
                 Net existingSR = siteInst.getNetFromSiteWire(p.getSecond());
                 if (existingSR != null) {
-                    if ((rst == null && existingSR.getType() != NetType.GND) || !rst.equals(existingSR)) {
+                    if ((rst == null && existingSR.getType() != NetType.GND) ||
+                            (rst != null && !rst.equals(existingSR))) {
                         continue;
                     }
                 }
