@@ -127,7 +127,12 @@ public class RegroupInstances {
         t.start("Read Design");
         if (args[0].endsWith(".dcp")) {
             design = Design.readCheckpoint(args[0], CodePerfTracker.SILENT);
-            design.unplaceDesign();
+            if (design.getSiteInsts().size() > 0) {
+                System.out.println("WARNING: Regrouping placed and/or routed non-leaf cells not "
+                        + "supported.  Implementation information will be removed prior to regrouping instances.");
+                design.unplaceDesign();
+            }
+
         } else {
             design = new Design(EDIFTools.readEdifFile(args[0]));
         }
