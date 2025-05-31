@@ -29,11 +29,9 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import org.python.google.common.hash.HashFunction;
 import org.python.google.common.hash.Hashing;
@@ -58,35 +56,57 @@ import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 
 /**
- * Flattens a design and obfuscates all of the names to SHA256 hashes.
+ * Flattens a design and obfuscates all of the names to SHA256 hashes. Note that
+ * time stamps are used to pepper the inputs and ensure that the hashes are
+ * different each time the application is run.
  */
 public class DesignObfuscator {
 
-    private String timeStamp = Long.toHexString(System.nanoTime() * System.nanoTime());
+    private String timeStamp;
     
-    private Map<String,String> obfuscatedMap = new HashMap<>();
+    private Map<String, String> obfuscatedMap;
     
-    private HashFunction sha256 = Hashing.sha256();
+    private HashFunction sha256;
     
     private EDIFLibrary macros;
 
-    private static Set<String> dontObfuscate;
+    /**
+     * Creates a design obfuscator object to obfuscate the names in a design.
+     */
+    public DesignObfuscator() {
+        timeStamp = Long.toHexString(System.nanoTime() * System.nanoTime());
+        obfuscatedMap = new HashMap<>();
+        sha256 = Hashing.sha256();
+        dontObfuscate("VCC");
+        dontObfuscate("GND");
+        dontObfuscate("<const0>");
+        dontObfuscate("<const1>");
+        dontObfuscate(Net.GND_NET);
+        dontObfuscate(Net.VCC_NET);
+        dontObfuscate(Net.USED_NET);
+        dontObfuscate(Net.Z_NET);
+    }
 
-    static {
-        dontObfuscate = new HashSet<>();
-        dontObfuscate.add("VCC");
-        dontObfuscate.add("GND");
-        dontObfuscate.add("<const0>");
-        dontObfuscate.add("<const1>");
-        dontObfuscate.add(Net.GND_NET);
-        dontObfuscate.add(Net.VCC_NET);
-        dontObfuscate.add(Net.USED_NET);
-        dontObfuscate.add(Net.Z_NET);
+    /**
+     * Create a design obfuscator with a custom pepper string.
+     * 
+     * @param pepper The string combined with names to be hashed.
+     */
+    public DesignObfuscator(String pepper) {
+        this();
+        this.timeStamp = pepper;
+    }
+
+    /**
+     * Specify a name that exists in the netlist to preserve.
+     * 
+     * @param preserve The name to preserve and won't be obfuscated.
+     */
+    public void dontObfuscate(String preserve) {
+        obfuscatedMap.put(preserve, preserve);
     }
 
     public String hash(String name) {
-        if (dontObfuscate.contains(name))
-            return name;
         return obfuscatedMap.computeIfAbsent(name,
                 s -> sha256.hashString(s + timeStamp, StandardCharsets.UTF_8).toString());
     }
@@ -228,13 +248,18 @@ public class DesignObfuscator {
         for (SiteInst si : d.getSiteInsts()) {
             SiteInst oSI = obfuscatedDesign.getSiteInstFromSite(si.getSite());
             if (oSI == null) {
-                obfuscatedDesign.createSiteInst(si.getName(), si.getSiteTypeEnum(), si.getSite());
+                oSI = obfuscatedDesign.createSiteInst(si.getName(), si.getSiteTypeEnum(), si.getSite());
             }
             oSI.setSiteLocked(si.isSiteLocked());
             for (Cell c : si.getCells()) {
                 String oCellName = getObfuscatedCellName(c);
                 Cell oCell = c.copyCell(oCellName, null, oSI);
-                oSI.addCell(oCell); // TODO - perhaps move the addCell call into Cell.copyCell()?
+                if (oCell.isRoutethru()) {
+                    oSI.getCellMap().put(oCellName, oCell);
+                } else {
+                    oSI.addCell(oCell);
+                }
+
             }
             for (SitePIP p : si.getUsedSitePIPs()) {
                 oSI.addSitePIP(p);
@@ -246,7 +271,13 @@ public class DesignObfuscator {
                     oNet = obfuscatedDesign.createNet(oNetName);
                 }
                 for (String siteWireName : e.getValue()) {
-                    BELPin pin = si.getSiteWirePins(siteWireName)[0];
+                    // TODO
+                    // oSI.routeIntraSiteNet(oNet, siteWireName);
+                    BELPin[] pins = si.getSiteWirePins(siteWireName);
+                    if (pins.length == 0) {
+                        continue;
+                    }
+                    BELPin pin = pins[0];
                     oSI.routeIntraSiteNet(oNet, pin, pin);
                 }
             }
@@ -261,16 +292,26 @@ public class DesignObfuscator {
             }
         }
         if (hasConstraints) {
-            System.out.println("[WARNING] Design contains XDC constraints which will not be present in the obfuscated design.");
+            System.out.println("WARNING: Design contains XDC constraints which will not be present in the obfuscated design.");
         }
         if (d.getPartitionPins().size() > 0) {
             // TODO support partition pins
-            System.out.println("[WARNING] Design contains partition which will not be present in the obfuscated design.");
+            System.out.println("WARNING: Design contains partition which will not be present in the obfuscated design.");
         }
         
         return obfuscatedDesign;
     }
     
+    public void writeObfuscationMapFile(String fileName) {
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(fileName))) {
+            for (Entry<String, String> e : obfuscatedMap.entrySet()) {
+                bw.write(e.getValue() + " " + e.getKey() + "\n");
+            }
+        } catch (IOException e1) {
+            throw new UncheckedIOException(e1);
+        }
+    }
+
     public static void main(String[] args) {
         if (args.length < 2 || args.length > 3) {
             System.out.println("USAGE: <input.dcp> <output.dcp> [obfuscation_map.txt]");
@@ -282,13 +323,7 @@ public class DesignObfuscator {
         obfuscated.writeCheckpoint(args[1]);
         
         if (args.length == 3) {
-            try(BufferedWriter bw = new BufferedWriter(new FileWriter(args[2]))) {
-                for (Entry<String, String> e : o.obfuscatedMap.entrySet()) {
-                    bw.write(e.getValue() + " " + e.getKey() + "\n");
-                }                
-            } catch (IOException e1) {
-                throw new UncheckedIOException(e1);
-            }
+            o.writeObfuscationMapFile(args[2]);
         }
     }
 }
