@@ -128,6 +128,8 @@ public class RegroupInstances {
         if (args[0].endsWith(".dcp")) {
             design = Design.readCheckpoint(args[0], CodePerfTracker.SILENT);
             if (design.getSiteInsts().size() > 0) {
+                // TODO - ECOTools.refactorCell() is the limitation. When support is added, this
+                // constraint can be removed
                 System.out.println("WARNING: Regrouping placed and/or routed non-leaf cells not "
                         + "supported.  Implementation information will be removed prior to regrouping instances.");
                 design.unplaceDesign();
