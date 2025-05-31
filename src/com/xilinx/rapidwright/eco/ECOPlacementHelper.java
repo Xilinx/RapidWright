@@ -22,11 +22,13 @@
 
 package com.xilinx.rapidwright.eco;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -51,7 +53,10 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.placer.blockplacer.Point;
 import com.xilinx.rapidwright.util.Pair;
 
 /**
@@ -261,6 +266,45 @@ public class ECOPlacementHelper {
 
         lutLessSites.add(site);
         return null;
+    }
+
+    public static Site getCentroidOfPoints(Device device, List<Point> points, Set<SiteTypeEnum> targetSiteTypes) {
+        Point centroid = KMeans.calculateCentroid(points);
+        Tile centroidTile = device.getTile(centroid.y, centroid.x);
+    
+        // We need to snap to the closest site with the site type of interest from the
+        // centroid tile
+        Site closest = null;
+        int closetDist = Integer.MAX_VALUE;
+        int searchGridDim = 0;
+        while (closest == null) {
+            searchGridDim++;
+            for (int row = -searchGridDim; row < searchGridDim; row++) {
+                for (int col = -searchGridDim; col < searchGridDim; col++) {
+                    Tile neighbor = centroidTile.getTileNeighbor(col, row);
+                    if (neighbor != null) {
+                        for (Site s : neighbor.getSites()) {
+                            if (targetSiteTypes.contains(s.getSiteTypeEnum())) {
+                                int manDist = centroidTile.getManhattanDistance(neighbor);
+                                if (manDist < closetDist) {
+                                    closest = s;
+                                    closetDist = manDist;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return closest;        
+    }
+
+    public static Site getCentroidOfNet(Net net, Set<SiteTypeEnum> targetSiteTypes) {
+        List<Point> points = new ArrayList<>();
+        for (SitePinInst i : net.getPins()) {
+            points.add(new Point(i.getTile().getColumn(), i.getTile().getRow()));
+        }
+        return ECOPlacementHelper.getCentroidOfPoints(net.getSource().getTile().getDevice(), points, targetSiteTypes);
     }
 
     /**

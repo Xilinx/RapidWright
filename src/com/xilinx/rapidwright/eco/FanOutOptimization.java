@@ -54,41 +54,6 @@ import com.xilinx.rapidwright.util.Utils;
  */
 public class FanOutOptimization {
 
-    public static Site getCentroidOfNet(Net net, Set<SiteTypeEnum> targetSiteTypes) {
-        List<Point> points = new ArrayList<>();
-        for (SitePinInst i : net.getPins()) {
-            points.add(new Point(i.getTile().getColumn(), i.getTile().getRow()));
-        }
-        Point centroid = KMeans.calculateCentroid(points);
-        Tile centroidTile = net.getSourceTile().getDevice().getTile(centroid.y, centroid.x);
-
-        // We need to snap to the closest site with the site type of interest from the
-        // centroid tile
-        Site closest = null;
-        int closetDist = Integer.MAX_VALUE;
-        int searchGridDim = 0;
-        while (closest == null) {
-            searchGridDim++;
-            for (int row = -searchGridDim; row < searchGridDim; row++) {
-                for (int col = -searchGridDim; col < searchGridDim; col++) {
-                    Tile neighbor = centroidTile.getTileNeighbor(col, row);
-                    if (neighbor != null) {
-                        for (Site s : neighbor.getSites()) {
-                            if (targetSiteTypes.contains(s.getSiteTypeEnum())) {
-                                int manDist = centroidTile.getManhattanDistance(neighbor);
-                                if (manDist < closetDist) {
-                                    closest = s;
-                                    closetDist = manDist;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return closest;
-    }
-
     private static Pair<Site, BEL> findValidPlacementOption(Design design, Cell srcFF, Iterator<Site> itr) {
         SiteInst si = srcFF.getSiteInst();
         Net clk = si.getNetFromSiteWire(srcFF.getSiteWireNameFromLogicalPin("C"));
@@ -96,7 +61,7 @@ public class FanOutOptimization {
         Net ce = si.getNetFromSiteWire(srcFF.getSiteWireNameFromLogicalPin("CE"));
         while (itr.hasNext()) {
             Site curr = itr.next();
-            SiteInst candidate = design.getSiteInst(curr.getName());
+            SiteInst candidate = design.getSiteInstFromSite(curr);
             if (candidate == null) {
                 // Empty site, let's use it
                 return new Pair<Site, BEL>(curr, curr.getBEL("AFF"));
@@ -150,7 +115,7 @@ public class FanOutOptimization {
         Net rst = si.getNetFromSiteWire(driverFlop.getSiteWireNameFromLogicalPin("R"));
         Net ce = si.getNetFromSiteWire(driverFlop.getSiteWireNameFromLogicalPin("CE"));
 
-        Site highFanoutNetCentroid = getCentroidOfNet(highFanoutNet, Utils.sliceTypes);
+        Site highFanoutNetCentroid = ECOPlacementHelper.getCentroidOfNet(highFanoutNet, Utils.sliceTypes);
 
         EDIFCell parent = driverFlop.getParentCell();
         Unisim ffType = Unisim.valueOf(driverFlop.getType());
