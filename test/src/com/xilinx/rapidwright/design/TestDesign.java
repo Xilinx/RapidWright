@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -29,6 +29,8 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
 
+import com.xilinx.rapidwright.util.ReportRouteStatusResult;
+import com.xilinx.rapidwright.util.VivadoTools;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -545,6 +547,18 @@ public class TestDesign {
         for (String logPin : new String[]{"CE", "C", "D", "R", "Q"}) {
             String physPin = myCell.getPhysicalPinMapping(logPin);
             Assertions.assertEquals(logPin, myCell.getLogicalPinMapping(physPin));
+        }
+    }
+
+    @Test
+    public void testRouteSites(@TempDir Path tempDir) {
+        Design d = RapidWrightDCP.loadDCP("bug780.dcp");
+        d.unrouteSites();
+        d.routeSites();
+        if (FileTools.isVivadoOnPath()) {
+            ReportRouteStatusResult rrs = VivadoTools.routeDesignAndGetStatus(d, tempDir);
+            Assertions.assertTrue(rrs.isFullyRouted());
+            Assertions.assertTrue(rrs.routableNets > 0);
         }
     }
 }

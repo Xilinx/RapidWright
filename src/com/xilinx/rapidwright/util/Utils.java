@@ -61,7 +61,7 @@ public class Utils{
 
     private static Set<SiteTypeEnum> moduleSiteTypes;
 
-    private static Set<SiteTypeEnum> sliceTypes;
+    public static Set<SiteTypeEnum> sliceTypes;
 
     public static Set<SiteTypeEnum> dspTypes;
 

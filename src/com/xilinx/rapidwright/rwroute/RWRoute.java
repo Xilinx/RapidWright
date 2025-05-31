@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -1225,9 +1225,7 @@ public class RWRoute {
             if (sinkRnode == rnodes.get(0)) {
                 List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(sinkRnode, connection.getSink().getConnectedNode());
                 if (switchBoxToSink.size() >= 2) {
-                    for (int i = 0; i < switchBoxToSink.size() - 1; i++) {
-                        nodes.add(switchBoxToSink.get(i));
-                    }
+                    nodes.addAll(switchBoxToSink.subList(0, switchBoxToSink.size() - 1));
                 }
             } else {
                 // Routing must go to an alternate sink
@@ -1238,15 +1236,11 @@ public class RWRoute {
                 assert(rnodes.get(0).getSitePin() != null);
             }
 
-            for (RouteNode rnode : rnodes) {
-                nodes.add(rnode);
-            }
+            nodes.addAll(rnodes);
 
             List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(connection.getSource().getConnectedNode(), connection.getSourceRnode());
             if (sourceToSwitchBox.size() >= 2) {
-                for (int i = 1; i <= sourceToSwitchBox.size() - 1; i++) {
-                    nodes.add(sourceToSwitchBox.get(i));
-                }
+                nodes.addAll(sourceToSwitchBox.subList(1, sourceToSwitchBox.size()));
             }
         }
     }
@@ -1820,7 +1814,7 @@ public class RWRoute {
 
         List<RouteNode> rnodes = connection.getRnodes();
         RouteNode sourceRnode = rnodes.get(rnodes.size() - 1);
-        // Only succesfully routed if backtracked to this connection's source node
+        // Only successfully routed if backtracked to this connection's source node
         return sourceRnode == connection.getSourceRnode();
     }
 
