@@ -785,7 +785,7 @@ public class RouteNodeGraph {
         }
 
         // (b) needs to cross an SLR and this is a Laguna column
-        // TODO: Check for Laguna rows too
+        // TODO: (Future optimization) Don't just check for Laguna columns, check for Laguna rows too
         Tile childTile = childRnode.getTile();
         RouteNode sinkRnode = connection.getSinkRnode();
         int childX = childTile.getTileXCoordinate();

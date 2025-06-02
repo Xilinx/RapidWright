@@ -162,7 +162,6 @@ public class PartialDFXRouter extends PartialRouter {
             RouteNode oldValue = connectionToBeginRnodeOfLockedPathToSink.put(connection, sinkRnode);
             assert(oldValue == null);
 
-            // TODO: assert that it is for the same net
             assert(!connection.hasAltSinks());
             assert(sinkRnode.countConnectionsOfUser(netWrapper) > 0);
             assert(!sinkRnode.isOverUsed());
@@ -178,7 +177,7 @@ public class PartialDFXRouter extends PartialRouter {
                 case EXCLUSIVE_SINK_NON_LOCAL:
                     break;
                 default:
-                    throw new RuntimeException("TODO: " + beginOfLockedPath.getType().toString());
+                    throw new RuntimeException("TODO: Failed to make " + beginOfLockedPath.getNode() + " into a routing sink");
             }
         }
     }
@@ -276,7 +275,7 @@ public class PartialDFXRouter extends PartialRouter {
                                                              String[] args,
                                                              Collection<SitePinInst> pinsToRoute,
                                                              boolean softPreserve) {
-        // Instantiates a RWRouteConfig Object and parses the arguments.
+        // Instantiates an RWRouteConfig Object and parses the arguments.
         // Uses the default configuration if basic usage only.
         RWRouteConfig config = new RWRouteConfig(args);
         if (pinsToRoute == null) {
