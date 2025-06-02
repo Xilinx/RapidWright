@@ -29,7 +29,6 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.IdentityHashMap;
@@ -43,13 +42,13 @@ import java.util.Map;
  * pinsToRoute parameter in the constructor) are tackled.
  * Enabling soft preserve allows preserved routing that may be the cause of any
  * unroutable connections to be ripped up and re-routed.
- * Special attention is paid to any {@link PartitionPin}s in the design which indicate the tip of locked routing
- * paths into and out from the static region to which newly routed connections must attach.
+ * Nets that route from the static region into the dynamic region must be locked and have a {@link PartitionPin}
+ * attached to indicate the branch point to be used to connect unrouted sinks.
  */
 public class PartialDFXRouter extends PartialRouter {
-    protected final Map<Connection,RouteNode> connectionToBeginRnodeOfLockedPathToSink = new IdentityHashMap<>();
+    protected final Map<Connection,RouteNode> connectionToTrueSinkRnodeBehindLockedPath = new IdentityHashMap<>();
 
-    protected final Map<NetWrapper,RouteNode> netToEndRnodeOfLockedPathFromSource = new IdentityHashMap<>();
+    protected final Map<NetWrapper,RouteNode> netToTrueSourceRnodeBehindLockedPath = new IdentityHashMap<>();
 
     public PartialDFXRouter(Design design, RWRouteConfig config, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         super(design, config, pinsToRoute, softPreserve);
@@ -67,27 +66,62 @@ public class PartialDFXRouter extends PartialRouter {
     protected void determineRoutingTargets() {
         super.determineRoutingTargets();
 
-        for (Connection connection : indirectConnections) {
-            if (connection.isRouted()) {
+        for (Map.Entry<Net,NetWrapper> e : nets.entrySet()) {
+            Net net = e.getKey();
+            if (!net.hasPIPs()) {
                 continue;
             }
-            Net net = connection.getNet();
-            Net preservedNet;
-            assert((preservedNet = routingGraph.getPreservedNet(connection.getSourceRnode())) == null || preservedNet == net);
-            RouteNode sinkRnode = connection.getSinkRnode();
-            preservedNet = routingGraph.getPreservedNet(sinkRnode);
-            if (preservedNet == net) {
-                // Sink is exclusively preserved for this unrouted connection => must be an inadvertently-preserved
-                // rnode of a locked path; unpreserve it so that it is not excluded when building out the routing graph
-                assert(connectionToBeginRnodeOfLockedPathToSink.containsKey(connection));
+
+            NetWrapper netWrapper = e.getValue();
+            for (Connection connection : netWrapper.getConnections()) {
+                if (connection.isDirect() || connection.isRouted()) {
+                    continue;
+                }
+
+                RouteNode sinkRnode = connection.getSinkRnode();
+                if (!sinkRnode.isArcLocked()) {
+                    continue;
+                }
+
+                // For connections where routing could not be fully recovered, but which have a locked arc
+                // to its sink, move the connection target back along all locked arcs
                 RouteNode beginOfLockedPath = sinkRnode;
-                routingGraph.unpreserve(beginOfLockedPath);
+                while ((beginOfLockedPath = beginOfLockedPath.getPrev()) != null && beginOfLockedPath.isArcLocked()) {}
+                assert(beginOfLockedPath != sinkRnode);
+                RouteNode oldValue = connectionToTrueSinkRnodeBehindLockedPath.put(connection, sinkRnode);
+                assert(oldValue == null);
+
+                assert(!connection.hasAltSinks());
+                assert(sinkRnode.countConnectionsOfUser(netWrapper) > 0);
+                assert(!sinkRnode.isOverUsed());
+
+                // Replace connection's sink node with the first node on the locked path to the sink
+                connection.setSinkRnode(beginOfLockedPath);
+                beginOfLockedPath.incrementUser(netWrapper);
+
+                switch (beginOfLockedPath.getType()) {
+                    case NON_LOCAL:
+                        beginOfLockedPath.setType(RouteNodeType.EXCLUSIVE_SINK_NON_LOCAL);
+                        break;
+                    case EXCLUSIVE_SINK_NON_LOCAL:
+                        break;
+                    default:
+                        throw new RuntimeException("TODO: Failed to make " + beginOfLockedPath.getNode() + " into a routing sink");
+                }
+
+                Net preservedNet;
+                assert((preservedNet = routingGraph.getPreservedNet(connection.getSourceRnode())) == null || preservedNet == net);
+                preservedNet = routingGraph.getPreservedNet(sinkRnode);
+                if (preservedNet == net) {
+                    // Sink is exclusively preserved for this unrouted connection => must be an inadvertently-preserved
+                    // rnode of a locked path; unpreserve it so that it is not excluded when building out the routing graph
+                    routingGraph.unpreserve(beginOfLockedPath);
+                }
             }
         }
 
         // Examine all partition pins and discover those that are the end rnode of locked paths
         // back to the source
-        Map<Net, List<RouteNode>> netToPartPins = new IdentityHashMap<>();
         for (PartitionPin pp : design.getPartitionPins()) {
             Node node = pp.getNode();
             if (node.isInvalidNode()) {
@@ -98,86 +132,28 @@ public class PartialDFXRouter extends PartialRouter {
                 continue;
             }
             if (rnode.getType().isAnyExclusiveSink()) {
+                // Ignore partition pins that lead to a sink
                 continue;
             }
 
             Net net = design.getNetFromPartitionPin(pp);
-            netToPartPins.computeIfAbsent(net, k -> new ArrayList<>(1))
-                    .add(rnode);
-        }
-        for (Map.Entry<Net, List<RouteNode>> e : netToPartPins.entrySet()) {
-            Net net = e.getKey();
             NetWrapper netWrapper = nets.get(net);
             if (netWrapper == null) {
                 continue;
             }
             assert(netWrapper.getAltSourceRnode() == null);
 
-            List<RouteNode> partPins = e.getValue();
-            if (partPins.size() > 1) {
-                throw new RuntimeException("ERROR: More than one partition pin found on net '" + net.getName() + "'.");
-            }
-            RouteNode endOfLockedPath = partPins.get(0);
+            // Trace locked path back from partition pin to the source
+            RouteNode endOfLockedPath = rnode;
             assert(endOfLockedPath.isArcLocked());
             assert(routingGraph.getPreservedNet(endOfLockedPath) == net);
             RouteNode sourceRnode = endOfLockedPath;
             while ((sourceRnode = sourceRnode.getPrev()) != null && sourceRnode.isArcLocked()) {}
             assert(sourceRnode == netWrapper.getSourceRnode());
-            netToEndRnodeOfLockedPathFromSource.put(netWrapper, netWrapper.getSourceRnode());
+            netToTrueSourceRnodeBehindLockedPath.put(netWrapper, netWrapper.getSourceRnode());
             for (Connection connection : netWrapper.getConnections()) {
                 assert(connection.getSourceRnode() == netWrapper.getSourceRnode());
                 connection.setSourceRnode(endOfLockedPath);
-            }
-        }
-    }
-
-    @Override
-    protected void addNetConnectionToRoutingTargets(Net net) {
-        super.addNetConnectionToRoutingTargets(net);
-
-        if (!net.hasPIPs()) {
-            return;
-        }
-
-        NetWrapper netWrapper = nets.get(net);
-        if (netWrapper == null) {
-            return;
-        }
-
-        for (Connection connection : netWrapper.getConnections()) {
-            if (connection.isDirect()) {
-                continue;
-            }
-
-            RouteNode sinkRnode = connection.getSinkRnode();
-            if (connection.isRouted() || !sinkRnode.isArcLocked()) {
-                continue;
-            }
-
-            // For connections where routing could not be fully recovered, but which have a locked arc
-            // to its sink, move the connection target back along all locked arcs
-            RouteNode beginOfLockedPath = sinkRnode;
-            while ((beginOfLockedPath = beginOfLockedPath.getPrev()) != null && beginOfLockedPath.isArcLocked()) {}
-            assert(beginOfLockedPath != sinkRnode);
-            RouteNode oldValue = connectionToBeginRnodeOfLockedPathToSink.put(connection, sinkRnode);
-            assert(oldValue == null);
-
-            assert(!connection.hasAltSinks());
-            assert(sinkRnode.countConnectionsOfUser(netWrapper) > 0);
-            assert(!sinkRnode.isOverUsed());
-
-            // Replace connection's sink node with the first node on the locked path to the sink
-            connection.setSinkRnode(beginOfLockedPath);
-            beginOfLockedPath.incrementUser(netWrapper);
-
-            switch (beginOfLockedPath.getType()) {
-                case NON_LOCAL:
-                    beginOfLockedPath.setType(RouteNodeType.EXCLUSIVE_SINK_NON_LOCAL);
-                    break;
-                case EXCLUSIVE_SINK_NON_LOCAL:
-                    break;
-                default:
-                    throw new RuntimeException("TODO: Failed to make " + beginOfLockedPath.getNode() + " into a routing sink");
             }
         }
     }
@@ -188,7 +164,7 @@ public class PartialDFXRouter extends PartialRouter {
             return true;
         }
 
-        RouteNode beginOfLockedPath = connectionToBeginRnodeOfLockedPathToSink.get(connection);
+        RouteNode beginOfLockedPath = connectionToTrueSinkRnodeBehindLockedPath.get(connection);
         if (beginOfLockedPath == rnode) {
             // This is the rnode of a locked path that does lead to this connection's sink
             return true;
@@ -205,7 +181,7 @@ public class PartialDFXRouter extends PartialRouter {
 
         List<RouteNode> rnodes = connection.getRnodes();
         RouteNode sourceRnode = rnodes.get(rnodes.size() - 1);
-        if (sourceRnode == netToEndRnodeOfLockedPathFromSource.get(connection.getNetWrapper())) {
+        if (sourceRnode == netToTrueSourceRnodeBehindLockedPath.get(connection.getNetWrapper())) {
             // Backtracked to the endRnode of a locked path that goes all the way back to the true
             // net source -- routing is complete
             return true;
@@ -216,7 +192,7 @@ public class PartialDFXRouter extends PartialRouter {
 
     @Override
     protected void finishRouteConnection(Connection connection, RouteNode rnode) {
-        RouteNode beginOfLockedPath = connectionToBeginRnodeOfLockedPathToSink.get(connection);
+        RouteNode beginOfLockedPath = connectionToTrueSinkRnodeBehindLockedPath.get(connection);
         if (beginOfLockedPath != null) {
             // rnode is the beginning of a locked path to the real sink; start routing recovery from that real sink instead
             assert(connection.getSinkRnode() == rnode);
@@ -230,11 +206,11 @@ public class PartialDFXRouter extends PartialRouter {
     protected void assignNodesToConnections() {
         // Now that we've finished routing, revert all source/sink rnodes back to their original
         for (Connection connection : indirectConnections) {
-            RouteNode trueSource = netToEndRnodeOfLockedPathFromSource.get(connection.getNetWrapper());
+            RouteNode trueSource = netToTrueSourceRnodeBehindLockedPath.get(connection.getNetWrapper());
             if (trueSource != null) {
                 connection.setSourceRnode(trueSource);
             }
-            RouteNode trueSink = connectionToBeginRnodeOfLockedPathToSink.get(connection);
+            RouteNode trueSink = connectionToTrueSinkRnodeBehindLockedPath.get(connection);
             if (trueSink != null) {
                 connection.setSinkRnode(trueSink);
             }
@@ -340,8 +316,8 @@ public class PartialDFXRouter extends PartialRouter {
      * and parses the arguments for the {@link RWRouteConfig} object of the router.
      * Similar to {@link PartialRouter}, only unrouted sinks will be tackled; all routed sinks will have their routing
      * preserved and not be re-routed.
-     * Special attention is paid to any {@link PartitionPin}s in the design which indicate the tip of locked routing
-     * paths into and out from the static region to which newly routed connections must attach.
+     * Nets that route from the static region into the dynamic region must be locked and have a {@link PartitionPin}
+     * attached to indicate the branch point to be used to connect unrouted sinks.
      * @param args An array of strings that are used to create a {@link RWRouteConfig} object for the router.
      */
     public static void main(String[] args) {
