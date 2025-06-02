@@ -417,7 +417,7 @@ public class RouteNodeGraph {
 
         String pblockString = config.getPBlock();
         if (pblockString != null) {
-            PBlock pblock = new PBlock(design.getDevice(), "SLICE_X0Y0:SLICE_X60Y119");
+            PBlock pblock = new PBlock(design.getDevice(), pblockString);
             allowedTiles = Collections.newSetFromMap(new IdentityHashMap<>());
             allowedTiles.addAll(pblock.getAllTiles());
         } else {

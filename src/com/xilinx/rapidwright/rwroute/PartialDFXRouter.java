@@ -115,7 +115,7 @@ public class PartialDFXRouter extends PartialRouter {
 
             List<RouteNode> partPins = e.getValue();
             if (partPins.size() > 1) {
-                throw new RuntimeException();
+                throw new RuntimeException("ERROR: More than one partition pin found on net '" + net.getName() + "'.");
             }
             RouteNode endOfLockedPath = partPins.get(0);
             assert(endOfLockedPath.isArcLocked());
