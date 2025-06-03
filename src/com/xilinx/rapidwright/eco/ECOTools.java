@@ -41,6 +41,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
@@ -308,6 +309,11 @@ public class ECOTools {
             List<EDIFHierPortInst> portInsts = e.getValue();
 
             for (EDIFHierPortInst ehpi : portInsts) {
+                if (ehpi.getNet() != null) {
+                    throw new RuntimeException("ERROR: Pin " + ehpi + " already connected to net "
+                            + ehpi.getHierarchicalNetName()
+                            + " please run ECOTools.disconnectNet() first.");
+                }
                 if (ehpi.isOutput()) {
                     for (EDIFHierPortInst src : ehn.getLeafHierPortInsts(true, false)) {
                         System.err.println("WARNING: Net '" + ehn.getHierarchicalNetName() + "' already has an output pin '" +
@@ -427,15 +433,31 @@ public class ECOTools {
                             // TODO: Use getLeafHierPortInst() to get parent net?
                             EDIFHierNet otherParentNet = netlist.getParentNet(otherEhpi.getHierarchicalNet());
                             if (!otherParentNet.equals(parentNet)) {
-                                String message = "Site pin " + spi.getSitePinName() + " cannot be used " +
-                                        "to connect to logical pin '" + ehpi + "' since it is also connected to pin '" +
-                                        otherEhpi + "'.";
-                                String warnIfCellInstStartsWith = System.getProperty("rapidwright.ecotools.connectNet.warnIfCellInstStartsWith");
-                                String cellInstName = (warnIfCellInstStartsWith != null) ? otherEhpi.getPortInst().getCellInst().getName() : null;
-                                if (cellInstName != null && cellInstName.startsWith(warnIfCellInstStartsWith)) {
-                                    System.err.println("WARNING: " + message);
+                                if (LUTTools.isCellALUT(cell)) {
+                                    // Check if we can map to a different physical pin
+                                    String newPhysPin = LUTTools.getFreePhysicalLUTInputPin(cell);
+                                    if (newPhysPin != null) {
+                                        cell.removePinMapping(physicalPinName);
+                                        cell.addPinMapping(newPhysPin, ehpi.getPortInst().getName());
+                                        physicalPinName = newPhysPin;
+                                        String newSpiName = cell.getBELName().charAt(0) + newPhysPin.substring(1);
+                                        newPhysNet.createPin(newSpiName, cell.getSiteInst());
+                                        continue nextNet;
+                                    } else {
+                                        throw new RuntimeException("ERROR: Couldn't find a free physical pin on LUT " 
+                                                + cell.getName() + " to connect net " + otherParentNet);
+                                    }
                                 } else {
-                                    throw new RuntimeException("ERROR: " + message);
+                                    String message = "Site pin " + spi.getSitePinName() + " cannot be used " +
+                                            "to connect to logical pin '" + ehpi + "' since it is also connected to pin '" +
+                                            otherEhpi + "'.";
+                                    String warnIfCellInstStartsWith = System.getProperty("rapidwright.ecotools.connectNet.warnIfCellInstStartsWith");
+                                    String cellInstName = (warnIfCellInstStartsWith != null) ? otherEhpi.getPortInst().getCellInst().getName() : null;
+                                    if (cellInstName != null && cellInstName.startsWith(warnIfCellInstStartsWith)) {
+                                        System.err.println("WARNING: " + message);
+                                    } else {
+                                        throw new RuntimeException("ERROR: " + message);
+                                    }
                                 }
                             }
                         }

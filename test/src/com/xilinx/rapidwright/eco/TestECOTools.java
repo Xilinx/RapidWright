@@ -46,6 +46,7 @@ import com.xilinx.rapidwright.design.PinType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
@@ -325,6 +326,95 @@ public class TestECOTools {
             Assertions.assertEquals(2, rrs.unroutedNets);
         }
     }
+
+    private Design genConnectNetSwitchLUTInputTestDesign() {
+        Design design = new Design("test", "xc7a100tftg256-2");
+        Device device = design.getDevice();
+        SiteInst si = design.createSiteInst("SLICE_X1Y97", SiteTypeEnum.SLICEL,
+                device.getSite("SLICE_X1Y97"));
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = netlist.getTopCell();
+        Cell cell0 = CodeGenerator.genCell(si, "cell0", false, "LUT1", "C5LUT", "A1:null", "A2:I0",
+                "A3:null", "A4:null", "A5:null", "O5:O");
+        cell0.addProperty("INIT", "2'h2", EDIFValueType.STRING);
+        Cell cell1 = CodeGenerator.genCell(si, "cell1", false, "LUT2", "C6LUT", "A1:null", "A2:I0",
+                "A3:null", "A4:null", "A5:null", "A6:I1", "O6:O");
+        cell1.addProperty("INIT", "2'h1", EDIFValueType.STRING);
+        Cell cell2 = CodeGenerator.genCell(si, "cell2", false, "LUT1", "A6LUT", "A1:null", "A2:null",
+                "A3:null", "A4:null", "A5:null", "A6:I0", "O6:O");
+        cell2.addProperty("INIT", "2'h1", EDIFValueType.STRING);
+
+        CodeGenerator.addSitePIPs(si, "CUSED:0", "AUSED:0", "COUTMUX:O5");
+
+        Net net3 = design.createNet("net3");
+        net3.getLogicalNet().createPortInst("O", cell1);
+        top.getNet("net3").createPortInst(top.createPort("port4", EDIFDirection.OUTPUT, 1));
+        net3.createPin("C", si);
+        CodeGenerator.routeSiteNet(si, net3, "C6LUT_O6", "C");
+        Net usedNet = design.createNet(Net.USED_NET);
+        CodeGenerator.routeSiteNet(si, usedNet, "CARRY4_CO0", "CARRY4_CO1", "CARRY4_CO2",
+                "CARRY4_CO3", "CARRY4_O0", "CARRY4_O1", "CARRY4_O2", "CARRY4_O3", "F7BMUX_OUT",
+                "F8MUX_OUT", "CARRY4_DMUX_OUT", "CARRY4_CMUX_OUT", "CARRY4_CXOR_O", "CARRY4_DXOR_O");
+        Net vcc = design.getVccNet();
+        vcc.createPin("C6", si);
+        CodeGenerator.routeSiteNet(si, vcc, "C6");
+        Net net5 = design.createNet("net5");
+        net5.getLogicalNet().createPortInst("I0", cell0);
+        net5.getLogicalNet().createPortInst("I0", cell2);
+        net5.getLogicalNet().createPortInst("I0", cell1);
+        top.getNet("net5").createPortInst(top.createPort("port6", EDIFDirection.INPUT, 1));
+        net5.createPin("C2", si);
+        net5.createPin("A6", si);
+        CodeGenerator.routeSiteNet(si, net5, "A6", "C2");
+        Net net7 = design.createNet("net7");
+        net7.getLogicalNet().createPortInst("O", cell0);
+        top.getNet("net7").createPortInst(top.createPort("port8", EDIFDirection.OUTPUT, 1));
+        net7.createPin("CMUX", si);
+        CodeGenerator.routeSiteNet(si, net7, "C5LUT_O5", "CMUX");
+        Net net9 = design.createNet("net9");
+        net9.getLogicalNet().createPortInst("O", cell2);
+        top.getNet("net9").createPortInst(top.createPort("port10", EDIFDirection.OUTPUT, 1));
+        net9.createPin("A", si);
+        CodeGenerator.routeSiteNet(si, net9, "A6LUT_O6", "A");
+        design.setDesignOutOfContext(true);
+        design.setAutoIOBuffers(false);
+        return design;
+    }
+    
+    @Test 
+    public void testConnectNetFailsWithoutDisconnect() { 
+        Design design = genConnectNetSwitchLUTInputTestDesign();
+        Cell testCell = design.getCell("cell1");
+        Net testNet = design.getNet("net7");
+        
+        // Ensure error is thrown in pin is still connected to a net
+        Assertions.assertThrows(RuntimeException.class, () -> {ECOTools.connectNet(design, testCell, "I0", testNet);},
+                "ERROR: Pin cell1/I0 already connected to net net5 please run ECOTools.disconnectNet() first.");
+    }
+    
+    @Test
+    public void testConnectNetSwitchLUTInput() {
+        Design design = genConnectNetSwitchLUTInputTestDesign();
+        Cell cell1 = design.getCell("cell1");
+        Net targetNet = design.getNet("net7");
+
+        // Both cell0.I0 and cell1.I0 are connected to the physical A2 pin
+        // Disconnect and connect the cell1.I0 pin to a new net
+        String pin = "I0";
+        Assertions.assertEquals("A2", cell1.getPhysicalPinMapping(pin));
+        Cell compCell = LUTTools.getCompanionLUTCell(cell1);
+        Assertions.assertNotNull(compCell);
+        Assertions.assertEquals("A2", compCell.getPhysicalPinMapping(pin));
+
+        ECOTools.disconnectNet(design, cell1.getEDIFHierCellInst().getPortInst(pin));
+        ECOTools.connectNet(design, cell1, pin, targetNet);
+        
+        // Because both LUT sites are occupied and the other A2
+        Assertions.assertEquals("A5", cell1.getPhysicalPinMapping(pin));
+        Assertions.assertEquals(targetNet.getName(),
+                cell1.getEDIFHierCellInst().getPortInst(pin).getHierarchicalNetName());
+    }
+
 
     @Test
     @Disabled("Currently, ECOTools.removeCell() does not work for hierarchical cells. Specifically, for this testcase " +
