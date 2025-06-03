@@ -327,7 +327,11 @@ public class TestECOTools {
         }
     }
 
-    private Design genConnectNetSwitchLUTInputTestDesign() {
+    /**
+     * Generated with CodeGenerator.genCodeForTestSite()
+     * From https://github.com/Xilinx/RapidWright/discussions/1198#discussioncomment-13335689
+     */
+    private Design genDiscussion1198TestCase() {
         Design design = new Design("test", "xc7a100tftg256-2");
         Device device = design.getDevice();
         SiteInst si = design.createSiteInst("SLICE_X1Y97", SiteTypeEnum.SLICEL,
@@ -383,7 +387,7 @@ public class TestECOTools {
     
     @Test 
     public void testConnectNetFailsWithoutDisconnect() { 
-        Design design = genConnectNetSwitchLUTInputTestDesign();
+        Design design = genDiscussion1198TestCase();
         Cell testCell = design.getCell("cell1");
         Net testNet = design.getNet("net7");
         
@@ -394,34 +398,44 @@ public class TestECOTools {
     
     @Test
     public void testConnectNetSwitchLUTInput() {
-        Design design = genConnectNetSwitchLUTInputTestDesign();
+        Design design = genDiscussion1198TestCase();
         Cell cell1 = design.getCell("cell1");
+        Net origNet = design.getNet("net5");
         Net targetNet = design.getNet("net7");
 
         // Both cell0.I0 and cell1.I0 are connected to the physical A2 pin
         // Disconnect and connect the cell1.I0 pin to a new net
         String pin = "I0";
         Assertions.assertEquals("A2", cell1.getPhysicalPinMapping(pin));
-        Cell compCell = LUTTools.getCompanionLUTCell(cell1);
-        Assertions.assertNotNull(compCell);
-        Assertions.assertEquals("A2", compCell.getPhysicalPinMapping(pin));
+        Cell cell0 = LUTTools.getCompanionLUTCell(cell1);
+        Assertions.assertNotNull(cell0);
+        Assertions.assertEquals("cell0", cell0.getName());
+        Assertions.assertEquals("A2", cell0.getPhysicalPinMapping(pin));
 
-        ECOTools.disconnectNet(design, cell1.getEDIFHierCellInst().getPortInst(pin));
+        EDIFHierPortInst ehpi = cell1.getEDIFHierCellInst().getPortInst(pin);
+        SitePinInst spiA2 = cell1.getSitePinFromPortInst(ehpi.getPortInst(), null);
+        Assertions.assertEquals("C2", spiA2.getName());
+        Assertions.assertSame(origNet, spiA2.getNet());
+
+        ECOTools.disconnectNet(design, ehpi);
         ECOTools.connectNet(design, cell1, pin, targetNet);
         
-        // Because both LUT sites are occupied and the other A2
+        // Because both LUT sites are occupied, A2 is being used by cell0 so we cannot use it anymore
         Assertions.assertEquals("A5", cell1.getPhysicalPinMapping(pin));
         Assertions.assertEquals(targetNet.getName(),
-                cell1.getEDIFHierCellInst().getPortInst(pin).getHierarchicalNetName());
+                ehpi.getHierarchicalNetName());
+        SitePinInst spiA5 = cell1.getSitePinFromPortInst(ehpi.getPortInst(), null);
+        Assertions.assertEquals("C5", spiA5.getName());
+        Assertions.assertSame(targetNet, spiA5.getNet());
+        Assertions.assertSame(origNet, spiA2.getNet());
     }
-
 
     @Test
     @Disabled("Currently, ECOTools.removeCell() does not work for hierarchical cells. Specifically, for this testcase " +
             "exclusively intra-site routes (e.g. 'processor/data_path_loop[4].small_spm.small_spm_ram.spm_ram/DOA') " +
             "are not removed and appear in the DCP causing Vivado to emit 'placement information for XX sites failed to" +
             "restore' warnings and cells (e.g. 'your_program/ram_4096x8') to be unplaced.")
-    public void testRemoveCell() {
+    public void testRemoveCellHier() {
         Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
         EDIFNetlist netlist = design.getNetlist();
         Map<Net, Set<SitePinInst>> deferredRemovals = new HashMap<>();
@@ -443,8 +457,6 @@ public class TestECOTools {
         Assertions.assertNull(netlist.getHierCellInstFromName(ehciToDelete.getFullHierarchicalInstName()));
 
         DesignTools.batchRemoveSitePins(deferredRemovals, true);
-
-        design.writeCheckpoint("/group/zircon2/eddieh/pb.dcp");
 
         if (FileTools.isVivadoOnPath()) {
             ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);

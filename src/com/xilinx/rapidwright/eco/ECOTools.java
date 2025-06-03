@@ -177,11 +177,21 @@ public class ECOTools {
             // Remove all affected SitePinInsts
             for (EDIFHierPortInst leafEhpi : leafPortInsts) {
                 // Do nothing if we're disconnecting an input, but this leaf pin is not an input
-                if (ehpi.isInput() && !leafEhpi.isInput())
+                if (ehpi.isInput() && !leafEhpi.isInput()) {
                     continue;
+                }
+                String logicalPin = leafEhpi.getPortInst().getName();
 
                 Cell cell = leafEhpi.getPhysicalCell(design);
-                for (SitePinInst spi : cell.getAllSitePinsFromLogicalPin(leafEhpi.getPortInst().getName(), null)) {
+                Cell compLut;
+                if (LUTTools.isCellALUT(cell) && (compLut = LUTTools.getCompanionLUTCell(cell)) != null) {
+                    String physicalPin = cell.getPhysicalPinMapping(logicalPin);
+                    if (compLut.getLogicalPinMapping(physicalPin) != null) {
+                        // Companion LUT exists and also uses this physical pin -- skip removal
+                        continue;
+                    }
+                }
+                for (SitePinInst spi : cell.getAllSitePinsFromLogicalPin(logicalPin, null)) {
                     DesignTools.handlePinRemovals(spi, deferredRemovals);
                 }
             }
