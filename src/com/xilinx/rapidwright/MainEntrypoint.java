@@ -47,6 +47,7 @@ import com.xilinx.rapidwright.device.browser.DeviceBrowser;
 import com.xilinx.rapidwright.device.browser.PBlockGenDebugger;
 import com.xilinx.rapidwright.device.helper.TileColumnPattern;
 import com.xilinx.rapidwright.eco.FanOutOptimization;
+import com.xilinx.rapidwright.eco.LUTInputConeOpt;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFParser;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
@@ -168,6 +169,7 @@ public class MainEntrypoint {
         addFunction("Lesson1", Lesson1::main);
         addFunction("LogicalNetlistExample", LogicalNetlistExample::main);
         addFunction("LogicalNetlistToEdif", LogicalNetlistToEdif::main);
+        addFunction("LUTInputConeOpt", LUTInputConeOpt::main);
         addFunction("LUTTools", LUTTools::main);
         addFunction("MakeBlackBox", MakeBlackBox::main);
         addFunction("MergeDesigns", MergeDesigns::main);
