@@ -122,6 +122,7 @@ public class LUTInputConeOpt {
             // We're inside a macro, pop out one more level
             targetParent = input.getFullHierarchicalInst().getParent().getParent().getCellType();
         }
+        input.getFullHierarchicalInst().ensureAncestorsAreUniquified();
         EDIFCellInst lutInst = optLut.createCellInst("optimized_lut" + EDIFTools.getUniqueSuffix(),
                 targetParent);
         EDIFHierCellInst hierLutInst = input.getHierarchicalInst().getChild(lutInst);
