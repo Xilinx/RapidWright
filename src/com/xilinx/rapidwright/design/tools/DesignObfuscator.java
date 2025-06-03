@@ -165,7 +165,8 @@ public class DesignObfuscator {
     /**
      * Creates a new design that mirrors the provided design in physical
      * implementation, but completely flattens logical hierarchy and obfuscates all
-     * logical names.
+     * logical names. This method preserves netlist properties but removes all XDC
+     * constraints.
      * 
      * @param d The original design
      * @return The flattened, obfuscated design
