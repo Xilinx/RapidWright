@@ -387,7 +387,7 @@ public class TestECOTools {
         Cell testCell = design.getCell("cell1");
         Net testNet = design.getNet("net7");
         
-        // Ensure error is thrown in pin is still connected to a net
+        // Ensure error is thrown if pin is still connected to a net
         Assertions.assertThrows(RuntimeException.class, () -> {ECOTools.connectNet(design, testCell, "I0", testNet);},
                 "ERROR: Pin cell1/I0 already connected to net net5 please run ECOTools.disconnectNet() first.");
     }
