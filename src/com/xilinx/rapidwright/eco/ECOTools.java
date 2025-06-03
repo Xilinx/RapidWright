@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023, 2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Advanced Micro Devices, Inc.
@@ -180,18 +180,18 @@ public class ECOTools {
                 if (ehpi.isInput() && !leafEhpi.isInput()) {
                     continue;
                 }
-                String logicalPin = leafEhpi.getPortInst().getName();
 
                 Cell cell = leafEhpi.getPhysicalCell(design);
-                Cell compLut;
-                if (LUTTools.isCellALUT(cell) && (compLut = LUTTools.getCompanionLUTCell(cell)) != null) {
-                    String physicalPin = cell.getPhysicalPinMapping(logicalPin);
-                    if (compLut.getLogicalPinMapping(physicalPin) != null) {
-                        // Companion LUT exists and also uses this physical pin -- skip removal
+                String logicalPin = leafEhpi.getPortInst().getName();
+                for (SitePinInst spi : cell.getAllSitePinsFromLogicalPin(logicalPin, null)) {
+                    List<EDIFHierPortInst> portInstsOnSpi = DesignTools.getPortInstsFromSitePinInst(spi);
+                    boolean removed = portInstsOnSpi.remove(leafEhpi);
+                    assert(removed);
+                    if (!portInstsOnSpi.isEmpty()) {
+                        // SPI also services a different logical port inst; skip
                         continue;
                     }
-                }
-                for (SitePinInst spi : cell.getAllSitePinsFromLogicalPin(logicalPin, null)) {
+
                     DesignTools.handlePinRemovals(spi, deferredRemovals);
                 }
             }
@@ -448,14 +448,13 @@ public class ECOTools {
                                     String newPhysPin = LUTTools.getFreePhysicalLUTInputPin(cell);
                                     if (newPhysPin != null) {
                                         cell.removePinMapping(physicalPinName);
-                                        cell.addPinMapping(newPhysPin, ehpi.getPortInst().getName());
-                                        physicalPinName = newPhysPin;
+                                        cell.addPinMapping(newPhysPin, logicalPinName);
                                         String newSpiName = cell.getBELName().charAt(0) + newPhysPin.substring(1);
                                         newPhysNet.createPin(newSpiName, cell.getSiteInst());
                                         continue nextNet;
                                     } else {
                                         throw new RuntimeException("ERROR: Couldn't find a free physical pin on LUT " 
-                                                + cell.getName() + " to connect net " + otherParentNet);
+                                                + cell.getName() + " to connect net " + parentNet);
                                     }
                                 } else {
                                     String message = "Site pin " + spi.getSitePinName() + " cannot be used " +

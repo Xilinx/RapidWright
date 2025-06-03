@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Advanced Micro Devices, Inc.
@@ -428,6 +428,18 @@ public class TestECOTools {
         Assertions.assertEquals("C5", spiA5.getName());
         Assertions.assertSame(targetNet, spiA5.getNet());
         Assertions.assertSame(origNet, spiA2.getNet());
+
+        // Now disconnect from cell0 too
+        ECOTools.disconnectNet(design, cell0.getEDIFHierCellInst().getPortInst(pin));
+        // Connect that to targetNet too
+        ECOTools.connectNet(design, cell0, pin, targetNet);
+        // Currently it use the existing A2 input
+        // TODO: Expect it to re-use A5
+        Assertions.assertEquals("A2", cell0.getPhysicalPinMapping(pin));
+        Assertions.assertEquals(targetNet.getName(),
+                cell0.getEDIFHierCellInst().getPortInst(pin).getHierarchicalNetName());
+        Assertions.assertSame(/*spiA5*/ spiA2, cell0.getSitePinFromPortInst(ehpi.getPortInst(), null));
+        Assertions.assertSame(targetNet, /*spiA5*/spiA2.getNet());
     }
 
     @Test
