@@ -464,17 +464,7 @@ public class Connection implements Comparable<Connection>{
     }
 
     public void setAllTargets(RWRoute.ConnectionState state) {
-        if (sinkRnode.countConnectionsOfUser(netWrapper) == 1 ||
-            sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE) {
-            // Since this connection will have been ripped up, only mark a node
-            // as a target if it's not already used by this net.
-            // This prevents -- for the case where the same net needs to be routed
-            // to the same LUT more than once -- the illegal case of the same
-            // physical pin servicing more than one logical pin
-            sinkRnode.markTarget(state);
-        } else {
-            assert(altSinkRnodes != null && !altSinkRnodes.isEmpty());
-        }
+        sinkRnode.markTarget(state);
         if (altSinkRnodes != null) {
             for (RouteNode rnode : altSinkRnodes) {
                 // Same condition as above: only allow this as an alternate sink
