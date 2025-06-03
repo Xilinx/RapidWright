@@ -431,6 +431,7 @@ public class TestECOTools {
 
         // Now disconnect from cell0 too
         ECOTools.disconnectNet(design, cell0.getEDIFHierCellInst().getPortInst(pin));
+        Assertions.assertNull(spiA2.getNet());
         // Connect that to targetNet too
         ECOTools.connectNet(design, cell0, pin, targetNet);
         // Currently it use the existing A2 input
