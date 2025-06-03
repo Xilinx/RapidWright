@@ -434,7 +434,7 @@ public class TestECOTools {
         Assertions.assertNull(spiA2.getNet());
         // Connect that to targetNet too
         ECOTools.connectNet(design, cell0, pin, targetNet);
-        // Currently it use the existing A2 input
+        // Check that it overwrites its existing A2 input
         // TODO: Expect it to re-use A5
         Assertions.assertEquals("A2", cell0.getPhysicalPinMapping(pin));
         Assertions.assertEquals(targetNet.getName(),
