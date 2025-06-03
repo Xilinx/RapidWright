@@ -57,8 +57,9 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 
 /**
  * Flattens a design and obfuscates all of the names to SHA256 hashes. Note that
- * time stamps are used to pepper the inputs and ensure that the hashes are
- * different each time the application is run.
+ * the default constructor uses the current time to pepper the inputs to ensure
+ * that the obfuscated output is different each time the application is run.
+ * This behavior can be overridden by using the DesignObfuscator(String) constructor.
  */
 public class DesignObfuscator {
 
