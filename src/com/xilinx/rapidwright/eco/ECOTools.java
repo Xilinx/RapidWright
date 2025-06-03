@@ -185,8 +185,9 @@ public class ECOTools {
                 String logicalPin = leafEhpi.getPortInst().getName();
                 for (SitePinInst spi : cell.getAllSitePinsFromLogicalPin(logicalPin, null)) {
                     List<EDIFHierPortInst> portInstsOnSpi = DesignTools.getPortInstsFromSitePinInst(spi);
-                    boolean removed = portInstsOnSpi.remove(leafEhpi);
-                    assert(removed);
+                    assert(portInstsOnSpi.contains(leafEhpi));
+                    boolean removedAnything = portInstsOnSpi.removeAll(leafPortInsts);
+                    assert(removedAnything);
                     if (!portInstsOnSpi.isEmpty()) {
                         // SPI also services a different logical port inst; skip
                         continue;

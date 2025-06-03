@@ -141,7 +141,7 @@ public class TestECOTools {
         }
         deferredRemovals.clear();
 
-        // *** Externally routed many-pin net (input pin)
+        // *** Externally routed many-pin net (input pin of LUT6_2 macro)
         {
             EDIFHierPortInst ehpi = netlist.getHierPortInstFromName("processor/stack_loop[4].upper_stack.stack_pointer_lut/I0");
             Net net = design.getNet(netlist.getParentNetName(ehpi.getHierarchicalNetName()));
