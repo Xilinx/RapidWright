@@ -273,10 +273,9 @@ public class DesignObfuscator {
                     oNet = obfuscatedDesign.createNet(oNetName);
                 }
                 for (String siteWireName : e.getValue()) {
-                    // TODO
-                    // oSI.routeIntraSiteNet(oNet, siteWireName);
                     BELPin[] pins = si.getSiteWirePins(siteWireName);
                     if (pins.length == 0) {
+                        // Ignore bi-directional site wires, will be resolved in Vivado
                         continue;
                     }
                     BELPin pin = pins[0];
