@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2018-2022, Xilinx, Inc.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -211,7 +211,7 @@ public class LUTTools {
     /**
      * If the provided cell instance is a LUT, it will return the LUT input count.
      * If it is not a LUT, it will return 0.
-     *
+     * 
      * @param c The LUT cell
      * @return The number of LUT inputs or 0 if cell is not a LUT.
      */
@@ -222,7 +222,7 @@ public class LUTTools {
     /**
      * Given a LUT BEL, get the size of the LUT (generally 5 or 6). If the BEL is
      * not a LUT type, it returns -1.
-     *
+     * 
      * @param bel The BEL to query
      * @return The size of the LUT, or -1 if the BEL is not a LUT.
      */
@@ -232,6 +232,7 @@ public class LUTTools {
 
     /**
      * Extracts the length value from the INIT String (16, in 16'hA8A2)
+     * 
      * @param init The init string.
      * @return The init length.
      */
@@ -432,11 +433,23 @@ public class LUTTools {
         return getLUTEquation(init);
     }
 
+    /**
+     * Reads the init string in this LUT and creates an equivalent (non-optimal)
+     * equation.
+     * 
+     * @param i The LUT instance
+     * @return The equation following LUT equation syntax or null if cell is not
+     *         configured.
+     */
+    public static String getLUTEquation(EDIFHierCellInst i) {
+        return getLUTEquation(i.getInst());
+    }
 
     /**
-     * Creates a (dumb, non-reduced) boolean logic equation compatible
-     * with Vivado's LUT Equation Editor from an INIT string.
-     * TODO - Enhance with a logic minimization method such as Quine-McCluskey method.
+     * Creates a (dumb, non-reduced) boolean logic equation compatible with Vivado's
+     * LUT Equation Editor from an INIT string. TODO - Enhance with a logic
+     * minimization method such as Quine-McCluskey method.
+     * 
      * @param init The existing INIT string configuring a LUT.
      * @return A Vivado LUT Equation Editor compatible equation.
      */
@@ -494,6 +507,39 @@ public class LUTTools {
             }
 
         }
+    }
+
+    /**
+     * Given a placed LUT cell, this method will find and return the fastest free
+     * physical LUT input pin available for use.
+     *
+     * Note: This method examines the logical-physical pin mapping of the give LUT
+     *       cell (and any companion LUT cell) to determine if a physical LUT
+     *       pin is free. Currently, it does not check if the logical LUT pin
+     *       behind that physical pin is actually connected in the logical netlist.
+     *       In addition, this method does not seek to re-use physical pins (when
+     *       given any new net to be connected) already in-use by the given or
+     *       companion LUTs.
+     *
+     * @param lut The current LUT to query for a free physical pin.
+     * @return The fastest available LUT input pin compatible with the current
+     *         placement.
+     */
+    public static String getFreePhysicalLUTInputPin(Cell lut) {
+        if (isCellALUT(lut) && lut.isPlaced()) {
+            Cell oLUT = LUTTools.getCompanionLUTCell(lut);
+            Map<String, String> pinMap = oLUT == null ? Collections.emptyMap() : oLUT.getPinMappingsP2L();
+            int start = getLUTSize(lut.getBEL());
+            start = start == 6 && oLUT != null ? 5 : start;
+            // Search starting at the fastest LUT inputs first
+            for (int i = start; i >= 1; i--) {
+                String physName = "A" + i;
+                if (lut.getLogicalPinMapping(physName) == null && pinMap.get(physName) == null) {
+                    return physName;
+                }
+            }
+        }
+        return null;
     }
 
     /**
