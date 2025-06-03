@@ -37,6 +37,7 @@ import com.xilinx.rapidwright.design.blocks.ImplGuide;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockGenerator;
 import com.xilinx.rapidwright.design.merge.MergeDesigns;
+import com.xilinx.rapidwright.design.tools.DesignObfuscator;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.design.tools.RegroupInstances;
 import com.xilinx.rapidwright.design.tools.RelocationTools;
@@ -142,6 +143,7 @@ public class MainEntrypoint {
         addFunction("DecomposeLUT", DecomposeLUT::main);
         addFunction("DesignImplementationDiff", DesignImplementationDiff::main);
         addFunction("DesignInstrumentor", DesignInstrumentor::main);
+        addFunction("DesignObfuscator", DesignObfuscator::main);
         addFunction("DeviceBrowser", DeviceBrowser::main);
         addFunction("DeviceLoader", DeviceLoader::main);
         addFunction("DeviceResourcesExample", DeviceResourcesExample::main);

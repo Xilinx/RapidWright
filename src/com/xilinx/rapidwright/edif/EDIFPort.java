@@ -348,5 +348,14 @@ public class EDIFPort extends EDIFPropertyObject {
         if (leftBracket == -1 && otherLeftBracket == -1) return true;
         return name.regionMatches(leftBracket, otherName, otherLeftBracket, len);
     }
+
+    public String getBusRange() {
+        String name = getName();
+        int leftBracket = name.lastIndexOf('[');
+        if (leftBracket == -1) {
+            return "";
+        }
+        return name.substring(leftBracket);
+    }
 }
 
