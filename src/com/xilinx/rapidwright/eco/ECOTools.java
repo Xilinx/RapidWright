@@ -448,11 +448,7 @@ public class ECOTools {
                                 // different net than the new one we're trying to connect up
                                 if (LUTTools.isCellALUT(cell)) {
                                     // Check if we can map to a different physical pin
-                                    String newPhysPin = LUTTools.getFreePhysicalLUTInputPin(cell);
-                                    if (newPhysPin != null) {
-                                        cell.removePinMapping(physicalPinName);
-                                        cell.addPinMapping(newPhysPin, logicalPinName);
-                                        createExitSitePinInst(design, ehpi, newPhysNet);
+                                    if (createExitSitePinInst(design, ehpi, newPhysNet) != null) {
                                         continue nextLeafPin;
                                     }
                                 }
@@ -483,8 +479,8 @@ public class ECOTools {
                                 throw new RuntimeException("ERROR: Failed to unroute intra-site connection " +
                                         spi.getSiteInst().getSiteName() + "/" + spi.getBELPin() + " to " + snkBp + ".");
                             }
-                            boolean preserveOtherRoutes = true;
                             if (oldPhysNet != null) {
+                                boolean preserveOtherRoutes = true;
                                 oldPhysNet.removePin(spi, preserveOtherRoutes);
                                 if (RouterHelper.isLoadLessNet(oldPhysNet) && oldPhysNet.hasPIPs()) {
                                     // Since oldPhysNet has no sink pins left, yet still has PIPs, then it may
@@ -514,6 +510,9 @@ public class ECOTools {
                     String logicalPinName = ehpi.getPortInst().getName();
                     if (cell.getAllPhysicalPinMappings(logicalPinName) != null) {
                         createExitSitePinInst(design, ehpi, newPhysNet);
+                    } else {
+                        // TODO: Find a new physical pin mapping
+                        throw new RuntimeException("ERROR: No logical-physical pin mapping found for pin '" + ehpi + "'");
                     }
                 }
             }
@@ -979,7 +978,24 @@ public class ECOTools {
                 // Site Pin not currently used or was driven by site port
             }
 
-            spi = net.createPin(sitePinName, si);
+            if (si.getSitePinInst(sitePinName) == null) {
+                spi = net.createPin(sitePinName, si);
+            } else if (LUTTools.isCellALUT(cell)) {
+                // Check if we can map to a different physical pin
+                String newPhysPin = LUTTools.getUnmappedPhysicalLUTInputPin(cell);
+                if (newPhysPin != null) {
+                    String physicalPinName = cell.getPhysicalPinMapping(logicalPinName);
+                    cell.removePinMapping(physicalPinName);
+                    cell.addPinMapping(newPhysPin, logicalPinName);
+                    spi = createExitSitePinInst(design, ehpi, net);
+                }
+                // TODO: Also check for:
+                //       (a) reusing a physical pin (on the current LUT or its companion) that is
+                //           already providing 'net'
+                //       (b) reclaiming a mapped physical pin that corresponds to an unconnected
+                //           logical pin
+            }
+
             break;
         }
 

@@ -510,22 +510,16 @@ public class LUTTools {
     }
 
     /**
-     * Given a placed LUT cell, this method will find and return the fastest free
-     * physical LUT input pin available for use.
-     *
-     * Note: This method examines the logical-physical pin mapping of the give LUT
-     *       cell (and any companion LUT cell) to determine if a physical LUT
-     *       pin is free. Currently, it does not check if the logical LUT pin
-     *       behind that physical pin is actually connected in the logical netlist.
-     *       In addition, this method does not seek to re-use physical pins (when
-     *       given any new net to be connected) already in-use by the given or
-     *       companion LUTs.
+     * Given a placed LUT cell, this method will find and return the fastest unmapped
+     * physical LUT input pin available for use, where unmapped means that it does
+     * not already participate in any pin mappings on the given LUT cell or its
+     * companion LUT cell if one exists.
      *
      * @param lut The current LUT to query for a free physical pin.
-     * @return The fastest available LUT input pin compatible with the current
+     * @return The fastest available unmapped LUT input pin compatible with the current
      *         placement.
      */
-    public static String getFreePhysicalLUTInputPin(Cell lut) {
+    public static String getUnmappedPhysicalLUTInputPin(Cell lut) {
         if (isCellALUT(lut) && lut.isPlaced()) {
             Cell oLUT = LUTTools.getCompanionLUTCell(lut);
             Map<String, String> pinMap = oLUT == null ? Collections.emptyMap() : oLUT.getPinMappingsP2L();
