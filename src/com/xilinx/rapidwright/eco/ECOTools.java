@@ -411,7 +411,7 @@ public class ECOTools {
                 }
             }
 
-            for (EDIFHierPortInst ehpi : leafEdifPins) {
+            nextLeafPin: for (EDIFHierPortInst ehpi : leafEdifPins) {
                 if (ehpi.isOutput()) {
                     continue;
                 }
@@ -444,15 +444,16 @@ public class ECOTools {
                             // TODO: Use getLeafHierPortInst() to get parent net?
                             EDIFHierNet otherParentNet = netlist.getParentNet(otherEhpi.getHierarchicalNet());
                             if (!otherParentNet.equals(parentNet)) {
+                                // This SPI also services a different port inst that is connected to a
+                                // different net than the new one we're trying to connect up
                                 if (LUTTools.isCellALUT(cell)) {
                                     // Check if we can map to a different physical pin
                                     String newPhysPin = LUTTools.getFreePhysicalLUTInputPin(cell);
                                     if (newPhysPin != null) {
                                         cell.removePinMapping(physicalPinName);
                                         cell.addPinMapping(newPhysPin, logicalPinName);
-                                        String newSpiName = cell.getBELName().charAt(0) + newPhysPin.substring(1);
-                                        newPhysNet.createPin(newSpiName, cell.getSiteInst());
-                                        continue nextNet;
+                                        createExitSitePinInst(design, ehpi, newPhysNet);
+                                        continue nextLeafPin;
                                     }
                                 }
                                 String message = "Site pin " + spi.getSitePinName() + " cannot be used " +
