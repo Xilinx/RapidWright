@@ -1,5 +1,5 @@
 {
     "recommendations": [
-        "vscjava.vscode-java-pack",  // General Java startup extension pack
+        "vscjava.vscode-java-pack",
     ],
 }
