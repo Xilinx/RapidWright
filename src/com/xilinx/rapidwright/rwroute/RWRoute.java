@@ -1515,9 +1515,9 @@ public class RWRoute {
                 rnodes = rnodes.subList(1, rnodes.size() - 1);
             }
         } else {
-            // sinkRnode could be an alternate sink (in which case it is not exclusive)
+            // sinkRnode could be an alternate sink
             assert(isValidSink(connection, sinkRnode));
-            // Rip up all used nodes
+            // In which case it cannot be exclusive -- rip up all used nodes
         }
 
         NetWrapper netWrapper = connection.getNetWrapper();
@@ -1547,9 +1547,9 @@ public class RWRoute {
                 rnodes = rnodes.subList(1, rnodes.size() - 1);
             }
         } else {
-            // sinkRnode could be an alternate sink (in which case it is not exclusive)
+            // sinkRnode could be an alternate sink
             assert(isValidSink(connection, sinkRnode));
-            // Increment all used nodes
+            // In which case it cannot be exclusive -- increment all used nodes
         }
 
         NetWrapper netWrapper = connection.getNetWrapper();
