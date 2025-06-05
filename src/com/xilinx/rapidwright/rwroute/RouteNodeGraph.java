@@ -887,8 +887,8 @@ public class RouteNodeGraph {
                     // BOUNCEs are only accessible through INODEs, so transitively this intent code is unreachable
                     break;
                 case NODE_IMUX:
-                    // IMUXes that are not our target EXCLUSIVE_SINK will have been isExcluded() from the graph unless LUT routethrus are enabled
-                    assert(lutRoutethru);
+                    // IMUXes that are not our target EXCLUSIVE_SINK will have been isExcluded() from the graph unless
+                    // LUT routethrus are enabled (which would have already returned true above)
                     break;
                 case NODE_PINFEED:
                     // Expected to be projected away
