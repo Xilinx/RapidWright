@@ -252,7 +252,29 @@ public class PartialRouter extends RWRoute {
             for (Net net : unpreserveNets) {
                 System.out.println("\t" + net);
                 assert(!net.isStaticNet());
-                unpreserveNet(net);
+                NetWrapper netWrapper = unpreserveNet(net);
+                for (Connection connection : netWrapper.getConnections()) {
+                    List<RouteNode> rnodes = connection.getRnodes();
+                    if (rnodes.size() < 3) {
+                        continue;
+                    }
+                    // Look for overused exclusive sinks within
+                    // this connection's used nodes (except for the first and last used node,
+                    // corresponding to source and sink)
+                    for (RouteNode rnode : rnodes.subList(1, rnodes.size() - 1)) {
+                        if (!rnode.getType().isAnyExclusiveSink() || !rnode.isOverUsed()) {
+                            continue;
+                        }
+
+                        // If an overused exclusive sink is found -- it must also be used
+                        // by the net to which that sink belongs to, so rip up this connection's
+                        // routing
+                        ripUp(connection);
+                        connection.resetRoute();
+                        connection.setRouted(false);
+                        break;
+                    }
+                }
             }
         }
     }
