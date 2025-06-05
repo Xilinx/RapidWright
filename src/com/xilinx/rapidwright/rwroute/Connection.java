@@ -467,15 +467,10 @@ public class Connection implements Comparable<Connection>{
         sinkRnode.markTarget(state);
         if (altSinkRnodes != null) {
             for (RouteNode rnode : altSinkRnodes) {
-                // Same condition as above: only allow this as an alternate sink
-                // if it's not already in use by the current net to prevent the case
-                // where the same physical pin services more than one logical pin
-                if (rnode.countConnectionsOfUser(netWrapper) == 0 ||
-                    // Except if it is not an EXCLUSIVE_SINK
-                    !rnode.getType().isAnyExclusiveSink()) {
-                    assert(rnode.getIntentCode() != IntentCode.NODE_PINBOUNCE);
-                    rnode.markTarget(state);
-                }
+                assert(rnode.countConnectionsOfUser(netWrapper) == 0);
+                assert(!rnode.getType().isAnyExclusiveSink());
+                assert(rnode.getIntentCode() != IntentCode.NODE_PINBOUNCE);
+                rnode.markTarget(state);
             }
         }
     }
