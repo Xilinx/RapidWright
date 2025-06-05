@@ -22,7 +22,6 @@
 
 package com.xilinx.rapidwright.util;
 
-import java.io.FileNotFoundException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -246,7 +245,13 @@ public class CodeGenerator {
         }
         for (String pinMap : pinMaps) {
             int colonIdx = pinMap.indexOf(':');
-            c.addPinMapping(pinMap.substring(0, colonIdx), pinMap.substring(colonIdx + 1));
+            String logPin = pinMap.substring(colonIdx + 1);
+            if (logPin.equals("null")) {
+                c.removePinMapping(pinMap.substring(0, colonIdx));
+            } else {
+                c.addPinMapping(pinMap.substring(0, colonIdx), logPin);
+            }
+
         }
         return c;
     }
