@@ -138,7 +138,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
             case LAGUNA_PINFEED:
                 // Make all approaches to SLLs zero-cost to encourage exploration
                 // Assigning a base cost of zero would normally break congestion resolution
-                // (since RWroute.getNodeCost() would return zero) but doing it here should be
+                // (since RWRoute.getNodeCost() would return zero) but doing it here should be
                 // okay because this node only leads to a SLL which will have a non-zero base cost
                 baseCost = 0.0f;
                 return;
