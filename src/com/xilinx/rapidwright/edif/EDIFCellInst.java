@@ -63,13 +63,15 @@ public class EDIFCellInst extends EDIFPropertyObject {
     }
 
     /**
-     * Copy constructor.  Creates new objects except portInsts.
-     * @param inst Prototype instance to copy
+     * Copy constructor. Creates new objects except portInsts.
+     * 
+     * @param inst   Prototype instance to copy
+     * @param parent The parent cell to which the new instance should belong.
      */
     public EDIFCellInst(EDIFCellInst inst, EDIFCell parentCell) {
         super((EDIFPropertyObject)inst);
-        setParentCell(parentCell);
         setCellType(inst.cellType);
+        setParentCell(parentCell);
         setViewref(new EDIFName(inst.viewref));
     }
 
