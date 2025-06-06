@@ -108,6 +108,9 @@ public class RouteNodeGraph {
     /** Flag for whether LUT routethrus are to be considered */
     protected final boolean lutRoutethru;
 
+    /** Flag for whether LUT pin swapping is to be considered */
+    protected final boolean lutPinSwapping;
+
     /** Map indicating (for UltraScale/UltraScale+ only) the subset wire indices of a NODE_LOCAL that are
      *  what RWRoute should assign a LOCAL_* type, e.g. excluding INT_NODE_SDQ_*
      */
@@ -134,6 +137,7 @@ public class RouteNodeGraph {
     public RouteNodeGraph(Design design, RWRouteConfig config) {
         this.design = design;
         lutRoutethru = config.isLutRoutethru();
+        lutPinSwapping = config.isLutPinSwapping();
 
         this.nodesMap = new RouteNode[getTileCount(design)][];
         nodesMapSize = new AtomicInteger();
@@ -617,8 +621,8 @@ public class RouteNodeGraph {
                 // PINFEEDs can lead to a site pin, or into a Laguna tile
                 if (childRnode != null) {
                     assert(childRnode.getType().isAnyExclusiveSink() ||
-                            childRnode.getType() == RouteNodeType.LAGUNA_PINFEED ||
-                            (lutRoutethru && childRnode.getType().isAnyLocal()));
+                           childRnode.getType() == RouteNodeType.LAGUNA_PINFEED ||
+                           ((lutRoutethru || lutPinSwapping) && childRnode.getType().isAnyLocal()));
                 } else if (!lutRoutethru) {
                     // child does not already exist in our routing graph, meaning it's not a used site pin
                     // in our design, but it could be a LAGUNA_I
@@ -798,12 +802,18 @@ public class RouteNodeGraph {
         // (c) on the same side as the sink
         Tile sinkTile = sinkRnode.getTile();
         switch (sinkRnode.getType()) {
+            case LOCAL_EAST:
+                assert(lutPinSwapping && connection.hasAltSinks());
+                // Fall-through
             case EXCLUSIVE_SINK_EAST:
                 if (type == RouteNodeType.LOCAL_WEST || type == RouteNodeType.LOCAL_RESERVED) {
                     // West wires can never reach an east sink
                     return false;
                 }
                 break;
+            case LOCAL_WEST:
+                assert(lutPinSwapping && connection.hasAltSinks());
+                // Fall-through
             case EXCLUSIVE_SINK_WEST:
                 if (type == RouteNodeType.LOCAL_EAST || type == RouteNodeType.LOCAL_RESERVED) {
                     // East wires can never reach a west sink
@@ -907,6 +917,10 @@ public class RouteNodeGraph {
     }
 
     protected boolean allowRoutethru(Node head, Node tail) {
+        if (!lutRoutethru) {
+            return false;
+        }
+
         if (!Utils.isCLB(tail.getTile().getTileTypeEnum())) {
             return false;
         }
@@ -918,9 +932,6 @@ public class RouteNodeGraph {
                    head.getIntentCode() == IntentCode.NODE_PINBOUNCE);
             return false;
         }
-
-        // Should not get to this point unless LUT routethru-s are enabled
-        assert(lutRoutethru);
 
         if (!RouteThruHelper.isRouteThruPIPAvailable(design, head, tail)) {
             return false;
