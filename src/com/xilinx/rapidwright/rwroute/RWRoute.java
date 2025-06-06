@@ -1870,9 +1870,12 @@ public class RWRoute {
 
             if (childRNode.isTarget()) {
                 boolean earlyTermination;
-                if (childRNode == connection.getSinkRnode() && !connection.hasAltSinks()) {
+                if (childRNode.getType().isAnyExclusiveSink()) {
                     // This sink must be exclusively reserved for this connection already
-                    assert(childRNode.getOccupancy() == 1 ||
+                    assert(childRNode == connection.getSinkRnode() && !connection.hasAltSinks());
+                    assert(!childRNode.isOverUsed());
+                    assert(!childRNode.willOverUse(connection.getNetWrapper()));
+                    assert(childRNode.countConnectionsOfUser(connection.getNetWrapper()) == 1 ||
                            childRNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
                     earlyTermination = true;
                 } else {
@@ -1933,6 +1936,9 @@ public class RWRoute {
                         if (!isAccessibleSink(childRNode, connection)) {
                             continue;
                         }
+                        assert(childRNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
+                        assert(childRNode.countConnectionsOfUser(connection.getNetWrapper()) > 0);
+                        assert(!childRNode.willOverUse(connection.getNetWrapper()));
                         break;
                     case LAGUNA_PINFEED:
                         if (!connection.isCrossSLR() ||
@@ -2034,7 +2040,8 @@ public class RWRoute {
                     }
                 }
 
-                // Account for any detours that must be taken to get to and back from the closest Laguna column
+                // Account for any detours that must be taken to get to the closest Laguna column
+                // and from there onto the sink
                 int nextLagunaColumn = routingGraph.nextLagunaColumn[childX];
                 int prevLagunaColumn = routingGraph.prevLagunaColumn[childX];
                 int nextLagunaColumnDeltaX = (nextLagunaColumn == Integer.MAX_VALUE) ? Integer.MAX_VALUE :
