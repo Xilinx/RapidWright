@@ -2089,15 +2089,13 @@ public class RWRoute {
         }
 
         float baseCost = rnode.getBaseCost();
-        float biasCost = 0;
-        if (!rnode.isTarget() && rnode.getType() != RouteNodeType.SUPER_LONG_LINE) {
-            NetWrapper net = connection.getNetWrapper();
-            float distToCenter = Math.abs(rnode.getEndTileXCoordinate() - net.getXCenter()) +
-                    Math.abs(rnode.getEndTileYCoordinate() - net.getYCenter());
-            biasCost = baseCost / net.getConnections().size() * distToCenter / net.getDoubleHpwl();
-        }
-
-        return baseCost * rnode.getHistoricalCongestionCost() * presentCongestionCost / sharingFactor + biasCost;
+        NetWrapper net = connection.getNetWrapper();
+        float distToCenter = Math.abs(rnode.getEndTileXCoordinate() - net.getXCenter()) + Math.abs(rnode.getEndTileYCoordinate() - net.getYCenter());
+        // CRoute paper states that the bias factor cannot be more than half of the wire cost
+        // (it may exceed this here because we may not be using the minimum-sized bounding box)
+        float biasCost = baseCost / net.getConnections().size() * distToCenter / net.getDoubleHpwl();
+        float nodeCost = baseCost * rnode.getHistoricalCongestionCost() * presentCongestionCost / sharingFactor;
+        return nodeCost + Math.min(biasCost, nodeCost / 2);
     }
 
     /**
