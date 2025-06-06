@@ -385,7 +385,7 @@ public class RouteNodeGraph {
                             }
                         }
 
-                        // Examine all wires in Laguna tile. Record those uphill of a Super Long Line
+                        // Examine all wires in each Laguna tile. Record those uphill of a Super Long Line
                         // that originates in an INT tile (and thus must be a NODE_PINFEED).
                         for (int wireIndex = 0; wireIndex < tile.getWireCount(); wireIndex++) {
                             if (!tile.getWireName(wireIndex).startsWith("UBUMP")) {
@@ -784,14 +784,14 @@ public class RouteNodeGraph {
             return true;
         }
 
-        // (b) needs to cross an SLR and this is a Laguna column
-        // TODO: (Future optimization) Don't just check for Laguna columns, check for Laguna rows too
+        // (b) needs to cross an SLR and this is a Laguna tile
         Tile childTile = childRnode.getTile();
         RouteNode sinkRnode = connection.getSinkRnode();
         int childX = childTile.getTileXCoordinate();
         if (connection.isCrossSLR() &&
                 childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this) &&
-                nextLagunaColumn[childX] == childX) {
+                lagunaI.get(childTile) != null) {
+            assert(nextLagunaColumn[childX] == childX);
             return true;
         }
 
