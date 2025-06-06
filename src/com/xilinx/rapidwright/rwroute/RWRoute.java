@@ -727,16 +727,17 @@ public class RWRoute {
                 }
 
                 if (!connection.hasAltSinks()) {
-                    // Since this connection only has a single sink target, increment
-                    // its usage here immediately
-                    sinkRnode.incrementUser(netWrapper);
-
+                    // Since this connection only has a single sink target, make it exclusive
                     sinkType = sinkType == RouteNodeType.LOCAL_EAST ? RouteNodeType.EXCLUSIVE_SINK_EAST :
                                sinkType == RouteNodeType.LOCAL_WEST ? RouteNodeType.EXCLUSIVE_SINK_WEST :
                                sinkType == RouteNodeType.LOCAL_BOTH ? RouteNodeType.EXCLUSIVE_SINK_BOTH :
                                null;
                     assert(sinkType != null);
                     sinkRnode.setType(sinkType);
+
+                    // And increment its usage here immediately
+                    assert(sinkRnode.getOccupancy() == 0);
+                    sinkRnode.incrementUser(netWrapper);
                 }
 
                 connection.setDirect(false);
