@@ -784,7 +784,7 @@ public class RouteNodeGraph {
             return true;
         }
 
-        // (b) needs to cross an SLR and this is a Laguna tile
+        // (b) needs to cross an SLR and this is an INT tile that services a Laguna
         Tile childTile = childRnode.getTile();
         RouteNode sinkRnode = connection.getSinkRnode();
         int childX = childTile.getTileXCoordinate();
