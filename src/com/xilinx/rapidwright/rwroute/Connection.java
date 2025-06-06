@@ -296,7 +296,7 @@ public class Connection implements Comparable<Connection>{
         } else {
             assert(!altSinkRnodes.contains(sinkRnode));
         }
-        assert(sinkRnode.getType().isAnyExclusiveSink() ||
+        assert(!sinkRnode.getType().isAnyExclusiveSink() ||
                // Can be a WIRE if node is not exclusive a sink
                sinkRnode.getType() == RouteNodeType.NON_LOCAL);
         altSinkRnodes.add(sinkRnode);

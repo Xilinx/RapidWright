@@ -661,11 +661,6 @@ public class RWRoute {
                 boolean forceSink = true;
                 RouteNodeType sinkType = RouteNodeInfo.getType(sinkINTNode, null, routingGraph, forceSink);
                 assert(sinkType.isAnyLocal());
-                sinkType = sinkType == RouteNodeType.LOCAL_EAST ? RouteNodeType.EXCLUSIVE_SINK_EAST :
-                           sinkType == RouteNodeType.LOCAL_WEST ? RouteNodeType.EXCLUSIVE_SINK_WEST :
-                           sinkType == RouteNodeType.LOCAL_BOTH ? RouteNodeType.EXCLUSIVE_SINK_BOTH :
-                           null;
-                assert(sinkType != null);
                 RouteNode sinkRnode = routingGraph.getOrCreate(sinkINTNode, sinkType);
                 sinkRnode.setType(sinkType);
                 connection.setSinkRnode(sinkRnode);
@@ -685,8 +680,6 @@ public class RWRoute {
                 int numberOfSwappablePins = (lutPinSwapping && sink.isLUTInputPin())
                         ? LUTTools.MAX_LUT_SIZE : 0;
                 if (numberOfSwappablePins > 0) {
-                    assert(sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_EAST || sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_WEST);
-
                     for (Cell cell : DesignTools.getConnectedCells(sink)) {
                         BEL bel = cell.getBEL();
                         assert(bel.isLUT());
@@ -728,8 +721,8 @@ public class RWRoute {
                     if (routingGraph.isPreserved(node)) {
                         continue;
                     }
-                    RouteNode altSinkRnode = routingGraph.getOrCreate(node, sinkRnode.getType());
-                    assert(altSinkRnode.getType().isAnyExclusiveSink());
+                    RouteNode altSinkRnode = routingGraph.getOrCreate(node, sinkType);
+                    assert(altSinkRnode.getType() == sinkType);
                     connection.addAltSinkRnode(altSinkRnode);
                 }
 
@@ -737,6 +730,13 @@ public class RWRoute {
                     // Since this connection only has a single sink target, increment
                     // its usage here immediately
                     sinkRnode.incrementUser(netWrapper);
+
+                    sinkType = sinkType == RouteNodeType.LOCAL_EAST ? RouteNodeType.EXCLUSIVE_SINK_EAST :
+                               sinkType == RouteNodeType.LOCAL_WEST ? RouteNodeType.EXCLUSIVE_SINK_WEST :
+                               sinkType == RouteNodeType.LOCAL_BOTH ? RouteNodeType.EXCLUSIVE_SINK_BOTH :
+                               null;
+                    assert(sinkType != null);
+                    sinkRnode.setType(sinkType);
                 }
 
                 connection.setDirect(false);
