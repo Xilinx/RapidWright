@@ -407,32 +407,33 @@ public class RouteNodeGraph {
                             if (!tile.getWireName(wireIndex).startsWith("UBUMP")) {
                                 continue;
                             }
-                            Node sllNode = Node.getNode(tile, wireIndex);
-                            for (Node uphill1 : sllNode.getAllUphillNodes()) {
-                                if (uphill1.isTiedToVcc()) {
+                            Node sll = Node.getNode(tile, wireIndex);
+                            for (Node txOut : sll.getAllUphillNodes()) {
+                                if (txOut.isTiedToVcc()) {
                                     continue;
                                 }
-                                List<Node> uphill1Nodes = uphill1.getAllUphillNodes();
-                                assert(uphill1Nodes.size() == 2);
-                                assert(uphill1Nodes.get(1).getTile().getTileTypeEnum() == sllNode.getTile().getTileTypeEnum());
-                                Node uphill2 = uphill1Nodes.get(0);
-                                Tile uphill2Tile = uphill2.getTile();
-                                assert(Utils.isInterConnect(uphill2Tile.getTileTypeEnum()));
-                                assert(uphill2.getIntentCode() == IntentCode.NODE_PINFEED);
+                                assert(txOut.getWireName().matches("LAG_MUX_ATOM_\\d+_TXOUT"));
+                                List<Node> txOutUphills = txOut.getAllUphillNodes();
+                                assert(txOutUphills.size() == 2);
+                                assert(txOutUphills.get(1).getTile().getTileTypeEnum() == sll.getTile().getTileTypeEnum());
+                                Node imux = txOutUphills.get(0);
+                                assert(imux.getIntentCode() == IntentCode.NODE_PINFEED);
+                                Tile imuxTile = imux.getTile();
+                                assert(Utils.isInterConnect(imuxTile.getTileTypeEnum()));
 
-                                BitSet bs = lagunaImuxOrInode.computeIfAbsent(uphill2Tile, k -> new BitSet());
-                                bs.set(uphill2.getWireIndex());
-                                for (Node uphill3 : uphill2.getAllUphillNodes()) {
-                                    if (uphill3.isTiedToVcc()) {
+                                BitSet bs = lagunaImuxOrInode.computeIfAbsent(imuxTile, k -> new BitSet());
+                                bs.set(imux.getWireIndex());
+                                for (Node inode : imux.getAllUphillNodes()) {
+                                    if (inode.isTiedToVcc()) {
                                         continue;
                                     }
-                                    assert(uphill3.getIntentCode() == IntentCode.NODE_LOCAL);
-                                    if (uphill3.getTile() != uphill2.getTile()) {
-                                        assert(uphill3.getWireName().matches("INODE_[EW]_\\d+_FT[01]"));
+                                    assert(inode.getIntentCode() == IntentCode.NODE_LOCAL);
+                                    if (inode.getTile() != imux.getTile()) {
+                                        assert(inode.getWireName().matches("INODE_[EW]_\\d+_FT[01]"));
                                     } else {
-                                        assert(uphill3.getWireName().matches("INT_NODE_IMUX_\\d+_INT_OUT[01]|INODE_[EW]_\\d+_FT[01]"));
+                                        assert(inode.getWireName().matches("INT_NODE_IMUX_\\d+_INT_OUT[01]|INODE_[EW]_\\d+_FT[01]"));
                                     }
-                                    bs.set(uphill3.getWireIndex());
+                                    bs.set(inode.getWireIndex());
                                 }
                             }
                         }
