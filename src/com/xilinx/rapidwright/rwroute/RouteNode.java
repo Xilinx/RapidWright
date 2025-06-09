@@ -51,6 +51,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     public static final int initialPresentCongestionCost = 1;
     public static final int initialHistoricalCongestionCost = 1;
 
+    public static final float SUPER_LONG_LINE_BASE_COST = 0.3f * RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
+
     /** The type of a rnode*/
     private byte type;
     /** The tileXCoordinate and tileYCoordinate of the INT tile that the associated node stops at */
@@ -142,7 +144,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 break;
             case SUPER_LONG_LINE:
                 assert(getLength() == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
-                baseCost = 0.3f * RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
+                baseCost = SUPER_LONG_LINE_BASE_COST;
                 break;
             case NON_LOCAL:
                 short length = getLength();

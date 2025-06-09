@@ -1698,7 +1698,6 @@ public class RWRoute {
         int nodesPoppedThisConnection = 0;
         RouteNode rnode;
         while ((rnode = queue.poll()) != null) {
-            System.out.println(rnode.getLowerBoundTotalPathCost() + " :: " + rnode);
             nodesPoppedThisConnection++;
             if (rnode.isTarget()) {
                 break;
@@ -1966,7 +1965,6 @@ public class RWRoute {
             }
 
             evaluateCostAndPush(state, rnode, longParent, childRNode);
-            System.out.println("\t" + childRNode.getLowerBoundTotalPathCost() + " :: " + childRNode);
             if (childRNode.isTarget() && queue.size() == 1) {
                 // Target is uncongested and the only thing in the (previously cleared) queue, abandon immediately
                 break;
@@ -2037,13 +2035,17 @@ public class RWRoute {
         int sinkY = sinkRnode.getBeginTileYCoordinate();
         int deltaX = Math.abs(childX - sinkX);
         int deltaY = Math.abs(childY - sinkY);
+        float estRemainingPathCost = 0;
         if (connection.isCrossSLR()) {
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
             if (deltaSLR != 0) {
-                if (childRnode.getType().isAnyLagunaImuxOrInodeOrSingle() && !childRnode.willOverUse(connection.getNetWrapper())) {
-                    // Give all INT-tile IMUX or INODEs that lead into a Laguna crossing that will not be
-                    // overused a zero node cost so that it can be explored quickly
-                    weightedNodeCost = 0;
+                if (childRnode.getType().isAnyLagunaImuxOrInodeOrSingle()) {
+                    assert(routingGraph.intYToNorthboundLaguna[childY] == connection.isCrossSLRnorth());
+                    // Give all INT-tile IMUX or INODEs that lead into a Laguna crossing an early discount on
+                    // the cost of a SLL
+                    estRemainingPathCost = state.rnodeCostWeight * (deltaSLR - 1) * RouteNode.SUPER_LONG_LINE_BASE_COST;
+                } else {
+                    estRemainingPathCost = state.rnodeCostWeight * deltaSLR * RouteNode.SUPER_LONG_LINE_BASE_COST;
                 }
 
                 // Check for overshooting which occurs when child and sink node are in
@@ -2078,10 +2080,12 @@ public class RWRoute {
         newPartialPathCost += weightedNodeCost;
 
         int distanceToSink = deltaX + deltaY;
-        float newTotalPathCost = newPartialPathCost + state.estWlWeight * distanceToSink / sharingFactor;
+        estRemainingPathCost += state.estWlWeight * distanceToSink / sharingFactor;
         if (config.isTimingDriven()) {
-            newTotalPathCost += state.estDlyWeight * (deltaX * 0.32 + deltaY * 0.16);
+            estRemainingPathCost += state.estDlyWeight * (deltaX * 0.32f + deltaY * 0.16f);
         }
+        float newTotalPathCost = newPartialPathCost + estRemainingPathCost;
+
         push(state, childRnode, newPartialPathCost, newTotalPathCost);
     }
 
