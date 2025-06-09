@@ -41,11 +41,11 @@ public enum RouteNodeType {
 
     /**
      * Denotes {@link RouteNode} objects that correspond to {@link Node} objects that enter
-     * a Laguna tile from an adjacent INT tile, or those Laguna tile nodes leading to a SUPER_LONG_LINE
+     * a Laguna tile from an INT tile, or those Laguna tile nodes leading to a SUPER_LONG_LINE
      * going in the given direction
      */
-    LAGUNA_IMUX_OR_INODE_OR_SINGLE_NORTH,
-    LAGUNA_IMUX_OR_INODE_OR_SINGLE_SOUTH,
+    LAGUNA_IMUX_OR_INODE_NORTH,
+    LAGUNA_IMUX_OR_INODE_SOUTH,
 
     NON_LOCAL,
 
@@ -80,7 +80,7 @@ public enum RouteNodeType {
         return ordinal == LOCAL_BOTH.ordinal() || ordinal == LOCAL_EAST.ordinal() || ordinal == LOCAL_WEST.ordinal() || ordinal == LOCAL_RESERVED.ordinal();
     }
 
-    public boolean isAnyLagunaImuxOrInodeOrSingle() {
-        return this == LAGUNA_IMUX_OR_INODE_OR_SINGLE_NORTH || this == LAGUNA_IMUX_OR_INODE_OR_SINGLE_SOUTH;
+    public boolean isAnyLagunaImuxOrInode() {
+        return this == LAGUNA_IMUX_OR_INODE_NORTH || this == LAGUNA_IMUX_OR_INODE_SOUTH;
     }
 }

@@ -401,9 +401,9 @@ public class TestRWRoute {
     @CsvSource({
             // One SLR crossing
             // (Too) Close
-            "SLICE_X9Y299,SLICE_X9Y300,100",    // On Laguna column
+            "SLICE_X9Y299,SLICE_X9Y300,300",    // On Laguna column
             "SLICE_X9Y300,SLICE_X9Y299,100",
-            "SLICE_X0Y299,SLICE_X0Y300,300",    // Far from Laguna column
+            "SLICE_X0Y299,SLICE_X0Y300,200",    // Far from Laguna column
             "SLICE_X0Y300,SLICE_X0Y299,200",
             "SLICE_X53Y299,SLICE_X53Y300,100",  // Equidistant from two Laguna columns
             "SLICE_X53Y300,SLICE_X53Y299,200",
@@ -417,19 +417,19 @@ public class TestRWRoute {
             // Far
             "SLICE_X9Y240,SLICE_X9Y359,100",    // On Laguna
             "SLICE_X9Y359,SLICE_X9Y240,100",
-            "SLICE_X162Y240,SLICE_X162Y430,400",
-            "SLICE_X162Y430,SLICE_X162Y240,100",
-            "SLICE_X0Y240,SLICE_X12Y430,100",   // Far from Laguna
-            "SLICE_X0Y430,SLICE_X12Y240,100",
+            "SLICE_X162Y240,SLICE_X162Y430,100",
+            "SLICE_X162Y430,SLICE_X162Y240,200",
+            "SLICE_X0Y240,SLICE_X12Y430,300",   // Far from Laguna
+            "SLICE_X0Y430,SLICE_X12Y240,200",
 
             // Two SLR crossings
             "SLICE_X162Y299,SLICE_X162Y599,500",
             "SLICE_X162Y599,SLICE_X162Y299,100",
 
             // Three SLR crossings
-            "SLICE_X79Y0,SLICE_X79Y899,200",    // Straight up: next to Laguna column
+            "SLICE_X79Y0,SLICE_X79Y899,600",    // Straight up: next to Laguna column
             "SLICE_X0Y0,SLICE_X0Y899,600",      // Straight up: far from Laguna column
-            "SLICE_X168Y0,SLICE_X168Y899,200",  // Straight up: far from Laguna column
+            "SLICE_X168Y0,SLICE_X168Y899,300",  // Straight up: far from Laguna column
             "SLICE_X9Y0,SLICE_X162Y899,400",    // Up and right
             "SLICE_X168Y162,SLICE_X9Y899,400",  // Up and left
     })
