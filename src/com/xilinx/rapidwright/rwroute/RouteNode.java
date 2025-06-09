@@ -120,8 +120,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 assert(length == 0 ||
                        (length == 1 && (series == Series.UltraScalePlus || series == Series.UltraScale) && getIntentCode() == IntentCode.NODE_PINBOUNCE));
                 break;
-            case LAGUNA_IMUX_OR_INODE_NORTH:
-            case LAGUNA_IMUX_OR_INODE_SOUTH:
+            case LAGUNA_IMUX_OR_INODE_OR_SINGLE_NORTH:
+            case LAGUNA_IMUX_OR_INODE_OR_SINGLE_SOUTH:
                 assert(length == 0 ||
                         (length == 1 && getWireName().matches("INODE_[EW]_\\d+_FT[01]")));
                 break;
