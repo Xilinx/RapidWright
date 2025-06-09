@@ -1698,6 +1698,7 @@ public class RWRoute {
         int nodesPoppedThisConnection = 0;
         RouteNode rnode;
         while ((rnode = queue.poll()) != null) {
+            System.out.println(rnode.getLowerBoundTotalPathCost() + " :: " + rnode);
             nodesPoppedThisConnection++;
             if (rnode.isTarget()) {
                 break;
@@ -1941,14 +1942,14 @@ public class RWRoute {
                         assert(childRNode.countConnectionsOfUser(connection.getNetWrapper()) > 0);
                         assert(!childRNode.willOverUse(connection.getNetWrapper()));
                         break;
-                    case LAGUNA_IMUX_OR_INODE_NORTH:
+                    case LAGUNA_IMUX_OR_INODE_OR_SINGLE_NORTH:
                         if (!connection.isCrossSLRnorth() ||
                                 connection.getSinkRnode().getSLRIndex(routingGraph) == childRNode.getSLRIndex(routingGraph)) {
                             // Do not consider approaching a SLL if not needing to cross
                             continue;
                         }
                         break;
-                    case LAGUNA_IMUX_OR_INODE_SOUTH:
+                    case LAGUNA_IMUX_OR_INODE_OR_SINGLE_SOUTH:
                         if (!connection.isCrossSLRsouth() ||
                                 connection.getSinkRnode().getSLRIndex(routingGraph) == childRNode.getSLRIndex(routingGraph)) {
                             // Do not consider approaching a SLL if not needing to cross
@@ -1965,6 +1966,7 @@ public class RWRoute {
             }
 
             evaluateCostAndPush(state, rnode, longParent, childRNode);
+            System.out.println("\t" + childRNode.getLowerBoundTotalPathCost() + " :: " + childRNode);
             if (childRNode.isTarget() && queue.size() == 1) {
                 // Target is uncongested and the only thing in the (previously cleared) queue, abandon immediately
                 break;
@@ -2038,7 +2040,7 @@ public class RWRoute {
         if (connection.isCrossSLR()) {
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
             if (deltaSLR != 0) {
-                if (childRnode.getType().isAnyLagunaImuxOrInode() && !childRnode.willOverUse(connection.getNetWrapper())) {
+                if (childRnode.getType().isAnyLagunaImuxOrInodeOrSingle() && !childRnode.willOverUse(connection.getNetWrapper())) {
                     // Give all INT-tile IMUX or INODEs that lead into a Laguna crossing that will not be
                     // overused a zero node cost so that it can be explored quickly
                     weightedNodeCost = 0;
