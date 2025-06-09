@@ -1409,7 +1409,7 @@ public class RWRoute {
                     continue;
                 }
                 totalINTNodes++;
-                int wl = RouteNode.getLength(node);
+                int wl = RouteNode.getLength(node, routingGraph);
                 totalWL += wl;
 
                 RouterHelper.addNodeTypeLengthToMap(node, wl, nodeTypeUsage, nodeTypeLength);
@@ -1941,9 +1941,16 @@ public class RWRoute {
                         assert(childRNode.countConnectionsOfUser(connection.getNetWrapper()) > 0);
                         assert(!childRNode.willOverUse(connection.getNetWrapper()));
                         break;
-                    case LAGUNA_PINFEED_OR_INODE:
-                        if (!connection.isCrossSLR() ||
-                            connection.getSinkRnode().getSLRIndex(routingGraph) == childRNode.getSLRIndex(routingGraph)) {
+                    case LAGUNA_IMUX_OR_INODE_NORTH:
+                        if (!connection.isCrossSLRnorth() ||
+                                connection.getSinkRnode().getSLRIndex(routingGraph) == childRNode.getSLRIndex(routingGraph)) {
+                            // Do not consider approaching a SLL if not needing to cross
+                            continue;
+                        }
+                        break;
+                    case LAGUNA_IMUX_OR_INODE_SOUTH:
+                        if (!connection.isCrossSLRsouth() ||
+                                connection.getSinkRnode().getSLRIndex(routingGraph) == childRNode.getSLRIndex(routingGraph)) {
                             // Do not consider approaching a SLL if not needing to cross
                             continue;
                         }
@@ -2031,7 +2038,9 @@ public class RWRoute {
         if (connection.isCrossSLR()) {
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
             if (deltaSLR != 0) {
-                if (childRnode.getType() == RouteNodeType.LAGUNA_PINFEED_OR_INODE && !childRnode.willOverUse(connection.getNetWrapper())) {
+                if (childRnode.getType().isAnyLagunaImuxOrInode() && !childRnode.willOverUse(connection.getNetWrapper())) {
+                    // Give all INT-tile IMUX or INODEs that lead into a Laguna crossing that will not be
+                    // overused a zero node cost so that it can be explored quickly
                     weightedNodeCost = 0;
                 }
 
@@ -2063,6 +2072,8 @@ public class RWRoute {
                 assert(deltaX >= 0 && deltaX < Integer.MAX_VALUE);
             }
         }
+
+        newPartialPathCost += weightedNodeCost;
 
         int distanceToSink = deltaX + deltaY;
         float newTotalPathCost = newPartialPathCost + state.estWlWeight * distanceToSink / sharingFactor;

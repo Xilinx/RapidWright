@@ -427,10 +427,10 @@ public class TestRWRoute {
             "SLICE_X162Y599,SLICE_X162Y299,100",
 
             // Three SLR crossings
-            "SLICE_X79Y0,SLICE_X79Y899,200",    // Straight up: next to Laguna column
-            "SLICE_X0Y0,SLICE_X0Y899,500",      // Straight up: far from Laguna column
-            "SLICE_X168Y0,SLICE_X168Y899,400",  // Straight up: far from Laguna column
-            "SLICE_X9Y0,SLICE_X162Y899,200",    // Up and right
+            "SLICE_X79Y0,SLICE_X79Y899,600",    // Straight up: next to Laguna column
+            "SLICE_X0Y0,SLICE_X0Y899,600",      // Straight up: far from Laguna column
+            "SLICE_X168Y0,SLICE_X168Y899,300",  // Straight up: far from Laguna column
+            "SLICE_X9Y0,SLICE_X162Y899,400",    // Up and right
             "SLICE_X168Y162,SLICE_X9Y899,400",  // Up and left
     })
     public void testSLRCrossingNonTimingDriven(String srcSiteName, String dstSiteName, long nodesPoppedLimit) {

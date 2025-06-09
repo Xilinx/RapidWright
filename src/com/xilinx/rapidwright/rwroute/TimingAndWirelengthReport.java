@@ -97,7 +97,7 @@ public class TimingAndWirelengthReport{
                     continue;
                 }
                 usedNodes++;
-                int wl = RouteNode.getLength(node);
+                int wl = RouteNode.getLength(node, routingGraph);
                 wirelength += wl;
                 RouterHelper.addNodeTypeLengthToMap(node, wl, nodeTypeUsage, nodeTypeLength);
             }

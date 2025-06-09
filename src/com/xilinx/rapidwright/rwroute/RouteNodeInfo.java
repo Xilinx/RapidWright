@@ -93,7 +93,7 @@ public class RouteNodeInfo {
                 }
                 break;
             case INT:
-                if (type == RouteNodeType.LAGUNA_PINFEED_OR_INODE) {
+                if (type.isAnyLagunaImuxOrInode()) {
                     assert(length <= 1); // 1 only if INODE_[EW]_\d+_FT[01]
                 }
                 break;
@@ -112,7 +112,7 @@ public class RouteNodeInfo {
                 // fanout nodes of the SLL are marked as) unless it is a fanin (LAGUNA_I)
                 // (i.e. do not apply it to the fanout nodes).
                 // Nor apply it to VCC_WIREs since their end tiles are INT tiles.
-                if ((node.getIntentCode() != IntentCode.NODE_LAGUNA_OUTPUT || type == RouteNodeType.LAGUNA_PINFEED_OR_INODE) &&
+                if ((node.getIntentCode() != IntentCode.NODE_LAGUNA_OUTPUT || type.isAnyLagunaImuxOrInode()) &&
                         !node.isTiedToVcc()) {
                     assert(baseTile.getTileXCoordinate() == endTileXCoordinate);
                     endTileXCoordinate++;
@@ -133,35 +133,35 @@ public class RouteNodeInfo {
         switch (ic) {
             case NODE_LOCAL: { // US/US+
                 assert(tileTypeEnum == TileTypeEnum.INT);
-                if (routingGraph != null) {
-                    BitSet bs = routingGraph.ultraScalesLocalWires.get(tileTypeEnum);
-                    if (!bs.get(node.getWireIndex())) {
-                        break;
-                    }
-                    if (routingGraph.lagunaI != null) {
-                        bs = routingGraph.lagunaI.get(node.getTile());
-                        if (bs != null && bs.get(node.getWireIndex())) {
-                            return RouteNodeType.LAGUNA_PINFEED_OR_INODE;
-                        }
-                    }
-                    BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
-                    if (eastWestWires[0].get(node.getWireIndex())) {
-                        return RouteNodeType.LOCAL_EAST;
-                    } else if (eastWestWires[1].get(node.getWireIndex())) {
-                        return RouteNodeType.LOCAL_WEST;
-                    }
-                    return RouteNodeType.LOCAL_BOTH;
+                BitSet bs = routingGraph.ultraScalesLocalWires.get(tileTypeEnum);
+                if (!bs.get(node.getWireIndex())) {
+                    break;
                 }
+                if (routingGraph.lagunaImuxOrInode != null) {
+                    bs = routingGraph.lagunaImuxOrInode.get(node.getTile());
+                    if (bs != null && bs.get(node.getWireIndex())) {
+                        return routingGraph.intYToNorthboundLaguna[endTile.getTileYCoordinate()] ? RouteNodeType.LAGUNA_IMUX_OR_INODE_NORTH
+                                                                                                 : RouteNodeType.LAGUNA_IMUX_OR_INODE_SOUTH;
+                    }
+                }
+                BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
+                if (eastWestWires[0].get(node.getWireIndex())) {
+                    return RouteNodeType.LOCAL_EAST;
+                } else if (eastWestWires[1].get(node.getWireIndex())) {
+                    return RouteNodeType.LOCAL_WEST;
+                }
+                return RouteNodeType.LOCAL_BOTH;
             }
 
             case NODE_PINFEED:
-                if (routingGraph == null || routingGraph.isVersal) {
+                if (routingGraph.isVersal) {
                     return RouteNodeType.LOCAL_BOTH;
                 }
-                if (routingGraph.lagunaI != null && !forceSink) {
-                    BitSet bs = routingGraph.lagunaI.get(node.getTile());
+                if (routingGraph.lagunaImuxOrInode != null && !forceSink) {
+                    BitSet bs = routingGraph.lagunaImuxOrInode.get(node.getTile());
                     if (bs != null && bs.get(node.getWireIndex())) {
-                        return RouteNodeType.LAGUNA_PINFEED_OR_INODE;
+                        return routingGraph.intYToNorthboundLaguna[endTile.getTileYCoordinate()] ? RouteNodeType.LAGUNA_IMUX_OR_INODE_NORTH
+                                                                                                 : RouteNodeType.LAGUNA_IMUX_OR_INODE_SOUTH;
                     }
                 }
                 // Fall through
@@ -172,15 +172,13 @@ public class RouteNodeInfo {
             case NODE_CLE_BNODE:    // CLE_BC_CORE*.BNODE_OUTS_[EW]*                 (Versal only)
             case NODE_INTF_BNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_BNODE_OUTS* (Versal only)
             case NODE_INTF_CNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_CNODE_OUTS* (Versal only)
-                if (routingGraph != null) {
-                    BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
-                    if (eastWestWires[0].get(node.getWireIndex())) {
-                        return RouteNodeType.LOCAL_EAST;
-                    } else if (eastWestWires[1].get(node.getWireIndex())) {
-                        return RouteNodeType.LOCAL_WEST;
-                    }
-                    assert(!routingGraph.isVersal && node.getWireName().startsWith("CTRL_"));
+                BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
+                if (eastWestWires[0].get(node.getWireIndex())) {
+                    return RouteNodeType.LOCAL_EAST;
+                } else if (eastWestWires[1].get(node.getWireIndex())) {
+                    return RouteNodeType.LOCAL_WEST;
                 }
+                assert(!routingGraph.isVersal && node.getWireName().startsWith("CTRL_"));
                 return RouteNodeType.LOCAL_BOTH;
 
             // Versal only
@@ -191,7 +189,8 @@ public class RouteNodeInfo {
             case NODE_LAGUNA_OUTPUT: // UltraScale+ only
                 assert(tileTypeEnum == TileTypeEnum.LAG_LAG);
                 if (node.getWireName().endsWith("_TXOUT")) {
-                    return RouteNodeType.LAGUNA_PINFEED_OR_INODE;
+                    return routingGraph.intYToNorthboundLaguna[endTile.getTileYCoordinate()] ? RouteNodeType.LAGUNA_IMUX_OR_INODE_NORTH
+                                                                                             : RouteNodeType.LAGUNA_IMUX_OR_INODE_SOUTH;
                 }
                 break;
 
@@ -213,8 +212,8 @@ public class RouteNodeInfo {
                         assert(node.getTile() != endTile);
                         return RouteNodeType.SUPER_LONG_LINE;
                     } else if (wireName.endsWith("_TXOUT")) {
-                        // This is the inner LAGUNA_I, mark it so it gets a base cost discount
-                        return RouteNodeType.LAGUNA_PINFEED_OR_INODE;
+                        return routingGraph.intYToNorthboundLaguna[endTile.getTileYCoordinate()] ? RouteNodeType.LAGUNA_IMUX_OR_INODE_NORTH
+                                                                                                 : RouteNodeType.LAGUNA_IMUX_OR_INODE_SOUTH;
                     }
                 }
                 break;
