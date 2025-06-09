@@ -1941,7 +1941,7 @@ public class RWRoute {
                         assert(childRNode.countConnectionsOfUser(connection.getNetWrapper()) > 0);
                         assert(!childRNode.willOverUse(connection.getNetWrapper()));
                         break;
-                    case LAGUNA_PINFEED:
+                    case LAGUNA_PINFEED_OR_INODE:
                         if (!connection.isCrossSLR() ||
                             connection.getSinkRnode().getSLRIndex(routingGraph) == childRNode.getSLRIndex(routingGraph)) {
                             // Do not consider approaching a SLL if not needing to cross
@@ -2015,7 +2015,7 @@ public class RWRoute {
         childRnode.setPrev(rnode);
 
         float newPartialPathCost = rnode.getUpstreamPathCost();
-        newPartialPathCost += state.rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor);
+        float weightedNodeCost = state.rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor);
         newPartialPathCost += state.rnodeWLWeight * childRnode.getLength() / sharingFactor;
         if (config.isTimingDriven()) {
             newPartialPathCost += state.dlyWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode, longParent));
@@ -2031,6 +2031,10 @@ public class RWRoute {
         if (connection.isCrossSLR()) {
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
             if (deltaSLR != 0) {
+                if (childRnode.getType() == RouteNodeType.LAGUNA_PINFEED_OR_INODE && !childRnode.willOverUse(connection.getNetWrapper())) {
+                    weightedNodeCost = 0;
+                }
+
                 // Check for overshooting which occurs when child and sink node are in
                 // adjacent SLRs and less than a SLL wire's length apart in the Y axis.
                 if (deltaSLR == 1) {

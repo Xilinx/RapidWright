@@ -43,7 +43,7 @@ public enum RouteNodeType {
      * Denotes {@link RouteNode} objects that correspond to {@link Node} objects that enter
      * a Laguna tile from an INT tile, or those Laguna tile nodes leading to a SUPER_LONG_LINE.
      */
-    LAGUNA_PINFEED,
+    LAGUNA_PINFEED_OR_INODE,
 
     NON_LOCAL,
 

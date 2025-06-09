@@ -93,8 +93,8 @@ public class RouteNodeInfo {
                 }
                 break;
             case INT:
-                if (type == RouteNodeType.LAGUNA_PINFEED) {
-                    assert(length == 0);
+                if (type == RouteNodeType.LAGUNA_PINFEED_OR_INODE) {
+                    assert(length <= 1); // 1 only if INODE_[EW]_\d+_FT[01]
                 }
                 break;
         }
@@ -112,7 +112,7 @@ public class RouteNodeInfo {
                 // fanout nodes of the SLL are marked as) unless it is a fanin (LAGUNA_I)
                 // (i.e. do not apply it to the fanout nodes).
                 // Nor apply it to VCC_WIREs since their end tiles are INT tiles.
-                if ((node.getIntentCode() != IntentCode.NODE_LAGUNA_OUTPUT || type == RouteNodeType.LAGUNA_PINFEED) &&
+                if ((node.getIntentCode() != IntentCode.NODE_LAGUNA_OUTPUT || type == RouteNodeType.LAGUNA_PINFEED_OR_INODE) &&
                         !node.isTiedToVcc()) {
                     assert(baseTile.getTileXCoordinate() == endTileXCoordinate);
                     endTileXCoordinate++;
@@ -138,6 +138,12 @@ public class RouteNodeInfo {
                     if (!bs.get(node.getWireIndex())) {
                         break;
                     }
+                    if (routingGraph.lagunaI != null) {
+                        bs = routingGraph.lagunaI.get(node.getTile());
+                        if (bs != null && bs.get(node.getWireIndex())) {
+                            return RouteNodeType.LAGUNA_PINFEED_OR_INODE;
+                        }
+                    }
                     BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
                     if (eastWestWires[0].get(node.getWireIndex())) {
                         return RouteNodeType.LOCAL_EAST;
@@ -155,7 +161,7 @@ public class RouteNodeInfo {
                 if (routingGraph.lagunaI != null && !forceSink) {
                     BitSet bs = routingGraph.lagunaI.get(node.getTile());
                     if (bs != null && bs.get(node.getWireIndex())) {
-                        return RouteNodeType.LAGUNA_PINFEED;
+                        return RouteNodeType.LAGUNA_PINFEED_OR_INODE;
                     }
                 }
                 // Fall through
@@ -185,7 +191,7 @@ public class RouteNodeInfo {
             case NODE_LAGUNA_OUTPUT: // UltraScale+ only
                 assert(tileTypeEnum == TileTypeEnum.LAG_LAG);
                 if (node.getWireName().endsWith("_TXOUT")) {
-                    return RouteNodeType.LAGUNA_PINFEED;
+                    return RouteNodeType.LAGUNA_PINFEED_OR_INODE;
                 }
                 break;
 
@@ -208,7 +214,7 @@ public class RouteNodeInfo {
                         return RouteNodeType.SUPER_LONG_LINE;
                     } else if (wireName.endsWith("_TXOUT")) {
                         // This is the inner LAGUNA_I, mark it so it gets a base cost discount
-                        return RouteNodeType.LAGUNA_PINFEED;
+                        return RouteNodeType.LAGUNA_PINFEED_OR_INODE;
                     }
                 }
                 break;
