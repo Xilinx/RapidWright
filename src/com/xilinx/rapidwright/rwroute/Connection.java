@@ -83,8 +83,9 @@ public class Connection implements Comparable<Connection>{
 
     /** To indicate if the route delay of a connection has been patched up, when there are consecutive long nodes */
     private boolean dlyPatched;
-    /** true to indicate that a connection cross SLRs */
-    private final boolean crossSLR;
+    /** true to indicate that a connection cross SLRs in given direction */
+    private final boolean crossSLRnorth;
+    private final boolean crossSLRsouth;
     /** List of nodes assigned to a connection to form the path for generating PIPs */
     private List<Node> nodes;
 
@@ -96,9 +97,20 @@ public class Connection implements Comparable<Connection>{
         rnodes = new ArrayList<>();
         this.netWrapper = netWrapper;
         netWrapper.addConnection(this);
-        crossSLR = !source.getTile().getSLR().equals(sink.getTile().getSLR());
-        if (crossSLR && source.getSiteInst().getDesign().getSeries() == Series.Versal) {
-            throw new RuntimeException("ERROR: Cross-SLR connections not yet supported on Versal.");
+        if (!source.getTile().getSLR().equals(sink.getTile().getSLR())) {
+            if (source.getSiteInst().getDesign().getSeries() == Series.Versal) {
+                throw new RuntimeException("ERROR: Cross-SLR connections not yet supported on Versal.");
+            }
+            if (source.getTile().getTileYCoordinate() < sink.getTile().getTileYCoordinate()) {
+                crossSLRnorth = true;
+                crossSLRsouth = false;
+            } else {
+                crossSLRnorth = false;
+                crossSLRsouth = true;
+            }
+        } else {
+            crossSLRnorth = false;
+            crossSLRsouth = false;
         }
     }
 
@@ -399,7 +411,15 @@ public class Connection implements Comparable<Connection>{
     }
 
     public boolean isCrossSLR() {
-        return crossSLR;
+        return crossSLRnorth || crossSLRsouth;
+    }
+
+    public boolean isCrossSLRnorth() {
+        return crossSLRnorth;
+    }
+
+    public boolean isCrossSLRsouth() {
+        return crossSLRsouth;
     }
 
     public List<Node> getNodes() {

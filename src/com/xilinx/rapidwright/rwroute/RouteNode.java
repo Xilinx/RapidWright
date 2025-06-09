@@ -120,7 +120,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 assert(length == 0 ||
                        (length == 1 && (series == Series.UltraScalePlus || series == Series.UltraScale) && getIntentCode() == IntentCode.NODE_PINBOUNCE));
                 break;
-            case LAGUNA_PINFEED_OR_INODE:
+            case LAGUNA_IMUX_OR_INODE_NORTH:
+            case LAGUNA_IMUX_OR_INODE_SOUTH:
                 assert(length == 0 ||
                         (length == 1 && getWireName().matches("INODE_[EW]_\\d+_FT[01]")));
                 break;
@@ -293,8 +294,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         return getOccupancy() > 0;
     }
 
-    public static short getLength(Node node) {
-        return RouteNodeInfo.get(node, null).length;
+    public static short getLength(Node node, RouteNodeGraph routingGraph) {
+        return RouteNodeInfo.get(node, routingGraph).length;
     }
 
     @Override
