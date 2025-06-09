@@ -397,14 +397,28 @@ public class RouteNodeGraph {
                             }
                             Node sllNode = Node.getNode(tile, wireIndex);
                             for (Node uphill1 : sllNode.getAllUphillNodes()) {
-                                for (Node uphill2 : uphill1.getAllUphillNodes()) {
-                                    Tile uphill2Tile = uphill2.getTile();
-                                    if (!Utils.isInterConnect(uphill2Tile.getTileTypeEnum())) {
+                                if (uphill1.isTiedToVcc()) {
+                                    continue;
+                                }
+                                List<Node> uphill1Nodes = uphill1.getAllUphillNodes();
+                                assert(uphill1Nodes.size() == 2);
+                                assert(uphill1Nodes.get(1).getTile().getTileTypeEnum() == sllNode.getTile().getTileTypeEnum());
+                                Node uphill2 = uphill1Nodes.get(0);
+                                Tile uphill2Tile = uphill2.getTile();
+                                assert(Utils.isInterConnect(uphill2Tile.getTileTypeEnum()));
+                                assert(uphill2.getIntentCode() == IntentCode.NODE_PINFEED);
+                                BitSet bs = lagunaI.computeIfAbsent(uphill2Tile, k -> new BitSet());
+                                bs.set(uphill2.getWireIndex());
+                                for (Node uphill3 : uphill2.getAllUphillNodes()) {
+                                    if (uphill3.isTiedToVcc()) {
                                         continue;
                                     }
-                                    assert(uphill2.getIntentCode() == IntentCode.NODE_PINFEED);
-                                    lagunaI.computeIfAbsent(uphill2Tile, k -> new BitSet())
-                                            .set(uphill2.getWireIndex());
+                                    assert(uphill3.getIntentCode() == IntentCode.NODE_LOCAL);
+                                    if (uphill3.getTile() != uphill2.getTile()) {
+                                        assert(uphill3.getWireName().matches("INODE_[EW]_\\d+_FT[01]"));
+                                        // continue;
+                                    }
+                                    bs.set(uphill3.getWireIndex());
                                 }
                             }
                         }
@@ -621,7 +635,7 @@ public class RouteNodeGraph {
                 // PINFEEDs can lead to a site pin, or into a Laguna tile
                 if (childRnode != null) {
                     assert(childRnode.getType().isAnyExclusiveSink() ||
-                           childRnode.getType() == RouteNodeType.LAGUNA_PINFEED ||
+                           childRnode.getType() == RouteNodeType.LAGUNA_PINFEED_OR_INODE ||
                            ((lutRoutethru || lutPinSwapping) && childRnode.getType().isAnyLocal()));
                 } else if (!lutRoutethru) {
                     // child does not already exist in our routing graph, meaning it's not a used site pin

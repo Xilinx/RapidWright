@@ -120,6 +120,10 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 assert(length == 0 ||
                        (length == 1 && (series == Series.UltraScalePlus || series == Series.UltraScale) && getIntentCode() == IntentCode.NODE_PINBOUNCE));
                 break;
+            case LAGUNA_PINFEED_OR_INODE:
+                assert(length == 0 ||
+                        (length == 1 && getWireName().matches("INODE_[EW]_\\d+_FT[01]")));
+                break;
             case LOCAL_BOTH:
                 assert(length == 0);
                 break;
@@ -135,13 +139,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                        ))
                    );
                 break;
-            case LAGUNA_PINFEED:
-                // Make all approaches to SLLs zero-cost to encourage exploration
-                // Assigning a base cost of zero would normally break congestion resolution
-                // (since RWRoute.getNodeCost() would return zero) but doing it here should be
-                // okay because this node only leads to a SLL which will have a non-zero base cost
-                baseCost = 0.0f;
-                return;
             case SUPER_LONG_LINE:
                 assert(getLength() == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
                 baseCost = 0.3f * RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
