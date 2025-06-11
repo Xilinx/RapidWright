@@ -269,6 +269,7 @@ public class ECOPlacementHelper {
     }
 
     public static Site getCentroidOfPoints(Device device, List<Point> points, Set<SiteTypeEnum> targetSiteTypes) {
+        if (points.size() == 0) return null;
         Point centroid = KMeans.calculateCentroid(points);
         Tile centroidTile = device.getTile(centroid.y, centroid.x);
     

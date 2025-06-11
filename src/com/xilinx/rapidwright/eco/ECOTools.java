@@ -182,12 +182,15 @@ public class ECOTools {
                 }
 
                 Cell cell = leafEhpi.getPhysicalCell(design);
+                if (cell == null) {
+                    continue;
+                }
                 String logicalPin = leafEhpi.getPortInst().getName();
                 for (SitePinInst spi : cell.getAllSitePinsFromLogicalPin(logicalPin, null)) {
                     List<EDIFHierPortInst> portInstsOnSpi = DesignTools.getPortInstsFromSitePinInst(spi);
-                    assert(portInstsOnSpi.contains(leafEhpi));
+                    assert (portInstsOnSpi.contains(leafEhpi));
                     boolean removedAnything = portInstsOnSpi.removeAll(leafPortInsts);
-                    assert(removedAnything);
+                    assert (removedAnything);
                     if (!portInstsOnSpi.isEmpty()) {
                         // SPI also services a different logical port inst; skip
                         continue;
@@ -417,8 +420,8 @@ public class ECOTools {
                 }
 
                 Cell cell = ehpi.getPhysicalCell(design);
-                if (cell == null) {
-                    throw new RuntimeException("ERROR: Cell corresponding to pin '" + ehpi + "' not found.");
+                if (cell == null || !cell.isPlaced()) {
+                    continue;
                 }
                 List<SitePinInst> sitePins = cell.getAllSitePinsFromLogicalPin(ehpi.getPortInst().getName(), null);
                 SiteInst si = cell.getSiteInst();
@@ -639,10 +642,9 @@ public class ECOTools {
             }
 
             Cell cell = sourceEhpi.getPhysicalCell(design);
-            if (cell == null) {
-                throw new RuntimeException("ERROR: Cell corresponding to pin '" + sourceEhpi + "' not found.");
+            if (cell == null || !cell.isPlaced()) {
+                continue;
             }
-
             List<SitePinInst> sitePins = cell.getAllSitePinsFromLogicalPin(sourceEhpi.getPortInst().getName(), null);
             if (!sitePins.isEmpty()) {
                 // This net's leaf pins already has some site pins
