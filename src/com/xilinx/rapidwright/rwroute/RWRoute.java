@@ -1698,6 +1698,7 @@ public class RWRoute {
         int nodesPoppedThisConnection = 0;
         RouteNode rnode;
         while ((rnode = queue.poll()) != null) {
+            // System.out.println(rnode.getLowerBoundTotalPathCost() + " :: " + rnode);
             nodesPoppedThisConnection++;
             if (rnode.isTarget()) {
                 break;
@@ -1965,7 +1966,7 @@ public class RWRoute {
             }
 
             evaluateCostAndPush(state, rnode, longParent, childRNode);
-            System.out.println("\t" + childRNode.getLowerBoundTotalPathCost() + " :: " + childRNode);
+            // System.out.println("\t" + childRNode.getLowerBoundTotalPathCost() + " :: " + childRNode);
             if (childRNode.isTarget() && queue.size() == 1) {
                 // Target is uncongested and the only thing in the (previously cleared) queue, abandon immediately
                 break;
