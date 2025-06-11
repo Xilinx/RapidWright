@@ -182,7 +182,7 @@ public class ECOTools {
                 }
 
                 Cell cell = leafEhpi.getPhysicalCell(design);
-                if (cell == null) {
+                if (cell == null || !cell.isPlaced()) {
                     continue;
                 }
                 String logicalPin = leafEhpi.getPortInst().getName();
