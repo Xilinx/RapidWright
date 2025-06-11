@@ -2037,17 +2037,13 @@ public class RWRoute {
         int sinkY = sinkRnode.getBeginTileYCoordinate();
         int deltaX = Math.abs(childX - sinkX);
         int deltaY = Math.abs(childY - sinkY);
-        float estRemainingPathCost = 0;
         if (connection.isCrossSLR()) {
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
             if (deltaSLR != 0) {
-                if (childRnode.getType().isAnyLagunaImuxOrInode()) {
-                    assert(routingGraph.intYToNorthboundLaguna[childY] == connection.isCrossSLRnorth());
-                    // Give all INT-tile IMUX or INODEs that lead into a Laguna crossing an early discount on
-                    // the cost of a SLL
-                    estRemainingPathCost = state.rnodeCostWeight * (deltaSLR - 1) * RouteNode.SUPER_LONG_LINE_BASE_COST;
-                } else {
-                    estRemainingPathCost = state.rnodeCostWeight * deltaSLR * RouteNode.SUPER_LONG_LINE_BASE_COST;
+                if (childRnode.getType().isAnyLagunaImuxOrInode() && !childRnode.willOverUse(connection.getNetWrapper())) {
+                    // Give all INT-tile IMUX or INODEs that lead into a Laguna crossing that will not be
+                    // overused a zero node cost so that it can be explored quickly
+                    weightedNodeCost = 0;
                 }
 
                 // Check for overshooting which occurs when child and sink node are in
@@ -2082,12 +2078,10 @@ public class RWRoute {
         newPartialPathCost += weightedNodeCost;
 
         int distanceToSink = deltaX + deltaY;
-        estRemainingPathCost += state.estWlWeight * distanceToSink / sharingFactor;
+        float newTotalPathCost = newPartialPathCost + state.estWlWeight * distanceToSink / sharingFactor;
         if (config.isTimingDriven()) {
-            estRemainingPathCost += state.estDlyWeight * (deltaX * 0.32f + deltaY * 0.16f);
+            newTotalPathCost += state.estDlyWeight * (deltaX * 0.32 + deltaY * 0.16);
         }
-        float newTotalPathCost = newPartialPathCost + estRemainingPathCost;
-
         push(state, childRnode, newPartialPathCost, newTotalPathCost);
     }
 
