@@ -735,5 +735,27 @@ public class EDIFCell extends EDIFPropertyObject {
     public boolean isUniquified() {
         return getNonHierInstantiationCount() <= 1;
     }
+
+    /**
+     * Checks if this cell and the provided cell have the same set of ports
+     * 
+     * @param other The other cell to match against.
+     * @return True if the set of ports on both this cell and the other cell match
+     *         exactly. False otherwise.
+     */
+    public boolean matchesInterface(EDIFCell other) {
+        if (getPorts().size() != other.getPorts().size()) {
+            return false;
+        }
+        Map<String, EDIFPort> otherPorts = other.getPortMap();
+        for (EDIFPort port : getPorts()) {
+            EDIFPort otherPort = otherPorts.get(port.getBusName(true));
+            if (otherPort == null || port.getWidth() != otherPort.getWidth()
+                    || port.getDirection() != otherPort.getDirection()) {
+                return false;
+            }
+        }
+        return true;
+    }
 }
 
