@@ -31,8 +31,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.ClockTools;
@@ -59,6 +61,8 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -94,8 +98,11 @@ public class ArrayBuilder {
     private static final List<String> REUSE_RESULTS_OPTS = Arrays.asList("r", "reuse");
     private static final List<String> SKIP_IMPL_OPTS = Arrays.asList("k", "skip-impl");
     private static final List<String> LIMIT_INSTS_OPTS = Arrays.asList("l", "limit-inst-count");
+    private static final List<String> TOP_LEVEL_DESIGN_OPTS = Arrays.asList("t", "top-design");
 
     private Design design;
+
+    private Design topDesign;
 
     private List<PBlock> pblocks;
 
@@ -129,6 +136,7 @@ public class ArrayBuilder {
                 acceptsAll(REUSE_RESULTS_OPTS, "Reuse Previous Implementation Results");
                 acceptsAll(SKIP_IMPL_OPTS, "Skip Implementation of the Kernel");
                 acceptsAll(LIMIT_INSTS_OPTS, "Limit number of instance copies").withRequiredArg();
+                acceptsAll(TOP_LEVEL_DESIGN_OPTS, "Top level design with blackboxes/kernel insts").withRequiredArg();
                 acceptsAll(HELP_OPTS, "Print this help message").forHelp();
             }
         };
@@ -164,6 +172,14 @@ public class ArrayBuilder {
 
     public Design getDesign() {
         return design;
+    }
+
+    public Design getTopDesign() {
+        return topDesign;
+    }
+
+    public void setTopDesign(Design topDesign) {
+        this.topDesign = topDesign;
     }
 
     public void setPBlocks(List<PBlock> pblocks) {
@@ -309,6 +325,11 @@ public class ArrayBuilder {
         if (options.has(LIMIT_INSTS_OPTS.get(0))) {
             setInstCountLimit(Integer.parseInt((String) options.valueOf(LIMIT_INSTS_OPTS.get(0))));
         }
+        
+        if (options.has(TOP_LEVEL_DESIGN_OPTS.get(0))) {
+            Design d = Design.readCheckpoint((String) options.valueOf(TOP_LEVEL_DESIGN_OPTS.get(0)));
+            setTopDesign(d);
+        }
 
     }
 
@@ -343,6 +364,25 @@ public class ArrayBuilder {
             }
             design.getTopEDIFCell().removeNet(clkin);
         }
+    }
+
+    public static List<String> getMatchingModuleInstanceNames(Module m, Design array) {
+        List<String> instNames = new ArrayList<>();
+        EDIFCell modCellType = m.getNetlist().getTopCell();
+        EDIFHierCellInst top = array.getNetlist().getTopHierCellInst();
+        Queue<EDIFHierCellInst> q = new LinkedList<>();
+        q.add(top);
+        while (!q.isEmpty()) {
+            EDIFHierCellInst curr = q.poll();
+            if (curr.getCellType().matchesInterface(modCellType)) {
+                instNames.add(curr.getFullHierarchicalInstName());
+            } else {
+                for (EDIFCellInst child : curr.getCellType().getCellInsts()) {
+                    q.add(curr.getChild(child));
+                }
+            }
+        }
+        return instNames;
     }
 
     public static void main(String[] args) {
@@ -410,6 +450,7 @@ public class ArrayBuilder {
             // Just use the design we loaded and replicate it
             removeBUFGs(ab.getDesign());
             Module m = new Module(ab.getDesign(), unrouteStaticNets);
+            m.getNet(ab.getClockName()).unroute();
             m.calculateAllValidPlacements(ab.getDevice());
             if (ab.getPBlocks().size() > 0) {
                 m.setPBlock(ab.getPBlocks().get(0));
@@ -418,7 +459,16 @@ public class ArrayBuilder {
         }
         t.stop().start("Place Instances");
 
-        Design array = new Design("array", ab.getDesign().getPartName());
+        Design array = null; 
+        List<String> modInstNames = null;
+        if (ab.getTopDesign() == null) {
+            array = new Design("array", ab.getDesign().getPartName());
+        } else {
+            array = ab.getTopDesign();
+            // Find instances in existing design
+            modInstNames = getMatchingModuleInstanceNames(modules.get(0), array);
+            ab.setInstCountLimit(modInstNames.size());
+        }
 
         ModuleInst curr = null;
         int placed = 0;
@@ -426,7 +476,9 @@ public class ArrayBuilder {
         outer: for (Module module : modules) {
             for (Site anchor : module.getAllValidPlacements()) {
                 if (curr == null) {
-                    curr = array.createModuleInst("inst_" + i++, module);
+                    String instName = modInstNames == null ? ("inst_" + i) : modInstNames.get(i);
+                    curr = array.createModuleInst(instName, module);
+                    i++;
                 }
                 if (curr.place(anchor, true, false)) {
                     if (straddlesClockRegion(curr)) {
@@ -449,9 +501,10 @@ public class ArrayBuilder {
             System.out.println("Found " + unrouted.size() + " overlapping nets, that were unrouted.");
         }
 
-        if (ab.isSkipImpl()) {
+        if (ab.isSkipImpl() && ab.getTopDesign() == null) {
             EDIFCell top = array.getTopEDIFCell();
-            if (array.getNet(ab.getClockName()) == null) {
+            EDIFHierNet clkNet = array.getNetlist().getHierNetFromName(ab.getClockName());
+            if (clkNet == null) {
                 // Create BUFG and clock net, then connect to all instances
                 Cell bufg = createBUFGCE(array, top, "bufg", array.getDevice().getSite("BUFGCE_X2Y0"));
                 Net clk = array.createNet(ab.getClockName());
