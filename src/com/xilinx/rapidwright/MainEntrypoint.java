@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -38,7 +38,9 @@ import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockGenerator;
 import com.xilinx.rapidwright.design.merge.MergeDesigns;
 import com.xilinx.rapidwright.design.tools.ArrayBuilder;
+import com.xilinx.rapidwright.design.tools.DesignObfuscator;
 import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.design.tools.RegroupInstances;
 import com.xilinx.rapidwright.design.tools.RelocationTools;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.PseudoPIPHelper;
@@ -46,6 +48,7 @@ import com.xilinx.rapidwright.device.browser.DeviceBrowser;
 import com.xilinx.rapidwright.device.browser.PBlockGenDebugger;
 import com.xilinx.rapidwright.device.helper.TileColumnPattern;
 import com.xilinx.rapidwright.eco.FanOutOptimization;
+import com.xilinx.rapidwright.eco.LUTInputConeOpt;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFParser;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
@@ -91,6 +94,7 @@ import com.xilinx.rapidwright.router.Router;
 import com.xilinx.rapidwright.router.RoutingHeatMap;
 import com.xilinx.rapidwright.rwroute.CUFR;
 import com.xilinx.rapidwright.rwroute.PartialCUFR;
+import com.xilinx.rapidwright.rwroute.PartialDFXRouter;
 import com.xilinx.rapidwright.rwroute.PartialRouter;
 import com.xilinx.rapidwright.rwroute.RWRoute;
 import com.xilinx.rapidwright.tests.CheckAccuracyUsingGnlDesigns;
@@ -142,6 +146,7 @@ public class MainEntrypoint {
         addFunction("DecomposeLUT", DecomposeLUT::main);
         addFunction("DesignImplementationDiff", DesignImplementationDiff::main);
         addFunction("DesignInstrumentor", DesignInstrumentor::main);
+        addFunction("DesignObfuscator", DesignObfuscator::main);
         addFunction("DeviceBrowser", DeviceBrowser::main);
         addFunction("DeviceLoader", DeviceLoader::main);
         addFunction("DeviceResourcesExample", DeviceResourcesExample::main);
@@ -166,6 +171,7 @@ public class MainEntrypoint {
         addFunction("Lesson1", Lesson1::main);
         addFunction("LogicalNetlistExample", LogicalNetlistExample::main);
         addFunction("LogicalNetlistToEdif", LogicalNetlistToEdif::main);
+        addFunction("LUTInputConeOpt", LUTInputConeOpt::main);
         addFunction("LUTTools", LUTTools::main);
         addFunction("MakeBlackBox", MakeBlackBox::main);
         addFunction("MergeDesigns", MergeDesigns::main);
@@ -176,6 +182,7 @@ public class MainEntrypoint {
         addFunction("PartTileBrowser", PartTileBrowser::main);
         addFunction("PartialCUFR", PartialCUFR::main);
         addFunction("PartialRouter", PartialRouter::main);
+        addFunction("PartialDFXRouter", PartialDFXRouter::main);
         addFunction("PBlockGenDebugger", PBlockGenDebugger::main);
         addFunction("PBlockGenerator", PBlockGenerator::main);
         addFunction("PBlock", PBlock::main);
@@ -191,6 +198,7 @@ public class MainEntrypoint {
         addFunction("PrintEDIFInstances", PrintEDIFInstances::main);
         addFunction("ProbeRouter", ProbeRouter::main);
         addFunction("PseudoPIPHelper", PseudoPIPHelper::main);
+        addFunction("RegroupInstances", RegroupInstances::main);
         addFunction("RelocationTools", RelocationTools::main);
         addFunction("ReplaceEDIFInDCP", ReplaceEDIFInDCP::main);
         addFunction("ReportDevicePerformance", ReportDevicePerformance::main);

@@ -1968,6 +1968,8 @@ public class EDIFNetlist extends EDIFName {
         for (String name : primsToRemoveOnCollapse) {
             prims.removeCell(name);
         }
+        // Invalidate parent net map due to macro collapses
+        resetParentNetMap();
     }
 
     /**

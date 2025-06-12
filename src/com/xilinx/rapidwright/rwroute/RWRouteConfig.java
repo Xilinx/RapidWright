@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -104,6 +104,8 @@ public class RWRouteConfig {
     private float husInitialCongestedThreshold;
     /* The threshold for determining whether to start using historical-centric updating in HUS */
     private float husActivateThreshold;
+    /* PBlock within which RWRoute must stay within */
+    private String pblock;
 
     /** Constructs a Configuration Object */
     public RWRouteConfig(String[] arguments) {
@@ -262,6 +264,9 @@ public class RWRouteConfig {
                 break;
             case "--husActivateThreshold":
                 setHusActivateThreshold(Float.parseFloat(arguments[++i]));
+                break;
+            case "--pblock":
+                setPBlock(arguments[++i]);
                 break;
             default:
                 throw new IllegalArgumentException("ERROR: RWRoute argument '" + arg + "' not recognized.");
@@ -1010,6 +1015,24 @@ public class RWRouteConfig {
      */
     public void setHusActivateThreshold(float husActivateThreshold) {
         this.husActivateThreshold = husActivateThreshold;
+    }
+
+    /**
+     * Sets the PBlock (e.g. SLICE_X0Y0:SLICE_X60Y119) which RWRoute must route within.
+     * Default: null (no PBlock)
+     * @param pblock String describing the PBlock which RWRoute must route within.
+     */
+    public void setPBlock(String pblock) {
+        this.pblock = pblock;
+    }
+
+    /**
+     * Gets the PBlock (e.g. SLICE_X0Y0:SLICE_X60Y119) which RWRoute must route within.
+     * Default: null (no PBlock)
+     * @returns pblock String describing the PBlock which RWRoute must route within.
+     */
+    public String getPBlock() {
+        return pblock;
     }
 
     @Override
