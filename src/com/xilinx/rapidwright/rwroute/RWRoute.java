@@ -1965,8 +1965,8 @@ public class RWRoute {
                 }
             }
 
-            evaluateCostAndPush(state, rnode, longParent, childRNode);
-            // System.out.println("\t" + childRNode.getLowerBoundTotalPathCost() + " :: " + childRNode);
+            boolean allowLookahead = !childRNode.isTarget();
+            evaluateCostAndPush(state, rnode, longParent, childRNode, allowLookahead);
             if (childRNode.isTarget() && queue.size() == 1) {
                 // Target is uncongested and the only thing in the (previously cleared) queue, abandon immediately
                 break;
@@ -2014,17 +2014,22 @@ public class RWRoute {
      * @param longParent A boolean value to indicate if the parent is a Long node
      * @param childRnode The child rnode in question.
      */
-    protected void evaluateCostAndPush(ConnectionState state, RouteNode rnode, boolean longParent, RouteNode childRnode) {
+    protected void evaluateCostAndPush(ConnectionState state,
+                                       RouteNode rnode,
+                                       boolean longParent,
+                                       RouteNode childRnode,
+                                       boolean allowLookahead) {
         final Connection connection = state.connection;
         final int countSourceUses = childRnode.countConnectionsOfUser(connection.getNetWrapper());
         final float sharingFactor = 1 + state.shareWeight * countSourceUses;
+        boolean lookahead = false;
 
         // Set the prev pointer, as RouteNode.getEndTileYCoordinate() and
         // RouteNode.getSLRIndex() require this
         childRnode.setPrev(rnode);
 
         float newPartialPathCost = rnode.getUpstreamPathCost();
-        float weightedNodeCost = state.rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor);
+        newPartialPathCost += state.rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor);
         newPartialPathCost += state.rnodeWLWeight * childRnode.getLength() / sharingFactor;
         if (config.isTimingDriven()) {
             newPartialPathCost += state.dlyWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode, longParent));
@@ -2038,14 +2043,17 @@ public class RWRoute {
         int deltaX = Math.abs(childX - sinkX);
         int deltaY = Math.abs(childY - sinkY);
         if (connection.isCrossSLR()) {
+            if (allowLookahead && Utils.isLaguna(childRnode.getTile().getTileTypeEnum())) {
+                if (rnode.getType() == RouteNodeType.SUPER_LONG_LINE) {
+                    assert(childRnode.getWireName().matches("LAG_LAGUNA_SITE_[0-3]_RXD[0-5]"));
+                    lookahead = (rnode.getEndTileYCoordinate() == childY);
+                } else {
+                    lookahead = true;
+                }
+            }
+
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
             if (deltaSLR != 0) {
-                if (childRnode.getType().isAnyLagunaImuxOrInode() && !childRnode.willOverUse(connection.getNetWrapper())) {
-                    // Give all INT-tile IMUX or INODEs that lead into a Laguna crossing that will not be
-                    // overused a zero node cost so that it can be explored quickly
-                    weightedNodeCost = 0;
-                }
-
                 // Check for overshooting which occurs when child and sink node are in
                 // adjacent SLRs and less than a SLL wire's length apart in the Y axis.
                 if (deltaSLR == 1) {
@@ -2072,17 +2080,32 @@ public class RWRoute {
                     deltaX = prevLagunaColumnDeltaX;
                 }
                 assert(deltaX >= 0 && deltaX < Integer.MAX_VALUE);
+
+                lookahead |= allowLookahead && childRnode.getType().isAnyLagunaImuxOrInode();
             }
         }
 
-        newPartialPathCost += weightedNodeCost;
-
         int distanceToSink = deltaX + deltaY;
-        float newTotalPathCost = newPartialPathCost + state.estWlWeight * distanceToSink / sharingFactor;
+        float estCostToSink = state.estWlWeight * distanceToSink / sharingFactor;
+        float newTotalPathCost = newPartialPathCost + estCostToSink;
         if (config.isTimingDriven()) {
-            newTotalPathCost += state.estDlyWeight * (deltaX * 0.32 + deltaY * 0.16);
+            newTotalPathCost += state.estDlyWeight * (deltaX * 0.32f + deltaY * 0.16f);
         }
-        push(state, childRnode, newPartialPathCost, newTotalPathCost);
+
+        if (lookahead) {
+            // Pushed node must have a prev pointer, unless it is a source (with no upstream path cost)
+            assert(childRnode.getPrev() != null || newPartialPathCost == 0);
+            childRnode.setLowerBoundTotalPathCost(newTotalPathCost);
+            childRnode.setUpstreamPathCost(newPartialPathCost);
+            // Use the number-of-connections-routed-so-far as the identifier for whether a rnode
+            // has been visited by this connection before
+            childRnode.setVisited(state.sequence);
+            exploreAndExpand(state, childRnode);
+            // System.out.println("\t\t" + childRnode.getLowerBoundTotalPathCost() + " :: " + childRnode);
+        } else {
+            push(state, childRnode, newPartialPathCost, newTotalPathCost);
+            // System.out.println("\t" + childRnode.getLowerBoundTotalPathCost() + " :: " + childRnode);
+        }
     }
 
     /**
