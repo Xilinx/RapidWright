@@ -208,27 +208,27 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         } else {
                             if (getBeginTileXCoordinate() != getEndTileXCoordinate()) {
                                 // Horizontal
-                                assert(getBeginTileYCoordinate() == getEndTileYCoordinate());
+                                assert(series == Series.UltraScalePlus && getBeginTileYCoordinate() == getEndTileYCoordinate());
                                 if (length == 1) {
                                     // Typically, length = 1 (since tile X is not equal)
-                                    baseCost *= 8f /* * length */;
                                 } else {
-                                    // In US, have seen length = 2, e.g. VU440's INT_X171Y827/EE2_E_BEG7.
+                                    // e.g. VU440's INT_X171Y827/EE2_E_BEG7 which feeds through to above
                                     assert(series == Series.UltraScale && length == 2);
-                                    // baseCost *= length;
                                 }
+                                baseCost *= 3f * length;
                             } else {
                                 // Vertical
                                 assert(getBeginTileYCoordinate() != getEndTileYCoordinate());
                                 if (length == 2) {
-
+                                    // Typically, length = 2
                                 } else if (length == 3) {
-                                    // In US, have seen length = 3, e.g. VU440's INT_X171Y827/NN2_E_BEG7.
+                                    // e.g. VU440's INT_X171Y827/NN2_E_BEG7.
                                     assert(series == Series.UltraScale);
                                 } else {
                                     // U-turn
                                     assert(length == 1);
                                 }
+                                baseCost *= length;
                             }
                         }
                         break;

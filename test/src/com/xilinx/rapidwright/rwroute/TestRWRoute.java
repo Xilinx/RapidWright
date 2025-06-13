@@ -403,7 +403,7 @@ public class TestRWRoute {
             // (Too) Close
             "SLICE_X9Y299,SLICE_X9Y300,200",    // On Laguna column
             "SLICE_X9Y300,SLICE_X9Y299,100",
-            "SLICE_X0Y299,SLICE_X0Y300,100",    // Far from Laguna column
+            "SLICE_X0Y299,SLICE_X0Y300,200",    // Far from Laguna column
             "SLICE_X0Y300,SLICE_X0Y299,100",
             "SLICE_X53Y299,SLICE_X53Y300,100",  // Equidistant from two Laguna columns
             "SLICE_X53Y300,SLICE_X53Y299,100",
