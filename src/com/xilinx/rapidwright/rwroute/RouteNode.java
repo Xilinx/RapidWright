@@ -220,7 +220,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             assert(getAllDownhillPIPs().isEmpty());
                             type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
                         } else {
-                            baseCost = 0.35f * length;
+                            baseCost *= 3 * length;
                         }
                         break;
                     case NODE_VQUAD: // US/US+/Versal
@@ -229,8 +229,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             assert((series == Series.Versal && getAllWiresInNode().length == 1) ||
                                     !getAllDownhillPIPs().isEmpty());
                         } else {
-                            // VQUADs have length 4 and 5
-                            baseCost = 0.15f * length;
+                            // VQUADs have typical length 4
+                            baseCost *= length;
                         }
                         break;
 
@@ -245,8 +245,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             assert(getAllDownhillPIPs().isEmpty());
                             type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
                         } else {
-                            // HLONGs have length 6 and 7
-                            baseCost = 0.15f * length;
+                            // HLONGs have typical length 6
+                            baseCost *= 3 * length;
                         }
                         break;
                     case NODE_VLONG7:  // Versal only
@@ -256,8 +256,10 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_VLONG:   // US/US+
                         if (length == 0) {
                             assert(!getAllDownhillPIPs().isEmpty());
+                        } else {
+                            // VLONGs are typically length 12
+                            baseCost *= length;
                         }
-                        baseCost = 0.7f;
                         break;
 
                     // Versal only
