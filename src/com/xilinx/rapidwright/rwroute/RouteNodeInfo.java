@@ -206,7 +206,8 @@ public class RouteNodeInfo {
                     // Check for INT_INT_ that leads to a Laguna
                     BitSet[] bs2 = routingGraph.wireIndicesLeadingToLaguna.get(node.getTile());
                     if (bs2 != null && bs2[1].get(node.getWireIndex())) {
-                        assert(node.getWireName().matches("INT_INT_SDQ_\\d+_INT_OUT[01]|WW1_E_7_FT0"));
+                        assert(node.getWireName().matches("INT_INT_SDQ_\\d+_INT_OUT[01]|WW1_E_7_FT0") ||    // UltraScale+
+                               node.getWireName().matches("INT_INT_SINGLE_\\d+_INT_OUT|EE1_W_0_FTS"));      // UltraScale
                         boolean northbound = routingGraph.intYToNorthboundLaguna[endTile.getTileYCoordinate()];
                         return northbound ? RouteNodeType.NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA
                                           : RouteNodeType.NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA;
