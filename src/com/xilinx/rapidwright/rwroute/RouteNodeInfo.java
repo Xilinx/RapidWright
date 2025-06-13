@@ -93,7 +93,7 @@ public class RouteNodeInfo {
                 }
                 break;
             case INT:
-                if (type.isLocalLeadingToLaguna()) {
+                if (type.leadsToLaguna()) {
                     assert(length <= 1); // 1 only if INODE_[EW]_\d+_FT[01]
                 }
                 break;

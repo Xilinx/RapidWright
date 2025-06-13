@@ -1856,9 +1856,10 @@ public class RWRoute {
         final PriorityQueue<RouteNode> queue = state.queue;
         final NetWrapper netWrapper = connection.getNetWrapper();
         final RouteNodeType rnodeType = rnode.getType();
-        final boolean lookaheadAllowed = connection.isCrossSLR() &&
-                (Utils.isLaguna(rnode.getTile().getTileTypeEnum()) ||     // (UBUMP\\d+) -> LAG_LAGUNA_SITE_[0-3]_RXD[0-5] -> RXD7 -> INT_NODE_SDQ_\\d+_INT_OUT[01]
-                        rnodeType.isLocalLeadingToLaguna());              // (IMUX_[EW]\\d+) -> LAG_MUX_ATOM_\\d+_TXOUT -> (UBUMP\\d+)
+        final boolean lookaheadAllowed = connection.isCrossSLR() && (
+                rnodeType.leadsToLaguna() ||                        // (IMUX_[EW]\\d+) -> LAG_MUX_ATOM_\\d+_TXOUT -> (UBUMP\\d+)
+                Utils.isLaguna(rnode.getTile().getTileTypeEnum())   // (UBUMP\\d+) -> LAG_LAGUNA_SITE_[0-3]_RXD[0-5] -> RXD7 -> INT_NODE_SDQ_\\d+_INT_OUT[01]
+        );
 
         for (RouteNode childRNode : rnode.getChildren(routingGraph)) {
             if (childRNode.isVisited(sequence)) {
@@ -1905,7 +1906,8 @@ public class RWRoute {
                 if (!isAccessible(childRNode, connection)) {
                     continue;
                 }
-                switch (childRNode.getType()) {
+                RouteNodeType childType = childRNode.getType();
+                switch (childType) {
                     case LOCAL_BOTH:
                     case LOCAL_EAST:
                     case LOCAL_WEST:
@@ -1914,11 +1916,11 @@ public class RWRoute {
                             continue;
                         }
                         // Verify invariant that east/west wires stay east/west ...
-                        assert(rnodeType != RouteNodeType.LOCAL_EAST || childRNode.getType() == RouteNodeType.LOCAL_EAST ||
+                        assert(rnodeType != RouteNodeType.LOCAL_EAST || childType == RouteNodeType.LOCAL_EAST ||
                                 // ... unless it's an exclusive sink using a LOCAL_RESERVED node
-                                (childRNode.getType() == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH));
-                        assert(rnodeType != RouteNodeType.LOCAL_WEST || childRNode.getType() == RouteNodeType.LOCAL_WEST ||
-                                (childRNode.getType() == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH));
+                                (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH));
+                        assert(rnodeType != RouteNodeType.LOCAL_WEST || childType == RouteNodeType.LOCAL_WEST ||
+                                (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH));
                         break;
                     case LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
                         if (!connection.isCrossSLRnorth() ||
@@ -1954,9 +1956,9 @@ public class RWRoute {
                     case EXCLUSIVE_SINK_EAST:
                     case EXCLUSIVE_SINK_WEST:
                     case EXCLUSIVE_SINK_NON_LOCAL:
-                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_EAST || rnodeType == RouteNodeType.LOCAL_EAST);
-                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_WEST || rnodeType == RouteNodeType.LOCAL_WEST);
-                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_BOTH || rnodeType == RouteNodeType.LOCAL_BOTH ||
+                        assert(childType != RouteNodeType.EXCLUSIVE_SINK_EAST || rnodeType == RouteNodeType.LOCAL_EAST);
+                        assert(childType != RouteNodeType.EXCLUSIVE_SINK_WEST || rnodeType == RouteNodeType.LOCAL_WEST);
+                        assert(childType != RouteNodeType.EXCLUSIVE_SINK_BOTH || rnodeType == RouteNodeType.LOCAL_BOTH ||
                                // [BC]NODEs are LOCAL_{EAST,WEST} since they connect to INODEs, but also service CTRL sinks
                                (routingGraph.isVersal && EnumSet.of(IntentCode.NODE_CLE_BNODE, IntentCode.NODE_CLE_CNODE,
                                                                     IntentCode.NODE_INTF_BNODE, IntentCode.NODE_INTF_CNODE)
@@ -1974,7 +1976,7 @@ public class RWRoute {
                         lookahead = false;
                         break;
                     default:
-                        throw new RuntimeException("Unexpected rnode type: " + childRNode.getType());
+                        throw new RuntimeException("Unexpected rnode type: " + childType);
                 }
             }
 
@@ -2065,10 +2067,10 @@ public class RWRoute {
 
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
             if (deltaSLR != 0) {
-                if (childRnode.getType().isLocalLeadingToLaguna()) {
-                    assert((connection.isCrossSLRnorth() && childRnode.getType().leadsToNorthboundLaguna()) ||
-                           (connection.isCrossSLRsouth() && childRnode.getType().leadsToSouthboundLaguna()));
-                }
+                assert(!childRnode.getType().isLocalLeadingToLaguna() || (
+                        (connection.isCrossSLRnorth() && childRnode.getType().leadsToNorthboundLaguna()) ||
+                        (connection.isCrossSLRsouth() && childRnode.getType().leadsToSouthboundLaguna())
+                ));
 
                 // Check for overshooting which occurs when child and sink node are in
                 // adjacent SLRs and less than a SLL wire's length apart in the Y axis.

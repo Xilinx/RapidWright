@@ -85,6 +85,10 @@ public enum RouteNodeType {
     public boolean isLocalLeadingToLaguna() {
         return this == LOCAL_LEADING_TO_NORTHBOUND_LAGUNA || this == LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA;
     }
+    public boolean leadsToLaguna() {
+        return this == LOCAL_LEADING_TO_NORTHBOUND_LAGUNA || this == NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA ||
+               this == LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA || this == NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA;
+    }
     public boolean leadsToNorthboundLaguna() {
         return this == LOCAL_LEADING_TO_NORTHBOUND_LAGUNA || this == NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA;
     }

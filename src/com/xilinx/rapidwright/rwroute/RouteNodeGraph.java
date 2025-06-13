@@ -853,7 +853,7 @@ public class RouteNodeGraph {
         // Only consider LOCAL nodes when:
         // (a) considering LUT routethrus
         RouteNodeType type = childRnode.getType();
-        if (!type.isAnyLocal() || lutRoutethru) {
+        if (!type.isAnyLocal() || childRnode.isTarget() || lutRoutethru) {
             return true;
         }
 
@@ -864,7 +864,7 @@ public class RouteNodeGraph {
         if (connection.isCrossSLR() &&
                 childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this) &&
                 wireIndicesLeadingToLaguna.get(childTile) != null &&
-                childRnode.getType().isLocalLeadingToLaguna()) {
+                childRnode.getType().leadsToLaguna()) {
             assert((connection.isCrossSLRnorth() && childRnode.getType().leadsToNorthboundLaguna()) ||
                    (connection.isCrossSLRsouth() && childRnode.getType().leadsToSouthboundLaguna()));
             assert(nextLagunaColumn[childX] == childX);
