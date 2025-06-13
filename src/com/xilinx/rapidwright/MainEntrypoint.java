@@ -37,6 +37,7 @@ import com.xilinx.rapidwright.design.blocks.ImplGuide;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockGenerator;
 import com.xilinx.rapidwright.design.merge.MergeDesigns;
+import com.xilinx.rapidwright.design.tools.CopyImplementation;
 import com.xilinx.rapidwright.design.tools.DesignObfuscator;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.design.tools.RegroupInstances;
@@ -137,6 +138,7 @@ public class MainEntrypoint {
         addFunction("CheckAccuracyUsingGnlDesigns", CheckAccuracyUsingGnlDesigns::main);
         addFunction("CompareRouteStatusReports", CompareRouteStatusReports::main);
         addFunction("CopyMMCMCell", CopyMMCMCell::main);
+        addFunction("CopyImplementation", CopyImplementation::main);
         addFunction("CountRoutedNets", CountRoutedNets::main);
         addFunction("CUFR", CUFR::main);
         addFunction("CustomRouting", CustomRouting::main);
