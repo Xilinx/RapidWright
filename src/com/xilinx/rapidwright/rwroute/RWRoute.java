@@ -2086,16 +2086,22 @@ public class RWRoute {
                 // and from there onto the sink
                 int nextLagunaColumn = routingGraph.nextLagunaColumn[childX];
                 int prevLagunaColumn = routingGraph.prevLagunaColumn[childX];
-                int nextLagunaColumnDeltaX = (nextLagunaColumn == Integer.MAX_VALUE) ? Integer.MAX_VALUE :
-                        Math.abs(nextLagunaColumn - childX) + Math.abs(sinkX - nextLagunaColumn);
-                int prevLagunaColumnDeltaX = (prevLagunaColumn == Integer.MIN_VALUE) ? Integer.MAX_VALUE :
-                        Math.abs(prevLagunaColumn - childX) + Math.abs(sinkX - prevLagunaColumn);
-                if (nextLagunaColumnDeltaX <= prevLagunaColumnDeltaX) {
-                    assert(deltaX <= nextLagunaColumnDeltaX);
-                    deltaX = nextLagunaColumnDeltaX;
+                int deltaXToNextColumn = (nextLagunaColumn == Integer.MAX_VALUE || nextLagunaColumn >= connection.getXMaxBB()) ? Integer.MAX_VALUE :
+                        Math.abs(nextLagunaColumn - childX);
+                int deltaXToPrevColumn = (prevLagunaColumn == Integer.MIN_VALUE || prevLagunaColumn <= connection.getXMinBB()) ? Integer.MAX_VALUE :
+                        Math.abs(prevLagunaColumn - childX);
+                if (deltaXToNextColumn == 0) {
+                    assert(deltaXToPrevColumn == 0);
+                    assert(deltaX == Math.abs(sinkX - nextLagunaColumn));
+                } else if (deltaXToNextColumn < deltaXToPrevColumn) {
+                    int deltaXToAndFromNextColumn = deltaXToNextColumn + Math.abs(sinkX - nextLagunaColumn);
+                    assert(deltaX <= deltaXToAndFromNextColumn);
+                    deltaX = deltaXToAndFromNextColumn;
                 } else {
-                    assert(deltaX <= prevLagunaColumnDeltaX);
-                    deltaX = prevLagunaColumnDeltaX;
+                    assert(prevLagunaColumn != Integer.MIN_VALUE);
+                    int deltaXToAndFromPrevColumn = deltaXToPrevColumn + Math.abs(sinkX - prevLagunaColumn);
+                    assert(deltaX <= deltaXToAndFromPrevColumn);
+                    deltaX = deltaXToAndFromPrevColumn;
                 }
                 assert(deltaX >= 0 && deltaX < Integer.MAX_VALUE);
             }
