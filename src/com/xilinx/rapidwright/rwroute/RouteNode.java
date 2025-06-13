@@ -163,7 +163,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_CLE_OUTPUT:    // CLE outputs (US+ and Versal)
                     case NODE_LAGUNA_OUTPUT: // LAG_LAG.{LAG_MUX_ATOM_*_TXOUT,RXD*} (US+)
                     case NODE_LAGUNA_DATA:   // LAG_LAG.UBUMP* super long lines for u-turns at the boundary of the device (US+)
-                    case NODE_PINFEED:
                     case INTENT_DEFAULT:     // INT.VCC_WIRE
                         assert(length == 0);
                         break;
