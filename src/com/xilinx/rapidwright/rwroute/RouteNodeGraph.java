@@ -875,6 +875,9 @@ public class RouteNodeGraph {
         Tile sinkTile = sinkRnode.getTile();
         switch (sinkRnode.getType()) {
             case LOCAL_EAST:
+                if (childRnode.isTarget()) {
+                    return true;
+                }
                 assert(lutPinSwapping && connection.hasAltSinks());
                 // Fall-through
             case EXCLUSIVE_SINK_EAST:
@@ -884,6 +887,9 @@ public class RouteNodeGraph {
                 }
                 break;
             case LOCAL_WEST:
+                if (childRnode.isTarget()) {
+                    return true;
+                }
                 assert(lutPinSwapping && connection.hasAltSinks());
                 // Fall-through
             case EXCLUSIVE_SINK_WEST:
