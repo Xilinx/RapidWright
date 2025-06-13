@@ -354,6 +354,10 @@ public class EDIFHierCellInst {
         for (int i = cellInsts.length - 1; i > 0; i--) {
             if (!cellInsts[i].isUniquified()) {
                 EDIFCell orig = cellInsts[i].getCellType();
+                // Don't unique-ify primitives or macros
+                if (orig.isPrimitive() || orig.isMacro()) {
+                    continue;
+                }
                 String newCellTypeName = orig.getName() + EDIFTools.getUniqueSuffix();
                 EDIFCell copy = new EDIFCell(orig.getLibrary(), orig, newCellTypeName);
                 cellInsts[i].setCellType(copy);
