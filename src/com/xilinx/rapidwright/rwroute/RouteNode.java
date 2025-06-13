@@ -177,11 +177,17 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         }
                         // Fall through
                     case NODE_SINGLE:  // US and US+
-                        if (length <= 1) {
-                            assert(!getAllDownhillPIPs().isEmpty());
+                        assert(!getAllDownhillPIPs().isEmpty());
+                        if (length == 0) {
+                            // U-turns and intra-tile INT_INT_SDQ_\\d+_INT_OUT[01]
                         } else {
-                            assert(length == 2);
-                            baseCost *= length;
+                            assert(length <= 2); // 2 for feedthrough e.g. WW1_W_BEG7
+                            if (getBeginTileXCoordinate() != getEndTileXCoordinate()) {
+                                // Horizontal
+                            } else {
+                                // Vertical
+                                assert(getBeginTileYCoordinate() != getEndTileYCoordinate());
+                            }
                         }
                         break;
                     case NODE_VDOUBLE: // Versal only
@@ -196,20 +202,33 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         // Fall through
                     case NODE_DOUBLE:  // US and US+
                         if (length == 0) {
+                            // U-turn nodes
+                            // FIXME: length == 0 for INT_X103Y299/NN2_E_BEG0 on VU9P
                             assert(!getAllDownhillPIPs().isEmpty());
                         } else {
                             if (getBeginTileXCoordinate() != getEndTileXCoordinate()) {
-                                assert(length <= 2);
-                                // Typically, length = 1 (since tile X is not equal)
-                                // In US, have seen length = 2, e.g. VU440's INT_X171Y827/EE2_E_BEG7.
-                                if (length == 2) {
-                                    baseCost *= length;
+                                // Horizontal
+                                assert(getBeginTileYCoordinate() == getEndTileYCoordinate());
+                                if (length == 1) {
+                                    // Typically, length = 1 (since tile X is not equal)
+                                    baseCost *= 8f /* * length */;
+                                } else {
+                                    // In US, have seen length = 2, e.g. VU440's INT_X171Y827/EE2_E_BEG7.
+                                    assert(series == Series.UltraScale && length == 2);
+                                    // baseCost *= length;
                                 }
                             } else {
-                                // Typically, length = 2 except for horizontal U-turns (length = 0)
-                                // or vertical U-turns (length = 1).
-                                // In US, have seen length = 3, e.g. VU440's INT_X171Y827/NN2_E_BEG7.
-                                assert(length <= 3);
+                                // Vertical
+                                assert(getBeginTileYCoordinate() != getEndTileYCoordinate());
+                                if (length == 2) {
+
+                                } else if (length == 3) {
+                                    // In US, have seen length = 3, e.g. VU440's INT_X171Y827/NN2_E_BEG7.
+                                    assert(series == Series.UltraScale);
+                                } else {
+                                    // U-turn
+                                    assert(length == 1);
+                                }
                             }
                         }
                         break;
