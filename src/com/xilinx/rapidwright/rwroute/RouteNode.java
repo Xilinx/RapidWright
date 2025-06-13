@@ -138,11 +138,16 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
             case LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
             case LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
                 assert(length == 0 ||
-                        (length == 1 && getWireName().matches("INODE_[EW]_\\d+_FT[01]")));
+                        (length == 1 && (
+                                (series == Series.UltraScalePlus && getWireName().matches("INODE_[EW]_\\d+_FT[01]")) ||
+                                (series == Series.UltraScale && getWireName().matches("INODE_[12]_[EW]_\\d+_FT[NS]"))
+                        ))
+                );
                 break;
             case NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
             case NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
-                assert(length == 0);
+                assert(length == 0 ||
+                        (length == 1 && series == Series.UltraScale && getWireName().matches("SDND[NS]W_E_15_FTN")));
                 break;
             case SUPER_LONG_LINE:
                 assert(getLength() == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
@@ -208,7 +213,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         } else {
                             if (getBeginTileXCoordinate() != getEndTileXCoordinate()) {
                                 // Horizontal
-                                assert(series == Series.UltraScalePlus && getBeginTileYCoordinate() == getEndTileYCoordinate());
+                                assert(series != Series.UltraScalePlus || getBeginTileYCoordinate() == getEndTileYCoordinate());
                                 if (length == 1) {
                                     // Typically, length = 1 (since tile X is not equal)
                                 } else {
@@ -222,7 +227,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                                 if (length == 2) {
                                     // Typically, length = 2
                                 } else if (length == 3) {
-                                    // e.g. VU440's INT_X171Y827/NN2_E_BEG7.
+                                    // e.g. VU440's INT_X171Y827/NN2_E_BEG7 which feeds through to above
                                     assert(series == Series.UltraScale);
                                 } else {
                                     // U-turn
