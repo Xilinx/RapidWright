@@ -108,7 +108,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     }
 
     private void setBaseCost(Series series) {
-        baseCost = 0.4f;
+        baseCost = 0.2f;
         switch (getType()) {
             case EXCLUSIVE_SOURCE:
                 assert(length == 0 ||
@@ -119,11 +119,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
             case EXCLUSIVE_SINK_WEST:
                 assert(length == 0 ||
                        (length == 1 && (series == Series.UltraScalePlus || series == Series.UltraScale) && getIntentCode() == IntentCode.NODE_PINBOUNCE));
-                break;
-            case LAGUNA_IMUX_OR_INODE_NORTH:
-            case LAGUNA_IMUX_OR_INODE_SOUTH:
-                assert(length == 0 ||
-                        (length == 1 && getWireName().matches("INODE_[EW]_\\d+_FT[01]")));
                 break;
             case LOCAL_BOTH:
                 assert(length == 0);
@@ -140,9 +135,18 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                        ))
                    );
                 break;
+            case LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
+            case LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
+                assert(length == 0 ||
+                        (length == 1 && getWireName().matches("INODE_[EW]_\\d+_FT[01]")));
+                break;
+            case NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
+            case NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
+                assert(length == 0);
+                break;
             case SUPER_LONG_LINE:
                 assert(getLength() == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
-                baseCost = 0.3f * RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
+                baseCost *= RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
                 break;
             case NON_LOCAL:
                 short length = getLength();
