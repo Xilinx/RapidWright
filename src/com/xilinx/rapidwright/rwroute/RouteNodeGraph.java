@@ -401,11 +401,15 @@ public class RouteNodeGraph {
                             }
                         }
 
-                        Pattern inodePattern = Pattern.compile("INT_NODE_IMUX_\\d+_INT_OUT[01]|INODE_[EW]_\\d+_FT[01]");
-                        Pattern intIntPattern = Pattern.compile("INT_INT_SDQ_\\d+_INT_OUT[01]|WW1_E_7_FT0");
+                        Pattern inodePattern = Pattern.compile(isUltraScalePlus ? "INT_NODE_IMUX_\\d+_INT_OUT[01]|INODE_[EW]_\\d+_FT[01]"
+                                                                                : "INT_NODE_IMUX_\\d+_INT_OUT|INODE_[12]_[EW]_\\d+_FT[NS]");
+                        Pattern intIntPattern = Pattern.compile(isUltraScalePlus ? "INT_INT_SDQ_\\d+_INT_OUT[01]|WW1_E_7_FT0"
+                                                                                 : "INT_INT_SINGLE_\\d+_INT_OUT|EE1_W_0_FTS");
                         Pattern singlePattern = Pattern.compile("(NN|EE|SS|WW)1_[EW]_BEG[0-7]");
-                        Pattern sdqNodeFtPattern = Pattern.compile("SDQNODE_[EW]_\\d+_FT[01]");
-                        Pattern sdqNodePattern = Pattern.compile("INT_NODE_SDQ_\\d+_INT_OUT[01]|SDQNODE_[EW]_\\d+_FT[01]");
+                        Pattern sdqNodeFtPattern = Pattern.compile(isUltraScalePlus ? "SDQNODE_[EW]_0_FT1"
+                                                                                    : "SDND[NS]W_E_0_FTS");
+                        Pattern sdqNodePattern = Pattern.compile(isUltraScalePlus ? "INT_NODE_SDQ_\\d+_INT_OUT[01]|SDQNODE_(W_91_FT1|E_93_FT0)"
+                                                                                  : "INT_NODE_SINGLE_DOUBLE_\\d+_INT_OUT|SDND[NS]W_E_15_FTN");
 
                         // Examine all wires in each Laguna tile. Record those IMUX and INODE uphill of a Super Long Line
                         // that originates in an INT tile
@@ -415,10 +419,11 @@ public class RouteNodeGraph {
                             }
                             Node sllNode = Node.getNode(tile, wireIndex);
                             for (Node txOut : sllNode.getAllUphillNodes()) {
-                                if (txOut.isTiedToVcc()) {
+                                List<Node> uphillTxout = txOut.getAllUphillNodes();
+                                if (uphillTxout.isEmpty()) {
+                                    assert((isUltraScalePlus && txOut.isTiedToVcc()) || (isUltraScale && txOut.getWireName().startsWith("VCC_WIRE")));
                                     continue;
                                 }
-                                List<Node> uphillTxout = txOut.getAllUphillNodes();
                                 assert(uphillTxout.size() == 2);
                                 assert(uphillTxout.get(1).getTile().getTileTypeEnum() == sllNode.getTile().getTileTypeEnum());
                                 Node imux = uphillTxout.get(0);
@@ -454,6 +459,9 @@ public class RouteNodeGraph {
                                         bs[1].set(intInt.getWireIndex());
 
                                         for (Node sdq : intInt.getAllUphillNodes()) {
+                                            if (isUltraScale && sdq.isTiedToVcc()) {
+                                                continue;
+                                            }
                                             assert(sdq.getIntentCode() == IntentCode.NODE_LOCAL);
 
                                             if (sdq.getTile() != intInt.getTile()) {
