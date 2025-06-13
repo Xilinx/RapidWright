@@ -2091,13 +2091,16 @@ public class RWRoute {
                 int deltaXToPrevColumn = (prevLagunaColumn == Integer.MIN_VALUE || prevLagunaColumn <= connection.getXMinBB()) ? Integer.MAX_VALUE :
                         Math.abs(prevLagunaColumn - childX);
                 if (deltaXToNextColumn == 0) {
+                    // Equidistant from both columns -- can only mean we're on the column
                     assert(deltaXToPrevColumn == 0);
                     assert(deltaX == Math.abs(sinkX - nextLagunaColumn));
                 } else if (deltaXToNextColumn < deltaXToPrevColumn) {
+                    // Closer to the next column
                     int deltaXToAndFromNextColumn = deltaXToNextColumn + Math.abs(sinkX - nextLagunaColumn);
                     assert(deltaX <= deltaXToAndFromNextColumn);
                     deltaX = deltaXToAndFromNextColumn;
                 } else {
+                    // Closer to the prev column
                     assert(prevLagunaColumn != Integer.MIN_VALUE);
                     int deltaXToAndFromPrevColumn = deltaXToPrevColumn + Math.abs(sinkX - prevLagunaColumn);
                     assert(deltaX <= deltaXToAndFromPrevColumn);
