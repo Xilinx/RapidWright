@@ -123,7 +123,7 @@ public class RWRouteConfig {
         criticalityExponent = 3;
         minRerouteCriticality = 0.85f;
         reroutePercentage = (short) 3;
-        initialPresentCongestionFactor = 0.5f;
+        initialPresentCongestionFactor = 1.0f;
         presentCongestionMultiplier = 2f;
         historicalCongestionFactor = 1f;
         timingDriven = true;

@@ -1668,6 +1668,8 @@ public class RWRoute {
         protected float dlyWeight;
         protected float estDlyWeight;
 
+        protected int nodesPopped;
+
         protected ConnectionState() {
             this.queue = new PriorityQueue<>();
             this.targets = new ArrayList<>();
@@ -1695,18 +1697,18 @@ public class RWRoute {
 
         prepareRouteConnection(state);
 
-        int nodesPoppedThisConnection = 0;
+        state.nodesPopped = 0;
         RouteNode rnode;
         while ((rnode = queue.poll()) != null) {
             // System.out.println(rnode.getLowerBoundTotalPathCost() + " :: " + rnode);
-            nodesPoppedThisConnection++;
+            state.nodesPopped++;
             if (rnode.isTarget()) {
                 break;
             }
             exploreAndExpand(state, rnode);
         }
-        nodesPushed.addAndGet(nodesPoppedThisConnection + queue.size());
-        nodesPopped.addAndGet(nodesPoppedThisConnection);
+        nodesPushed.addAndGet(state.nodesPopped + queue.size());
+        nodesPopped.addAndGet(state.nodesPopped);
 
         if (rnode != null) {
             queue.clear();
@@ -1852,17 +1854,18 @@ public class RWRoute {
         final Connection connection = state.connection;
         final int sequence = state.sequence;
         final PriorityQueue<RouteNode> queue = state.queue;
+        final NetWrapper netWrapper = connection.getNetWrapper();
+        final RouteNodeType rnodeType = rnode.getType();
+        final boolean lookaheadAllowed = connection.isCrossSLR() &&
+                (Utils.isLaguna(rnode.getTile().getTileTypeEnum()) ||     // (UBUMP\\d+) -> LAG_LAGUNA_SITE_[0-3]_RXD[0-5] -> RXD7 -> INT_NODE_SDQ_\\d+_INT_OUT[01]
+                        rnodeType.isLocalLeadingToLaguna());              // (IMUX_[EW]\\d+) -> LAG_MUX_ATOM_\\d+_TXOUT -> (UBUMP\\d+)
+
         for (RouteNode childRNode : rnode.getChildren(routingGraph)) {
-            // Targets that are visited more than once must be overused
-            assert(!childRNode.isTarget() || !childRNode.isVisited(sequence) || childRNode.willOverUse(connection.getNetWrapper()));
-
-            // If childRnode is preserved, then it must be preserved for the current net we're routing
-            Net preservedNet;
-            assert((preservedNet = routingGraph.getPreservedNet(childRNode)) == null ||
-                    preservedNet == connection.getNet());
-
             if (childRNode.isVisited(sequence)) {
-                // Node must be in queue already.
+                // Node must be in queue already
+
+                // Targets that are visited more than once must be overused
+                assert(!childRNode.isTarget() || childRNode.willOverUse(netWrapper));
 
                 // Note: it is possible this is a cheaper path to childRNode; however, because the
                 // PriorityQueue class does not support (efficiently) reducing the cost of nodes
@@ -1870,20 +1873,27 @@ public class RWRoute {
                 continue;
             }
 
+            // If childRnode is preserved, then it must be preserved for the current net we're routing
+            Net preservedNet;
+            assert((preservedNet = routingGraph.getPreservedNet(childRNode)) == null ||
+                    preservedNet == connection.getNet());
+
+            boolean lookahead = lookaheadAllowed;
             if (childRNode.isTarget()) {
+                lookahead = false;
                 boolean earlyTermination;
                 if (childRNode.getType().isAnyExclusiveSink()) {
                     // This sink must be exclusively reserved for this connection already
                     assert(childRNode == connection.getSinkRnode() && !connection.hasAltSinks());
                     assert(!childRNode.isOverUsed());
-                    assert(!childRNode.willOverUse(connection.getNetWrapper()));
-                    assert(childRNode.countConnectionsOfUser(connection.getNetWrapper()) == 1 ||
+                    assert(!childRNode.willOverUse(netWrapper));
+                    assert(childRNode.countConnectionsOfUser(netWrapper) == 1 ||
                            childRNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
                     earlyTermination = true;
                 } else {
                     // Target is not an exclusive sink, only early terminate if this net will not
                     // (further) overuse this node
-                    earlyTermination = !childRNode.willOverUse(connection.getNetWrapper());
+                    earlyTermination = !childRNode.willOverUse(netWrapper);
                 }
 
                 if (earlyTermination) {
@@ -1904,15 +1914,31 @@ public class RWRoute {
                             continue;
                         }
                         // Verify invariant that east/west wires stay east/west ...
-                        assert(rnode.getType() != RouteNodeType.LOCAL_EAST || childRNode.getType() == RouteNodeType.LOCAL_EAST ||
+                        assert(rnodeType != RouteNodeType.LOCAL_EAST || childRNode.getType() == RouteNodeType.LOCAL_EAST ||
                                 // ... unless it's an exclusive sink using a LOCAL_RESERVED node
                                 (childRNode.getType() == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH));
-                        assert(rnode.getType() != RouteNodeType.LOCAL_WEST || childRNode.getType() == RouteNodeType.LOCAL_WEST ||
+                        assert(rnodeType != RouteNodeType.LOCAL_WEST || childRNode.getType() == RouteNodeType.LOCAL_WEST ||
                                 (childRNode.getType() == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH));
                         break;
+                    case LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
+                        if (!connection.isCrossSLRnorth() ||
+                                connection.getSinkRnode().getSLRIndex(routingGraph) == childRNode.getSLRIndex(routingGraph)) {
+                            // Do not consider approaching a SLL if not needing to cross
+                            continue;
+                        }
+                        break;
+                    case LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
+                        if (!connection.isCrossSLRsouth() ||
+                                connection.getSinkRnode().getSLRIndex(routingGraph) == childRNode.getSLRIndex(routingGraph)) {
+                            // Do not consider approaching a SLL if not needing to cross
+                            continue;
+                        }
+                        break;
                     case NON_LOCAL:
+                    case NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
+                    case NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
                         // LOCALs cannot connect to NON_LOCALs except via a LUT routethru
-                        assert(!rnode.getType().isAnyLocal() ||
+                        assert(!rnodeType.isAnyLocal() ||
                                routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED);
 
                         if (!routingGraph.isAccessible(childRNode, connection)) {
@@ -1928,9 +1954,9 @@ public class RWRoute {
                     case EXCLUSIVE_SINK_EAST:
                     case EXCLUSIVE_SINK_WEST:
                     case EXCLUSIVE_SINK_NON_LOCAL:
-                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_EAST || rnode.getType() == RouteNodeType.LOCAL_EAST);
-                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_WEST || rnode.getType() == RouteNodeType.LOCAL_WEST);
-                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_BOTH || rnode.getType() == RouteNodeType.LOCAL_BOTH ||
+                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_EAST || rnodeType == RouteNodeType.LOCAL_EAST);
+                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_WEST || rnodeType == RouteNodeType.LOCAL_WEST);
+                        assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_BOTH || rnodeType == RouteNodeType.LOCAL_BOTH ||
                                // [BC]NODEs are LOCAL_{EAST,WEST} since they connect to INODEs, but also service CTRL sinks
                                (routingGraph.isVersal && EnumSet.of(IntentCode.NODE_CLE_BNODE, IntentCode.NODE_CLE_CNODE,
                                                                     IntentCode.NODE_INTF_BNODE, IntentCode.NODE_INTF_CNODE)
@@ -1939,35 +1965,23 @@ public class RWRoute {
                             continue;
                         }
                         assert(childRNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
-                        assert(childRNode.countConnectionsOfUser(connection.getNetWrapper()) > 0);
-                        assert(!childRNode.willOverUse(connection.getNetWrapper()));
-                        break;
-                    case LAGUNA_IMUX_OR_INODE_NORTH:
-                        if (!connection.isCrossSLRnorth() ||
-                                connection.getSinkRnode().getSLRIndex(routingGraph) == childRNode.getSLRIndex(routingGraph)) {
-                            // Do not consider approaching a SLL if not needing to cross
-                            continue;
-                        }
-                        break;
-                    case LAGUNA_IMUX_OR_INODE_SOUTH:
-                        if (!connection.isCrossSLRsouth() ||
-                                connection.getSinkRnode().getSLRIndex(routingGraph) == childRNode.getSLRIndex(routingGraph)) {
-                            // Do not consider approaching a SLL if not needing to cross
-                            continue;
-                        }
+                        assert(childRNode.countConnectionsOfUser(netWrapper) > 0);
+                        assert(!childRNode.willOverUse(netWrapper));
                         break;
                     case SUPER_LONG_LINE:
                         assert(connection.isCrossSLR() &&
                                 connection.getSinkRnode().getSLRIndex(routingGraph) != rnode.getSLRIndex(routingGraph));
+                        lookahead = false;
                         break;
                     default:
                         throw new RuntimeException("Unexpected rnode type: " + childRNode.getType());
                 }
             }
 
-            boolean allowLookahead = !childRNode.isTarget();
-            evaluateCostAndPush(state, rnode, longParent, childRNode, allowLookahead);
-            if (childRNode.isTarget() && queue.size() == 1) {
+            evaluateCostAndPush(state, rnode, longParent, childRNode, lookahead);
+
+            RouteNode frontRnode = queue.peek();
+            if (frontRnode.isTarget() && !frontRnode.willOverUse(netWrapper)) {
                 // Target is uncongested and the only thing in the (previously cleared) queue, abandon immediately
                 break;
             }
@@ -2007,6 +2021,8 @@ public class RWRoute {
         return true;
     }
 
+    // int depth = 1;
+
     /**
      * Evaluates the cost of a child of a rnode and pushes the child into the queue after cost evaluation.
      * @param state State from the connection that is being routed.
@@ -2018,11 +2034,10 @@ public class RWRoute {
                                        RouteNode rnode,
                                        boolean longParent,
                                        RouteNode childRnode,
-                                       boolean allowLookahead) {
+                                       boolean lookahead) {
         final Connection connection = state.connection;
         final int countSourceUses = childRnode.countConnectionsOfUser(connection.getNetWrapper());
         final float sharingFactor = 1 + state.shareWeight * countSourceUses;
-        boolean lookahead = false;
 
         // Set the prev pointer, as RouteNode.getEndTileYCoordinate() and
         // RouteNode.getSLRIndex() require this
@@ -2043,17 +2058,18 @@ public class RWRoute {
         int deltaX = Math.abs(childX - sinkX);
         int deltaY = Math.abs(childY - sinkY);
         if (connection.isCrossSLR()) {
-            if (allowLookahead && Utils.isLaguna(childRnode.getTile().getTileTypeEnum())) {
-                if (rnode.getType() == RouteNodeType.SUPER_LONG_LINE) {
-                    assert(childRnode.getWireName().matches("LAG_LAGUNA_SITE_[0-3]_RXD[0-5]"));
-                    lookahead = (rnode.getEndTileYCoordinate() == childY);
-                } else {
-                    lookahead = true;
-                }
+            if (lookahead && rnode.getType() == RouteNodeType.SUPER_LONG_LINE) {
+                // With the SLL being bidrectional, do not lookahead the way we came from
+                lookahead = (rnode.getPrev().getTile() != childRnode.getTile());
             }
 
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
             if (deltaSLR != 0) {
+                if (childRnode.getType().isLocalLeadingToLaguna()) {
+                    assert((connection.isCrossSLRnorth() && childRnode.getType().leadsToNorthboundLaguna()) ||
+                           (connection.isCrossSLRsouth() && childRnode.getType().leadsToSouthboundLaguna()));
+                }
+
                 // Check for overshooting which occurs when child and sink node are in
                 // adjacent SLRs and less than a SLL wire's length apart in the Y axis.
                 if (deltaSLR == 1) {
@@ -2080,8 +2096,6 @@ public class RWRoute {
                     deltaX = prevLagunaColumnDeltaX;
                 }
                 assert(deltaX >= 0 && deltaX < Integer.MAX_VALUE);
-
-                lookahead |= allowLookahead && childRnode.getType().isAnyLagunaImuxOrInode();
             }
         }
 
@@ -2092,6 +2106,7 @@ public class RWRoute {
             newTotalPathCost += state.estDlyWeight * (deltaX * 0.32f + deltaY * 0.16f);
         }
 
+        // System.out.println(String.join("", Collections.nCopies(depth, "\t")) + newTotalPathCost + " :: " + distanceToSink + " -- " + childRnode);
         if (lookahead) {
             // Pushed node must have a prev pointer, unless it is a source (with no upstream path cost)
             assert(childRnode.getPrev() != null || newPartialPathCost == 0);
@@ -2100,11 +2115,12 @@ public class RWRoute {
             // Use the number-of-connections-routed-so-far as the identifier for whether a rnode
             // has been visited by this connection before
             childRnode.setVisited(state.sequence);
+            state.nodesPopped++;
+            // depth++;
             exploreAndExpand(state, childRnode);
-            // System.out.println("\t\t" + childRnode.getLowerBoundTotalPathCost() + " :: " + childRnode);
+            // depth--;
         } else {
             push(state, childRnode, newPartialPathCost, newTotalPathCost);
-            // System.out.println("\t" + childRnode.getLowerBoundTotalPathCost() + " :: " + childRnode);
         }
     }
 

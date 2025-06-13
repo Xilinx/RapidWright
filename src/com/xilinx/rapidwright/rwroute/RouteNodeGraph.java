@@ -95,10 +95,10 @@ public class RouteNodeGraph {
     public final int[] prevLagunaColumn;
 
     /**
-     * Map indicating which "IMUX_[EW]\d+" and "INT_NODE_IMUX_\d+_INT_OUT[01]"/"INODE_[EW]_\d+_FT[01]:
-     * wire indices within a Laguna-adjacent INT tile service a Laguna-crossing
+     * Map indicating which IMUX, INODE, SDQNODE or INT_INT single wire indices
+     * within a Laguna-adjacent INT tile service a Laguna-crossing
      */
-    protected final Map<Tile, BitSet> lagunaImuxOrInode;
+    protected final Map<Tile, BitSet[]> wireIndicesLeadingToLaguna;
 
     /** For one of the above IMUX/INODE wires, indicate whether it leads to a SLL travelling northbound (else southbound) **/
     public final boolean[] intYToNorthboundLaguna;
@@ -365,7 +365,7 @@ public class RouteNodeGraph {
             final int maxTileColumns = device.getColumns(); // An over-approximation since this isn't in tiles
             nextLagunaColumn = new int[maxTileColumns];
             prevLagunaColumn = new int[maxTileColumns];
-            lagunaImuxOrInode = new IdentityHashMap<>();
+            wireIndicesLeadingToLaguna = new IdentityHashMap<>();
             intYToNorthboundLaguna = new boolean[device.getRows()];
             final int clockRegionHeight = 60;
             final int slrHeight = device.getNumOfClockRegionRows() * clockRegionHeight / device.getSLRs().length;
@@ -401,39 +401,69 @@ public class RouteNodeGraph {
                             }
                         }
 
+                        Pattern inodePattern = Pattern.compile("INT_NODE_IMUX_\\d+_INT_OUT[01]|INODE_[EW]_\\d+_FT[01]");
+                        Pattern intIntPattern = Pattern.compile("INT_INT_SDQ_\\d+_INT_OUT[01]|WW1_E_7_FT0");
+                        Pattern singlePattern = Pattern.compile("(NN|EE|SS|WW)1_[EW]_BEG[0-7]");
+                        Pattern sdqNodeFtPattern = Pattern.compile("SDQNODE_[EW]_\\d+_FT[01]");
+                        Pattern sdqNodePattern = Pattern.compile("INT_NODE_SDQ_\\d+_INT_OUT[01]|SDQNODE_[EW]_\\d+_FT[01]");
+
                         // Examine all wires in each Laguna tile. Record those IMUX and INODE uphill of a Super Long Line
                         // that originates in an INT tile
                         for (int wireIndex = 0; wireIndex < tile.getWireCount(); wireIndex++) {
                             if (!tile.getWireName(wireIndex).startsWith("UBUMP")) {
                                 continue;
                             }
-                            Node sll = Node.getNode(tile, wireIndex);
-                            for (Node txOut : sll.getAllUphillNodes()) {
+                            Node sllNode = Node.getNode(tile, wireIndex);
+                            for (Node txOut : sllNode.getAllUphillNodes()) {
                                 if (txOut.isTiedToVcc()) {
                                     continue;
                                 }
-                                assert(txOut.getWireName().matches("LAG_MUX_ATOM_\\d+_TXOUT"));
-                                List<Node> txOutUphills = txOut.getAllUphillNodes();
-                                assert(txOutUphills.size() == 2);
-                                assert(txOutUphills.get(1).getTile().getTileTypeEnum() == sll.getTile().getTileTypeEnum());
-                                Node imux = txOutUphills.get(0);
+                                List<Node> uphillTxout = txOut.getAllUphillNodes();
+                                assert(uphillTxout.size() == 2);
+                                assert(uphillTxout.get(1).getTile().getTileTypeEnum() == sllNode.getTile().getTileTypeEnum());
+                                Node imux = uphillTxout.get(0);
                                 assert(imux.getIntentCode() == IntentCode.NODE_PINFEED);
                                 Tile imuxTile = imux.getTile();
                                 assert(Utils.isInterConnect(imuxTile.getTileTypeEnum()));
 
-                                BitSet bs = lagunaImuxOrInode.computeIfAbsent(imuxTile, k -> new BitSet());
-                                bs.set(imux.getWireIndex());
+                                BitSet[] bs = wireIndicesLeadingToLaguna.computeIfAbsent(imuxTile, k -> new BitSet[]{new BitSet(), new BitSet()});
+                                bs[0].set(imux.getWireIndex());
                                 for (Node inode : imux.getAllUphillNodes()) {
                                     if (inode.isTiedToVcc()) {
                                         continue;
                                     }
                                     assert(inode.getIntentCode() == IntentCode.NODE_LOCAL);
+                                    bs[0].set(inode.getWireIndex());
+
                                     if (inode.getTile() != imux.getTile()) {
-                                        assert(inode.getWireName().matches("INODE_[EW]_\\d+_FT[01]"));
-                                    } else {
-                                        assert(inode.getWireName().matches("INT_NODE_IMUX_\\d+_INT_OUT[01]|INODE_[EW]_\\d+_FT[01]"));
+                                        continue;
                                     }
-                                    bs.set(inode.getWireIndex());
+                                    assert(inodePattern.matcher(inode.getWireName()).matches());
+
+                                    for (Node intInt : inode.getAllUphillNodes()) {
+                                        if (intInt.getTile() != inode.getTile()) {
+                                            continue;
+                                        }
+                                        if (intInt.getIntentCode() != IntentCode.NODE_SINGLE) {
+                                            continue;
+                                        }
+                                        if (!intIntPattern.matcher(intInt.getWireName()).matches()) {
+                                            assert(singlePattern.matcher(intInt.getWireName()).matches());
+                                            continue;
+                                        }
+                                        bs[1].set(intInt.getWireIndex());
+
+                                        for (Node sdq : intInt.getAllUphillNodes()) {
+                                            assert(sdq.getIntentCode() == IntentCode.NODE_LOCAL);
+
+                                            if (sdq.getTile() != intInt.getTile()) {
+                                                assert(sdqNodeFtPattern.matcher(sdq.getWireName()).matches());
+                                                continue;
+                                            }
+                                            assert(sdqNodePattern.matcher(sdq.getWireName()).matches());
+                                            bs[1].set(sdq.getWireIndex());
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -443,7 +473,7 @@ public class RouteNodeGraph {
         } else {
             nextLagunaColumn = null;
             prevLagunaColumn = null;
-            lagunaImuxOrInode = null;
+            wireIndicesLeadingToLaguna = null;
             intYToNorthboundLaguna = null;
         }
 
@@ -651,19 +681,19 @@ public class RouteNodeGraph {
                 // PINFEEDs can lead to a site pin, or into a Laguna tile
                 if (childRnode != null) {
                     assert(childRnode.getType().isAnyExclusiveSink() ||
-                           childRnode.getType().isAnyLagunaImuxOrInode() ||
+                           childRnode.getType().isLocalLeadingToLaguna() ||
                            ((lutRoutethru || lutPinSwapping) && childRnode.getType().isAnyLocal()));
                 } else if (!lutRoutethru) {
                     // child does not already exist in our routing graph, meaning it's not a used site pin
-                    // in our design, but it could be a LAGUNA_I
-                    if (lagunaImuxOrInode == null) {
-                        // No LAGUNA_Is
+                    // in our design, but it could be a IMUX that leads to a Laguna
+                    if (wireIndicesLeadingToLaguna == null) {
+                        // No Laguna on this device
                         return true;
                     }
 
-                    BitSet bs = lagunaImuxOrInode.get(child.getTile());
-                    if (bs == null || !bs.get(child.getWireIndex())) {
-                        // Not a LAGUNA_I -- skip it
+                    BitSet[] bs2 = wireIndicesLeadingToLaguna.get(child.getTile());
+                    if (bs2 == null || !bs2[0].get(child.getWireIndex())) {
+                        // Doesn't lead to Laguna -- skip it
                         return true;
                     }
                 }
@@ -825,7 +855,10 @@ public class RouteNodeGraph {
         int childX = childTile.getTileXCoordinate();
         if (connection.isCrossSLR() &&
                 childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this) &&
-                lagunaImuxOrInode.get(childTile) != null) {
+                wireIndicesLeadingToLaguna.get(childTile) != null &&
+                childRnode.getType().isLocalLeadingToLaguna()) {
+            assert((connection.isCrossSLRnorth() && childRnode.getType().leadsToNorthboundLaguna()) ||
+                   (connection.isCrossSLRsouth() && childRnode.getType().leadsToSouthboundLaguna()));
             assert(nextLagunaColumn[childX] == childX);
             return true;
         }
