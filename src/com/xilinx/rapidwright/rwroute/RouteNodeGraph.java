@@ -850,10 +850,12 @@ public class RouteNodeGraph {
     }
 
     public boolean isAccessible(RouteNode childRnode, Connection connection) {
+        assert(!childRnode.isTarget());
+
         // Only consider LOCAL nodes when:
         // (a) considering LUT routethrus
         RouteNodeType type = childRnode.getType();
-        if (!type.isAnyLocal() || childRnode.isTarget() || lutRoutethru) {
+        if (!type.isAnyLocal() || lutRoutethru) {
             return true;
         }
 
@@ -875,10 +877,7 @@ public class RouteNodeGraph {
         Tile sinkTile = sinkRnode.getTile();
         switch (sinkRnode.getType()) {
             case LOCAL_EAST:
-                if (childRnode.isTarget()) {
-                    return true;
-                }
-                assert(lutPinSwapping && connection.hasAltSinks());
+                assert(connection.hasAltSinks());
                 // Fall-through
             case EXCLUSIVE_SINK_EAST:
                 if (type == RouteNodeType.LOCAL_WEST || type == RouteNodeType.LOCAL_RESERVED) {
@@ -887,10 +886,7 @@ public class RouteNodeGraph {
                 }
                 break;
             case LOCAL_WEST:
-                if (childRnode.isTarget()) {
-                    return true;
-                }
-                assert(lutPinSwapping && connection.hasAltSinks());
+                assert(connection.hasAltSinks());
                 // Fall-through
             case EXCLUSIVE_SINK_WEST:
                 if (type == RouteNodeType.LOCAL_EAST || type == RouteNodeType.LOCAL_RESERVED) {
