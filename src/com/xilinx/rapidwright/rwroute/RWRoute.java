@@ -1857,8 +1857,11 @@ public class RWRoute {
         final NetWrapper netWrapper = connection.getNetWrapper();
         final RouteNodeType rnodeType = rnode.getType();
         final boolean lookaheadAllowed = connection.isCrossSLR() && (
-                rnodeType.leadsToLaguna() ||                        // (IMUX_[EW]\\d+) -> LAG_MUX_ATOM_\\d+_TXOUT -> (UBUMP\\d+)
-                Utils.isLaguna(rnode.getTile().getTileTypeEnum())   // (UBUMP\\d+) -> LAG_LAGUNA_SITE_[0-3]_RXD[0-5] -> RXD7 -> INT_NODE_SDQ_\\d+_INT_OUT[01]
+                // INT_NODE_SDQ_\\d+_INT_OUT[01] INT_INT_SDQ_\\d+_INT_OUT[01] -> INT_NODE_IMUX_\\d+_INT_OUT[01] ->
+                // IMUX_[EW]\\d+ -> LAG_MUX_ATOM_\\d+_TXOUT -> (UBUMP\\d+)
+                (rnodeType.leadsToLaguna() && connection.getSinkRnode().getSLRIndex(routingGraph) != rnode.getSLRIndex(routingGraph)) ||
+                // (UBUMP\\d+) -> LAG_LAGUNA_SITE_[0-3]_RXD[0-5] -> RXD7 -> INT_NODE_SDQ_\\d+_INT_OUT[01]
+                Utils.isLaguna(rnode.getTile().getTileTypeEnum())
         );
 
         for (RouteNode childRNode : rnode.getChildren(routingGraph)) {
@@ -1879,7 +1882,7 @@ public class RWRoute {
             assert((preservedNet = routingGraph.getPreservedNet(childRNode)) == null ||
                     preservedNet == connection.getNet());
 
-            boolean lookahead = lookaheadAllowed;
+            boolean lookahead;
             if (childRNode.isTarget()) {
                 lookahead = false;
                 boolean earlyTermination;
@@ -1906,6 +1909,7 @@ public class RWRoute {
                 if (!isAccessible(childRNode, connection)) {
                     continue;
                 }
+                lookahead = lookaheadAllowed;
                 RouteNodeType childType = childRNode.getType();
                 switch (childType) {
                     case LOCAL_BOTH:
@@ -2060,18 +2064,18 @@ public class RWRoute {
         int deltaX = Math.abs(childX - sinkX);
         int deltaY = Math.abs(childY - sinkY);
         if (connection.isCrossSLR()) {
-            if (lookahead && rnode.getType() == RouteNodeType.SUPER_LONG_LINE) {
+            assert(!childRnode.getType().isLocalLeadingToLaguna() || (
+                    (connection.isCrossSLRnorth() && childRnode.getType().leadsToNorthboundLaguna()) ||
+                            (connection.isCrossSLRsouth() && childRnode.getType().leadsToSouthboundLaguna())
+            ));
+
+            if (rnode.getType() == RouteNodeType.SUPER_LONG_LINE) {
                 // With the SLL being bidrectional, do not lookahead the way we came from
-                lookahead = (rnode.getPrev().getTile() != childRnode.getTile());
+                lookahead &= (rnode.getPrev().getTile() != childRnode.getTile());
             }
 
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
             if (deltaSLR != 0) {
-                assert(!childRnode.getType().isLocalLeadingToLaguna() || (
-                        (connection.isCrossSLRnorth() && childRnode.getType().leadsToNorthboundLaguna()) ||
-                        (connection.isCrossSLRsouth() && childRnode.getType().leadsToSouthboundLaguna())
-                ));
-
                 // Check for overshooting which occurs when child and sink node are in
                 // adjacent SLRs and less than a SLL wire's length apart in the Y axis.
                 if (deltaSLR == 1) {
@@ -2090,6 +2094,8 @@ public class RWRoute {
                     // On top of the column
                     assert(deltaX == Math.abs(sinkX - nextLagunaColumn));
                 } else {
+                    assert(rnode.getType() != RouteNodeType.SUPER_LONG_LINE);
+
                     final int deltaXToNextColumn;
                     final int deltaXToPrevColumn;
                     final int deltaXToAndFromNextColumn;

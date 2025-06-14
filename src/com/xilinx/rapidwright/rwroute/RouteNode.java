@@ -219,7 +219,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                                     // e.g. VU440's INT_X171Y827/EE2_E_BEG7 which feeds through to above
                                     assert(series == Series.UltraScale && length == 2);
                                 }
-                                baseCost *= 3f * length;
+                                baseCost *= 3;
                             } else {
                                 // Vertical
                                 assert(getBeginTileYCoordinate() != getEndTileYCoordinate());
@@ -232,7 +232,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                                     // U-turn
                                     assert(length == 1);
                                 }
-                                baseCost *= length;
+                                baseCost *= 2;
                             }
                         }
                         break;
@@ -243,7 +243,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             assert(getAllDownhillPIPs().isEmpty());
                             type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
                         } else {
-                            baseCost *= 3 * length;
+                            // HQUADs are typically length 2
+                            baseCost *= 3 * 2;
                         }
                         break;
                     case NODE_VQUAD: // US/US+/Versal
@@ -252,8 +253,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             assert((series == Series.Versal && getAllWiresInNode().length == 1) ||
                                     !getAllDownhillPIPs().isEmpty());
                         } else {
-                            // VQUADs have typical length 4
-                            baseCost *= length;
+                            // VQUADs are typically length 4
+                            baseCost *= 4;
                         }
                         break;
 
@@ -268,8 +269,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             assert(getAllDownhillPIPs().isEmpty());
                             type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
                         } else {
-                            // HLONGs have typical length 6
-                            baseCost *= 3 * length;
+                            // HLONGs are typically length 6
+                            baseCost *= 3 * 6;
                         }
                         break;
                     case NODE_VLONG7:  // Versal only
@@ -281,7 +282,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             assert(!getAllDownhillPIPs().isEmpty());
                         } else {
                             // VLONGs are typically length 12
-                            baseCost *= length;
+                            baseCost *= 12;
                         }
                         break;
 
