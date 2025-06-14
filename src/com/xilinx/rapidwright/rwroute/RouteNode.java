@@ -188,6 +188,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             assert(length <= 2); // 2 for feedthrough e.g. WW1_W_BEG7
                             if (getBeginTileXCoordinate() != getEndTileXCoordinate()) {
                                 // Horizontal
+                                baseCost *= 5f;
                             } else {
                                 // Vertical
                                 assert(getBeginTileYCoordinate() != getEndTileYCoordinate());
