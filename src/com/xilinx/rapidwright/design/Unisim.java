@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Advanced Micro Devices, Inc.
@@ -33,7 +33,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 
 /**
- * Generated on: Thu Nov 21 13:34:09 MST 2024
+ * Generated on: Sat Jun 07 20:43:57 MDT 2025
  * by: com.xilinx.rapidwright.release.UnisimParser
  *
  * Enumerates supported Unisim primitives that map to Xilinx devices.
@@ -180,6 +180,7 @@ public enum Unisim {
     DDRMC5,
     DDRMC5C,
     DDRMC5E,
+    DDRMC5X,
     DDRMC_RIU,
     DFE_CFR,
     DFE_CHANNELIZER,
@@ -700,6 +701,7 @@ public enum Unisim {
     LDP_1,
     LD_1,
     LOOKAHEAD8,
+    LPDDRMC,
     LUT1,
     LUT1_D,
     LUT1_L,
@@ -1201,6 +1203,7 @@ public enum Unisim {
     PCIE40E4,
     PCIE40E5,
     PCIE4CE4,
+    PCIE4CEE4,
     PCIE50E5,
     PCIE_2_1,
     PCIE_3_0,
@@ -1215,11 +1218,14 @@ public enum Unisim {
     PLLE2_BASE,
     PLLE3_ADV,
     PLLE3_BASE,
+    PLLE4XP_ADV,
+    PLLE4XP_BASE,
     PLLE4_ADV,
     PLLE4_BASE,
     PLL_ADV,
     PLL_BASE,
     PS11,
+    PS11_A,
     PS7,
     PS8,
     PS9,
@@ -1389,6 +1395,9 @@ public enum Unisim {
     XORCY,
     XORCY_D,
     XORCY_L,
+    XP5IO_VREF,
+    XP5PHY_HS,
+    XP5PHY_LS,
     XPHY,
     XPIO_VREF,
     XPIPE_QUAD,
