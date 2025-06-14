@@ -1882,6 +1882,8 @@ public class RWRoute {
             assert((preservedNet = routingGraph.getPreservedNet(childRNode)) == null ||
                     preservedNet == connection.getNet());
 
+            childRNode.setPrev(rnode);
+
             boolean lookahead;
             if (childRNode.isTarget()) {
                 lookahead = false;
@@ -1984,7 +1986,7 @@ public class RWRoute {
                 }
             }
 
-            evaluateCostAndPush(state, rnode, longParent, childRNode, lookahead);
+            evaluateCostAndPush(state, longParent, childRNode, lookahead);
 
             RouteNode frontRnode = queue.peek();
             if (frontRnode.isTarget() && !frontRnode.willOverUse(netWrapper)) {
@@ -2027,27 +2029,23 @@ public class RWRoute {
         return true;
     }
 
-    // int depth = 1;
+    int depth = 1;
 
     /**
      * Evaluates the cost of a child of a rnode and pushes the child into the queue after cost evaluation.
      * @param state State from the connection that is being routed.
-     * @param rnode The parent rnode of the child in question.
      * @param longParent A boolean value to indicate if the parent is a Long node
      * @param childRnode The child rnode in question.
      */
     protected void evaluateCostAndPush(ConnectionState state,
-                                       RouteNode rnode,
                                        boolean longParent,
                                        RouteNode childRnode,
                                        boolean lookahead) {
         final Connection connection = state.connection;
         final int countSourceUses = childRnode.countConnectionsOfUser(connection.getNetWrapper());
         final float sharingFactor = 1 + state.shareWeight * countSourceUses;
-
-        // Set the prev pointer, as RouteNode.getEndTileYCoordinate() and
-        // RouteNode.getSLRIndex() require this
-        childRnode.setPrev(rnode);
+        final RouteNode rnode = childRnode.getPrev();
+        assert(rnode != null);
 
         float newPartialPathCost = rnode.getUpstreamPathCost();
         newPartialPathCost += state.rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor);
@@ -2069,10 +2067,7 @@ public class RWRoute {
                             (connection.isCrossSLRsouth() && childRnode.getType().leadsToSouthboundLaguna())
             ));
 
-            if (rnode.getType() == RouteNodeType.SUPER_LONG_LINE) {
-                // With the SLL being bidrectional, do not lookahead the way we came from
-                lookahead &= (rnode.getPrev().getTile() != childRnode.getTile());
-            }
+
 
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
             if (deltaSLR != 0) {

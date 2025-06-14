@@ -852,9 +852,18 @@ public class RouteNodeGraph {
     public boolean isAccessible(RouteNode childRnode, Connection connection) {
         assert(!childRnode.isTarget());
 
+        RouteNodeType type = childRnode.getType();
+        if (type == RouteNodeType.NON_LOCAL) {
+            RouteNode parentRnode = childRnode.getPrev();
+            if (parentRnode.getType() == RouteNodeType.SUPER_LONG_LINE && parentRnode.getPrev().getTile() == childRnode.getTile()) {
+                // With an SLL being bidrectional, do not lookahead back the way we came from
+                return false;
+            }
+            return true;
+        }
+
         // Only consider LOCAL nodes when:
         // (a) considering LUT routethrus
-        RouteNodeType type = childRnode.getType();
         if (!type.isAnyLocal() || lutRoutethru) {
             return true;
         }
