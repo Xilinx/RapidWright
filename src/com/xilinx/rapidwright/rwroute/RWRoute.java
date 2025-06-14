@@ -1909,7 +1909,7 @@ public class RWRoute {
                 if (!isAccessible(childRNode, connection)) {
                     continue;
                 }
-                lookahead = lookaheadAllowed;
+                lookahead = lookaheadAllowed && !childRNode.willOverUse(netWrapper);
                 RouteNodeType childType = childRNode.getType();
                 switch (childType) {
                     case LOCAL_BOTH:
