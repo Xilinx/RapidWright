@@ -874,10 +874,10 @@ public class RouteNodeGraph {
         int childX = childTile.getTileXCoordinate();
         if (connection.isCrossSLR() &&
                 childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this) &&
-                wireIndicesLeadingToLaguna.get(childTile) != null &&
-                childRnode.getType().leadsToLaguna()) {
-            assert((connection.isCrossSLRnorth() && childRnode.getType().leadsToNorthboundLaguna()) ||
-                   (connection.isCrossSLRsouth() && childRnode.getType().leadsToSouthboundLaguna()));
+                wireIndicesLeadingToLaguna.get(childTile) != null /*&&
+                childRnode.getType().leadsToLaguna()*/) {
+            assert((!childRnode.getType().leadsToNorthboundLaguna() || connection.isCrossSLRnorth()) &&
+                   (!childRnode.getType().leadsToSouthboundLaguna() || connection.isCrossSLRsouth()));
             assert(nextLagunaColumn[childX] == childX);
             return true;
         }

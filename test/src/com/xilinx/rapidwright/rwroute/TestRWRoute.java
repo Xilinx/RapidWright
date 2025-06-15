@@ -401,21 +401,21 @@ public class TestRWRoute {
     @CsvSource({
             // One SLR crossing
             // (Too) Close
-            "SLICE_X9Y299,SLICE_X9Y300,200",    // On Laguna column
-            "SLICE_X9Y300,SLICE_X9Y299,100",
+            "SLICE_X9Y299,SLICE_X9Y300,100",    // On Laguna column
+            "SLICE_X9Y300,SLICE_X9Y299,200",
             "SLICE_X0Y299,SLICE_X0Y300,200",    // Far from Laguna column
             "SLICE_X0Y300,SLICE_X0Y299,100",
             "SLICE_X54Y299,SLICE_X56Y300,100",  // Slight closer to one Laguna column that is further from sink
             "SLICE_X54Y300,SLICE_X56Y299,100",
             "SLICE_X50Y299,SLICE_X65Y300,100",
             "SLICE_X50Y300,SLICE_X65Y299,100",
-            "SLICE_X55Y299,SLICE_X55Y300,100",  // Equidistant from two Laguna columns
+            "SLICE_X55Y299,SLICE_X55Y300,200",  // Equidistant from two Laguna columns
             "SLICE_X55Y300,SLICE_X55Y299,100",
             // Perfect
             "SLICE_X9Y241,SLICE_X9Y300,200",
-            "SLICE_X9Y300,SLICE_X9Y241,100",
+            "SLICE_X9Y300,SLICE_X9Y241,200",
             "SLICE_X9Y358,SLICE_X9Y299,200",
-            "SLICE_X9Y299,SLICE_X9Y358,200",
+            "SLICE_X9Y299,SLICE_X9Y358,100",
             "SLICE_X53Y241,SLICE_X69Y300,100",
             "SLICE_X53Y358,SLICE_X69Y299,100",
             // Far
