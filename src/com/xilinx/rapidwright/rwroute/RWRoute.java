@@ -1856,13 +1856,7 @@ public class RWRoute {
         final PriorityQueue<RouteNode> queue = state.queue;
         final NetWrapper netWrapper = connection.getNetWrapper();
         final RouteNodeType rnodeType = rnode.getType();
-        final boolean lookaheadAllowed = connection.isCrossSLR() && (
-                // INT_NODE_SDQ_\\d+_INT_OUT[01] INT_INT_SDQ_\\d+_INT_OUT[01] -> INT_NODE_IMUX_\\d+_INT_OUT[01] ->
-                // IMUX_[EW]\\d+ -> LAG_MUX_ATOM_\\d+_TXOUT -> (UBUMP\\d+)
-                (rnodeType.leadsToLaguna() && connection.getSinkRnode().getSLRIndex(routingGraph) != rnode.getSLRIndex(routingGraph)) ||
-                // (UBUMP\\d+) -> LAG_LAGUNA_SITE_[0-3]_RXD[0-5] -> RXD7 -> INT_NODE_SDQ_\\d+_INT_OUT[01]
-                Utils.isLaguna(rnode.getTile().getTileTypeEnum())
-        );
+        final boolean forceLookahead = Utils.isLaguna(rnode.getTile().getTileTypeEnum());
 
         for (RouteNode childRNode : rnode.getChildren(routingGraph)) {
             if (childRNode.isVisited(sequence)) {
@@ -1884,9 +1878,8 @@ public class RWRoute {
 
             childRNode.setPrev(rnode);
 
-            boolean lookahead;
+            boolean lookahead = false;
             if (childRNode.isTarget()) {
-                lookahead = false;
                 boolean earlyTermination;
                 if (childRNode.getType().isAnyExclusiveSink()) {
                     // This sink must be exclusively reserved for this connection already
@@ -1911,7 +1904,6 @@ public class RWRoute {
                 if (!isAccessible(childRNode, connection)) {
                     continue;
                 }
-                lookahead = lookaheadAllowed && !childRNode.willOverUse(netWrapper);
                 RouteNodeType childType = childRNode.getType();
                 switch (childType) {
                     case LOCAL_BOTH:
@@ -1934,6 +1926,7 @@ public class RWRoute {
                             // Do not consider approaching a SLL if not needing to cross
                             continue;
                         }
+                        lookahead = !childRNode.willOverUse(netWrapper);
                         break;
                     case LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
                         if (!connection.isCrossSLRsouth() ||
@@ -1941,10 +1934,17 @@ public class RWRoute {
                             // Do not consider approaching a SLL if not needing to cross
                             continue;
                         }
+                        lookahead = !childRNode.willOverUse(netWrapper);
                         break;
-                    case NON_LOCAL:
                     case NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
                     case NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
+                        if (connection.getSinkRnode().getSLRIndex(routingGraph) != childRNode.getSLRIndex(routingGraph) &&
+                                ((connection.isCrossSLRnorth() && childType == RouteNodeType.NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA) ||
+                                 (connection.isCrossSLRsouth() && childType == RouteNodeType.NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA))) {
+                            lookahead = !childRNode.willOverUse(netWrapper);
+                        }
+                        // Fall through
+                    case NON_LOCAL:
                         // LOCALs cannot connect to NON_LOCALs except via a LUT routethru
                         assert(!rnodeType.isAnyLocal() ||
                                routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED);
@@ -1956,6 +1956,11 @@ public class RWRoute {
                             // To filter out those nodes that are considered to be excluded with the masking resource approach,
                             // such as U-turn shape nodes near the boundary
                             continue;
+                        }
+                        if (forceLookahead) {
+                            lookahead = true;
+                        } else if (Utils.isLaguna(childRNode.getTile().getTileTypeEnum())) {
+                            lookahead = !childRNode.willOverUse(netWrapper);
                         }
                         break;
                     case EXCLUSIVE_SINK_BOTH:
@@ -1979,7 +1984,7 @@ public class RWRoute {
                     case SUPER_LONG_LINE:
                         assert(connection.isCrossSLR() &&
                                 connection.getSinkRnode().getSLRIndex(routingGraph) != rnode.getSLRIndex(routingGraph));
-                        lookahead = false;
+                        assert(!lookahead); // Make sure we're looking ahead beyond one of potentially many SLLs
                         break;
                     default:
                         throw new RuntimeException("Unexpected rnode type: " + childType);
