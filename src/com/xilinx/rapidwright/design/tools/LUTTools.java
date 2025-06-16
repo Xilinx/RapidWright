@@ -205,7 +205,8 @@ public class LUTTools {
      */
     public static int getLUTSize(EDIFCellInst c) {
         if (!isCellALUT(c)) return 0;
-        return Character.getNumericValue(c.getCellType().getName().charAt(3));
+        String cellType = c.getCellType().getName();
+        return cellType.startsWith("LUTCY") ? 5 : Character.getNumericValue(cellType.charAt(3));
     }
 
     /**
