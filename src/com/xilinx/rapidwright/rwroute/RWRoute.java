@@ -1940,7 +1940,7 @@ public class RWRoute {
                     case NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
                         if (connection.getSinkRnode().getSLRIndex(routingGraph) != childRNode.getSLRIndex(routingGraph) &&
                                 ((connection.isCrossSLRnorth() && childType == RouteNodeType.NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA) ||
-                                 (connection.isCrossSLRsouth() && childType == RouteNodeType.NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA))) {
+                                 (connection.isCrossSLRsouth() && childType == RouteNodeType.NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA))) {
                             lookahead = !childRNode.willOverUse(netWrapper);
                         }
                         // Fall through
@@ -2071,8 +2071,6 @@ public class RWRoute {
                     (connection.isCrossSLRnorth() && childRnode.getType().leadsToNorthboundLaguna()) ||
                             (connection.isCrossSLRsouth() && childRnode.getType().leadsToSouthboundLaguna())
             ));
-
-
 
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
             if (deltaSLR != 0) {
