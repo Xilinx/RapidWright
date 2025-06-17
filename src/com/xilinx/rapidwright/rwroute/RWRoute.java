@@ -255,6 +255,7 @@ public class RWRoute {
 
         routerTimer.createRuntimeTracker("determine route targets", "Initialization").start();
         determineRoutingTargets();
+        ensureSinkRoutability();
         routerTimer.getRuntimeTracker("determine route targets").stop();
 
         if (config.isTimingDriven()) {
@@ -326,6 +327,11 @@ public class RWRoute {
 
         // Wait for all outstanding RouteNodeGraph.preserveAsync() calls to complete
         routingGraph.awaitPreserve();
+    }
+
+    protected Set<Net> ensureSinkRoutability() {
+        // Assume all sinks are reachable
+        return Collections.emptySet();
     }
 
     private void categorizeNets() {

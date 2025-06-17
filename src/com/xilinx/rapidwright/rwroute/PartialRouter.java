@@ -226,9 +226,7 @@ public class PartialRouter extends RWRoute {
     }
 
     @Override
-    protected void determineRoutingTargets() {
-        super.determineRoutingTargets();
-
+    protected Set<Net> ensureSinkRoutability() {
         // With all routingGraph.preserveAsync() calls having completed,
         // now check that no sinks are preserved by another net
         // (e.g. a pin was moved from one net to the other, but
@@ -240,10 +238,12 @@ public class PartialRouter extends RWRoute {
             Net preservedNet;
             assert((preservedNet = routingGraph.getPreservedNet(connection.getSourceRnode())) == null || preservedNet == net);
             RouteNode sinkRnode = connection.getSinkRnode();
+            if (!sinkRnode.getType().isAnyExclusiveSink()) {
+                continue;
+            }
             preservedNet = routingGraph.getPreservedNet(sinkRnode);
             if (preservedNet != null && preservedNet != net) {
                 unpreserveNets.add(preservedNet);
-                assert(sinkRnode.getType().isAnyExclusiveSink());
             }
         }
 
@@ -277,6 +277,7 @@ public class PartialRouter extends RWRoute {
                 }
             }
         }
+        return unpreserveNets;
     }
 
     @Override
