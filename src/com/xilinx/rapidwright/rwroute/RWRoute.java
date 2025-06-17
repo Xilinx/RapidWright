@@ -1953,7 +1953,7 @@ public class RWRoute {
                     case NON_LOCAL:
                         // LOCALs cannot connect to NON_LOCALs except via a LUT routethru
                         assert(!rnodeType.isAnyLocal() ||
-                               routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED);
+                               (routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED));
 
                         if (!routingGraph.isAccessible(childRNode, connection)) {
                             continue;
