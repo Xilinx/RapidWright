@@ -387,7 +387,7 @@ public class RouteNodeGraph {
                             assert(x == tile.getTileXCoordinate());
                             // Looks like (on US+) LAGUNA tiles are always on the left side of an INT tile,
                             // with tile X coordinate one smaller
-                            final int intTileXCoordinate = x + 1;
+                            final int intTileXCoordinate = (isUltraScalePlus) ? x + 1 : x;
 
                             // Go backwards til beginning
                             for (int i = intTileXCoordinate; i >= 0; i--) {

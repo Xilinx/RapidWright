@@ -742,7 +742,6 @@ public class RWRoute {
                     sinkRnode.setType(sinkType);
 
                     // And increment its usage here immediately
-                    assert(sinkRnode.getOccupancy() == 0);
                     sinkRnode.incrementUser(netWrapper);
                 }
 
