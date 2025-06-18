@@ -48,21 +48,24 @@ public class RouteNodeInfo {
 
     public static RouteNodeInfo get(Node node, RouteNodeGraph routingGraph) {
         Wire[] wires = node.getAllWiresInNode();
+        assert(wires[0].getTile() == node.getTile() && wires[0].getWireIndex() == node.getWireIndex());
         Tile baseTile = node.getTile();
-        TileTypeEnum baseTileType = baseTile.getTileTypeEnum();
-        Tile endTile = null;
-        for (Wire w : wires) {
+        TileTypeEnum endTileType;
+        if (node.getIntentCode() == IntentCode.NODE_LAGUNA_DATA) {
+            endTileType = baseTile.getTileTypeEnum();
+        } else {
+            endTileType = TileTypeEnum.INT;
+        }
+        Tile endTile = baseTile;
+        for (int i = 1; i < wires.length; i++) {
+            Wire w = wires[i];
             Tile tile = w.getTile();
             TileTypeEnum tileType = tile.getTileTypeEnum();
-            if (tileType == TileTypeEnum.INT || tileType == baseTileType) {
-                boolean endTileWasNotNull = (endTile != null);
-                endTile = tile;
-                // Break if this is the second non-null tile
-                if (endTileWasNotNull) break;
+            if (tileType != endTileType) {
+                continue;
             }
-        }
-        if (endTile == null) {
-            endTile = node.getTile();
+            endTile = tile;
+            break;
         }
 
         boolean forceSink = false;

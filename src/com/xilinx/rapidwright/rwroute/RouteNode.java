@@ -208,7 +208,14 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_DOUBLE:  // US and US+
                         if (length == 0) {
                             // U-turn nodes
-                            // FIXME: length == 0 for INT_X103Y299/NN2_E_BEG0 on VU9P
+                            String wireName = getWireName();
+                            if (wireName.charAt(0) == 'E' || wireName.charAt(0) == 'W') {
+                                // Horizontal doubles can U-turn to get length 0
+                                assert(wireName.matches("(EE|WW)2_[EW]_BEG[0-7]"));
+                            } else {
+                                // This specific vertical double has an extra PIP
+                                assert(wireName.matches("NN2_[EW]_BEG0"));
+                            }
                             assert(!getAllDownhillPIPs().isEmpty());
                         } else {
                             if (getBeginTileXCoordinate() != getEndTileXCoordinate()) {
