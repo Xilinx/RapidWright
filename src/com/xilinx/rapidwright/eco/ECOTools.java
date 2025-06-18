@@ -182,12 +182,15 @@ public class ECOTools {
                 }
 
                 Cell cell = leafEhpi.getPhysicalCell(design);
+                if (cell == null || !cell.isPlaced()) {
+                    continue;
+                }
                 String logicalPin = leafEhpi.getPortInst().getName();
                 for (SitePinInst spi : cell.getAllSitePinsFromLogicalPin(logicalPin, null)) {
                     List<EDIFHierPortInst> portInstsOnSpi = DesignTools.getPortInstsFromSitePinInst(spi);
-                    assert(portInstsOnSpi.contains(leafEhpi));
+                    assert (portInstsOnSpi.contains(leafEhpi));
                     boolean removedAnything = portInstsOnSpi.removeAll(leafPortInsts);
-                    assert(removedAnything);
+                    assert (removedAnything);
                     if (!portInstsOnSpi.isEmpty()) {
                         // SPI also services a different logical port inst; skip
                         continue;
@@ -361,7 +364,8 @@ public class ECOTools {
         // Modify the physical netlist
         EDIFCell ecGnd = netlist.getHDIPrimitive(Unisim.GND);
         EDIFCell ecVcc = netlist.getHDIPrimitive(Unisim.VCC);
-        nextNet: for (EDIFHierNet ehn : netToPortInsts.keySet()) {
+        nextNet: for (Map.Entry<EDIFHierNet,List<EDIFHierPortInst>> e : netToPortInsts.entrySet()) {
+            EDIFHierNet ehn = e.getKey();
             Net newPhysNet = null;
 
             // Find the one and only source pin
@@ -411,14 +415,15 @@ public class ECOTools {
                 }
             }
 
+            // Now go through all sink pins
             nextLeafPin: for (EDIFHierPortInst ehpi : leafEdifPins) {
                 if (ehpi.isOutput()) {
                     continue;
                 }
 
                 Cell cell = ehpi.getPhysicalCell(design);
-                if (cell == null) {
-                    throw new RuntimeException("ERROR: Cell corresponding to pin '" + ehpi + "' not found.");
+                if (cell == null || !cell.isPlaced()) {
+                    continue;
                 }
                 List<SitePinInst> sitePins = cell.getAllSitePinsFromLogicalPin(ehpi.getPortInst().getName(), null);
                 SiteInst si = cell.getSiteInst();
@@ -511,8 +516,15 @@ public class ECOTools {
                     if (cell.getAllPhysicalPinMappings(logicalPinName) != null) {
                         createExitSitePinInst(design, ehpi, newPhysNet);
                     } else {
-                        // TODO: Find a new physical pin mapping
-                        throw new RuntimeException("ERROR: No logical-physical pin mapping found for pin '" + ehpi + "'");
+                        if (LUTTools.isCellALUT(cell)) {
+                            // TODO: Find a new physical pin mapping
+                            throw new RuntimeException("ERROR: No logical-physical pin mapping found for pin '" + ehpi + "'");
+                        } else {
+                            // Assume that sink does not need routing (e.g. CARRY8.CIN may already be connected to VCC
+                            //  but does not need physically routing)
+                            assert(ehn.getNet().isVCC() || ehn.getNet().isGND());
+                            assert(!e.getValue().contains(ehpi));
+                        }
                     }
                 }
             }
@@ -639,10 +651,9 @@ public class ECOTools {
             }
 
             Cell cell = sourceEhpi.getPhysicalCell(design);
-            if (cell == null) {
-                throw new RuntimeException("ERROR: Cell corresponding to pin '" + sourceEhpi + "' not found.");
+            if (cell == null || !cell.isPlaced()) {
+                continue;
             }
-
             List<SitePinInst> sitePins = cell.getAllSitePinsFromLogicalPin(sourceEhpi.getPortInst().getName(), null);
             if (!sitePins.isEmpty()) {
                 // This net's leaf pins already has some site pins

@@ -72,7 +72,7 @@ public class LUTInputConeOpt {
         List<EDIFHierPortInst> srcs = hierNet.getLeafHierPortInsts(true, false);
         assert (srcs.size() == 1);
         EDIFHierPortInst src = srcs.get(0);
-        if (!LUTTools.isCellALUT(src.getPhysicalCell(design))) {
+        if (!LUTTools.isCellALUT(src.getFullHierarchicalInst().getInst())) {
             // If cell is not a LUT, we cannot combine it
             return null;
         }
@@ -95,7 +95,7 @@ public class LUTInputConeOpt {
                 srcs = currNet.getLeafHierPortInsts(true, false);
                 assert (srcs.size() == 1);
                 src = srcs.get(0);
-                if (LUTTools.isCellALUT(src.getPhysicalCell(design))) {
+                if (LUTTools.isCellALUT(src.getFullHierarchicalInst().getInst())) {
                     q.add(src);
                 } else {
                     sourceNets.put(lutPin, src.getHierarchicalNet());
@@ -148,31 +148,47 @@ public class LUTInputConeOpt {
         // Place the new LUT near the centroid of its sources
         List<Point> points = new ArrayList<>();
         for (Entry<EDIFHierPortInst, EDIFHierNet> e : sourceNets.entrySet()) {
-            Tile tile = e.getKey().getPhysicalCell(design).getTile();
+            Cell cell = e.getKey().getPhysicalCell(design);
+            if (cell == null || cell.getTile() == null) {
+                // Cell is not placed, skip
+                continue;
+            }
+            Tile tile = cell.getTile();
             points.add(new Point(tile.getColumn(), tile.getRow()));
         }
-        Site centroid = ECOPlacementHelper.getCentroidOfPoints(design.getDevice(), points,
-                Utils.sliceTypes);
-        Iterator<Site> itr = ECOPlacementHelper.spiralOutFrom(centroid).iterator();
         Cell physCell = null;
-        while (itr.hasNext()) {
-            Site curr = itr.next();
-            SiteInst candidate = design.getSiteInstFromSite(curr);
-            if (candidate == null) {
-                physCell = design.createCell(hierLutInst.getFullHierarchicalInstName(), lutInst);
-                design.placeCell(physCell, curr, curr.getBEL("A6LUT"));
-                EDIFNet optLutOutput = input.getParentCell().createNet(lutInst.getName());
-                EDIFHierNet hierLutOutput = new EDIFHierNet(input.getFullHierarchicalInst().getParent(), optLutOutput);
-                List<EDIFHierPortInst> pinsToConnect = new ArrayList<>();
-                pinsToConnect.add(input);
-                pinsToConnect.add(new EDIFHierPortInst(hierLutInst.getParent(), lutInst.getOrCreatePortInst("O")));
-                Map<EDIFHierNet, List<EDIFHierPortInst>> map = new HashMap<>();
-                map.put(hierLutOutput, pinsToConnect);
-                ECOTools.connectNet(design, map, null);
-                break;
+        if (points.size() == 0) {
+            // No other connecting cell is placed, let's not place the cell
+            physCell = createAndConnectCell(design, hierLutInst, lutInst, input, null);
+        } else {
+            Site centroid = ECOPlacementHelper.getCentroidOfPoints(design.getDevice(), points, Utils.sliceTypes);
+            Iterator<Site> itr = ECOPlacementHelper.spiralOutFrom(centroid).iterator();
+            while (itr.hasNext()) {
+                Site curr = itr.next();
+                SiteInst candidate = design.getSiteInstFromSite(curr);
+                if (candidate == null) {
+                    physCell = createAndConnectCell(design, hierLutInst, lutInst, input, curr);
+                    break;
+                }
             }
         }
 
+        return physCell;
+    }
+
+    private static Cell createAndConnectCell(Design design, EDIFHierCellInst hierLutInst, EDIFCellInst lutInst,
+            EDIFHierPortInst input, Site site) {
+        Cell physCell = design.createCell(hierLutInst.getFullHierarchicalInstName(), lutInst);
+        if (site != null)
+            design.placeCell(physCell, site, site.getBEL("A6LUT"));
+        EDIFNet optLutOutput = input.getParentCell().createNet(lutInst.getName());
+        EDIFHierNet hierLutOutput = new EDIFHierNet(input.getFullHierarchicalInst().getParent(), optLutOutput);
+        List<EDIFHierPortInst> pinsToConnect = new ArrayList<>();
+        pinsToConnect.add(input);
+        pinsToConnect.add(new EDIFHierPortInst(hierLutInst.getParent(), lutInst.getOrCreatePortInst("O")));
+        Map<EDIFHierNet, List<EDIFHierPortInst>> map = new HashMap<>();
+        map.put(hierLutOutput, pinsToConnect);
+        ECOTools.connectNet(design, map, null);
         return physCell;
     }
 
