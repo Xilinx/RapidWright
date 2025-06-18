@@ -1951,8 +1951,10 @@ public class RWRoute {
                         }
                         // Fall through
                     case NON_LOCAL:
-                        // LOCALs cannot connect to NON_LOCALs except via a LUT routethru
-                        assert(!rnodeType.isAnyLocal() ||
+                        // LOCALs cannot connect to NON_LOCALs except
+                        //   (a) IMUX -> LAG_MUX_ATOM_\\d+_TXOUT
+                        //   (b) via a LUT routethru
+                        assert(!rnodeType.isAnyLocal() || rnodeType.isLocalLeadingToLaguna() ||
                                (routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED));
 
                         if (!routingGraph.isAccessible(childRNode, connection)) {
