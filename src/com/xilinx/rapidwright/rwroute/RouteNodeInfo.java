@@ -68,9 +68,8 @@ public class RouteNodeInfo {
             break;
         }
 
-        boolean forceSink = false;
-        RouteNodeType type = getType(node, endTile, routingGraph, forceSink);
-        short endTileXCoordinate = getEndTileXCoordinate(node, type, (short) endTile.getTileXCoordinate());
+        RouteNodeType type = getType(node, endTile, routingGraph);
+        short endTileXCoordinate = getEndTileXCoordinate(node, (short) endTile.getTileXCoordinate());
         short endTileYCoordinate = (short) endTile.getTileYCoordinate();
         short length = getLength(baseTile, type, endTileXCoordinate, endTileYCoordinate);
 
@@ -104,7 +103,7 @@ public class RouteNodeInfo {
         return length;
     }
 
-    private static short getEndTileXCoordinate(Node node, RouteNodeType type, short endTileXCoordinate) {
+    private static short getEndTileXCoordinate(Node node, short endTileXCoordinate) {
         Tile baseTile = node.getTile();
         TileTypeEnum baseType = baseTile.getTileTypeEnum();
         switch (baseType) {
@@ -134,7 +133,7 @@ public class RouteNodeInfo {
         return endTileXCoordinate;
     }
 
-    public static RouteNodeType getType(Node node, Tile endTile, RouteNodeGraph routingGraph, boolean forceSink) {
+    public static RouteNodeType getType(Node node, Tile endTile, RouteNodeGraph routingGraph) {
         // NOTE: IntentCode is device-dependent
         IntentCode ic = node.getIntentCode();
         TileTypeEnum tileTypeEnum = node.getTile().getTileTypeEnum();
@@ -178,7 +177,7 @@ public class RouteNodeInfo {
                     return RouteNodeType.LOCAL_BOTH;
                 }
 
-                if (routingGraph.wireIndicesLeadingToLaguna != null && !forceSink) {
+                if (routingGraph.wireIndicesLeadingToLaguna != null) {
                     // Check for IMUX that leads to a Laguna
                     BitSet[] bs2 = routingGraph.wireIndicesLeadingToLaguna.get(node.getTile());
                     if (bs2 != null && bs2[0].get(node.getWireIndex())) {

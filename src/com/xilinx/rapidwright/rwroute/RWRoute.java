@@ -662,10 +662,7 @@ public class RWRoute {
 
                 indirectConnections.add(connection);
 
-                // Inform RouteNodeInfo.getType() that this a sink to prevent it from returning
-                // RouteNodeType.LAGUNA_PINFEED and instead return LOCAL_{EAST,WEST}
-                boolean forceSink = true;
-                RouteNodeType sinkType = RouteNodeInfo.getType(sinkINTNode, null, routingGraph, forceSink);
+                RouteNodeType sinkType = RouteNodeInfo.getType(sinkINTNode, null, routingGraph);
                 assert(sinkType.isAnyLocal());
                 RouteNode sinkRnode = routingGraph.getOrCreate(sinkINTNode, sinkType);
                 sinkRnode.setType(sinkType);
