@@ -75,23 +75,28 @@ public enum RouteNodeType {
     }
 
     public boolean isAnyLocal() {
-        return this == LOCAL_BOTH || this == LOCAL_EAST || this == LOCAL_WEST || this == LOCAL_RESERVED;
+        return this == LOCAL_BOTH || this == LOCAL_EAST || this == LOCAL_WEST || this == LOCAL_RESERVED ||
+               this == LOCAL_LEADING_TO_NORTHBOUND_LAGUNA || this == LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA;
     }
 
     public static boolean isAnyLocal(int ordinal) {
-        return ordinal == LOCAL_BOTH.ordinal() || ordinal == LOCAL_EAST.ordinal() || ordinal == LOCAL_WEST.ordinal() || ordinal == LOCAL_RESERVED.ordinal();
+        return ordinal == LOCAL_BOTH.ordinal() || ordinal == LOCAL_EAST.ordinal() || ordinal == LOCAL_WEST.ordinal() || ordinal == LOCAL_RESERVED.ordinal() ||
+               ordinal == LOCAL_LEADING_TO_NORTHBOUND_LAGUNA.ordinal() || ordinal == LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA.ordinal();
     }
 
     public boolean isLocalLeadingToLaguna() {
         return this == LOCAL_LEADING_TO_NORTHBOUND_LAGUNA || this == LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA;
     }
+
     public boolean leadsToLaguna() {
         return this == LOCAL_LEADING_TO_NORTHBOUND_LAGUNA || this == NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA ||
                this == LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA || this == NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA;
     }
+
     public boolean leadsToNorthboundLaguna() {
         return this == LOCAL_LEADING_TO_NORTHBOUND_LAGUNA || this == NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA;
     }
+
     public boolean leadsToSouthboundLaguna() {
         return this == LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA || this == NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA;
     }
