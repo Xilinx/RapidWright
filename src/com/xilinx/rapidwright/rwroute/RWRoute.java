@@ -1888,7 +1888,9 @@ public class RWRoute {
                 boolean earlyTermination;
                 if (childRNode.getType().isAnyExclusiveSink()) {
                     // This sink must be exclusively reserved for this connection already
-                    assert(childRNode == connection.getSinkRnode() && !connection.hasAltSinks());
+                    assert((childRNode == connection.getSinkRnode() && !connection.hasAltSinks()) ||
+                           // Or be an exclusive BOUNCE sink for a different connection on the same net
+                           childRNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
                     assert(!childRNode.isOverUsed());
                     assert(!childRNode.willOverUse(netWrapper));
                     assert(childRNode.countConnectionsOfUser(netWrapper) == 1 ||
