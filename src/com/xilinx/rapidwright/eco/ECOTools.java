@@ -521,8 +521,8 @@ public class ECOTools {
                             throw new RuntimeException("ERROR: No logical-physical pin mapping found for pin '" + ehpi + "'");
                         } else {
                             // Assume that sink does not need routing (e.g. CARRY8.CIN may already be connected to VCC
-                            //  but does not need physically routing)
-                            assert(ehn.getNet().isVCC() || ehn.getNet().isGND());
+                            //  but does not need physically routing, or RAMB36.WEBWE[2] which would have been covered by
+                            //  RAMB36.WEBWE[0])
                             assert(!e.getValue().contains(ehpi));
                         }
                     }
