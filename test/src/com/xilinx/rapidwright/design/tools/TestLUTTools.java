@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.xilinx.rapidwright.device.SitePIPStatus;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -50,7 +49,9 @@ import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePIPStatus;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.rwroute.RWRoute;
 import com.xilinx.rapidwright.rwroute.TestRWRoute;
 import com.xilinx.rapidwright.support.LargeTest;
@@ -178,6 +179,20 @@ public class TestLUTTools {
         } finally {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "false");
         }
+    }
+
+    @Test
+    public void testGetLUTSize() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        Cell lutcy1 = design.getCell("processor/address_loop[0].lsb_pc.pc_muxcy_CARRY4_CARRY8_LUT6CY_7/LUTCY1_INST");
+        Assertions.assertEquals(5, LUTTools.getLUTSize(lutcy1));
+        Cell lutcy2 = design.getCell("processor/address_loop[0].lsb_pc.pc_muxcy_CARRY4_CARRY8_LUT6CY_7/LUTCY2_INST");
+        Assertions.assertEquals(5, LUTTools.getLUTSize(lutcy2));
+        EDIFHierCellInst lut6cy = design.getNetlist()
+                .getHierCellInstFromName("processor/address_loop[0].lsb_pc.pc_muxcy_CARRY4_CARRY8_LUT6CY_7");
+        Assertions.assertEquals(0, LUTTools.getLUTSize(lut6cy));
+        EDIFHierCellInst lut6_2 = design.getNetlist().getHierCellInstFromName("processor/address_loop[4].output_data.pc_vector_mux_lut");
+        Assertions.assertEquals(0, LUTTools.getLUTSize(lut6_2));
     }
 
     @Test
