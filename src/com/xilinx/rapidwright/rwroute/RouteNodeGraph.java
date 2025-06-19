@@ -862,10 +862,11 @@ public class RouteNodeGraph {
 
                 RouteNode sinkRnode = connection.getSinkRnode();
                 if (!connection.isCrossSLR() ||
-                        childRnode.getSLRIndex(this) == sinkRnode.getSLRIndex(this)) {
-                    // Inadvertently approaching an SLL because we are Y +/- 1 from sink
-                    assert(childRnode.getBeginTileXCoordinate() == sinkRnode.getBeginTileXCoordinate());
-                    assert(Math.abs(childRnode.getBeginTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1);
+                    childRnode.getSLRIndex(this) == sinkRnode.getSLRIndex(this)) {
+                    assert(lutRoutethru ||
+                            // Inadvertently approaching an SLL because we are Y +/- 1 from sink
+                            (childRnode.getBeginTileXCoordinate() == sinkRnode.getBeginTileXCoordinate() &&
+                             Math.abs(childRnode.getBeginTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1));
                     return false;
                 }
             } else if (parentType == RouteNodeType.SUPER_LONG_LINE && parentRnode.getPrev().getTile() == childRnode.getTile()) {
