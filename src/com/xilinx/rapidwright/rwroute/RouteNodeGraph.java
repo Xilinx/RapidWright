@@ -95,12 +95,12 @@ public class RouteNodeGraph {
     public final int[] prevLagunaColumn;
 
     /**
-     * Map indicating which IMUX, INODE, SDQNODE or INT_INT single wire indices
+     * Map indicating which IMUX, INODE, INT_INT, or SDQNODE wire indices
      * within a Laguna-adjacent INT tile service a Laguna-crossing
      */
     protected final Map<Tile, BitSet[]> wireIndicesLeadingToLaguna;
 
-    /** For one of the above IMUX/INODE wires, indicate whether it leads to a SLL travelling northbound (else southbound) **/
+    /** For one of the above IMUX/INODE wires, indicate whether it leads to an SLL travelling northbound (else southbound) **/
     public final boolean[] intYToNorthboundLaguna;
 
     /** Map indicating (for UltraScale/UltraScale+ only) the wire indices corresponding to the [A-H]MUX output
@@ -279,7 +279,7 @@ public class RouteNodeGraph {
                     }
                 } else {
                     if ((inode = m.group("inode")) != null) {
-                        int i = Integer.valueOf(inode);
+                        int i = Integer.parseInt(inode);
                         if (i < 32 || ((isUltraScale || isVersal) && i >= 64 && i < 96)) {
                             eastWires.set(baseNode.getWireIndex());
                         } else {
@@ -561,7 +561,7 @@ public class RouteNodeGraph {
 
                 String pinName = pin.getName();
                 char lutLetter = pinName.charAt(0);
-                String otherPinName = null;
+                String otherPinName;
                 String otherPinNameSuffix = isVersal ? "Q" : "MUX";
                 if (pinName.endsWith(otherPinNameSuffix)) {
                     otherPinName = lutLetter + "_O";
