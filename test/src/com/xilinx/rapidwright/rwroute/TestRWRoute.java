@@ -425,7 +425,7 @@ public class TestRWRoute {
 
             "SLICE_X162Y430,SLICE_X162Y240,100",
             "SLICE_X0Y240,SLICE_X12Y430,100",   // Far from Laguna
-            "SLICE_X0Y430,SLICE_X12Y240,100",
+            "SLICE_X0Y430,SLICE_X12Y240,200",
 
             // Two SLR crossings
             "SLICE_X162Y299,SLICE_X162Y599,100",

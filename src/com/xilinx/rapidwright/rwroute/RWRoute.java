@@ -662,10 +662,9 @@ public class RWRoute {
 
                 indirectConnections.add(connection);
 
-                RouteNodeType sinkType = RouteNodeInfo.getType(sinkINTNode, null, routingGraph);
+                RouteNode sinkRnode = routingGraph.getOrCreate(sinkINTNode);
+                RouteNodeType sinkType = sinkRnode.getType();
                 assert(sinkType.isAnyLocal());
-                RouteNode sinkRnode = routingGraph.getOrCreate(sinkINTNode, sinkType);
-                sinkRnode.setType(sinkType);
                 connection.setSinkRnode(sinkRnode);
 
                 if (sinkINTNode.getTile() != sink.getTile()) {
@@ -731,8 +730,8 @@ public class RWRoute {
 
                 if (!connection.hasAltSinks()) {
                     // Since this connection only has a single sink target, make it exclusive
-                    sinkType = sinkType == RouteNodeType.LOCAL_EAST ? RouteNodeType.EXCLUSIVE_SINK_EAST :
-                               sinkType == RouteNodeType.LOCAL_WEST ? RouteNodeType.EXCLUSIVE_SINK_WEST :
+                    sinkType = sinkType.isEastLocal() ? RouteNodeType.EXCLUSIVE_SINK_EAST :
+                               sinkType.isWestLocal() ? RouteNodeType.EXCLUSIVE_SINK_WEST :
                                sinkType == RouteNodeType.LOCAL_BOTH ? RouteNodeType.EXCLUSIVE_SINK_BOTH :
                                null;
                     assert(sinkType != null);
@@ -1910,6 +1909,12 @@ public class RWRoute {
                 }
                 RouteNodeType childType = childRNode.getType();
                 switch (childType) {
+                    case LOCAL_EAST_LEADING_TO_NORTHBOUND_LAGUNA:
+                    case LOCAL_EAST_LEADING_TO_SOUTHBOUND_LAGUNA:
+                    case LOCAL_WEST_LEADING_TO_NORTHBOUND_LAGUNA:
+                    case LOCAL_WEST_LEADING_TO_SOUTHBOUND_LAGUNA:
+                        lookahead = !childRNode.willOverUse(netWrapper);
+                        // Fall-through
                     case LOCAL_BOTH:
                     case LOCAL_EAST:
                     case LOCAL_WEST:
@@ -1918,27 +1923,11 @@ public class RWRoute {
                             continue;
                         }
                         // Verify invariant that east/west wires stay east/west ...
-                        assert(rnodeType != RouteNodeType.LOCAL_EAST || childType == RouteNodeType.LOCAL_EAST ||
+                        assert(!rnodeType.isEastLocal() || childType.isEastLocal() ||
                                 // ... unless it's an exclusive sink using a LOCAL_RESERVED node
                                 (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH));
-                        assert(rnodeType != RouteNodeType.LOCAL_WEST || childType == RouteNodeType.LOCAL_WEST ||
+                        assert(!rnodeType.isWestLocal() || childType.isWestLocal() ||
                                 (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH));
-                        break;
-                    case LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
-                        if (!connection.isCrossSLRnorth() ||
-                                connection.getSinkRnode().getSLRIndex(routingGraph) == childRNode.getSLRIndex(routingGraph)) {
-                            // Do not consider approaching a SLL if not needing to cross
-                            continue;
-                        }
-                        lookahead = !childRNode.willOverUse(netWrapper);
-                        break;
-                    case LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
-                        if (!connection.isCrossSLRsouth() ||
-                                connection.getSinkRnode().getSLRIndex(routingGraph) == childRNode.getSLRIndex(routingGraph)) {
-                            // Do not consider approaching a SLL if not needing to cross
-                            continue;
-                        }
-                        lookahead = !childRNode.willOverUse(netWrapper);
                         break;
                     case NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
                     case NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
@@ -2004,7 +1993,7 @@ public class RWRoute {
             evaluateCostAndPush(state, longParent, childRNode, lookahead);
 
             RouteNode frontRnode = queue.peek();
-            if (frontRnode.isTarget() && !frontRnode.willOverUse(netWrapper)) {
+            if (frontRnode != null && frontRnode.isTarget() && !frontRnode.willOverUse(netWrapper)) {
                 // Target is uncongested and the only thing in the (previously cleared) queue, abandon immediately
                 break;
             }
@@ -2079,7 +2068,8 @@ public class RWRoute {
         if (connection.isCrossSLR()) {
             assert(!childRnode.getType().isLocalLeadingToLaguna() || (
                     (connection.isCrossSLRnorth() && childRnode.getType().leadsToNorthboundLaguna()) ||
-                            (connection.isCrossSLRsouth() && childRnode.getType().leadsToSouthboundLaguna())
+                    (connection.isCrossSLRsouth() && childRnode.getType().leadsToSouthboundLaguna()) ||
+                    sinkRnode.getTile() == childRnode.getTile()
             ));
 
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));

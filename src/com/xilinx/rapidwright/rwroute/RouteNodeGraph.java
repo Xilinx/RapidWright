@@ -855,8 +855,21 @@ public class RouteNodeGraph {
         RouteNodeType type = childRnode.getType();
         if (type == RouteNodeType.NON_LOCAL) {
             RouteNode parentRnode = childRnode.getPrev();
-            if (parentRnode.getType() == RouteNodeType.SUPER_LONG_LINE && parentRnode.getPrev().getTile() == childRnode.getTile()) {
-                // With an SLL being bidrectional, do not lookahead back the way we came from
+            RouteNodeType parentType = parentRnode.getType();
+            if (parentType.isLocalLeadingToLaguna()) {
+                // IMUX_[EW]\\d+ -> LAG_MUX_ATOM_\\d+_TXOUT
+                assert(parentRnode.getIntentCode() == IntentCode.NODE_PINFEED);
+
+                RouteNode sinkRnode = connection.getSinkRnode();
+                if (!connection.isCrossSLR() ||
+                        childRnode.getSLRIndex(this) == sinkRnode.getSLRIndex(this)) {
+                    // Inadvertently approaching an SLL because we are Y +/- 1 from sink
+                    assert(childRnode.getBeginTileXCoordinate() == sinkRnode.getBeginTileXCoordinate());
+                    assert(Math.abs(childRnode.getBeginTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1);
+                    return false;
+                }
+            } else if (parentType == RouteNodeType.SUPER_LONG_LINE && parentRnode.getPrev().getTile() == childRnode.getTile()) {
+                // UBUMP -> RXD: with an SLL being bidirectional, do not go back the way we came from
                 return false;
             }
             return true;
@@ -868,16 +881,19 @@ public class RouteNodeGraph {
             return true;
         }
 
-        // (b) needs to cross an SLR and this is an INT tile that services a Laguna
+        // (b) needs to cross an SLR and this is a local node servicing a Laguna
         Tile childTile = childRnode.getTile();
         RouteNode sinkRnode = connection.getSinkRnode();
         int childX = childTile.getTileXCoordinate();
-        if (connection.isCrossSLR() &&
-                childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this) &&
-                wireIndicesLeadingToLaguna.get(childTile) != null /*&&
-                childRnode.getType().leadsToLaguna()*/) {
-            assert((!childRnode.getType().leadsToNorthboundLaguna() || connection.isCrossSLRnorth()) &&
-                   (!childRnode.getType().leadsToSouthboundLaguna() || connection.isCrossSLRsouth()));
+        if (connection.isCrossSLR() && type.isLocalLeadingToLaguna() &&
+                childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
+            assert(wireIndicesLeadingToLaguna.get(childTile) != null);
+            assert(childTile != sinkRnode.getTile());
+            if ((type.leadsToNorthboundLaguna() && !connection.isCrossSLRnorth()) ||
+                (type.leadsToSouthboundLaguna() && !connection.isCrossSLRsouth())) {
+                // Does not lead to a Laguna in the direction that we want
+                return false;
+            }
             assert(nextLagunaColumn[childX] == childX);
             return true;
         }
@@ -889,7 +905,7 @@ public class RouteNodeGraph {
                 assert(connection.hasAltSinks());
                 // Fall-through
             case EXCLUSIVE_SINK_EAST:
-                if (type == RouteNodeType.LOCAL_WEST || type == RouteNodeType.LOCAL_RESERVED) {
+                if (type.isWestLocal() || type == RouteNodeType.LOCAL_RESERVED) {
                     // West wires can never reach an east sink
                     return false;
                 }
@@ -898,7 +914,7 @@ public class RouteNodeGraph {
                 assert(connection.hasAltSinks());
                 // Fall-through
             case EXCLUSIVE_SINK_WEST:
-                if (type == RouteNodeType.LOCAL_EAST || type == RouteNodeType.LOCAL_RESERVED) {
+                if (type.isEastLocal() || type == RouteNodeType.LOCAL_RESERVED) {
                     // East wires can never reach a west sink
                     return false;
                 }

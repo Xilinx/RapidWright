@@ -135,8 +135,10 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                        ))
                    );
                 break;
-            case LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
-            case LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
+            case LOCAL_EAST_LEADING_TO_NORTHBOUND_LAGUNA:
+            case LOCAL_WEST_LEADING_TO_NORTHBOUND_LAGUNA:
+            case LOCAL_EAST_LEADING_TO_SOUTHBOUND_LAGUNA:
+            case LOCAL_WEST_LEADING_TO_SOUTHBOUND_LAGUNA:
                 assert(length == 0 ||
                         (length == 1 && (
                                 (series == Series.UltraScalePlus && getWireName().matches("INODE_[EW]_\\d+_FT[01]")) ||
@@ -147,10 +149,12 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
             case NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
             case NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
                 assert(length == 0 ||
-                        (length == 1 && series == Series.UltraScale && getWireName().matches("SDND[NS]W_E_15_FTN")));
+                        (length == 1 && series == Series.UltraScale && getWireName().matches("SDND[NS]W_E_15_FTN")) ||
+                        (length == 1 && series == Series.UltraScalePlus && getWireName().equals("WW1_E_7_FT0")));
                 break;
             case SUPER_LONG_LINE:
-                assert(getLength() == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
+                assert(length == 0 ||
+                       length == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
                 baseCost *= RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
                 break;
             case NON_LOCAL:
