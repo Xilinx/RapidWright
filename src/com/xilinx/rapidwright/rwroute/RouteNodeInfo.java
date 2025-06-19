@@ -51,8 +51,10 @@ public class RouteNodeInfo {
         assert(wires[0].getTile() == node.getTile() && wires[0].getWireIndex() == node.getWireIndex());
         Tile baseTile = node.getTile();
         TileTypeEnum endTileType;
-        if (node.getIntentCode() == IntentCode.NODE_LAGUNA_DATA) {
-            endTileType = baseTile.getTileTypeEnum();
+        if (baseTile.getTileTypeEnum() == TileTypeEnum.LAG_LAG) { // US+
+            endTileType = TileTypeEnum.LAG_LAG;
+        } else if (baseTile.getTileTypeEnum() == TileTypeEnum.LAGUNA_TILE) { // US
+            endTileType = TileTypeEnum.LAGUNA_TILE;
         } else {
             endTileType = TileTypeEnum.INT;
         }
