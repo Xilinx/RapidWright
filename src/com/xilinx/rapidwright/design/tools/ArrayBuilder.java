@@ -477,7 +477,24 @@ public class ArrayBuilder {
             for (Site anchor : module.getAllValidPlacements()) {
                 if (curr == null) {
                     String instName = modInstNames == null ? ("inst_" + i) : modInstNames.get(i);
+                    // TODO - Remove after createModuleInst() fix
+                    EDIFHierCellInst hierInst = array.getNetlist().getHierCellInstFromName(instName);
+                    if (hierInst != null && hierInst.getCellType().isLeafCellOrBlackBox()) {
+                        EDIFCell bb = hierInst.getCellType();
+                        if (bb.getLibrary() != null) {
+                            bb.getLibrary().removeCell(bb);
+                        }
+                        EDIFCell modCell = module.getNetlist().getTopCell();
+                        EDIFCell currCell = array.getNetlist().getWorkLibrary().getCell(modCell.getName());
+                        if (currCell == null) {
+                            array.getNetlist().copyCellAndSubCells(modCell);
+                        }
+                    } // END TODO
                     curr = array.createModuleInst(instName, module);
+                    // TODO - Remove after createModuleInst() fix
+                    EDIFHierCellInst hierCellInst = array.getNetlist().getHierCellInstFromName(instName);
+                    hierCellInst.getInst().removeBlackBoxProperty();
+                    // END TODO
                     i++;
                 }
                 if (curr.place(anchor, true, false)) {
