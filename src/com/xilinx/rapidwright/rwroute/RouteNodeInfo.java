@@ -27,6 +27,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.util.Utils;
 
 import java.util.BitSet;
 
@@ -51,10 +52,8 @@ public class RouteNodeInfo {
         assert(wires[0].getTile() == node.getTile() && wires[0].getWireIndex() == node.getWireIndex());
         Tile baseTile = node.getTile();
         TileTypeEnum endTileType;
-        if (baseTile.getTileTypeEnum() == TileTypeEnum.LAG_LAG) { // US+
-            endTileType = TileTypeEnum.LAG_LAG;
-        } else if (baseTile.getTileTypeEnum() == TileTypeEnum.LAGUNA_TILE) { // US
-            endTileType = TileTypeEnum.LAGUNA_TILE;
+        if (Utils.isLaguna(baseTile.getTileTypeEnum())) {
+            endTileType = baseTile.getTileTypeEnum();
         } else {
             endTileType = TileTypeEnum.INT;
         }
