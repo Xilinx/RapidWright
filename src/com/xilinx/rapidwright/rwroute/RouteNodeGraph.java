@@ -852,33 +852,31 @@ public class RouteNodeGraph {
     public boolean isAccessible(RouteNode childRnode, Connection connection) {
         assert(!childRnode.isTarget());
 
-        RouteNodeType type = childRnode.getType();
-        if (type == RouteNodeType.NON_LOCAL) {
-            RouteNode parentRnode = childRnode.getPrev();
-            RouteNodeType parentType = parentRnode.getType();
-            if (parentType.isLocalLeadingToLaguna()) {
-                // IMUX_[EW]\\d+ -> LAG_MUX_ATOM_\\d+_TXOUT
-                assert(parentRnode.getIntentCode() == IntentCode.NODE_PINFEED);
-
-                RouteNode sinkRnode = connection.getSinkRnode();
-                if (!connection.isCrossSLR() ||
-                    childRnode.getSLRIndex(this) == sinkRnode.getSLRIndex(this)) {
-                    assert(lutRoutethru ||
-                            // Inadvertently approaching an SLL because we are Y +/- 1 from sink
-                            (childRnode.getBeginTileXCoordinate() == sinkRnode.getBeginTileXCoordinate() &&
-                             Math.abs(childRnode.getBeginTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1));
-                    return false;
-                }
-            } else if (parentType == RouteNodeType.SUPER_LONG_LINE && parentRnode.getPrev().getTile() == childRnode.getTile()) {
-                // UBUMP -> RXD: with an SLL being bidirectional, do not go back the way we came from
-                return false;
-            }
-            return true;
-        }
-
         // Only consider LOCAL nodes when:
         // (a) considering LUT routethrus
+        RouteNodeType type = childRnode.getType();
         if (!type.isAnyLocal() || lutRoutethru) {
+            if (type == RouteNodeType.NON_LOCAL) {
+                RouteNode parentRnode = childRnode.getPrev();
+                RouteNodeType parentType = parentRnode.getType();
+                if (parentType.isLocalLeadingToLaguna()) {
+                    // IMUX_[EW]\\d+ -> LAG_MUX_ATOM_\\d+_TXOUT
+                    assert(parentRnode.getIntentCode() == IntentCode.NODE_PINFEED);
+
+                    RouteNode sinkRnode = connection.getSinkRnode();
+                    if (!connection.isCrossSLR() ||
+                            childRnode.getSLRIndex(this) == sinkRnode.getSLRIndex(this)) {
+                        assert(lutRoutethru ||
+                                // Inadvertently approaching an SLL because we are Y +/- 1 from sink
+                                (childRnode.getBeginTileXCoordinate() == sinkRnode.getBeginTileXCoordinate() &&
+                                        Math.abs(childRnode.getBeginTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1));
+                        return false;
+                    }
+                } else if (parentType == RouteNodeType.SUPER_LONG_LINE && parentRnode.getPrev().getTile() == childRnode.getTile()) {
+                    // UBUMP -> RXD: with an SLL being bidirectional, do not go back the way we came from
+                    return false;
+                }
+            }
             return true;
         }
 
