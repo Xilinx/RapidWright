@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023, 2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Advanced Micro Devices, Inc.
@@ -41,6 +41,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
@@ -176,11 +177,25 @@ public class ECOTools {
             // Remove all affected SitePinInsts
             for (EDIFHierPortInst leafEhpi : leafPortInsts) {
                 // Do nothing if we're disconnecting an input, but this leaf pin is not an input
-                if (ehpi.isInput() && !leafEhpi.isInput())
+                if (ehpi.isInput() && !leafEhpi.isInput()) {
                     continue;
+                }
 
                 Cell cell = leafEhpi.getPhysicalCell(design);
-                for (SitePinInst spi : cell.getAllSitePinsFromLogicalPin(leafEhpi.getPortInst().getName(), null)) {
+                if (cell == null || !cell.isPlaced()) {
+                    continue;
+                }
+                String logicalPin = leafEhpi.getPortInst().getName();
+                for (SitePinInst spi : cell.getAllSitePinsFromLogicalPin(logicalPin, null)) {
+                    List<EDIFHierPortInst> portInstsOnSpi = DesignTools.getPortInstsFromSitePinInst(spi);
+                    assert (portInstsOnSpi.contains(leafEhpi));
+                    boolean removedAnything = portInstsOnSpi.removeAll(leafPortInsts);
+                    assert (removedAnything);
+                    if (!portInstsOnSpi.isEmpty()) {
+                        // SPI also services a different logical port inst; skip
+                        continue;
+                    }
+
                     DesignTools.handlePinRemovals(spi, deferredRemovals);
                 }
             }
@@ -308,6 +323,11 @@ public class ECOTools {
             List<EDIFHierPortInst> portInsts = e.getValue();
 
             for (EDIFHierPortInst ehpi : portInsts) {
+                if (ehpi.getNet() != null) {
+                    throw new RuntimeException("ERROR: Pin " + ehpi + " already connected to net "
+                            + ehpi.getHierarchicalNetName()
+                            + " please run ECOTools.disconnectNet() first.");
+                }
                 if (ehpi.isOutput()) {
                     for (EDIFHierPortInst src : ehn.getLeafHierPortInsts(true, false)) {
                         System.err.println("WARNING: Net '" + ehn.getHierarchicalNetName() + "' already has an output pin '" +
@@ -344,7 +364,8 @@ public class ECOTools {
         // Modify the physical netlist
         EDIFCell ecGnd = netlist.getHDIPrimitive(Unisim.GND);
         EDIFCell ecVcc = netlist.getHDIPrimitive(Unisim.VCC);
-        nextNet: for (EDIFHierNet ehn : netToPortInsts.keySet()) {
+        nextNet: for (Map.Entry<EDIFHierNet,List<EDIFHierPortInst>> e : netToPortInsts.entrySet()) {
+            EDIFHierNet ehn = e.getKey();
             Net newPhysNet = null;
 
             // Find the one and only source pin
@@ -394,14 +415,15 @@ public class ECOTools {
                 }
             }
 
-            for (EDIFHierPortInst ehpi : leafEdifPins) {
+            // Now go through all sink pins
+            nextLeafPin: for (EDIFHierPortInst ehpi : leafEdifPins) {
                 if (ehpi.isOutput()) {
                     continue;
                 }
 
                 Cell cell = ehpi.getPhysicalCell(design);
-                if (cell == null) {
-                    throw new RuntimeException("ERROR: Cell corresponding to pin '" + ehpi + "' not found.");
+                if (cell == null || !cell.isPlaced()) {
+                    continue;
                 }
                 List<SitePinInst> sitePins = cell.getAllSitePinsFromLogicalPin(ehpi.getPortInst().getName(), null);
                 SiteInst si = cell.getSiteInst();
@@ -427,6 +449,14 @@ public class ECOTools {
                             // TODO: Use getLeafHierPortInst() to get parent net?
                             EDIFHierNet otherParentNet = netlist.getParentNet(otherEhpi.getHierarchicalNet());
                             if (!otherParentNet.equals(parentNet)) {
+                                // This SPI also services a different port inst that is connected to a
+                                // different net than the new one we're trying to connect up
+                                if (LUTTools.isCellALUT(cell)) {
+                                    // Check if we can map to a different physical pin
+                                    if (createExitSitePinInst(design, ehpi, newPhysNet) != null) {
+                                        continue nextLeafPin;
+                                    }
+                                }
                                 String message = "Site pin " + spi.getSitePinName() + " cannot be used " +
                                         "to connect to logical pin '" + ehpi + "' since it is also connected to pin '" +
                                         otherEhpi + "'.";
@@ -454,8 +484,8 @@ public class ECOTools {
                                 throw new RuntimeException("ERROR: Failed to unroute intra-site connection " +
                                         spi.getSiteInst().getSiteName() + "/" + spi.getBELPin() + " to " + snkBp + ".");
                             }
-                            boolean preserveOtherRoutes = true;
                             if (oldPhysNet != null) {
+                                boolean preserveOtherRoutes = true;
                                 oldPhysNet.removePin(spi, preserveOtherRoutes);
                                 if (RouterHelper.isLoadLessNet(oldPhysNet) && oldPhysNet.hasPIPs()) {
                                     // Since oldPhysNet has no sink pins left, yet still has PIPs, then it may
@@ -485,6 +515,16 @@ public class ECOTools {
                     String logicalPinName = ehpi.getPortInst().getName();
                     if (cell.getAllPhysicalPinMappings(logicalPinName) != null) {
                         createExitSitePinInst(design, ehpi, newPhysNet);
+                    } else {
+                        if (LUTTools.isCellALUT(cell)) {
+                            // TODO: Find a new physical pin mapping
+                            throw new RuntimeException("ERROR: No logical-physical pin mapping found for pin '" + ehpi + "'");
+                        } else {
+                            // Assume that sink does not need routing (e.g. CARRY8.CIN may already be connected to VCC
+                            //  but does not need physically routing, or RAMB36.WEBWE[2] which would have been covered by
+                            //  RAMB36.WEBWE[0])
+                            assert(!e.getValue().contains(ehpi));
+                        }
                     }
                 }
             }
@@ -611,10 +651,9 @@ public class ECOTools {
             }
 
             Cell cell = sourceEhpi.getPhysicalCell(design);
-            if (cell == null) {
-                throw new RuntimeException("ERROR: Cell corresponding to pin '" + sourceEhpi + "' not found.");
+            if (cell == null || !cell.isPlaced()) {
+                continue;
             }
-
             List<SitePinInst> sitePins = cell.getAllSitePinsFromLogicalPin(sourceEhpi.getPortInst().getName(), null);
             if (!sitePins.isEmpty()) {
                 // This net's leaf pins already has some site pins
@@ -950,7 +989,24 @@ public class ECOTools {
                 // Site Pin not currently used or was driven by site port
             }
 
-            spi = net.createPin(sitePinName, si);
+            if (si.getSitePinInst(sitePinName) == null) {
+                spi = net.createPin(sitePinName, si);
+            } else if (LUTTools.isCellALUT(cell)) {
+                // Check if we can map to a different physical pin
+                String newPhysPin = LUTTools.getUnmappedPhysicalLUTInputPin(cell);
+                if (newPhysPin != null) {
+                    String physicalPinName = cell.getPhysicalPinMapping(logicalPinName);
+                    cell.removePinMapping(physicalPinName);
+                    cell.addPinMapping(newPhysPin, logicalPinName);
+                    spi = createExitSitePinInst(design, ehpi, net);
+                }
+                // TODO: Also check for:
+                //       (a) reusing a physical pin (on the current LUT or its companion) that is
+                //           already providing 'net'
+                //       (b) reclaiming a mapped physical pin that corresponds to an unconnected
+                //           logical pin
+            }
+
             break;
         }
 

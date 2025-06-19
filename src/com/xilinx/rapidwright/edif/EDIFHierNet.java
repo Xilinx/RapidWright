@@ -24,9 +24,9 @@
 
 package com.xilinx.rapidwright.edif;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -42,7 +42,7 @@ import org.jetbrains.annotations.NotNull;
  *
  * Created on: Sep 13, 2017
  */
-public class EDIFHierNet {
+public class EDIFHierNet implements Comparable<EDIFHierNet> {
 
     @NotNull
     private final EDIFHierCellInst hierarchicalInst;
@@ -296,5 +296,10 @@ public class EDIFHierNet {
         }
 
         return leafCellPins;
+    }
+
+    @Override
+    public int compareTo(EDIFHierNet o) {
+        return this.toString().compareTo(o.toString());
     }
 }

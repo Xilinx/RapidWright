@@ -466,19 +466,29 @@ public class PhysNetlistWriter {
                                 throw new RuntimeException("Unable to process PORT cell at site " + siteInst.getSiteName());
                             }
                         } else {
-                            assert(series == Series.Versal);
-
                             String cellType = cell.getType();
-                            if (cellType.startsWith("IBUF")) {
-                                bidirPinIsInput = true;
-                            } else if (cellType.startsWith("OBUF")) {
-                                bidirPinIsInput = false;
-                            } else if (cellType.equals("PS9")) {
-                                assert(belPin.getName().startsWith("PSS_PAD_"));
-                                // Assume output?
-                                bidirPinIsInput = false;
+                            if (series == Series.Versal) {
+                                if (cellType.startsWith("IBUF")) {
+                                    bidirPinIsInput = true;
+                                } else if (cellType.startsWith("OBUF")) {
+                                    bidirPinIsInput = false;
+                                } else if (cellType.equals("PS9")) {
+                                    assert (belPin.getName().startsWith("PSS_PAD_"));
+                                    // Assume output?
+                                    bidirPinIsInput = false;
+                                } else {
+                                    throw new RuntimeException("ERROR: Unrecognized cell type: " + cellType);
+                                }
+                            } else if (series == Series.UltraScalePlus) {
+                                if (cellType.equals("PS8")) {
+                                    assert (belPin.getName().startsWith("PSS_ALTO_CORE_PAD_"));
+                                    // Assume output?
+                                    bidirPinIsInput = false;
+                                } else {
+                                    throw new RuntimeException("ERROR: Unrecognized cell type: " + cellType);
+                                }
                             } else {
-                                throw new RuntimeException("ERROR: Unrecognized cell type: " + cellType);
+                                throw new RuntimeException("ERROR: Unsupported series: " + series);
                             }
                         }
                         bidirPinIsOutput = !bidirPinIsInput;
