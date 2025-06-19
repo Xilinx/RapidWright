@@ -274,6 +274,11 @@ public class EDIFCellInst extends EDIFPropertyObject {
         return false;
     }
 
+    public void removeBlackBoxProperty() {
+        removeProperty(BLACK_BOX_PROP);
+        removeProperty(BLACK_BOX_PROP_VERSAL);
+    }
+
     protected EDIFPortInstList getEDIFPortInstList() {
         return portInsts;
     }
