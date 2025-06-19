@@ -128,11 +128,11 @@ public class TimingAndWirelengthReport{
             if (sinkINTNode == null) {
                 connection.setDirect(true);
             } else {
-                connection.setSinkRnode(routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_BOTH));
                 if (sourceINTNode == null) {
                     sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
                 }
                 connection.setSourceRnode(routingGraph.getOrCreate(sourceINTNode, RouteNodeType.EXCLUSIVE_SOURCE));
+                connection.setSinkRnode(routingGraph.getOrCreate(sinkINTNode));
                 connection.setDirect(false);
             }
         }
