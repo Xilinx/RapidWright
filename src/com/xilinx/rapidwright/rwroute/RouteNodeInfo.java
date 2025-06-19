@@ -255,7 +255,6 @@ public class RouteNodeInfo {
                         return RouteNodeType.SUPER_LONG_LINE;
                     } else if (wireName.endsWith("_TXOUT")) {
                         boolean northbound = routingGraph.intYToNorthboundLaguna[node.getTile().getTileYCoordinate()];
-                        assert(false);
                         return northbound ? RouteNodeType.LOCAL_EAST_LEADING_TO_NORTHBOUND_LAGUNA
                                           : RouteNodeType.LOCAL_EAST_LEADING_TO_SOUTHBOUND_LAGUNA;
                     }
