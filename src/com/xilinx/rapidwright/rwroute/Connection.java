@@ -84,8 +84,8 @@ public class Connection implements Comparable<Connection>{
     /** To indicate if the route delay of a connection has been patched up, when there are consecutive long nodes */
     private boolean dlyPatched;
     /** true to indicate that a connection cross SLRs in given direction */
-    private final boolean crossSLRnorth;
-    private final boolean crossSLRsouth;
+    private boolean crossSLRnorth;
+    private boolean crossSLRsouth;
     /** List of nodes assigned to a connection to form the path for generating PIPs */
     private List<Node> nodes;
 
@@ -97,21 +97,8 @@ public class Connection implements Comparable<Connection>{
         rnodes = new ArrayList<>();
         this.netWrapper = netWrapper;
         netWrapper.addConnection(this);
-        if (!source.getTile().getSLR().equals(sink.getTile().getSLR())) {
-            if (source.getSiteInst().getDesign().getSeries() == Series.Versal) {
-                throw new RuntimeException("ERROR: Cross-SLR connections not yet supported on Versal.");
-            }
-            if (source.getTile().getTileYCoordinate() < sink.getTile().getTileYCoordinate()) {
-                crossSLRnorth = true;
-                crossSLRsouth = false;
-            } else {
-                crossSLRnorth = false;
-                crossSLRsouth = true;
-            }
-        } else {
-            crossSLRnorth = false;
-            crossSLRsouth = false;
-        }
+        crossSLRnorth = false;
+        crossSLRsouth = false;
     }
 
     /**
@@ -292,6 +279,24 @@ public class Connection implements Comparable<Connection>{
 
     public void setSinkRnode(RouteNode sinkRnode) {
         this.sinkRnode = sinkRnode;
+
+        assert(sourceRnode != null);
+        if (!sourceRnode.getTile().getSLR().equals(sinkRnode.getTile().getSLR())) {
+            if (source.getSiteInst().getDesign().getSeries() == Series.Versal) {
+                throw new RuntimeException("ERROR: Cross-SLR connections not yet supported on Versal.");
+            }
+
+            if (sourceRnode.getTile().getTileYCoordinate() < sinkRnode.getTile().getTileYCoordinate()) {
+                crossSLRnorth = true;
+                assert(!crossSLRsouth);
+            } else {
+                assert(!crossSLRnorth);
+                crossSLRsouth = true;
+            }
+        } else {
+            assert(!crossSLRnorth);
+            assert(!crossSLRsouth);
+        }
     }
 
     public List<RouteNode> getAltSinkRnodes() {
