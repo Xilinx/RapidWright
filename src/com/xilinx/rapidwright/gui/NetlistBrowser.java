@@ -113,7 +113,8 @@ public class NetlistBrowser extends QMainWindow {
 
         EDIFNetlist netlist = null;
         if (args[0].endsWith(".dcp")) {
-            netlist = Design.readCheckpoint(args[0], true).getNetlist();
+            boolean skipXdef = true;
+            netlist = Design.readCheckpoint(args[0], skipXdef).getNetlist();
         } else {
             netlist = EDIFTools.readEdifFile(args[0]);
             if (!netlist.expandMacroUnisims()) {
