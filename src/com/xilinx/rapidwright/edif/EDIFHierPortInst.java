@@ -43,7 +43,7 @@ import org.jetbrains.annotations.NotNull;
  *
  * Created on: Sep 12, 2017
  */
-public class EDIFHierPortInst {
+public class EDIFHierPortInst implements Comparable<EDIFHierPortInst> {
 
     @NotNull
     private final EDIFHierCellInst hierarchicalInst;
@@ -295,5 +295,10 @@ public class EDIFHierPortInst {
 
     public EDIFCell getParentCell() {
         return hierarchicalInst.getCellType();
+    }
+
+    @Override
+    public int compareTo(EDIFHierPortInst o) {
+        return this.toString().compareTo(o.toString());
     }
 }

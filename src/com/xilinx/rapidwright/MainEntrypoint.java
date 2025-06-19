@@ -73,6 +73,7 @@ import com.xilinx.rapidwright.examples.SLRCrosserGenerator;
 import com.xilinx.rapidwright.examples.StampPlacement;
 import com.xilinx.rapidwright.examples.UpdateRoutingUsingSATRouter;
 import com.xilinx.rapidwright.examples.tilebrowser.PartTileBrowser;
+import com.xilinx.rapidwright.gui.NetlistBrowser;
 import com.xilinx.rapidwright.interchange.DcpToInterchange;
 import com.xilinx.rapidwright.interchange.DeviceResourcesExample;
 import com.xilinx.rapidwright.interchange.EdifToLogicalNetlist;
@@ -178,6 +179,7 @@ public class MainEntrypoint {
         addFunction("MetadataParser", MetadataParser::main);
         addFunction("ModuleOptimizer", ModuleOptimizer::main);
         addFunction("MultGenerator", MultGenerator::main);
+        addFunction("NetlistBrowser", NetlistBrowser::main);
         addFunction("PartPrinter", PartPrinter::main);
         addFunction("PartTileBrowser", PartTileBrowser::main);
         addFunction("PartialCUFR", PartialCUFR::main);
