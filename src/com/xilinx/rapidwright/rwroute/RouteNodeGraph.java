@@ -367,7 +367,7 @@ public class RouteNodeGraph {
             prevLagunaColumn = new int[maxTileColumns];
             wireIndicesLeadingToLaguna = new IdentityHashMap<>();
             intYToNorthboundLaguna = new boolean[device.getRows()];
-            final int clockRegionHeight = 60;
+            final int clockRegionHeight = series.getCLEHeight();
             final int slrHeight = device.getNumOfClockRegionRows() * clockRegionHeight / device.getSLRs().length;
             Arrays.fill(nextLagunaColumn, Integer.MAX_VALUE);
             Arrays.fill(prevLagunaColumn, Integer.MIN_VALUE);
