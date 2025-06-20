@@ -234,13 +234,16 @@ public class PartialRouter extends RWRoute {
         // if so, unpreserve that blocking net
         Set<Net> unpreserveNets = new HashSet<>();
         for (Connection connection : indirectConnections) {
+            if (connection.hasAltSinks()) {
+                // Skip connections that have alternate sinks
+                continue;
+            }
             Net net = connection.getNet();
             Net preservedNet;
             assert((preservedNet = routingGraph.getPreservedNet(connection.getSourceRnode())) == null || preservedNet == net);
+
             RouteNode sinkRnode = connection.getSinkRnode();
-            if (!sinkRnode.getType().isAnyExclusiveSink()) {
-                continue;
-            }
+            assert(sinkRnode.getType().isAnyExclusiveSink());
             preservedNet = routingGraph.getPreservedNet(sinkRnode);
             if (preservedNet != null && preservedNet != net) {
                 unpreserveNets.add(preservedNet);
