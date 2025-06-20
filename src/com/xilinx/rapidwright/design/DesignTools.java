@@ -3772,12 +3772,18 @@ public class DesignTools {
         loop: while (!curr.equals(srcNode)) {
             PIP pip = reverseNodeToPIPMap.get(curr);
             if (pip == null) {
-                for (PIP biDirPIP : biDirs) {
-                    if (biDirPIP.getStartNode().equals(curr)) {
-                        path.add(biDirPIP);
-                        curr = biDirPIP.getEndNode();
-                        continue loop;
+                if (biDirs != null) {
+                    for (PIP biDirPIP : biDirs) {
+                        if (biDirPIP.getStartNode().equals(curr)) {
+                            path.add(biDirPIP);
+                            curr = biDirPIP.getEndNode();
+                            continue loop;
+                        }
                     }
+                } else {
+                    // LUT const generator will cause srcNode of global const to be unreachable
+                    assert(sinkPin.getNet().isStaticNet());
+                    return path;
                 }
             }
             path.add(pip);
