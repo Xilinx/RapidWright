@@ -60,6 +60,9 @@ public class NetlistTreeWidget extends QTreeWidget {
     }
 
     public QTreeWidgetItem populateCellInst(QTreeWidgetItem curr, EDIFHierCellInst inst) {
+        if (curr.childCount() > 1) {
+            return curr;
+        }
         // Remove DUMMY
         curr.removeChild(curr.child(0));
 
