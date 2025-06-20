@@ -284,7 +284,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
                         } else {
                             // HLONGs are nominally length 6
-                            baseCost *= 3 * 6;
+                            baseCost *= 2.575f * 6 * 1.166667f;
                         }
                         break;
                     case NODE_VLONG7:  // Versal only
@@ -297,7 +297,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             assert(!getAllDownhillPIPs().isEmpty());
                         } else {
                             // VLONGs are nominally length 12 in US+ and 12/16 in US
-                            baseCost *= (series == Series.UltraScalePlus) ? 12 : length;
+                            baseCost *= ((series == Series.UltraScalePlus) ? 12 : length) * 1.166667f;
                         }
                         break;
 
