@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Advanced Micro Devices, Inc.
@@ -36,7 +36,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
- * Generated on: Thu Nov 21 13:06:39 MST 2024
+ * Generated on: Wed Jun 11 09:41:43 MDT 2025
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  *
  * Class to hold utility APIs dealing with Parts and device names.
@@ -158,11 +158,14 @@ public class PartNameTools {
             case QZYNQUPLUS: return FamilyType.ZYNQUPLUS;
             case QZYNQUPLUSRFSOC: return FamilyType.ZYNQUPLUSRFSOC;
             case SPARTAN7: return FamilyType.SPARTAN7;
+            case SPARTANUPLUS: return FamilyType.SPARTANUPLUS;
             case VERSALAICORE: return FamilyType.VERSAL;
             case VERSALAIEDGE: return FamilyType.VERSAL;
+            case VERSALAIEDGE2: return FamilyType.VERSAL;
             case VERSALHBM: return FamilyType.VERSAL;
             case VERSALPREMIUM: return FamilyType.VERSAL;
             case VERSALPRIME: return FamilyType.VERSAL;
+            case VERSALPRIME2: return FamilyType.VERSAL;
             case VIRTEX7: return FamilyType.VIRTEX7;
             case VIRTEXU: return FamilyType.VIRTEXU;
             case VIRTEXUPLUS: return FamilyType.VIRTEXUPLUS;
@@ -214,12 +217,15 @@ public class PartNameTools {
             case QZYNQUPLUS: return "Zynq UltraScale+";
             case QZYNQUPLUSRFSOC: return "Zynq UltraScale+ RFSOC";
             case SPARTAN7: return "Spartan-7";
+            case SPARTANUPLUS: return "Spartan UltraScale+";
             case VERSAL: return "Versal ACAP";
             case VERSALAICORE: return "Versal ACAP";
             case VERSALAIEDGE: return "Versal ACAP";
+            case VERSALAIEDGE2: return "Versal ACAP";
             case VERSALHBM: return "Versal ACAP";
             case VERSALPREMIUM: return "Versal ACAP";
             case VERSALPRIME: return "Versal ACAP";
+            case VERSALPRIME2: return "Versal ACAP";
             case VIRTEX7: return "Virtex-7";
             case VIRTEXU: return "Virtex UltraScale";
             case VIRTEXUPLUS: return "Virtex UltraScale+";
@@ -271,12 +277,15 @@ public class PartNameTools {
             case QZYNQUPLUS: return Series.UltraScalePlus;
             case QZYNQUPLUSRFSOC: return Series.UltraScalePlus;
             case SPARTAN7: return Series.Series7;
+            case SPARTANUPLUS: return Series.UltraScalePlus;
             case VERSAL: return Series.Versal;
             case VERSALAICORE: return Series.Versal;
             case VERSALAIEDGE: return Series.Versal;
+            case VERSALAIEDGE2: return Series.Versal;
             case VERSALHBM: return Series.Versal;
             case VERSALPREMIUM: return Series.Versal;
             case VERSALPRIME: return Series.Versal;
+            case VERSALPRIME2: return Series.Versal;
             case VIRTEX7: return Series.Series7;
             case VIRTEXU: return Series.UltraScale;
             case VIRTEXUPLUS: return Series.UltraScalePlus;

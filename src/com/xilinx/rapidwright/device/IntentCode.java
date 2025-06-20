@@ -130,7 +130,16 @@ public enum IntentCode {
     NODE_SLL_DATA,
     NODE_GLOBAL_VDISTR_LVL3,
     NODE_GLOBAL_VDISTR_LVL21,
-    NODE_GLOBAL_VDISTR_SHARED;
+    NODE_GLOBAL_VDISTR_SHARED,
+    
+    // Versal Gen 2
+    NODE_GLOBAL_HDISTR_SLOW,
+    NODE_GLOBAL_HDISTR_MED,
+    NODE_GLOBAL_HDISTR_FAST,
+    NODE_GLOBAL_HROUTE_SLOW,
+    NODE_GLOBAL_HROUTE_MED;
+    
+    
 
 
     public static boolean isLongWire(Tile tile, int wire) {
