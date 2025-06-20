@@ -41,7 +41,7 @@ import java.util.Map.Entry;
  *
  * Created on: Oct 30, 2017
  */
-public class EDIFHierCellInst {
+public class EDIFHierCellInst implements Comparable<EDIFHierCellInst> {
     private final EDIFCellInst[] cellInsts;
 
     private EDIFHierCellInst(EDIFCellInst[] cellInsts, int newLength, EDIFCellInst relativeChild) {
@@ -363,5 +363,10 @@ public class EDIFHierCellInst {
                 cellInsts[i].setCellType(copy);
             }
         }
+    }
+
+    @Override
+    public int compareTo(EDIFHierCellInst o) {
+        return this.toString().compareTo(o.toString());
     }
 }
