@@ -330,7 +330,7 @@ public class RWRoute {
     }
 
     protected Set<Net> ensureSinkRoutability() {
-        // Assume all sinks are reachable
+        // RWRoute routes designs from scratch -- all sinks must be reachable
         return Collections.emptySet();
     }
 
