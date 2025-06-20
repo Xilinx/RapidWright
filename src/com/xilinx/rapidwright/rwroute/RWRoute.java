@@ -1931,12 +1931,12 @@ public class RWRoute {
                         break;
                     case NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
                     case NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
-                        if (connection.getSinkRnode().getSLRIndex(routingGraph) != childRNode.getSLRIndex(routingGraph) &&
+                        if (connection.isCrossSLR() && connection.getSinkRnode().getSLRIndex(routingGraph) != childRNode.getSLRIndex(routingGraph) &&
                                 ((connection.isCrossSLRnorth() && childType == RouteNodeType.NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA) ||
                                  (connection.isCrossSLRsouth() && childType == RouteNodeType.NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA))) {
                             lookahead = !childRNode.willOverUse(netWrapper);
                         }
-                        // Fall through
+                        // Fall-through
                     case NON_LOCAL:
                         // LOCALs cannot connect to NON_LOCALs except
                         //   (a) IMUX -> LAG_MUX_ATOM_\\d+_TXOUT

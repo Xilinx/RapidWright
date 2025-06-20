@@ -868,8 +868,8 @@ public class RouteNodeGraph {
                             childRnode.getSLRIndex(this) == sinkRnode.getSLRIndex(this)) {
                         assert(lutRoutethru ||
                                 // Inadvertently approaching an SLL because we are Y +/- 1 from sink
-                                (childRnode.getBeginTileXCoordinate() == sinkRnode.getBeginTileXCoordinate() &&
-                                        Math.abs(childRnode.getBeginTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1));
+                                (childRnode.getEndTileXCoordinate() == sinkRnode.getBeginTileXCoordinate() &&
+                                        Math.abs(childRnode.getEndTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1));
                         return false;
                     }
                 } else if (parentType == RouteNodeType.SUPER_LONG_LINE && parentRnode.getPrev().getTile() == childRnode.getTile()) {
@@ -883,7 +883,7 @@ public class RouteNodeGraph {
         // (b) needs to cross an SLR and this is a local node servicing a Laguna
         Tile childTile = childRnode.getTile();
         RouteNode sinkRnode = connection.getSinkRnode();
-        int childX = childTile.getTileXCoordinate();
+        int childX = childRnode.getEndTileXCoordinate();
         if (connection.isCrossSLR() && type.isLocalLeadingToLaguna() &&
                 childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
             assert(wireIndicesLeadingToLaguna.get(childTile) != null);
@@ -1010,8 +1010,8 @@ public class RouteNodeGraph {
         }
 
         // (e) when in same X as the sink tile, but Y +/- 1
-        return childX == sinkTile.getTileXCoordinate() &&
-               Math.abs(childTile.getTileYCoordinate() - sinkTile.getTileYCoordinate()) <= 1;
+        return childX == sinkRnode.getBeginTileXCoordinate() &&
+               Math.abs(childRnode.getEndTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1;
     }
 
     protected boolean allowRoutethru(Node head, Node tail) {
