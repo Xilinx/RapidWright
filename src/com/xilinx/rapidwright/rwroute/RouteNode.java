@@ -108,7 +108,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     }
 
     private void setBaseCost(Series series) {
-        baseCost = 0.2f;
+        baseCost = 0.4f;
         switch (getType()) {
             case EXCLUSIVE_SOURCE:
                 assert(length == 0 ||
@@ -155,7 +155,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
             case SUPER_LONG_LINE:
                 assert(length == 0 ||
                        length == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
-                baseCost *= RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
+                baseCost = 0.3f * RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
                 break;
             case NON_LOCAL:
                 short length = getLength();
@@ -190,9 +190,9 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             // U-turns and intra-tile INT_INT_SDQ_\\d+_INT_OUT[01]
                         } else {
                             assert(length <= 2); // 2 for feedthrough e.g. WW1_W_BEG7
+                            baseCost *= length;
                             if (getBeginTileXCoordinate() != getEndTileXCoordinate()) {
                                 // Horizontal
-                                baseCost *= 5f;
                             } else {
                                 // Vertical
                                 assert(getBeginTileYCoordinate() != getEndTileYCoordinate());
@@ -232,8 +232,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                                 } else {
                                     // e.g. VU440's INT_X171Y827/EE2_E_BEG7 which feeds through to above
                                     assert(series == Series.UltraScale && length == 2);
+                                    baseCost *= length;
                                 }
-                                baseCost *= 3;
                             } else {
                                 // Vertical
                                 assert(getBeginTileYCoordinate() != getEndTileYCoordinate());
@@ -246,7 +246,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                                     // U-turn
                                     assert(length == 1);
                                 }
-                                baseCost *= 2;
                             }
                         }
                         break;
@@ -258,7 +257,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
                         } else {
                             // HQUADs are nominally length 2
-                            baseCost *= 3 * 2;
+                            baseCost = 0.35f * length;
                         }
                         break;
                     case NODE_VQUAD: // US/US+/Versal
@@ -268,7 +267,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                                     !getAllDownhillPIPs().isEmpty());
                         } else {
                             // VQUADs are nominally length 4
-                            baseCost *= 4;
+                            baseCost = 0.15f * length;
                         }
                         break;
 
@@ -284,7 +283,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
                         } else {
                             // HLONGs are nominally length 6
-                            baseCost *= 2.575f * 6 * 1.166667f;
+                            baseCost = 0.15f * length;
                         }
                         break;
                     case NODE_VLONG7:  // Versal only
@@ -297,8 +296,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             assert(!getAllDownhillPIPs().isEmpty());
                         } else {
                             // VLONGs are nominally length 12 in US+ and 12/16 in US
-                            baseCost *= ((series == Series.UltraScalePlus) ? 12 : length) * 1.166667f;
                         }
+                        baseCost = 0.7f;
                         break;
 
                     // Versal only
