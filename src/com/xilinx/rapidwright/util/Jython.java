@@ -162,6 +162,7 @@ public class Jython {
                     com.xilinx.rapidwright.design.DesignTools.class,
                     com.xilinx.rapidwright.design.tools.LUTTools.class,
                     com.xilinx.rapidwright.device.helper.TileColumnPattern.class,
+                    com.xilinx.rapidwright.gui.NetlistBrowser.class,
             };
 
             args = new String[3];

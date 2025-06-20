@@ -693,6 +693,8 @@ public class DesignTools {
                     incrementUtilType(map, UtilizationType.REGS_AS_FFS);
                 } else if (belName != null && belName.contains("CARRY")) {
                     incrementUtilType(map, UtilizationType.CARRY8S);
+                } else if (belName != null && belName.equals("LOOKAHEAD8")) {
+                    incrementUtilType(map, UtilizationType.LOOKAHEAD8);
                 }
             }
             for (char letter : LUTTools.lutLetters) {
