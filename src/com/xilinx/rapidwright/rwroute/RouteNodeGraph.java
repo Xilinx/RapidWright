@@ -722,6 +722,11 @@ public class RouteNodeGraph {
             }
         }
 
+        if (wireIndicesLeadingToLaguna == null && Utils.isLaguna(child.getTile().getTileTypeEnum())) {
+            // Exclude Laguna nodes on single SLR devices
+            return true;
+        }
+
         if (childRnode != null && childRnode.isArcLocked() && childRnode.getPrev() != parent) {
             // Downhill is a locked node that doesn't point back to this node, skip
             return true;
@@ -878,22 +883,23 @@ public class RouteNodeGraph {
                         assert(parentRnode.getIntentCode() == IntentCode.NODE_PINFEED);
 
                         TileTypeEnum childTileType = childRnode.getTile().getTileTypeEnum();
-                        if (Utils.isCLB(childTileType)) {
-                            // IMUX_[EW]\\d+ -> CLE_CLE_L_SITE_0_[A-H]_O
-                            assert(childRnode.getIntentCode() == IntentCode.NODE_CLE_OUTPUT);
-                        } else if (Utils.isLaguna(childTileType)) {
+                        if (Utils.isLaguna(childTileType)) {
+                            assert(parentType.isLocalLeadingToLaguna());
                             // IMUX_[EW]\\d+ -> LAG_MUX_ATOM_\\d+_TXOUT
                             RouteNode sinkRnode = connection.getSinkRnode();
                             if (!connection.isCrossSLR() ||
                                 childRnode.getSLRIndex(this) == sinkRnode.getSLRIndex(this)) {
                                 assert(lutRoutethru ||
-                                        // Inadvertently approaching an SLL because we are Y +/- 1 from sink
+                                        // Inadvertently approaching an SLL because we are approaching the sink tile
                                         (childRnode.getEndTileXCoordinate() == sinkRnode.getBeginTileXCoordinate() &&
-                                         Math.abs(childRnode.getEndTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1));
+                                         childRnode.getEndTileYCoordinate() == sinkRnode.getBeginTileYCoordinate()));
                                 return false;
                             }
                         } else {
-                            assert(childTileType == TileTypeEnum.INT);
+                            assert(lutRoutethru);
+                            assert(Utils.isCLB(childTileType));
+                            // IMUX_[EW]\\d+ -> CLE_CLE_L_SITE_0_[A-H]_O
+                            assert(childRnode.getIntentCode() == IntentCode.NODE_CLE_OUTPUT);
                         }
                     } else if (parentType == RouteNodeType.SUPER_LONG_LINE && parentRnode.getPrev().getTile() == childRnode.getTile()) {
                         // UBUMP -> RXD: with an SLL being bidirectional, do not go back the way we came from
@@ -907,9 +913,12 @@ public class RouteNodeGraph {
                     throw new RuntimeException("ERROR: Unrecognized rnode type: " + type);
             }
             return true;
-        } else if (lutRoutethru) {
-            // (a) considering LUT routethrus
-            assert(childRnode.getTile().getTileTypeEnum() == TileTypeEnum.INT);
+        }
+
+        assert(childRnode.getTile().getTileTypeEnum() == TileTypeEnum.INT);
+
+        if (lutRoutethru && !type.leadsToLaguna()) {
+            // (a) considering LUT routethrus (that do not lead to a Laguna)
             return true;
         }
 
@@ -1042,9 +1051,9 @@ public class RouteNodeGraph {
             throw new RuntimeException("ERROR: Unhandled IntentCode: " + childIntentCode);
         }
 
-        // (e) when in same X as the sink tile, but Y +/- 1
+        // (e) when approaching the sink tile
         return childX == sinkRnode.getBeginTileXCoordinate() &&
-               Math.abs(childRnode.getEndTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1;
+               childRnode.getEndTileYCoordinate() == sinkRnode.getBeginTileYCoordinate();
     }
 
     protected boolean allowRoutethru(Node head, Node tail) {
