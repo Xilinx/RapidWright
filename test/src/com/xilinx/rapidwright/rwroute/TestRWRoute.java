@@ -419,8 +419,8 @@ public class TestRWRoute {
             "SLICE_X53Y241,SLICE_X69Y300,200",
             "SLICE_X53Y358,SLICE_X69Y299,200",
             // Far
-            "SLICE_X9Y240,SLICE_X9Y359,100",    // On Laguna
-            "SLICE_X9Y359,SLICE_X9Y240,100",
+            "SLICE_X9Y240,SLICE_X9Y359,200",    // On Laguna
+            "SLICE_X9Y359,SLICE_X9Y240,200",
             "SLICE_X162Y240,SLICE_X162Y430,100",
 
             "SLICE_X162Y430,SLICE_X162Y240,200",
