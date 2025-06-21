@@ -915,7 +915,12 @@ public class RouteNodeGraph {
             return true;
         }
 
-        assert(childRnode.getTile().getTileTypeEnum() == TileTypeEnum.INT);
+        TileTypeEnum childTileType = childRnode.getTile().getTileTypeEnum();
+        assert(childTileType == TileTypeEnum.INT ||
+               isVersal && EnumSet.of(TileTypeEnum.INTF_LOCF_TR_TILE, TileTypeEnum.INTF_LOCF_BR_TILE, TileTypeEnum.INTF_ROCF_TR_TILE, TileTypeEnum.INTF_ROCF_BR_TILE,
+                                      TileTypeEnum.INTF_LOCF_TL_TILE, TileTypeEnum.INTF_LOCF_BL_TILE, TileTypeEnum.INTF_ROCF_TL_TILE, TileTypeEnum.INTF_ROCF_BL_TILE,
+                                      TileTypeEnum.CLE_BC_CORE)
+                       .contains(childTileType));
 
         if (lutRoutethru && !type.leadsToLaguna()) {
             // (a) considering LUT routethrus (that do not lead to a Laguna)
