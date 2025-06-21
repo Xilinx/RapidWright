@@ -43,7 +43,7 @@ import org.jetbrains.annotations.NotNull;
  *
  * Created on: Sep 12, 2017
  */
-public class EDIFHierPortInst {
+public class EDIFHierPortInst implements Comparable<EDIFHierPortInst> {
 
     @NotNull
     private final EDIFHierCellInst hierarchicalInst;
@@ -69,6 +69,15 @@ public class EDIFHierPortInst {
     public String getHierarchicalInstName() {
         return hierarchicalInst.getFullHierarchicalInstName();
 
+    }
+
+    /**
+     * Gets the full instance, including the instance of the EDIFPortInst.
+     * 
+     * @return
+     */
+    public EDIFHierCellInst getFullHierarchicalInst() {
+        return hierarchicalInst.getChild(portInst.getCellInst());
     }
 
     /**
@@ -286,5 +295,10 @@ public class EDIFHierPortInst {
 
     public EDIFCell getParentCell() {
         return hierarchicalInst.getCellType();
+    }
+
+    @Override
+    public int compareTo(EDIFHierPortInst o) {
+        return this.toString().compareTo(o.toString());
     }
 }

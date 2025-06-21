@@ -22,6 +22,19 @@
 
 package com.xilinx.rapidwright.eco;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Set;
+
+import org.jetbrains.annotations.NotNull;
+
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
@@ -29,6 +42,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
@@ -39,18 +53,11 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.placer.blockplacer.Point;
 import com.xilinx.rapidwright.util.Pair;
-import org.jetbrains.annotations.NotNull;
-
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Set;
 
 /**
  * Class for aiding with ECO placement activities.
@@ -142,6 +149,20 @@ public class ECOPlacementHelper {
      * @return Unused flop BEL.
      */
     public BEL getUnusedFlop(SiteInst siteInst, Net clk) {
+        return getUnusedFlop(siteInst, clk, null, null);
+    }
+
+    /**
+     * Given a SiteInst and a clock net, find an unused flop BEL that can host a new cell.
+     * This flop BEL will have its bypass pin ([A-H](X|_I)) available.
+     *
+     * @param siteInst SiteInst object to search inside.
+     * @param clk      Desired clock net for flop cell.
+     * @param ce       Desired clock enable net for flop cell (null for VCC).
+     * @param rst      Desired reset net for flop cell (null for GND).
+     * @return Unused flop BEL.
+     */
+    public BEL getUnusedFlop(SiteInst siteInst, Net clk, Net ce, Net rst) {
         Site site = siteInst.getSite();
         Set<Site> flopLessSites = flopLessSitesByClk.get(clk);
         if (flopLessSites != null && flopLessSites.contains(site)) {
@@ -183,15 +204,22 @@ public class ECOPlacementHelper {
                     }
                 }
 
-                // Check that CE and SR are VCC and GND respectively
+                // Check that CE and SR are already connected to the
+                // required nets (if null, to VCC and GND respectively)
                 Pair<String, String> p = belTypeSitePinNameMapping.get(belFlop);
                 Net existingCE = siteInst.getNetFromSiteWire(p.getFirst());
-                if (existingCE != null && existingCE.getType() != NetType.VCC) {
-                    continue;
+                if (existingCE != null) {
+                    if ((ce == null && existingCE.getType() != NetType.VCC) ||
+                            (ce != null && !ce.equals(existingCE))) {
+                        continue;
+                    }
                 }
                 Net existingSR = siteInst.getNetFromSiteWire(p.getSecond());
-                if (existingSR != null && existingSR.getType() != NetType.GND) {
-                    continue;
+                if (existingSR != null) {
+                    if ((rst == null && existingSR.getType() != NetType.GND) ||
+                            (rst != null && !rst.equals(existingSR))) {
+                        continue;
+                    }
                 }
 
                 // Compatible BEL found! Return.
@@ -240,6 +268,46 @@ public class ECOPlacementHelper {
         return null;
     }
 
+    public static Site getCentroidOfPoints(Device device, List<Point> points, Set<SiteTypeEnum> targetSiteTypes) {
+        if (points.size() == 0) return null;
+        Point centroid = KMeans.calculateCentroid(points);
+        Tile centroidTile = device.getTile(centroid.y, centroid.x);
+    
+        // We need to snap to the closest site with the site type of interest from the
+        // centroid tile
+        Site closest = null;
+        int closetDist = Integer.MAX_VALUE;
+        int searchGridDim = 0;
+        while (closest == null) {
+            searchGridDim++;
+            for (int row = -searchGridDim; row < searchGridDim; row++) {
+                for (int col = -searchGridDim; col < searchGridDim; col++) {
+                    Tile neighbor = centroidTile.getTileNeighbor(col, row);
+                    if (neighbor != null) {
+                        for (Site s : neighbor.getSites()) {
+                            if (targetSiteTypes.contains(s.getSiteTypeEnum())) {
+                                int manDist = centroidTile.getManhattanDistance(neighbor);
+                                if (manDist < closetDist) {
+                                    closest = s;
+                                    closetDist = manDist;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return closest;        
+    }
+
+    public static Site getCentroidOfNet(Net net, Set<SiteTypeEnum> targetSiteTypes) {
+        List<Point> points = new ArrayList<>();
+        for (SitePinInst i : net.getPins()) {
+            points.add(new Point(i.getTile().getColumn(), i.getTile().getRow()));
+        }
+        return ECOPlacementHelper.getCentroidOfPoints(net.getSource().getTile().getDevice(), points, targetSiteTypes);
+    }
+
     /**
      * Given a home Site, return an Iterable that yields the neighbouring sites encountered
      * when walking outwards in a spiral fashion. To be used in conjunction with
@@ -248,6 +316,21 @@ public class ECOPlacementHelper {
      * @return Iterable<Site> of neighbouring sites.
      */
     public static Iterable<Site> spiralOutFrom(Site site) {
+        return spiralOutFrom(site, null);
+    }
+
+    /**
+     * Given a home Site, return an Iterable that yields the neighbouring sites
+     * encountered when walking outwards in a spiral fashion. To be used in
+     * conjunction with {@link #getUnusedLUT(SiteInst)} and
+     * {@link #getUnusedFlop(SiteInst, Net)}.
+     * 
+     * @param site   Originating Site.
+     * @param pblock Also check to ensure the proposed sites are inside the provided
+     *               pblock.
+     * @return Iterable<Site> of neighbouring sites.
+     */
+    public static Iterable<Site> spiralOutFrom(Site site, PBlock pblock) {
         return new Iterable<Site>() {
             @NotNull
             @Override
@@ -295,8 +378,13 @@ public class ECOPlacementHelper {
                                 assert(nextSite == null);
                                 break;
                             }
-                        } while ((nextSite = home.getNeighborSite(dx, dy)) == null);
+                            nextSite = home.getNeighborSite(dx, dy);
+                        } while (nextSite == null || !insidePblock(nextSite));
                         return retSite;
+                    }
+
+                    private boolean insidePblock(Site nextSite) {
+                        return pblock == null ? true : pblock.containsTile(nextSite.getTile());
                     }
                 };
             }

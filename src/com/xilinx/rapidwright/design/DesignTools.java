@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -41,6 +41,7 @@ import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -1823,8 +1824,8 @@ public class DesignTools {
             SiteInst si = c.getSiteInst();
 
             // Check for VCC on A6 and remove if needed
-            if (c.getBEL().isLUT() && c.getBELName().endsWith("5LUT")) {
-                SitePinInst vcc = c.getSiteInst().getSitePinInst(c.getBELName().charAt(0) + "6");
+            if (bel != null && bel.isLUT() && bel.getName().endsWith("5LUT")) {
+                SitePinInst vcc = si.getSitePinInst(bel.getName().charAt(0) + "6");
                 if (vcc != null && vcc.getNet().getName().equals(Net.VCC_NET)) {
                     boolean hasOtherSink = false;
                     for (BELPin otherSink : si.getSiteWirePins(vcc.getBELPin().getSiteWireIndex())) {
@@ -1850,11 +1851,12 @@ public class DesignTools {
                     pinsToRemove.computeIfAbsent(pin.getNet(), $ -> new HashSet<>()).add(pin);
                 }
             }
-            touched.add(c.getSiteInst());
+            if (si != null) {
+                touched.add(si);
+            }
 
             c.unplace();
             d.removeCell(c.getName());
-            si.removeCell(bel);
         }
 
         t.stop().start("cleanup t-prims");
@@ -2279,7 +2281,7 @@ public class DesignTools {
                             parentEhn = netlist.getParentNet(net.getLogicalHierNet());
                         }
                         EDIFHierNet parentSiteWireEhn = netlist.getParentNet(siteWireNet.getLogicalHierNet());
-                        if (!parentSiteWireEhn.equals(parentEhn)) {
+                        if (parentSiteWireEhn != null && !parentSiteWireEhn.equals(parentEhn)) {
                             // Site wire net is not an alias of the net
                             throw new RuntimeException("ERROR: Net on " + si.getSiteName() + "/" + belPin +
                                     "'" + siteWireNet.getName() + "' is not an alias of " +
@@ -2347,7 +2349,7 @@ public class DesignTools {
         Set<String> siteWires = new HashSet<>(inst.getSiteWiresFromNet(net));
         if (net.isGNDNet()) {
             // Since GND sitewires may be inverted for easier routing, also accept VCC sitewires
-            siteWires.addAll(inst.getSiteWiresFromNet(net.getDesign().getVccNet()));
+            siteWires.addAll(inst.getSiteWiresFromNet(cell.getSiteInst().getDesign().getVccNet()));
         }
         Queue<BELPin> queue = new LinkedList<>();
         queue.add(cell.getBEL().getPin(belPinName));
@@ -4457,6 +4459,21 @@ public class DesignTools {
      * @return Number of unrouted sink pins on net.
      */
     public static int updatePinsIsRouted(Net net) {
+        return updatePinsIsRouted(net, Collections.newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    /**
+     * Update the SitePinInst.isRouted() value of all pins on the given
+     * Net. A sink pin will be marked as being routed if it is reachable from the
+     * Net's source pins (or in the case of static nets, also from nodes
+     * tied to GND or VCC) when following the Net's PIPs.
+     * A source pin will be marked as being routed if it drives at least one PIP.
+     * @param net Net on which pins are to be updated.
+     * @param multiplyDrivenNodesVisited Set to be used to track multiply-driven nodes.
+     * @return Number of unrouted sink pins on net.
+     */
+    public static int updatePinsIsRouted(Net net,
+                                         Set<NetTools.NodeTree> multiplyDrivenNodesVisited) {
         int numUnroutedSinkPins = 0;
         for (SitePinInst spi : net.getPins()) {
             spi.setRouted(false);
@@ -4481,6 +4498,7 @@ public class DesignTools {
                 continue;
             }
             queue.add(node);
+            assert(!node.multiplyDriven);
         }
         while (!queue.isEmpty()) {
             NetTools.NodeTree node = queue.poll();
@@ -4492,7 +4510,13 @@ public class DesignTools {
                     numUnroutedSinkPins--;
                 }
             }
-            queue.addAll(node.fanouts);
+            for (NetTools.NodeTree fanout : node.fanouts) {
+                if (fanout.multiplyDriven && !multiplyDrivenNodesVisited.add(fanout)) {
+                    // fanout is a multiply-driven node that has already been visited, skip
+                    continue;
+                }
+                queue.add(fanout);
+            }
         }
         return numUnroutedSinkPins;
     }
@@ -4505,11 +4529,13 @@ public class DesignTools {
      */
     public static int updatePinsIsRouted(Design design) {
         int totalUnroutedSinkPins = 0;
+        Set<NetTools.NodeTree> multiplyDrivenNodesVisited = Collections.newSetFromMap(new IdentityHashMap<>());
         for (Net net : design.getNets()) {
-            int numUnroutedSinkPins = updatePinsIsRouted(net);
+            int numUnroutedSinkPins = updatePinsIsRouted(net, multiplyDrivenNodesVisited);
             if (!DesignTools.isNetDrivenByHierPort(net)) {
                 totalUnroutedSinkPins += numUnroutedSinkPins;
             }
+            multiplyDrivenNodesVisited.clear();
         }
         return totalUnroutedSinkPins;
     }

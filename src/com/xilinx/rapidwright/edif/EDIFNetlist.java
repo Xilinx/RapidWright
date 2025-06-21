@@ -64,6 +64,8 @@ import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IOStandard;
+import com.xilinx.rapidwright.device.Part;
+import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
@@ -1768,6 +1770,22 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
+     * Attempts to expand the macro primitives in the design if the part can be
+     * identified.
+     * 
+     * @return True if the part was found and macro unisims were expanded. False
+     *         otherwise.
+     */
+    public boolean expandMacroUnisims() {
+        Part part = PartNameTools.getPart(EDIFTools.getPartName(this));
+        if (part == null) {
+            return false;
+        }
+        expandMacroUnisims(part.getSeries());
+        return true;
+    }
+    
+    /**
      * Expands macro primitives into a native-compatible implementation.
      * In Vivado, some non-native unisims are expanded or transformed
      * into one or more native unisims to target the architecture while
@@ -1968,6 +1986,8 @@ public class EDIFNetlist extends EDIFName {
         for (String name : primsToRemoveOnCollapse) {
             prims.removeCell(name);
         }
+        // Invalidate parent net map due to macro collapses
+        resetParentNetMap();
     }
 
     /**

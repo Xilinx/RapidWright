@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2018-2022, Xilinx, Inc.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -26,6 +26,7 @@ package com.xilinx.rapidwright.design.tools;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -55,6 +56,7 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 
 
@@ -203,11 +205,35 @@ public class LUTTools {
      */
     public static int getLUTSize(EDIFCellInst c) {
         if (!isCellALUT(c)) return 0;
-        return Character.getNumericValue(c.getCellType().getName().charAt(3));
+        String cellType = c.getCellType().getName();
+        return cellType.startsWith("LUTCY") ? 5 : Character.getNumericValue(cellType.charAt(3));
+    }
+
+    /**
+     * If the provided cell instance is a LUT, it will return the LUT input count.
+     * If it is not a LUT, it will return 0.
+     * 
+     * @param c The LUT cell
+     * @return The number of LUT inputs or 0 if cell is not a LUT.
+     */
+    public static int getLUTSize(EDIFHierCellInst c) {
+        return getLUTSize(c.getInst());
+    }
+
+    /**
+     * Given a LUT BEL, get the size of the LUT (generally 5 or 6). If the BEL is
+     * not a LUT type, it returns -1.
+     * 
+     * @param bel The BEL to query
+     * @return The size of the LUT, or -1 if the BEL is not a LUT.
+     */
+    public static int getLUTSize(BEL bel) {
+        return bel.isLUT() ? (bel.getName().charAt(1) - '0') : -1;
     }
 
     /**
      * Extracts the length value from the INIT String (16, in 16'hA8A2)
+     * 
      * @param init The init string.
      * @return The init length.
      */
@@ -408,11 +434,23 @@ public class LUTTools {
         return getLUTEquation(init);
     }
 
+    /**
+     * Reads the init string in this LUT and creates an equivalent (non-optimal)
+     * equation.
+     * 
+     * @param i The LUT instance
+     * @return The equation following LUT equation syntax or null if cell is not
+     *         configured.
+     */
+    public static String getLUTEquation(EDIFHierCellInst i) {
+        return getLUTEquation(i.getInst());
+    }
 
     /**
-     * Creates a (dumb, non-reduced) boolean logic equation compatible
-     * with Vivado's LUT Equation Editor from an INIT string.
-     * TODO - Enhance with a logic minimization method such as Quine-McCluskey method.
+     * Creates a (dumb, non-reduced) boolean logic equation compatible with Vivado's
+     * LUT Equation Editor from an INIT string. TODO - Enhance with a logic
+     * minimization method such as Quine-McCluskey method.
+     * 
      * @param init The existing INIT string configuring a LUT.
      * @return A Vivado LUT Equation Editor compatible equation.
      */
@@ -470,6 +508,33 @@ public class LUTTools {
             }
 
         }
+    }
+
+    /**
+     * Given a placed LUT cell, this method will find and return the fastest unmapped
+     * physical LUT input pin available for use, where unmapped means that it does
+     * not already participate in any pin mappings on the given LUT cell or its
+     * companion LUT cell if one exists.
+     *
+     * @param lut The current LUT to query for a free physical pin.
+     * @return The fastest available unmapped LUT input pin compatible with the current
+     *         placement.
+     */
+    public static String getUnmappedPhysicalLUTInputPin(Cell lut) {
+        if (isCellALUT(lut) && lut.isPlaced()) {
+            Cell oLUT = LUTTools.getCompanionLUTCell(lut);
+            Map<String, String> pinMap = oLUT == null ? Collections.emptyMap() : oLUT.getPinMappingsP2L();
+            int start = getLUTSize(lut.getBEL());
+            start = start == 6 && oLUT != null ? 5 : start;
+            // Search starting at the fastest LUT inputs first
+            for (int i = start; i >= 1; i--) {
+                String physName = "A" + i;
+                if (lut.getLogicalPinMapping(physName) == null && pinMap.get(physName) == null) {
+                    return physName;
+                }
+            }
+        }
+        return null;
     }
 
     /**

@@ -33,6 +33,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -45,8 +46,8 @@ public class TestEDIFTools {
     public static final String TEST_SRC = "base_mb_i/microblaze_0/U0/"
             + "MicroBlaze_Core_I/Performance.Core/Data_Flow_I/Data_Flow_Logic_I/Gen_Bits[22]."
             + "MEM_EX_Result_Inst/Using_FPGA.Native/Q";
-    public static final String TEST_SNK = "u_ila_0/inst/PROBE_PIPE."
-            + "shift_probes_reg[0][7]/D";
+    public static final String TEST_SNK = "u_ila_0/inst/PROBE_PIPE.shift_probes_reg[0][7]/D";
+    public static final String TEST_SNK2 = "u_ila_0/inst/PROBE_PIPE.shift_probes_reg[0][8]/D";
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
@@ -89,6 +90,35 @@ public class TestEDIFTools {
             }
         }
         Assertions.assertTrue(containsSnk);
+
+        // Now check if it will reuse ports already created
+
+        // Disconnect sink in anticipation of connecting to another net
+        EDIFHierPortInst snkPortInst2 = netlist.getHierPortInstFromName(TEST_SNK2);
+        snkPortInst2.getNet().removePortInst(snkPortInst2.getPortInst());
+
+        // Count number of ports prior to connection to ensure no additional ports were
+        // created
+        List<Integer> portCounts = new ArrayList<>();
+        List<EDIFCellInst> insts = snkPortInst2.getFullHierarchicalInst().getFullHierarchy();
+        for (EDIFCellInst i : insts) {
+            portCounts.add(i.getCellPorts().size());
+        }
+
+        if (netToPin) {
+            EDIFTools.connectPortInstsThruHier(srcPortInst.getHierarchicalNet(), snkPortInst2,
+                    UNIQUE_SUFFIX);
+        } else {
+            EDIFTools.connectPortInstsThruHier(srcPortInst, snkPortInst2, UNIQUE_SUFFIX);
+        }
+
+        // Ensure no additional ports were created
+        for (int i = 0; i < insts.size(); i++) {
+            EDIFCellInst inst = insts.get(i);
+            Assertions.assertEquals(portCounts.get(i), inst.getCellPorts().size());
+        }
+
+        Assertions.assertEquals(snkPortInst.getNet(), snkPortInst2.getNet());
     }
 
     @Test

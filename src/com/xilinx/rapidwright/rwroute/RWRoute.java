@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -422,6 +422,11 @@ public class RWRoute {
      * @return NodeStatus result.
      */
     protected NodeStatus getGlobalRoutingNodeStatus(Net net, Node node) {
+        if (!routingGraph.isAllowedTile(node)) {
+            // Outside of PBlock
+            return NodeStatus.UNAVAILABLE;
+        }
+
         Net preservedNet = routingGraph.getPreservedNet(node);
         if (preservedNet == net) {
             return NodeStatus.INUSE;
@@ -532,7 +537,13 @@ public class RWRoute {
                 // already routed to and preserved at those uninferrable SitePinInst-s -- and remove them from being a
                 // static net sink
                 pins.removeIf(spi -> {
-                    Net preservedNet = routingGraph.getPreservedNet(spi.getConnectedNode());
+                    Node node = spi.getConnectedNode();
+                    if (!routingGraph.isAllowedTile(node)) {
+                        // If sink is not in an allowed tile (e.g. outside routing PBlock) drop it silently
+                        return true;
+                    }
+
+                    Net preservedNet = routingGraph.getPreservedNet(node);
                     if (preservedNet == null) {
                         // This sink is not preserved by any net, allow
                         return false;
@@ -1225,28 +1236,22 @@ public class RWRoute {
             if (sinkRnode == rnodes.get(0)) {
                 List<Node> switchBoxToSink = RouterHelper.findPathBetweenNodes(sinkRnode, connection.getSink().getConnectedNode());
                 if (switchBoxToSink.size() >= 2) {
-                    for (int i = 0; i < switchBoxToSink.size() - 1; i++) {
-                        nodes.add(switchBoxToSink.get(i));
-                    }
+                    nodes.addAll(switchBoxToSink.subList(0, switchBoxToSink.size() - 1));
                 }
             } else {
-                // Routing must go to an alternate sink
-                assert(connection.hasAltSinks());
+                // sinkRnode could be an alternate sink
+                assert(isValidSink(connection, sinkRnode));
 
                 // Assume that it doesn't need unprojecting back to the sink pin
                 // since the sink node is a site pin
                 assert(rnodes.get(0).getSitePin() != null);
             }
 
-            for (RouteNode rnode : rnodes) {
-                nodes.add(rnode);
-            }
+            nodes.addAll(rnodes);
 
             List<Node> sourceToSwitchBox = RouterHelper.findPathBetweenNodes(connection.getSource().getConnectedNode(), connection.getSourceRnode());
             if (sourceToSwitchBox.size() >= 2) {
-                for (int i = 1; i <= sourceToSwitchBox.size() - 1; i++) {
-                    nodes.add(sourceToSwitchBox.get(i));
-                }
+                nodes.addAll(sourceToSwitchBox.subList(1, sourceToSwitchBox.size()));
             }
         }
     }
@@ -1510,8 +1515,9 @@ public class RWRoute {
                 rnodes = rnodes.subList(1, rnodes.size() - 1);
             }
         } else {
-            // Sink is not exclusive
-            assert(connection.getAltSinkRnodes().contains(sinkRnode));
+            // sinkRnode could be an alternate sink (in which case it is not exclusive)
+            assert(isValidSink(connection, sinkRnode));
+            // Rip up all used nodes
         }
 
         NetWrapper netWrapper = connection.getNetWrapper();
@@ -1541,8 +1547,9 @@ public class RWRoute {
                 rnodes = rnodes.subList(1, rnodes.size() - 1);
             }
         } else {
-            // Sink is not exclusive
-            assert(connection.getAltSinkRnodes().contains(sinkRnode));
+            // sinkRnode could be an alternate sink (in which case it is not exclusive)
+            assert(isValidSink(connection, sinkRnode));
+            // Increment all used nodes
         }
 
         NetWrapper netWrapper = connection.getNetWrapper();
@@ -1569,6 +1576,12 @@ public class RWRoute {
             assert(net.getType() == NetType.WIRE && !NetTools.isGlobalClock(net));
 
             Set<PIP> newPIPs = new HashSet<>();
+            // Start by carrying over all fixed PIPs (even those that didn't get used)
+            for (PIP pip : net.getPIPs()) {
+                if (pip.isPIPFixed()) {
+                    newPIPs.add(pip);
+                }
+            }
             for (Connection connection:netWrapper.getConnections()) {
                 List<PIP> pips = RouterHelper.getConnectionPIPs(connection);
                 newPIPs.addAll(pips);
@@ -1794,6 +1807,10 @@ public class RWRoute {
         }
     }
 
+    protected boolean isValidSink(Connection connection, RouteNode rnode) {
+        return connection.getSinkRnode() == rnode || connection.getAltSinkRnodes().contains(rnode);
+    }
+
     /**
      * Traces back for a connection from its sink rnode to its source, in order to build and store the routing path.
      * @param connection: The connection that is being routed.
@@ -1801,9 +1818,7 @@ public class RWRoute {
      * @return True if backtracking successful.
      */
     protected boolean saveRouting(Connection connection, RouteNode rnode) {
-        RouteNode sinkRnode = connection.getSinkRnode();
-        List<RouteNode> altSinkRnodes = connection.getAltSinkRnodes();
-        if (rnode != sinkRnode && !altSinkRnodes.contains(rnode)) {
+        if (!isValidSink(connection, rnode)) {
             List<RouteNode> prevRouting = connection.getRnodes();
             // Check that this is the sink path marked by prepareRouteConnection()
             if (!connection.isRouted() || prevRouting.isEmpty() || !rnode.isTarget()) {
@@ -1820,7 +1835,7 @@ public class RWRoute {
 
         List<RouteNode> rnodes = connection.getRnodes();
         RouteNode sourceRnode = rnodes.get(rnodes.size() - 1);
-        // Only succesfully routed if backtracked to this connection's source node
+        // Only successfully routed if backtracked to this connection's source node
         return sourceRnode == connection.getSourceRnode();
     }
 
@@ -1907,6 +1922,7 @@ public class RWRoute {
                     case EXCLUSIVE_SINK_BOTH:
                     case EXCLUSIVE_SINK_EAST:
                     case EXCLUSIVE_SINK_WEST:
+                    case EXCLUSIVE_SINK_NON_LOCAL:
                         assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_EAST || rnode.getType() == RouteNodeType.LOCAL_EAST);
                         assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_WEST || rnode.getType() == RouteNodeType.LOCAL_WEST);
                         assert(childRNode.getType() != RouteNodeType.EXCLUSIVE_SINK_BOTH || rnode.getType() == RouteNodeType.LOCAL_BOTH ||
@@ -2114,8 +2130,9 @@ public class RWRoute {
 
         // Adds the source rnode to the queue
         RouteNode sourceRnode = connection.getSourceRnode();
-        assert(sourceRnode.getPrev() == null);
         push(state, sourceRnode, 0, 0);
+
+        assert(routingGraph.isAllowedTile(connection.getSinkRnode()));
     }
 
     /**
