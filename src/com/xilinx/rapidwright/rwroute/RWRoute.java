@@ -2075,7 +2075,7 @@ public class RWRoute {
             assert(!childRnode.getType().isLocalLeadingToLaguna() || (
                     (connection.isCrossSLRnorth() && childRnode.getType().leadsToNorthboundLaguna()) ||
                     (connection.isCrossSLRsouth() && childRnode.getType().leadsToSouthboundLaguna()) ||
-                    (deltaX == 0 && deltaY <= 1)
+                    (deltaX == 0 && deltaY == 0)
             ));
 
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
