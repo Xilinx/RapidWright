@@ -867,28 +867,33 @@ public class RouteNodeGraph {
         assert(!childRnode.isTarget());
 
         // Only consider LOCAL nodes when:
-        // (a) considering LUT routethrus
-        if (lutRoutethru) {
-            return true;
-        }
         RouteNodeType type = childRnode.getType();
         if (!type.isAnyLocal()) {
             switch (type) {
                 case NON_LOCAL:
                     RouteNode parentRnode = childRnode.getPrev();
                     RouteNodeType parentType = parentRnode.getType();
-                    if (parentType.isLocalLeadingToLaguna()) {
-                        // IMUX_[EW]\\d+ -> LAG_MUX_ATOM_\\d+_TXOUT
+                    if (parentType.isAnyLocal()) {
+                        // LOCAL -> NON_LOCAL
                         assert(parentRnode.getIntentCode() == IntentCode.NODE_PINFEED);
 
-                        RouteNode sinkRnode = connection.getSinkRnode();
-                        if (!connection.isCrossSLR() ||
+                        TileTypeEnum childTileType = childRnode.getTile().getTileTypeEnum();
+                        if (Utils.isCLB(childTileType)) {
+                            // IMUX_[EW]\\d+ -> CLE_CLE_L_SITE_0_[A-H]_O
+                            assert(childRnode.getIntentCode() == IntentCode.NODE_CLE_OUTPUT);
+                        } else if (Utils.isLaguna(childTileType)) {
+                            // IMUX_[EW]\\d+ -> LAG_MUX_ATOM_\\d+_TXOUT
+                            RouteNode sinkRnode = connection.getSinkRnode();
+                            if (!connection.isCrossSLR() ||
                                 childRnode.getSLRIndex(this) == sinkRnode.getSLRIndex(this)) {
-                            assert(lutRoutethru ||
-                                    // Inadvertently approaching an SLL because we are Y +/- 1 from sink
-                                    (childRnode.getEndTileXCoordinate() == sinkRnode.getBeginTileXCoordinate() &&
-                                            Math.abs(childRnode.getEndTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1));
-                            return false;
+                                assert(lutRoutethru ||
+                                        // Inadvertently approaching an SLL because we are Y +/- 1 from sink
+                                        (childRnode.getEndTileXCoordinate() == sinkRnode.getBeginTileXCoordinate() &&
+                                         Math.abs(childRnode.getEndTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1));
+                                return false;
+                            }
+                        } else {
+                            assert(childTileType == TileTypeEnum.INT);
                         }
                     } else if (parentType == RouteNodeType.SUPER_LONG_LINE && parentRnode.getPrev().getTile() == childRnode.getTile()) {
                         // UBUMP -> RXD: with an SLL being bidirectional, do not go back the way we came from
@@ -901,6 +906,10 @@ public class RouteNodeGraph {
                 default:
                     throw new RuntimeException("ERROR: Unrecognized rnode type: " + type);
             }
+            return true;
+        } else if (lutRoutethru) {
+            // (a) considering LUT routethrus
+            assert(childRnode.getTile().getTileTypeEnum() == TileTypeEnum.INT);
             return true;
         }
 
