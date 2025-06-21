@@ -890,9 +890,9 @@ public class RouteNodeGraph {
                             if (!connection.isCrossSLR() ||
                                 childRnode.getSLRIndex(this) == sinkRnode.getSLRIndex(this)) {
                                 assert(lutRoutethru ||
-                                        // Inadvertently approaching an SLL because we are approaching the sink tile
+                                        // Inadvertently approaching an SLL because we are Y +/- 1 to the sink tile
                                         (childRnode.getEndTileXCoordinate() == sinkRnode.getBeginTileXCoordinate() &&
-                                         childRnode.getEndTileYCoordinate() == sinkRnode.getBeginTileYCoordinate()));
+                                         Math.abs(childRnode.getEndTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1));
                                 return false;
                             }
                         } else {
@@ -1053,7 +1053,7 @@ public class RouteNodeGraph {
 
         // (e) when approaching the sink tile
         return childX == sinkRnode.getBeginTileXCoordinate() &&
-               childRnode.getEndTileYCoordinate() == sinkRnode.getBeginTileYCoordinate();
+               Math.abs(childRnode.getEndTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1;
     }
 
     protected boolean allowRoutethru(Node head, Node tail) {
