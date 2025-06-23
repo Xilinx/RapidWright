@@ -2145,19 +2145,7 @@ public class RWRoute {
             newTotalPathCost += state.estDlyWeight * (deltaX * 0.32f + deltaY * 0.16f);
         }
 
-        if (lookahead) {
-            // Pushed node must have a prev pointer, unless it is a source (with no upstream path cost)
-            assert(childRnode.getPrev() != null || newPartialPathCost == 0);
-            childRnode.setLowerBoundTotalPathCost(newTotalPathCost);
-            childRnode.setUpstreamPathCost(newPartialPathCost);
-            // Use the number-of-connections-routed-so-far as the identifier for whether a rnode
-            // has been visited by this connection before
-            childRnode.setVisited(state.sequence);
-            state.nodesPopped++;
-            exploreAndExpand(state, childRnode);
-        } else {
-            push(state, childRnode, newPartialPathCost, newTotalPathCost);
-        }
+        push(state, childRnode, newPartialPathCost, newTotalPathCost, lookahead);
     }
 
     /**
@@ -2198,7 +2186,11 @@ public class RWRoute {
      * @param newPartialPathCost The upstream path cost from childRnode to the source.
      * @param newTotalPathCost Total path cost of childRnode.
      */
-    protected void push(ConnectionState state, RouteNode childRnode, float newPartialPathCost, float newTotalPathCost) {
+    protected void push(ConnectionState state,
+                        RouteNode childRnode,
+                        float newPartialPathCost,
+                        float newTotalPathCost,
+                        boolean lookahead) {
         // Pushed node must have a prev pointer, unless it is a source (with no upstream path cost)
         assert(childRnode.getPrev() != null || newPartialPathCost == 0);
         childRnode.setLowerBoundTotalPathCost(newTotalPathCost);
@@ -2206,7 +2198,12 @@ public class RWRoute {
         // Use the number-of-connections-routed-so-far as the identifier for whether a rnode
         // has been visited by this connection before
         childRnode.setVisited(state.sequence);
-        state.queue.add(childRnode);
+        if (lookahead) {
+            state.nodesPopped++;
+            exploreAndExpand(state, childRnode);
+        } else {
+            state.queue.add(childRnode);
+        }
     }
 
     /**
@@ -2228,7 +2225,10 @@ public class RWRoute {
 
         // Adds the source rnode to the queue
         RouteNode sourceRnode = connection.getSourceRnode();
-        push(state, sourceRnode, 0, 0);
+        float newPartialPathCost = 0;
+        float newTotalPathCost = 0;
+        boolean lookahead = false;
+        push(state, sourceRnode, newPartialPathCost, newTotalPathCost, lookahead);
 
         assert(routingGraph.isAllowedTile(connection.getSinkRnode()));
     }
