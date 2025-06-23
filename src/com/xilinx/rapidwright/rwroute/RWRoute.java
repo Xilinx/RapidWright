@@ -2139,9 +2139,8 @@ public class RWRoute {
             }
         }
 
-        int distanceToSink = deltaX * 2 + deltaY;
-        float estCostToSink = state.estWlWeight * distanceToSink / sharingFactor;
-        float newTotalPathCost = newPartialPathCost + estCostToSink;
+        int distanceToSink = deltaX + deltaY;
+        float newTotalPathCost = newPartialPathCost + state.estWlWeight * distanceToSink / sharingFactor;
         if (config.isTimingDriven()) {
             newTotalPathCost += state.estDlyWeight * (deltaX * 0.32f + deltaY * 0.16f);
         }
