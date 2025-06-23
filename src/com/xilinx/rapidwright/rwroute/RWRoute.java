@@ -1918,7 +1918,7 @@ public class RWRoute {
                     case LOCAL_EAST:
                     case LOCAL_WEST:
                     case LOCAL_RESERVED:
-                        if (!routingGraph.isAccessible(childRNode, connection)) {
+                        if (!routingGraph.isAccessible(childRNode, rnode, connection)) {
                             continue;
                         }
                         // Verify invariant that east/west wires stay east/west ...
@@ -1945,7 +1945,7 @@ public class RWRoute {
                         assert(!rnodeType.isAnyLocal() || rnodeType.isLocalLeadingToLaguna() ||
                                (routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED));
 
-                        if (!routingGraph.isAccessible(childRNode, connection)) {
+                        if (!routingGraph.isAccessible(childRNode, rnode, connection)) {
                             continue;
                         }
                         if (!config.isUseUTurnNodes() && childRNode.getDelay() > 10000) {

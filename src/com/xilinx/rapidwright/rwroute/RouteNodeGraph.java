@@ -868,7 +868,7 @@ public class RouteNodeGraph {
         return Math.round((float) sum / numNodes());
     }
 
-    public boolean isAccessible(RouteNode childRnode, Connection connection) {
+    public boolean isAccessible(RouteNode childRnode, RouteNode parentRnode, Connection connection) {
         assert(!childRnode.isTarget());
 
         // Only consider LOCAL nodes when:
@@ -876,7 +876,6 @@ public class RouteNodeGraph {
         if (!type.isAnyLocal()) {
             switch (type) {
                 case NON_LOCAL:
-                    RouteNode parentRnode = childRnode.getPrev();
                     RouteNodeType parentType = parentRnode.getType();
                     if (parentType.isAnyLocal()) {
                         // LOCAL -> NON_LOCAL
