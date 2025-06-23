@@ -1877,8 +1877,6 @@ public class RWRoute {
             assert((preservedNet = routingGraph.getPreservedNet(childRNode)) == null ||
                     preservedNet == connection.getNet());
 
-            childRNode.setPrev(rnode);
-
             boolean lookahead = false;
             if (childRNode.isTarget()) {
                 boolean earlyTermination;
@@ -1998,7 +1996,7 @@ public class RWRoute {
                 }
             }
 
-            evaluateCostAndPush(state, longParent, childRNode, lookahead);
+            evaluateCostAndPush(state, rnode, longParent, childRNode, lookahead);
 
             RouteNode frontRnode = queue.peek();
             if (frontRnode != null && frontRnode.isTarget() && !frontRnode.willOverUse(netWrapper)) {
@@ -2048,14 +2046,16 @@ public class RWRoute {
      * @param childRnode The child rnode in question.
      */
     protected void evaluateCostAndPush(ConnectionState state,
+                                       RouteNode rnode,
                                        boolean longParent,
                                        RouteNode childRnode,
                                        boolean lookahead) {
         final Connection connection = state.connection;
         final int countSourceUses = childRnode.countConnectionsOfUser(connection.getNetWrapper());
         final float sharingFactor = 1 + state.shareWeight * countSourceUses;
-        final RouteNode rnode = childRnode.getPrev();
-        assert(rnode != null);
+        // Set the prev pointer, as RouteNode.getEndTileYCoordinate() and
+        // RouteNode.getSLRIndex() require this
+        childRnode.setPrev(rnode);
 
         float newPartialPathCost = rnode.getUpstreamPathCost();
         newPartialPathCost += state.rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor);
