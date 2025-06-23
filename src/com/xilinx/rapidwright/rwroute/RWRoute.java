@@ -1997,9 +1997,7 @@ public class RWRoute {
             }
 
             evaluateCostAndPush(state, rnode, longParent, childRNode, lookahead);
-
-            RouteNode frontRnode = queue.peek();
-            if (frontRnode != null && frontRnode.isTarget() && !frontRnode.willOverUse(netWrapper)) {
+            if (childRNode.isTarget() && queue.size() == 1) {
                 // Target is uncongested and the only thing in the (previously cleared) queue, abandon immediately
                 break;
             }
