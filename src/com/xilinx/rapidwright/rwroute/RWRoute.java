@@ -1672,6 +1672,8 @@ public class RWRoute {
         /** Number of nodes popped during the routing of this connection */
         protected int nodesPopped;
 
+        protected boolean earlyTermination;
+
         protected ConnectionState() {
             this.queue = new PriorityQueue<>();
             this.targets = new ArrayList<>();
@@ -1694,6 +1696,7 @@ public class RWRoute {
         state.dlyWeight = connection.getCriticality() * oneMinusTimingWeight / 100f;
         state.estDlyWeight = connection.getCriticality() * timingWeight;
         state.nodesPopped = 0;
+        state.earlyTermination = false;
 
         PriorityQueue<RouteNode> queue = state.queue;
         assert(queue.isEmpty());
@@ -1879,7 +1882,6 @@ public class RWRoute {
 
             boolean lookahead = false;
             if (childRNode.isTarget()) {
-                boolean earlyTermination;
                 if (childRNode.getType().isAnyExclusiveSink()) {
                     // This sink must be exclusively reserved for this connection already
                     assert((childRNode == connection.getSinkRnode() && !connection.hasAltSinks()) ||
@@ -1889,14 +1891,14 @@ public class RWRoute {
                     assert(!childRNode.willOverUse(netWrapper));
                     assert(childRNode.countConnectionsOfUser(netWrapper) == 1 ||
                            childRNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
-                    earlyTermination = true;
+                    state.earlyTermination = true;
                 } else {
                     // Target is not an exclusive sink, only early terminate if this net will not
                     // (further) overuse this node
-                    earlyTermination = !childRNode.willOverUse(netWrapper);
+                    state.earlyTermination = !childRNode.willOverUse(netWrapper);
                 }
 
-                if (earlyTermination) {
+                if (state.earlyTermination) {
                     assert(!childRNode.isVisited(sequence));
                     nodesPushed.addAndGet(queue.size());
                     queue.clear();
@@ -1997,7 +1999,8 @@ public class RWRoute {
             }
 
             evaluateCostAndPush(state, rnode, longParent, childRNode, lookahead);
-            if (childRNode.isTarget() && queue.size() == 1) {
+            if (state.earlyTermination) {
+                assert(queue.size() == 1 && queue.peek().isTarget() && !queue.peek().willOverUse(netWrapper));
                 // Target is uncongested and the only thing in the (previously cleared) queue, abandon immediately
                 break;
             }
