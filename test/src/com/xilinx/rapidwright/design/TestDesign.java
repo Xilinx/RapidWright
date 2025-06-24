@@ -27,10 +27,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 
-import com.xilinx.rapidwright.util.ReportRouteStatusResult;
-import com.xilinx.rapidwright.util.VivadoTools;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -64,6 +63,8 @@ import com.xilinx.rapidwright.util.Job;
 import com.xilinx.rapidwright.util.JobQueue;
 import com.xilinx.rapidwright.util.LocalJob;
 import com.xilinx.rapidwright.util.ParallelismTools;
+import com.xilinx.rapidwright.util.ReportRouteStatusResult;
+import com.xilinx.rapidwright.util.VivadoTools;
 import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 /**
@@ -393,6 +394,46 @@ public class TestDesign {
         Assertions.assertEquals("[IN SLICE_X32Y73.H6]", newNet.getPins().toString());
         Assertions.assertEquals("[B_O, FFMUXB1_OUT1, H6]", si.getSiteWiresFromNet(newNet).toString());
         Assertions.assertTrue(newNet.getPIPs().isEmpty());
+    }
+
+    @Test
+    public void testCreateModuleInstFromBlackBox(@TempDir Path dir) {
+        Design d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks_2024.1.dcp");
+        String ilaName = "u_ila_0";
+        Design d2 = new Design(ilaName, d.getPartName());
+        DesignTools.copyImplementation(d, d2, false, false, Collections.singletonMap(ilaName, ""));
+        d.setAutoIOBuffers(false);
+        d.setDesignOutOfContext(true);
+        Path ilaPath = dir.resolve("ila.dcp");
+        d2.writeCheckpoint(ilaPath);
+
+        String origCellName = d.getNetlist().getHierCellInstFromName(ilaName).getCellName();
+
+        DesignTools.makeBlackBox(d, ilaName);
+        d.getNetlist().removeUnusedCellsFromAllWorkLibraries();
+        // DesignTools.makeBlackBox renames to black box to "black_box0", we want to
+        // test the collision scenario so we want to rename it back to the original name
+        EDIFCell blackBoxCell = d.getNetlist().getHierCellInstFromName(ilaName).getCellType();
+        Assertions.assertEquals("black_box0", blackBoxCell.getName());
+        blackBoxCell.rename(origCellName);
+
+        Path microblazePath = dir.resolve("microblaze_bb.dcp");
+        d.writeCheckpoint(microblazePath);
+
+        Design microblazeBB = Design.readCheckpoint(microblazePath);
+        Design ila = Design.readCheckpoint(ilaPath);
+        Module m = new Module(ila);
+
+        EDIFHierCellInst bb = microblazeBB.getNetlist().getHierCellInstFromName(ilaName);
+        Assertions.assertTrue(bb.getInst().isBlackBox());
+        String bbCellName = bb.getCellName();
+        EDIFCell bbCellType = bb.getCellType();
+        Assertions.assertEquals(m.getNetlist().getTopCell().getName(), bbCellName);
+
+        ModuleInst mi = microblazeBB.createModuleInst(ilaName, m);
+
+        Assertions.assertEquals(bbCellName, mi.getCellInst().getCellName());
+        Assertions.assertNotEquals(bb.getCellName(), bbCellType.getName());
     }
 
     @ParameterizedTest
