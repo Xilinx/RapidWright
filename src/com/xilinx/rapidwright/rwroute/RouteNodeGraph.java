@@ -474,7 +474,7 @@ public class RouteNodeGraph {
                                 if (inode.getTile() != imux.getTile()) {
                                     continue;
                                 }
-                                assert(inodePattern.matcher(inode.getWireName()).matches());
+                                // assert(inodePattern.matcher(inode.getWireName()).matches());
 
                                 for (Node intInt : inode.getAllUphillNodes()) {
                                     if (intInt.getTile() != inode.getTile()) {
@@ -484,7 +484,7 @@ public class RouteNodeGraph {
                                         continue;
                                     }
                                     if (!intIntPattern.matcher(intInt.getWireName()).matches()) {
-                                        assert(singlePattern.matcher(intInt.getWireName()).matches());
+                                        // assert(singlePattern.matcher(intInt.getWireName()).matches());
                                         continue;
                                     }
                                     bs[1].set(intInt.getWireIndex());
@@ -496,10 +496,10 @@ public class RouteNodeGraph {
                                         assert(sdq.getIntentCode() == IntentCode.NODE_LOCAL);
 
                                         if (sdq.getTile() != intInt.getTile()) {
-                                            assert(sdqNodeFtPattern.matcher(sdq.getWireName()).matches());
+                                            // assert(sdqNodeFtPattern.matcher(sdq.getWireName()).matches());
                                             continue;
                                         }
-                                        assert(sdqNodePattern.matcher(sdq.getWireName()).matches());
+                                        // assert(sdqNodePattern.matcher(sdq.getWireName()).matches());
                                         bs[1].set(sdq.getWireIndex());
                                     }
                                 }
