@@ -2043,8 +2043,10 @@ public class RWRoute {
     /**
      * Evaluates the cost of a child of a rnode and pushes the child into the queue after cost evaluation.
      * @param state State from the connection that is being routed.
+     * @param rnode The parent rnode of the child in question.
      * @param longParent A boolean value to indicate if the parent is a Long node
      * @param childRnode The child rnode in question.
+     * @param lookahead Boolean for whether we should skiping pushing this child node on the queue and immediately explore it.
      */
     protected void evaluateCostAndPush(ConnectionState state,
                                        RouteNode rnode,

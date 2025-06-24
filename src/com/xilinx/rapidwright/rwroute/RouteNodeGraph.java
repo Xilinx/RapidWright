@@ -1055,7 +1055,7 @@ public class RouteNodeGraph {
             throw new RuntimeException("ERROR: Unhandled IntentCode: " + childIntentCode);
         }
 
-        // (e) when approaching the sink tile
+        // (e) when in same X as the sink tile, but Y +/- 1
         return childX == sinkRnode.getBeginTileXCoordinate() &&
                Math.abs(childRnode.getEndTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1;
     }
