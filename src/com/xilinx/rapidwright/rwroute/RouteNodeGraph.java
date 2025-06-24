@@ -402,20 +402,23 @@ public class RouteNodeGraph {
         final int slrHeight = device.getNumOfClockRegionRows() * clockRegionHeight / device.getSLRs().length;
         Arrays.fill(nextLagunaColumn, Integer.MAX_VALUE);
         Arrays.fill(prevLagunaColumn, Integer.MIN_VALUE);
-        for (int y = 0; y < lagunaTiles.length; y++) {
-            Tile[] lagunaTilesAtY = lagunaTiles[y];
-            final int lagunaTileYModSlrHeight = y % slrHeight;
-            boolean northbound = (lagunaTileYModSlrHeight >= (slrHeight - clockRegionHeight));
-            for (int x = 0; x < lagunaTilesAtY.length; x++) {
-                Tile tile = lagunaTilesAtY[x];
-                if (tile != null) {
+        for (int slr = 0; slr < device.getNumOfSLRs() - 1; slr++) {
+            for (int yModSlrHeight = slrHeight - clockRegionHeight; yModSlrHeight < slrHeight; yModSlrHeight++) {
+                int y = slr * slrHeight + yModSlrHeight;
+                // Examine the top clock region of every SLR
+                Tile[] lagunaTilesAtY = lagunaTiles[y];
+                for (int x = 0; x < lagunaTilesAtY.length; x++) {
+                    Tile tile = lagunaTilesAtY[x];
+                    if (tile == null) {
+                        continue;
+                    }
+                    assert(x == tile.getTileXCoordinate());
                     assert(y == tile.getTileYCoordinate());
-                    assert(northbound || lagunaTileYModSlrHeight < clockRegionHeight);
-                    intYToNorthboundLaguna[y] = northbound;
+
+                    intYToNorthboundLaguna[y] = true;
 
                     // For LAGUNA tiles on the first SLR boundary
                     if (nextLagunaColumn[x] == Integer.MAX_VALUE) {
-                        assert(x == tile.getTileXCoordinate());
                         // Looks like (on US+) LAGUNA tiles are always on the left side of an INT tile,
                         // with tile X coordinate one smaller
                         final int intTileXCoordinate = isUltraScalePlus ? x + 1 : x;
