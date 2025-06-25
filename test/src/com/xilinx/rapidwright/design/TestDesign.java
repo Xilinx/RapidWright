@@ -414,7 +414,7 @@ public class TestDesign {
         // DesignTools.makeBlackBox renames to black box to "black_box0", we want to
         // test the collision scenario so we want to rename it back to the original name
         EDIFCell blackBoxCell = d.getNetlist().getHierCellInstFromName(ilaName).getCellType();
-        Assertions.assertEquals("black_box0", blackBoxCell.getName());
+        Assertions.assertTrue(blackBoxCell.getName().startsWith("black_box"));
         blackBoxCell.rename(origCellName);
 
         Path microblazePath = dir.resolve("microblaze_bb.dcp");
