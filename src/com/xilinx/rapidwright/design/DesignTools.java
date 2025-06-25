@@ -3151,11 +3151,18 @@ public class DesignTools {
                         if (tmpCell.isRoutethru()) {
                             String cellName = tmpCell.getName();
                             String prefixMatch = StringTools.startsWithAny(cellName, prefixes.keySet());
+                            boolean keepPhysName = false;
                             if (prefixMatch == null) {
-                                throw new RuntimeException("ERROR: Unable to find appropriate "
-                                    + "translation name for cell: " + tmpCell);
+                                BEL bel = tmpCell.getBEL();
+                                if (bel.isIMR() || bel.isCEIMR() || bel.isSRIMR()) {
+                                    keepPhysName = true;
+                                } else {
+                                    throw new RuntimeException("ERROR: Unable to find appropriate "
+                                            + "translation name for cell: " + tmpCell);
+                                }
                             }
-                            String newCellName = getNewHierName(cellName, srcToDestNames, prefixes, prefixMatch);
+                            String newCellName = keepPhysName ? cellName
+                                    : getNewHierName(cellName, srcToDestNames, prefixes, prefixMatch);
                             Cell rtCopy = tmpCell
                                     .copyCell(newCellName, tmpCell.getEDIFHierCellInst(), dstSiteInst);
                             dstSiteInst.getCellMap().put(belName, rtCopy);
