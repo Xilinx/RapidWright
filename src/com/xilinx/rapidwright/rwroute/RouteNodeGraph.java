@@ -23,6 +23,7 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
@@ -32,12 +33,12 @@ import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.BiConsumer;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.xilinx.rapidwright.design.Design;
@@ -168,25 +169,13 @@ public class RouteNodeGraph {
         boolean isUltraScalePlus = series == Series.UltraScalePlus;
         isVersal = series == Series.Versal;
         Tile intTile;
-        final Set<IntentCode> intTileIntentCodeCareSet;
         eastWestWires = new EnumMap<>(TileTypeEnum.class);
         BitSet localWires = new BitSet();
         if (isUltraScale || isUltraScalePlus) {
             intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
             // Device.getArbitraryTileOfType() typically gives you the North-Western-most
             // tile (with minimum X, maximum Y). Analyze a tile further in than that.
-            intTile = intTile.getTileXYNeighbor(6, -12);
-            intTileIntentCodeCareSet = EnumSet.of(
-                    IntentCode.NODE_PINFEED,
-                    IntentCode.NODE_PINBOUNCE,
-                    IntentCode.NODE_LOCAL,
-
-                    IntentCode.NODE_SINGLE,
-                    IntentCode.NODE_DOUBLE,
-                    IntentCode.NODE_HQUAD,
-                    IntentCode.NODE_VQUAD,
-                    IntentCode.NODE_HLONG,
-                    IntentCode.NODE_VLONG);
+            intTile = intTile.getTileXYNeighbor(12, -16);
 
             ultraScalesLocalWires = new EnumMap<>(TileTypeEnum.class);
             ultraScalesLocalWires.put(intTile.getTileTypeEnum(), localWires);
@@ -197,125 +186,123 @@ public class RouteNodeGraph {
             Tile bcCoreTile = device.getArbitraryTileOfType(TileTypeEnum.CLE_BC_CORE);
             // Device.getArbitraryTileOfType() typically gives you the North-Western-most
             // tile (with minimum X, maximum Y). Analyze the tile just below that.
-            intTile = bcCoreTile.getTileNeighbor(2, 0);
+            intTile = bcCoreTile.getTileXYNeighbor(10, -16).getTileNeighbor(2, 0);
             assert(intTile.getTileTypeEnum() == TileTypeEnum.INT);
-            intTileIntentCodeCareSet = EnumSet.of(
-                    IntentCode.NODE_IMUX,
-                    IntentCode.NODE_PINBOUNCE,
-                    IntentCode.NODE_INODE,
-                    IntentCode.NODE_CLE_BNODE,
-                    IntentCode.NODE_CLE_CNODE);
 
             ultraScalesLocalWires = null;
         }
 
-        Pattern eastPattern;
-        Pattern westPattern;
-        if (isUltraScalePlus) {
-            eastPattern = Pattern.compile("(BOUNCE|BYPASS|IMUX|(NN|EE|SS|WW)[124])_E.+");
-            westPattern = Pattern.compile("(BOUNCE|BYPASS|IMUX|(NN|EE|SS|WW)[124])_W.+");
-        } else {
-            throw new RuntimeException();
-        }
-
+        Queue<Node> queue = new ArrayDeque<>();
         for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
-            Node baseNode = Node.getNode(intTile, wireIndex);
-            if (baseNode == null) {
+            IntentCode ic = intTile.getWireIntentCode(wireIndex);
+            String wireName = intTile.getWireName(wireIndex);
+            if (ic == IntentCode.NODE_PINFEED || ic == IntentCode.NODE_IMUX) {
+                if (wireName.startsWith("CTRL_")) {
+                    // Ignore PINFEEDs fed by GNODEs (which are accessible from both sides of the tile)
+                    continue;
+                }
+            } else if (ic == IntentCode.INTENT_DEFAULT &&
+                    (wireName.startsWith("BNODE_") || wireName.startsWith("CNODE_"))) {
+                // Versal only
+            } else if (ic != IntentCode.NODE_PINBOUNCE) {
                 continue;
             }
 
-            IntentCode baseIntentCode = baseNode.getIntentCode();
-            if (!intTileIntentCodeCareSet.contains(baseIntentCode)) {
-                continue;
+            localWires.set(wireIndex);
+
+            int eastOrWest;
+            if (wireName.startsWith("IMUX_E") || wireName.startsWith("BYPASS_E") || wireName.startsWith("BOUNCE_E") ||
+                    // Versal only
+                    wireName.startsWith("IMUX_B_E") || wireName.startsWith("BNODE_E") || wireName.startsWith("CNODE_E")) {
+                eastOrWest = 0;
+            } else {
+                assert(wireName.startsWith("IMUX_W") || wireName.startsWith("BYPASS_W") || wireName.startsWith("BOUNCE_W") ||
+                        // Versal only
+                        wireName.startsWith("IMUX_B_W") || wireName.startsWith("BNODE_W") || wireName.startsWith("CNODE_W"));
+                eastOrWest = 1;
             }
+            Node node = Node.getNode(intTile, wireIndex);
+            BitSet[] eastWestWires = this.eastWestWires.computeIfAbsent(node.getTile().getTileTypeEnum(),
+                    k -> new BitSet[]{new BitSet(), new BitSet()});
+            assert(!eastWestWires[1-eastOrWest].get(node.getWireIndex()));
+            eastWestWires[eastOrWest].set(node.getWireIndex());
+            queue.add(node);
 
-            String baseWireName = baseNode.getWireName();
-            boolean isEast = eastPattern.matcher(baseWireName).matches();
-            boolean isWest = westPattern.matcher(baseWireName).matches();
-
-            if (baseIntentCode != IntentCode.NODE_SINGLE || (!baseWireName.startsWith("EE1") && !baseWireName.startsWith("WW1"))) {
-                boolean isLong = baseIntentCode == IntentCode.NODE_HLONG || baseIntentCode == IntentCode.NODE_VLONG;
-                boolean intraTileSingle = baseIntentCode == IntentCode.NODE_SINGLE && baseWireName.startsWith("INT_INT_");
-                for (Node downhill : baseNode.getAllDownhillNodes()) {
-                    IntentCode downhillIntentCode = downhill.getIntentCode();
-                    if (downhillIntentCode == IntentCode.NODE_HLONG || downhillIntentCode == IntentCode.NODE_VLONG) {
+            while ((node = queue.poll()) != null) {
+                for (Node uphill : node.getAllUphillNodes()) {
+                    if (uphill.isTied()) {
                         continue;
                     }
-                    String downhillWireName = downhill.getWireName();
-                    isEast |= eastPattern.matcher(downhillWireName).matches();
-                    isWest |= westPattern.matcher(downhillWireName).matches();
-                    if (isLong || intraTileSingle) {
-                        for (Node downhill2 : downhill.getAllDownhillNodes()) {
-                            String downhill2WireName = downhill2.getWireName();
-                            isEast |= eastPattern.matcher(downhill2WireName).matches();
-                            isWest |= westPattern.matcher(downhill2WireName).matches();
-                        }
-                    }
-                }
-                if (intraTileSingle) {
-                    boolean isEastCopy = isEast;
-                    isEast = isWest;
-                    isWest = isEastCopy;
-                }
-            }
-
-            if (!isEast && !isWest) {
-                assert((isUltraScale || isUltraScalePlus) &&
-                        baseWireName.matches("CTRL_[EW](_B)?\\d+|INT_NODE_GLOBAL_\\d+(_INT)?_OUT[01]?"));
-            } else {
-                assert(!isEast || !isWest);
-
-                BitSet[] eastWestWires = this.eastWestWires.computeIfAbsent(baseNode.getTile().getTileTypeEnum(),
-                        k -> new BitSet[]{new BitSet(), new BitSet()});
-                if (baseIntentCode == IntentCode.NODE_CLE_BNODE || baseIntentCode == IntentCode.NODE_CLE_CNODE) {
-                    // [BC]NODEs connect to INODEs opposite to their wire name
-                    isEast = !isEast;
-                }
-                BitSet wires = eastWestWires[isEast ? 0 : 1];
-                assert(!eastWestWires[isEast ? 1 : 0].get(baseNode.getWireIndex()));
-                if (baseNode.getWireIndex() == 27)
-                    System.err.print("");
-                wires.set(baseNode.getWireIndex());
-            }
-
-            if (isUltraScale || isUltraScalePlus) {
-                if (baseIntentCode == IntentCode.NODE_LOCAL) {
-                    Tile baseTile = baseNode.getTile();
-                    assert(baseTile.getTileTypeEnum() == intTile.getTileTypeEnum());
-                    if (isUltraScalePlus) {
-                        if (baseWireName.startsWith("INT_NODE_SDQ_") || baseWireName.startsWith("SDQNODE_")) {
-                            if (baseTile != intTile) {
-                                if (baseWireName.endsWith("_FT0")) {
-                                    assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() - 1);
+                    eastWestWires = this.eastWestWires.computeIfAbsent(uphill.getTile().getTileTypeEnum(),
+                            k -> new BitSet[]{new BitSet(), new BitSet()});
+                    boolean isEast = eastWestWires[0].get(uphill.getWireIndex());
+                    boolean isWest = eastWestWires[1].get(uphill.getWireIndex());
+                    if (!isEast && !isWest) {
+                        boolean enqueue = true;
+                        switch (uphill.getIntentCode()) {
+                            case NODE_PINBOUNCE:
+                                break;
+                            case NODE_LOCAL:
+                                if (isUltraScale || isUltraScalePlus) {
+                                    assert(uphill.getTile().getTileTypeEnum() == intTile.getTileTypeEnum());
+                                    String uphillWireName = uphill.getWireName();
+                                    boolean isGnode = false;
+                                    if (uphillWireName.startsWith("INT_NODE_IMUX_") || uphillWireName.startsWith("INODE_") ||
+                                            (isGnode = uphillWireName.startsWith("INT_NODE_GLOBAL_"))) {
+                                        localWires.set(uphill.getWireIndex());
+                                        if (isGnode) {
+                                            // Do not descend past GNODEs as they are served from both sides
+                                            continue;
+                                        }
+                                    }
                                 } else {
-                                    assert(baseWireName.endsWith("_FT1"));
-                                    assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
+                                    assert(isVersal);
                                 }
-                            }
-                            continue;
+                                break;
+                            case NODE_SINGLE:
+                                if (uphill.getWireName().startsWith("EE1") || uphill.getWireName().startsWith("WW1") || uphill.getWireName().startsWith("INT_INT_")) {
+                                    // Horizontal singles will always change sides
+                                    eastWestWires[1-eastOrWest].set(uphill.getWireIndex());
+                                    continue;
+                                }
+                                break;
+                            case NODE_DOUBLE:
+                            case NODE_HQUAD:
+                            case NODE_VQUAD:
+                                break;
+                            case NODE_HLONG:
+                            case NODE_VLONG:
+                                enqueue = false;
+                                break;
+
+                            // Versal only
+                            case NODE_INODE:
+                            case NODE_SDQNODE:
+                                break;
+                            case NODE_HSINGLE:
+                                // Horizontal singles will always change sides
+                                eastWestWires[1-eastOrWest].set(uphill.getWireIndex());
+                                continue;
+                            case NODE_VSINGLE:
+                            case NODE_HDOUBLE:
+                            case NODE_VDOUBLE:
+                            case NODE_HLONG6:
+                            case NODE_HLONG10:
+                            case NODE_VLONG7:
+                            case NODE_VLONG12:
+                                break;
+
+                            default:
+                                continue;
+                        }
+                        eastWestWires[eastOrWest].set(uphill.getWireIndex());
+                        if (enqueue) {
+                            queue.add(uphill);
                         }
                     } else {
-                        assert(isUltraScale);
-                        if (baseWireName.startsWith("INT_NODE_SINGLE_DOUBLE_") || baseWireName.startsWith("SDND") ||
-                                baseWireName.startsWith("INT_NODE_QUAD_LONG") || baseWireName.startsWith("QLND")) {
-                            if (baseTile != intTile) {
-                                if (baseWireName.endsWith("_FTN")) {
-                                    assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() - 1);
-                                } else {
-                                    assert(baseWireName.endsWith("_FTS"));
-                                    assert(baseTile.getTileYCoordinate() == intTile.getTileYCoordinate() + 1);
-                                }
-                            }
-                            continue;
-                        }
+                        assert(!isEast || !isWest);
                     }
                 }
-
-                if (baseIntentCode == IntentCode.NODE_LOCAL || baseIntentCode == IntentCode.NODE_PINFEED || baseIntentCode == IntentCode.NODE_PINBOUNCE) {
-                    localWires.set(baseNode.getWireIndex());
-                }
-            } else {
-                assert(isVersal);
             }
         }
 
@@ -930,14 +917,6 @@ public class RouteNodeGraph {
                             // IMUX_[EW]\\d+ -> CLE_CLE_L_SITE_0_[A-H]_O
                             assert(childRnode.getIntentCode() == IntentCode.NODE_CLE_OUTPUT);
                         }
-                    } else if (parentType.isAnyNonLocal()) {
-                        // NON_LOCAL -> NON_LOCAL should stay on same side
-                        assert(parentType == type ||
-                               // Except for SINGLEs which will always change sides
-                               parentRnode.getIntentCode() == IntentCode.NODE_SINGLE ||
-                               // And when entering LONGs
-                               childRnode.getIntentCode() == IntentCode.NODE_HLONG || childRnode.getIntentCode() == IntentCode.NODE_VLONG
-                        );
                     } else if (parentType == RouteNodeType.SUPER_LONG_LINE && parentRnode.getPrev().getTile() == childRnode.getTile()) {
                         // UBUMP -> RXD: with an SLL being bidirectional, do not go back the way we came from
                         return false;

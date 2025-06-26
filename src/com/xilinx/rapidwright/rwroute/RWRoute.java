@@ -2178,10 +2178,17 @@ public class RWRoute {
             // enter the CLE without leaving the tile/side and coming back; same for a SDQNODE
             // which can only leave the tile
             IntentCode childIntent = childRnode.getIntentCode();
-            if (childIntent != IntentCode.NODE_SINGLE && childIntent != IntentCode.NODE_DOUBLE) {
+            if (childIntent != IntentCode.NODE_SINGLE && childIntent != IntentCode.NODE_DOUBLE &&
+                    // Versal
+                    childIntent != IntentCode.NODE_HSINGLE && childIntent != IntentCode.NODE_VSINGLE &&
+                    childIntent != IntentCode.NODE_HDOUBLE && childIntent != IntentCode.NODE_VDOUBLE) {
                 assert(childIntent == IntentCode.NODE_LOCAL ||
                         childIntent == IntentCode.NODE_HQUAD || childIntent == IntentCode.NODE_VQUAD ||
-                        childIntent == IntentCode.NODE_HLONG || childIntent == IntentCode.NODE_VLONG);
+                        childIntent == IntentCode.NODE_HLONG || childIntent == IntentCode.NODE_VLONG ||
+                        // Versal
+                        childIntent == IntentCode.NODE_SDQNODE ||
+                        childIntent == IntentCode.NODE_HLONG6 || childIntent == IntentCode.NODE_HLONG10 ||
+                        childIntent == IntentCode.NODE_VLONG7 || childIntent == IntentCode.NODE_VLONG12);
                 distanceToSink += 2;
             }
         }

@@ -259,13 +259,17 @@ public class RouteNodeInfo {
 
         BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
         if ((tileTypeEnum == TileTypeEnum.INT && eastWestWires[0].get(node.getWireIndex())) ||
-                tileTypeEnum == TileTypeEnum.CLEL_R || tileTypeEnum == TileTypeEnum.CLEM_R ||
-                tileTypeEnum == TileTypeEnum.INT_INTF_L) {
+                tileTypeEnum == TileTypeEnum.CLEL_R || tileTypeEnum == TileTypeEnum.CLEM_R || tileTypeEnum == TileTypeEnum.INT_INTF_L ||
+                tileTypeEnum == TileTypeEnum.CLE_E_CORE || tileTypeEnum == TileTypeEnum.INTF_ROCF_BR_TILE // Versal only
+        ) {
             return RouteNodeType.NON_LOCAL_EAST;
         } else {
             assert((tileTypeEnum == TileTypeEnum.INT && eastWestWires[1].get(node.getWireIndex())) ||
-                    tileTypeEnum == TileTypeEnum.CLEL_L || tileTypeEnum == TileTypeEnum.CLEM ||
-                    tileTypeEnum == TileTypeEnum.INT_INTF_R);
+                    tileTypeEnum == TileTypeEnum.CLEL_L || tileTypeEnum == TileTypeEnum.INT_INTF_R ||
+                    tileTypeEnum == TileTypeEnum.CLEM ||  tileTypeEnum == TileTypeEnum.LAG_LAG || // US+ only
+                    tileTypeEnum == TileTypeEnum.CLE_M || tileTypeEnum == TileTypeEnum.CLE_M_R || tileTypeEnum == TileTypeEnum.LAGUNA_TILE || // US only
+                    tileTypeEnum == TileTypeEnum.CLE_W_CORE || tileTypeEnum == TileTypeEnum.BLI_CLE_BOT_CORE // Versal only
+            );
             return RouteNodeType.NON_LOCAL_WEST;
         }
     }
