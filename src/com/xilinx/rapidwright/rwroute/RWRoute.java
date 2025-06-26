@@ -1940,7 +1940,8 @@ public class RWRoute {
                             lookahead = !childRNode.willOverUse(netWrapper);
                         }
                         // Fall-through
-                    case NON_LOCAL:
+                    case NON_LOCAL_EAST:
+                    case NON_LOCAL_WEST:
                         // LOCALs cannot connect to NON_LOCALs except
                         //   (a) IMUX (LOCAL_*_LEADING_TO_*_LAGUNA) -> LAG_MUX_ATOM_\\d+_TXOUT
                         //   (b) via a LUT routethru: IMUX (LOCAL*) -> CLE_CLE_*_SITE_0_[A-H]_O
@@ -2143,6 +2144,48 @@ public class RWRoute {
         }
 
         int distanceToSink = deltaX + deltaY;
+
+        // Check for arrival on a non-local to the opposite side of the INT tile as the sink
+        RouteNodeType childType = childRnode.getType();
+        RouteNodeType sinkType = sinkRnode.getType();
+        switch (sinkType) {
+            case EXCLUSIVE_SINK_EAST:
+            case LOCAL_EAST:
+                if (childType == RouteNodeType.NON_LOCAL_WEST) {
+                    distanceToSink += 1;
+                } else {
+                    // Locals on the wrong side should already have been filtered out by RoutingGraph.isAccessible()
+                    assert(childType != RouteNodeType.LOCAL_WEST);
+                }
+                break;
+            case EXCLUSIVE_SINK_WEST:
+            case LOCAL_WEST:
+                if (childType == RouteNodeType.NON_LOCAL_EAST) {
+                    distanceToSink += 1;
+                } else {
+                    // Locals on the wrong side should already have been filtered out by RoutingGraph.isAccessible()
+                    assert(childType != RouteNodeType.LOCAL_EAST);
+                }
+                break;
+            case EXCLUSIVE_SINK_BOTH:
+                break;
+            default:
+                throw new RuntimeException();
+        }
+
+        if (distanceToSink == 0 && childType.isAnyNonLocal()) {
+            // Same tile and same side as sink, but arriving on a quad/long means we cannot
+            // enter the CLE without leaving the tile/side and coming back; same for a SDQNODE
+            // which can only leave the tile
+            IntentCode childIntent = childRnode.getIntentCode();
+            if (childIntent != IntentCode.NODE_SINGLE && childIntent != IntentCode.NODE_DOUBLE) {
+                assert(childIntent == IntentCode.NODE_LOCAL ||
+                        childIntent == IntentCode.NODE_HQUAD || childIntent == IntentCode.NODE_VQUAD ||
+                        childIntent == IntentCode.NODE_HLONG || childIntent == IntentCode.NODE_VLONG);
+                distanceToSink += 2;
+            }
+        }
+
         float newTotalPathCost = newPartialPathCost + state.estWlWeight * distanceToSink / sharingFactor;
         if (config.isTimingDriven()) {
             newTotalPathCost += state.estDlyWeight * (deltaX * 0.32f + deltaY * 0.16f);

@@ -257,6 +257,16 @@ public class RouteNodeInfo {
                 break;
         }
 
-        return RouteNodeType.NON_LOCAL;
+        BitSet[] eastWestWires = routingGraph.eastWestWires.get(tileTypeEnum);
+        if ((tileTypeEnum == TileTypeEnum.INT && eastWestWires[0].get(node.getWireIndex())) ||
+                tileTypeEnum == TileTypeEnum.CLEL_R || tileTypeEnum == TileTypeEnum.CLEM_R ||
+                tileTypeEnum == TileTypeEnum.INT_INTF_L) {
+            return RouteNodeType.NON_LOCAL_EAST;
+        } else {
+            assert((tileTypeEnum == TileTypeEnum.INT && eastWestWires[1].get(node.getWireIndex())) ||
+                    tileTypeEnum == TileTypeEnum.CLEL_L || tileTypeEnum == TileTypeEnum.CLEM ||
+                    tileTypeEnum == TileTypeEnum.INT_INTF_R);
+            return RouteNodeType.NON_LOCAL_WEST;
+        }
     }
 }

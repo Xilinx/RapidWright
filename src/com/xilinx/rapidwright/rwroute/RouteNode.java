@@ -157,7 +157,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         (length == 1 && series == Series.UltraScale && getWireName().matches("SDND[NS]W_E_15_FTN")) ||
                         (length == 1 && series == Series.UltraScalePlus && getWireName().equals("WW1_E_7_FT0")));
                 // Fall-through
-            case NON_LOCAL:
+            case NON_LOCAL_EAST:
+            case NON_LOCAL_WEST:
                 short length = getLength();
                 // NOTE: IntentCode is device-dependent
                 IntentCode ic = getIntentCode();
@@ -426,7 +427,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 (RouteNodeType.isAnyLocal(this.type) && type == RouteNodeType.LOCAL_RESERVED && visited == 0) ||
                 // Or promotions to EXCLUSIVE_SINK_NON_LOCAL from NON_LOCAL (by PartialRouter.determineRoutingTargets()
                 // for the begin node of a locked path to sinks, before any routing)
-                (this.type == RouteNodeType.NON_LOCAL.ordinal() && type == RouteNodeType.EXCLUSIVE_SINK_NON_LOCAL && visited == 0)
+                (RouteNodeType.isAnyNonLocal(this.type) && type == RouteNodeType.EXCLUSIVE_SINK_NON_LOCAL && visited == 0)
         );
         this.type = (byte) type.ordinal();
     }

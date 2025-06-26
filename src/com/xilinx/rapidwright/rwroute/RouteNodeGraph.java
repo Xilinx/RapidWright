@@ -169,23 +169,27 @@ public class RouteNodeGraph {
         isVersal = series == Series.Versal;
         Tile intTile;
         final Set<IntentCode> intTileIntentCodeCareSet;
-        Pattern eastWestPattern;
         eastWestWires = new EnumMap<>(TileTypeEnum.class);
         BitSet localWires = new BitSet();
         if (isUltraScale || isUltraScalePlus) {
             intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
             // Device.getArbitraryTileOfType() typically gives you the North-Western-most
-            // tile (with minimum X, maximum Y). Analyze the tile just below that.
-            intTile = intTile.getTileXYNeighbor(0, -1);
+            // tile (with minimum X, maximum Y). Analyze a tile further in than that.
+            intTile = intTile.getTileXYNeighbor(6, -12);
             intTileIntentCodeCareSet = EnumSet.of(
                     IntentCode.NODE_PINFEED,
                     IntentCode.NODE_PINBOUNCE,
-                    IntentCode.NODE_LOCAL);
+                    IntentCode.NODE_LOCAL,
+
+                    IntentCode.NODE_SINGLE,
+                    IntentCode.NODE_DOUBLE,
+                    IntentCode.NODE_HQUAD,
+                    IntentCode.NODE_VQUAD,
+                    IntentCode.NODE_HLONG,
+                    IntentCode.NODE_VLONG);
 
             ultraScalesLocalWires = new EnumMap<>(TileTypeEnum.class);
             ultraScalesLocalWires.put(intTile.getTileTypeEnum(), localWires);
-
-            eastWestPattern = Pattern.compile("(((BOUNCE|BYPASS|IMUX|INODE(_[12])?)_(?<eastwest>[EW]))|INT_NODE_IMUX_(?<inode>\\d+)_).*");
         } else {
             assert(isVersal);
 
@@ -203,8 +207,15 @@ public class RouteNodeGraph {
                     IntentCode.NODE_CLE_CNODE);
 
             ultraScalesLocalWires = null;
+        }
 
-            eastWestPattern = Pattern.compile("(((BOUNCE|IMUX_B|[BC]NODE_OUTS)_(?<eastwest>[EW]))|INT_NODE_IMUX_ATOM_(?<inode>\\d+)_).*");
+        Pattern eastPattern;
+        Pattern westPattern;
+        if (isUltraScalePlus) {
+            eastPattern = Pattern.compile("(BOUNCE|BYPASS|IMUX|(NN|EE|SS|WW)[124])_E.+");
+            westPattern = Pattern.compile("(BOUNCE|BYPASS|IMUX|(NN|EE|SS|WW)[124])_W.+");
+        } else {
+            throw new RuntimeException();
         }
 
         for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
@@ -219,6 +230,54 @@ public class RouteNodeGraph {
             }
 
             String baseWireName = baseNode.getWireName();
+            boolean isEast = eastPattern.matcher(baseWireName).matches();
+            boolean isWest = westPattern.matcher(baseWireName).matches();
+
+            if (baseIntentCode != IntentCode.NODE_SINGLE || (!baseWireName.startsWith("EE1") && !baseWireName.startsWith("WW1"))) {
+                boolean isLong = baseIntentCode == IntentCode.NODE_HLONG || baseIntentCode == IntentCode.NODE_VLONG;
+                boolean intraTileSingle = baseIntentCode == IntentCode.NODE_SINGLE && baseWireName.startsWith("INT_INT_");
+                for (Node downhill : baseNode.getAllDownhillNodes()) {
+                    IntentCode downhillIntentCode = downhill.getIntentCode();
+                    if (downhillIntentCode == IntentCode.NODE_HLONG || downhillIntentCode == IntentCode.NODE_VLONG) {
+                        continue;
+                    }
+                    String downhillWireName = downhill.getWireName();
+                    isEast |= eastPattern.matcher(downhillWireName).matches();
+                    isWest |= westPattern.matcher(downhillWireName).matches();
+                    if (isLong || intraTileSingle) {
+                        for (Node downhill2 : downhill.getAllDownhillNodes()) {
+                            String downhill2WireName = downhill2.getWireName();
+                            isEast |= eastPattern.matcher(downhill2WireName).matches();
+                            isWest |= westPattern.matcher(downhill2WireName).matches();
+                        }
+                    }
+                }
+                if (intraTileSingle) {
+                    boolean isEastCopy = isEast;
+                    isEast = isWest;
+                    isWest = isEastCopy;
+                }
+            }
+
+            if (!isEast && !isWest) {
+                assert((isUltraScale || isUltraScalePlus) &&
+                        baseWireName.matches("CTRL_[EW](_B)?\\d+|INT_NODE_GLOBAL_\\d+(_INT)?_OUT[01]?"));
+            } else {
+                assert(!isEast || !isWest);
+
+                BitSet[] eastWestWires = this.eastWestWires.computeIfAbsent(baseNode.getTile().getTileTypeEnum(),
+                        k -> new BitSet[]{new BitSet(), new BitSet()});
+                if (baseIntentCode == IntentCode.NODE_CLE_BNODE || baseIntentCode == IntentCode.NODE_CLE_CNODE) {
+                    // [BC]NODEs connect to INODEs opposite to their wire name
+                    isEast = !isEast;
+                }
+                BitSet wires = eastWestWires[isEast ? 0 : 1];
+                assert(!eastWestWires[isEast ? 1 : 0].get(baseNode.getWireIndex()));
+                if (baseNode.getWireIndex() == 27)
+                    System.err.print("");
+                wires.set(baseNode.getWireIndex());
+            }
+
             if (isUltraScale || isUltraScalePlus) {
                 if (baseIntentCode == IntentCode.NODE_LOCAL) {
                     Tile baseTile = baseNode.getTile();
@@ -250,46 +309,13 @@ public class RouteNodeGraph {
                             continue;
                         }
                     }
-                } else {
-                    assert(baseIntentCode == IntentCode.NODE_PINFEED || baseIntentCode == IntentCode.NODE_PINBOUNCE);
                 }
-                localWires.set(baseNode.getWireIndex());
+
+                if (baseIntentCode == IntentCode.NODE_LOCAL || baseIntentCode == IntentCode.NODE_PINFEED || baseIntentCode == IntentCode.NODE_PINBOUNCE) {
+                    localWires.set(baseNode.getWireIndex());
+                }
             } else {
                 assert(isVersal);
-            }
-
-            Matcher m = eastWestPattern.matcher(baseWireName);
-            if (m.matches()) {
-                BitSet[] eastWestWires = this.eastWestWires.computeIfAbsent(baseNode.getTile().getTileTypeEnum(),
-                        k -> new BitSet[]{new BitSet(), new BitSet()});
-                BitSet eastWires = eastWestWires[0];
-                BitSet westWires = eastWestWires[1];
-                String ew = m.group("eastwest");
-                String inode;
-                if (ew != null) {
-                    // [BC]NODEs connect to INODEs opposite to their wire name
-                    if (baseIntentCode == IntentCode.NODE_CLE_BNODE || baseIntentCode == IntentCode.NODE_CLE_CNODE) {
-                        ew = ew.equals("E") ? "W" : "E";
-                    }
-                    if (ew.equals("E")) {
-                        eastWires.set(baseNode.getWireIndex());
-                    } else {
-                        assert(ew.equals("W"));
-                        westWires.set(baseNode.getWireIndex());
-                    }
-                } else {
-                    if ((inode = m.group("inode")) != null) {
-                        int i = Integer.parseInt(inode);
-                        if (i < 32 || ((isUltraScale || isVersal) && i >= 64 && i < 96)) {
-                            eastWires.set(baseNode.getWireIndex());
-                        } else {
-                            assert(i < 64 || (isUltraScale || isVersal && i >= 96 && i < 128));
-                            westWires.set(baseNode.getWireIndex());
-                        }
-                    }
-                }
-            } else {
-                assert((isUltraScale || isUltraScalePlus) && baseWireName.matches("CTRL_[EW](_B)?\\d+|INT_NODE_GLOBAL_\\d+(_INT)?_OUT[01]?"));
             }
         }
 
@@ -878,7 +904,8 @@ public class RouteNodeGraph {
         RouteNodeType type = childRnode.getType();
         if (!type.isAnyLocal()) {
             switch (type) {
-                case NON_LOCAL:
+                case NON_LOCAL_EAST:
+                case NON_LOCAL_WEST:
                     RouteNodeType parentType = parentRnode.getType();
                     if (parentType.isAnyLocal()) {
                         // LOCAL -> NON_LOCAL
@@ -903,6 +930,14 @@ public class RouteNodeGraph {
                             // IMUX_[EW]\\d+ -> CLE_CLE_L_SITE_0_[A-H]_O
                             assert(childRnode.getIntentCode() == IntentCode.NODE_CLE_OUTPUT);
                         }
+                    } else if (parentType.isAnyNonLocal()) {
+                        // NON_LOCAL -> NON_LOCAL should stay on same side
+                        assert(parentType == type ||
+                               // Except for SINGLEs which will always change sides
+                               parentRnode.getIntentCode() == IntentCode.NODE_SINGLE ||
+                               // And when entering LONGs
+                               childRnode.getIntentCode() == IntentCode.NODE_HLONG || childRnode.getIntentCode() == IntentCode.NODE_VLONG
+                        );
                     } else if (parentType == RouteNodeType.SUPER_LONG_LINE && parentRnode.getPrev().getTile() == childRnode.getTile()) {
                         // UBUMP -> RXD: with an SLL being bidirectional, do not go back the way we came from
                         return false;

@@ -51,7 +51,8 @@ public enum RouteNodeType {
     NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA,
     NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA,
 
-    NON_LOCAL,
+    NON_LOCAL_EAST,
+    NON_LOCAL_WEST,
 
     LOCAL_BOTH,
     LOCAL_EAST,
@@ -112,5 +113,16 @@ public enum RouteNodeType {
 
     public boolean leadsToSouthboundLaguna() {
         return this == LOCAL_EAST_LEADING_TO_SOUTHBOUND_LAGUNA || this == LOCAL_WEST_LEADING_TO_SOUTHBOUND_LAGUNA ||this == NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA;
+    }
+
+    public boolean isAnyNonLocal() {
+        return this == NON_LOCAL_EAST || this == NON_LOCAL_WEST ||
+                this == NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA || this == NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA;
+    }
+
+    public static boolean isAnyNonLocal(int ordinal) {
+        return ordinal == NON_LOCAL_EAST.ordinal() || ordinal == NON_LOCAL_WEST.ordinal() ||
+                ordinal == NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA.ordinal() ||
+                ordinal == NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA.ordinal();
     }
 }

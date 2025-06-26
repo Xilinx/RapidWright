@@ -100,7 +100,8 @@ public class PartialDFXRouter extends PartialRouter {
                 beginOfLockedPath.incrementUser(netWrapper);
 
                 switch (beginOfLockedPath.getType()) {
-                    case NON_LOCAL:
+                    case NON_LOCAL_EAST:
+                    case NON_LOCAL_WEST:
                         beginOfLockedPath.setType(RouteNodeType.EXCLUSIVE_SINK_NON_LOCAL);
                         break;
                     case EXCLUSIVE_SINK_NON_LOCAL:
