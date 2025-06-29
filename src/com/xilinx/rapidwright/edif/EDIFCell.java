@@ -341,12 +341,13 @@ public class EDIFCell extends EDIFPropertyObject {
     }
 
     public void rename(String newName) {
-        if (getLibrary() != null) {
-            getLibrary().removeCell(this);
+        EDIFLibrary lib = getLibrary();
+        if (lib != null) {
+            lib.removeCell(this);
         }
         setName(newName);
-        if (getLibrary() != null) {
-            getLibrary().addCell(this);
+        if (lib != null) {
+            lib.addCell(this);
         }
     }
 

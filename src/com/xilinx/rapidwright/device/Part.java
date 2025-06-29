@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Advanced Micro Devices, Inc.
@@ -30,7 +30,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 
 /**
- * Generated on: Thu Nov 21 13:06:39 MST 2024
+ * Generated on: Wed Jun 11 09:41:43 MDT 2025
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  *
  * Class used to uniquely represent a Xilinx part.
@@ -250,6 +250,7 @@ public class Part {
                 FamilyType.QVIRTEXUPLUSHBM,
                 FamilyType.QZYNQUPLUS,
                 FamilyType.QZYNQUPLUSRFSOC,
+                FamilyType.SPARTANUPLUS,
                 FamilyType.VIRTEXUPLUS,
                 FamilyType.VIRTEXUPLUS58G,
                 FamilyType.VIRTEXUPLUSHBM,
@@ -268,9 +269,11 @@ public class Part {
                 FamilyType.VERSAL,
                 FamilyType.VERSALAICORE,
                 FamilyType.VERSALAIEDGE,
+                FamilyType.VERSALAIEDGE2,
                 FamilyType.VERSALHBM,
                 FamilyType.VERSALPREMIUM,
                 FamilyType.VERSALPRIME,
+                FamilyType.VERSALPRIME2,
         };
         versal = new HashSet<FamilyType>(Arrays.asList(versalTypes));
     }

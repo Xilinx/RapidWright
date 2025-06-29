@@ -56,7 +56,9 @@ public enum UtilizationType {
     RAMB36S_FIFOS("RAMB36s/FIFOs"),
     RAMB18S("RAMB18s"),
     URAMS("URAMs"),
-    DSPS("DSPs"), BRAMS("BRAMS");
+    DSPS("DSPs"),
+    BRAMS("BRAMS"),
+    LOOKAHEAD8("LOOKAHEAD8");
 
     private String name;
 

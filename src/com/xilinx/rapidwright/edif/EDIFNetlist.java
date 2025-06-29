@@ -1944,7 +1944,7 @@ public class EDIFNetlist extends EDIFName {
         Map<String, Pair<String, EnumSet<IOStandard>>> seriesMacroCollapseExceptionMap =
                 macroCollapseExceptionMap.getOrDefault(series, Collections.emptyMap());
         Map<EDIFCell, EDIFCell> updateCellTypes = new IdentityHashMap<>();
-        for (EDIFCell cell : prims.getCells()) {
+        for (EDIFCell cell : new ArrayList<>(prims.getCells())) {
             if (macros.containsCell(cell.getName())) {
                 cell.makePrimitive();
                 Pair<String, EnumSet<IOStandard>> exception = seriesMacroCollapseExceptionMap.get(cell.getName());
