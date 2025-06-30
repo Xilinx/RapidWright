@@ -39,6 +39,7 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.eco.ECOPlacementHelper;
 import com.xilinx.rapidwright.edif.EDIFCell;
@@ -63,14 +64,16 @@ public class InlineFlopTools {
     private static final String PBLOCK_OPT = "--pblock";
     private static final String REMOVE_FLOPS_OPT = "--remove_flops";
 
-    private static final String INLINE_SUFFIX = "_rw_inline_flop";
+    public static final String INLINE_SUFFIX = "_rw_inline_flop";
 
     /**
      * Add flip flops inline on all the top-level ports of an out-of-context design.
      * This is useful for placed out-of-context kernels prior to routing so that
      * after the flops have been placed, the router is forced to route connections
      * of each of the ports to each of the flops. This can help alleviate congestion
-     * when the kernels are placed/relocated in context.
+     * when the kernels are placed/relocated in context. Note this assumes the
+     * design is not implemented as in most contexts it will be placed and routed
+     * immediately following this modification.
      * 
      * @param design  The design to modify
      * @param clkNet  Name of the clock net to use on which to add the flops
@@ -78,6 +81,7 @@ public class InlineFlopTools {
      *                not be placed inside this area.
      */
     public static void createAndPlaceFlopsInlineOnTopPorts(Design design, String clkNet, PBlock keepOut) {
+        assert (design.getSiteInsts().size() == 0);
         EDIFCell top = design.getTopEDIFCell();
         Site start = keepOut.getAllSites("SLICE").iterator().next(); // TODO this is a bit wasteful
         boolean exclude = true;
@@ -89,6 +93,10 @@ public class InlineFlopTools {
         Set<SiteInst> siteInstsToRoute = new HashSet<>();
 
         for (EDIFPort port : top.getPorts()) {
+            // Don't flop the clock net
+            if (port.getName().equals(clkNet)) {
+                continue;
+            }
             if (port.isBus()) {
                 for (int i : port.getBitBlastedIndicies()) {
                     EDIFPortInst inst = port.getInternalPortInstFromIndex(i);
@@ -160,6 +168,7 @@ public class InlineFlopTools {
         Net vcc = design.getVccNet();
         Set<SitePinInst> vccPins = new HashSet<>();
         pinsToRemove.put(vcc, vccPins);
+        String[] staticPins = new String[] { "CKEN1", design.getSeries() == Series.Versal ? "RST" : "SRST1" };
         for (EDIFCellInst inst : design.getTopEDIFCell().getCellInsts()) {
             if (inst.getName().endsWith(INLINE_SUFFIX)) {
                 Cell flop = design.getCell(inst.getName());
@@ -169,8 +178,11 @@ public class InlineFlopTools {
                 for (SitePinInst pin : si.getSitePinInsts()) {
                     pinsToRemove.computeIfAbsent(pin.getNet(), p -> new HashSet<>()).add(pin);
                 }
-                vccPins.add(vcc.createPin("CKEN1", si));
-                vccPins.add(vcc.createPin("RST", si));
+                for (String staticPin : staticPins) {
+                    if (si.getSitePinInst(staticPin) == null) {
+                        vccPins.add(vcc.createPin(staticPin, si));
+                    }
+                }
 
                 cellsToRemove.add(inst);
             }
@@ -217,6 +229,7 @@ public class InlineFlopTools {
             }
 
             top.removeCellInst(c);
+            design.removeCell(c.getName());
         }
 
     }
