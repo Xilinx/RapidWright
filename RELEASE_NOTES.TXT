@@ -1,4 +1,34 @@
-============= RapidWright 2024.2.3-beta released on 2025-5-29 ================
+============= RapidWright 2025.1.0-beta released on 2025-06-25 ================
+Notes:
+  - Add methods to access internal DiffMap (#1234)
+  - [EDIFNetlist] Update library when renaming cells; add API to remove blackbox prop (#1226)
+  - Fixes to count LOOKAHEAD8 cells in Versal designs (#1230)
+  - [NetlistBrowser] Fix extra click issue with instances (#1229)
+  - [Netlist Browser] GUI Widget to browse a loaded netlist (#1225)
+  - [CopyImplementation] Command-line version of DesignTools.copyImplementation() (#1215)
+  - [DesignTools.copyImplementation()] Support Versal IMR routethrus (#1224)
+  - [ECOTools] connectNet() remove static net assertion (#1223)
+  - [ECOTools] Fix connectNet() for pins that don't need routing (#1222)
+  - [LUTTools] Properly size LUTCY* primitives (#1221)
+  - [LUTInputConeOpt] Enable unplaced netlists (#1213)
+  - [PhysNetlistWriter] Treat bidir BEL pins on PS8 as output (#1214)
+  - [ECOTools] Augments connectNet() to handle dual-LUT pin usage scenarios (#1209)
+  - Basic VS Code Settings (#1210)
+  - LUT Input Cone Optimization (#1205)
+  - Design Obfuscator - Flattens design and uses hashing to obfuscate names (#1196)
+  - Regroup Instances -- command line tool (#1201)
+  - [PartialDFXRouter] Add PartialRouter specialization for DFX designs (#1204)
+  - [RWRoute] Connection.setAllTargets() to always set primary sink (#1206)
+  - [ECOPlacementHelper] Fix NPE for getUnusedFlop() (#1207)
+  - [Actions] Remove gradle/wrapper-validation-action (#1208)
+  - [RWRoute] Minor cleanup (#1203)
+  - [Design.createModuleInst()] Handles black boxes by renaming prior to Design.addModule() 
+  - Fixes gap routing issue
+  - Improves NOC traffic parsing file
+
+API Additions:
+  - (None)
+============= RapidWright 2024.2.3-beta released on 2025-05-29 ================
 Notes: 
   - Add testcase for #780 (Design.routeSites()) (#1191)
   - Post-route fanout optimization (#1178)
@@ -31,7 +61,7 @@ API Additions:
   - com.xilinx.rapidwright.design.Design "public List<PartitionPin> getPartitionPins(Net net)"
   - com.xilinx.rapidwright.design.Design "public Net getNetFromPartitionPin(PartitionPin p)"
 
-============= RapidWright 2024.2.2-beta released on 2025-3-25 ================
+============= RapidWright 2024.2.2-beta released on 2025-03-25 ================
 Notes: 
   - [DesignTools] Fix routethru corner case in fullyUnplaceCellHelper() (#1157)
   - Add option to uniquify copied cells (#1156)
@@ -49,7 +79,7 @@ API Additions:
   - com.xilinx.rapidwright.design.Design "public static Map<SiteTypeEnum, Set<String>> getCompatiblePlacements(FamilyType family, Unisim u)"
 
 
-============= RapidWright 2024.2.1-beta released on 2025-1-15 ================
+============= RapidWright 2024.2.1-beta released on 2025-01-15 ================
 Notes: 
   - Adds an Override Flag for Advanced Flow Settings in Designs (#1135)
   - Test for SiteInst.isEmpty() (#1128)

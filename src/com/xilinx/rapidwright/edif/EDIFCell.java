@@ -41,6 +41,10 @@ import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.device.PartNameTools;
+import com.xilinx.rapidwright.device.Series;
+
 /**
  * Represent a logical cell in an EDIF netlist.  Can
  * be both a leaf cell or a hierarchical cell.
@@ -337,7 +341,14 @@ public class EDIFCell extends EDIFPropertyObject {
     }
 
     public void rename(String newName) {
+        EDIFLibrary lib = getLibrary();
+        if (lib != null) {
+            lib.removeCell(this);
+        }
         setName(newName);
+        if (lib != null) {
+            lib.addCell(this);
+        }
     }
 
     /**
@@ -507,6 +518,13 @@ public class EDIFCell extends EDIFPropertyObject {
 
     public boolean isPrimitive() {
         return getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME) && isLeafCellOrBlackBox();
+    }
+
+    public boolean isMacro() {
+        EDIFNetlist n = getLibrary().getNetlist();
+        String partName = EDIFTools.getPartName(n);
+        Series s = partName != null ? PartNameTools.getPart(partName).getSeries() : null;
+        return s == null ? false : Design.getMacroPrimitives(s).containsCell(this);
     }
 
     public boolean isStaticSource() {
