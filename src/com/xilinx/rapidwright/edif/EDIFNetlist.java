@@ -1146,10 +1146,10 @@ public class EDIFNetlist extends EDIFName {
         }
 
         Map<EDIFHierNet,EDIFHierNet> parentNetMap = getParentNetMap();
-        EDIFHierNet parentNetName = parentNetMap.get(p.getHierarchicalNet());
-        Net n = parentNetName == null ? null : d.getNet(parentNetName.getHierarchicalNetName());
+        EDIFHierNet parentNet = parentNetMap.get(p.getHierarchicalNet());
+        Net n = parentNet == null ? null : d.getNet(parentNet.getHierarchicalNetName());
         if (n == null) {
-            if (parentNetName == null) {
+            if (parentNet == null) {
                 // Maybe it is GND/VCC
                 List<EDIFPortInst> src = p.getNet().getSourcePortInsts(false);
                 if (src.size() > 0 && src.get(0).getCellInst() != null) {
@@ -1158,12 +1158,12 @@ public class EDIFNetlist extends EDIFName {
                     if (cellType.equals("VCC")) return d.getVccNet();
                 }
             }
-            if (parentNetName == null) {
+            if (parentNet == null) {
                 System.err.println("WARNING: Could not find parent of net \"" + p.getHierarchicalNet() +
                         "\", please check that the netlist is fully connected through all levels of "
                         + "hierarchy for this net.");
             }
-            EDIFNet logicalNet = parentNetName.getNet();
+            EDIFNet logicalNet = parentNet.getNet();
             List<EDIFPortInst> eprList = logicalNet.getSourcePortInsts(false);
             if (eprList.size() > 1) throw new RuntimeException("ERROR: Bad assumption on net, has two sources.");
             if (eprList.size() == 1) {
@@ -1176,8 +1176,13 @@ public class EDIFNetlist extends EDIFName {
             }
             // If size is 0, assume top level port in an OOC design
 
-            n = d.createNet(parentNetName.getHierarchicalNetName());
-            n.setLogicalHierNet(parentNetName);
+            n = d.createNet(parentNet.getHierarchicalNetName());
+            n.setLogicalHierNet(parentNet);
+        } else {
+            NetType staticType = p.getNet().getPhysStaticSourceType();
+            if (staticType != NetType.UNKNOWN) {
+                d.getStaticNet(staticType);
+            }
         }
         return n;
     }

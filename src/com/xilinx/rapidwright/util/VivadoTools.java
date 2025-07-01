@@ -392,6 +392,45 @@ public class VivadoTools {
     }
 
     /**
+     * Run Vivado's `place_design` and `route_design` command on the design provided
+     * and get the `report_route_status` results. Note: this method does not
+     * preserve the routed output from Vivado.
+     * 
+     * @param design  The design to route and report on.
+     * @param workdir Directory to work within.
+     * @return The results of `report_route_status`.
+     */
+    public static ReportRouteStatusResult placeAndRouteDesignAndGetStatus(Design design, Path workdir) {
+        boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
+        Path dcp = workdir.resolve("placeAndRouteDesignAndGetStatus.dcp");
+        design.writeCheckpoint(dcp);
+        return placeAndRouteDesignAndGetStatus(dcp, workdir, encrypted);
+    }
+
+    /**
+     * Run Vivado's `place_design` and `route_design` command on the provided DCP
+     * path and return the `report_route_status` results. Note: this method does not
+     * preserve the routed output from Vivado.
+     *
+     * @param dcp       Path to DCP to route and report on.
+     * @param workdir   Directory to work within.
+     * @param encrypted Indicates whether DCP contains encrypted EDIF cells.
+     * @return The results of `report_route_status`.
+     */
+    public static ReportRouteStatusResult placeAndRouteDesignAndGetStatus(Path dcp, Path workdir, boolean encrypted) {
+        final Path outputLog = workdir.resolve("outputLog.log");
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(createTclDCPLoadCommand(dcp, encrypted));
+        sb.append(PLACE_DESIGN + "; ");
+        sb.append(ROUTE_DESIGN + "; ");
+        sb.append(REPORT_ROUTE_STATUS + "; ");
+
+        List<String> log = VivadoTools.runTcl(outputLog, sb.toString(), true);
+        return new ReportRouteStatusResult(log);
+    }
+
+    /**
      * Run Vivado's `route_design` command on the provided DCP path and return the
      * `report_route_status` results. Note: this method does not preserve the routed
      * output from Vivado.
