@@ -48,6 +48,10 @@ public class EDIFNet extends EDIFPropertyObject {
 
     private EDIFPortInstList portInsts;
 
+    private Boolean _isGND = null;
+    private Boolean _isVCC = null;
+
+
     public EDIFNet(String name, EDIFCell parentCell) {
         super(name);
         if (parentCell != null) parentCell.addNet(this);
@@ -103,6 +107,10 @@ public class EDIFNet extends EDIFPropertyObject {
             boolean added = portInsts.add(portInst);
             assert(added);
         }
+        if (portInst.isOutput()) {
+            _isGND = null; // Reset GND check
+            _isVCC = null; // Reset VCC check
+        }
     }
 
     public void trackChanges(EDIFChangeType type, EDIFCellInst inst, String portInstName) {
@@ -115,10 +123,18 @@ public class EDIFNet extends EDIFPropertyObject {
     }
 
     public EDIFPortInst createPortInst(EDIFPort port) {
+        if (port.isOutput()) {
+            _isGND = null; // Reset GND check
+            _isVCC = null; // Reset VCC check
+        }
         return new EDIFPortInst(port, this, null);
     }
 
     public EDIFPortInst createPortInst(EDIFPort port, int index) {
+        if (port.isOutput()) {
+            _isGND = null; // Reset GND check
+            _isVCC = null; // Reset VCC check
+        }
         return new EDIFPortInst(port, this, index, null);
     }
 
@@ -201,11 +217,19 @@ public class EDIFNet extends EDIFPropertyObject {
             int idx = EDIFTools.getPortIndexFromName(portInstName);
             portIdx = port.getPortIndexFromNameIndex(idx);
         }
+        if (port.isOutput()) {
+            _isGND = null; // Reset GND check
+            _isVCC = null; // Reset VCC check
+        }
         return new EDIFPortInst(port, this, portIdx, inst, deferSort);
     }
 
     public EDIFPortInst createPortInst(String portName, int index, EDIFCellInst cellInst) {
         EDIFPort port = cellInst.getPort(portName);
+        if (port.isOutput()) {
+            _isGND = null; // Reset GND check
+            _isVCC = null; // Reset VCC check
+        }
         return new EDIFPortInst(port, this, index, cellInst);
     }
 
@@ -221,18 +245,34 @@ public class EDIFNet extends EDIFPropertyObject {
 
 
     public EDIFPortInst createPortInst(EDIFPort port, EDIFCellInst cellInst) {
+        if (port.isOutput()) {
+            _isGND = null; // Reset GND check
+            _isVCC = null; // Reset VCC check
+        }
         return new EDIFPortInst(port, this, cellInst);
     }
 
     public EDIFPortInst createPortInst(EDIFPort port, EDIFCellInst cellInst, boolean deferSort) {
+        if (port.isOutput()) {
+            _isGND = null; // Reset GND check
+            _isVCC = null; // Reset VCC check
+        }
         return new EDIFPortInst(port, this, cellInst, deferSort);
     }
 
     public EDIFPortInst createPortInst(EDIFPort port, int index, EDIFCellInst cellInst) {
+        if (port.isOutput()) {
+            _isGND = null; // Reset GND check
+            _isVCC = null; // Reset VCC check
+        }
         return new EDIFPortInst(port, this, index, cellInst);
     }
     
     public EDIFPortInst createPortInst(EDIFPort port, int index, EDIFCellInst cellInst, boolean deferSort) {
+        if (port.isOutput()) {
+            _isGND = null; // Reset GND check
+            _isVCC = null; // Reset VCC check
+        }
         return new EDIFPortInst(port, this, index, cellInst, deferSort);
     }
 
@@ -335,7 +375,13 @@ public class EDIFNet extends EDIFPropertyObject {
             trackChanges(EDIFChangeType.PORT_INST_REMOVE, inst, portInstName);
         }
         EDIFPortInst tmp = portInsts.remove(inst, portInstName);
-        if (tmp != null) tmp.setParentNet(null);
+        if (tmp != null) {
+            tmp.setParentNet(null);
+            if (tmp.isOutput()) {
+                _isGND = null; // Reset GND check
+                _isVCC = null; // Reset VCC check
+            }
+        }
         return tmp;
     }
 
@@ -367,7 +413,9 @@ public class EDIFNet extends EDIFPropertyObject {
      * @return True if this is a logical VCC net, false otherwise.
      */
     public boolean isVCC() {
-        return checkIsStaticSource(EDIFTools.LOGICAL_VCC_NET_NAME, Unisim.VCC.name());
+        if (_isVCC != null) return _isVCC;
+        _isVCC = checkIsStaticSource(EDIFTools.LOGICAL_VCC_NET_NAME, Unisim.VCC.name());
+        return _isVCC;
     }
 
     /**
@@ -380,7 +428,9 @@ public class EDIFNet extends EDIFPropertyObject {
      * @return True if this is a logical GND net, false otherwise.
      */
     public boolean isGND() {
-        return checkIsStaticSource(EDIFTools.LOGICAL_GND_NET_NAME, Unisim.GND.name());
+        if (_isGND != null) return _isGND;
+        _isGND = checkIsStaticSource(EDIFTools.LOGICAL_GND_NET_NAME, Unisim.GND.name());
+        return _isGND;
     }
 
     /**
