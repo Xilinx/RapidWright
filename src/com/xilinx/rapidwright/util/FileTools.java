@@ -1741,11 +1741,17 @@ public class FileTools {
      * @return True if the file is considered binary, false otherwise.
      */
     public static boolean isFileBinary(Path fileName) {
-        try (BufferedInputStream br = new BufferedInputStream(Files.newInputStream(fileName))) {
-            return isDataBinary(br);
-        } catch (IOException e) {
-            throw new RuntimeException("ERROR: Trying to read file " + fileName + " and it errored.", e);
-        }
+        // Temporarily force this method to return false as it's currently only used by
+        // Design.readCheckpoint() to detect if the EDIF file is encrypted.
+        // To do so, it reads some bytes from the file -- we can't stuff those bytes back for named pipes!
+
+
+        // try (BufferedInputStream br = new BufferedInputStream(Files.newInputStream(fileName))) {
+        //     return isDataBinary(br);
+        // } catch (IOException e) {
+        //     throw new RuntimeException("ERROR: Trying to read file " + fileName + " and it errored.", e);
+        // }
+        return false;
     }
 
     /**
