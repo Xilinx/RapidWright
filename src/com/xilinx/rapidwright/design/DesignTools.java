@@ -3809,16 +3809,18 @@ public class DesignTools {
         try {
 
             final Job job = new LocalJob();
-            job.setCommand(FileTools.getVivadoPath() + " -mode batch -source readable.tcl");
 
             final Path runDir = Files.createTempDirectory(edif.toAbsolutePath().getParent(),edif.getFileName()+"_readable_edif_");
             job.setRunDir(runDir.toString());
 
+            job.setCommand("mkfifo -m 600 " + edif.toAbsolutePath() + " && " +
+                    FileTools.getVivadoPath() + " -mode batch -source readable.tcl && " +
+                    "rm -rf " + runDir);
+
             Files.write(runDir.resolve("readable.tcl"), Arrays.asList(
                     "open_checkpoint " + checkpoint.toAbsolutePath(),
-                    "write_edif " + edif.toAbsolutePath()
+                    "write_edif -force " + edif.toAbsolutePath()
             ));
-
 
             return job;
         } catch (IOException e) {
@@ -3864,45 +3866,34 @@ public class DesignTools {
      * @return the readable output edif filename
      */
     public static Path generateReadableEDIF(Path dcp, Path edfFileName) {
-        String currMD5 = null;
-        Path existingMD5File = null;
         if (edfFileName == null) {
             // We'll manage the creation and location of the edf file, DCP will be checked with
             // an MD5 hash so that if it changes, we re-update the edf file
-            currMD5 = Installer.calculateMD5OfFile(dcp);
             Path edfDir = getDefaultReadableEDIFDir(dcp);
-            existingMD5File = getDCPAutoGenMD5FilePath(dcp, edfDir);
             edfFileName = getEDFAutoGenFilePath(dcp, edfDir);
             if (!Files.exists(edfDir)) {
                 FileTools.makeDirs(edfDir.toString());
-            }
-
-            // Check if a previously auto-generated edf is still usable
-            String existingMD5 = FileTools.getStoredMD5FromFile(existingMD5File);
-            if (Files.exists(edfFileName)) {
-                if (currMD5.equals(existingMD5)) {
-                    return edfFileName;
-                } else {
-                    try {
+            } else if (Files.exists(edfFileName)) {
+                try {
+                    if (Files.size(edfFileName) == 0) {
                         Files.delete(edfFileName);
-                    } catch (IOException e) {
-                        throw new RuntimeException("ERROR: Couldn't auto-generate updated edf file"
-                                + " as the file appears to be in use or no permission to do so.");
                     }
+                } catch (IOException e) {
+                    throw new RuntimeException("ERROR: Couldn't auto-generate updated edf file"
+                            + " as the file appears to be in use or no permission to do so.");
                 }
             }
-
         }
-        JobQueue queue = new JobQueue();
         Job job = generateReadableEDIFJob(dcp, edfFileName);
-        queue.addJob(job);
-        if (!queue.runAllToCompletion()) {
-            throw new RuntimeException("Generating Readable EDIF job failed");
+        job.launchJob();
+        try {
+            while (!Files.exists(edfFileName)) {
+                Thread.sleep(100);
+            }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
-        FileTools.deleteFolder(job.getRunDir());
-        if (currMD5 != null && existingMD5File != null) {
-            FileTools.writeStringToTextFile(currMD5, existingMD5File.toString());
-        }
+
         return edfFileName;
     }
 
