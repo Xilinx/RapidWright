@@ -2046,7 +2046,7 @@ public class RWRoute {
      * @param rnode The parent rnode of the child in question.
      * @param longParent A boolean value to indicate if the parent is a Long node
      * @param childRnode The child rnode in question.
-     * @param lookahead Boolean for whether we should skiping pushing this child node on the queue and immediately explore it.
+     * @param lookahead A boolean for whether we should skipping pushing this child node on the queue and immediately explore it.
      */
     protected void evaluateCostAndPush(ConnectionState state,
                                        RouteNode rnode,
