@@ -185,7 +185,7 @@ public class RWRoute {
                 Series.Versal);
 
     /** For connections that require SLR crossing(s), snap back to the previous Laguna column if the (horizontal) detour
-     *  is less than this number of tiles */
+     *  is no more than this number of tiles */
     protected int maxDetourToSnapBackToPrevLagunaColumn = 4;
 
     public RWRoute(Design design, RWRouteConfig config) {
