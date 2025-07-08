@@ -175,6 +175,10 @@ public class RouterHelper {
         // Only block clocking tiles if source is not in a clock tile
         final boolean blockClocking = !Utils.isClocking(source.getTile().getTileTypeEnum());
 
+        // Laguna crossings from the output of the TX flop
+        final boolean isLagunaTXQ = Utils.isLaguna(source.getTile().getTileTypeEnum());
+        assert(!isLagunaTXQ || output.getName().startsWith("TXQ"));
+
         // Starting from the SPI's connected node, perform a downhill breadth-first search
         Queue<Node> queue = new ArrayDeque<>();
         queue.add(source);
@@ -186,6 +190,10 @@ public class RouterHelper {
                 if (Utils.isInterConnect(downhillTileType)) {
                     // Return node that has at least one downhill in the INT tile
                     return node;
+                }
+                if (isLagunaTXQ && downhill.getTile() == source.getTile() && node.getWireName().startsWith("UBUMP")) {
+                    // For Laguna crossings using the TX flop, do not project back the way we came from
+                    continue;
                 }
                 if (blockClocking && Utils.isClocking(downhillTileType)) {
                     continue;
@@ -208,8 +216,10 @@ public class RouterHelper {
         if (sinkTileType == TileTypeEnum.INT) {
             return sink;
         }
-        // Only block clocking tiles if source is not in a clock tile
-        final boolean blockClocking = !Utils.isClocking(sinkTileType);
+
+        // Laguna crossings to the input of the RX flop
+        final boolean isLagunaRXD = Utils.isLaguna(sink.getTile().getTileTypeEnum());
+        assert(!isLagunaRXD || input.getName().startsWith("RXD"));
 
         int watchdog = 40;
 
@@ -225,6 +235,10 @@ public class RouterHelper {
                         // Versal only: Terminate at non INT (e.g. CLE_BC_CORE) tile type for CTRL pin inputs
                         EnumSet.of(IntentCode.NODE_CLE_CTRL, IntentCode.NODE_INTF_CTRL).contains(uphill.getIntentCode())) {
                     return uphill;
+                }
+                if (isLagunaRXD && uphill.getTile() == sink.getTile() && node.getWireName().startsWith("UBUMP")) {
+                    // For Laguna crossings using the RX flop, do not project back the way we came from
+                    continue;
                 }
                 if (uphillTileType != sinkTileType && Utils.isClocking(uphillTileType)) {
                     continue;

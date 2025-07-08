@@ -83,8 +83,9 @@ public class Connection implements Comparable<Connection>{
 
     /** To indicate if the route delay of a connection has been patched up, when there are consecutive long nodes */
     private boolean dlyPatched;
-    /** true to indicate that a connection cross SLRs */
-    private final boolean crossSLR;
+    /** true to indicate that a connection cross SLRs in given direction */
+    private boolean crossSLRnorth;
+    private boolean crossSLRsouth;
     /** List of nodes assigned to a connection to form the path for generating PIPs */
     private List<Node> nodes;
 
@@ -96,10 +97,8 @@ public class Connection implements Comparable<Connection>{
         rnodes = new ArrayList<>();
         this.netWrapper = netWrapper;
         netWrapper.addConnection(this);
-        crossSLR = !source.getTile().getSLR().equals(sink.getTile().getSLR());
-        if (crossSLR && source.getSiteInst().getDesign().getSeries() == Series.Versal) {
-            throw new RuntimeException("ERROR: Cross-SLR connections not yet supported on Versal.");
-        }
+        crossSLRnorth = false;
+        crossSLRsouth = false;
     }
 
     /**
@@ -280,6 +279,24 @@ public class Connection implements Comparable<Connection>{
 
     public void setSinkRnode(RouteNode sinkRnode) {
         this.sinkRnode = sinkRnode;
+
+        assert(sourceRnode != null);
+        if (!sourceRnode.getTile().getSLR().equals(sinkRnode.getTile().getSLR())) {
+            if (source.getSiteInst().getDesign().getSeries() == Series.Versal) {
+                throw new RuntimeException("ERROR: Cross-SLR connections not yet supported on Versal.");
+            }
+
+            if (sourceRnode.getTile().getTileYCoordinate() < sinkRnode.getTile().getTileYCoordinate()) {
+                crossSLRnorth = true;
+                assert(!crossSLRsouth);
+            } else {
+                assert(!crossSLRnorth);
+                crossSLRsouth = true;
+            }
+        } else {
+            assert(!crossSLRnorth);
+            assert(!crossSLRsouth);
+        }
     }
 
     public List<RouteNode> getAltSinkRnodes() {
@@ -296,9 +313,8 @@ public class Connection implements Comparable<Connection>{
         } else {
             assert(!altSinkRnodes.contains(sinkRnode));
         }
-        assert(sinkRnode.getType().isAnyExclusiveSink() ||
-               // Can be a WIRE if node is not exclusive a sink
-               sinkRnode.getType() == RouteNodeType.NON_LOCAL);
+        // Alternate sinks by their nature cannot be exclusive
+        assert(!sinkRnode.getType().isAnyExclusiveSink());
         altSinkRnodes.add(sinkRnode);
     }
 
@@ -400,7 +416,15 @@ public class Connection implements Comparable<Connection>{
     }
 
     public boolean isCrossSLR() {
-        return crossSLR;
+        return crossSLRnorth || crossSLRsouth;
+    }
+
+    public boolean isCrossSLRnorth() {
+        return crossSLRnorth;
+    }
+
+    public boolean isCrossSLRsouth() {
+        return crossSLRsouth;
     }
 
     public List<Node> getNodes() {
@@ -467,15 +491,10 @@ public class Connection implements Comparable<Connection>{
         sinkRnode.markTarget(state);
         if (altSinkRnodes != null) {
             for (RouteNode rnode : altSinkRnodes) {
-                // Same condition as above: only allow this as an alternate sink
-                // if it's not already in use by the current net to prevent the case
-                // where the same physical pin services more than one logical pin
-                if (rnode.countConnectionsOfUser(netWrapper) == 0 ||
-                    // Except if it is not an EXCLUSIVE_SINK
-                    !rnode.getType().isAnyExclusiveSink()) {
-                    assert(rnode.getIntentCode() != IntentCode.NODE_PINBOUNCE);
-                    rnode.markTarget(state);
-                }
+                assert(rnode.countConnectionsOfUser(netWrapper) == 0);
+                assert(!rnode.getType().isAnyExclusiveSink());
+                assert(rnode.getIntentCode() != IntentCode.NODE_PINBOUNCE);
+                rnode.markTarget(state);
             }
         }
     }
