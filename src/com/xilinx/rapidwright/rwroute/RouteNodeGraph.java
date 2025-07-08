@@ -480,7 +480,7 @@ public class RouteNodeGraph {
                                 if (inode.getTile() != imux.getTile()) {
                                     continue;
                                 }
-                                assert(enableComprehensiveAssertions && inodePattern.matcher(inode.getWireName()).matches());
+                                assert(!enableComprehensiveAssertions || inodePattern.matcher(inode.getWireName()).matches());
 
                                 for (Node intInt : inode.getAllUphillNodes()) {
                                     if (intInt.getTile() != inode.getTile()) {
@@ -490,7 +490,7 @@ public class RouteNodeGraph {
                                         continue;
                                     }
                                     if (!intIntPattern.matcher(intInt.getWireName()).matches()) {
-                                        assert(enableComprehensiveAssertions && singlePattern.matcher(intInt.getWireName()).matches());
+                                        assert(!enableComprehensiveAssertions || singlePattern.matcher(intInt.getWireName()).matches());
                                         continue;
                                     }
                                     bs[1].set(intInt.getWireIndex());
@@ -502,11 +502,11 @@ public class RouteNodeGraph {
                                         assert(sdq.getIntentCode() == IntentCode.NODE_LOCAL);
 
                                         if (sdq.getTile() != intInt.getTile()) {
-                                            assert(enableComprehensiveAssertions && sdqNodeFtPattern.matcher(sdq.getWireName()).matches());
+                                            assert(!enableComprehensiveAssertions || sdqNodeFtPattern.matcher(sdq.getWireName()).matches());
                                             continue;
                                         }
                                         // The following assertion is expected to hold, but commented out for performance reasons
-                                        assert(enableComprehensiveAssertions && sdqNodePattern.matcher(sdq.getWireName()).matches());
+                                        assert(!enableComprehensiveAssertions || sdqNodePattern.matcher(sdq.getWireName()).matches());
                                         bs[1].set(sdq.getWireIndex());
                                     }
                                 }
