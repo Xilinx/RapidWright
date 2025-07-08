@@ -137,6 +137,9 @@ public class RouteNodeGraph {
 
     protected final Set<Tile> allowedTiles;
 
+    /** Flag to enable really comprehensive (but performance-impacting) assertions */
+    protected final static boolean enableComprehensiveAssertions = false;
+
     public RouteNodeGraph(Design design, RWRouteConfig config) {
         this.design = design;
         lutRoutethru = config.isLutRoutethru();
@@ -400,6 +403,16 @@ public class RouteNodeGraph {
         final boolean isUltraScalePlus = series == Series.UltraScalePlus;
         final int clockRegionHeight = series.getCLEHeight();
         final int slrHeight = device.getNumOfClockRegionRows() * clockRegionHeight / device.getSLRs().length;
+        final Pattern inodePattern = Pattern.compile(isUltraScalePlus ? "INT_NODE_IMUX_\\d+_INT_OUT[01]|INODE_[EW]_\\d+_FT[01]"
+                                                                      : "INT_NODE_IMUX_\\d+_INT_OUT|INODE_[12]_[EW]_\\d+_FT[NS]");
+        final Pattern intIntPattern = Pattern.compile(isUltraScalePlus ? "INT_INT_SDQ_\\d+_INT_OUT[01]|WW1_E_7_FT0"
+                                                                       : "INT_INT_SINGLE_\\d+_INT_OUT|EE1_W_0_FTS");
+        final Pattern singlePattern = Pattern.compile("(NN|EE|SS|WW)1_[EW]_BEG[0-7]");
+        final Pattern sdqNodeFtPattern = Pattern.compile(isUltraScalePlus ? "SDQNODE_[EW]_0_FT1"
+                                                                          : "SDND[NS]W_E_0_FTS");
+        final Pattern sdqNodePattern = Pattern.compile(isUltraScalePlus ? "INT_NODE_SDQ_\\d+_INT_OUT[01]|SDQNODE_(W_91_FT1|E_93_FT0)"
+                                                                        : "INT_NODE_SINGLE_DOUBLE_\\d+_INT_OUT|SDND[NS]W_E_15_FTN");
+
         Arrays.fill(nextLagunaColumn, Integer.MAX_VALUE);
         Arrays.fill(prevLagunaColumn, Integer.MIN_VALUE);
         for (int slr = 0; slr < device.getNumOfSLRs() - 1; slr++) {
@@ -435,16 +448,6 @@ public class RouteNodeGraph {
                         }
                     }
 
-                    Pattern inodePattern = Pattern.compile(isUltraScalePlus ? "INT_NODE_IMUX_\\d+_INT_OUT[01]|INODE_[EW]_\\d+_FT[01]"
-                                                                            : "INT_NODE_IMUX_\\d+_INT_OUT|INODE_[12]_[EW]_\\d+_FT[NS]");
-                    Pattern intIntPattern = Pattern.compile(isUltraScalePlus ? "INT_INT_SDQ_\\d+_INT_OUT[01]|WW1_E_7_FT0"
-                                                                             : "INT_INT_SINGLE_\\d+_INT_OUT|EE1_W_0_FTS");
-                    Pattern singlePattern = Pattern.compile("(NN|EE|SS|WW)1_[EW]_BEG[0-7]");
-                    Pattern sdqNodeFtPattern = Pattern.compile(isUltraScalePlus ? "SDQNODE_[EW]_0_FT1"
-                                                                                : "SDND[NS]W_E_0_FTS");
-                    Pattern sdqNodePattern = Pattern.compile(isUltraScalePlus ? "INT_NODE_SDQ_\\d+_INT_OUT[01]|SDQNODE_(W_91_FT1|E_93_FT0)"
-                                                                              : "INT_NODE_SINGLE_DOUBLE_\\d+_INT_OUT|SDND[NS]W_E_15_FTN");
-
                     // Examine all wires in each Laguna tile. Record those IMUX and INODE uphill of a Super Long Line
                     // that originates in an INT tile
                     for (int wireIndex = 0; wireIndex < tile.getWireCount(); wireIndex++) {
@@ -477,7 +480,7 @@ public class RouteNodeGraph {
                                 if (inode.getTile() != imux.getTile()) {
                                     continue;
                                 }
-                                // assert(inodePattern.matcher(inode.getWireName()).matches());
+                                assert(enableComprehensiveAssertions && inodePattern.matcher(inode.getWireName()).matches());
 
                                 for (Node intInt : inode.getAllUphillNodes()) {
                                     if (intInt.getTile() != inode.getTile()) {
@@ -487,7 +490,7 @@ public class RouteNodeGraph {
                                         continue;
                                     }
                                     if (!intIntPattern.matcher(intInt.getWireName()).matches()) {
-                                        // assert(singlePattern.matcher(intInt.getWireName()).matches());
+                                        assert(enableComprehensiveAssertions && singlePattern.matcher(intInt.getWireName()).matches());
                                         continue;
                                     }
                                     bs[1].set(intInt.getWireIndex());
@@ -499,10 +502,11 @@ public class RouteNodeGraph {
                                         assert(sdq.getIntentCode() == IntentCode.NODE_LOCAL);
 
                                         if (sdq.getTile() != intInt.getTile()) {
-                                            // assert(sdqNodeFtPattern.matcher(sdq.getWireName()).matches());
+                                            assert(enableComprehensiveAssertions && sdqNodeFtPattern.matcher(sdq.getWireName()).matches());
                                             continue;
                                         }
-                                        // assert(sdqNodePattern.matcher(sdq.getWireName()).matches());
+                                        // The following assertion is expected to hold, but commented out for performance reasons
+                                        assert(enableComprehensiveAssertions && sdqNodePattern.matcher(sdq.getWireName()).matches());
                                         bs[1].set(sdq.getWireIndex());
                                     }
                                 }

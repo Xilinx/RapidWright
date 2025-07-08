@@ -84,6 +84,9 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      */
     private Map<NetWrapper, Integer> usersConnectionCounts;
 
+    /** Flag to enable really comprehensive (but performance-impacting) assertions */
+    protected final static boolean enableComprehensiveAssertions = false;
+
     protected RouteNode(RouteNodeGraph routingGraph, Node node, RouteNodeType type) {
         super(node);
         RouteNodeInfo nodeInfo = RouteNodeInfo.get(node, routingGraph);
@@ -216,10 +219,10 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             if (series == Series.UltraScalePlus || series == Series.UltraScale) {
                                 if (wireName.charAt(0) == 'E' || wireName.charAt(0) == 'W') {
                                     // Horizontal doubles can U-turn to get length 0
-                                    // assert(wireName.matches("(EE|WW)2_[EW]_BEG[0-7]"));
+                                    assert(enableComprehensiveAssertions && wireName.matches("(EE|WW)2_[EW]_BEG[0-7]"));
                                 } else {
-                                    // These two specific vertical doubles have an extra PIP
-                                    // assert(wireName.matches("(NN|SS)2_[EW]_BEG0"));
+                                    // Two specific vertical doubles have an extra PIP
+                                    assert(enableComprehensiveAssertions && wireName.matches("(NN|SS)2_[EW]_BEG0"));
                                 }
                             }
                             assert(!getAllDownhillPIPs().isEmpty());

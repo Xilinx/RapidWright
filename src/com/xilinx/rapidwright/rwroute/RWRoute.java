@@ -179,14 +179,14 @@ public class RWRoute {
     /** A map storing routes from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
     protected Map<String, List<String>> routesToSinkINTTiles;
 
-    public static final EnumSet<Series> SUPPORTED_SERIES;
-
-    static {
-        SUPPORTED_SERIES = EnumSet.of(
+    public static final EnumSet<Series> SUPPORTED_SERIES = EnumSet.of(
                 Series.UltraScale,
                 Series.UltraScalePlus,
                 Series.Versal);
-    }
+
+    /** For connections that require SLR crossing(s), snap back to the previous Laguna column if the (horizontal) detour
+     *  is less than this number of tiles */
+    protected int maxDetourToSnapBackToPrevLagunaColumn = 4;
 
     public RWRoute(Design design, RWRouteConfig config) {
         this.design = design;
@@ -2124,11 +2124,13 @@ public class RWRoute {
                     if (deltaXToNextColumn == deltaXToPrevColumn) {
                         // Equidistant from both columns, prefer the one closer when considering to/from the sink
                         deltaX = Math.min(deltaXToAndFromNextColumn, deltaXToAndFromPrevColumn);
-                    } else if (deltaXToNextColumn < deltaXToPrevColumn && deltaXToAndFromNextColumn <= deltaXToAndFromPrevColumn + 4) {
+                    } else if (deltaXToNextColumn < deltaXToPrevColumn &&
+                            deltaXToAndFromNextColumn <= deltaXToAndFromPrevColumn + maxDetourToSnapBackToPrevLagunaColumn) {
                         // Closer to the next column and not detouring more than 4 tiles extra to/from using the prev column
                         assert(deltaX <= deltaXToAndFromNextColumn);
                         deltaX = deltaXToAndFromNextColumn;
-                    } else if (deltaXToPrevColumn < deltaXToNextColumn && deltaXToAndFromPrevColumn  <= deltaXToAndFromNextColumn + 4) {
+                    } else if (deltaXToPrevColumn < deltaXToNextColumn &&
+                            deltaXToAndFromPrevColumn <= deltaXToAndFromNextColumn + maxDetourToSnapBackToPrevLagunaColumn) {
                         // Closer to the next column and not detouring more than 4 tiles extra to/from using the prev column
                         assert(deltaX <= deltaXToAndFromPrevColumn);
                         deltaX = deltaXToAndFromPrevColumn;
@@ -2188,6 +2190,7 @@ public class RWRoute {
      * @param childRnode A child rnode.
      * @param newPartialPathCost The upstream path cost from childRnode to the source.
      * @param newTotalPathCost Total path cost of childRnode.
+     * @param lookahead True to explore this node immediately, rather than to push it onto the queue.
      */
     protected void push(ConnectionState state,
                         RouteNode childRnode,
