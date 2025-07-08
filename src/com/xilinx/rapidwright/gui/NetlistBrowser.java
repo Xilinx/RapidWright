@@ -109,6 +109,7 @@ public class NetlistBrowser extends QMainWindow {
 
         if (args.length != 1) {
             System.out.println("USAGE: <input.dcp|input.edf>");
+            System.exit(1);
         }
 
         EDIFNetlist netlist = null;

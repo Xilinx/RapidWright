@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Advanced Micro Devices, Inc.
@@ -27,13 +27,27 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Thu Nov 21 13:34:08 MST 2024
+ * Generated on: Sat Jun 07 22:31:12 MDT 2025
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  *
  * Enumeration of SiteTypeEnum type for all valid devices within Vivado.
  */
 public enum SiteTypeEnum {
     ABUS_SWITCH,
+    AIE2PS_ARRAYSWITCH,
+    AIE2PS_CORE,
+    AIE2PS_MEMGRP,
+    AIE2PS_MEM_ARRAYSWITCH,
+    AIE2PS_MEM_MEMGRP,
+    AIE2PS_NMU_ARBIT,
+    AIE2PS_NOC,
+    AIE2PS_PLL,
+    AIE2PS_SHIMSWITCH,
+    AIE2PS_SHIMTRACE,
+    AIE2PS_SHIM_CNTRL,
+    AIE2P_FIFO,
+    AIE2P_PL,
+    AIE2P_TILECTRL,
     AIE_ARRAYSWITCH,
     AIE_CORE,
     AIE_FIFO,
@@ -92,17 +106,21 @@ public enum SiteTypeEnum {
     BUFCE_ROW,
     BUFCE_ROW_FSR,
     BUFDIV_LEAF,
+    BUFDIV_LEAF_ULVT,
     BUFG,
     BUFGCE,
     BUFGCE_DIV,
     BUFGCE_HDIO,
     BUFGCTRL,
     BUFG_FABRIC,
+    BUFG_FABRIC_ULVT,
     BUFG_GT,
     BUFG_GT_SYNC,
+    BUFG_GT_ULVT,
     BUFG_HSR_TEST,
     BUFG_LB,
     BUFG_PS,
+    BUFG_PS_ULVT,
     BUFHCE,
     BUFIO,
     BUFMRCE,
@@ -119,12 +137,14 @@ public enum SiteTypeEnum {
     CPM5N,
     CPM_EXT,
     CPM_MAIN,
+    CSEC_SITE,
     DCI,
     DCIRESET,
     DCMAC,
     DDRMC,
     DDRMC5,
     DDRMC5C,
+    DDRMC5E,
     DDRMC_RIU,
     DFE_A,
     DFE_B,
@@ -246,12 +266,14 @@ public enum SiteTypeEnum {
     IRI_QUAD_EVEN,
     IRI_QUAD_ODD,
     ISERDESE2,
+    ISP2,
     KEY_CLEAR,
     LAGUNA,
     MISR,
     MMCM,
     MMCME2_ADV,
     MMCME3_ADV,
+    MMI,
     MRMAC,
     MTBF2,
     MTBF3,
@@ -261,6 +283,7 @@ public enum SiteTypeEnum {
     NOC2_NMU256,
     NOC2_NMU512,
     NOC2_NPS5555,
+    NOC2_NPS6X,
     NOC2_NPS7575,
     NOC2_NSU128,
     NOC2_NSU256,
@@ -315,6 +338,7 @@ public enum SiteTypeEnum {
     PMV2_SVT,
     PMVBRAM,
     PMVIOB,
+    PS11,
     PS7,
     PS8,
     PS9,
@@ -349,6 +373,7 @@ public enum SiteTypeEnum {
     USR_ACCESS,
     VBUS_SWITCH,
     VCU,
+    VCU2,
     VDU,
     X5PHIO_CMUIF,
     X5PHIO_CMU_X32,
