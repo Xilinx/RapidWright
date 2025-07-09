@@ -1093,6 +1093,6 @@ public class TestECOTools {
         ECOTools.connectNet(test, lut_1, "O", net);        // Source
         ECOTools.connectNet(test, lut_2, "I1", net);       // Sinks
 
-        Assertions.assertEquals("[IN SLICE_X148Y0.B2]", PartialRouter.getUnroutedPins(test).toString());
+        Assertions.assertEquals("[IN SLICE_X148Y1.B2]", PartialRouter.getUnroutedPins(test).toString());
     }
 }
