@@ -22,20 +22,6 @@
 
 package com.xilinx.rapidwright.eco;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-
 import com.xilinx.rapidwright.design.AltPinMapping;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -62,12 +48,28 @@ import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.edif.EDIFValueType;
 import com.xilinx.rapidwright.router.Router;
+import com.xilinx.rapidwright.rwroute.PartialRouter;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.CodeGenerator;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
 import com.xilinx.rapidwright.util.VivadoTools;
 import com.xilinx.rapidwright.util.VivadoToolsHelper;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class TestECOTools {
     @Test
@@ -1071,4 +1073,26 @@ public class TestECOTools {
         VivadoToolsHelper.assertFullyRouted(d);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"xcvu19p", "xcvp1502"})
+    public void testDiscussion1245(String device) {
+        // Create a test design
+        Design test = new Design("test_design", device);
+
+        // Place two luts at 2 arbitrarily chosen sites
+        Cell lut_1 = test.createAndPlaceCell("lut_1", Unisim.LUT6, "SLICE_X148Y0/A6LUT");
+        LUTTools.configureLUT(lut_1, "O!=I1");
+
+        Cell lut_2 = test.createAndPlaceCell("lut_2", Unisim.LUT6, "SLICE_X148Y1/B6LUT");
+        LUTTools.configureLUT(lut_2, "O=I1");
+
+        // Create a net
+        Net net = test.createNet("test_net");
+
+        // Using ECOTools
+        ECOTools.connectNet(test, lut_1, "O", net);        // Source
+        ECOTools.connectNet(test, lut_2, "I1", net);       // Sinks
+
+        Assertions.assertEquals("[IN SLICE_X148Y1.B2]", PartialRouter.getUnroutedPins(test).toString());
+    }
 }
