@@ -55,8 +55,14 @@ public class ReportRouteStatus {
         Set<Net> conflictingNets = new HashSet<>();
 
         Collection<Net> nets = design.getNets();
+        rrs.logicalNets = nets.size();
         for (Net net : nets) {
-            if (!net.isStaticNet() && !RouterHelper.isRoutableNetWithSourceSinks(net)) {
+            if (net.isStaticNet()) {
+                if (net.getPins().isEmpty()) {
+                    rrs.logicalNets--;
+                    continue;
+                }
+            } else if (!RouterHelper.isRoutableNetWithSourceSinks(net)) {
                 rrs.netsNotNeedingRouting++;
                 continue;
             }
@@ -93,7 +99,6 @@ public class ReportRouteStatus {
             }
         }
 
-        rrs.logicalNets = nets.size();
         rrs.netsWithResourceConflicts = conflictingNets.size();
         rrs.netsWithRoutingErrors = rrs.netsWithSomeUnroutedPins + rrs.netsWithResourceConflicts;
         rrs.fullyRoutedNets = rrs.routableNets - rrs.unroutedNets - rrs.netsWithRoutingErrors;
