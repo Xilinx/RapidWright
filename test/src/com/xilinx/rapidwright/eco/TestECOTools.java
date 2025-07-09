@@ -1083,8 +1083,8 @@ public class TestECOTools {
         Cell lut_1 = test.createAndPlaceCell("lut_1", Unisim.LUT6, "SLICE_X148Y0/A6LUT");
         LUTTools.configureLUT(lut_1, "O!=I1");
 
-        Cell lut_2 = test.createAndPlaceCell("lut_2", Unisim.LUT6, "SLICE_X148Y0/B6LUT");
-        LUTTools.configureLUT(lut_1, "O=I1");
+        Cell lut_2 = test.createAndPlaceCell("lut_2", Unisim.LUT6, "SLICE_X148Y1/B6LUT");
+        LUTTools.configureLUT(lut_2, "O=I1");
 
         // Create a net
         Net net = test.createNet("test_net");
