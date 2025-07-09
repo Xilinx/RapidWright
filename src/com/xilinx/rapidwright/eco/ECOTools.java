@@ -45,6 +45,7 @@ import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.edif.EDIFCell;
@@ -961,6 +962,15 @@ public class ECOTools {
                     sitePinNames = cell.getAllCorrespondingSitePinNames(logicalPinName, siteWires, considerLutRoutethru);
                     break;
                 }
+
+                // BEGIN WORKAROUND AHEAD OF 2025.1.1 release
+                if (design.getSeries() == Series.Versal && srcBEL.isIMR() && srcBp.getName().equals("Q")) {
+                    BELPin D = srcBEL.getPin("D");
+                    BELPin sitePort = D.getSourcePin();
+                    assert(sitePort.isSitePort());
+                    sitePinNames = Collections.singletonList(sitePort.getName());
+                }
+                // END WORKAROUND AHEAD OF 2025.1.1 release
             }
         }
 
