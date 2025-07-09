@@ -43,10 +43,18 @@ public class TestReportRouteStatus {
         Design design = RapidWrightDCP.loadDCP("optical-flow.dcp");
         DesignTools.createMissingSitePinInsts(design);
         ReportRouteStatusResult rrs = ReportRouteStatus.reportRouteStatus(design);
-        Assertions.assertEquals(185996, rrs.logicalNets);
+        Assertions.assertEquals(185994, rrs.logicalNets);
         Assertions.assertEquals(58865, rrs.routableNets);
         Assertions.assertEquals(58865, rrs.unroutedNets);
         Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
+
+        if (FileTools.isVivadoOnPath()) {
+            rrs = VivadoTools.reportRouteStatus(design);
+            Assertions.assertEquals(185994, rrs.logicalNets);
+            Assertions.assertEquals(58865, rrs.routableNets);
+            Assertions.assertEquals(58865, rrs.unroutedNets);
+            Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
+        }
     }
 
     @Test
