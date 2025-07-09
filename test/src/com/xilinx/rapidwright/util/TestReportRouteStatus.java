@@ -24,6 +24,9 @@ package com.xilinx.rapidwright.util;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -44,5 +47,29 @@ public class TestReportRouteStatus {
         Assertions.assertEquals(58865, rrs.routableNets);
         Assertions.assertEquals(58865, rrs.unroutedNets);
         Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
+    }
+
+    @Test
+    public void testReportRouteStatusNoPins() {
+        Design design = new Design("testReportRouteStatusNoPins", "xcvu3p");
+        design.createNet("net_with_no_pins");
+        Net vcc = design.getVccNet(); // Causes a net to be created
+        Net gnd = design.getGndNet(); // Causes a net to be created
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportRouteStatus(design);
+        Assertions.assertEquals(0, rrs.logicalNets);
+        Assertions.assertEquals(0, rrs.routableNets);
+        Assertions.assertEquals(0, rrs.unroutedNets);
+        Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFTools.getStaticNet(vcc.getType(), netlist.getTopHierCellInst(), netlist);
+        EDIFTools.getStaticNet(gnd.getType(), netlist.getTopHierCellInst(), netlist);
+
+        if (FileTools.isVivadoOnPath()) {
+            rrs = VivadoTools.reportRouteStatus(design);
+            Assertions.assertEquals(0, rrs.logicalNets);
+            Assertions.assertEquals(0, rrs.routableNets);
+            Assertions.assertEquals(0, rrs.unroutedNets);
+            Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
+        }
     }
 }
