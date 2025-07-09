@@ -28,6 +28,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 
 import java.util.Collection;
@@ -49,8 +50,9 @@ public class ReportRouteStatus {
      * @return ReportRouteStatusResult object.
      */
     public static ReportRouteStatusResult reportRouteStatus(Design design) {
-        ReportRouteStatusResult rrs = new ReportRouteStatusResult();
+        final EDIFNetlist netlist = design.getNetlist();
 
+        ReportRouteStatusResult rrs = new ReportRouteStatusResult();
         Map<Node, Net> nodesUsedByDesign = new HashMap<>();
         Set<Net> conflictingNets = new HashSet<>();
 
@@ -63,6 +65,9 @@ public class ReportRouteStatus {
                     continue;
                 }
             } else if (!RouterHelper.isRoutableNetWithSourceSinks(net)) {
+                if (netlist.getPhysicalPins(net) == null) {
+                    rrs.logicalNets--;
+                }
                 rrs.netsNotNeedingRouting++;
                 continue;
             }
