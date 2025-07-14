@@ -339,6 +339,7 @@ public class EDIFNetlistComparator {
                 EDIFCell testCell = testCells.remove(e2.getKey());
                 if (testCell == null) {
                     addDiff(EDIFDiffType.CELL_MISSING, e2.getValue(), testCell, null, goldLib, "");
+                    continue;
                 }
                 EDIFCell goldCell = e2.getValue();
                 checkCell(goldCell, testCell);
