@@ -320,6 +320,7 @@ public class EDIFNetlistComparator {
 
     public int compareNetlists(EDIFNetlist gold, EDIFNetlist test) {
         diffMap = new LinkedHashMap<>();
+        diffCount = 0;
 
         Map<String, EDIFLibrary> testLibs = new HashMap<>(test.getLibrariesMap());
         for (Entry<String, EDIFLibrary> e : gold.getLibrariesMap().entrySet()) {
