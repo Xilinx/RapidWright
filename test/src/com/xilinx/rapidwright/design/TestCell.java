@@ -63,9 +63,27 @@ public class TestCell {
         List<String> sitePinNames = cell.getAllCorrespondingSitePinNames(logicalPinName, considerLutRoutethru);
         Assertions.assertEquals(expectedSitePins, sitePinNames.toString());
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            // Versal input pins
+            "xcvp1502,SLICE_X148Y0,BFF,D,D,BX",
+    })
+    public void testGetCorrespondingSitePinName(String deviceName,
+                                                String siteName,
+                                                String belName,
+                                                String logicalPinName,
+                                                String physicalPinName,
+                                                String expectedSitePin) {
+        Device device = Device.getDevice(deviceName);
+        Cell cell = new Cell("cell", device.getSite(siteName).getBEL(belName));
+        cell.addPinMapping(physicalPinName, logicalPinName);
+        String sitePinName = cell.getCorrespondingSitePinName(logicalPinName);
+        Assertions.assertEquals(expectedSitePin, sitePinName);
+    }
     
     @Test
-    public void testGetCorrespondingSitePinName() {
+    public void testGetCorrespondingSitePinNameDualLut() {
         Device device = Device.getDevice("xcvu3p");
         Design design = new Design("testDesign", device.getName());
         Cell cell = design.createAndPlaceCell("testFF", Unisim.FDRE, "SLICE_X10Y10/GFF");
