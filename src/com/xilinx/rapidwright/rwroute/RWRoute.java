@@ -2018,13 +2018,9 @@ public class RWRoute {
     }
 
     protected boolean isAccessibleSink(RouteNode child, Connection connection) {
-        // When LUT pin swapping is enabled, EXCLUSIVE_SINK-s are not exclusive anymore
-        return isAccessibleSink(child, connection, !lutPinSwapping);
-    }
-
-    protected boolean isAccessibleSink(RouteNode child, Connection connection, boolean assertOnOveruse) {
         assert(child.getType().isAnyExclusiveSink());
-        assert(!assertOnOveruse || !child.isOverUsed());
+        // When LUT pin swapping is enabled, EXCLUSIVE_SINK-s are not exclusive anymore
+        assert(!child.isOverUsed());
 
         if (child.isTarget()) {
             return true;
@@ -2037,6 +2033,7 @@ public class RWRoute {
             return false;
         }
 
+        // Must be a NODE_PINBOUNCE that is an exclusive sink of some other connection on the same net
         return true;
     }
 
