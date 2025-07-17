@@ -161,7 +161,7 @@ public class TestEDIFTools {
 
         // Test connecting a sink in a low hierarchical cell to a unconnected net in at the root
         //   [net] 'test_net3' -->
-        // [pin] 'bd_0_i/hls_inst/inst/add_ln180_1_reg_1471_reg[5]/D'
+        //   [pin] 'bd_0_i/hls_inst/inst/add_ln180_1_reg_1471_reg[5]/D'
         netName = "test_net3";
         d.getTopEDIFCell().createNet(netName);
         net = d.getNetlist().getHierNetFromName(netName);
@@ -175,8 +175,8 @@ public class TestEDIFTools {
 
         // Test connecting a sink in a low hierarchical cell to an unconnected net in
         // another (separate) low hierarchical cell
-        // [net] 'bd_0_i/hls_inst/inst/wt_mem_V_U/top_wt_mem_V_ram_U/test_net4' -->
-        // [pin] 'bd_0_i/hls_inst/inst/add_ln180_1_reg_1471_reg[4]/D'
+        //   [net] 'bd_0_i/hls_inst/inst/wt_mem_V_U/top_wt_mem_V_ram_U/test_net4' -->
+        //   [pin] 'bd_0_i/hls_inst/inst/add_ln180_1_reg_1471_reg[4]/D'
         netName = "test_net4";
         targetInst.getCellType().createNet(netName);
         net = targetInst.getNet(netName);

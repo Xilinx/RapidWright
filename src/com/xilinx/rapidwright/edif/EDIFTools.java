@@ -653,6 +653,7 @@ public class EDIFTools {
         EDIFHierCellInst netInst = net.getHierarchicalInst();
         EDIFCell cellType = netInst.getCellType();
         
+        // Search for existing pins on the provided net, use those preferentially
         if (pinIsOutput) {
             for (EDIFHierPortInst pi : net.getPortInsts()) {
                 if (pi.isInput() || (pi.getPortInst().isTopLevelPort() && pi.isOutput())) {
@@ -667,6 +668,8 @@ public class EDIFTools {
             }
         }
 
+        // If the net has no usable pins for reference, determine the hierarchical
+        // direction the connection will need to be made and create a pin pre-emptively
         outer: if (snk == null || src == null) {
             EDIFHierCellInst pinInst = pin.getFullHierarchicalInst();
             EDIFHierCellInst commonAncestor = pinInst.getCommonAncestor(netInst);
@@ -678,9 +681,8 @@ public class EDIFTools {
                 while (!currNet.getHierarchicalInst().equals(commonAncestor)) {
                     EDIFPortInst topPortInst = currNet.getNet().getTopLevelPortInst();
                     if (topPortInst == null) {
-                        // No existing path exists, we should create a new PortInst on the appropriate
+                        // No existing connectivity exists, we should create a new port and PortInst on the appropriate
                         // instance connected to the requested net
-
                         EDIFHierCellInst targetInst = currNet.getHierarchicalInst();
                         EDIFPort port = createUniquePort(targetInst.getCellType(), newName, pinIsOutput ? EDIFDirection.INPUT : EDIFDirection.OUTPUT, 1);
                         EDIFHierPortInst otherPin = new EDIFHierPortInst(targetInst, currNet.getNet().createPortInst(port));
@@ -694,19 +696,16 @@ public class EDIFTools {
                     EDIFPortInst outerPortInst = currNet.getParentInst().getPortInst(topPortInst.getName());
                     currNet = new EDIFHierNet(currNet.getHierarchicalInst().getParent(), outerPortInst.getNet());
                 }
-
             } 
             if (commonAncestor.getDepth() <= pinInst.getDepth()) {
                 // Need to go up in hierarchy
-                
                 EDIFHierNet currNet = pin.getHierarchicalNet();
                 // follow net connectivity until we either reach the commonAncestor or can't go any higher
                 while (currNet == null || !currNet.getHierarchicalInst().equals(commonAncestor)) {
                     EDIFPortInst topPortInst = currNet == null ? null : currNet.getNet().getTopLevelPortInst();
                     if (topPortInst == null) {
-                        // No existing path exists, we should create a new PortInst on the appropriate
+                        // No existing connectivity exists, we should create a new port and PortInst on the appropriate
                         // instance connected to the requested net
-
                         EDIFHierCellInst targetInst = commonAncestor.getChild(pinInst.getFullHierarchy().get(commonAncestor.getDepth()));
                         EDIFPort port = createUniquePort(targetInst.getCellType(), newName, pinIsOutput ? EDIFDirection.OUTPUT : EDIFDirection.INPUT, 1);
                         EDIFHierPortInst otherPin = new EDIFHierPortInst(commonAncestor, net.getNet().createPortInst(port, targetInst.getInst()));
@@ -726,7 +725,6 @@ public class EDIFTools {
                         snk = otherPin;
                     }
                 }
-                
             } else {
                 // Create one if one doesn't exist
                 EDIFPort port = createUniquePort(cellType, newName, pinIsOutput ? EDIFDirection.INPUT : EDIFDirection.OUTPUT, 1);
