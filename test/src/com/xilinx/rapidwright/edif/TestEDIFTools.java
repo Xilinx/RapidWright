@@ -156,8 +156,8 @@ public class TestEDIFTools {
         Assertions.assertEquals(1, leafPins.size());
         Assertions.assertEquals(pin.toString(), leafPins.get(0).toString());
 
-        includeSrcs = !includeSrcs;
-        includeSnks = !includeSnks;
+        includeSrcs = false;
+        includeSnks = true;
 
         // Test connecting a sink in a low hierarchical cell to a unconnected net in at the root
         //   [net] 'test_net3' -->
