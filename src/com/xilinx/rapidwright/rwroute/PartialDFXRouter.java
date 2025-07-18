@@ -164,9 +164,9 @@ public class PartialDFXRouter extends PartialRouter {
             return true;
         }
 
-        RouteNode beginOfLockedPath = connectionToTrueSinkRnodeBehindLockedPath.get(connection);
-        if (beginOfLockedPath == rnode) {
-            // This is the rnode of a locked path that does lead to this connection's sink
+        RouteNode trueSinkRnode = connectionToTrueSinkRnodeBehindLockedPath.get(connection);
+        if (rnode == trueSinkRnode) {
+            // This is the connection's true sink rnode behind the locked path
             return true;
         }
 
@@ -192,11 +192,11 @@ public class PartialDFXRouter extends PartialRouter {
 
     @Override
     protected void finishRouteConnection(Connection connection, RouteNode rnode) {
-        RouteNode beginOfLockedPath = connectionToTrueSinkRnodeBehindLockedPath.get(connection);
-        if (beginOfLockedPath != null) {
+        RouteNode trueSinkRnode = connectionToTrueSinkRnodeBehindLockedPath.get(connection);
+        if (trueSinkRnode != null) {
             // rnode is the beginning of a locked path to the real sink; start routing recovery from that real sink instead
             assert(connection.getSinkRnode() == rnode);
-            rnode = beginOfLockedPath;
+            rnode = trueSinkRnode;
         }
 
         super.finishRouteConnection(connection, rnode);
@@ -210,9 +210,9 @@ public class PartialDFXRouter extends PartialRouter {
             if (trueSource != null) {
                 connection.setSourceRnode(trueSource);
             }
-            RouteNode trueSink = connectionToTrueSinkRnodeBehindLockedPath.get(connection);
-            if (trueSink != null) {
-                connection.setSinkRnode(trueSink);
+            RouteNode trueSinkRnode = connectionToTrueSinkRnodeBehindLockedPath.get(connection);
+            if (trueSinkRnode != null) {
+                connection.setSinkRnode(trueSinkRnode);
             }
         }
 
