@@ -2674,7 +2674,7 @@ public class DesignTools {
             BELPin belPin = queue.remove();
             if (belPin.isOutput() == sitePin.isOutPin()) {
                 BEL bel = belPin.getBEL();
-                if (bel.getBELClass() == BELClass.RBEL) {
+                if (!bel.isLUT() && belPin.getSitePIPs().size() > 0) {
                     // Routing BEL, lets look ahead/behind it
                     SitePIP sitePIP = siteInst.getUsedSitePIP(belPin);
                     if (sitePIP != null) {
@@ -2683,6 +2683,20 @@ public class DesignTools {
                             if (belPin2.equals(otherPin)) continue;
                             EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, belPin2);
                             if (portInst != null) portInsts.add(portInst);
+                        }
+                    } else if (bel.isIMR()) {
+                        int outPinIdx = bel.getHighestInputIndex() + 1;
+                        assert (bel.getPins().length == outPinIdx + 1);
+                        BELPin imrOut = bel.getPin(outPinIdx);
+                        for (BELPin pin : imrOut.getSiteConns()) {
+                            if (pin.isInput()) {
+                                Cell lut = siteInst.getCell(pin.getBEL());
+                                if (lut != null && lut.getLogicalPinMapping(pin.getName()) != null) {
+                                    EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, pin);
+                                    if (portInst != null)
+                                        portInsts.add(portInst);
+                                }
+                            }
                         }
                     }
                 } else {

@@ -446,6 +446,29 @@ public class TestECOTools {
     }
 
     @Test
+    public void testConnectNetVersalLUTInput() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        Cell c = design.getCell("processor/upper_parity_lut");
+        String pin = "I2";
+        String siteWire = c.getSiteWireNameFromLogicalPin(pin);
+        SitePinInst spi = c.getSitePinFromLogicalPin(pin, null);
+        SiteInst si = c.getSiteInst();
+        Net net = si.getNetFromSiteWire(siteWire);
+        EDIFHierPortInst portInst = c.getEDIFHierCellInst().getPortInst(pin);
+        ECOTools.disconnectNet(design, portInst);
+        // TODO Question: should disconnectNet() be unrouting IMR routethrus? Is this next line necessary?
+        si.unrouteIntraSiteNet(spi.getBELPin(), c.getBELPin(portInst.getPortInst()));
+
+        Assertions.assertNull(si.getNetFromSiteWire(siteWire));
+        Assertions.assertNull(c.getEDIFHierCellInst().getPortInst(pin).getNet());
+
+        ECOTools.connectNet(design, c, "I2", net);
+
+        Assertions.assertEquals(net, si.getNetFromSiteWire(siteWire));
+        Assertions.assertEquals(net.getLogicalNet(), c.getEDIFHierCellInst().getPortInst(pin).getNet());
+    }
+
+    @Test
     @Disabled("Currently, ECOTools.removeCell() does not work for hierarchical cells. Specifically, for this testcase " +
             "exclusively intra-site routes (e.g. 'processor/data_path_loop[4].small_spm.small_spm_ram.spm_ram/DOA') " +
             "are not removed and appear in the DCP causing Vivado to emit 'placement information for XX sites failed to" +
