@@ -25,6 +25,7 @@
  */
 package com.xilinx.rapidwright.design.blocks;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -200,6 +201,10 @@ public class PBlockRange {
      */
     public Set<Tile> getAllTiles() {
         Set<Tile> tiles = new HashSet<>();
+
+        if (getBottomLeftTile() == getTopRightTile()) {
+            return Collections.singleton(getBottomLeftTile());
+        }
 
         int colMin = getBottomLeftTile().getColumn();
         int rowMin = getTopRightTile().getRow();
