@@ -2712,8 +2712,10 @@ public class DesignTools {
                                 Cell c = siteInst.getCell(pin.getBEL());
                                 if (c != null) {
                                     EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, pin);
-                                    if (portInst != null)
+                                    if (portInst != null && portInst.getHierarchicalNet()
+                                            .isAlias(sitePin.getNet().getLogicalHierNet())) {
                                         portInsts.add(portInst);
+                                    }
                                 }
                             }
                         }
