@@ -451,13 +451,11 @@ public class TestECOTools {
         Cell c = design.getCell("processor/upper_parity_lut");
         String pin = "I2";
         String siteWire = c.getSiteWireNameFromLogicalPin(pin);
-        SitePinInst spi = c.getSitePinFromLogicalPin(pin, null);
         SiteInst si = c.getSiteInst();
         Net net = si.getNetFromSiteWire(siteWire);
         EDIFHierPortInst portInst = c.getEDIFHierCellInst().getPortInst(pin);
+
         ECOTools.disconnectNet(design, portInst);
-        // TODO Question: should disconnectNet() be unrouting IMR routethrus? Is this next line necessary?
-        si.unrouteIntraSiteNet(spi.getBELPin(), c.getBELPin(portInst.getPortInst()));
 
         Assertions.assertNull(si.getNetFromSiteWire(siteWire));
         Assertions.assertNull(c.getEDIFHierCellInst().getPortInst(pin).getNet());
