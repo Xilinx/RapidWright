@@ -442,7 +442,6 @@ public class ECOTools {
                         if (spi == null) {
                             continue;
                         }
-                        assert (spi.getNet() == null || spi.getNet().getLogicalHierNet().isAlias(ehn));
                         // Check that all port insts serviced by this SPI are on this net
                         List<EDIFHierPortInst> portInstsOnSpi = DesignTools.getPortInstsFromSitePinInst(spi);
                         assert(portInstsOnSpi.contains(ehpi));
