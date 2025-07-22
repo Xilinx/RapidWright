@@ -2019,7 +2019,6 @@ public class RWRoute {
 
     protected boolean isAccessibleSink(RouteNode child, Connection connection) {
         assert(child.getType().isAnyExclusiveSink());
-        // When LUT pin swapping is enabled, EXCLUSIVE_SINK-s are not exclusive anymore
         assert(!child.isOverUsed());
 
         if (child.isTarget()) {
