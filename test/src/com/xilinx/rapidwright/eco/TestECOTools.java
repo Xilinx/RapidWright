@@ -211,6 +211,8 @@ public class TestECOTools {
         }
         ECOTools.disconnectNet(design, disconnectPins, deferredRemovals);
         Assertions.assertEquals(14, deferredRemovals.size());
+        DesignTools.batchRemoveSitePins(deferredRemovals, true);
+        deferredRemovals.clear();
 
         // Re-connect those inputs to some other nets
         final Map<EDIFHierNet, List<EDIFHierPortInst>> netToPortInsts = new HashMap<>();
