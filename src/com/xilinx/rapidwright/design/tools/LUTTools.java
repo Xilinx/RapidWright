@@ -429,7 +429,8 @@ public class LUTTools {
      * @return The equation following LUT equation syntax or null if cell is not configured.
      */
     public static String getLUTEquation(EDIFCellInst i) {
-        String init = i.getProperty(LUT_INIT).getValue();
+        EDIFPropertyValue prop = i.getProperty(LUT_INIT);
+        String init = prop == null ? null : prop.getValue();
         if (init == null) return null;
         return getLUTEquation(init);
     }
