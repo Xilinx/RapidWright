@@ -701,7 +701,7 @@ public class EDIFTools {
                 // Need to go up in hierarchy ...
                 EDIFHierNet currNet;
                 if (pinIsOutput) {
-                    // ... fom the target pin (which is an input)
+                    // ... from the target pin (which is an input)
                     currNet = pin.getHierarchicalNet();
                 } else {
                     // ... from the target net (which is to be treated as the output)
