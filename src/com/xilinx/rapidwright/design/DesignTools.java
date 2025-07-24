@@ -2658,11 +2658,16 @@ public class DesignTools {
 
         return result;
     }
+
     /**
-     * Given a SitePinInst, this method will find any return hierarchical logical cell pins within
-     * the site directly connected to the site pin.
+     * Given a SitePinInst, this method will find any and all possible potential
+     * hierarchical logical cell pins within the site that can connect to the site
+     * pin. If the site has been routed, it will only return those pins that are
+     * reachable through the site routing. For those paths that are not routed in
+     * the site, it will return all possible connections that could be made.
+     * 
      * @param sitePin The site pin to query.
-     * @return A list of hierarchical port instances that connect to the site pin.
+     * @return A list of hierarchical port instances that can connect to the site pin.
      */
     public static List<EDIFHierPortInst> getPortInstsFromSitePinInst(SitePinInst sitePin) {
         SiteInst siteInst = sitePin.getSiteInst();
@@ -2674,7 +2679,7 @@ public class DesignTools {
             BELPin belPin = queue.remove();
             if (belPin.isOutput() == sitePin.isOutPin()) {
                 BEL bel = belPin.getBEL();
-                if (bel.getBELClass() == BELClass.RBEL) {
+                if (!bel.isLUT() && belPin.getSitePIPs().size() > 0) {
                     // Routing BEL, lets look ahead/behind it
                     SitePIP sitePIP = siteInst.getUsedSitePIP(belPin);
                     if (sitePIP != null) {
@@ -2683,6 +2688,36 @@ public class DesignTools {
                             if (belPin2.equals(otherPin)) continue;
                             EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, belPin2);
                             if (portInst != null) portInsts.add(portInst);
+                        }
+                    } else if (bel.isIMR()) {
+                        int outPinIdx = bel.getHighestInputIndex() + 1;
+                        assert (bel.getPins().length == outPinIdx + 1);
+                        BELPin imrOut = bel.getPin(outPinIdx);
+                        for (BELPin pin : imrOut.getSiteConns()) {
+                            if (pin.isInput()) {
+                                Cell lut = siteInst.getCell(pin.getBEL());
+                                if (lut != null && lut.getLogicalPinMapping(pin.getName()) != null) {
+                                    EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, pin);
+                                    if (portInst != null)
+                                        portInsts.add(portInst);
+                                }
+                            }
+                        }
+                    } else if (sitePIP == null) {
+                        // No sitePIP has been set, explore all options
+                        for (SitePIP pip : belPin.getSitePIPs()) {
+                            List<BELPin> pins = belPin.isInput() ? pip.getOutputPin().getSiteConns()
+                                    : pip.getInputPin().getSiteConns();
+                            for (BELPin pin : pins) {
+                                Cell c = siteInst.getCell(pin.getBEL());
+                                if (c != null) {
+                                    EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, pin);
+                                    if (portInst != null && sitePin.getNet() != null && portInst.getHierarchicalNet()
+                                            .isAlias(sitePin.getNet().getLogicalHierNet())) {
+                                        portInsts.add(portInst);
+                                    }
+                                }
+                            }
                         }
                     }
                 } else {

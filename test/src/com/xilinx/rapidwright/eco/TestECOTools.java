@@ -211,6 +211,8 @@ public class TestECOTools {
         }
         ECOTools.disconnectNet(design, disconnectPins, deferredRemovals);
         Assertions.assertEquals(14, deferredRemovals.size());
+        DesignTools.batchRemoveSitePins(deferredRemovals, true);
+        deferredRemovals.clear();
 
         // Re-connect those inputs to some other nets
         final Map<EDIFHierNet, List<EDIFHierPortInst>> netToPortInsts = new HashMap<>();
@@ -443,6 +445,27 @@ public class TestECOTools {
                 cell0.getEDIFHierCellInst().getPortInst(pin).getHierarchicalNetName());
         Assertions.assertSame(/*spiA5*/ spiA2, cell0.getSitePinFromPortInst(ehpi.getPortInst(), null));
         Assertions.assertSame(targetNet, /*spiA5*/spiA2.getNet());
+    }
+
+    @Test
+    public void testConnectNetVersalLUTInput() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        Cell c = design.getCell("processor/upper_parity_lut");
+        String pin = "I2";
+        String siteWire = c.getSiteWireNameFromLogicalPin(pin);
+        SiteInst si = c.getSiteInst();
+        Net net = si.getNetFromSiteWire(siteWire);
+        EDIFHierPortInst portInst = c.getEDIFHierCellInst().getPortInst(pin);
+
+        ECOTools.disconnectNet(design, portInst);
+
+        Assertions.assertNull(si.getNetFromSiteWire(siteWire));
+        Assertions.assertNull(c.getEDIFHierCellInst().getPortInst(pin).getNet());
+
+        ECOTools.connectNet(design, c, "I2", net);
+
+        Assertions.assertEquals(net, si.getNetFromSiteWire(siteWire));
+        Assertions.assertEquals(net.getLogicalNet(), c.getEDIFHierCellInst().getPortInst(pin).getNet());
     }
 
     @Test

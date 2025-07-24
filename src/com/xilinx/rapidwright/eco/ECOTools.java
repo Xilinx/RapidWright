@@ -195,7 +195,11 @@ public class ECOTools {
                         // SPI also services a different logical port inst; skip
                         continue;
                     }
+                    BELPin otherPin = cell.getBELPin(leafEhpi);
+                    BELPin src = otherPin.isOutput() ? otherPin : spi.getBELPin();
+                    BELPin snk = otherPin.isOutput() ? spi.getBELPin() : otherPin;
 
+                    cell.getSiteInst().unrouteIntraSiteNet(src, snk);
                     DesignTools.handlePinRemovals(spi, deferredRemovals);
                 }
             }
