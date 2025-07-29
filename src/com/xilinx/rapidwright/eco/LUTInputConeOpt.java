@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.eco;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -36,6 +37,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
@@ -176,6 +178,30 @@ public class LUTInputConeOpt {
         return physCell;
     }
 
+    private static List<EDIFHierPortInst> getSharedSinksInSite(Design design, EDIFHierPortInst input) {
+        Cell c = design.getCell(input.getFullHierarchicalInstName());
+        if (c == null) {
+            return Collections.emptyList();
+        }
+        List<EDIFHierPortInst> sharedPortInsts = new ArrayList<>();
+        String siteWire = c.getSiteWireNameFromLogicalPin(input.getPortInst().getName());
+        for (BELPin pin : c.getSite().getBELPins(siteWire)) {
+            if (pin.isInput()) {
+                Cell otherCell = c.getSiteInst().getCell(pin.getBEL());
+                if (otherCell != null && !otherCell.isRoutethru() && c != otherCell) {
+                    String logPinName = otherCell.getLogicalPinMapping(pin.getName());
+                    if (logPinName != null) {
+                        EDIFHierPortInst ehpi = otherCell.getEDIFHierCellInst()
+                                .getPortInst(logPinName);
+                        sharedPortInsts.add(ehpi);
+                    }
+                }
+            }
+        }
+
+        return sharedPortInsts;
+    }
+
     private static Cell createAndConnectCell(Design design, EDIFHierCellInst hierLutInst, EDIFCellInst lutInst,
             EDIFHierPortInst input, Site site) {
         Cell physCell = design.createCell(hierLutInst.getFullHierarchicalInstName(), lutInst);
@@ -186,6 +212,16 @@ public class LUTInputConeOpt {
         List<EDIFHierPortInst> pinsToConnect = new ArrayList<>();
         pinsToConnect.add(input);
         pinsToConnect.add(new EDIFHierPortInst(hierLutInst.getParent(), lutInst.getOrCreatePortInst("O")));
+
+        // Check for other cells physically sharing the same SitePinInst input
+        List<EDIFHierPortInst> otherPins = getSharedSinksInSite(design, input);
+        if (otherPins.size() > 0) {
+            // Include other sinks in the optimization by disconnecting them also and
+            // connecting them to the optimized LUT output
+            ECOTools.disconnectNet(design, otherPins);
+            pinsToConnect.addAll(otherPins);
+        }
+
         Map<EDIFHierNet, List<EDIFHierPortInst>> map = new HashMap<>();
         map.put(hierLutOutput, pinsToConnect);
         ECOTools.connectNet(design, map, null);
