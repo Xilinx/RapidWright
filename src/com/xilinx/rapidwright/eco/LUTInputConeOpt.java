@@ -218,6 +218,10 @@ public class LUTInputConeOpt {
         if (otherPins.size() > 0) {
             // Include other sinks in the optimization by disconnecting them also and
             // connecting them to the optimized LUT output
+            for (EDIFHierPortInst ehpi : otherPins) {
+                System.out.println("[INFO]: Optimized pin is sharing a site pin with " + ehpi
+                        + " and will also have its source swapped.");
+            }
             ECOTools.disconnectNet(design, otherPins);
             pinsToConnect.addAll(otherPins);
         }
