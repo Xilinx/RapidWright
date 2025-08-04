@@ -335,18 +335,11 @@ public class EDIFNetlistComparator {
         addDiff(type, gold, test, parentCell, parentLibrary, notEqualString, null, null);
     }
 
-    private void addDiff(
-            EDIFDiffType type,
-            Object gold,
-            Object test,
-            EDIFCell parentCell,
-            EDIFLibrary parentLibrary,
-            String notEqualString,
-            EDIFCellInst sourceInst,
-            String propertyKey) {
+    private void addDiff(EDIFDiffType type, Object gold, Object test, EDIFCell parentCell,
+            EDIFLibrary parentLibrary, String notEqualString, 
+            EDIFCellInst sourceInst, String propertyKey) {
         List<EDIFDiff> diffs = diffMap.computeIfAbsent(type, l -> new ArrayList<>());
-        diffs.add(new EDIFDiff(type, gold, test, 
-                    parentCell, parentLibrary, 
+        diffs.add(new EDIFDiff(type, gold, test, parentCell, parentLibrary, 
                     notEqualString, sourceInst, propertyKey));
         diffCount++;
     }
