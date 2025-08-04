@@ -26,28 +26,47 @@
  */
 package com.xilinx.rapidwright.ipi;
 
+import java.util.stream.Stream;
+
 /**
  * Annotates a package pin name with an IO standard
  * Created on: Jan 25, 2018
  */
-public class PackagePinConstraint {
+public class PackagePinConstraint implements Constraint<PackagePinConstraint> {
 
-    private String name;
+    private String portName;
+
+    private String packagePin;
 
     private String ioStandard;
+
+    public PackagePinConstraint() {
+    }
+
+    @Override
+    public PackagePinConstraint clone() {
+        PackagePinConstraint res = new PackagePinConstraint(portName);
+        res.setPackagePin(packagePin);
+        res.setIOStandard(ioStandard);
+        return res;
+    }
+
+    public PackagePinConstraint(String portName) {
+        setPortName(portName);
+    }
 
     /**
      * @return the name
      */
-    public String getName() {
-        return name;
+    public String getPackagePin() {
+        return packagePin;
     }
 
     /**
-     * @param name the name to set
+     * @param packagePin the name to set
      */
-    public void setName(String name) {
-        this.name = name;
+    public void setPackagePin(String packagePin) {
+        this.packagePin = packagePin;
     }
 
     /**
@@ -65,6 +84,21 @@ public class PackagePinConstraint {
     }
 
     public String toString() {
-        return name + ":" + ioStandard;
+        return packagePin + ":" + ioStandard;
+    }
+
+    public String getPortName() {
+        return portName;
+    }
+
+    public Stream<String> asXdc() {
+        return Stream.of(
+                "set_property PACKAGE_PIN "+packagePin+" [get_ports "+portName+"]",
+                "set_property IOSTANDARD "+ioStandard+" [get_ports "+portName+"]"
+        );
+    }
+
+    public void setPortName(String portName) {
+        this.portName = portName;
     }
 }
