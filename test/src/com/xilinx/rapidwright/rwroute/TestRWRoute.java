@@ -32,6 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.eco.ECOTools;
 import com.xilinx.rapidwright.util.VivadoToolsHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
@@ -535,5 +537,29 @@ public class TestRWRoute {
                 srcSiteName, srcPinName,
                 dstSiteName, dstPinName,
                 nodesPoppedLimit);
+    }
+
+    @Test
+    public void testDiscussion1245() {
+        // Adapted from https://github.com/Xilinx/RapidWright/discussions/1245#discussioncomment-14003055
+        Design test_place = new Design("test_design", "vp1202");
+
+        Cell cell_1 = test_place.createAndPlaceCell("my_test_cell_1", Unisim.LUT6, "SLICE_X342Y0/A6LUT");
+        LUTTools.configureLUT(cell_1, "O=I1");
+        cell_1.fixCell(true);
+
+        Cell cell_2 = test_place.createAndPlaceCell("my_test_cell_2", Unisim.LUT6, "SLICE_X342Y0/C6LUT");
+        LUTTools.configureLUT(cell_2, "O=I1");
+        cell_2.fixCell(true);
+
+        Net net = test_place.createNet("my_test_net");
+        ECOTools.connectNet(test_place, cell_1, "O", net);
+        ECOTools.connectNet(test_place, cell_2, "I1", net);
+
+        Design test_route = test_place;
+
+        test_route.routeSites();
+
+        RWRoute.routeDesignFullNonTimingDriven(test_route);
     }
 }

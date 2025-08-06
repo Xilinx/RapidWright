@@ -302,6 +302,7 @@ public class RouteNodeGraph {
             BiConsumer<List<TileTypeEnum>, Boolean> lambda = (types, east) -> {
                 for (TileTypeEnum tte : types) {
                     Tile intfTile = device.getArbitraryTileOfType(tte);
+                    if (intfTile == null) continue;
                     BitSet eastWestWires = this.eastWestWires.computeIfAbsent(tte,
                             k -> new BitSet[]{new BitSet(), new BitSet()})[east ? 0 : 1];
                     for (int wireIndex = 0; wireIndex < intfTile.getWireCount(); wireIndex++) {
@@ -320,12 +321,28 @@ public class RouteNodeGraph {
                     TileTypeEnum.INTF_LOCF_TR_TILE,
                     TileTypeEnum.INTF_LOCF_BR_TILE,
                     TileTypeEnum.INTF_ROCF_TR_TILE,
-                    TileTypeEnum.INTF_ROCF_BR_TILE), true);
+                    TileTypeEnum.INTF_ROCF_BR_TILE,
+                    TileTypeEnum.INTF_GT_TR_TILE,
+                    TileTypeEnum.INTF_GT_BR_TILE,
+                    TileTypeEnum.INTF_HB_LOCF_TR_TILE,
+                    TileTypeEnum.INTF_HB_LOCF_BR_TILE,
+                    TileTypeEnum.INTF_HB_ROCF_TR_TILE,
+                    TileTypeEnum.INTF_HB_ROCF_BR_TILE), true /* east */);
             lambda.accept(Arrays.asList(
                     TileTypeEnum.INTF_LOCF_TL_TILE,
                     TileTypeEnum.INTF_LOCF_BL_TILE,
                     TileTypeEnum.INTF_ROCF_TL_TILE,
-                    TileTypeEnum.INTF_ROCF_BL_TILE), false);
+                    TileTypeEnum.INTF_ROCF_BL_TILE,
+                    TileTypeEnum.INTF_CFRM_TL_TILE,
+                    TileTypeEnum.INTF_CFRM_BL_TILE,
+                    TileTypeEnum.INTF_GT_TL_TILE,
+                    TileTypeEnum.INTF_GT_BL_TILE,
+                    TileTypeEnum.INTF_HB_LOCF_TL_TILE,
+                    TileTypeEnum.INTF_HB_LOCF_BL_TILE,
+                    TileTypeEnum.INTF_HB_ROCF_TL_TILE,
+                    TileTypeEnum.INTF_HB_ROCF_BL_TILE,
+                    TileTypeEnum.INTF_PSS_BL_TILE,
+                    TileTypeEnum.INTF_PSS_TL_TILE), false /* west */);
         }
 
         if (lutRoutethru) {
