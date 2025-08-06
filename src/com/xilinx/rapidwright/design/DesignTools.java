@@ -659,9 +659,17 @@ public class DesignTools {
             } else if (Utils.isDSP(si)) {
                 incrementUtilType(map, UtilizationType.DSPS);
             } else if (Utils.isBRAM(si)) {
-                if (s == SiteTypeEnum.RAMBFIFO36) {
+                if (s == SiteTypeEnum.RAMBFIFO36 ||
+                    s == SiteTypeEnum.RAMB36 ||
+                    s == SiteTypeEnum.RAMB36E1 ||
+                    s == SiteTypeEnum.RAMBFIFO36E1) {
                     incrementUtilType(map, UtilizationType.RAMB36S_FIFOS);
-                } else if (s == SiteTypeEnum.RAMB181 || s == SiteTypeEnum.RAMBFIFO18) {
+                } else if (s == SiteTypeEnum.RAMB181 ||
+                            s == SiteTypeEnum.RAMB180 ||
+                            s == SiteTypeEnum.RAMB18E1 ||
+                            s == SiteTypeEnum.RAMB18_L ||
+                            s == SiteTypeEnum.RAMB18_U ||
+                            s == SiteTypeEnum.RAMBFIFO18) {
                     incrementUtilType(map, UtilizationType.RAMB18S);
                 }
             } else if (Utils.isURAM(si)) {

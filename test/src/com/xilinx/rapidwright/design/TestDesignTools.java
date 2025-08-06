@@ -1131,6 +1131,61 @@ public class TestDesignTools {
         DesignTools.createCeSrRstPinsToVCC(design);
     }
 
+    @Test
+    public void testCalculateUtilization7Series() {
+        Device device = Device.getDevice("xc7z020");
+        Design design = new Design("testDesign", device.getName());
+
+        design.createAndPlaceCell("ram18_1", Unisim.RAMB18E1, "RAMB18_X1Y17/RAMB18E1");
+        design.createAndPlaceCell("ram18_2", Unisim.RAMB18E1, "RAMB18_X2Y21/RAMB18E1");
+        design.createAndPlaceCell("ram36_1", Unisim.RAMB36E1, "RAMB36_X1Y7/RAMB36E1");
+        // design.createAndPlaceCell("ram36_2", Unisim.RAMB36E1, "RAMB36_X2Y12/RAMBFIFO36E1");
+
+        Map<UtilizationType, Integer> util = DesignTools.calculateUtilization(design);
+        Assertions.assertEquals(2, util.get(UtilizationType.RAMB18S));
+        Assertions.assertEquals(1, util.get(UtilizationType.RAMB36S_FIFOS));
+    }
+
+    @Test
+    public void testCalculateUtilizationUltraScale() {
+        Design design = new Design("testDesign", Device.KCU105);
+
+        design.createAndPlaceCell("ram18_1", Unisim.RAMB18E2, "RAMB18_X1Y0/RAMB18E2_L");
+        design.createAndPlaceCell("ram18_2", Unisim.RAMB18E2, "RAMB18_X1Y1/RAMB18E2_U");
+        design.createAndPlaceCell("ram36_1", Unisim.RAMB36E2, "RAMB36_X1Y0/RAMB36E2");
+
+        Map<UtilizationType, Integer> util = DesignTools.calculateUtilization(design);
+        Assertions.assertEquals(2, util.get(UtilizationType.RAMB18S));
+        Assertions.assertEquals(1, util.get(UtilizationType.RAMB36S_FIFOS));
+    }
+
+    @Test
+    public void testCalculateUtilizationUltraScalePlus() {
+        Design design = new Design("testDesign", Device.AWS_F1);
+
+        design.createAndPlaceCell("ram18_1", Unisim.RAMB18E2, "RAMB18_X1Y0/RAMB18E2_L");
+        design.createAndPlaceCell("ram18_2", Unisim.RAMB18E2, "RAMB18_X1Y1/RAMB18E2_U");
+        design.createAndPlaceCell("ram36_1", Unisim.RAMB36E2, "RAMB36_X1Y0/RAMB36E2");
+
+        Map<UtilizationType, Integer> util = DesignTools.calculateUtilization(design);
+        Assertions.assertEquals(2, util.get(UtilizationType.RAMB18S));
+        Assertions.assertEquals(1, util.get(UtilizationType.RAMB36S_FIFOS));
+    }
+
+    @Test
+    public void testCalculateUtilizationVersal() {
+        Device device = Device.getDevice("xcvp1002");
+        Design design = new Design("testDesign", device.getName());
+
+        design.createAndPlaceCell("ram18_1", Unisim.RAMB18E5_INT, "RAMB18_X1Y0/RAMB18_L");
+        design.createAndPlaceCell("ram18_2", Unisim.RAMB18E5_INT, "RAMB18_X1Y1/RAMB18_U");
+        design.createAndPlaceCell("ram36_1", Unisim.RAMB36E5_INT, "RAMB36_X2Y11/RAMB36");
+
+        Map<UtilizationType, Integer> util = DesignTools.calculateUtilization(design);
+        Assertions.assertEquals(2, util.get(UtilizationType.RAMB18S));
+        Assertions.assertEquals(1, util.get(UtilizationType.RAMB36S_FIFOS));
+    }
+
     @ParameterizedTest
     @CsvSource({
             // US+
