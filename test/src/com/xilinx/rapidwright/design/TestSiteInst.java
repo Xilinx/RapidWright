@@ -23,21 +23,27 @@
 
 package com.xilinx.rapidwright.design;
 
-import com.xilinx.rapidwright.design.tools.LUTTools;
-import com.xilinx.rapidwright.device.BEL;
-import com.xilinx.rapidwright.device.BELPin;
-import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.Series;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.util.VivadoToolsHelper;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import java.nio.file.Path;
-import java.util.Arrays;
+import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.device.SitePIP;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 public class TestSiteInst {
 
@@ -411,5 +417,67 @@ public class TestSiteInst {
 
         SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X40Y10"));
         Assertions.assertTrue(si.isEmpty());
+    }
+
+    @Test
+    public void testRouteSiteVersal() {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+
+        _testRouteSiteVersal(d, "SLICE_X138Y0", 40, 34);
+        _testRouteSiteVersal(d, "SLICE_X139Y0", 65, 34);
+        _testRouteSiteVersal(d, "SLICE_X142Y4", 40, 24);
+    }
+
+    private void _testRouteSiteVersal(Design d, String siteName, int expectedSiteNetMappings,
+            int expectedUsedSitePIPs) {
+        SiteInst si = d.getSiteInstFromSiteName(siteName);
+        Map<Net, List<String>> origSiteNetMap = si.getNetToSiteWiresMap();
+        List<SitePIP> origUsedSitePIPs = si.getUsedSitePIPs();
+
+        Assertions.assertEquals(expectedSiteNetMappings, origSiteNetMap.size());
+        Assertions.assertEquals(expectedUsedSitePIPs, origUsedSitePIPs.size());
+
+        si.unrouteSite();
+
+        // TODO Not going to reproduce these for now
+        origSiteNetMap.remove(d.getNet(Net.USED_NET));
+
+        Assertions.assertTrue(si.getNetToSiteWiresMap().isEmpty());
+        Assertions.assertTrue(si.getUsedSitePIPs().isEmpty());
+
+        si.routeSite();
+
+        Map<Net, List<String>> siteNetMap = si.getNetToSiteWiresMap();
+        List<SitePIP> usedSitePIPs = si.getUsedSitePIPs();
+
+        for (SitePIP p : origUsedSitePIPs) {
+            if (!usedSitePIPs.contains(p)) {
+                System.out.println("Missing: " + p);
+            }
+        }
+        for (SitePIP p : usedSitePIPs) {
+            if (!origUsedSitePIPs.contains(p)) {
+                System.out.println("Extra: " + p);
+            }
+        }
+
+        Assertions.assertEquals(origSiteNetMap.size(), siteNetMap.size());
+        Assertions.assertEquals(origUsedSitePIPs.size(), usedSitePIPs.size());
+
+        for (Entry<Net, List<String>> e : origSiteNetMap.entrySet()) {
+            List<String> origSiteWires = e.getValue();
+            List<String> siteWires = siteNetMap.get(e.getKey());
+            Collections.sort(origSiteWires);
+            Collections.sort(siteWires);
+            if (!origSiteWires.toString().equals(siteWires.toString())) {
+                System.out.println("Net: " + e.getKey());
+            }
+            Assertions.assertEquals(origSiteWires.toString(), siteWires.toString());
+        }
+
+        List<String> origUsedSitePIPNames = origUsedSitePIPs.stream().map(Object::toString).sorted()
+                .toList();
+        List<String> usedSitePIPNames = usedSitePIPs.stream().map(Object::toString).sorted().toList();
+        Assertions.assertEquals(origUsedSitePIPNames, usedSitePIPNames);
     }
 }
