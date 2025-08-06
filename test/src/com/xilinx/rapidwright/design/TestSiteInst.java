@@ -27,9 +27,11 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -44,6 +46,9 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.ReportRouteStatusResult;
+import com.xilinx.rapidwright.util.VivadoTools;
 import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 public class TestSiteInst {
@@ -427,6 +432,14 @@ public class TestSiteInst {
         _testRouteSiteVersal(d, "SLICE_X138Y0", 40, 34);
         _testRouteSiteVersal(d, "SLICE_X139Y0", 65, 34);
         _testRouteSiteVersal(d, "SLICE_X142Y4", 40, 24);
+
+        if (FileTools.isVivadoOnPath()) {
+            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(d);
+            // The original design had 14 pre-existing routing errors
+            Assertions.assertEquals(14, rrs.netsWithRoutingErrors);
+            Assertions.assertEquals(276, rrs.fullyRoutedNets);
+        }
+
     }
 
     private void _testRouteSiteVersal(Design d, String siteName, int expectedSiteNetMappings,
@@ -440,6 +453,15 @@ public class TestSiteInst {
 
         si.unrouteSite();
 
+        // Remove routethru cells
+        Set<String> belsWithRouteThrus = new HashSet<>();
+        for (Cell c : new ArrayList<>(si.getCells())) {
+            if (c.isRoutethru()) {
+                belsWithRouteThrus.add(c.getBELName());
+                si.removeCell(c.getBEL());
+            }
+        }
+
         // TODO Not going to reproduce these for now
         origSiteNetMap.remove(d.getNet(Net.USED_NET));
 
@@ -447,6 +469,15 @@ public class TestSiteInst {
         Assertions.assertTrue(si.getUsedSitePIPs().isEmpty());
 
         si.routeSite();
+
+        // Ensure routethru cells restored
+        for (Cell c : si.getCells()) {
+            if (c.isRoutethru()) {
+                Assertions.assertTrue(belsWithRouteThrus.contains(c.getBELName()));
+            } else {
+                Assertions.assertFalse(belsWithRouteThrus.contains(c.getBELName()));
+            }
+        }
 
         Map<Net, List<String>> siteNetMap = si.getNetToSiteWiresMap();
         List<SitePIP> usedSitePIPs = si.getUsedSitePIPs();
