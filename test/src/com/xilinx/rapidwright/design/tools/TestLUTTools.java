@@ -49,7 +49,6 @@ import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.device.SitePIPStatus;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.rwroute.RWRoute;
@@ -229,22 +228,19 @@ public class TestLUTTools {
         spiF6 = si.getSitePinInst("F6");
         Assertions.assertSame(f1, spiF6.getNet());
         Assertions.assertSame(f1, si.getNetFromSiteWire("F6"));
-        Assertions.assertNull(si.getCell("F6_IMR"));
-        Assertions.assertEquals(SitePIPStatus.ON, si.getSitePIPStatus(si.getSitePIP("F6_IMR", "D")));
+        Assertions.assertTrue(si.getCell("F6_IMR").isRoutethru());
         Assertions.assertSame(f1, si.getNetFromSiteWire("F6_IMR_Q"));
 
         spiF3 = si.getSitePinInst("F3");
         Assertions.assertSame(f6, spiF3.getNet());
         Assertions.assertSame(f6, si.getNetFromSiteWire("F3"));
-        Assertions.assertNull(si.getCell("F3_IMR"));
-        Assertions.assertEquals(SitePIPStatus.ON, si.getSitePIPStatus(si.getSitePIP("F3_IMR", "D")));
+        Assertions.assertTrue(si.getCell("F3_IMR").isRoutethru());
         Assertions.assertSame(f6, si.getNetFromSiteWire("F3_IMR_Q"));
 
         spiF1 = si.getSitePinInst("F1");
         Assertions.assertSame(f3, spiF1.getNet());
         Assertions.assertSame(f3, si.getNetFromSiteWire("F1"));
-        Assertions.assertNull(si.getCell("F1_IMR"));
-        Assertions.assertEquals(SitePIPStatus.ON, si.getSitePIPStatus(si.getSitePIP("F1_IMR", "D")));
+        Assertions.assertTrue(si.getCell("F1_IMR").isRoutethru());
         Assertions.assertSame(f3, si.getNetFromSiteWire("F1_IMR_Q"));
     }
     
