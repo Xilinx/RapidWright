@@ -302,6 +302,7 @@ public class RouteNodeGraph {
             BiConsumer<List<TileTypeEnum>, Boolean> lambda = (types, east) -> {
                 for (TileTypeEnum tte : types) {
                     Tile intfTile = device.getArbitraryTileOfType(tte);
+                    if (intfTile == null) continue;
                     BitSet eastWestWires = this.eastWestWires.computeIfAbsent(tte,
                             k -> new BitSet[]{new BitSet(), new BitSet()})[east ? 0 : 1];
                     for (int wireIndex = 0; wireIndex < intfTile.getWireCount(); wireIndex++) {
