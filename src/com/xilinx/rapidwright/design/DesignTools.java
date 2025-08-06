@@ -1481,7 +1481,6 @@ public class DesignTools {
         } else {
             final boolean preserveOtherRoutes = true;
             spi.getNet().removePin(spi, preserveOtherRoutes);
-            spi.getSiteInst().removePin(spi);
         }
     }
 
