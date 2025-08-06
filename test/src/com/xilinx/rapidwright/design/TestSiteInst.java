@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.design;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -450,17 +451,6 @@ public class TestSiteInst {
         Map<Net, List<String>> siteNetMap = si.getNetToSiteWiresMap();
         List<SitePIP> usedSitePIPs = si.getUsedSitePIPs();
 
-        for (SitePIP p : origUsedSitePIPs) {
-            if (!usedSitePIPs.contains(p)) {
-                System.out.println("Missing: " + p);
-            }
-        }
-        for (SitePIP p : usedSitePIPs) {
-            if (!origUsedSitePIPs.contains(p)) {
-                System.out.println("Extra: " + p);
-            }
-        }
-
         Assertions.assertEquals(origSiteNetMap.size(), siteNetMap.size());
         Assertions.assertEquals(origUsedSitePIPs.size(), usedSitePIPs.size());
 
@@ -469,15 +459,20 @@ public class TestSiteInst {
             List<String> siteWires = siteNetMap.get(e.getKey());
             Collections.sort(origSiteWires);
             Collections.sort(siteWires);
-            if (!origSiteWires.toString().equals(siteWires.toString())) {
-                System.out.println("Net: " + e.getKey());
-            }
             Assertions.assertEquals(origSiteWires.toString(), siteWires.toString());
         }
 
-        List<String> origUsedSitePIPNames = origUsedSitePIPs.stream().map(Object::toString).sorted()
-                .toList();
-        List<String> usedSitePIPNames = usedSitePIPs.stream().map(Object::toString).sorted().toList();
+        List<String> origUsedSitePIPNames = getSortedStringList(origUsedSitePIPs);
+        List<String> usedSitePIPNames = getSortedStringList(usedSitePIPs);
         Assertions.assertEquals(origUsedSitePIPNames, usedSitePIPNames);
+    }
+
+    private List<String> getSortedStringList(List<SitePIP> sitePIPs) {
+        List<String> strings = new ArrayList<>();
+        for (SitePIP p : sitePIPs) {
+            strings.add(p.toString());
+        }
+        Collections.sort(strings);
+        return strings;
     }
 }
