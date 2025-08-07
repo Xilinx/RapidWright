@@ -1090,6 +1090,10 @@ public class RouteNodeGraph {
                 case NODE_INTF_CTRL:
                     // CTRL pins that are not our target EXCLUSIVE_SINK will have been isExcluded() from the graph
                     break;
+                case NODE_SLL_INPUT:
+                    // Temporarily only allow NODE_SLL_INPUT to be explored if they are the sink
+                    // TODO: Revisit when SLR crossings are supported
+                    return childRnode == sinkRnode;
             }
             throw new RuntimeException("ERROR: Unhandled IntentCode: " + childIntentCode);
         }
