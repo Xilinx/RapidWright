@@ -604,7 +604,7 @@ public class TestRWRoute {
             SiteInst si = ff.getSiteInst();
             SitePinInst spi = si.getSitePinInst("AX");
             Assertions.assertTrue(si.unrouteIntraSiteNet(spi.getBELPin(), ff.getBEL().getPin("D")));
-            spi.movePin("LAG_E2");
+            Assertions.assertTrue(spi.movePin("LAG_E2"));
             Assertions.assertTrue(si.routeIntraSiteNet(spi.getNet(), spi.getBELPin(), ff.getBEL().getPin("D")));
         }
 
