@@ -602,8 +602,8 @@ public class TestRWRoute {
         // Test for intra-SLR connections to the LAG input
         if (forceLagPin) {
             SiteInst si = ff.getSiteInst();
-            Assertions.assertTrue(si.unrouteIntraSiteNet(si.getBELPin("AX", "AX"), ff.getBEL().getPin("D")));
             SitePinInst spi = si.getSitePinInst("AX");
+            Assertions.assertTrue(si.unrouteIntraSiteNet(spi.getBELPin(), ff.getBEL().getPin("D")));
             spi.movePin("LAG_E2");
             Assertions.assertTrue(si.routeIntraSiteNet(spi.getNet(), spi.getBELPin(), ff.getBEL().getPin("D")));
         }
