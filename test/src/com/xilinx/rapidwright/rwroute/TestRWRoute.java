@@ -563,8 +563,9 @@ public class TestRWRoute {
         RWRoute.routeDesignFullNonTimingDriven(test_route);
     }
 
-    @Test
-    public void testDiscussion1245_20250807() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testDiscussion1245_20250807(boolean forceLagPin) {
         // Adapted from https://github.com/Xilinx/RapidWright/discussions/1245#discussioncomment-14035707
 
         Design test_place = new Design("test_design", "vp1202");
@@ -596,8 +597,16 @@ public class TestRWRoute {
 
         test_route.routeSites();
 
+        Assertions.assertEquals("SLICE_X100Y0.AX", ff.getSitePinFromLogicalPin("D", null).getSitePinName());
+
         // Test for intra-SLR connections to the LAG input
-        Assertions.assertEquals("SLICE_X100Y0.LAG_E2", ff.getSitePinFromLogicalPin("D", null).getSitePinName());
+        if (forceLagPin) {
+            SiteInst si = ff.getSiteInst();
+            Assertions.assertTrue(si.unrouteIntraSiteNet(si.getBELPin("AX", "AX"), ff.getBEL().getPin("D")));
+            SitePinInst spi = si.getSitePinInst("AX");
+            spi.movePin("LAG_E2");
+            Assertions.assertTrue(si.routeIntraSiteNet(spi.getNet(), spi.getBELPin(), ff.getBEL().getPin("D")));
+        }
 
         RWRoute.routeDesignFullNonTimingDriven(test_route);
 
