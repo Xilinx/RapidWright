@@ -233,7 +233,7 @@ public class RouterHelper {
                 TileTypeEnum uphillTileType = uphill.getTile().getTileTypeEnum();
                 if (uphillTileType == TileTypeEnum.INT ||
                         // Versal only: Terminate at non INT (e.g. CLE_BC_CORE) tile type for CTRL pin inputs
-                        EnumSet.of(IntentCode.NODE_CLE_CTRL, IntentCode.NODE_INTF_CTRL).contains(uphill.getIntentCode())) {
+                        EnumSet.of(IntentCode.NODE_CLE_CTRL, IntentCode.NODE_INTF_CTRL, IntentCode.NODE_SLL_INPUT).contains(uphill.getIntentCode())) {
                     return uphill;
                 }
                 if (isLagunaRXD && uphill.getTile() == sink.getTile() && node.getWireName().startsWith("UBUMP")) {
