@@ -202,8 +202,8 @@ public class RouteNodeGraph {
             intTilesToExamine.add(tile);
 
             Tile sllTile = device.getArbitraryTileOfType(TileTypeEnum.SLL);
-            tile = sllTile.getTileNeighbor(2, 0);
-            if (tile != null) {
+            if (sllTile != null) {
+                tile = sllTile.getTileNeighbor(2, 0);
                 assert(tile.getTileTypeEnum() == TileTypeEnum.INT);
                 intTilesToExamine.add(tile);
             }
