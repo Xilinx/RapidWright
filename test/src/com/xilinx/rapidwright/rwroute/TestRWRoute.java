@@ -540,7 +540,7 @@ public class TestRWRoute {
     }
 
     @Test
-    public void testDiscussion1245() {
+    public void testDiscussion1245_20250805() {
         // Adapted from https://github.com/Xilinx/RapidWright/discussions/1245#discussioncomment-14003055
         Design test_place = new Design("test_design", "vp1202");
 
@@ -562,4 +562,55 @@ public class TestRWRoute {
 
         RWRoute.routeDesignFullNonTimingDriven(test_route);
     }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testDiscussion1245_20250807(boolean forceLagPin) {
+        // Adapted from https://github.com/Xilinx/RapidWright/discussions/1245#discussioncomment-14035707
+
+        Design test_place = new Design("test_design", "vp1202");
+
+        Cell cell_1 = test_place.createAndPlaceCell("my_test_cell_1", Unisim.LUT6, "SLICE_X100Y0/A6LUT");
+        LUTTools.configureLUT(cell_1, "O=I1");
+        cell_1.fixCell(true);
+
+        Cell cell_2 = test_place.createAndPlaceCell("my_test_cell_2", Unisim.LUT6, "SLICE_X100Y0/H6LUT");
+        LUTTools.configureLUT(cell_2, "O=I1");
+        cell_2.fixCell(true);
+
+        Cell ff = test_place.createAndPlaceCell("flipflop", Unisim.FDCE, "SLICE_X100Y0/AFF");
+        ff.fixCell(true);
+
+        Net net = test_place.createNet("my_test_net_0");
+        ECOTools.connectNet(test_place, cell_1, "O", net);
+        ECOTools.connectNet(test_place, cell_2, "I1", net);
+
+        Net outer_net_1 = test_place.createNet("my_test_net_1");
+        ECOTools.connectNet(test_place, cell_2, "O", outer_net_1);
+        ECOTools.connectNet(test_place, ff, "D", outer_net_1);
+
+        Net outer_net_2 = test_place.createNet("my_test_net_2");
+        ECOTools.connectNet(test_place, ff, "Q", outer_net_2);
+        ECOTools.connectNet(test_place, cell_1, "I1", outer_net_2);
+
+        Design test_route = test_place;
+
+        test_route.routeSites();
+
+        Assertions.assertEquals("SLICE_X100Y0.AX", ff.getSitePinFromLogicalPin("D", null).getSitePinName());
+
+        // Test for intra-SLR connections to the LAG input
+        if (forceLagPin) {
+            SiteInst si = ff.getSiteInst();
+            SitePinInst spi = si.getSitePinInst("AX");
+            Assertions.assertTrue(si.unrouteIntraSiteNet(spi.getBELPin(), ff.getBEL().getPin("D")));
+            Assertions.assertTrue(spi.movePin("LAG_E2"));
+            Assertions.assertTrue(si.routeIntraSiteNet(spi.getNet(), spi.getBELPin(), ff.getBEL().getPin("D")));
+        }
+
+        RWRoute.routeDesignFullNonTimingDriven(test_route);
+
+        VivadoToolsHelper.assertFullyRouted(test_route);
+    }
+
 }

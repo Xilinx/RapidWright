@@ -182,6 +182,9 @@ public class RouteNodeInfo {
                 return RouteNodeType.LOCAL_BOTH;
             }
 
+            case NODE_SLL_INPUT: // Versal only
+                return RouteNodeType.LOCAL_BOTH;
+
             case NODE_PINFEED:
                 if (routingGraph.isVersal) {
                     return RouteNodeType.LOCAL_BOTH;
