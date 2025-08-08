@@ -328,9 +328,28 @@ public class ECOPlacementHelper {
      * @param site   Originating Site.
      * @param pblock Also check to ensure the proposed sites are inside the provided
      *               pblock.
+     * 
      * @return Iterable<Site> of neighbouring sites.
      */
     public static Iterable<Site> spiralOutFrom(Site site, PBlock pblock) {
+        return spiralOutFrom(site, pblock, false);
+    }
+
+    /**
+     * Given a home Site, return an Iterable that yields the neighbouring sites
+     * encountered when walking outwards in a spiral fashion. To be used in
+     * conjunction with {@link #getUnusedLUT(SiteInst)} and
+     * {@link #getUnusedFlop(SiteInst, Net)}.
+     * 
+     * @param site    Originating Site.
+     * @param pblock  Also check to ensure the proposed sites are inside the
+     *                provided pblock.
+     * @param exclude If this flag is true, any sites inside the pblock are
+     *                excluded.
+     * 
+     * @return Iterable<Site> of neighbouring sites.
+     */
+    public static Iterable<Site> spiralOutFrom(Site site, PBlock pblock, boolean exclude) {
         return new Iterable<Site>() {
             @NotNull
             @Override
@@ -379,7 +398,7 @@ public class ECOPlacementHelper {
                                 break;
                             }
                             nextSite = home.getNeighborSite(dx, dy);
-                        } while (nextSite == null || !insidePblock(nextSite));
+                        } while (nextSite == null || (exclude ? insidePblock(nextSite) : !insidePblock(nextSite)));
                         return retSite;
                     }
 

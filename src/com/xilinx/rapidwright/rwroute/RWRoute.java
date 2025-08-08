@@ -799,6 +799,7 @@ public class RWRoute {
             for (Connection connection : indirectConnections) {
                 RouteNode sinkRnode = connection.getSinkRnode();
                 if (sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH) {
+                    IntentCode sinkIntent = sinkRnode.getIntentCode();
                     for (Node uphill : sinkRnode.getAllUphillNodes()) {
                         if (uphill.isTiedToVcc()) {
                             continue;
@@ -807,10 +808,17 @@ public class RWRoute {
                         if (preservedNet != null && preservedNet != connection.getNet()) {
                             continue;
                         }
-                        assert((sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL &&
-                                (uphill.getIntentCode() == IntentCode.NODE_CLE_CNODE || uphill.getIntentCode() == IntentCode.NODE_CLE_BNODE)) ||
-                                (sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL &&
-                                        (uphill.getIntentCode() == IntentCode.NODE_INTF_CNODE || uphill.getIntentCode() == IntentCode.NODE_INTF_BNODE)));
+                        if (sinkIntent == IntentCode.NODE_SLL_INPUT && uphill.getIntentCode() == IntentCode.NODE_SLL_OUTPUT) {
+                            // No need to reserve NODE_SLL_OUTPUT nodes of a NODE_SLL_INPUT
+                            continue;
+                        }
+                        assert((sinkIntent == IntentCode.NODE_CLE_CTRL &&
+                                        (uphill.getIntentCode() == IntentCode.NODE_CLE_CNODE || uphill.getIntentCode() == IntentCode.NODE_CLE_BNODE)) ||
+                                (sinkIntent == IntentCode.NODE_INTF_CTRL &&
+                                        (uphill.getIntentCode() == IntentCode.NODE_INTF_CNODE || uphill.getIntentCode() == IntentCode.NODE_INTF_BNODE)) ||
+                                (sinkIntent == IntentCode.NODE_SLL_INPUT &&
+                                        uphill.getIntentCode() == IntentCode.NODE_CLE_BNODE)
+                        );
                         RouteNode rnode = routingGraph.getOrCreate(uphill, RouteNodeType.LOCAL_RESERVED);
                         rnode.setType(RouteNodeType.LOCAL_RESERVED);
                     }

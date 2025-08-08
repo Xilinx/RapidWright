@@ -632,6 +632,7 @@ public class EDIFTools {
             }
         }
         // Make final connection in the common ancestor instance
+        assert (finalSrc.getNet().getParentCell().equals(finalSnk.getParentCell()));
         finalSrc.getNet().addPortInst(finalSnk.getPortInst());
     }
 

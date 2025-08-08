@@ -302,4 +302,58 @@ public class EDIFHierNet implements Comparable<EDIFHierNet> {
     public int compareTo(EDIFHierNet o) {
         return this.toString().compareTo(o.toString());
     }
+
+    /**
+     * Checks if the provided logical hierarchical net is an alias of this net. Two
+     * logical hierarchical nets are aliases if they belong to the same physical
+     * net. Doesn't use any cached information about the netlist so it will not
+     * scale, but is always operating on the current state of the netlist
+     * connectivity. See {@link EDIFNetlist#getParentNet(EDIFHierNet)} for scaling
+     * queries of this kind.
+     * 
+     * @param possibleAlias The logical hierarchical net to check if this net is an
+     *                      alias.
+     * @return True if this net and the provided net are aliases (samephysical net).
+     */
+    public boolean isAlias(EDIFHierNet possibleAlias) {
+        if (this.equals(possibleAlias))
+            return true;
+
+        Queue<EDIFHierNet> queue = new ArrayDeque<>();
+        queue.add(possibleAlias);
+        HashSet<EDIFHierNet> visited = new HashSet<>();
+
+        while (!queue.isEmpty()) {
+            EDIFHierNet net = queue.poll();
+            if (!visited.add(net)) {
+                continue;
+            }
+            for (EDIFPortInst relP : net.getNet().getPortInsts()) {
+                EDIFHierPortInst p = new EDIFHierPortInst(net.getHierarchicalInst(), relP);
+                if (p.getPortInst().getCellInst() == null) {
+                    // Moving up in hierarchy
+                    if (!p.getHierarchicalInst().isTopLevelInst()) {
+                        final EDIFHierPortInst upPort = p.getPortInParent();
+                        if (upPort != null && upPort.getNet() != null) {
+                            EDIFHierNet alias = upPort.getHierarchicalNet();
+                            if (this.equals(alias))
+                                return true;
+                            queue.add(alias);
+                        }
+                    }
+                } else {
+                    // Moving down in hierarchy
+                    EDIFHierNet alias = p.getInternalNet();
+                    if (alias == null) {
+                        // Looks unconnected
+                        continue;
+                    }
+                    if (this.equals(alias))
+                        return true;
+                    queue.add(alias);
+                }
+            }
+        }
+        return false;
+    }
 }

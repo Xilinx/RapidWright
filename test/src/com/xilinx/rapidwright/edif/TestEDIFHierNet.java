@@ -25,16 +25,18 @@ package com.xilinx.rapidwright.edif;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
-import com.xilinx.rapidwright.design.Unisim;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-
-import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestEDIFHierNet {
 
@@ -127,6 +129,25 @@ public class TestEDIFHierNet {
                 Assertions.assertTrue(portInsts.remove(portInst.getPortInst()));
             }
             Assertions.assertTrue(portInsts.isEmpty());
+        }
+    }
+
+    @Test
+    public void testIsAlias() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+
+        Map<EDIFHierNet, EDIFHierNet> parentNetMap = netlist.getParentNetMap();
+
+        for (Entry<EDIFHierNet, EDIFHierNet> e : parentNetMap.entrySet()) {
+            Assertions.assertTrue(e.getKey().isAlias(e.getValue()));
+            Assertions.assertTrue(e.getValue().isAlias(e.getKey()));
+            for (Entry<EDIFHierNet, EDIFHierNet> e2 : parentNetMap.entrySet()) {
+                if (e.getValue().equals(e2.getValue())) {
+                    continue;
+                }
+                Assertions.assertFalse(e.getKey().isAlias(e2.getKey()));
+            }
         }
     }
 }
