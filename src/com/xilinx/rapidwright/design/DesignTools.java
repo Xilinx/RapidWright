@@ -2720,9 +2720,13 @@ public class DesignTools {
                                 Cell c = siteInst.getCell(pin.getBEL());
                                 if (c != null) {
                                     EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, pin);
-                                    if (portInst != null && sitePin.getNet() != null && portInst.getHierarchicalNet()
-                                            .isAlias(sitePin.getNet().getLogicalHierNet())) {
-                                        portInsts.add(portInst);
+                                    Net sitePinNet = sitePin.getNet();
+                                    if (portInst != null && sitePinNet != null) {
+                                        if (sitePinNet.isStaticNet() && sitePinNet.getType() == portInst.getNet().getPhysStaticSourceType()) { 
+                                            portInsts.add(portInst);
+                                        } else if (portInst.getHierarchicalNet().isAlias(sitePin.getNet().getLogicalHierNet())) {
+                                            portInsts.add(portInst);
+                                        }
                                     }
                                 }
                             }
