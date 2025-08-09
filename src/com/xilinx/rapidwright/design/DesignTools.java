@@ -2700,6 +2700,12 @@ public class DesignTools {
                                     if (portInst != null) portInsts.add(portInst);
                                 }
                                 break nextPin;
+                            } else if (belPin2.getBEL().isSRIMR()) {
+                                for (BELPin conn : belPin2.getBEL().getPin("Q").getSiteConns()) {
+                                    EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, conn);
+                                    if (portInst != null) portInsts.add(portInst);
+                                }
+                                break nextPin;
                             }
                             EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, belPin2);
                             if (portInst != null) portInsts.add(portInst);
