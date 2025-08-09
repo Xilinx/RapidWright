@@ -49,6 +49,7 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.edif.EDIFValueType;
 import com.xilinx.rapidwright.router.Router;
 import com.xilinx.rapidwright.rwroute.PartialRouter;
+import com.xilinx.rapidwright.rwroute.RWRoute;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.CodeGenerator;
 import com.xilinx.rapidwright.util.FileTools;
@@ -1118,4 +1119,66 @@ public class TestECOTools {
 
         Assertions.assertEquals("[IN SLICE_X148Y1.B2]", PartialRouter.getUnroutedPins(test).toString());
     }
+
+    @Test
+    public void testConnectNetWithoutSource() {
+        // Also taken from discussion:
+        // https://github.com/Xilinx/RapidWright/discussions/1245#discussioncomment-14044695
+
+        Design design = new Design("clock_gating_test", "vp1202");
+        EDIFCell top = design.getTopEDIFCell();
+
+        Net clk = design.createNet("clk");
+        clk.getLogicalNet().createPortInst(top.createPort("clk", EDIFDirection.INPUT, 1));
+
+        Net gate = design.createNet("gate");
+        gate.getLogicalNet().createPortInst(top.createPort("gate", EDIFDirection.INPUT, 1));
+
+        // TODO - Instantiate IBUFs after primitives fix
+//        Cell clkIBUF = design.createAndPlaceCell(top, "clkIBUF", Unisim.IBUF, "IOB_X29Y0/IOB_M");
+//        ECOTools.connectNet(design, clkIBUF, "I", clk);
+//        
+//        Cell gateIBUF = design.createAndPlaceCell(top, "gateIBUF", Unisim.IBUF, "IOB_X29Y1/IOB_M");
+//        ECOTools.connectNet(design, gateIBUF, "I", gate);
+//
+//        Net clkBUF = design.createNet("clkBUF");
+//        ECOTools.connectNet(design, clkIBUF, "O", clkBUF);
+//        Net gateBUF = design.createNet("gateBUF");
+//        ECOTools.connectNet(design, gateIBUF, "O", gateBUF);
+
+        Cell lut = design.createAndPlaceCell("lut", Unisim.LUT2, "SLICE_X86Y67/C6LUT");
+        LUTTools.configureLUT(lut, "O=I1 & I0");
+        lut.fixCell(true);
+
+        Cell ff1 = design.createAndPlaceCell("ff1", Unisim.FDRE, "SLICE_X86Y67/CFF2");
+        ff1.fixCell(true);
+
+        Cell ff2 = design.createAndPlaceCell("ff2", Unisim.FDRE, "SLICE_X86Y67/DFF2");
+        ff2.fixCell(true);
+
+        Net gatedClk = design.createNet("gated_clk");
+
+        ECOTools.connectNet(design, lut, "O", gatedClk);
+        ECOTools.connectNet(design, lut, "I0", clk);
+        ECOTools.connectNet(design, lut, "I1", gate);
+        ECOTools.connectNet(design, ff1, "C", gatedClk);
+        ECOTools.connectNet(design, ff2, "C", gatedClk);
+
+        Net ff1Feedback = design.createNet("ff1_feedback");
+        Net ff2Feedback = design.createNet("ff2_feedback");
+        ECOTools.connectNet(design, ff1, "D", ff1Feedback);
+        ECOTools.connectNet(design, ff1, "Q", ff1Feedback);
+        ECOTools.connectNet(design, ff2, "D", ff2Feedback);
+        ECOTools.connectNet(design, ff2, "Q", ff2Feedback);
+
+        Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
+        ECOTools.connectNet(design, ff1, "CE", vcc);
+        ECOTools.connectNet(design, ff2, "CE", vcc);
+        ECOTools.connectNet(design, ff1, "R", gnd);
+        ECOTools.connectNet(design, ff2, "R", gnd);
+
+        RWRoute.routeDesignFullNonTimingDriven(design);
+    }
+
 }
