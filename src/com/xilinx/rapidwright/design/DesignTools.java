@@ -2692,17 +2692,25 @@ public class DesignTools {
                     SitePIP sitePIP = siteInst.getUsedSitePIP(belPin);
                     if (sitePIP != null) {
                         BELPin otherPin = belPin.isOutput() ? sitePIP.getInputPin() : sitePIP.getOutputPin();
-                        for (BELPin belPin2 : otherPin.getSiteConns()) {
+                        nextPin: for (BELPin belPin2 : otherPin.getSiteConns()) {
                             if (belPin2.equals(otherPin)) continue;
+                            if (belPin2.getBEL().isSliceFFClkMod()) {
+                                for (BELPin conn : belPin2.getBEL().getPin("CLK_OUT").getSiteConns()) {
+                                    EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, conn);
+                                    if (portInst != null) portInsts.add(portInst);
+                                }
+                                break nextPin;
+                            }
                             EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, belPin2);
                             if (portInst != null) portInsts.add(portInst);
                         }
-                    } else if (bel.isIMR()) {
-                        int outPinIdx = bel.getHighestInputIndex() + 1;
-                        assert (bel.getPins().length == outPinIdx + 1);
-                        BELPin imrOut = bel.getPin(outPinIdx);
+                    } else if (bel.isAnyIMR()) {
+                        BELPin imrOut = bel.getPin("Q");
                         for (BELPin pin : imrOut.getSiteConns()) {
-                            if (pin.isInput()) {
+                            assert (pin.isInput());
+                            if (pin.getBEL().getBELClass() == BELClass.RBEL) {
+                                queue.add(pin);
+                            } else {
                                 Cell lut = siteInst.getCell(pin.getBEL());
                                 if (lut != null && lut.getLogicalPinMapping(pin.getName()) != null) {
                                     EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, pin);
