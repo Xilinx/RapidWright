@@ -38,6 +38,7 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
@@ -509,6 +510,15 @@ public class ECOTools {
                         }
                     }
                 } else {
+                    if (newPhysNet == null) {
+                        assert (sourceEhpi == null);
+                        // The net doesn't have a source yet, look up the net directly
+                        String hierNetName = ehn.getHierarchicalNetName();
+                        newPhysNet = design.getNet(hierNetName);
+                        if (newPhysNet == null) {
+                            newPhysNet = design.createNet(hierNetName);
+                        }
+                    }
                     // If source and sink pin happen to be in the same site, try intra-site routing first
                     if (si.equals(sourceSi) && si.routeIntraSiteNet(newPhysNet, sourceBELPin, cell.getBELPin(ehpi))) {
                         // Intra-site routing successful
@@ -536,8 +546,10 @@ public class ECOTools {
             if (newPhysNet.getSource() == null && !newPhysNet.getPins().isEmpty() && !newPhysNet.isStaticNet()) {
                 // We have at least one sink pin -- ensure we have a
                 // source pin to exit the site with
-                createExitSitePinInst(design, sourceEhpi, newPhysNet);
-                assert (newPhysNet.getSource() != null);
+                if (sourceEhpi != null) {
+                    createExitSitePinInst(design, sourceEhpi, newPhysNet);
+                    assert (newPhysNet.getSource() != null);
+                }
             }
         }
     }
@@ -730,7 +742,12 @@ public class ECOTools {
     public static void connectNet(Design d, Cell cell, String logPin, Net net) {
         Map<EDIFHierNet, List<EDIFHierPortInst>> map = new HashMap<>();
         EDIFPortInst portInst = cell.getEDIFCellInst().getOrCreatePortInst(logPin);
-        map.put(net.getLogicalHierNet(),new ArrayList<>(Arrays.asList(
+        EDIFHierNet logicalNet = net.getLogicalHierNet();
+        if (logicalNet == null && net.isStaticNet()) {
+            logicalNet = EDIFTools.getStaticNet(net.isVCCNet() ? NetType.VCC : NetType.GND,
+                    cell.getEDIFHierCellInst().getParent(), d.getNetlist());
+        }
+        map.put(logicalNet, new ArrayList<>(Arrays.asList(
                 new EDIFHierPortInst(cell.getEDIFHierCellInst().getParent(), portInst))));
         ECOTools.connectNet(d, map, null);
     }
