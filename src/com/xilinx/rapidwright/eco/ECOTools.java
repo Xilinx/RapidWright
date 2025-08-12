@@ -528,7 +528,11 @@ public class ECOTools {
                     // Otherwise create and attach a new site-pin
                     String logicalPinName = ehpi.getPortInst().getName();
                     if (cell.getAllPhysicalPinMappings(logicalPinName) != null) {
-                        createExitSitePinInst(design, ehpi, newPhysNet);
+                        boolean isTopLevelPort = cell.getType().equals("IBUF") && logicalPinName.equals("I") ||
+                                                 cell.getType().equals("OBUF") && logicalPinName.equals("O"); 
+                        if (!isTopLevelPort) {
+                            createExitSitePinInst(design, ehpi, newPhysNet);
+                        }
                     } else {
                         if (LUTTools.isCellALUT(cell)) {
                             // TODO: Find a new physical pin mapping

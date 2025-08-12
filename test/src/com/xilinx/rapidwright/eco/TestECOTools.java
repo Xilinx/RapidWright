@@ -1134,17 +1134,16 @@ public class TestECOTools {
         Net gate = design.createNet("gate");
         gate.getLogicalNet().createPortInst(top.createPort("gate", EDIFDirection.INPUT, 1));
 
-        // TODO - Instantiate IBUFs after primitives fix
-//        Cell clkIBUF = design.createAndPlaceCell(top, "clkIBUF", Unisim.IBUF, "IOB_X29Y0/IOB_M");
-//        ECOTools.connectNet(design, clkIBUF, "I", clk);
-//        
-//        Cell gateIBUF = design.createAndPlaceCell(top, "gateIBUF", Unisim.IBUF, "IOB_X29Y1/IOB_M");
-//        ECOTools.connectNet(design, gateIBUF, "I", gate);
-//
-//        Net clkBUF = design.createNet("clkBUF");
-//        ECOTools.connectNet(design, clkIBUF, "O", clkBUF);
-//        Net gateBUF = design.createNet("gateBUF");
-//        ECOTools.connectNet(design, gateIBUF, "O", gateBUF);
+        Cell clkIBUF = design.createAndPlaceCell(top, "clkIBUF", Unisim.IBUF, "IOB_X29Y0/IOB_M");
+        ECOTools.connectNet(design, clkIBUF, "I", clk);
+
+        Cell gateIBUF = design.createAndPlaceCell(top, "gateIBUF", Unisim.IBUF, "IOB_X29Y1/IOB_M");
+        ECOTools.connectNet(design, gateIBUF, "I", gate);
+
+        Net clkBUF = design.createNet("clkBUF");
+        ECOTools.connectNet(design, clkIBUF, "O", clkBUF);
+        Net gateBUF = design.createNet("gateBUF");
+        ECOTools.connectNet(design, gateIBUF, "O", gateBUF);
 
         Cell lut = design.createAndPlaceCell("lut", Unisim.LUT2, "SLICE_X86Y67/C6LUT");
         LUTTools.configureLUT(lut, "O=I1 & I0");
@@ -1159,8 +1158,8 @@ public class TestECOTools {
         Net gatedClk = design.createNet("gated_clk");
 
         ECOTools.connectNet(design, lut, "O", gatedClk);
-        ECOTools.connectNet(design, lut, "I0", clk);
-        ECOTools.connectNet(design, lut, "I1", gate);
+        ECOTools.connectNet(design, lut, "I0", clkBUF);
+        ECOTools.connectNet(design, lut, "I1", gateBUF);
         ECOTools.connectNet(design, ff1, "C", gatedClk);
         ECOTools.connectNet(design, ff2, "C", gatedClk);
 
@@ -1179,6 +1178,8 @@ public class TestECOTools {
         ECOTools.connectNet(design, ff2, "R", gnd);
 
         RWRoute.routeDesignFullNonTimingDriven(design);
+
+        VivadoToolsHelper.assertFullyRouted(design);
     }
 
 }
