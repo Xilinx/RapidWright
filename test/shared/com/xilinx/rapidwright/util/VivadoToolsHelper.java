@@ -60,4 +60,12 @@ public class VivadoToolsHelper {
         ReportRouteStatusResult rrs = VivadoTools.routeDesignAndGetStatus(design, dir);
         Assertions.assertTrue(rrs.isFullyRouted());
     }
+
+    public static void assertCanBeFullyPlacedAndRoutedByVivado(Design design, Path dir) {
+        if (!FileTools.isVivadoOnPath()) {
+            return;
+        }
+        ReportRouteStatusResult rrs = VivadoTools.placeAndRouteDesignAndGetStatus(design, dir);
+        Assertions.assertTrue(rrs.isFullyRouted());
+    }
 }

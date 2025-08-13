@@ -1,3 +1,33 @@
+============= RapidWright 2025.1.1-beta released on 2025-08-13 ================
+Notes:
+  - Unisim Primitive Mappings Updates for Versal (#1271)
+  - [ECOTools.connectNet()] Fixes static net connection and no source issues (#1270)
+  - [RWRoute] Add support for SLL tile types (#1269)
+  - Test and fixes for Versal site routing support (#1267)
+  - Netlist Comparator Inst and Property Tracking (#1260)
+  - Fix an issue on calculateUtilization function for Versal devices. (#1264)
+  - Add support for shared sink SitePinInsts in LUTInputConeOpt (#1262)
+  - Update Versal Unisims (#1261)
+  - EDIFNetlistComparator Test (#1263)
+  - Minor Changes to PBlock and LUT eval fixes (#1257)
+  - Versal LUT Input Routing Fixes and Test (#1254)
+  - [EDIFTools] Fix connectPortInstsThruHier when finding source pin (#1258)
+  - [RWRoute] Cleanup RWRoute.isAccessibleSink() (#1256)
+  - [EDIFTools] Add support for connecting logical nets through both hierarchical directions (#1253)
+  - [RWRoute] General + SLR crossing optimizations (#1232)
+  - [ReportRouteStatus] Do not count nets with no pins (#1248)
+  - [EDIFNetlist] Create a wrapper EDIFCell constructor (#1238)
+  - Test that Versal site pins are acquired correctly (#1247)
+  - Inline Flop Insertion/Removal Tool (#1242)
+  - Reset diffCount when compareNetlists is ran (#1251)
+  - Continue if cell is null (#1250)
+
+API Additions:
+  - com.xilinx.rapidwright.design.Design "public static Map<SiteTypeEnum, Set<String>> getCompatiblePlacements(Device device, Unisim u)"
+  - com.xilinx.rapidwright.design.Design "public static Map<SiteTypeEnum, Set<String>> getCompatiblePlacements(String deviceName, Unisim u)"
+  - com.xilinx.rapidwright.device.BEL "public boolean isAnyIMR()"
+
+
 ============= RapidWright 2025.1.0-beta released on 2025-06-25 ================
 Notes:
   - Add methods to access internal DiffMap (#1234)
