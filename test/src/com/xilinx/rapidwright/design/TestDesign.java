@@ -29,6 +29,8 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
@@ -46,6 +48,7 @@ import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
@@ -262,6 +265,28 @@ public class TestDesign {
         Cell orig = d.createAndPlaceCell("orig", Unisim.DSP_PREADD58, "DSP_X0Y0/DSP_PREADD");
         Design d2 = new Design("test2", d.getPartName());
         Assertions.assertNotNull(d2.copyCell(orig, "copy"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvp1502,XPIOB,IOB_S",
+            "xcvm2152,HDIOB,IOB_M",
+            "xcve2002,XPIOB,IOB_M",
+            "xcvm2152,X5PHIO_XCVR,IO_M"
+    })
+    public void testCreateAndPlaceCell(String device, String siteType, String belType) {
+        Design d = new Design("d1", PartNameTools.getPart(device).getName());
+        SiteTypeEnum t = SiteTypeEnum.valueOf(siteType);
+        Unisim u = Unisim.IBUF;
+        Site s = d.getDevice().getAllSitesOfType(t)[0];
+        Cell c = d.createAndPlaceCell(d.getTopEDIFCell(), "ibuf", u, s.getName() + "/" + belType);
+        Assertions.assertTrue(c.isPlacedOn(t, belType));
+        Assertions.assertTrue(c.getPinMappingsL2P().size() > 0);
+        Map<SiteTypeEnum, Set<String>> map = Design.getCompatiblePlacements(d.getDevice(), u);
+        Assertions.assertTrue(map.containsKey(t));
+        Assertions.assertTrue(map.get(t).contains(belType));
+        Map<SiteTypeEnum, Set<String>> map2 = Design.getCompatiblePlacements(d.getDevice().getName(), u);
+        Assertions.assertEquals(map, map2);
     }
 
     /**

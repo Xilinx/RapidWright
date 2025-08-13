@@ -159,6 +159,7 @@ public class PartNameTools {
             case QZYNQUPLUSRFSOC: return FamilyType.ZYNQUPLUSRFSOC;
             case SPARTAN7: return FamilyType.SPARTAN7;
             case SPARTANUPLUS: return FamilyType.SPARTANUPLUS;
+            case VERSAL: return FamilyType.VERSAL;
             case VERSALAICORE: return FamilyType.VERSAL;
             case VERSALAIEDGE: return FamilyType.VERSAL;
             case VERSALAIEDGE2: return FamilyType.VERSAL;
