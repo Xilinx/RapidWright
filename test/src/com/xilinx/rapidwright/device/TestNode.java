@@ -429,5 +429,12 @@ public class TestNode {
             }
         }
     }
+
+    @Test
+    public void testGetAllWiresInNode() {
+        Device device = Device.getDevice("xcau10p");
+        Node node = device.getNode("INT_IBRK_FSR2IO_X0Y140/IO_TO_CTR_FT0_3");
+        Assertions.assertEquals(22, node.getAllWiresInNode().length);
+    }
 }
 
