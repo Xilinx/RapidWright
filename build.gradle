@@ -96,7 +96,7 @@ task restoreScripts(type: Copy) {
 run.dependsOn(restoreScripts)
 
 task mainJar(type: Jar, dependsOn: classes) {
-    archiveBaseName = 'main'
+    archiveFileName = 'main.jar'
     from sourceSets.main.output include mainEntrypointClassName
     manifest {
         attributes 'Main-Class': mainEntrypointClassName
