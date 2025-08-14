@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
@@ -137,7 +138,7 @@ public class BlockStitcher {
      * @param design
      * @param constraints
      */
-    public void stitchDesign(Design design, HashMap<String,PackagePinConstraint> constraints) {
+    public void stitchDesign(Design design, Map<String,PackagePinConstraint> constraints) {
         boolean debug = false;
         EDIFNetlist n = design.getNetlist();
         // Create a reverse parent net map (Parent Net -> Children Nets: all logical nets that are physically equivalent)
@@ -271,7 +272,7 @@ public class BlockStitcher {
                 Net portNet = null;
                 portNet = e.getValue();
 
-                Site site = design.getDevice().getSiteFromPackagePin(constraints.get(portName).getName());
+                Site site = design.getDevice().getSiteFromPackagePin(constraints.get(portName).getPackagePin());
                 if (site == null) {
                     MessageGenerator.briefMessage("WARNING: It appears that the I/O called " + portName + " is not assigned to a package pin!");
                     continue nextPort;
@@ -294,7 +295,7 @@ public class BlockStitcher {
                 }
 
                 String ioStandard = constraints.get(portName).getIoStandard();
-                String pkgPin = constraints.get(portName).getName();
+                String pkgPin = constraints.get(portName).getPackagePin();
                 EDIFNet logNet = e.getKey().getPortInst().getNet();
                 design.createAndPlaceIOB(portName, isPortOutput ? PinType.OUT : PinType.IN, pkgPin, ioStandard, portNet, logNet);
             }
@@ -562,7 +563,7 @@ public class BlockStitcher {
         runtimes[2] = System.currentTimeMillis();
         System.out.println("Total Blocks : " + totalBlocks);
         String xdcFileName = args[1].replace(".edf", ".xdc");
-        HashMap<String,PackagePinConstraint> constraints = null;
+        Map<String,PackagePinConstraint> constraints = null;
         if (new File(xdcFileName).exists()) {
             constraints = XDCParser.parseXDC(xdcFileName,stitched.getDevice());
         } else {
