@@ -7,6 +7,7 @@ plugins {
     id 'java'
     id 'maven-publish'
     id 'signing'
+    id 'org.jreleaser' version '1.19.0'
 }
 
 apply from: 'common.gradle'
@@ -28,6 +29,9 @@ def read_rapidwright_version() {
     return sw.toString().replace("RAPIDWRIGHT_VERSION: v", "").replace("-beta", "").trim() + ""
 }
 def rapidwright_version = project.hasProperty('override_rapidwright_version') ? override_rapidwright_version : read_rapidwright_version()
+
+group = 'com.xilinx.rapidwright'
+version = rapidwright_version
 
 // Skipping test-fixtures for publication, see https://github.com/Xilinx/RapidWright/issues/697
 components["java"].withVariantsFromConfiguration(configurations["testFixturesApiElements"]) { skip() }
@@ -187,22 +191,27 @@ publishing {
     }
     repositories {
         maven {
-            credentials {
-                username = project.findProperty("ossrhUsername") ?: ""
-                password = project.findProperty("ossrhPassword") ?: ""
-            }
-            url = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+            url = layout.buildDirectory.dir('staging-deploy')
         }
     }
 }
 
-signing {
-    setRequired {
-        // signing is only required when publishing to maven central
-        gradle.taskGraph.allTasks.any { it.equals( publishMavenJavaPublicationToMavenRepository ) }
+jreleaser {
+    signing {
+        active = "ALWAYS"
+        armored = true
     }
-    sign configurations.archives
-    sign publishing.publications.mavenJava
+    deploy {
+        maven {
+            mavenCentral {
+                sonatype {
+                    active = 'ALWAYS'
+                    url = 'https://central.sonatype.com/api/v1/publisher'
+                    stagingRepository('build/staging-deploy')
+                }
+            }
+        }
+    }
 }
 
 task testPython(type:Test) {
