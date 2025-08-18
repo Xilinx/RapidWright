@@ -36,6 +36,14 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
+import org.jgrapht.GraphPath;
+import org.jgrapht.alg.shortestpath.AllDirectedPaths;
+import org.jgrapht.alg.shortestpath.BellmanFordShortestPath;
+import org.jgrapht.alg.shortestpath.KShortestSimplePaths;
+import org.jgrapht.graph.DefaultDirectedWeightedGraph;
+import org.jgrapht.graph.GraphWalk;
+import org.jgrapht.traverse.TopologicalOrderIterator;
+
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
@@ -48,6 +56,7 @@ import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
@@ -58,14 +67,6 @@ import com.xilinx.rapidwright.rwroute.Connection;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.RuntimeTrackerTree;
-
-import org.jgrapht.GraphPath;
-import org.jgrapht.alg.shortestpath.AllDirectedPaths;
-import org.jgrapht.alg.shortestpath.BellmanFordShortestPath;
-import org.jgrapht.alg.shortestpath.KShortestSimplePaths;
-import org.jgrapht.graph.DefaultDirectedWeightedGraph;
-import org.jgrapht.graph.GraphWalk;
-import org.jgrapht.traverse.TopologicalOrderIterator;
 
 /**
  * A TimingGraph is an acyclic weighted-directed graph representing logic delays and physical net 
@@ -2022,5 +2023,44 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         System.out.println("---------------------------------------------------------------------");
         System.out.printf("%6.1f %6.1f | Total: %6.1f\n", netDelayTotal, logicDelayTotal,
                 netDelayTotal + logicDelayTotal);
+    }
+
+    /**
+     * Gets the parent clock net of the launching synchronizer of the path (usually
+     * a flip flop).
+     * 
+     * @param path The path to get the clock from.
+     * @return The logical parent clock net of this path.
+     */
+    public EDIFHierNet getClockNet(GraphPath<TimingVertex, TimingEdge> path) {
+        EDIFHierNet net = null;
+        outer: for (TimingVertex v : path.getVertexList()) {
+            // Skip anything that isn't a flop output
+            if (v.getName().equals("superSource"))
+                continue;
+            EDIFHierPortInst ehpi = design.getNetlist().getHierPortInstFromName(v.getName());
+            // Check if this is a physical cell
+            Cell c = ehpi != null ? ehpi.getPhysicalCell(design) : null;
+            if (c != null) {
+                // Look at the BEL site and check for a clock pin
+                for (BELPin p : c.getBEL().getPins()) {
+                    if (p.isClock()) {
+                        // Look if the clock pin is mapped to a pin on the cell
+                        String logicalClockPin = c.getLogicalPinMapping(p.getName());
+                        if (logicalClockPin != null) {
+                            EDIFHierPortInst portInst = c.getEDIFHierCellInst()
+                                    .getPortInst(logicalClockPin);
+                            if (portInst != null) {
+                                EDIFHierNet clkNet = portInst.getHierarchicalNet();
+                                // Get the canonical parent net for consistency
+                                net = design.getNetlist().getParentNet(clkNet);
+                                break outer;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return net;
     }
 }

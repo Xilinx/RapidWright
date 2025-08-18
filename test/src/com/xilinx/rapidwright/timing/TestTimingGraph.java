@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestTimingGraph {
@@ -40,6 +41,9 @@ public class TestTimingGraph {
 
         GraphPath<TimingVertex, TimingEdge> criticalPath = tg.getMaxDelayPath();
 
+        EDIFHierNet clk = tg.getClockNet(criticalPath);
+        Assertions.assertEquals("clk", clk.toString());
+
         tg.prettyPrintPathDelays(criticalPath);
 
         Assertions.assertEquals(2437.7f, tg.getPathDelay(criticalPath));
@@ -47,6 +51,9 @@ public class TestTimingGraph {
         GraphPath<TimingVertex, TimingEdge> otherPath = tg.getTimingPath(
                 "processor/sx_addr4_flop/Q",
                 "output_port_w_reg[6]/D");
+
+        clk = tg.getClockNet(otherPath);
+        Assertions.assertEquals("clk", clk.toString());
 
         tg.prettyPrintPathDelays(otherPath);
         
