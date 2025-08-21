@@ -64,6 +64,18 @@ sourceSets {
   }
 }
 
+tasks.named('jar', Jar) {
+  archiveFileName = 'rapidwright.jar'
+}
+
+tasks.named('testJar', Jar) {
+  archiveFileName = 'rapidwright-tests.jar'
+}
+
+tasks.named('testFixturesJar', Jar) {
+  archiveFileName = 'rapidwright-test-fixtures.jar'
+}
+
 task preserveBin(type: Copy) {
      from "bin/rapidwright", "bin/rapidwright.bat"
      into preserveDir
