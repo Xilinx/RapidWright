@@ -97,6 +97,8 @@ public class TestSitePinInst {
         Design full = new Design("top", m.getDevice().getName());
         ModuleInst mi = full.createModuleInst("stuff", m);
         mi.getPort(portName);
+
+        Assertions.assertTrue(n.removePin(spi));
     }
 
 }
