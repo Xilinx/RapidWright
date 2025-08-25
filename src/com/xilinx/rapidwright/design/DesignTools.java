@@ -1008,7 +1008,13 @@ public class DesignTools {
             EDIFHierNet parentNetName = netlist.getParentNet(netName);
             Net parentNet = design.getNet(parentNetName.getHierarchicalNetName());
             if (parentNet == null) {
-                parentNet = new Net(parentNetName);
+                if (net.isVCC()) {
+                    parentNet = design.getVccNet();
+                } else if (net.isGND()) {
+                    parentNet = design.getGndNet();
+                } else {
+                    parentNet = new Net(parentNetName);
+                }
             }
             for (EDIFHierNet netAlias : netlist.getNetAliases(netName)) {
                 if (parentNet.getName().equals(netAlias.getHierarchicalNetName())) continue;
