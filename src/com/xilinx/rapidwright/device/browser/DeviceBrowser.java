@@ -243,7 +243,8 @@ public class DeviceBrowser extends QMainWindow{
      * Expands items in the node tree to add children nodes under uphill and
      * downhill.
      * 
-     * @param index
+     * @param item  The GUI widget object
+     * @param value Index to locate name on the item.
      */
     public void nodeClicked(QTreeWidgetItem item, Integer value) {
         String currNodeName = item.text(value);

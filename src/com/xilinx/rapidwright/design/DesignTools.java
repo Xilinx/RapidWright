@@ -106,6 +106,7 @@ public class DesignTools {
 
     // Map from site_pin to list of bels
     // TODO: derive from architecture.
+    @SuppressWarnings("serial")
     private static HashMap<String, List<String>> sitePin2Bels = new HashMap<String, List<String>>()
     {{
         put("A_O",  Arrays.asList("A5LUT", "A6LUT"));
@@ -1945,31 +1946,6 @@ public class DesignTools {
     }
 
     /**
-     * Helper method for makeBlackBox(). When cutting out nets that used to be
-     * source'd from something inside a black box, the net names need to be updated.
-     * 
-     * @param d         The current design
-     * @param currNet   Current net that requires a name change
-     * @param newSource The source net (probably a pin on the black box)
-     * @param newName   New name for the net
-     * @return A reference to the newly updated/renamed net.
-     */
-    private static Net updateNetName(Design d, Net currNet, EDIFNet newSource, String newName) {
-        List<PIP> pips = currNet.getPIPs();
-        List<SitePinInst> pins = currNet.getPins();
-
-        d.removeNet(currNet);
-
-        Net newNet = d.createNet(newName);
-        newNet.setPIPs(pips);
-        for (SitePinInst pin : pins) {
-            newNet.addPin(pin);
-        }
-
-        return newNet;
-    }
-
-    /**
      * Gets or creates the corresponding SiteInst from the prototype orig from a module.
      * @param design The current design from which to get the corresponding site instance.
      * @param orig The original site instance (from the module)
@@ -2916,7 +2892,7 @@ public class DesignTools {
             }
         }
 
-        List<Net> staticNets = new ArrayList();
+        List<Net> staticNets = new ArrayList<Net>();
 
         // Identify nets to copy routing
         for (Net net : src.getNets()) {
@@ -3714,7 +3690,7 @@ public class DesignTools {
     /** Mapping from device Series to another mapping from FF BEL name to CKEN/SRST site pin name **/
     static public final Map<Series, Map<String, Pair<String, String>>> belTypeSitePinNameMapping;
     static{
-        belTypeSitePinNameMapping = new EnumMap(Series.class);
+        belTypeSitePinNameMapping = new EnumMap<Series, Map<String, Pair<String, String>>>(Series.class);
         Pair<String,String> p;
 
         {

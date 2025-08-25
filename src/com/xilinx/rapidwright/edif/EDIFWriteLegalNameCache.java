@@ -54,6 +54,7 @@ public abstract class EDIFWriteLegalNameCache<T> {
 
     private final Map<String, byte[]> busCollisionRenames;
 
+    @SuppressWarnings("unchecked")
     private EDIFWriteLegalNameCache(Map<String, T> usedRenames, Supplier<Map<String, byte[]>> renameSupplier) {
         this.usedRenames = usedRenames;
         this.renames = new Map[256];

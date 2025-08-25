@@ -24,21 +24,6 @@
 
 package com.xilinx.rapidwright.util;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
-import com.esotericsoftware.kryo.serializers.MapSerializer;
-import com.xilinx.rapidwright.bitstream.Bitstream;
-import com.xilinx.rapidwright.bitstream.BlockType;
-import com.xilinx.rapidwright.bitstream.ConfigArray;
-import com.xilinx.rapidwright.bitstream.ConfigRow;
-import com.xilinx.rapidwright.bitstream.FAR;
-import com.xilinx.rapidwright.bitstream.Frame;
-import com.xilinx.rapidwright.bitstream.OpCode;
-import com.xilinx.rapidwright.bitstream.Packet;
-import com.xilinx.rapidwright.bitstream.RegisterType;
-import com.xilinx.rapidwright.tests.CodePerfTracker;
-
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -54,6 +39,20 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
+
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import com.esotericsoftware.kryo.serializers.MapSerializer;
+import com.xilinx.rapidwright.bitstream.Bitstream;
+import com.xilinx.rapidwright.bitstream.BlockType;
+import com.xilinx.rapidwright.bitstream.ConfigArray;
+import com.xilinx.rapidwright.bitstream.ConfigRow;
+import com.xilinx.rapidwright.bitstream.FAR;
+import com.xilinx.rapidwright.bitstream.Frame;
+import com.xilinx.rapidwright.bitstream.OpCode;
+import com.xilinx.rapidwright.bitstream.Packet;
+import com.xilinx.rapidwright.bitstream.RegisterType;
 
 
 /**
@@ -144,6 +143,7 @@ public class ReplaceFrameData {
     /**
      * Save the "NO OP" frame data to a file
      */
+    @SuppressWarnings("rawtypes")
     public void save(String filename) {
         try {
             Output output = new Output(new FileOutputStream(filename));
@@ -162,6 +162,7 @@ public class ReplaceFrameData {
     /**
      * Load the "NO OP" frame data from a file.
      */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public void load(String filename) {
         try {
             Input input = new Input(new FileInputStream(filename));
@@ -244,6 +245,7 @@ public class ReplaceFrameData {
     /**
      * Get list of target rows and cols to extract from bitstream built at row 0
      */
+    @SuppressWarnings("serial")
     private ReplacementSpec getExampleSpec() {
         int row = 0; // Either 0 or 2 because it was verified that the template at RP0 and RP1 are the same for this example.
         List<Integer> rows = new ArrayList<Integer>() {{add(row);add(row+1);}};
@@ -271,6 +273,7 @@ public class ReplaceFrameData {
         }
 
         // Need by serialization
+        @SuppressWarnings("unused")
         public Address() {
             row = -1;
             col = -1;
@@ -405,6 +408,7 @@ public class ReplaceFrameData {
          * Populate frameCounts.
          * @param c An empty ConfigArray to get the dimension of the bitstream
          */
+        @SuppressWarnings("serial")
         private void buildNumFrameArray(ConfigArray c) {
 
             for (BlockType blkType : new ArrayList<BlockType>() {{
@@ -539,7 +543,7 @@ public class ReplaceFrameData {
         int dataIdx = 0;
 
 
-        Function reportThenExit = txt -> {
+        Function<String, ?> reportThenExit = txt -> {
             System.out.println(txt);
             System.out.println("For more information please use \"ReplaceFrameData -help\".");
             System.exit(1);

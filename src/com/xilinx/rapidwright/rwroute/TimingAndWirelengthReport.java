@@ -51,7 +51,7 @@ public class TimingAndWirelengthReport{
     private int numWireNetsToRoute;
     private int numConnectionsToRoute;
     private TimingManager timingManager;
-    private DelayEstimatorBase estimator;
+    private DelayEstimatorBase<InterconnectInfo> estimator;
     private Map<IntentCode, Long> nodeTypeUsage ;
     private Map<IntentCode, Long> nodeTypeLength;
     private RouteNodeGraph routingGraph;
@@ -59,7 +59,8 @@ public class TimingAndWirelengthReport{
     public TimingAndWirelengthReport(Design design, RWRouteConfig config, boolean isPartialRouting) {
         this.design = design;
         timingManager = new TimingManager(design, null, config, RWRoute.createClkTimingData(config), design.getNets(), isPartialRouting);
-        estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+        estimator = new DelayEstimatorBase<InterconnectInfo>(design.getDevice(),
+                new InterconnectInfo(), config.isUseUTurnNodes(), 0);
         routingGraph = new RouteNodeGraphTimingDriven(design, config, estimator);
         wirelength = 0;
         usedNodes = 0;

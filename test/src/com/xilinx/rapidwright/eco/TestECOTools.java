@@ -22,6 +22,22 @@
 
 package com.xilinx.rapidwright.eco;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
 import com.xilinx.rapidwright.design.AltPinMapping;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -56,21 +72,6 @@ import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
 import com.xilinx.rapidwright.util.VivadoTools;
 import com.xilinx.rapidwright.util.VivadoToolsHelper;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 public class TestECOTools {
     @Test
@@ -194,6 +195,7 @@ public class TestECOTools {
         deferredRemovals.clear();
     }
 
+    @SuppressWarnings("serial")
     @Test
     public void testConnectNetSwapSinks() {
         Design design = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
@@ -226,7 +228,7 @@ public class TestECOTools {
             List<EDIFHierPortInst> ehpiLeaves = ehpi.getInternalNet().getLeafHierPortInsts(false, true);
             Assertions.assertFalse(ehn.getLeafHierPortInsts(false, true).stream().anyMatch(ehpiLeaves::contains));
 
-            netToPortInsts.put(ehn, new ArrayList(){{ add(ehpi); }});
+            netToPortInsts.put(ehn, new ArrayList<EDIFHierPortInst>(){{ add(ehpi); }});
         }
         ECOTools.connectNet(design, netToPortInsts, deferredRemovals);
         Assertions.assertEquals(0, deferredRemovals.size());
@@ -262,6 +264,7 @@ public class TestECOTools {
         }
     }
 
+    @SuppressWarnings("serial")
     @Test
     public void testConnectNetSwapSource() {
         Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
@@ -302,8 +305,8 @@ public class TestECOTools {
 
         // Swap those output pins
         Map<EDIFHierNet, List<EDIFHierPortInst>> netToPortInsts = new HashMap<>();
-        netToPortInsts.put(disconnectedNets.get(0), new ArrayList() {{ add(disconnectPins.get(1)); }});
-        netToPortInsts.put(disconnectedNets.get(1), new ArrayList() {{ add(disconnectPins.get(0)); }});
+        netToPortInsts.put(disconnectedNets.get(0), new ArrayList<EDIFHierPortInst>() {{ add(disconnectPins.get(1)); }});
+        netToPortInsts.put(disconnectedNets.get(1), new ArrayList<EDIFHierPortInst>() {{ add(disconnectPins.get(0)); }});
 
         ECOTools.connectNet(design, netToPortInsts, deferredRemovals);
         Assertions.assertEquals(0, deferredRemovals.size());
@@ -815,6 +818,7 @@ public class TestECOTools {
     /**
      * Generated with CodeGenerator.genCodeForTestSite()
      */
+    @SuppressWarnings("unused")
     public Design genTestDesign() {
         Design design = new Design("test", "xcku060-ffva1517-2-i");
         Device device = design.getDevice();
