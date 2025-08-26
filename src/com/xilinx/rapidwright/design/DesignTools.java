@@ -945,6 +945,8 @@ public class DesignTools {
         // We need to prefix all cell and net names with the hierarchicalCellName as a prefix
         Net vcc = design.getVccNet();
         Net gnd = design.getGndNet();
+        Net vccCell = cell.getVccNet();
+        Net gndCell = cell.getGndNet();
         for (SiteInst si : cell.getSiteInsts()) {
             for (Cell c : new ArrayList<Cell>(si.getCells())) {
                 c.updateName(hierarchicalCellName + "/" + c.getName());
@@ -958,11 +960,11 @@ public class DesignTools {
             }
             design.addSiteInst(si);
             // Update GND/VCC site routing to point to destination design's GND/VCC nets
-            for (String siteWire : si.getSiteWiresFromNet(vcc)) {
+            for (String siteWire : si.getSiteWiresFromNet(vccCell)) {
                 BELPin pin = si.getSiteWirePins(siteWire)[0];
                 si.routeIntraSiteNet(vcc, pin, pin);
             }
-            for (String siteWire : si.getSiteWiresFromNet(gnd)) {
+            for (String siteWire : si.getSiteWiresFromNet(gndCell)) {
                 BELPin pin = si.getSiteWirePins(siteWire)[0];
                 si.routeIntraSiteNet(gnd, pin, pin);
             }
