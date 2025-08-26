@@ -943,6 +943,10 @@ public class DesignTools {
 
         // Add placement information
         // We need to prefix all cell and net names with the hierarchicalCellName as a prefix
+        Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
+        Net vccCell = cell.getVccNet();
+        Net gndCell = cell.getGndNet();
         for (SiteInst si : cell.getSiteInsts()) {
             for (Cell c : new ArrayList<Cell>(si.getCells())) {
                 c.updateName(hierarchicalCellName + "/" + c.getName());
@@ -955,6 +959,15 @@ public class DesignTools {
                 }
             }
             design.addSiteInst(si);
+            // Update GND/VCC site routing to point to destination design's GND/VCC nets
+            for (String siteWire : si.getSiteWiresFromNet(vccCell)) {
+                BELPin pin = si.getSiteWirePins(siteWire)[0];
+                si.routeIntraSiteNet(vcc, pin, pin);
+            }
+            for (String siteWire : si.getSiteWiresFromNet(gndCell)) {
+                BELPin pin = si.getSiteWirePins(siteWire)[0];
+                si.routeIntraSiteNet(gnd, pin, pin);
+            }
         }
 
         // Add routing information
@@ -1008,7 +1021,13 @@ public class DesignTools {
             EDIFHierNet parentNetName = netlist.getParentNet(netName);
             Net parentNet = design.getNet(parentNetName.getHierarchicalNetName());
             if (parentNet == null) {
-                parentNet = new Net(parentNetName);
+                if (net.isVCC()) {
+                    parentNet = design.getVccNet();
+                } else if (net.isGND()) {
+                    parentNet = design.getGndNet();
+                } else {
+                    parentNet = new Net(parentNetName);
+                }
             }
             for (EDIFHierNet netAlias : netlist.getNetAliases(netName)) {
                 if (parentNet.getName().equals(netAlias.getHierarchicalNetName())) continue;
