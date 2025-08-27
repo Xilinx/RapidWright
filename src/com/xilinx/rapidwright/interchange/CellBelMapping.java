@@ -94,7 +94,7 @@ class CellBelMapping {
                     for (int i = 0; i < belStrings.size(); ++i) {
                         int belStringIdx = belStrings.get(i);
                         String bel = allStrings.get(belStringIdx);
-                        Map.Entry<SiteTypeEnum, String> key = new AbstractMap.SimpleEntry(siteType, bel);
+                        Map.Entry<SiteTypeEnum, String> key = new AbstractMap.SimpleEntry<SiteTypeEnum, String>(siteType, bel);
 
                         Map<String, String> otherPins = commonMaps.get(key);
                         if (otherPins != null) {
@@ -114,7 +114,7 @@ class CellBelMapping {
                 for (ParameterSiteTypeBelEntry.Reader entry : parameterPin.getParametersSiteTypes()) {
                     SiteTypeEnum siteType = SiteTypeEnum.valueOf(allStrings.get(entry.getSiteType()));
                     String bel = allStrings.get(entry.getBel());
-                    Map.Entry<SiteTypeEnum, String> key = new AbstractMap.SimpleEntry(siteType, bel);
+                    Map.Entry<SiteTypeEnum, String> key = new AbstractMap.SimpleEntry<SiteTypeEnum, String>(siteType, bel);
 
                     Map<String, Map<String, String>> parameterToPins = parameterMaps.get(key);
                     if (parameterToPins == null) {
@@ -168,7 +168,7 @@ class CellBelMapping {
         public Map<String,String>  getPinMappingsP2L(SiteTypeEnum siteType, String bel, String... params) {
             Map<String, String> pins = new HashMap<String, String>();
 
-            Map.Entry<SiteTypeEnum, String> key = new AbstractMap.SimpleEntry(siteType, bel);
+            Map.Entry<SiteTypeEnum, String> key = new AbstractMap.SimpleEntry<SiteTypeEnum, String>(siteType, bel);
 
             Map<String, String> commonPins = commonMaps.get(key);
             pins.putAll(commonPins);

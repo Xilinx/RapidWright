@@ -266,11 +266,11 @@ public class CodeGenerator {
      * from scratch in RapidWright APIs. This is useful for testing when only a
      * small context is necessary to reproduce a specific scenario.
      * 
-     * @param inst          The instance to replicate in the test
-     * @param ps            The PrintStream (System.out, or a file-based
-     *                      PrintStream, for example).
-     * @param simplifyNames Flag indicating that the cell and and net names should
-     *                      be simplified.
+     * @param inst           The instance to replicate in the test
+     * @param ps             The PrintStream (System.out, or a file-based
+     *                       PrintStream, for example).
+     * @param includeRouting Flag indicating that the code example should include
+     *                       inter-site routing (PIPs).
      */
     public static void genCodeForTestSite(SiteInst inst, PrintStream ps, boolean includeRouting) {
         Design design = inst.getDesign();
