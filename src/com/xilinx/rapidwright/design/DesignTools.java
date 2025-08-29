@@ -3328,6 +3328,14 @@ public class DesignTools {
                     continue;
                 }
 
+                // Check to make sure net is not improperly categorized
+                EDIFNet srcNetAlias = parentHierNet.getNet();
+                if (srcNetAlias.isGND()) {
+                    parentPhysNet = design.getGndNet();
+                } else if (srcNetAlias.isVCC()) {
+                    parentPhysNet = design.getVccNet();
+                }
+
                 if (!hierNet.equals(parentHierNet)) {
                     String parentNetName = parentHierNet.getNet().getName();
                     // Assume that a net named <const1> or <const0> is always a VCC or GND net

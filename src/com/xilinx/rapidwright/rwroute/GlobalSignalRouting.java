@@ -24,7 +24,10 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -59,10 +62,6 @@ import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 import com.xilinx.rapidwright.router.VersalClockRouting;
 import com.xilinx.rapidwright.util.Utils;
-
-import java.util.ArrayDeque;
-import java.util.Comparator;
-import java.util.EnumSet;
 
 /**
  * A collection of methods for routing global signals, i.e. GLOBAL_CLOCK, VCC and GND.
@@ -289,6 +288,14 @@ public class GlobalSignalRouting {
 
             Node clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
             centroidHRouteNode = VersalClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true);
+        } else if (sourceTypeEnum == SiteTypeEnum.BUFG_PS) {
+            // These source sites are located in the middle of the device. The path from the
+            // output pin to HROUTE matches the following pattern:
+            // NODE_GLOBAL_BUFG (has a suffix "_O_PIN") ->
+            // NODE_GLOBAL_BUFG (the output node with a suffix "_O") ->
+            // NODE_GLOBAL_HROUTE (located in the same clock region)
+            centroid = source.getTile().getClockRegion();
+            centroidHRouteNode = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
         } else {
             throw new RuntimeException("ERROR: Routing clock net with source type " + sourceTypeEnum + " not supported.");
         }
