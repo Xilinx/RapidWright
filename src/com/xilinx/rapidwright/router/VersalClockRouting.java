@@ -87,7 +87,7 @@ public class VersalClockRouting {
         while (!q.isEmpty()) {
             NodeWithPrev curr = q.poll();
             IntentCode c = curr.getIntentCode();
-            if (c == IntentCode.NODE_GLOBAL_HROUTE_HSR) {
+            if (c == IntentCode.NODE_GLOBAL_HROUTE_HSR || c == IntentCode.NODE_GLOBAL_HROUTE) {
                 List<Node> path = curr.getPrevPath();
                 clk.getPIPs().addAll(RouterHelper.getPIPsFromNodes(path));
                 return curr;
@@ -124,7 +124,7 @@ public class VersalClockRouting {
         while (!q.isEmpty()) {
             NodeWithPrevAndCost curr = q.poll();
             boolean possibleCentroid = false;
-            Node parent = curr.getPrev();
+            NodeWithPrev parent = curr.getPrev();
             if (parent != null) {
                 IntentCode parentIntentCode = parent.getIntentCode();
                 IntentCode currIntentCode = curr.getIntentCode();
@@ -133,12 +133,21 @@ public class VersalClockRouting {
                     // Disallow ability to go from VROUTE back to HROUTE
                     continue;
                 }
-                if (currIntentCode == IntentCode.NODE_GLOBAL_GCLK &&
-                    parentIntentCode == IntentCode.NODE_GLOBAL_VROUTE &&
-                    clockRegion.equals(curr.getTile().getClockRegion()) &&
-                    clockRegion.equals(parent.getTile().getClockRegion()) &&
-                    parent.getWireName().contains("BOT")) {
-                    possibleCentroid = true;
+                if (currIntentCode == IntentCode.NODE_GLOBAL_GCLK 
+                        && clockRegion.equals(curr.getTile().getClockRegion()) 
+                        && clockRegion.equals(parent.getTile().getClockRegion())) {
+                    if (parentIntentCode == IntentCode.NODE_GLOBAL_VROUTE && parent.getWireName().contains("BOT")) {
+                        possibleCentroid = true;
+                    } else if (parentIntentCode == IntentCode.NODE_GLOBAL_GCLK && parent.getPrev() != null) {
+                        // Check grandparent
+                        NodeWithPrev grandParent = parent.getPrev();
+                        if ( grandParent.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE 
+                                && clockRegion.equals(grandParent.getTile().getClockRegion()) 
+                                && grandParent.getWireName().contains("BOT")) { 
+                            possibleCentroid = true;                            
+                        }
+                    }
+
                 }
             }
             for (Node downhill : curr.getAllDownhillNodes()) {
