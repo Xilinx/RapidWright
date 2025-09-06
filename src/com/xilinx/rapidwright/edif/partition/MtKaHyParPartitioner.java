@@ -29,6 +29,9 @@ import java.nio.file.Paths;
 
 import com.xilinx.rapidwright.util.FileTools;
 
+/**
+ * Facilitates calling the MtKaHyPar partitioning tool.
+ */
 public class MtKaHyParPartitioner implements AbstractPartitioner {
 
     private static final String name = "MtKaHyPar";

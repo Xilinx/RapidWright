@@ -44,6 +44,10 @@ import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 
+/**
+ * Collection of methods used to export, analyze and parse hMETIS-based
+ * partitioning problems and solutions from RapidWright Netlists.
+ */
 public class PartitionTools {
 
     /**

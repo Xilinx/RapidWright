@@ -53,6 +53,7 @@ import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFParser;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.edif.partition.Partitioner;
 import com.xilinx.rapidwright.examples.AddSubGenerator;
 import com.xilinx.rapidwright.examples.CopyMMCMCell;
 import com.xilinx.rapidwright.examples.CountRoutedNets;
@@ -185,6 +186,7 @@ public class MainEntrypoint {
         addFunction("PartialCUFR", PartialCUFR::main);
         addFunction("PartialRouter", PartialRouter::main);
         addFunction("PartialDFXRouter", PartialDFXRouter::main);
+        addFunction("Partitioner", Partitioner::main);
         addFunction("PBlockGenDebugger", PBlockGenDebugger::main);
         addFunction("PBlockGenerator", PBlockGenerator::main);
         addFunction("PBlock", PBlock::main);

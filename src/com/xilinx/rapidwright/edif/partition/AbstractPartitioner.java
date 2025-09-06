@@ -27,7 +27,7 @@ import java.nio.file.Path;
 
 /**
  * Interface to abstract calling outside partitioning tools. These tools should
- * accept hMetis file formats.
+ * accept hMETIS file formats.
  */
 public abstract interface AbstractPartitioner {
 

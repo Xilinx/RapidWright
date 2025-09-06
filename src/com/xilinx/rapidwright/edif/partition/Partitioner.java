@@ -19,6 +19,9 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.MessageGenerator;
 
+/**
+ * Command-line tool to partition an EDIFNetlist
+ */
 public class Partitioner {
 
     public static AbstractPartitioner getDefaultPartitioner() {
@@ -33,7 +36,7 @@ public class Partitioner {
         }
         Path inputEDIF = Paths.get(args[0]);
         int k = Integer.parseInt(args[1]);
-        int leafLUTCountLimit = Integer.parseInt(args[2]);// 8200;
+        int leafLUTCountLimit = Integer.parseInt(args[2]);
         CodePerfTracker t = new CodePerfTracker("Partitioner");
 
         t.start("Read EDIF");
