@@ -298,6 +298,54 @@ public class EDIFHierNet implements Comparable<EDIFHierNet> {
         return leafCellPins;
     }
 
+    /**
+     * Gets the set of hierarchical cell instances from the provided set of
+     * otherInsts that are connected through this hierarchical net.
+     * 
+     * @param otherInsts A set of interesting hierarchical cell instances to search
+     *                   through
+     * @return The set of hierarchical cell instances that connect via this
+     *         hierarchical net in otherInsts.
+     */
+    public Set<EDIFHierCellInst> getConnectedInsts(Set<EDIFHierCellInst> otherInsts) {
+        Set<EDIFHierCellInst> connectedInsts = new HashSet<>();
+        Queue<EDIFHierNet> queue = new ArrayDeque<>();
+        queue.add(this);
+        Set<EDIFHierNet> visited = new HashSet<>();
+        
+        while (!queue.isEmpty()) {
+            EDIFHierNet net = queue.poll();
+            if (!visited.add(net)) {
+                continue;
+            }
+            for (EDIFPortInst relP : net.getNet().getPortInsts()) {
+                EDIFHierPortInst p = new EDIFHierPortInst(net.getHierarchicalInst(), relP);
+                if (relP.getCellInst() != null && otherInsts.contains(p.getFullHierarchicalInst())) {
+                    connectedInsts.add(p.getFullHierarchicalInst());
+                }
+
+                if (p.getPortInst().getCellInst() == null) {
+                    // Moving up in hierarchy
+                    if (!p.getHierarchicalInst().isTopLevelInst()) {
+                        final EDIFHierPortInst upPort = p.getPortInParent();
+                        final EDIFHierNet upNet = (upPort != null) ? upPort.getHierarchicalNet() : null;
+                        if (upNet != null) {
+                            queue.add(upPort.getHierarchicalNet());
+                        }
+                    }
+                } else {
+                    // Moving down in hierarchy
+                    EDIFHierNet downNet = p.getInternalNet();
+                    if (downNet != null) {
+                        queue.add(downNet);
+                    }
+                }
+            }
+        }
+
+        return connectedInsts;
+    }
+    
     @Override
     public int compareTo(EDIFHierNet o) {
         return this.toString().compareTo(o.toString());
