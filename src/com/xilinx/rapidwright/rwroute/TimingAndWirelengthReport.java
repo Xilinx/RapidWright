@@ -51,7 +51,7 @@ public class TimingAndWirelengthReport{
     private int numWireNetsToRoute;
     private int numConnectionsToRoute;
     private TimingManager timingManager;
-    private DelayEstimatorBase estimator;
+    private DelayEstimatorBase<InterconnectInfo> estimator;
     private Map<IntentCode, Long> nodeTypeUsage ;
     private Map<IntentCode, Long> nodeTypeLength;
     private RouteNodeGraph routingGraph;
@@ -59,7 +59,8 @@ public class TimingAndWirelengthReport{
     public TimingAndWirelengthReport(Design design, RWRouteConfig config, boolean isPartialRouting) {
         this.design = design;
         timingManager = new TimingManager(design, null, config, RWRoute.createClkTimingData(config), design.getNets(), isPartialRouting);
-        estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+        estimator = new DelayEstimatorBase<InterconnectInfo>(design.getDevice(),
+                new InterconnectInfo(), config.isUseUTurnNodes(), 0);
         routingGraph = new RouteNodeGraphTimingDriven(design, config, estimator);
         wirelength = 0;
         usedNodes = 0;
@@ -97,7 +98,7 @@ public class TimingAndWirelengthReport{
                     continue;
                 }
                 usedNodes++;
-                int wl = RouteNode.getLength(node);
+                int wl = RouteNode.getLength(node, routingGraph);
                 wirelength += wl;
                 RouterHelper.addNodeTypeLengthToMap(node, wl, nodeTypeUsage, nodeTypeLength);
             }
@@ -128,11 +129,11 @@ public class TimingAndWirelengthReport{
             if (sinkINTNode == null) {
                 connection.setDirect(true);
             } else {
-                connection.setSinkRnode(routingGraph.getOrCreate(sinkINTNode, RouteNodeType.EXCLUSIVE_SINK_BOTH));
                 if (sourceINTNode == null) {
                     sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
                 }
                 connection.setSourceRnode(routingGraph.getOrCreate(sourceINTNode, RouteNodeType.EXCLUSIVE_SOURCE));
+                connection.setSinkRnode(routingGraph.getOrCreate(sinkINTNode));
                 connection.setDirect(false);
             }
         }

@@ -84,6 +84,9 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      */
     private Map<NetWrapper, Integer> usersConnectionCounts;
 
+    /** Flag to enable really comprehensive (but performance-impacting) assertions */
+    protected final static boolean enableComprehensiveAssertions = false;
+
     protected RouteNode(RouteNodeGraph routingGraph, Node node, RouteNodeType type) {
         super(node);
         RouteNodeInfo nodeInfo = RouteNodeInfo.get(node, routingGraph);
@@ -135,17 +138,28 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                        ))
                    );
                 break;
-            case LAGUNA_PINFEED:
-                // Make all approaches to SLLs zero-cost to encourage exploration
-                // Assigning a base cost of zero would normally break congestion resolution
-                // (since RWroute.getNodeCost() would return zero) but doing it here should be
-                // okay because this node only leads to a SLL which will have a non-zero base cost
-                baseCost = 0.0f;
-                return;
+            case LOCAL_EAST_LEADING_TO_NORTHBOUND_LAGUNA:
+            case LOCAL_WEST_LEADING_TO_NORTHBOUND_LAGUNA:
+            case LOCAL_EAST_LEADING_TO_SOUTHBOUND_LAGUNA:
+            case LOCAL_WEST_LEADING_TO_SOUTHBOUND_LAGUNA:
+                assert(length == 0 ||
+                        (length == 1 && (
+                                (series == Series.UltraScalePlus && getWireName().matches("INODE_[EW]_\\d+_FT[01]")) ||
+                                (series == Series.UltraScale && getWireName().matches("INODE_[12]_[EW]_\\d+_FT[NS]"))
+                        ))
+                );
+                break;
             case SUPER_LONG_LINE:
-                assert(getLength() == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
+                assert(length == 0 ||
+                       length == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
                 baseCost = 0.3f * RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
                 break;
+            case NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
+            case NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
+                assert(length == 0 ||
+                        (length == 1 && series == Series.UltraScale && getWireName().matches("SDND[NS]W_E_15_FTN")) ||
+                        (length == 1 && series == Series.UltraScalePlus && getWireName().equals("WW1_E_7_FT0")));
+                // Fall-through
             case NON_LOCAL:
                 short length = getLength();
                 // NOTE: IntentCode is device-dependent
@@ -156,7 +170,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_CLE_OUTPUT:    // CLE outputs (US+ and Versal)
                     case NODE_LAGUNA_OUTPUT: // LAG_LAG.{LAG_MUX_ATOM_*_TXOUT,RXD*} (US+)
                     case NODE_LAGUNA_DATA:   // LAG_LAG.UBUMP* super long lines for u-turns at the boundary of the device (US+)
-                    case NODE_PINFEED:
+                    case NODE_SLL_INPUT:     // Versal only
                     case INTENT_DEFAULT:     // INT.VCC_WIRE
                         assert(length == 0);
                         break;
@@ -175,11 +189,18 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         }
                         // Fall through
                     case NODE_SINGLE:  // US and US+
-                        if (length <= 1) {
-                            assert(!getAllDownhillPIPs().isEmpty());
+                        assert(!getAllDownhillPIPs().isEmpty());
+                        if (length == 0) {
+                            // U-turns and intra-tile INT_INT_SDQ_\\d+_INT_OUT[01]
                         } else {
-                            assert(length == 2);
+                            assert(length <= 2); // 2 for feedthrough e.g. WW1_W_BEG7
                             baseCost *= length;
+                            if (getBeginTileXCoordinate() != getEndTileXCoordinate()) {
+                                // Horizontal
+                            } else {
+                                // Vertical
+                                assert(getBeginTileYCoordinate() != getEndTileYCoordinate());
+                            }
                         }
                         break;
                     case NODE_VDOUBLE: // Versal only
@@ -194,20 +215,41 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         // Fall through
                     case NODE_DOUBLE:  // US and US+
                         if (length == 0) {
+                            // U-turn nodes
+                            String wireName = getWireName();
+                            if (series == Series.UltraScalePlus || series == Series.UltraScale) {
+                                if (wireName.charAt(0) == 'E' || wireName.charAt(0) == 'W') {
+                                    // Horizontal doubles can U-turn to get length 0
+                                    assert(!enableComprehensiveAssertions || wireName.matches("(EE|WW)2_[EW]_BEG[0-7]"));
+                                } else {
+                                    // Two specific vertical doubles have an extra PIP
+                                    assert(!enableComprehensiveAssertions || wireName.matches("(NN|SS)2_[EW]_BEG0"));
+                                }
+                            }
                             assert(!getAllDownhillPIPs().isEmpty());
                         } else {
                             if (getBeginTileXCoordinate() != getEndTileXCoordinate()) {
-                                assert(length <= 2);
-                                // Typically, length = 1 (since tile X is not equal)
-                                // In US, have seen length = 2, e.g. VU440's INT_X171Y827/EE2_E_BEG7.
-                                if (length == 2) {
+                                // Horizontal
+                                assert(series != Series.UltraScalePlus || getBeginTileYCoordinate() == getEndTileYCoordinate());
+                                if (length == 1) {
+                                    // Nominally length = 1 (since tile X is not equal)
+                                } else {
+                                    // e.g. VU440's INT_X171Y827/EE2_E_BEG7 which feeds through to above
+                                    assert(series == Series.UltraScale && length == 2);
                                     baseCost *= length;
                                 }
                             } else {
-                                // Typically, length = 2 except for horizontal U-turns (length = 0)
-                                // or vertical U-turns (length = 1).
-                                // In US, have seen length = 3, e.g. VU440's INT_X171Y827/NN2_E_BEG7.
-                                assert(length <= 3);
+                                // Vertical
+                                assert(getBeginTileYCoordinate() != getEndTileYCoordinate());
+                                if (length == 2) {
+                                    // Nominally length = 2
+                                } else if (length == 3) {
+                                    // e.g. VU440's INT_X171Y827/NN2_E_BEG7 which feeds through to above
+                                    assert(series == Series.UltraScale);
+                                } else {
+                                    // U-turn
+                                    assert(length == 1);
+                                }
                             }
                         }
                         break;
@@ -218,6 +260,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             assert(getAllDownhillPIPs().isEmpty());
                             type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
                         } else {
+                            // HQUADs are nominally length 2
                             baseCost = 0.35f * length;
                         }
                         break;
@@ -227,7 +270,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             assert((series == Series.Versal && getAllWiresInNode().length == 1) ||
                                     !getAllDownhillPIPs().isEmpty());
                         } else {
-                            // VQUADs have length 4 and 5
+                            // VQUADs are nominally length 4
                             baseCost = 0.15f * length;
                         }
                         break;
@@ -243,7 +286,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             assert(getAllDownhillPIPs().isEmpty());
                             type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
                         } else {
-                            // HLONGs have length 6 and 7
+                            // HLONGs are nominally length 6
                             baseCost = 0.15f * length;
                         }
                         break;
@@ -253,7 +296,10 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         break;
                     case NODE_VLONG:   // US/US+
                         if (length == 0) {
+                            // e.g. INT_X167Y608/SS16_BEG0 in VU440
                             assert(!getAllDownhillPIPs().isEmpty());
+                        } else {
+                            // VLONGs are nominally length 12 in US+ and 12/16 in US
                         }
                         baseCost = 0.7f;
                         break;
@@ -296,8 +342,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         return getOccupancy() > 0;
     }
 
-    public static short getLength(Node node) {
-        return RouteNodeInfo.get(node, null).length;
+    public static short getLength(Node node, RouteNodeGraph routingGraph) {
+        return RouteNodeInfo.get(node, routingGraph).length;
     }
 
     @Override

@@ -23,21 +23,33 @@
 
 package com.xilinx.rapidwright.design;
 
-import com.xilinx.rapidwright.design.tools.LUTTools;
-import com.xilinx.rapidwright.device.BEL;
-import com.xilinx.rapidwright.device.BELPin;
-import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.Series;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.util.VivadoToolsHelper;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import java.nio.file.Path;
-import java.util.Arrays;
+import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.device.SitePIP;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.ReportRouteStatusResult;
+import com.xilinx.rapidwright.util.VivadoTools;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 public class TestSiteInst {
 
@@ -411,5 +423,87 @@ public class TestSiteInst {
 
         SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X40Y10"));
         Assertions.assertTrue(si.isEmpty());
+    }
+
+    @Test
+    public void testRouteSiteVersal() {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+
+        _testRouteSiteVersal(d, "SLICE_X138Y0", 40, 34);
+        _testRouteSiteVersal(d, "SLICE_X139Y0", 65, 34);
+        _testRouteSiteVersal(d, "SLICE_X142Y4", 40, 24);
+
+        if (FileTools.isVivadoOnPath()) {
+            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(d);
+            // The original design had 14 pre-existing routing errors
+            Assertions.assertEquals(14, rrs.netsWithRoutingErrors);
+            Assertions.assertEquals(276, rrs.fullyRoutedNets);
+        }
+
+    }
+
+    private void _testRouteSiteVersal(Design d, String siteName, int expectedSiteNetMappings,
+            int expectedUsedSitePIPs) {
+        SiteInst si = d.getSiteInstFromSiteName(siteName);
+        Map<Net, List<String>> origSiteNetMap = si.getNetToSiteWiresMap();
+        List<SitePIP> origUsedSitePIPs = si.getUsedSitePIPs();
+
+        Assertions.assertEquals(expectedSiteNetMappings, origSiteNetMap.size());
+        Assertions.assertEquals(expectedUsedSitePIPs, origUsedSitePIPs.size());
+
+        si.unrouteSite();
+
+        // Remove routethru cells
+        Set<String> belsWithRouteThrus = new HashSet<>();
+        for (Cell c : new ArrayList<>(si.getCells())) {
+            if (c.isRoutethru()) {
+                belsWithRouteThrus.add(c.getBELName());
+                si.removeCell(c.getBEL());
+            }
+        }
+
+        // TODO Not going to reproduce these for now
+        origSiteNetMap.remove(d.getNet(Net.USED_NET));
+
+        Assertions.assertTrue(si.getNetToSiteWiresMap().isEmpty());
+        Assertions.assertTrue(si.getUsedSitePIPs().isEmpty());
+
+        si.routeSite();
+
+        // Ensure routethru cells restored
+        for (Cell c : si.getCells()) {
+            if (c.isRoutethru()) {
+                Assertions.assertTrue(belsWithRouteThrus.contains(c.getBELName()));
+            } else {
+                Assertions.assertFalse(belsWithRouteThrus.contains(c.getBELName()));
+            }
+        }
+
+        Map<Net, List<String>> siteNetMap = si.getNetToSiteWiresMap();
+        List<SitePIP> usedSitePIPs = si.getUsedSitePIPs();
+
+        Assertions.assertEquals(origSiteNetMap.size(), siteNetMap.size());
+        Assertions.assertEquals(origUsedSitePIPs.size(), usedSitePIPs.size());
+
+        for (Entry<Net, List<String>> e : origSiteNetMap.entrySet()) {
+            List<String> origSiteWires = e.getValue();
+            List<String> siteWires = siteNetMap.get(e.getKey());
+            Collections.sort(origSiteWires);
+            Collections.sort(siteWires);
+            Assertions.assertEquals(origSiteWires.toString(), siteWires.toString());
+        }
+
+        List<String> origUsedSitePIPNames = getSortedStringList(origUsedSitePIPs);
+        List<String> usedSitePIPNames = getSortedStringList(usedSitePIPs);
+        Assertions.assertEquals(origUsedSitePIPNames, usedSitePIPNames);
+    }
+
+    private List<String> getSortedStringList(List<SitePIP> sitePIPs) {
+        List<String> strings = new ArrayList<>();
+        for (SitePIP p : sitePIPs) {
+            strings.add(p.toString());
+        }
+        Collections.sort(strings);
+        return strings;
     }
 }

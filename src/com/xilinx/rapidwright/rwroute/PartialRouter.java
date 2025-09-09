@@ -86,7 +86,7 @@ public class PartialRouter extends RWRoute {
     protected static class RouteNodeGraphPartialTimingDriven extends RouteNodeGraphTimingDriven {
         public RouteNodeGraphPartialTimingDriven(Design design,
                                                  RWRouteConfig config,
-                                                 DelayEstimatorBase delayEstimator) {
+                                                 DelayEstimatorBase<InterconnectInfo> delayEstimator) {
             super(design, config, delayEstimator);
         }
 
@@ -172,7 +172,8 @@ public class PartialRouter extends RWRoute {
     protected RouteNodeGraph createRouteNodeGraph() {
         if (config.isTimingDriven()) {
             /* An instantiated delay estimator that is used to calculate delay of routing resources */
-            DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+            DelayEstimatorBase<InterconnectInfo> estimator = new DelayEstimatorBase<InterconnectInfo>(
+                    design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
             return new RouteNodeGraphPartialTimingDriven(design, config, estimator);
         } else {
             return new RouteNodeGraphPartial(design, config);
@@ -226,9 +227,7 @@ public class PartialRouter extends RWRoute {
     }
 
     @Override
-    protected void determineRoutingTargets() {
-        super.determineRoutingTargets();
-
+    protected Set<Net> ensureSinkRoutability() {
         // With all routingGraph.preserveAsync() calls having completed,
         // now check that no sinks are preserved by another net
         // (e.g. a pin was moved from one net to the other, but
@@ -236,14 +235,19 @@ public class PartialRouter extends RWRoute {
         // if so, unpreserve that blocking net
         Set<Net> unpreserveNets = new HashSet<>();
         for (Connection connection : indirectConnections) {
+            if (connection.hasAltSinks()) {
+                // Skip connections that have alternate sinks
+                continue;
+            }
             Net net = connection.getNet();
             Net preservedNet;
             assert((preservedNet = routingGraph.getPreservedNet(connection.getSourceRnode())) == null || preservedNet == net);
+
             RouteNode sinkRnode = connection.getSinkRnode();
+            assert(sinkRnode.getType().isAnyExclusiveSink());
             preservedNet = routingGraph.getPreservedNet(sinkRnode);
             if (preservedNet != null && preservedNet != net) {
                 unpreserveNets.add(preservedNet);
-                assert(sinkRnode.getType().isAnyExclusiveSink());
             }
         }
 
@@ -277,6 +281,7 @@ public class PartialRouter extends RWRoute {
                 }
             }
         }
+        return unpreserveNets;
     }
 
     @Override

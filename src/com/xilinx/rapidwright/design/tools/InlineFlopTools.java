@@ -68,7 +68,7 @@ public class InlineFlopTools {
 
     /**
      * Add flip flops inline on all the top-level ports of an out-of-context design.
-     * This is useful for placed out-of-context kernels prior to routing so that
+     * This is useful for out-of-context kernels prior to placement and routing so that
      * after the flops have been placed, the router is forced to route connections
      * of each of the ports to each of the flops. This can help alleviate congestion
      * when the kernels are placed/relocated in context. Note this assumes the

@@ -118,8 +118,27 @@ public class EDIFCell extends EDIFPropertyObject {
      */
     public EDIFCell(EDIFLibrary lib, EDIFCell orig, String newCellName) {
         super(newCellName);
+        deepCopyInit(lib, orig, newCellName, true);
+    }
+
+    /**
+     * Full Deep Copy Constructor with rename and optional inclusion of nets and
+     * insts
+     *
+     * @param lib                 Destination library of the new cell
+     * @param orig                Prototype of the original cell
+     * @param newCellName         Name of the new cell copy
+     * @param includeNetsAndInsts In the deep copy, include copies of all the nets
+     *                            and instances
+     */
+    public EDIFCell(EDIFLibrary lib, EDIFCell orig, String newCellName, boolean includeNetsAndInsts) {
+        super(newCellName);
+        deepCopyInit(lib, orig, newCellName, includeNetsAndInsts);
+    }
+
+    private void deepCopyInit(EDIFLibrary lib, EDIFCell orig, String newCellName, boolean includeNetsAndInsts) {
         if (lib != null) lib.addCell(this);
-        if (orig.instances != null) {
+        if (includeNetsAndInsts && orig.instances != null) {
             for (Entry<String, EDIFCellInst> e : orig.instances.entrySet()) {
                 addCellInst(new EDIFCellInst(e.getValue(), this));
             }
@@ -129,7 +148,7 @@ public class EDIFCell extends EDIFPropertyObject {
                 addPort(new EDIFPort(e.getValue()));
             }
         }
-        if (orig.nets != null) {
+        if (includeNetsAndInsts && orig.nets != null) {
             for (Entry<String, EDIFNet> e : orig.nets.entrySet()) {
                 EDIFNet net = addNet(new EDIFNet(e.getValue()));
                 for (EDIFPortInst prototype : e.getValue().getPortInsts()) {

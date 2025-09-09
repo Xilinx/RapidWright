@@ -24,20 +24,22 @@
 
 package com.xilinx.rapidwright.edif;
 
-import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.eco.ECOTools;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestEDIFTools {
 
@@ -121,6 +123,118 @@ public class TestEDIFTools {
         Assertions.assertEquals(snkPortInst.getNet(), snkPortInst2.getNet());
     }
 
+    @Test
+    public void testConnectPortInstsThruHierNet() {
+        Design d = Design.readCheckpoint(RapidWrightDCP.getPath("bnn.dcp"), true);
+        EDIFNetlist netlist = d.getNetlist();
+        boolean includeSrcs = true;
+        boolean includeSnks = false;
+
+        // Test connecting a source in a low hierarchical cell to a unconnected net in at the root
+        //   [pin] 'bd_0_i/hls_inst/inst/add_ln180_1_reg_1471_reg[5]/Q' --> 
+        //   [net] 'test_net'
+        String netName = "test_net";
+        d.getTopEDIFCell().createNet(netName);
+        EDIFHierNet net = netlist.getHierNetFromName(netName);
+        EDIFHierPortInst pin = netlist.getHierPortInstFromName("bd_0_i/hls_inst/inst/add_ln180_1_reg_1471_reg[5]/Q");
+        Assertions.assertEquals(2, pin.getNet().getPortInsts().size());
+        EDIFTools.connectPortInstsThruHier(net, pin, "test_connect");
+        Assertions.assertEquals(1, net.getNet().getPortInsts().size());
+        List<EDIFHierPortInst> leafPins = net.getLeafHierPortInsts(includeSrcs, includeSnks);
+        Assertions.assertEquals(1, leafPins.size());
+        Assertions.assertEquals(pin.toString(), leafPins.get(0).toString());
+        // Needed to punch a new port ...
+        Assertions.assertEquals(3, pin.getNet().getPortInsts().size());
+        Assertions.assertTrue(pin.getHierarchicalNet().getPortInsts().stream().anyMatch(
+                // ... upwards from the pin
+                ehpi -> ehpi.toString().equals("bd_0_i/hls_inst/inst/test_connect")
+        ));
+
+
+        // Test connecting a source in a low hierarchical cell to an unconnected net in another (separate) low hierarchical cell
+        //   [pin] 'bd_0_i/hls_inst/inst/grp_bin_dense_fu_523/ram_reg_bram_0_i_6__4/O' -->
+        //   [net] 'bd_0_i/hls_inst/inst/wt_mem_V_U/top_wt_mem_V_ram_U/test_net2'
+        netName = "test_net2";
+        EDIFHierCellInst targetInst = netlist.getHierCellInstFromName("bd_0_i/hls_inst/inst/wt_mem_V_U/top_wt_mem_V_ram_U");
+        targetInst.getCellType().createNet(netName);
+        net = targetInst.getNet(netName);
+        pin = netlist.getHierPortInstFromName("bd_0_i/hls_inst/inst/grp_bin_dense_fu_523/ram_reg_bram_0_i_6__4/O");
+        Assertions.assertEquals(2, pin.getNet().getPortInsts().size());
+        EDIFTools.connectPortInstsThruHier(net, pin, "test_connect2");
+        Assertions.assertEquals(1, net.getNet().getPortInsts().size());
+        leafPins = net.getLeafHierPortInsts(includeSrcs, includeSnks);
+        Assertions.assertEquals(1, leafPins.size());
+        Assertions.assertEquals(pin.toString(), leafPins.get(0).toString());
+        // Re-used the existing port
+        Assertions.assertEquals(2, pin.getNet().getPortInsts().size());
+
+        includeSrcs = false;
+        includeSnks = true;
+
+        // Test connecting a sink in a low hierarchical cell to a unconnected net in at the root
+        //   [net] 'test_net3' -->
+        //   [pin] 'bd_0_i/hls_inst/inst/add_ln180_1_reg_1471_reg[5]/D'
+        netName = "test_net3";
+        d.getTopEDIFCell().createNet(netName);
+        net = netlist.getHierNetFromName(netName);
+        Assertions.assertEquals(0, net.getNet().getPortInsts().size());
+        pin = netlist.getHierPortInstFromName("bd_0_i/hls_inst/inst/add_ln180_1_reg_1471_reg[5]/D");
+        Assertions.assertEquals(2, pin.getNet().getPortInsts().size());
+        ECOTools.disconnectNet(d, pin);
+        Assertions.assertNull(pin.getNet());
+        EDIFTools.connectPortInstsThruHier(net, pin, "test_connect3");
+        // Needed to punch a new port
+        Assertions.assertEquals(1, net.getNet().getPortInsts().size());
+        Assertions.assertTrue(net.getPortInsts().stream().anyMatch(
+                // ... downwards from the net
+                ehpi -> ehpi.toString().equals("bd_0_i/test_connect3")
+        ));
+
+
+        leafPins = net.getLeafHierPortInsts(includeSrcs, includeSnks);
+        Assertions.assertEquals(1, leafPins.size());
+        Assertions.assertEquals(pin.toString(), leafPins.get(0).toString());
+
+        // Needed to punch a new port
+        Assertions.assertEquals(2, pin.getNet().getPortInsts().size());
+        Assertions.assertTrue(pin.getHierarchicalNet().getPortInsts().stream().anyMatch(
+                // ... upwards from the pin
+                ehpi -> ehpi.toString().equals("bd_0_i/hls_inst/inst/test_connect3")
+        ));
+
+        // Test connecting a sink in a low hierarchical cell to an unconnected net in
+        // another (separate) low hierarchical cell
+        //   [net] 'bd_0_i/hls_inst/inst/wt_mem_V_U/top_wt_mem_V_ram_U/test_net4' -->
+        //   [pin] 'bd_0_i/hls_inst/inst/add_ln180_1_reg_1471_reg[4]/D'
+        netName = "test_net4";
+        targetInst.getCellType().createNet(netName);
+        net = targetInst.getNet(netName);
+        Assertions.assertEquals(0, net.getNet().getPortInsts().size());
+        pin = netlist.getHierPortInstFromName("bd_0_i/hls_inst/inst/add_ln180_1_reg_1471_reg[4]/D");
+        Assertions.assertEquals(2, pin.getNet().getPortInsts().size());
+        ECOTools.disconnectNet(d, pin);
+        Assertions.assertNull(pin.getNet());
+        EDIFTools.connectPortInstsThruHier(net, pin, "test_connect4");
+        // Needed to punch a new port
+        Assertions.assertEquals(1, net.getNet().getPortInsts().size());
+        Assertions.assertTrue(net.getPortInsts().stream().anyMatch(
+                // ... upwards from the net
+                ehpi -> ehpi.toString().equals("bd_0_i/hls_inst/inst/wt_mem_V_U/top_wt_mem_V_ram_U/test_connect4")
+        ));
+
+        leafPins = net.getLeafHierPortInsts(includeSrcs, includeSnks);
+        Assertions.assertEquals(1, leafPins.size());
+        Assertions.assertEquals(pin.toString(), leafPins.get(0).toString());
+
+        // Needed to punch a new port
+        Assertions.assertEquals(2, pin.getNet().getPortInsts().size());
+        Assertions.assertTrue(pin.getHierarchicalNet().getPortInsts().stream().anyMatch(
+                // ... downwards from the pin
+                ehpi -> ehpi.toString().equals("bd_0_i/hls_inst/inst/wt_mem_V_U/test_connect4")
+        ));
+    }
+    
+    
     @Test
     public void testCreateNewNetlist() {
         Design d = Design.readCheckpoint(RapidWrightDCP.getPath("bnn.dcp"), true);

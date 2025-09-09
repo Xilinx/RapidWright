@@ -65,10 +65,6 @@ if(project.hasProperty('limitToSingleProc') && limitToSingleProc.equals("single-
 }
 
 
-configurations.implementation.canBeResolved = true
-configurations.testImplementation.canBeResolved = true
-configurations.testFixturesImplementation.canBeResolved = true
-configurations.api.canBeResolved = true
 
 tasks.withType(Test) {
   maxHeapSize = "10G"
