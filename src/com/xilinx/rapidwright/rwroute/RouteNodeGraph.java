@@ -627,7 +627,12 @@ public class RouteNodeGraph {
         }
 
         for (PIP pip : net.getPIPs()) {
-            preserve(pip.getStartNode(), net);
+            Node startNode = pip.getStartNode();
+            if (isStaticNet && startNode.isTied()) {
+                // No need to preserve tied nodes (e.g. VCC_WIRE) since they can't conflict
+            } else {
+                preserve(startNode, net);
+            }
             preserve(pip.getEndNode(), net);
         }
     }
