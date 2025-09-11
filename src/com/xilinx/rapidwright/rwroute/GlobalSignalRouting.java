@@ -456,6 +456,7 @@ public class GlobalSignalRouting {
             assertIntentCodeOfPoppedNodesOnVcc.add(IntentCode.NODE_CLE_CTRL);
             assertIntentCodeOfPoppedNodesOnVcc.add(IntentCode.NODE_INTF_CTRL);
             assertIntentCodeOfPoppedNodesOnVcc.add(IntentCode.NODE_IRI);
+            assertIntentCodeOfPoppedNodesOnVcc.add(IntentCode.NODE_OPTDELAY); // e.g. INTF_PSS_TL_TILE_X15Y56/IF_COE_IMUX93 on vp1202
         } else {
             throw new RuntimeException("ERROR: Unsupported series " + series);
         }
@@ -478,6 +479,11 @@ public class GlobalSignalRouting {
             Node node = sink.getConnectedNode();
             if (getNodeState.apply(node) != NodeStatus.INUSE) {
                 throw new RuntimeException("ERROR: Site pin " + sink + " is not available for net " + currNet);
+            } else if (node.getIntentCode() == IntentCode.NODE_DEDICATED) {
+                // Skip dedicated nodes that don't reach the INT tile
+                // e.g. XPIO_NIBBLE_SC_5_X0Y0/XPIO_IOBPAIR_5_IBUF_DISABLE_M_PIN on vp1202
+                assert(isVersal);
+                continue;
             }
             nodeToRouteToSink.put(node, sink);
         }
