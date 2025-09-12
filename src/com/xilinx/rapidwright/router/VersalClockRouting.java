@@ -22,20 +22,6 @@
 
 package com.xilinx.rapidwright.router;
 
-import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.DesignTools;
-import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.device.ClockRegion;
-import com.xilinx.rapidwright.device.IntentCode;
-import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.PIP;
-
-import com.xilinx.rapidwright.device.Tile;
-import com.xilinx.rapidwright.rwroute.NodeStatus;
-import com.xilinx.rapidwright.rwroute.RouterHelper;
-import com.xilinx.rapidwright.rwroute.RouterHelper.NodeWithPrev;
-
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -43,6 +29,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -51,6 +38,19 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
+
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.ClockRegion;
+import com.xilinx.rapidwright.device.IntentCode;
+import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.rwroute.NodeStatus;
+import com.xilinx.rapidwright.rwroute.RouterHelper;
+import com.xilinx.rapidwright.rwroute.RouterHelper.NodeWithPrev;
 
 /**
  * A collection of utility methods for routing clocks on
@@ -123,7 +123,6 @@ public class VersalClockRouting {
 
         while (!q.isEmpty()) {
             NodeWithPrevAndCost curr = q.poll();
-            boolean possibleCentroid = false;
             NodeWithPrev parent = curr.getPrev();
             if (parent != null) {
                 IntentCode parentIntentCode = parent.getIntentCode();
@@ -133,22 +132,6 @@ public class VersalClockRouting {
                     // Disallow ability to go from VROUTE back to HROUTE
                     continue;
                 }
-                if (currIntentCode == IntentCode.NODE_GLOBAL_GCLK 
-                        && clockRegion.equals(curr.getTile().getClockRegion()) 
-                        && clockRegion.equals(parent.getTile().getClockRegion())) {
-                    if (parentIntentCode == IntentCode.NODE_GLOBAL_VROUTE && parent.getWireName().contains("BOT")) {
-                        possibleCentroid = true;
-                    } else if (parentIntentCode == IntentCode.NODE_GLOBAL_GCLK && parent.getPrev() != null) {
-                        // Check grandparent
-                        NodeWithPrev grandParent = parent.getPrev();
-                        if ( grandParent.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE 
-                                && clockRegion.equals(grandParent.getTile().getClockRegion()) 
-                                && grandParent.getWireName().contains("BOT")) { 
-                            possibleCentroid = true;                            
-                        }
-                    }
-
-                }
             }
             for (Node downhill : curr.getAllDownhillNodes()) {
                 IntentCode downhillIntentCode = downhill.getIntentCode();
@@ -157,16 +140,17 @@ public class VersalClockRouting {
                     continue;
                 }
 
-                if (possibleCentroid && downhillIntentCode == IntentCode.NODE_GLOBAL_VDISTR_LVL2) {
-                    NodeWithPrev centroidHRouteNode  = curr.getPrev();
-                    if (findCentroidHroute) {
-                        while (centroidHRouteNode.getIntentCode() != IntentCode.NODE_GLOBAL_HROUTE_HSR) {
-                            centroidHRouteNode = centroidHRouteNode.getPrev();
-                        }
+                if (clockRegion.equals(downhill.getTile().getClockRegion())
+                        && downhillIntentCode == IntentCode.NODE_GLOBAL_VDISTR) {
+                    NodeWithPrev centroid = curr;
+                    IntentCode codeType = findCentroidHroute ? IntentCode.NODE_GLOBAL_HROUTE_HSR
+                            : IntentCode.NODE_GLOBAL_VROUTE;
+                    while (centroid.getIntentCode() != codeType) {
+                        centroid = centroid.getPrev();
                     }
-                    List<Node> path = centroidHRouteNode.getPrevPath();
+                    List<Node> path = centroid.getPrevPath();
                     clk.getPIPs().addAll(RouterHelper.getPIPsFromNodes(path));
-                    return centroidHRouteNode;
+                    return centroid;
                 }
 
                 if (!findCentroidHroute && downhillIntentCode == IntentCode.NODE_GLOBAL_HROUTE_HSR) {
@@ -202,7 +186,17 @@ public class VersalClockRouting {
             IntentCode.NODE_GLOBAL_VDISTR,
             IntentCode.NODE_GLOBAL_VDISTR_LVL1,
             IntentCode.NODE_GLOBAL_VDISTR_LVL2,
+            IntentCode.NODE_GLOBAL_VDISTR_LVL21,
             IntentCode.NODE_GLOBAL_GCLK
+//            IntentCode.NODE_GLOBAL_HDISTR,
+//            IntentCode.NODE_GLOBAL_LEAF,
+//            IntentCode.NODE_PINFEED,
+//            IntentCode.NODE_GLOBAL_HDISTR_LOCAL,
+//            IntentCode.NODE_CLE_CNODE,
+//            IntentCode.NODE_INODE,
+//            IntentCode.NODE_IMUX,
+//            IntentCode.NODE_IRI,
+//            IntentCode.NODE_OUTPUT
         );
         nextClockRegion: for (ClockRegion cr : clockRegions) {
             q.clear();
