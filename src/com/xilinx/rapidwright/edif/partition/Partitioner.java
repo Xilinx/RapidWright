@@ -71,6 +71,11 @@ public class Partitioner {
         Map<EDIFHierCellInst, Integer> leafInsts = PartitionTools.identifyLeafInstances(n,
                 leafLUTCountLimit, instLutCountMap);
         System.out.println("Identified " + leafInsts.size() + " leaves");
+        int totalLUTs = instLutCountMap.get(n.getTopHierCellInst());
+        if (leafLUTCountLimit >= totalLUTs || leafLUTCountLimit < 1) {
+            throw new RuntimeException("ERROR: Invalid leafLUTCountLimit '" + leafLUTCountLimit
+                    + "', must be less than total LUT count in netlist or 1 or greater.");
+        }
         t.stop();
 
         t.start("Find Edges");
@@ -124,8 +129,7 @@ public class Partitioner {
             }
         }
         System.out.println("-----------------------------------------------------------");
-        System.out.printf("        Total : %10d LUTs\n\n\n",
-                instLutCountMap.get(n.getTopHierCellInst()));
+        System.out.printf("        Total : %10d LUTs\n\n\n", totalLUTs);
         t.stop();
         t.printSummary();
     }
