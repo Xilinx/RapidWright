@@ -433,10 +433,10 @@ public class GlobalSignalRouting {
             // Snap to the closest legal clock region
             if (centroid.getRow() == 0) {
                 centroid = centroid.getNeighborClockRegion(1, 0);
+            } else if (centroid.getRow() == device.getNumOfClockRegionRows() - 1) {
+                centroid = centroid.getNeighborClockRegion(-1, 0);
             }
         }
-        // TODO make search more robust
-
         return centroid;
     }
 
