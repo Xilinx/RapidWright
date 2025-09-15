@@ -29,7 +29,6 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -59,6 +58,22 @@ import com.xilinx.rapidwright.rwroute.RouterHelper.NodeWithPrev;
  * Created on: Nov 1, 2024
  */
 public class VersalClockRouting {
+
+    private static final EnumSet<IntentCode> hRouteTypes;
+    private static final EnumSet<IntentCode> vRouteTypes;
+    private static final EnumSet<IntentCode> allRouteTypes;
+    
+    static {
+        hRouteTypes = EnumSet.of(IntentCode.NODE_GLOBAL_HROUTE,
+                IntentCode.NODE_GLOBAL_HROUTE_HSR, 
+                IntentCode.NODE_GLOBAL_HROUTE_MED, 
+                IntentCode.NODE_GLOBAL_HROUTE_SLOW); 
+        vRouteTypes = EnumSet.of(IntentCode.NODE_GLOBAL_VROUTE);
+        allRouteTypes = EnumSet.of(IntentCode.NODE_GLOBAL_VROUTE, IntentCode.NODE_GLOBAL_HROUTE,
+                IntentCode.NODE_GLOBAL_HROUTE_HSR, IntentCode.NODE_GLOBAL_HROUTE_MED,
+                IntentCode.NODE_GLOBAL_HROUTE_SLOW);
+    }
+    
     public static class NodeWithPrevAndCost extends NodeWithPrev implements Comparable<NodeWithPrevAndCost> {
         protected int cost;
         public NodeWithPrevAndCost(Node node) {
@@ -116,7 +131,8 @@ public class VersalClockRouting {
         int watchDog = 10000;
         Set<Node> visited = new HashSet<>();
         Tile crApproxCenterTile = clockRegion.getApproximateCenter();
-
+        EnumSet<IntentCode> targetCodes = findCentroidHroute ? allRouteTypes : vRouteTypes;
+        
         // In Vivado solutions, we can always find the pattern:
         // ... -> NODE_GLOBAL_GCLK -> NODE_GLOBAL_VROUTE -> NODE_GLOBAL_VDISTR_LVL2 -> ...
         // and this is how we locate the VROUTE node
@@ -127,8 +143,7 @@ public class VersalClockRouting {
             if (parent != null) {
                 IntentCode parentIntentCode = parent.getIntentCode();
                 IntentCode currIntentCode = curr.getIntentCode();
-                if (parentIntentCode == IntentCode.NODE_GLOBAL_VROUTE &&
-                    currIntentCode == IntentCode.NODE_GLOBAL_HROUTE_HSR) {
+                if (vRouteTypes.contains(parentIntentCode) && hRouteTypes.contains(currIntentCode)) {
                     // Disallow ability to go from VROUTE back to HROUTE
                     continue;
                 }
@@ -143,9 +158,7 @@ public class VersalClockRouting {
                 if (clockRegion.equals(downhill.getTile().getClockRegion())
                         && downhillIntentCode == IntentCode.NODE_GLOBAL_VDISTR) {
                     NodeWithPrev centroid = curr;
-                    IntentCode codeType = findCentroidHroute ? IntentCode.NODE_GLOBAL_HROUTE_HSR
-                            : IntentCode.NODE_GLOBAL_VROUTE;
-                    while (centroid.getIntentCode() != codeType) {
+                    while (!targetCodes.contains(centroid.getIntentCode())) {
                         centroid = centroid.getPrev();
                     }
                     List<Node> path = centroid.getPrevPath();
@@ -153,7 +166,7 @@ public class VersalClockRouting {
                     return centroid;
                 }
 
-                if (!findCentroidHroute && downhillIntentCode == IntentCode.NODE_GLOBAL_HROUTE_HSR) {
+                if (!findCentroidHroute && hRouteTypes.contains(downhillIntentCode)) {
                     continue;
                 }
                 if (!visited.add(downhill)) {
@@ -450,7 +463,7 @@ public class VersalClockRouting {
         RouteThruHelper routeThruHelper = new RouteThruHelper(clk.getDesign().getDevice());
 
         nextPin: for (SitePinInst p: clk.getPins()) {
-            if (p.isOutPin()) {
+            if (p.isOutPin() || p.isRouted()) {
                 continue;
             }
             NodeWithPrev sink = new NodeWithPrev(p.getConnectedNode());
@@ -494,5 +507,49 @@ public class VersalClockRouting {
         }
 
         return lcbMappings;
+    }
+
+    public static void routeNonLCBPins(Net clk, List<SitePinInst> sinks) {
+        Set<Node> visited = new HashSet<>();
+        Queue<NodeWithPrevAndCost> q = new PriorityQueue<>();
+        Set<PIP> allPIPs = new HashSet<>(clk.getPIPs());
+        nextPin: for (SitePinInst p : sinks) {
+            q.clear();
+            visited.clear();
+            NodeWithPrev sink = new NodeWithPrev(p.getConnectedNode());
+            List<Node> uphill = sink.getAllUphillNodes();
+            boolean sinkOneHopLater = false;
+            if (uphill.size() == 1) {
+                sink = new NodeWithPrev(uphill.get(0));
+                sinkOneHopLater = true;
+            }
+            for (PIP pip : allPIPs) {
+                int cost = pip.getTile().getManhattanDistance(sink.getTile());
+                q.add(new NodeWithPrevAndCost(pip.getEndNode(), null, cost));
+            }
+
+            while (!q.isEmpty()) {
+                NodeWithPrev curr = q.poll();
+                visited.add(curr);
+                if (sink.equals(curr)) {
+                    if (sinkOneHopLater) {
+                        curr = new NodeWithPrev(p.getConnectedNode(), curr);
+                    }
+                    List<Node> path = curr.getPrevPath();
+                    allPIPs.addAll(RouterHelper.getPIPsFromNodes(path));
+                    p.setRouted(true);
+                    continue nextPin;
+                }
+
+                for (Node downhill : curr.getAllDownhillNodes()) {
+                    if (!visited.add(downhill)) {
+                        continue;
+                    }
+                    int cost = downhill.getTile().getManhattanDistance(sink.getTile());
+                    q.add(new NodeWithPrevAndCost(downhill, curr, cost));
+                }
+            }
+        }
+        clk.getPIPs().addAll(allPIPs);
     }
 }

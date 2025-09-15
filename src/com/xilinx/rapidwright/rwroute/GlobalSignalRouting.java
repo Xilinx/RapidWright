@@ -270,7 +270,6 @@ public class GlobalSignalRouting {
             // NODE_GLOBAL_VROUTE (located in the same clock region of the source site)
 
             // Notice that Vivado always uses the above VROUTE node, there is no need to find a centroid clock region to route to.
-//            centroid = source.getTile().getClockRegion();
             centroidHRouteNode = source.getConnectedNode();
         } else if (sourceTypeEnum == SiteTypeEnum.BUFGCE) {
             // Assume that these source sites are located in the bottom of the device (Y=0).
@@ -279,14 +278,6 @@ public class GlobalSignalRouting {
             // which is similar to US/US+ clock routing.
             // Notice that we have to quickly reach a NODE_GLOBAL_HROUTE_HSR node, and if we allow the Y coordinate of centroid to be bigger than 1,
             // we may fail to do so. Thus, we need to force the Y-coordinate of centroid to be 1.
-//            assert(source.getTile().getTileYCoordinate() == 0);
-            // And, in X-axis, Vivado doesn't go to the real centroid of target clock regions... it just uses a nearby VROUTE.
-//            int centroidX = source.getTile().getClockRegion().getColumn();
-            // VROUTE nodes are in the clock region where X is odd.
-//            if (centroidX % 2 == 0) centroidX -= 1;
-//            if (centroidX <= 0)     centroidX = 1;
-//            centroid = device.getClockRegion(1, centroidX);
-
             Node clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
             centroidHRouteNode = VersalClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true);
         } else if (sourceTypeEnum == SiteTypeEnum.BUFG_PS) {
@@ -295,15 +286,27 @@ public class GlobalSignalRouting {
             // NODE_GLOBAL_BUFG (has a suffix "_O_PIN") ->
             // NODE_GLOBAL_BUFG (the output node with a suffix "_O") ->
             // NODE_GLOBAL_HROUTE (located in the same clock region)
-//            centroid = source.getTile().getClockRegion();
             centroidHRouteNode = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
         } else {
             throw new RuntimeException("ERROR: Routing clock net with source type " + sourceTypeEnum + " not supported.");
         }
 
-        Node vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid, false);
+        // If the source and centroid are in the same row, we do not need to traverse vertical routing tracks
+        boolean noVrouteNeeded = centroidHRouteNode.getTile().getClockRegion().getRow() == centroid.getRow();
+        Node vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid, noVrouteNeeded);
+
+        if (vroute == null) {
+            // Try neighboring CR
+            ClockRegion neighbor = centroid.getNeighborClockRegion(0, 1);
+            centroid = neighbor == null ? centroid.getNeighborClockRegion(0, -1) : neighbor;
+            vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid, noVrouteNeeded);
+            assert (vroute != null);
+        }
 
         Map<ClockRegion, Node> upDownDistLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vroute, clockRegions.getFirst(), false, getNodeStatus);
+
+        // Route non-LCB driven pins
+        VersalClockRouting.routeNonLCBPins(clk, clockRegions.getSecond());
 
         Map<Node, List<SitePinInst>> lcbMappings = VersalClockRouting.routeLCBsToSinks(clk, getNodeStatus);
         VersalClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
@@ -399,6 +402,17 @@ public class GlobalSignalRouting {
         return lcbMappings;
     }
 
+    private static boolean centroidEligible(ClockRegion candidate) {
+        // Check if we can use this clock region
+        Tile lowerLeft = candidate.getLowerLeft();
+        Tile upperLeft = candidate.getUpperLeft();
+        int tileHeight = 0;
+        if (lowerLeft != null && upperLeft != null) {
+            tileHeight = Math.abs(lowerLeft.getRow() - upperLeft.getRow());
+        }
+        return tileHeight > 40;
+    }
+
     /**
      * Finds the centroid clock region of a clock net.
      * @param clk The clock net of a design.
@@ -413,7 +427,17 @@ public class GlobalSignalRouting {
             sitePinInstTilePoints.add(new Point(c.getColumn(),c.getRow()));
         }
         Point center = SmallestEnclosingCircle.getCenterPoint(sitePinInstTilePoints);
-        return device.getClockRegion(center.y, center.x);
+        ClockRegion centroid = device.getClockRegion(center.y, center.x);
+        // Check if we can use this clock region
+        if (!centroidEligible(centroid)) {
+            // Snap to the closest legal clock region
+            if (centroid.getRow() == 0) {
+                centroid = centroid.getNeighborClockRegion(1, 0);
+            }
+        }
+        // TODO make search more robust
+
+        return centroid;
     }
 
     /**
