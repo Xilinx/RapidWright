@@ -53,6 +53,7 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
@@ -459,12 +460,13 @@ public class RWRoute {
      * TODO: fix the potential issue.
      */
     protected void routeGlobalClkNets() {
+        Map<Integer, Set<ClockRegion>> usedRoutingTracks = new HashMap<>();
         for (Net clk : clkNets) {
-            routeGlobalClkNet(clk);
+            routeGlobalClkNet(clk, usedRoutingTracks);
         }
     }
 
-    protected void routeGlobalClkNet(Net clk) {
+    protected void routeGlobalClkNet(Net clk, Map<Integer, Set<ClockRegion>> usedRoutingTracks) {
         // Since we preserved all pins in addGlobalClkRoutingTargets(), unpreserve them here
         for (SitePinInst spi : clk.getPins()) {
             routingGraph.unpreserve(spi.getConnectedNode());
@@ -477,7 +479,7 @@ public class RWRoute {
         } else {
             // routes clock nets from scratch
             System.out.println("INFO: Routing " + clk.getPins().size() + " pins of clock " + clk + " (non timing-driven)");
-            GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), gns);
+            GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), gns, usedRoutingTracks);
         }
         preserveNet(clk, false);
 
