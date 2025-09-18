@@ -26,6 +26,7 @@ package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -301,8 +302,10 @@ public class GlobalSignalRouting {
             // Notice that we have to quickly reach a NODE_GLOBAL_HROUTE_HSR node, and if we allow the Y coordinate of centroid to be bigger than 1,
             // we may fail to do so. Thus, we need to force the Y-coordinate of centroid to be 1.
             Node clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk, getNodeStatus);// first HROUTE
-            centroidHRouteNode = VersalClockRouting.routeToCentroid(clk, clkRoutingLine, centroid,
-                    true, getNodeStatus, unavailableTracks);
+            Pair<Node, ClockRegion> result = findCentroid(clk, clkRoutingLine, centroid, true,
+                    getNodeStatus, unavailableTracks);
+            centroidHRouteNode = result.getFirst();
+            centroid = result.getSecond();
         } else if (sourceTypeEnum == SiteTypeEnum.BUFG_PS) {
             // These source sites are located in the middle of the device. The path from the
             // output pin to HROUTE matches the following pattern:
@@ -316,18 +319,12 @@ public class GlobalSignalRouting {
 
         // If the source and centroid are in the same row, we do not need to traverse vertical routing tracks
         boolean noVrouteNeeded = centroidHRouteNode.getTile().getClockRegion().getRow() == centroid.getRow();
-        Node vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid,
+
+        Pair<Node, ClockRegion> centroidResult = findCentroid(clk, centroidHRouteNode, centroid,
                 noVrouteNeeded, getNodeStatus, unavailableTracks);
-
-        if (vroute == null) {
-            // Try neighboring CR
-            ClockRegion neighbor = centroid.getNeighborClockRegion(0, 1);
-            centroid = neighbor == null ? centroid.getNeighborClockRegion(0, -1) : neighbor;
-            vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid,
-                    noVrouteNeeded, getNodeStatus, unavailableTracks);
-            assert (vroute != null);
-        }
-
+        Node vroute = centroidResult.getFirst();
+        centroid = centroidResult.getSecond();
+        
         Map<ClockRegion, Node> upDownDistLines = VersalClockRouting
                 .routeToHorizontalDistributionLines(clk, vroute, usedCRsAndNonLCBPinsTuple.getFirst(),
                         false, getNodeStatus);
@@ -351,6 +348,69 @@ public class GlobalSignalRouting {
         }
     }
 
+    /**
+     * Iteratively attempts to find a viable centroid based on architecture and
+     * availability.
+     * 
+     * @param clk               The clock net being routed
+     * @param start             The start node to search for a centroid
+     * @param origCentroid      This is the pre-calculated centroid based on the
+     *                          placed clock loads.
+     * @param noVrouteNeeded    Pass thru flag for routeToCentroid that doesn't
+     *                          require passing through a VROUTE.
+     * @param getNodeStatus     Function to identify nodes availability for use.
+     * @param unavailableTracks Tracks that are used by other clocks already routed.
+     *                          When chosing a centroid, we also pick a track that
+     *                          will persist for the rest of the clock tree. We need
+     *                          to pre-emptively avoid clock tracks that have
+     *                          already been used in the same clock region foot
+     *                          print of this clock net.
+     * @return
+     */
+    private static Pair<Node, ClockRegion> findCentroid(Net clk, Node start,
+            ClockRegion origCentroid, boolean noVrouteNeeded,
+            Function<Node, NodeStatus> getNodeStatus, Set<Integer> unavailableTracks) {
+        Node vroute = null;
+        int currIdx = 0;
+        List<Integer> rowOffsets = getOtherRowCentroidCandidates(origCentroid);
+        ClockRegion neighbor = null;
+        do {
+            // Start with estimate centroid
+            neighbor = origCentroid.getNeighborClockRegion(0, rowOffsets.get(currIdx));
+            if (neighbor.getApproximateCenter() != null) {
+                vroute = VersalClockRouting.routeToCentroid(clk, start, neighbor, noVrouteNeeded,
+                        getNodeStatus, unavailableTracks);
+            }
+            // If we weren't successful, loop around and try neighbors
+            currIdx++;
+        } while (vroute == null && currIdx < rowOffsets.size());
+        if (vroute == null) {
+            throw new RuntimeException("ERROR: Unable to find a centroid CR for clock " + clk);
+        }
+        assert (neighbor != null);
+        return new Pair<Node, ClockRegion>(vroute, neighbor);
+    }
+
+    /**
+     * Evaluates all possible centroid column offset indices for a given candidate.
+     * This is used in conjunction with iterative centroid exploration.
+     * 
+     * @param candidateCentroid The pre-selected centroid based on the placed loads
+     *                          on the clock net.
+     * @return The list of column index offsets sorted by lowest absolute value
+     *         (starting with 0).
+     */
+    private static List<Integer> getOtherRowCentroidCandidates(ClockRegion candidateCentroid) {
+        int columns = candidateCentroid.getDevice().getNumOfClockRegionsColumns();
+        int candidateIdx = candidateCentroid.getColumn();
+        List<Integer> rowOffsets = new ArrayList<>();
+        for (int i=0; i < columns; i++) {
+            rowOffsets.add(i - candidateIdx);
+        }
+        Collections.sort(rowOffsets, (a,b) -> Integer.compare(Math.abs(a), Math.abs(b)));
+        return rowOffsets;
+    }
+    
     /**
      * Gets clock regions of a net's sink pins.
      * @param clk The net in question.
