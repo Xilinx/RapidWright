@@ -824,7 +824,7 @@ public class GlobalSignalRouting {
     }
 
     /**
-     * Determines if the given {@link Node} instance can serve as our sink.
+     * Determines if the given {@link Node} instance can serve as our source.
      * @param node The {@link Node} instance in question.
      * @param type The net type to designate the static source type.
      * @return {@link SitePin} if a valid source is found, null otherwise.
@@ -862,11 +862,9 @@ public class GlobalSignalRouting {
         if (isVersal) {
             sitePinName = wireName.substring(17, wireName.length() - 4);
 
-            // For [A-H]Q only
-            if (si != null && sitePinName.endsWith("Q")) {
+            if (si != null) {
                 char lutLetter = sitePinName.charAt(0);
-                Net o6Net = si.getNetFromSiteWire(lutLetter + "_O");
-                if (o6Net != null && o6Net.getType() != type) {
+                if (si.getCell(lutLetter + "6LUT") != null) {
                     // 6LUT is occupied
                     return null;
                 }
