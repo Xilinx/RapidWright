@@ -554,7 +554,7 @@ public class GlobalSignalRouting {
                                       Design design, RouteThruHelper routeThruHelper) {
         Queue<Node> q = new ArrayDeque<>();
         Set<Node> usedRoutingNodes = new HashSet<>();
-        Map<Node, Node> prevNode = new HashMap<>();
+        Map<Node, Node> nextNode = new HashMap<>();
         List<Node> pathNodes = new ArrayList<>();
         List<SitePin> sitePinsToCreate = new ArrayList<>();
         final Node INVALID_NODE = new Node(null, Integer.MAX_VALUE);
@@ -627,16 +627,16 @@ public class GlobalSignalRouting {
 
         NetType netType = currNet.getType();
         for (Node node : nodesToRoute) {
-            int watchdog = 10000;
+            int watchdog = 20000;
             SitePinInst sink = nodeToRouteToSink.get(node);
             if (usedRoutingNodes.contains(node)) {
                 sink.setRouted(true);
             } else {
-                assert(prevNode.isEmpty());
+                assert(nextNode.isEmpty());
                 // Use an invalid node as the sink's prev node, as that's what we'll be looking for
                 // during trace-back. This is necessary because `null` cannot be used since `null`
                 // is what Map uses internally to indicate key is not present.
-                prevNode.put(node, INVALID_NODE);
+                nextNode.put(node, INVALID_NODE);
                 assert(q.isEmpty());
                 q.add(node);
                 search: while ((node = q.poll()) != null) {
@@ -722,7 +722,8 @@ public class GlobalSignalRouting {
                                 break;
                         }
 
-                        if (prevNode.putIfAbsent(uphillNode, node) != null) {
+                        if (nextNode.putIfAbsent(uphillNode, node) != null) {
+                            // Uphill node has already been visited
                             continue;
                         }
 
@@ -763,17 +764,18 @@ public class GlobalSignalRouting {
                     }
                     watchdog--;
                     if (watchdog < 0) {
+                        node = null;
                         break;
                     }
                 }
                 if (node == null) {
                     System.err.println("ERROR: Failed to route " + currNet.getName() + " pin " + sink);
                 } else {
-                    // trace back for a complete path
+                    // trace forward for a complete path
                     do {
                         usedRoutingNodes.add(node);
                         pathNodes.add(node);
-                        node = prevNode.get(node);
+                        node = nextNode.get(node);
                     } while (node != INVALID_NODE);
 
                     // Note that the static net router goes backward from sinks to sources,
@@ -787,7 +789,7 @@ public class GlobalSignalRouting {
                 }
                 assert(pathNodes.isEmpty());
                 q.clear();
-                prevNode.clear();
+                nextNode.clear();
             }
         }
 
