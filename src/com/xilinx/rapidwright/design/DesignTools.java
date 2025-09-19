@@ -3370,10 +3370,7 @@ public class DesignTools {
     }
 
     public static void createCeClkOfRoutethruFFToVCC(Design design) {
-        if (design.getSeries() == Series.Versal) {
-            // Versal have OUTMUX[A-H][12]-es for bypassing FFs
-            return;
-        }
+        boolean isVersal = (design.getSeries() == Series.Versal);
         Net vcc = design.getVccNet();
         Net gnd = design.getGndNet();
         for (SiteInst si : design.getSiteInsts()) {
@@ -3381,12 +3378,19 @@ public class DesignTools {
                 continue;
             }
             for (Cell cell : si.getCells()) {
-                if (!cell.isFFRoutethruCell()) {
+                BEL bel = cell.getBEL();
+                if (bel == null || !bel.isFF() || bel.isAnyIMR()) {
                     continue;
                 }
 
-                BEL bel = cell.getBEL();
-                if (bel == null) {
+                String cellType = cell.getType();
+                if (cellType.equals("AND2B1L") || cellType.equals("OR2L")) {
+                    // pass
+                } else if (cell.isFFRoutethruCell()) {
+                    // Versal have OUTMUX[A-H][12]-es for bypassing FFs
+                    assert(!isVersal);
+                    // pass
+                } else {
                     continue;
                 }
 
@@ -3401,6 +3405,13 @@ public class DesignTools {
                 // ...and GND at CLK
                 BELPin clkInput = bel.getPin("CLK");
                 BELPin clkInvOut = clkInput.getSourcePin();
+                if (isVersal) {
+                    // On Versal only, punch through the FF_CLK_MOD
+                    assert(clkInvOut.getBEL().isSliceFFClkMod());
+                    assert(clkInvOut.getName().equals("CLK_OUT"));
+                    clkInvOut = clkInvOut.getBEL().getPin("CLK").getSourcePin();
+                }
+                assert(clkInvOut.getBELName().matches("CLK[12]?INV"));
                 si.routeIntraSiteNet(gnd, clkInvOut, clkInput);
                 BELPin clkInvIn = clkInvOut.getBEL().getPin(0);
                 String clkInputSitePinName = clkInvIn.getConnectedSitePinName();
