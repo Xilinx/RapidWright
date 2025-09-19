@@ -1018,19 +1018,20 @@ public class DesignTools {
         //   updated.
         for (EDIFPortInst portInst : inst.getInst().getPortInsts()) {
             EDIFNet net = portInst.getNet();
-            EDIFHierNet netName = new EDIFHierNet(parentInst, net);
-            EDIFHierNet parentNetName = netlist.getParentNet(netName);
-            Net parentNet = design.getNet(parentNetName.getHierarchicalNetName());
-            if (parentNet == null) {
-                if (net.isVCC()) {
-                    parentNet = design.getVccNet();
-                } else if (net.isGND()) {
-                    parentNet = design.getGndNet();
-                } else {
-                    parentNet = new Net(parentNetName);
+            EDIFHierNet hierNet = new EDIFHierNet(parentInst, net);
+            Net parentNet;
+            if (net.isGND()) {
+                parentNet = design.getGndNet();
+            } else if (net.isVCC()) {
+                parentNet = design.getVccNet();
+            } else {
+                EDIFHierNet parentHierName = netlist.getParentNet(hierNet);
+                parentNet = design.getNet(parentHierName.getHierarchicalNetName());
+                if (parentNet == null) {
+                    parentNet = new Net(parentHierName);
                 }
             }
-            for (EDIFHierNet netAlias : netlist.getNetAliases(netName)) {
+            for (EDIFHierNet netAlias : netlist.getNetAliases(hierNet)) {
                 if (parentNet.getName().equals(netAlias.getHierarchicalNetName())) continue;
                 Net alias = design.getNet(netAlias.getHierarchicalNetName());
                 if (alias != null) {
