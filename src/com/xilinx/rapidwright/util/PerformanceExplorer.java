@@ -32,18 +32,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.DecimalFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 
+import com.xilinx.rapidwright.design.tools.InlineFlopTools;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 
@@ -55,8 +51,11 @@ import joptsimple.OptionSet;
 public class PerformanceExplorer {
 
     private static final String INITIAL_DCP_NAME = "initial.dcp";
+    private static final String INITIAL_ENCRYPTED_TCL_NAME = "initial_load.tcl";
     private static final String PLACED_TIMING_RESULT = "place_timing.twr";
     private static final String ROUTED_TIMING_RESULT = "route_timing.twr";
+    private static final String ROUTED_TIMING_SUMMARY = "route_timing_summary.rpt";
+    private static final String ROUTE_STATUS_RESULT = "route_status.rpt";
     private static final String RUN_TCL_NAME = "run.tcl";
     private static final double DEFAULT_MIN_CLK_UNCERT = -0.100;
     private static final double DEFAULT_MAX_CLK_UNCERT = 0.250;
@@ -86,6 +85,8 @@ public class PerformanceExplorer {
 
     private boolean addEDIFAndMetadata;
 
+    private boolean getBestPerPBlock;
+
     private ArrayList<PlacerDirective> placerDirectives;
 
     private ArrayList<RouterDirective> routerDirectives;
@@ -101,6 +102,8 @@ public class PerformanceExplorer {
     private String vivadoPath = DEFAULT_VIVADO;
 
     private boolean reusePreviousResults;
+
+    private boolean ensureExternalRoutability;
 
     public PerformanceExplorer(Design d, String testDir, String clkName, double targetPeriod) {
         init(d, testDir, clkName, targetPeriod, null);
@@ -269,6 +272,22 @@ public class PerformanceExplorer {
         this.addEDIFAndMetadata = addEDIFAndMetadata;
     }
 
+    public boolean getBestPerPBlock() {
+        return getBestPerPBlock;
+    }
+
+    public void setGetBestPerPBlock(boolean getBestPerPBlock) {
+        this.getBestPerPBlock = getBestPerPBlock;
+    }
+
+    public boolean ensureExternalRoutability() {
+        return ensureExternalRoutability;
+    }
+
+    public void setEnsureExternalRoutability(boolean ensureExternalRoutability) {
+        this.ensureExternalRoutability = ensureExternalRoutability;
+    }
+
     public PBlock getPBlock(int i) {
         return pblockLookup[i];
     }
@@ -282,11 +301,16 @@ public class PerformanceExplorer {
     }
 
     public ArrayList<String> createTclScript(String initialDcp, String instDirectory,
-            PlacerDirective p, RouterDirective r, String clockUncertainty, Entry<PBlock, String> pblockEntry) {
+                                             PlacerDirective p, RouterDirective r, String clockUncertainty,
+                                             Entry<PBlock, String> pblockEntry, String encryptedTcl) {
         PBlock pblock = pblockEntry.getKey();
         String pblockCells = pblockEntry.getValue();
         ArrayList<String> lines = new ArrayList<>();
-        lines.add("open_checkpoint " + initialDcp);
+        if (encryptedTcl == null) {
+            lines.add("open_checkpoint " + initialDcp);
+        } else {
+            lines.add("source " + encryptedTcl);
+        }
         lines.add("set_clock_uncertainty -setup "+clockUncertainty+" [get_clocks "+clkName+"]");
         if (pblock != null) {
             String pblockName = pblock.getName() == null ? "pe_pblock_1" : pblock.getName();
@@ -298,7 +322,13 @@ public class PerformanceExplorer {
                 lines.add("set_property CONTAIN_ROUTING 1 [get_pblocks "+ pblockName+"]");
             }
         }
-        lines.add("place_design -unplace");
+        if (ensureExternalRoutability()) {
+            lines.add("lock_design -level placement");
+        }
+        lines.add("opt_design");
+        if (!ensureExternalRoutability()) {
+            lines.add("place_design -unplace");
+        }
         lines.add("place_design -directive " + p.name());
         lines.add("set_clock_uncertainty -setup 0.0 [get_clocks "+clkName+"]");
         lines.add("report_timing -file "+instDirectory + File.separator+PLACED_TIMING_RESULT);
@@ -345,6 +375,7 @@ public class PerformanceExplorer {
         FileTools.makeDirs(runDirectory);
         runDirectory = new File(runDirectory).getAbsolutePath();
         String dcpName = runDirectory + File.separator + INITIAL_DCP_NAME;
+
         updateClockPeriodConstraint(design, getClkName(), getTargetPeriod());
 
         design.writeCheckpoint(dcpName);
@@ -361,6 +392,14 @@ public class PerformanceExplorer {
         pblockLookup = new PBlock[pblocks.size()];
         for (Entry<PBlock, String> e : pblocks.entrySet()) {
             PBlock pblock = e.getKey();
+
+            String pblockDcpName = dcpName;
+            if (ensureExternalRoutability()) {
+                InlineFlopTools.createAndPlaceFlopsInlineOnTopPorts(design, clkName, pblock);
+                pblockDcpName = runDirectory + File.separator + "pblock" + pb + "_" + INITIAL_DCP_NAME;
+                design.writeCheckpoint(pblockDcpName);
+            }
+
             for (PlacerDirective p : getPlacerDirectives()) {
                 for (RouterDirective r : getRouterDirectives()) {
                     for (double c : getClockUncertaintyValues()) {
@@ -372,7 +411,13 @@ public class PerformanceExplorer {
                         System.out.println(uniqueID);
                         String instDir = runDirectory + File.separator + uniqueID;
                         FileTools.makeDir(instDir);
-                        ArrayList<String> tcl = createTclScript(dcpName, instDir, p, r, roundedC, e);
+                        String encryptedTcl = null;
+                        boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
+                        if (encrypted) {
+                            encryptedTcl = runDirectory + File.separator + "pblock" + pb +
+                                           "_" + INITIAL_ENCRYPTED_TCL_NAME;
+                        }
+                        ArrayList<String> tcl = createTclScript(pblockDcpName, instDir, p, r, roundedC, e, encryptedTcl);
                         String scriptName = instDir + File.separator + RUN_TCL_NAME;
 
                         if (!reusePreviousResults) {
@@ -448,6 +493,29 @@ public class PerformanceExplorer {
         return results;
     }
 
+    public void getBestDesignPerPBlock() {
+        List<Pair<Path, Float>> bestResultsPerPBlock = getBestResultsPerPBlock();
+        Path runDir = Paths.get(runDirectory);
+
+        int pblockNum = 0;
+        for (Pair<Path, Float> best : bestResultsPerPBlock) {
+            String pblock = "pblock" + pblockNum;
+            Path bestPath = best.getFirst();
+            Float bestSlack = best.getSecond();
+            if (bestSlack < 0.0) {
+                System.out.println("No implementation passes timing for " + pblock);
+            }
+
+            Design d = Design.readCheckpoint(bestPath + File.separator + "routed.dcp");
+
+            if (ensureExternalRoutability()) {
+                InlineFlopTools.removeInlineFlops(d);
+            }
+
+            d.writeCheckpoint(runDirectory + File.separator + pblock + "_best.dcp");
+        }
+    }
+
     private static final String INPUT_DCP_OPT = "i";
     private static final String PBLOCK_FILE_OPT = "b";
     private static final String CLK_NAME_OPT = "c";
@@ -464,6 +532,9 @@ public class PerformanceExplorer {
     private static final String RUN_DIR_OPT = "d";
     private static final String VIVADO_PATH_OPT = "y";
     private static final String MAX_CONCURRENT_JOBS_OPT = "z";
+    private static final String ENSURE_EXT_ROUTABILITY = "e";
+    private static final String COLLECT_RESULTS_OPT = "o";
+    private static final String REUSE_PREVIOUS_RESULTS = "reuse-previous";
 
     private static OptionParser createOptionParser() {
         // Defaults
@@ -485,6 +556,9 @@ public class PerformanceExplorer {
             accepts(VIVADO_PATH_OPT).withOptionalArg().defaultsTo(DEFAULT_VIVADO).describedAs("Specifies vivado path");
             accepts(CONTAIN_ROUTING_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(DEFAULT_CONTAIN_ROUTING).describedAs("Sets attribute on pblock to contain routing");
             accepts(MAX_CONCURRENT_JOBS_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(JobQueue.MAX_LOCAL_CONCURRENT_JOBS).describedAs("Max number of concurrent job when run locally");
+            accepts(ENSURE_EXT_ROUTABILITY, "Ensure all I/O are routable outside the pblock");
+            accepts(COLLECT_RESULTS_OPT,"Collect results into output csv");
+            accepts(REUSE_PREVIOUS_RESULTS, "Reuse previous results if they exist");
             acceptsAll( Arrays.asList(HELP_OPT, "?"), "Print Help" ).forHelp();
         }};
 
@@ -548,7 +622,9 @@ public class PerformanceExplorer {
         pe.setVivadoPath((String)opts.valueOf(VIVADO_PATH_OPT));
         pe.setContainRouting((boolean)opts.valueOf(CONTAIN_ROUTING_OPT));
         pe.setAddEDIFAndMetadata((boolean)opts.valueOf(ADD_EDIF_METADATA_OPT));
-
+        pe.setGetBestPerPBlock(opts.has(COLLECT_RESULTS_OPT));
+        pe.setReusePreviousResults(opts.has(REUSE_PREVIOUS_RESULTS));
+        pe.setEnsureExternalRoutability(opts.has(ENSURE_EXT_ROUTABILITY));
 
         if (opts.hasArgument(PBLOCK_FILE_OPT)) {
             String fileName = (String) opts.valueOf(PBLOCK_FILE_OPT);
@@ -572,5 +648,9 @@ public class PerformanceExplorer {
         }
 
         pe.explorePerformance();
+
+        if (pe.getBestPerPBlock) {
+            pe.getBestDesignPerPBlock();
+        }
     }
 }

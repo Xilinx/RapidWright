@@ -27,14 +27,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.ClockTools;
@@ -58,17 +52,7 @@ import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
-import com.xilinx.rapidwright.edif.EDIFCell;
-import com.xilinx.rapidwright.edif.EDIFCellInst;
-import com.xilinx.rapidwright.edif.EDIFDirection;
-import com.xilinx.rapidwright.edif.EDIFHierCellInst;
-import com.xilinx.rapidwright.edif.EDIFHierNet;
-import com.xilinx.rapidwright.edif.EDIFNet;
-import com.xilinx.rapidwright.edif.EDIFNetlist;
-import com.xilinx.rapidwright.edif.EDIFPort;
-import com.xilinx.rapidwright.edif.EDIFPortInst;
-import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.edif.EDIFValueType;
+import com.xilinx.rapidwright.edif.*;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
@@ -99,6 +83,9 @@ public class ArrayBuilder {
     private static final List<String> SKIP_IMPL_OPTS = Arrays.asList("k", "skip-impl");
     private static final List<String> LIMIT_INSTS_OPTS = Arrays.asList("l", "limit-inst-count");
     private static final List<String> TOP_LEVEL_DESIGN_OPTS = Arrays.asList("t", "top-design");
+    private static final List<String> WRITE_PLACEMENT_OPTS = List.of("write-placement");
+    private static final List<String> PLACEMENT_FILE_OPTS = List.of("placement-file");
+    private static final List<String> PLACEMENT_LOCS_OPTS = List.of("write-placement-locs");
 
     private Design design;
 
@@ -118,6 +105,12 @@ public class ArrayBuilder {
 
     private int instCountLimit = Integer.MAX_VALUE;
 
+    private String outputPlacementFileName;
+
+    private String inputPlacementFileName;
+
+    private String outputPlacementLocsFileName;
+
     public static final double DEFAULT_CLK_PERIOD_TARGET = 2.0;
 
     private OptionParser createOptionParser() {
@@ -136,6 +129,9 @@ public class ArrayBuilder {
                 acceptsAll(REUSE_RESULTS_OPTS, "Reuse Previous Implementation Results");
                 acceptsAll(SKIP_IMPL_OPTS, "Skip Implementation of the Kernel");
                 acceptsAll(LIMIT_INSTS_OPTS, "Limit number of instance copies").withRequiredArg();
+                acceptsAll(WRITE_PLACEMENT_OPTS, "Write the chosen placement to the specified file").withRequiredArg();
+                acceptsAll(PLACEMENT_FILE_OPTS, "Use placement specified in file").withRequiredArg();
+                acceptsAll(PLACEMENT_LOCS_OPTS, "Write grid of possible placement locations to specified file").withRequiredArg();
                 acceptsAll(TOP_LEVEL_DESIGN_OPTS, "Top level design with blackboxes/kernel insts").withRequiredArg();
                 acceptsAll(HELP_OPTS, "Print this help message").forHelp();
             }
@@ -230,6 +226,30 @@ public class ArrayBuilder {
         this.instCountLimit = instCountLimit;
     }
 
+    public String getOutputPlacementFileName() {
+        return outputPlacementFileName;
+    }
+
+    public void setOutputPlacementFileName(String outputPlacementFileName) {
+        this.outputPlacementFileName = outputPlacementFileName;
+    }
+
+    public String getInputPlacementFileName() {
+        return inputPlacementFileName;
+    }
+
+    public void setInputPlacementFileName(String inputPlacementFileName) {
+        this.inputPlacementFileName = inputPlacementFileName;
+    }
+
+    public String getOutputPlacementLocsFileName() {
+        return outputPlacementLocsFileName;
+    }
+
+    public void setOutputPlacementLocsFileName(String outputPlacementLocsFileName) {
+        this.outputPlacementLocsFileName = outputPlacementLocsFileName;
+    }
+
     private void initializeArrayBuilder(OptionSet options) {
         Path inputFile = null;
 
@@ -238,13 +258,18 @@ public class ArrayBuilder {
         }
 
         if (options.has(INPUT_DESIGN_OPTS.get(0))) {
-            inputFile = Paths.get((String)options.valueOf(INPUT_DESIGN_OPTS.get(0)));
+            inputFile = Paths.get((String) options.valueOf(INPUT_DESIGN_OPTS.get(0)));
             if (inputFile.toString().endsWith(".dcp")) {
                 if (options.has(INPUT_EDIF_OPTS.get(0))) {
-                    Path companionEDIF = Paths.get((String)options.valueOf(INPUT_EDIF_OPTS.get(0)));
+                    Path companionEDIF = Paths.get((String) options.valueOf(INPUT_EDIF_OPTS.get(0)));
                     setDesign(Design.readCheckpoint(inputFile, companionEDIF, CodePerfTracker.SILENT));
                 } else {
-                    setDesign(Design.readCheckpoint(inputFile, CodePerfTracker.SILENT));
+                    setDesign(Design.readCheckpoint(inputFile));
+                    if (design.getNetlist().getEncryptedCells().size() > 0) {
+                        System.out.println("Design has encrypted cells");
+                    } else {
+                        System.out.println("Design does not have encrypted cells");
+                    }
                 }
 
             } else if (inputFile.toString().endsWith(".edf")) {
@@ -321,16 +346,27 @@ public class ArrayBuilder {
         } else {
             setOutputName("array.dcp");
         }
-        
+
         if (options.has(LIMIT_INSTS_OPTS.get(0))) {
             setInstCountLimit(Integer.parseInt((String) options.valueOf(LIMIT_INSTS_OPTS.get(0))));
         }
-        
+
         if (options.has(TOP_LEVEL_DESIGN_OPTS.get(0))) {
             Design d = Design.readCheckpoint((String) options.valueOf(TOP_LEVEL_DESIGN_OPTS.get(0)));
             setTopDesign(d);
         }
 
+        if (options.has(WRITE_PLACEMENT_OPTS.get(0))) {
+            setOutputPlacementFileName((String) options.valueOf(WRITE_PLACEMENT_OPTS.get(0)));
+        }
+
+        if (options.has(PLACEMENT_FILE_OPTS.get(0))) {
+            setInputPlacementFileName((String) options.valueOf(PLACEMENT_FILE_OPTS.get(0)));
+        }
+
+        if (options.has(PLACEMENT_LOCS_OPTS.get(0))) {
+            setOutputPlacementLocsFileName((String) options.valueOf(PLACEMENT_LOCS_OPTS.get(0)));
+        }
     }
 
     public static void removeBUFGs(Design design) {
@@ -383,6 +419,70 @@ public class ArrayBuilder {
             }
         }
         return instNames;
+    }
+
+    public static void writePlacementToFile(Map<ModuleInst, Site> placementMap, String fileName) {
+        List<String> lines = new ArrayList<>();
+        Comparator<Site> comparator = new Comparator<Site>() {
+            @Override
+            public int compare(Site o1, Site o2) {
+                if (o1.getInstanceY() > o2.getInstanceY()) {
+                    return -1;
+                }
+
+                if (o1.getInstanceY() < o2.getInstanceY()) {
+                    return 1;
+                }
+
+                return Integer.compare(o1.getInstanceX(), o2.getInstanceX());
+            }
+        };
+        Map<ModuleInst, Site> sortedMap = placementMap.entrySet().stream()
+                .sorted(Map.Entry.comparingByValue(comparator))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+                        (e1, e2) -> e1, LinkedHashMap::new));
+        for (Map.Entry<ModuleInst, Site> entry : sortedMap.entrySet()) {
+            lines.add(entry.getKey() + " " + entry.getValue());
+        }
+        FileTools.writeLinesToTextFile(lines, fileName);
+    }
+
+    public static Map<String, String> readPlacementFromFile(String fileName) {
+        Map<String, String> placementMap = new HashMap<>();
+        List<String> lines = FileTools.getLinesFromTextFile(fileName);
+
+        for (String line : lines) {
+            String[] splitLine = line.split("\\s+");
+            placementMap.put(splitLine[0], splitLine[1]);
+        }
+
+        return placementMap;
+    }
+
+    public static void writePlacementLocsToFile(List<Module> modules, String fileName) {
+        List<String> lines = new ArrayList<>();
+        Comparator<Site> comparator = new Comparator<Site>() {
+            @Override
+            public int compare(Site o1, Site o2) {
+                if (o1.getInstanceY() > o2.getInstanceY()) {
+                    return -1;
+                }
+
+                if (o1.getInstanceY() < o2.getInstanceY()) {
+                    return 1;
+                }
+
+                return Integer.compare(o1.getInstanceX(), o2.getInstanceX());
+            }
+        };
+        for (Module module : modules) {
+            lines.add(module.getName() + ":");
+            List<Site> validPlacements = module.getAllValidPlacements().stream().sorted(comparator).toList();
+            for (Site anchor : validPlacements) {
+                lines.add(anchor.getName());
+            }
+        }
+        FileTools.writeLinesToTextFile(lines, fileName);
     }
 
     public static void main(String[] args) {
@@ -459,7 +559,7 @@ public class ArrayBuilder {
         }
         t.stop().start("Place Instances");
 
-        Design array = null; 
+        Design array = null;
         List<String> modInstNames = null;
         if (ab.getTopDesign() == null) {
             array = new Design("array", ab.getDesign().getPartName());
@@ -470,53 +570,121 @@ public class ArrayBuilder {
             ab.setInstCountLimit(modInstNames.size());
         }
 
-        ModuleInst curr = null;
+        if (ab.outputPlacementLocsFileName != null) {
+            writePlacementLocsToFile(modules, ab.outputPlacementLocsFileName);
+        }
+
+        // Add encrypted cells from modules to array
+        for (Module module : modules) {
+            // Merge encrypted cells
+            List<String> encryptedCells = module.getNetlist().getEncryptedCells();
+            if (!encryptedCells.isEmpty()) {
+                System.out.println("Encrypted cells merged");
+                array.getNetlist().addEncryptedCells(encryptedCells);
+            }
+        }
+
         int placed = 0;
-        int i = 0;
-        outer: for (Module module : modules) {
-            for (Site anchor : module.getAllValidPlacements()) {
-                if (curr == null) {
-                    String instName = modInstNames == null ? ("inst_" + i) : modInstNames.get(i);
-                    // TODO - Remove after createModuleInst() fix
-                    EDIFHierCellInst hierInst = array.getNetlist().getHierCellInstFromName(instName);
-                    if (hierInst != null && hierInst.getCellType().isLeafCellOrBlackBox()) {
-                        EDIFCell bb = hierInst.getCellType();
-                        if (bb.getLibrary() != null) {
-                            bb.getLibrary().removeCell(bb);
-                        }
-                        EDIFCell modCell = module.getNetlist().getTopCell();
-                        EDIFCell currCell = array.getNetlist().getWorkLibrary().getCell(modCell.getName());
-                        if (currCell == null) {
-                            array.getNetlist().copyCellAndSubCells(modCell);
-                        }
-                        // Merge encrypted cells
-                        List<String> encryptedCells = module.getNetlist().getEncryptedCells();
-                        if (encryptedCells.size() > 0) {
-                            array.getNetlist().addEncryptedCells(encryptedCells);
-                        }
-                    } // END TODO
-                    curr = array.createModuleInst(instName, module);
-                    // TODO - Remove after createModuleInst() fix
-                    EDIFHierCellInst hierCellInst = array.getNetlist().getHierCellInstFromName(instName);
-                    hierCellInst.getInst().removeBlackBoxProperty();
-                    // END TODO
-                    i++;
+        Map<ModuleInst, Site> newPlacementMap = new HashMap<>();
+        if (ab.getInputPlacementFileName() != null) {
+            Map<String, String> placementMap = readPlacementFromFile(ab.inputPlacementFileName);
+            System.out.println("Placing from specified file");
+            for (Map.Entry<String, String> entry : placementMap.entrySet()) {
+                String instName = entry.getKey();
+                String anchorName = entry.getValue();
+                // TODO - Remove after createModuleInst() fix
+                EDIFHierCellInst hierInst = array.getNetlist().getHierCellInstFromName(instName);
+                if (hierInst == null) {
+                    throw new RuntimeException("Instance name " + instName + " is invalid");
                 }
-                if (curr.place(anchor, true, false)) {
-                    if (straddlesClockRegion(curr)) {
-                        curr.unplace();
-                        continue;
+                Module module = null;
+                for (Module m : modules) {
+                    if (m.getName().equals(hierInst.getCellName())) {
+                        module = m;
                     }
-                    placed++;
-                    System.out.println("  ** PLACED: " + placed + " " + anchor + " " + curr.getName());
-                    curr = null;
-                    if (placed >= ab.getInstCountLimit()) {
-                        break outer;
+                }
+                assert module != null;
+                if (hierInst.getCellType().isLeafCellOrBlackBox()) {
+                    EDIFCell bb = hierInst.getCellType();
+                    if (bb.getLibrary() != null) {
+                        bb.getLibrary().removeCell(bb);
+                    }
+                    EDIFCell modCell = module.getNetlist().getTopCell();
+                    EDIFCell currCell = array.getNetlist().getWorkLibrary().getCell(modCell.getName());
+                    if (currCell == null) {
+                        array.getNetlist().copyCellAndSubCells(modCell);
+                    }
+                } // END TODO
+                ModuleInst curr = array.createModuleInst(instName, module);
+                // TODO - Remove after createModuleInst() fix
+                EDIFHierCellInst hierCellInst = array.getNetlist().getHierCellInstFromName(instName);
+                hierCellInst.getInst().removeBlackBoxProperty();
+                // END TODO
+
+                Site anchor = array.getDevice().getSite(anchorName);
+
+                boolean wasPlaced = curr.place(anchor, true, false);
+                if (!wasPlaced) {
+                    throw new RuntimeException("Unable to place cell " + instName + " at site " + anchor);
+                }
+
+                if (straddlesClockRegion(curr)) {
+                    curr.unplace();
+                    throw new RuntimeException("Chosen site anchor " + anchor + " straddles multiple clock regions");
+                }
+
+                newPlacementMap.put(curr, anchor);
+                placed++;
+                System.out.println("  ** PLACED: " + placed + " " + anchor + " " + curr.getName());
+            }
+        } else {
+            ModuleInst curr = null;
+            int i = 0;
+            outer:
+            for (Module module : modules) {
+                for (Site anchor : module.getAllValidPlacements()) {
+                    if (curr == null) {
+                        String instName = modInstNames == null ? ("inst_" + i) : modInstNames.get(i);
+                        // TODO - Remove after createModuleInst() fix
+                        EDIFHierCellInst hierInst = array.getNetlist().getHierCellInstFromName(instName);
+                        if (hierInst != null && hierInst.getCellType().isLeafCellOrBlackBox()) {
+                            EDIFCell bb = hierInst.getCellType();
+                            if (bb.getLibrary() != null) {
+                                bb.getLibrary().removeCell(bb);
+                            }
+                            EDIFCell modCell = module.getNetlist().getTopCell();
+                            EDIFCell currCell = array.getNetlist().getWorkLibrary().getCell(modCell.getName());
+                            if (currCell == null) {
+                                array.getNetlist().copyCellAndSubCells(modCell);
+                            }
+                        } // END TODO
+                        curr = array.createModuleInst(instName, module);
+                        // TODO - Remove after createModuleInst() fix
+                        EDIFHierCellInst hierCellInst = array.getNetlist().getHierCellInstFromName(instName);
+                        hierCellInst.getInst().removeBlackBoxProperty();
+                        // END TODO
+                        i++;
+                    }
+                    if (curr.place(anchor, true, false)) {
+                        if (straddlesClockRegion(curr)) {
+                            curr.unplace();
+                            continue;
+                        }
+                        placed++;
+                        newPlacementMap.put(curr, anchor);
+                        System.out.println("  ** PLACED: " + placed + " " + anchor + " " + curr.getName());
+                        curr = null;
+                        if (placed >= ab.getInstCountLimit()) {
+                            break outer;
+                        }
                     }
                 }
             }
         }
 
+        if (ab.getOutputPlacementFileName() != null) {
+            writePlacementToFile(newPlacementMap, ab.outputPlacementFileName);
+        }
 
         List<Net> unrouted = NetTools.unrouteNetsWithOverlappingNodes(array);
         if (unrouted.size() > 0) {
@@ -572,11 +740,61 @@ public class ArrayBuilder {
             array.setDesignOutOfContext(true);
             array.setAutoIOBuffers(false);
         }
+        for (EDIFLibrary library : array.getNetlist().getLibraries()) {
+            if (library.isHDIPrimitivesLibrary())
+                continue;
+            for (EDIFCell cell : library.getCells()) {
+//                for (EDIFNet net : cell.getNets()) {
+//                    List<EDIFPortInst> portInsts = net.getSourcePortInsts(true);
+//
+//                    if (portInsts.isEmpty()) {
+//                        System.err.println("WARNING: Undriven net " + net.getName() +
+//                                " found in cell: " + cell.getName());
+//                    }
+//                }
+                for (EDIFCellInst cellInst : cell.getCellInsts()) {
+                    for (EDIFPort port : cellInst.getCellPorts()) {
+                        if (port.isOutput()) {
+                            continue;
+                        }
 
+
+//                        if (port.isBus()) {
+//                            for (int i : port.getBitBlastedIndicies()) {
+//                                String portInstName = port.getPortInstNameFromPort(i);
+//                                checkUnconnectedPort(portInstName, cellInst);
+//                            }
+//                        } else {
+//                            String portInstName = port.getPortInstNameFromPort(0);
+//                            checkUnconnectedPort(portInstName, cellInst);
+//                        }
+                    }
+                }
+            }
+        }
         array.getNetlist().consolidateAllToWorkLibrary();
         t.stop().start("Write DCP");
-        array.writeCheckpoint(ab.getOutputName(), CodePerfTracker.SILENT);
+        array.writeCheckpoint(ab.getOutputName());
         t.stop().printSummary();
+    }
+
+    private static void checkUnconnectedPort(String portInstName, EDIFCellInst cellInst) {
+        EDIFPortInst portInst = cellInst.getPortInst(portInstName);
+
+        if (portInst == null || portInst.getNet() == null) {
+//            System.err.println("WARNING: Undriven port " + portInstName +
+//                    " found in cell: " + cellInst.getParentCell().getName() + " cell inst: " + cellInst.getName());
+        } else {
+            List<EDIFPortInst> portInsts = portInst.getNet().getSourcePortInsts(true);
+            if (cellInst.getParentCell().getName().equals("systolic_array") && portInstName.contains("weight_inputs")) {
+                System.out.println("");
+            }
+
+            if (portInsts.isEmpty()) {
+                System.err.println("WARNING: Undriven net " + portInst.getNet().getName() +
+                        " found in cell: " + cellInst.getParentCell().getName());
+            }
+        }
     }
 
     public static Cell createBUFGCE(Design design, EDIFCell parent, String name, Site location) {
@@ -632,7 +850,8 @@ public class ArrayBuilder {
     private static int getRCLKRowIndex(ClockRegion cr) {
         Tile center = cr.getApproximateCenter();
         int searchGridDim = 0;
-        outer: while (!center.getName().startsWith("RCLK_")) {
+        outer:
+        while (!center.getName().startsWith("RCLK_")) {
             searchGridDim++;
             for (int row = -searchGridDim; row < searchGridDim; row++) {
                 for (int col = -searchGridDim; col < searchGridDim; col++) {

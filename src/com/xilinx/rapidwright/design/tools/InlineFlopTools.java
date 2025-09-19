@@ -42,12 +42,7 @@ import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.eco.ECOPlacementHelper;
-import com.xilinx.rapidwright.edif.EDIFCell;
-import com.xilinx.rapidwright.edif.EDIFCellInst;
-import com.xilinx.rapidwright.edif.EDIFHierNet;
-import com.xilinx.rapidwright.edif.EDIFNet;
-import com.xilinx.rapidwright.edif.EDIFPort;
-import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.*;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.StringTools;
 
@@ -88,7 +83,7 @@ public class InlineFlopTools {
         Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(start, keepOut, exclude).iterator();
         siteItr.next(); // Skip the first site, as we are suggesting one inside the pblock
 
-        Net clk = design.getNet(clkNet);
+        EDIFHierNet clk = design.getNetlist().getHierNetFromName(clkNet);
 
         Set<SiteInst> siteInstsToRoute = new HashSet<>();
 
@@ -106,9 +101,11 @@ public class InlineFlopTools {
                 }
             } else {
                 EDIFPortInst inst = port.getInternalPortInst();
-                Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr);
-                Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
-                siteInstsToRoute.add(flop.getSiteInst());
+                if (inst != null) {
+                    Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr);
+                    Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
+                    siteInstsToRoute.add(flop.getSiteInst());
+                }
             }
         }
         for (SiteInst si : siteInstsToRoute) {
@@ -129,7 +126,7 @@ public class InlineFlopTools {
     }
 
     private static Cell createAndPlaceFlopInlineOnTopPortInst(Design design, EDIFPortInst portInst, Pair<Site, BEL> loc,
-            Net clk) {
+            EDIFHierNet clk) {
         String name = portInst.getFullName() + INLINE_SUFFIX;
         Cell flop = design.createAndPlaceCell(design.getTopEDIFCell(), name, Unisim.FDRE, loc.getFirst(),
                 loc.getSecond());
@@ -137,7 +134,7 @@ public class InlineFlopTools {
         net.connect(flop, portInst.isInput() ? "D" : "Q");
         design.getGndNet().connect(flop, "R");
         design.getVccNet().connect(flop, "CE");
-        clk.connect(flop, "C");
+        clk.getNet().createPortInst("C", flop);
         EDIFNet origNet = portInst.getNet();
         origNet.removePortInst(portInst);
         net.getLogicalNet().addPortInst(portInst);
