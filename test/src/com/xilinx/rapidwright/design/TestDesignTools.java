@@ -1679,6 +1679,35 @@ public class TestDesignTools {
         for (SitePinInst p : unrouted) {
             Assertions.assertTrue(p.getName().equals("CLKAU_X") || p.getName().equals("CLKAL_X"));
         }
+    }
 
+    @ParameterizedTest
+    @CsvSource({
+            // Versal
+            "xcvp1202,SLICE_X64Y105,AND2B1L",
+            "xcvp1202,SLICE_X64Y105,OR2L",
+
+            // US+
+            "xcvu3p,SLICE_X0Y0,AND2B1L",
+            "xcvu3p,SLICE_X0Y0,OR2L"
+    })
+    public void testCreateCeClkOfRoutethruFFToVCC(String deviceName, String siteName, String unisimName) {
+        Design design = new Design("testCreateCeClkOfRoutethruFFToVCC", deviceName);
+        Cell cell = design.createAndPlaceCell("ff", Unisim.valueOf(unisimName), siteName + "/AFF");
+
+        Assertions.assertTrue(design.getNets().isEmpty());
+
+        DesignTools.createCeClkOfRoutethruFFToVCC(design);
+
+        SiteInst si = cell.getSiteInst();
+        SitePinInst ceSpi = si.getSitePinInst("CKEN1");
+        Assertions.assertTrue(ceSpi.getNet().isVCCNet());
+
+        boolean isVersal = design.getSeries() == Series.Versal;
+        SitePinInst clkSpi = si.getSitePinInst(isVersal ? "CLK" : "CLK1");
+        Assertions.assertTrue(clkSpi.getNet().isVCCNet());
+        if (isVersal) {
+            Assertions.assertTrue(si.getNetFromSiteWire("FF_CLK_MOD_CLK_OUT").isGNDNet());
+        }
     }
 }
