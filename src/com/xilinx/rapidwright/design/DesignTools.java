@@ -3362,6 +3362,12 @@ public class DesignTools {
         createCeSrRstPinsToVCC(design);
     }
 
+    /**
+     * Examines a design for FFs configured as routethrus or as AND/OR functions, ensuring that the CE pins of
+     * the used BELs are connected via the correct intra-site routing to VCC and their CLK pins are connected to
+     * GND (which is supplied via inversion from VCC).
+     * @param design Design to be processed.
+     */
     public static void createCeClkOfRoutethruFFToVCC(Design design) {
         boolean isVersal = (design.getSeries() == Series.Versal);
         Net vcc = design.getVccNet();
