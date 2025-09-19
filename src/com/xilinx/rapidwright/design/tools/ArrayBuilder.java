@@ -489,6 +489,11 @@ public class ArrayBuilder {
                         if (currCell == null) {
                             array.getNetlist().copyCellAndSubCells(modCell);
                         }
+                        // Merge encrypted cells
+                        List<String> encryptedCells = module.getNetlist().getEncryptedCells();
+                        if (encryptedCells.size() > 0) {
+                            array.getNetlist().addEncryptedCells(encryptedCells);
+                        }
                     } // END TODO
                     curr = array.createModuleInst(instName, module);
                     // TODO - Remove after createModuleInst() fix
