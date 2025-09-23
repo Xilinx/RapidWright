@@ -106,6 +106,7 @@ public class DesignTools {
 
     // Map from site_pin to list of bels
     // TODO: derive from architecture.
+    @SuppressWarnings("serial")
     private static HashMap<String, List<String>> sitePin2Bels = new HashMap<String, List<String>>()
     {{
         put("A_O",  Arrays.asList("A5LUT", "A6LUT"));
@@ -943,6 +944,10 @@ public class DesignTools {
 
         // Add placement information
         // We need to prefix all cell and net names with the hierarchicalCellName as a prefix
+        Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
+        Net vccCell = cell.getVccNet();
+        Net gndCell = cell.getGndNet();
         for (SiteInst si : cell.getSiteInsts()) {
             for (Cell c : new ArrayList<Cell>(si.getCells())) {
                 c.updateName(hierarchicalCellName + "/" + c.getName());
@@ -955,6 +960,15 @@ public class DesignTools {
                 }
             }
             design.addSiteInst(si);
+            // Update GND/VCC site routing to point to destination design's GND/VCC nets
+            for (String siteWire : si.getSiteWiresFromNet(vccCell)) {
+                BELPin pin = si.getSiteWirePins(siteWire)[0];
+                si.routeIntraSiteNet(vcc, pin, pin);
+            }
+            for (String siteWire : si.getSiteWiresFromNet(gndCell)) {
+                BELPin pin = si.getSiteWirePins(siteWire)[0];
+                si.routeIntraSiteNet(gnd, pin, pin);
+            }
         }
 
         // Add routing information
@@ -1008,7 +1022,13 @@ public class DesignTools {
             EDIFHierNet parentNetName = netlist.getParentNet(netName);
             Net parentNet = design.getNet(parentNetName.getHierarchicalNetName());
             if (parentNet == null) {
-                parentNet = new Net(parentNetName);
+                if (net.isVCC()) {
+                    parentNet = design.getVccNet();
+                } else if (net.isGND()) {
+                    parentNet = design.getGndNet();
+                } else {
+                    parentNet = new Net(parentNetName);
+                }
             }
             for (EDIFHierNet netAlias : netlist.getNetAliases(netName)) {
                 if (parentNet.getName().equals(netAlias.getHierarchicalNetName())) continue;
@@ -1942,31 +1962,6 @@ public class DesignTools {
         d.getVccNet().unroute();
 
         t.stop().printSummary();
-    }
-
-    /**
-     * Helper method for makeBlackBox(). When cutting out nets that used to be
-     * source'd from something inside a black box, the net names need to be updated.
-     * 
-     * @param d         The current design
-     * @param currNet   Current net that requires a name change
-     * @param newSource The source net (probably a pin on the black box)
-     * @param newName   New name for the net
-     * @return A reference to the newly updated/renamed net.
-     */
-    private static Net updateNetName(Design d, Net currNet, EDIFNet newSource, String newName) {
-        List<PIP> pips = currNet.getPIPs();
-        List<SitePinInst> pins = currNet.getPins();
-
-        d.removeNet(currNet);
-
-        Net newNet = d.createNet(newName);
-        newNet.setPIPs(pips);
-        for (SitePinInst pin : pins) {
-            newNet.addPin(pin);
-        }
-
-        return newNet;
     }
 
     /**
@@ -2916,7 +2911,7 @@ public class DesignTools {
             }
         }
 
-        List<Net> staticNets = new ArrayList();
+        List<Net> staticNets = new ArrayList<Net>();
 
         // Identify nets to copy routing
         for (Net net : src.getNets()) {
@@ -3714,7 +3709,7 @@ public class DesignTools {
     /** Mapping from device Series to another mapping from FF BEL name to CKEN/SRST site pin name **/
     static public final Map<Series, Map<String, Pair<String, String>>> belTypeSitePinNameMapping;
     static{
-        belTypeSitePinNameMapping = new EnumMap(Series.class);
+        belTypeSitePinNameMapping = new EnumMap<Series, Map<String, Pair<String, String>>>(Series.class);
         Pair<String,String> p;
 
         {

@@ -1501,6 +1501,7 @@ public class FileTools {
 
     public static Pair<InputStream,Long> getInputStreamFromZipFile(String zipFileName, String fileEndsWith) {
         try {
+            @SuppressWarnings("resource")
             final ZipFile zip = new ZipFile(zipFileName);
             Enumeration<? extends ZipEntry> entries = zip.entries();
             ZipEntry match = null;

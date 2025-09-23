@@ -64,17 +64,32 @@ sourceSets {
   }
 }
 
+tasks.named('jar', Jar) {
+  archiveFileName = 'rapidwright.jar'
+}
+
+tasks.named('testJar', Jar) {
+  archiveFileName = 'rapidwright-tests.jar'
+}
+
+tasks.named('testFixturesJar', Jar) {
+  archiveFileName = 'rapidwright-test-fixtures.jar'
+}
+
 task preserveBin(type: Copy) {
      from "bin/rapidwright", "bin/rapidwright.bat"
      into preserveDir
 }
 
 task copyJars(type: Copy) {
-    from configurations.api
+    from({
+        configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts.collect { it.file } .findAll { it.name != tasks.getByName("jar").archiveFile.get().asFile.name }
+	})
+	
     into 'jars'
-    //testFixturesImplementation contains the output jar, as well as an implicit dependency on the task.
-    //Filter to remove the jar itself, getFiles() to remove the implicit dependency
-    from configurations.testFixturesImplementation.filter { !tasks.getByName("jar").outputs.files.contains(it) } .getFiles()
+    from({
+        configurations.testFixturesRuntimeClasspath.resolvedConfiguration.resolvedArtifacts.collect { it.file } .findAll { it.name != tasks.getByName("jar").archiveFile.get().asFile.name }
+	})
     into 'jars'
 }
 compileJava.dependsOn(copyJars)
@@ -101,7 +116,7 @@ task mainJar(type: Jar, dependsOn: classes) {
     manifest {
         attributes 'Main-Class': mainEntrypointClassName
         attributes 'Class-Path': ([destinationDirectory.get().getAsFile().toPath().relativize(sourceSets.main.java.destinationDirectory.get().getAsFile().toPath()).toString() + File.separator]
-            + configurations.implementation.collect { destinationDirectory.get().getAsFile().toPath().relativize(projectDir.toPath()).resolve('jars').resolve(it.getName()) }).join(' ')
+            + configurations.runtimeClasspath.collect { destinationDirectory.get().getAsFile().toPath().relativize(projectDir.toPath()).resolve('jars').resolve(it.getName()) }).join(' ')
     }
     finalizedBy(restoreScripts)
 }
@@ -132,7 +147,7 @@ task sourceJar(type: Jar) {
 
 javadoc {
     source = sourceSets.main.allJava
-    classpath = configurations.implementation
+    classpath = configurations.runtimeClasspath
     options.addStringOption('Xdoclint:none', '-quiet')
 }
 
@@ -196,23 +211,24 @@ publishing {
     }
 }
 
-jreleaser {
-    signing {
-        active = "ALWAYS"
-        armored = true
-    }
-    deploy {
-        maven {
-            mavenCentral {
-                sonatype {
-                    active = 'ALWAYS'
-                    url = 'https://central.sonatype.com/api/v1/publisher'
-                    stagingRepository('build/staging-deploy')
-                }
-            }
-        }
-    }
-}
+// TODO - The next release of jreleaser will resolve a Gradle 9 warning.  Once we can update, to 1.20.0, we can restore this section (only used for releases)
+// jreleaser {
+//     signing {
+//         active = "ALWAYS"
+//         armored = true
+//     }
+//     deploy {
+//         maven {
+//             mavenCentral {
+//                 sonatype {
+//                     active = 'ALWAYS'
+//                     url = 'https://central.sonatype.com/api/v1/publisher'
+//                     stagingRepository('build/staging-deploy')
+//                 }
+//             }
+//         }
+//     }
+// }
 
 task testPython(type:Test) {
   group = "verification"
