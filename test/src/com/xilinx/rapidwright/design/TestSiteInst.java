@@ -45,6 +45,7 @@ import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.SitePIP;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
@@ -505,5 +506,16 @@ public class TestSiteInst {
         }
         Collections.sort(strings);
         return strings;
+    }
+
+    @Test
+    public void testRemoveSitePinInst() {
+        Design d = new Design("test", "xc7a200tsbg484-1");
+        Cell c = d.createAndPlaceCell("testRAMB18E1", Unisim.RAMB18E1, "RAMB18_X0Y58/RAMB18E1");
+        Assertions.assertEquals(SiteTypeEnum.RAMB18E1, c.getSiteInst().getSiteTypeEnum());
+        SitePinInst spi = new SitePinInst(true, "DO18", c.getSiteInst());
+        Net n = d.createNet("debug_net");
+        n.addPin(spi);
+        Assertions.assertTrue(spi.getSiteInst().removePin(spi));
     }
 }
