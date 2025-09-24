@@ -1008,20 +1008,33 @@ public class FileTools {
         return path;
     }
 
-    public static String getExecJarStoragePath() {
-        String rootPath = "";
+    /**
+     * Gets and returns the path for storing user-specific RapidWright data.
+     * On Linux, this is overridden by the $XDG_DATA_HOME environment variable, defaulting to ~/.local/share
+     * On Windows, this is overridden by %APPDATA% environment variable
+     * @return A string containing this user-specific data path plus the "RapidWright" subdirectory (created
+     * if it does not exist).
+     */
+    public static Path getUserSpecificRapidWrightDataPath() {
+        Path rootPath;
         if (isWindows()) {
-            rootPath = System.getenv("APPDATA");
+            rootPath = Paths.get(System.getenv("APPDATA"));
         } else {
-            rootPath = System.getenv("XDG_DATA_HOME");
-            if (rootPath == null || rootPath.length() == 0) {
-                rootPath = System.getenv("HOME") + File.separator + ".local" + File.separator + "share";
+            String env = System.getenv("XDG_DATA_HOME");
+            if (env == null || env.length() == 0) {
+                rootPath = Paths.get(System.getenv("HOME"), ".local", "share");
+            } else {
+                rootPath = Paths.get(env);
             }
             // TODO for Mac OS, the default for XDG_DATA_HOME would be '~/Library/My App/'
         }
-        rootPath += File.separator + "RapidWright";
-        makeDirs(rootPath);
+        rootPath = rootPath.resolve("RapidWright");
+        makeDirs(rootPath.toString());
         return rootPath;
+    }
+
+    public static String getExecJarStoragePath() {
+        return getUserSpecificRapidWrightDataPath().toString();
     }
 
     public static void updateAllDataFiles() {
