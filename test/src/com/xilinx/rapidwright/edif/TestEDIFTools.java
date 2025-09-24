@@ -25,6 +25,8 @@
 package com.xilinx.rapidwright.edif;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +35,7 @@ import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -40,6 +43,8 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.eco.ECOTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Params;
 
 public class TestEDIFTools {
 
@@ -366,5 +371,59 @@ public class TestEDIFTools {
         Assertions.assertEquals(321, flatNetlist.getAllLeafHierCellInstances().size());
         boolean includeBlackBoxes = true;
         Assertions.assertEquals(322, flatNetlist.getAllLeafHierCellInstances(includeBlackBoxes).size());
+    }
+
+    /**
+     * In the provided directory, it will create 3 files: (1) <name>.dcp, (2)
+     * <name>.edf, (3) dummy.edn. This is to simulate a DCP that contains encrypted
+     * cells.
+     * 
+     * @param dir         Destination directory to write the three files
+     * @param testDCPName Name of the test DCP to read from the RapidWrightDCP
+     *                    directory.
+     * @return The path to the resulting DCP.
+     */
+    public static Path createEncryptedDCPExample(Path dir, String testDCPName) {
+        Path dcp = RapidWrightDCP.getPath(testDCPName);
+        Design tmp = Design.readCheckpoint(dcp, true);
+        Path edf = dir.resolve(testDCPName.replace(".dcp", ".edf"));
+        tmp.getNetlist().exportEDIF(edf);
+        String dummyEDN = "dummy.edn";
+        Path copyDCP = dir.resolve(testDCPName);
+        FileTools.copyFile(dcp.toString(), copyDCP.toString());
+        FileTools.writeStringToTextFile("Dummy EDN", dir.resolve(dummyEDN).toString());
+        return copyDCP;
+    }
+
+    @Test
+    public void testCopyEDNOnDCPWrite(@TempDir Path dir) {
+        Path srcDir = dir.resolve("src");
+        FileTools.makeDir(srcDir.toString());
+        Path dcp = createEncryptedDCPExample(srcDir, "picoblaze_2022.2.dcp");
+        Path edf = srcDir.resolve(dcp.getFileName().toString().replace(".dcp", ".edf"));
+        Path edn = srcDir.resolve("dummy.edn");
+
+        Design d = Design.readCheckpoint(dcp, edf);
+
+        Assertions.assertEquals(1, d.getNetlist().getEncryptedCells().size());
+
+        Params.RW_COPY_EDNS_ON_DCP_WRITE = true;
+
+        d.writeCheckpoint(dir.resolve(dcp.getFileName()));
+        Assertions.assertTrue(Files.exists(dir.resolve(edn.getFileName())));
+
+        Path tclLoadScript = dir
+                .resolve(dcp.getFileName().toString().replace(".dcp", EDIFTools.LOAD_TCL_SUFFIX));
+        Assertions.assertTrue(Files.exists(tclLoadScript));
+
+        boolean hasDummyEDN = false;
+        for (String line : FileTools.getLinesFromTextFile(tclLoadScript.toString())) {
+            if (line.contains("read_edif") && line.contains(edn.getFileName().toString())) {
+                hasDummyEDN = true;
+                break;
+            }
+        }
+        Assertions.assertTrue(hasDummyEDN);
+
     }
 }
