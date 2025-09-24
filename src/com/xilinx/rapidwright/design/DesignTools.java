@@ -4623,4 +4623,56 @@ public class DesignTools {
         n.removeUnusedCellsFromAllWorkLibraries();
         n.setEncryptedCells(netlists.stream().map(Object::toString).collect(Collectors.toList()));
     }
+
+    /**
+     * (Untested) Remove the speicifed pblock from the XDC constraints of the design.
+     * 
+     * This utility will iterate through the lines of the XDC constraints and
+     * remove any lines that contain the specified pblock name and any pblock-related
+     * commands. The commands that are considered pblock-related are:
+     * - add_cells_to_pblock
+     * - create_pblock
+     * - get_pblocks
+     * - resize_pblock
+     * 
+     * This utility is only tested on Vivado-maintained XDC constraints.
+     * 
+     * @param design The design to remove the pblock from.
+     * @param pblockName The name of the pblock to remove.
+     */
+    public static void deletePblock(Design design, String pblockName) {
+        List<String> pblockCommands = Arrays.asList(
+            "add_cells_to_pblock",
+            "create_pblock",
+            "get_pblocks",
+            "resize_pblock"
+        );
+
+        boolean foundPblock = false; // Flag to track if any matching pblock is found
+
+        for (ConstraintGroup cg : ConstraintGroup.values()) {
+            // Get the current constraints for the constraint group
+            List<String> updatedConstraints = new ArrayList<>();
+
+            // Check if the line contains any pblock-related command and the pblockName
+            for (String line : design.getXDCConstraints(cg)) {
+                boolean containsPblockCommand = pblockCommands.stream().anyMatch(line::contains);
+                boolean containsPblockName = line.contains(pblockName);
+
+                if (containsPblockCommand && containsPblockName) {
+                    foundPblock = true;
+                    continue;
+                }
+
+                updatedConstraints.add(line);
+            }
+
+            // Update the constraints for the constraint group
+            design.setXDCConstraints(updatedConstraints, cg);
+        }
+
+        if (!foundPblock) {
+            System.out.println("WARNING: No such pblock '" + pblockName + "' found in the design.");
+        }
+    }
 }
