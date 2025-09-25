@@ -395,7 +395,7 @@ public class PerformanceExplorer {
 
             String pblockDcpName = dcpName;
             if (ensureExternalRoutability()) {
-                InlineFlopTools.createAndPlaceFlopsInlineOnTopPorts(design, clkName, pblock);
+                InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsArbitrarily(design, clkName, pblock);
                 pblockDcpName = runDirectory + File.separator + "pblock" + pb + "_" + INITIAL_DCP_NAME;
                 design.writeCheckpoint(pblockDcpName);
             }

@@ -69,7 +69,7 @@ import joptsimple.OptionSet;
  */
 public class ArrayBuilder {
 
-    private static final List<String> INPUT_DESIGN_OPTS = Arrays.asList("i", "input");
+    private static final List<String> KERNEL_DESIGN_OPTS = Arrays.asList("i", "input");
     private static final List<String> OUTPUT_DESIGN_OPTS = Arrays.asList("o", "output");
     private static final List<String> INPUT_EDIF_OPTS = Arrays.asList("e", "edif");
     private static final List<String> UTILIZATION_OPTS = Arrays.asList("u", "utilization");
@@ -78,7 +78,8 @@ public class ArrayBuilder {
     private static final List<String> PBLOCK_OPTS = Arrays.asList("b", "pblock");
     private static final List<String> HELP_OPTS = Arrays.asList("?", "h", "help");
     private static final List<String> TARGET_CLK_PERIOD_OPTS = Arrays.asList("c", "clk-period");
-    private static final List<String> TARGET_CLK_NAME_OPTS = Arrays.asList("n", "clk-name");
+    private static final List<String> KERNEL_CLK_NAME_OPTS = Arrays.asList("n", "kernel-clk-name");
+    private static final List<String> TOP_CLK_NAME_OPTS = Arrays.asList("m", "top-clk-name");
     private static final List<String> REUSE_RESULTS_OPTS = Arrays.asList("r", "reuse");
     private static final List<String> SKIP_IMPL_OPTS = Arrays.asList("k", "skip-impl");
     private static final List<String> LIMIT_INSTS_OPTS = Arrays.asList("l", "limit-inst-count");
@@ -95,7 +96,9 @@ public class ArrayBuilder {
 
     private double clkPeriod;
 
-    private String clkName;
+    private String kernelClkName;
+
+    private String topClkName;
 
     private boolean skipImpl;
 
@@ -117,7 +120,7 @@ public class ArrayBuilder {
 
         OptionParser p = new OptionParser() {
             {
-                acceptsAll(INPUT_DESIGN_OPTS, "Input Kernel Design (*.dcp or *.edf)").withRequiredArg();
+                acceptsAll(KERNEL_DESIGN_OPTS, "Input Kernel Design (*.dcp or *.edf)").withRequiredArg();
                 acceptsAll(OUTPUT_DESIGN_OPTS, "Output Array Design (default is 'array.dcp')").withRequiredArg();
                 acceptsAll(PBLOCK_OPTS, "PBlock Constraint(s), separated with ';'").withRequiredArg();
                 acceptsAll(INPUT_EDIF_OPTS, "Companion EDIF for DCP  (*.edf)").withRequiredArg();
@@ -125,7 +128,8 @@ public class ArrayBuilder {
                 acceptsAll(SHAPES_OPTS, "Vivado Generated Shapes").withRequiredArg();
                 acceptsAll(PART_OPTS, "Target AMD Part").withRequiredArg();
                 acceptsAll(TARGET_CLK_PERIOD_OPTS, "Target Clock Period (ns)").withRequiredArg();
-                acceptsAll(TARGET_CLK_NAME_OPTS, "Target Clock Name").withRequiredArg();
+                acceptsAll(KERNEL_CLK_NAME_OPTS, "Kernel Clock Name").withRequiredArg();
+                acceptsAll(TOP_CLK_NAME_OPTS, "Top Clock Name").withRequiredArg();
                 acceptsAll(REUSE_RESULTS_OPTS, "Reuse Previous Implementation Results");
                 acceptsAll(SKIP_IMPL_OPTS, "Skip Implementation of the Kernel");
                 acceptsAll(LIMIT_INSTS_OPTS, "Limit number of instance copies").withRequiredArg();
@@ -159,14 +163,14 @@ public class ArrayBuilder {
     }
 
     public Device getDevice() {
-        return getDesign().getDevice();
+        return getKernelDesign().getDevice();
     }
 
-    public void setDesign(Design design) {
+    public void setKernelDesign(Design design) {
         this.design = design;
     }
 
-    public Design getDesign() {
+    public Design getKernelDesign() {
         return design;
     }
 
@@ -194,12 +198,20 @@ public class ArrayBuilder {
         return clkPeriod;
     }
 
-    public void setClockName(String clkName) {
-        this.clkName = clkName;
+    public void setKernelClockName(String clkName) {
+        this.kernelClkName = clkName;
     }
 
-    public String getClockName() {
-        return clkName;
+    public String getKernelClockName() {
+        return kernelClkName;
+    }
+
+    public void setTopClockName(String clkName) {
+        this.topClkName = clkName;
+    }
+
+    public String getTopClockName() {
+        return topClkName;
     }
 
     public boolean isSkipImpl() {
@@ -257,14 +269,14 @@ public class ArrayBuilder {
             this.skipImpl = true;
         }
 
-        if (options.has(INPUT_DESIGN_OPTS.get(0))) {
-            inputFile = Paths.get((String) options.valueOf(INPUT_DESIGN_OPTS.get(0)));
+        if (options.has(KERNEL_DESIGN_OPTS.get(0))) {
+            inputFile = Paths.get((String) options.valueOf(KERNEL_DESIGN_OPTS.get(0)));
             if (inputFile.toString().endsWith(".dcp")) {
                 if (options.has(INPUT_EDIF_OPTS.get(0))) {
                     Path companionEDIF = Paths.get((String) options.valueOf(INPUT_EDIF_OPTS.get(0)));
-                    setDesign(Design.readCheckpoint(inputFile, companionEDIF, CodePerfTracker.SILENT));
+                    setKernelDesign(Design.readCheckpoint(inputFile, companionEDIF, CodePerfTracker.SILENT));
                 } else {
-                    setDesign(Design.readCheckpoint(inputFile));
+                    setKernelDesign(Design.readCheckpoint(inputFile));
                     if (design.getNetlist().getEncryptedCells().size() > 0) {
                         System.out.println("Design has encrypted cells");
                     } else {
@@ -278,14 +290,14 @@ public class ArrayBuilder {
                     Part part = PartNameTools.getPart((String) options.valueOf(PART_OPTS.get(0)));
                     EDIFTools.ensureCorrectPartInEDIF(netlist, part.toString());
                 }
-                setDesign(new Design(netlist));
+                setKernelDesign(new Design(netlist));
             }
         } else {
             throw new RuntimeException("No input design found. "
                     + "Please specify an input kernel (*.dcp or *.edf) using options "
-                    + INPUT_DESIGN_OPTS);
+                    + KERNEL_DESIGN_OPTS);
         }
-        assert (getDesign() != null);
+        assert (getKernelDesign() != null);
 
         if (options.has(PBLOCK_OPTS.get(0))) {
             String pblockString = (String) options.valueOf(PBLOCK_OPTS.get(0));
@@ -335,10 +347,10 @@ public class ArrayBuilder {
             System.out.println("[INFO] No clock period set, defaulting to: " + getClockPeriod() + "ns");
         }
 
-        if (options.has(TARGET_CLK_NAME_OPTS.get(0))) {
-            setClockName(((String) options.valueOf(TARGET_CLK_NAME_OPTS.get(0))));
+        if (options.has(KERNEL_CLK_NAME_OPTS.get(0))) {
+            setKernelClockName(((String) options.valueOf(KERNEL_CLK_NAME_OPTS.get(0))));
         } else {
-            setClockName(ClockTools.getClockFromDesign(getDesign()).toString());
+            setKernelClockName(ClockTools.getClockFromDesign(getKernelDesign()).toString());
         }
 
         if (options.has(OUTPUT_DESIGN_OPTS.get(0))) {
@@ -354,6 +366,12 @@ public class ArrayBuilder {
         if (options.has(TOP_LEVEL_DESIGN_OPTS.get(0))) {
             Design d = Design.readCheckpoint((String) options.valueOf(TOP_LEVEL_DESIGN_OPTS.get(0)));
             setTopDesign(d);
+        }
+
+        if (options.has(TOP_CLK_NAME_OPTS.get(0))) {
+            setTopClockName(((String) options.valueOf(TOP_CLK_NAME_OPTS.get(0))));
+        } else {
+            setTopClockName(ClockTools.getClockFromDesign(getTopDesign()).toString());
         }
 
         if (options.has(WRITE_PLACEMENT_OPTS.get(0))) {
@@ -461,19 +479,16 @@ public class ArrayBuilder {
 
     public static void writePlacementLocsToFile(List<Module> modules, String fileName) {
         List<String> lines = new ArrayList<>();
-        Comparator<Site> comparator = new Comparator<Site>() {
-            @Override
-            public int compare(Site o1, Site o2) {
-                if (o1.getInstanceY() > o2.getInstanceY()) {
-                    return -1;
-                }
-
-                if (o1.getInstanceY() < o2.getInstanceY()) {
-                    return 1;
-                }
-
-                return Integer.compare(o1.getInstanceX(), o2.getInstanceX());
+        Comparator<Site> comparator = (o1, o2) -> {
+            if (o1.getInstanceY() > o2.getInstanceY()) {
+                return -1;
             }
+
+            if (o1.getInstanceY() < o2.getInstanceY()) {
+                return 1;
+            }
+
+            return Integer.compare(o1.getInstanceX(), o2.getInstanceX());
         };
         for (Module module : modules) {
             lines.add(module.getName() + ":");
@@ -507,17 +522,17 @@ public class ArrayBuilder {
             workDir = Paths.get((String) options.valueOf(REUSE_RESULTS_OPTS.get(0)));
             reuseResults = true;
         }
-        t.stop().start("Implement Kernel");
 
         List<Module> modules = new ArrayList<>();
         boolean unrouteStaticNets = false;
         if (!ab.isSkipImpl()) {
+            t.stop().start("Implement Kernel");
             FileTools.makeDirs(workDir.toString());
             System.out.println("[INFO] Created work directory: " + workDir.toString());
 
             // Initialize PerformanceExplorer
-            PerformanceExplorer pe = new PerformanceExplorer(ab.getDesign(), workDir.toString(),
-                    ab.getClockName(), ab.getClockPeriod());
+            PerformanceExplorer pe = new PerformanceExplorer(ab.getKernelDesign(), workDir.toString(),
+                    ab.getKernelClockName(), ab.getClockPeriod());
 
             // Set PBlocks
             Map<PBlock, String> pblocks = new HashMap<>();
@@ -548,11 +563,14 @@ public class ArrayBuilder {
             }
         } else /* skipImpl==true */ {
             // Just use the design we loaded and replicate it
-            removeBUFGs(ab.getDesign());
-            Module m = new Module(ab.getDesign(), unrouteStaticNets);
-            m.getNet(ab.getClockName()).unroute();
-            m.calculateAllValidPlacements(ab.getDevice());
-            if (ab.getPBlocks().size() > 0) {
+            t.stop().start("Calculate Valid Placements");
+            removeBUFGs(ab.getKernelDesign());
+            Module m = new Module(ab.getKernelDesign(), unrouteStaticNets);
+            m.getNet(ab.getKernelClockName()).unroute();
+            if (ab.getInputPlacementFileName() == null) {
+                m.calculateAllValidPlacements(ab.getDevice());
+            }
+            if (!ab.getPBlocks().isEmpty()) {
                 m.setPBlock(ab.getPBlocks().get(0));
             }
             modules.add(m);
@@ -562,7 +580,7 @@ public class ArrayBuilder {
         Design array = null;
         List<String> modInstNames = null;
         if (ab.getTopDesign() == null) {
-            array = new Design("array", ab.getDesign().getPartName());
+            array = new Design("array", ab.getKernelDesign().getPartName());
         } else {
             array = ab.getTopDesign();
             // Find instances in existing design
@@ -570,8 +588,8 @@ public class ArrayBuilder {
             ab.setInstCountLimit(modInstNames.size());
         }
 
-        if (ab.outputPlacementLocsFileName != null) {
-            writePlacementLocsToFile(modules, ab.outputPlacementLocsFileName);
+        if (ab.getOutputPlacementLocsFileName() != null) {
+            writePlacementLocsToFile(modules, ab.getOutputPlacementLocsFileName());
         }
 
         // Add encrypted cells from modules to array
@@ -670,6 +688,13 @@ public class ArrayBuilder {
                             curr.unplace();
                             continue;
                         }
+
+                        List<Net> overlapping = NetTools.netsWithOverlappingNodes(array);
+                        if (!overlapping.isEmpty()) {
+                            curr.unplace();
+                            continue;
+                        }
+
                         placed++;
                         newPlacementMap.put(curr, anchor);
                         System.out.println("  ** PLACED: " + placed + " " + anchor + " " + curr.getName());
@@ -687,25 +712,25 @@ public class ArrayBuilder {
         }
 
         List<Net> unrouted = NetTools.unrouteNetsWithOverlappingNodes(array);
-        if (unrouted.size() > 0) {
+        if (!unrouted.isEmpty()) {
             System.out.println("Found " + unrouted.size() + " overlapping nets, that were unrouted.");
         }
 
         if (ab.isSkipImpl() && ab.getTopDesign() == null) {
             EDIFCell top = array.getTopEDIFCell();
-            EDIFHierNet clkNet = array.getNetlist().getHierNetFromName(ab.getClockName());
+            EDIFHierNet clkNet = array.getNetlist().getHierNetFromName(ab.getKernelClockName());
             if (clkNet == null) {
                 // Create BUFG and clock net, then connect to all instances
                 Cell bufg = createBUFGCE(array, top, "bufg", array.getDevice().getSite("BUFGCE_X2Y0"));
-                Net clk = array.createNet(ab.getClockName());
+                Net clk = array.createNet(ab.getKernelClockName());
                 clk.connect(bufg, "O");
-                Net clkIn = array.createNet(ab.getClockName() + "_in");
+                Net clkIn = array.createNet(ab.getKernelClockName() + "_in");
                 clkIn.connect(bufg, "I");
-                EDIFPort clkInPort = top.createPort(ab.getClockName(), EDIFDirection.INPUT, 1);
+                EDIFPort clkInPort = top.createPort(ab.getKernelClockName(), EDIFDirection.INPUT, 1);
                 clkIn.getLogicalNet().createPortInst(clkInPort);
                 EDIFNet logClkNet = clk.getLogicalNet();
                 for (EDIFCellInst inst : top.getCellInsts()) {
-                    EDIFPort port = inst.getPort(ab.getClockName());
+                    EDIFPort port = inst.getPort(ab.getKernelClockName());
                     if (port != null) {
                         logClkNet.createPortInst(port, inst);
                     }
@@ -736,65 +761,22 @@ public class ArrayBuilder {
                 }
             }
 
-            PerformanceExplorer.updateClockPeriodConstraint(array, ab.getClockName(), ab.getClockPeriod());
+            PerformanceExplorer.updateClockPeriodConstraint(array, ab.getKernelClockName(), ab.getClockPeriod());
             array.setDesignOutOfContext(true);
             array.setAutoIOBuffers(false);
         }
-        for (EDIFLibrary library : array.getNetlist().getLibraries()) {
-            if (library.isHDIPrimitivesLibrary())
-                continue;
-            for (EDIFCell cell : library.getCells()) {
-//                for (EDIFNet net : cell.getNets()) {
-//                    List<EDIFPortInst> portInsts = net.getSourcePortInsts(true);
-//
-//                    if (portInsts.isEmpty()) {
-//                        System.err.println("WARNING: Undriven net " + net.getName() +
-//                                " found in cell: " + cell.getName());
-//                    }
-//                }
-                for (EDIFCellInst cellInst : cell.getCellInsts()) {
-                    for (EDIFPort port : cellInst.getCellPorts()) {
-                        if (port.isOutput()) {
-                            continue;
-                        }
 
-
-//                        if (port.isBus()) {
-//                            for (int i : port.getBitBlastedIndicies()) {
-//                                String portInstName = port.getPortInstNameFromPort(i);
-//                                checkUnconnectedPort(portInstName, cellInst);
-//                            }
-//                        } else {
-//                            String portInstName = port.getPortInstNameFromPort(0);
-//                            checkUnconnectedPort(portInstName, cellInst);
-//                        }
-                    }
-                }
-            }
-        }
+        Net gndNet = array.getNet(Net.GND_NET);
+        gndNet.unroute();
+        Net vccNet = array.getNet(Net.VCC_NET);
+        vccNet.unroute();
         array.getNetlist().consolidateAllToWorkLibrary();
+        // TODO: automatically detect PBlock
+        PBlock pBlock = new PBlock(array.getDevice(), "SLICE_X84Y816:SLICE_X123Y903");
+        InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsNearPins(array, ab.getTopClockName(), pBlock);
         t.stop().start("Write DCP");
         array.writeCheckpoint(ab.getOutputName());
         t.stop().printSummary();
-    }
-
-    private static void checkUnconnectedPort(String portInstName, EDIFCellInst cellInst) {
-        EDIFPortInst portInst = cellInst.getPortInst(portInstName);
-
-        if (portInst == null || portInst.getNet() == null) {
-//            System.err.println("WARNING: Undriven port " + portInstName +
-//                    " found in cell: " + cellInst.getParentCell().getName() + " cell inst: " + cellInst.getName());
-        } else {
-            List<EDIFPortInst> portInsts = portInst.getNet().getSourcePortInsts(true);
-            if (cellInst.getParentCell().getName().equals("systolic_array") && portInstName.contains("weight_inputs")) {
-                System.out.println("");
-            }
-
-            if (portInsts.isEmpty()) {
-                System.err.println("WARNING: Undriven net " + portInst.getNet().getName() +
-                        " found in cell: " + cellInst.getParentCell().getName());
-            }
-        }
     }
 
     public static Cell createBUFGCE(Design design, EDIFCell parent, String name, Site location) {
