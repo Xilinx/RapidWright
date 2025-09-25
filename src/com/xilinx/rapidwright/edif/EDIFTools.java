@@ -61,6 +61,7 @@ import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.Params;
 
 
 /**
@@ -1008,6 +1009,18 @@ public class EDIFTools {
         return Collections.emptyList();
     }
 
+    public static List<String> getEDNFilesFromDCPLoadTclScript(Path tclFileName) {
+        List<String> ednFiles = new ArrayList<>();
+        for (String line : FileTools.getLinesFromTextFile(tclFileName.toString())) {
+            if (line.startsWith("read_edif")) {
+                int start = line.indexOf('{');
+                int end = line.lastIndexOf('}');
+                ednFiles.add(line.subSequence(start + 1, end).toString());
+            }
+        }
+        return ednFiles;
+    }
+
     public static Path getEDIFParentDir(Path edifFileName) {
         Path parent = edifFileName == null ? null : edifFileName.getParent();
         return parent == null ? Paths.get(System.getProperty("user.dir")) : parent;
@@ -1106,6 +1119,23 @@ public class EDIFTools {
     public static void writeTclLoadScriptForPartialEncryptedDesigns(EDIFNetlist edif,
                                                             Path dcpFileName, String partName) {
         ArrayList<String> lines = new ArrayList<String>();
+        if (Params.RW_COPY_EDNS_ON_DCP_WRITE && edif.getEncryptedCells().size() > 0) {
+            Path destDir = dcpFileName.getParent();
+            System.out.println("INFO: Copying *.edn files to: " + destDir);
+            List<String> newLocs = new ArrayList<>();
+            for (String cellName : edif.getEncryptedCells()) {
+                Path src = Paths.get(cellName);
+                String dst = destDir.resolve(src.getFileName()).toString();
+                if (!FileTools.copyFile(src.toString(), dst)) {
+                    System.err.println("WARNING: Failed to copy " + src + " to " + dst);
+                    newLocs.add(src.toString());
+                } else {
+                    newLocs.add(dst);
+                }
+            }
+            edif.setEncryptedCells(newLocs);
+        }
+
         for (String cellName : edif.getEncryptedCells()) {
             if (cellName.endsWith(".edn") || cellName.endsWith(".edf")) {
                 lines.add(EDIFNetlist.READ_EDIF_CMD + " {" + cellName + "}");
