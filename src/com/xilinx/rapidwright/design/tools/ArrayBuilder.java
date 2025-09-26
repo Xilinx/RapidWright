@@ -80,6 +80,7 @@ public class ArrayBuilder {
     private static final List<String> WRITE_PLACEMENT_OPTS = List.of("write-placement");
     private static final List<String> PLACEMENT_FILE_OPTS = List.of("placement-file");
     private static final List<String> PLACEMENT_LOCS_OPTS = List.of("write-placement-locs");
+    private static final List<String> OUT_OF_CONTEXT_OPTS = List.of("out-of-context");
 
     private Design design;
 
@@ -107,6 +108,8 @@ public class ArrayBuilder {
 
     private String outputPlacementLocsFileName;
 
+    private boolean outOfContext;
+
     public static final double DEFAULT_CLK_PERIOD_TARGET = 2.0;
 
     private OptionParser createOptionParser() {
@@ -130,6 +133,7 @@ public class ArrayBuilder {
                 acceptsAll(PLACEMENT_FILE_OPTS, "Use placement specified in file").withRequiredArg();
                 acceptsAll(PLACEMENT_LOCS_OPTS, "Write grid of possible placement locations to specified file").withRequiredArg();
                 acceptsAll(TOP_LEVEL_DESIGN_OPTS, "Top level design with blackboxes/kernel insts").withRequiredArg();
+                acceptsAll(OUT_OF_CONTEXT_OPTS, "Specifies that the array will be compiled out of context");
                 acceptsAll(HELP_OPTS, "Print this help message").forHelp();
             }
         };
@@ -255,12 +259,19 @@ public class ArrayBuilder {
         this.outputPlacementLocsFileName = outputPlacementLocsFileName;
     }
 
+    public boolean getOutOfContext() {
+        return outOfContext;
+    }
+
+    public void setOutOfContext(boolean outOfContext) {
+        this.outOfContext = outOfContext;
+    }
+
     private void initializeArrayBuilder(OptionSet options) {
         Path inputFile = null;
 
-        if (options.has(SKIP_IMPL_OPTS.get(0))) {
-            this.skipImpl = true;
-        }
+        setSkipImpl(options.has(SKIP_IMPL_OPTS.get(0)));
+        setOutOfContext(options.has(OUT_OF_CONTEXT_OPTS.get(0)));
 
         if (options.has(KERNEL_DESIGN_OPTS.get(0))) {
             inputFile = Paths.get((String) options.valueOf(KERNEL_DESIGN_OPTS.get(0)));
@@ -270,7 +281,7 @@ public class ArrayBuilder {
                     setKernelDesign(Design.readCheckpoint(inputFile, companionEDIF, CodePerfTracker.SILENT));
                 } else {
                     setKernelDesign(Design.readCheckpoint(inputFile));
-                    if (design.getNetlist().getEncryptedCells().size() > 0) {
+                    if (!design.getNetlist().getEncryptedCells().isEmpty()) {
                         System.out.println("Design has encrypted cells");
                     } else {
                         System.out.println("Design does not have encrypted cells");
@@ -765,13 +776,16 @@ public class ArrayBuilder {
         vccNet.unroute();
         array.getNetlist().consolidateAllToWorkLibrary();
 
-        // Automatically find bounding PBlock based on used Slices, DSPs, and BRAMs
-        Set<Site> usedSites = array.getUsedSites().stream().filter(
-                (Site s) -> Arrays.asList(SiteTypeEnum.SLICEL, SiteTypeEnum.SLICEM, SiteTypeEnum.DSP58_PRIMARY,
-                                SiteTypeEnum.RAMB36, SiteTypeEnum.RAMB18_L, SiteTypeEnum.RAMB18_U)
-                        .contains(s.getPrimarySiteType().getTypeEnum())).collect(Collectors.toSet());
-        PBlock pBlock = new PBlock(array.getDevice(), usedSites);
-        InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsNearPins(array, ab.getTopClockName(), pBlock);
+        if (ab.getOutOfContext()) {
+            // Automatically find bounding PBlock based on used Slices, DSPs, and BRAMs
+            Set<Site> usedSites = array.getUsedSites().stream().filter(
+                    (Site s) -> Arrays.asList(SiteTypeEnum.SLICEL, SiteTypeEnum.SLICEM, SiteTypeEnum.DSP58_PRIMARY,
+                                    SiteTypeEnum.RAMB36, SiteTypeEnum.RAMB18_L, SiteTypeEnum.RAMB18_U)
+                            .contains(s.getPrimarySiteType().getTypeEnum())).collect(Collectors.toSet());
+            PBlock pBlock = new PBlock(array.getDevice(), usedSites);
+            InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsNearPins(array, ab.getTopClockName(), pBlock);
+        }
+
         t.stop().start("Write DCP");
         array.writeCheckpoint(ab.getOutputName());
         t.stop().printSummary();
