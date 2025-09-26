@@ -44,14 +44,7 @@ import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockGenerator;
 import com.xilinx.rapidwright.design.blocks.PBlockRange;
-import com.xilinx.rapidwright.device.BEL;
-import com.xilinx.rapidwright.device.ClockRegion;
-import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.Part;
-import com.xilinx.rapidwright.device.PartNameTools;
-import com.xilinx.rapidwright.device.Series;
-import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.*;
 import com.xilinx.rapidwright.edif.*;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
@@ -771,8 +764,13 @@ public class ArrayBuilder {
         Net vccNet = array.getNet(Net.VCC_NET);
         vccNet.unroute();
         array.getNetlist().consolidateAllToWorkLibrary();
-        // TODO: automatically detect PBlock
-        PBlock pBlock = new PBlock(array.getDevice(), "SLICE_X84Y816:SLICE_X123Y903");
+
+        // Automatically find bounding PBlock based on used Slices, DSPs, and BRAMs
+        Set<Site> usedSites = array.getUsedSites().stream().filter(
+                (Site s) -> Arrays.asList(SiteTypeEnum.SLICEL, SiteTypeEnum.SLICEM, SiteTypeEnum.DSP58_PRIMARY,
+                                SiteTypeEnum.RAMB36, SiteTypeEnum.RAMB18_L, SiteTypeEnum.RAMB18_U)
+                        .contains(s.getPrimarySiteType().getTypeEnum())).collect(Collectors.toSet());
+        PBlock pBlock = new PBlock(array.getDevice(), usedSites);
         InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsNearPins(array, ab.getTopClockName(), pBlock);
         t.stop().start("Write DCP");
         array.writeCheckpoint(ab.getOutputName());

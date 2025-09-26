@@ -22,13 +22,8 @@
 
 package com.xilinx.rapidwright.design.tools;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -202,9 +197,22 @@ public class InlineFlopTools {
         while (itr.hasNext()) {
             Site curr = itr.next();
             SiteInst candidate = design.getSiteInstFromSite(curr);
-            if (candidate == null) {
-                // Empty site, let's use it
-                return new Pair<Site, BEL>(curr, curr.getBEL("AFF"));
+            List<BEL> usedFFs = new ArrayList<>();
+            if (candidate != null) {
+                for (Cell c : candidate.getCells()) {
+                    if (c.isPlaced() && c.getBEL().isFF() && !c.getBEL().isAnyIMR()) {
+                        usedFFs.add(c.getBEL());
+                    }
+                }
+            }
+            if (usedFFs.size() < 5) {
+                // There is an FF available, use one of them
+                List<BEL> bels = Arrays.stream(curr.getBELs()).filter((BEL b) -> b.isFF() && !b.isAnyIMR()).toList();
+                for (BEL b : bels) {
+                    if (!usedFFs.contains(b)) {
+                        return new Pair<>(curr, b);
+                    }
+                }
             }
         }
         return null;
