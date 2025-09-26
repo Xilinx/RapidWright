@@ -604,6 +604,12 @@ public class GlobalSignalRouting {
                 assert(currNet == sink.getNet());
             }
             assert(!sink.isOutPin());
+            if (isVersal && currNet.isGNDNet() && sink.getSiteTypeEnum() == SiteTypeEnum.XPLL
+                    && sink.getName().equals("PWRDWN")) {
+                // The PWRDWN pin does not need to be routed to GND
+                sink.setRouted(true);
+            }
+
             if (sink.isRouted()) {
                 continue;
             }
