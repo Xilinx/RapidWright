@@ -41,7 +41,6 @@ import java.util.function.Predicate;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.IntentCode;
@@ -213,7 +212,7 @@ public class VersalClockRouting {
                 q.add(new NodeWithPrevAndCost(downhill, curr, cost));
             }
             if (watchDog-- == 0) {
-                throw new RuntimeException("ERROR: Could not route from " + startingNode + " to clock region " + targetCR);
+                return null;
             }
         }
 
