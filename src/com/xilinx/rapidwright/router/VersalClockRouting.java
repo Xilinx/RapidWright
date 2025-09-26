@@ -41,6 +41,7 @@ import java.util.function.Predicate;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.IntentCode;
@@ -219,6 +220,37 @@ public class VersalClockRouting {
         return null;
     }
 
+    private static NodeWithPrevAndCost getFirstVDistNode(NodeWithPrevAndCost vroute,
+            Function<Node, NodeStatus> getNodeStatus, Set<IntentCode> allowedIntentCodes) {
+        Queue<NodeWithPrevAndCost> q = new PriorityQueue<>();
+        Set<Node> visited = new HashSet<>();
+        q.add(vroute);
+        Tile crApproxCenterTile = vroute.getTile().getClockRegion().getApproximateCenter();
+
+        while (!q.isEmpty()) {
+            NodeWithPrevAndCost curr = q.poll();
+            if (getNodeStatus.apply(curr) != NodeStatus.AVAILABLE) {
+                continue;
+            }
+            IntentCode c = curr.getIntentCode();
+            if (c == IntentCode.NODE_GLOBAL_VDISTR) {
+                return curr;
+            }
+
+            for (Node downhill : curr.getAllDownhillNodes()) {
+                if (!allowedIntentCodes.contains(downhill.getIntentCode())) {
+                    continue;
+                }
+                if (!visited.add(downhill)) {
+                    continue;
+                }
+                int cost = downhill.getTile().getManhattanDistance(crApproxCenterTile);
+                q.add(new NodeWithPrevAndCost(downhill, curr, cost));
+            }
+        }
+        return null;
+    }
+
     public static Map<ClockRegion, Node> routeVrouteToVerticalDistributionLines(Net clk,
                                                                                 Node vroute,
                                                                                 Collection<ClockRegion> clockRegions,
@@ -227,16 +259,23 @@ public class VersalClockRouting {
         Queue<NodeWithPrevAndCost> q = new PriorityQueue<>();
         Set<Node> visited = new HashSet<>();
         Set<PIP> allPIPs = new HashSet<>();
-        Set<NodeWithPrevAndCost> startingPoints = new HashSet<>();
-        startingPoints.add(new NodeWithPrevAndCost(vroute));
-        // Pattern: NODE_GLOBAL_VROUTE -> ... -> NODE_GLOBAL_VDISTR_LVL2 -> ... -> NODE_GLOBAL_VDISTR_LVL1 -> ... -> NODE_GLOBAL_VDISTR
+
         Set<IntentCode> allowedIntentCodes = EnumSet.of(
-            IntentCode.NODE_GLOBAL_VDISTR,
-            IntentCode.NODE_GLOBAL_VDISTR_LVL1,
-            IntentCode.NODE_GLOBAL_VDISTR_LVL2,
-            IntentCode.NODE_GLOBAL_VDISTR_LVL21,
-            IntentCode.NODE_GLOBAL_GCLK
-        );
+                IntentCode.NODE_GLOBAL_VDISTR,
+                IntentCode.NODE_GLOBAL_VDISTR_LVL1, 
+                IntentCode.NODE_GLOBAL_VDISTR_LVL2,
+                IntentCode.NODE_GLOBAL_VDISTR_LVL21, 
+                IntentCode.NODE_GLOBAL_GCLK);
+
+        Set<NodeWithPrevAndCost> startingPoints = new HashSet<>();
+        // The VROUTE node is the precursor to the clock root, technically the first
+        // VDISTR node is the center point. If we have more than one VROUTE->VDISTR
+        // transition we end up with multiple clock roots
+        NodeWithPrevAndCost vdistr = getFirstVDistNode(new NodeWithPrevAndCost(vroute), getNodeStatus,
+                allowedIntentCodes);
+        assert (vdistr != null);
+        startingPoints.add(vdistr);
+
         nextClockRegion: for (ClockRegion cr : clockRegions) {
             q.clear();
             visited.clear();
@@ -257,6 +296,10 @@ public class VersalClockRouting {
                         List<Node> path = curr.getPrevPath();
                         for (Node node : path) {
                             startingPoints.add(new NodeWithPrevAndCost(node));
+                            if (node.equals(vdistr)) {
+                                // Don't allow multiple clock roots (VROUTE->VDISTR transitions)   
+                                break;
+                            }
                         }
                         allPIPs.addAll(RouterHelper.getPIPsFromNodes(path));
                     }
