@@ -219,37 +219,6 @@ public class VersalClockRouting {
         return null;
     }
 
-    private static NodeWithPrevAndCost getFirstVDistNode(NodeWithPrevAndCost vroute,
-            Function<Node, NodeStatus> getNodeStatus, Set<IntentCode> allowedIntentCodes) {
-        Queue<NodeWithPrevAndCost> q = new PriorityQueue<>();
-        Set<Node> visited = new HashSet<>();
-        q.add(vroute);
-        Tile crApproxCenterTile = vroute.getTile().getClockRegion().getApproximateCenter();
-
-        while (!q.isEmpty()) {
-            NodeWithPrevAndCost curr = q.poll();
-            if (getNodeStatus.apply(curr) != NodeStatus.AVAILABLE) {
-                continue;
-            }
-            IntentCode c = curr.getIntentCode();
-            if (c == IntentCode.NODE_GLOBAL_VDISTR) {
-                return curr;
-            }
-
-            for (Node downhill : curr.getAllDownhillNodes()) {
-                if (!allowedIntentCodes.contains(downhill.getIntentCode())) {
-                    continue;
-                }
-                if (!visited.add(downhill)) {
-                    continue;
-                }
-                int cost = downhill.getTile().getManhattanDistance(crApproxCenterTile);
-                q.add(new NodeWithPrevAndCost(downhill, curr, cost));
-            }
-        }
-        return null;
-    }
-
     public static Map<ClockRegion, Node> routeVrouteToVerticalDistributionLines(Net clk,
                                                                                 Node vroute,
                                                                                 Collection<ClockRegion> clockRegions,
@@ -270,10 +239,8 @@ public class VersalClockRouting {
         // The VROUTE node is the precursor to the clock root, technically the first
         // VDISTR node is the center point. If we have more than one VROUTE->VDISTR
         // transition we end up with multiple clock roots
-        NodeWithPrevAndCost vdistr = getFirstVDistNode(new NodeWithPrevAndCost(vroute), getNodeStatus,
-                allowedIntentCodes);
-        assert (vdistr != null);
-        startingPoints.add(vdistr);
+        startingPoints.add(new NodeWithPrevAndCost(vroute));
+        NodeWithPrevAndCost vdistr = null;
 
         nextClockRegion: for (ClockRegion cr : clockRegions) {
             q.clear();
@@ -293,10 +260,23 @@ public class VersalClockRouting {
                         startingPoints.add(curr);
                     } else {
                         List<Node> path = curr.getPrevPath();
+                        if (vdistr == null) {
+                            // Identify the first VROUTE->VDISTR VDISTR node
+                            for (int i = path.size() - 1; i >= 0; i--) {
+                                Node node = path.get(i);
+                                if (node.getIntentCode() == IntentCode.NODE_GLOBAL_VDISTR) {
+                                    vdistr = new NodeWithPrevAndCost(node);
+                                    break;
+                                }
+                            }
+                            assert (vdistr != null);
+                        }
+
                         for (Node node : path) {
                             startingPoints.add(new NodeWithPrevAndCost(node));
                             if (node.equals(vdistr)) {
-                                // Don't allow multiple clock roots (VROUTE->VDISTR transitions)   
+                                // Don't allow multiple clock roots (VROUTE->VDISTR transitions)
+                                startingPoints.remove(vroute);
                                 break;
                             }
                         }

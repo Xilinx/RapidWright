@@ -2281,7 +2281,7 @@ public class DesignTools {
                     // Use the net attached to the phys pin
                     Net siteWireNet = si.getNetFromSiteWire(belPin.getSiteWireName());
                     if (siteWireNet == null) {
-                        if (isVersal && net.isStaticNet()) {
+                        if (isVersal && net.isStaticNet() && bel.isLUT()) {
                             siteWireNet = net;
                             si.routeIntraSiteNet(net, belPin, belPin);
                         } else {
