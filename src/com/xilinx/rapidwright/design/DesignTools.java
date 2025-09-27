@@ -2205,6 +2205,7 @@ public class DesignTools {
      * @return The list of pins that were created or an empty list if none were created.
      */
     public static List<SitePinInst> createMissingSitePinInsts(Design design, Net net) {
+        boolean isVersal = design.getSeries() == Series.Versal;
         EDIFNetlist n = design.getNetlist();
         List<EDIFHierPortInst> physPins = n.getPhysicalPins(net);
         if (physPins == null) {
@@ -2280,7 +2281,12 @@ public class DesignTools {
                     // Use the net attached to the phys pin
                     Net siteWireNet = si.getNetFromSiteWire(belPin.getSiteWireName());
                     if (siteWireNet == null) {
-                        continue;
+                        if (isVersal && net.isStaticNet()) {
+                            siteWireNet = net;
+                            si.routeIntraSiteNet(net, belPin, belPin);
+                        } else {
+                            continue;
+                        }
                     }
                     if (siteWireNet != net && !siteWireNet.isStaticNet()) {
                         if (parentEhn == null) {
@@ -3468,7 +3474,8 @@ public class DesignTools {
                         String pinName = belName.charAt(0) + "1";
                         SitePinInst spi = si.getSitePinInst(pinName);
                         if (spi == null) {
-                            vccNet.createPin(pinName, si);
+                            spi = vccNet.createPin(pinName, si);
+                            si.routeIntraSiteNet(vccNet, spi.getBELPin(), bel.getPin("A1"));
                         } else {
                             assert(spi.getNet().isVCCNet());
                         }
@@ -3491,8 +3498,9 @@ public class DesignTools {
                     String pinName = belName.charAt(0) + "1";
                     SitePinInst spi = si.getSitePinInst(pinName);
                     if (spi == null) {
-                        vccNet.createPin(pinName, si);
+                        spi = vccNet.createPin(pinName, si);
                     }
+                    si.routeIntraSiteNet(vccNet, spi.getBELPin(), lut6Bel.getPin("A1"));
 
                     // SRL16Es that have been transformed from SRLC32E require GND on their A6 pin
                     if ("SRLC32E".equals(cell.getPropertyValueString("XILINX_LEGACY_PRIM"))) {
