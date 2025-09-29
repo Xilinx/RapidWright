@@ -43,6 +43,7 @@ import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.ClockRegion;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
@@ -65,13 +66,17 @@ public class VersalClockRouting {
     private static final EnumSet<IntentCode> allRouteTypes;
     
     static {
-        hRouteTypes = EnumSet.of(IntentCode.NODE_GLOBAL_HROUTE,
+        hRouteTypes = EnumSet.of(
+                IntentCode.NODE_GLOBAL_HROUTE,
                 IntentCode.NODE_GLOBAL_HROUTE_HSR, 
                 IntentCode.NODE_GLOBAL_HROUTE_MED, 
                 IntentCode.NODE_GLOBAL_HROUTE_SLOW); 
         vRouteTypes = EnumSet.of(IntentCode.NODE_GLOBAL_VROUTE);
-        allRouteTypes = EnumSet.of(IntentCode.NODE_GLOBAL_VROUTE, IntentCode.NODE_GLOBAL_HROUTE,
-                IntentCode.NODE_GLOBAL_HROUTE_HSR, IntentCode.NODE_GLOBAL_HROUTE_MED,
+        allRouteTypes = EnumSet.of(
+                IntentCode.NODE_GLOBAL_VROUTE, 
+                IntentCode.NODE_GLOBAL_HROUTE,
+                IntentCode.NODE_GLOBAL_HROUTE_HSR, 
+                IntentCode.NODE_GLOBAL_HROUTE_MED,
                 IntentCode.NODE_GLOBAL_HROUTE_SLOW);
     }
     
@@ -232,7 +237,8 @@ public class VersalClockRouting {
                 IntentCode.NODE_GLOBAL_VDISTR,
                 IntentCode.NODE_GLOBAL_VDISTR_LVL1, 
                 IntentCode.NODE_GLOBAL_VDISTR_LVL2,
-                IntentCode.NODE_GLOBAL_VDISTR_LVL21, 
+                IntentCode.NODE_GLOBAL_VDISTR_LVL21,
+                IntentCode.NODE_GLOBAL_VDISTR_LVL3, 
                 IntentCode.NODE_GLOBAL_GCLK);
 
         Set<NodeWithPrevAndCost> startingPoints = new HashSet<>();
@@ -240,9 +246,22 @@ public class VersalClockRouting {
         // VDISTR node is the center point. If we have more than one VROUTE->VDISTR
         // transition we end up with multiple clock roots
         startingPoints.add(new NodeWithPrevAndCost(vroute));
-        NodeWithPrevAndCost vdistr = null;
 
-        nextClockRegion: for (ClockRegion cr : clockRegions) {
+        // Identify top and bottom clock region spine targets
+        int minY = Integer.MAX_VALUE;
+        int maxY = 0;
+        int x = vroute.getTile().getClockRegion().getInstanceX();
+        Device device = clk.getDesign().getDevice();
+        for (ClockRegion cr : clockRegions) {
+            minY = Math.min(minY, cr.getInstanceY());
+            maxY = Math.max(maxY, cr.getInstanceY());
+        }
+        List<ClockRegion> verticalSpineCRs = new ArrayList<>();
+        for (int i = minY; i <= maxY; i++) {
+            verticalSpineCRs.add(device.getClockRegion(i, x));
+        }
+
+        nextClockRegion: for (ClockRegion cr : verticalSpineCRs) {
             q.clear();
             visited.clear();
             q.addAll(startingPoints);
@@ -260,25 +279,9 @@ public class VersalClockRouting {
                         startingPoints.add(curr);
                     } else {
                         List<Node> path = curr.getPrevPath();
-                        if (vdistr == null) {
-                            // Identify the first VROUTE->VDISTR VDISTR node
-                            for (int i = path.size() - 1; i >= 0; i--) {
-                                Node node = path.get(i);
-                                if (node.getIntentCode() == IntentCode.NODE_GLOBAL_VDISTR) {
-                                    vdistr = new NodeWithPrevAndCost(node);
-                                    break;
-                                }
-                            }
-                            assert (vdistr != null);
-                        }
 
                         for (Node node : path) {
                             startingPoints.add(new NodeWithPrevAndCost(node));
-                            if (node.equals(vdistr)) {
-                                // Don't allow multiple clock roots (VROUTE->VDISTR transitions)
-                                startingPoints.remove(vroute);
-                                break;
-                            }
                         }
                         allPIPs.addAll(RouterHelper.getPIPsFromNodes(path));
                     }
@@ -300,6 +303,16 @@ public class VersalClockRouting {
             throw new RuntimeException("ERROR: Couldn't route to distribution line in clock region " + cr);
         }
         clk.getPIPs().addAll(allPIPs);
+
+        // Propagate all vdist nodes as sources for other non-spine CRs
+        for (ClockRegion cr : clockRegions) {
+            if (!crToVdist.containsKey(cr)) {
+                ClockRegion correspondingCR = device.getClockRegion(cr.getRow(), x);
+                Node vNode = crToVdist.get(correspondingCR);
+                crToVdist.put(cr, vNode);
+            }
+        }
+
         return crToVdist;
     }
 
