@@ -77,10 +77,10 @@ public class ArrayBuilder {
     private static final List<String> SKIP_IMPL_OPTS = Arrays.asList("k", "skip-impl");
     private static final List<String> LIMIT_INSTS_OPTS = Arrays.asList("l", "limit-inst-count");
     private static final List<String> TOP_LEVEL_DESIGN_OPTS = Arrays.asList("t", "top-design");
-    private static final List<String> WRITE_PLACEMENT_OPTS = List.of("write-placement");
-    private static final List<String> PLACEMENT_FILE_OPTS = List.of("placement-file");
-    private static final List<String> PLACEMENT_LOCS_OPTS = List.of("write-placement-locs");
-    private static final List<String> OUT_OF_CONTEXT_OPTS = List.of("out-of-context");
+    private static final List<String> WRITE_PLACEMENT_OPTS = Collections.singletonList("write-placement");
+    private static final List<String> PLACEMENT_FILE_OPTS = Collections.singletonList("placement-file");
+    private static final List<String> PLACEMENT_LOCS_OPTS = Collections.singletonList("write-placement-locs");
+    private static final List<String> OUT_OF_CONTEXT_OPTS = Collections.singletonList("out-of-context");
 
     private Design design;
 
@@ -496,7 +496,7 @@ public class ArrayBuilder {
         };
         for (Module module : modules) {
             lines.add(module.getName() + ":");
-            List<Site> validPlacements = module.getAllValidPlacements().stream().sorted(comparator).toList();
+            List<Site> validPlacements = module.getAllValidPlacements().stream().sorted(comparator).collect(Collectors.toList());
             for (Site anchor : validPlacements) {
                 lines.add(anchor.getName());
             }

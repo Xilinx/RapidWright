@@ -183,7 +183,9 @@ public class InlineFlopTools {
         }
 
         if (!points.isEmpty()) {
-            Set<SiteTypeEnum> validCentroidSiteTypes = Set.of(SiteTypeEnum.SLICEL, SiteTypeEnum.SLICEM);
+            Set<SiteTypeEnum> validCentroidSiteTypes = new HashSet<>();
+            validCentroidSiteTypes.add(SiteTypeEnum.SLICEL);
+            validCentroidSiteTypes.add(SiteTypeEnum.SLICEM);
             Site centroid = ECOPlacementHelper.getCentroidOfPoints(design.getDevice(), points, validCentroidSiteTypes);
             Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(centroid, keepOut, true).iterator();
             siteItr.next();
@@ -207,7 +209,8 @@ public class InlineFlopTools {
             }
             if (usedFFs.size() < 5) {
                 // There is an FF available, use one of them
-                List<BEL> bels = Arrays.stream(curr.getBELs()).filter((BEL b) -> b.isFF() && !b.isAnyIMR()).toList();
+                List<BEL> bels = Arrays.stream(curr.getBELs()).filter((BEL b) -> b.isFF() && !b.isAnyIMR())
+                        .collect(Collectors.toList());
                 for (BEL b : bels) {
                     if (!usedFFs.contains(b)) {
                         return new Pair<>(curr, b);
