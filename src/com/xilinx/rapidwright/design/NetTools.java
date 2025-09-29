@@ -197,27 +197,11 @@ public class NetTools {
      * @return The list of nets that were unrouted.
      */
     public static List<Net> unrouteNetsWithOverlappingNodes(Design design) {
-        List<Net> unroutedNets = new ArrayList<>();
-        Map<Node, Net> used = new HashMap<>();
-        for (Net net : design.getNets()) {
-            for (PIP pip : net.getPIPs()) {
-                for (Node node : new Node[] { pip.getStartNode(), pip.getEndNode() }) {
-                    if (node == null)
-                        continue;
-                    Net existing = used.putIfAbsent(node, net);
-                    if (existing != null && existing != net) {
-                        for (PIP oldPip : new ArrayList<>(existing.getPIPs())) {
-                            for (Node oldNode : new Node[] { oldPip.getStartNode(), oldPip.getEndNode() }) {
-                                used.remove(oldNode);
-                            }
-                        }
-                        existing.unroute();
-                        unroutedNets.add(existing);
-                    }
-                }
-            }
+        List<Net> overlappingNets = getNetsWithOverlappingNodes(design);
+        for (Net net : overlappingNets) {
+            net.unroute();
         }
-        return unroutedNets;
+        return overlappingNets;
     }
 
     /**
@@ -226,7 +210,7 @@ public class NetTools {
      * @param design The design to evaluate for conflicting nodes.
      * @return The list of nets that overlap.
      */
-    public static List<Net> netsWithOverlappingNodes(Design design) {
+    public static List<Net> getNetsWithOverlappingNodes(Design design) {
         List<Net> overlappingNets = new ArrayList<>();
         Map<Node, Net> used = new HashMap<>();
         for (Net net : design.getNets()) {

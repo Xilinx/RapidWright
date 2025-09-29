@@ -693,7 +693,7 @@ public class ArrayBuilder {
                             continue;
                         }
 
-                        List<Net> overlapping = NetTools.netsWithOverlappingNodes(array);
+                        List<Net> overlapping = NetTools.getNetsWithOverlappingNodes(array);
                         if (!overlapping.isEmpty()) {
                             curr.unplace();
                             continue;
