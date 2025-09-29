@@ -55,6 +55,10 @@ public class InlineFlopTools {
 
     public static final String INLINE_SUFFIX = "_rw_inline_flop";
 
+    private static final int MAX_FFS_PER_SLICE = 5;
+    private static final Set<SiteTypeEnum> VALID_CENTROID_SITE_TYPES =
+            new HashSet<>(Arrays.asList(SiteTypeEnum.SLICEL, SiteTypeEnum.SLICEM));
+
     /**
      * Add flip-flops inline on all the top-level ports of an out-of-context design.
      * This is useful for out-of-context kernels prior to placement and routing so that
@@ -97,15 +101,15 @@ public class InlineFlopTools {
      * each of the flops. This can help alleviate congestion when the kernels are
      * placed/relocated in context.
      *
-     * @param design         The design to modify
-     * @param clkNet         Name of the clock net to use on which to add the flops
-     * @param keepOut        The pblock used to contain the kernel and the added flops will
-     *                       not be placed inside this area.
-     * @param smartPlacement Places flip-flops based on the centroid of the top-level net pins. Should only be
-     *                       used if a placement already exists.
+     * @param design            The design to modify
+     * @param clkNet            Name of the clock net to use on which to add the flops
+     * @param keepOut           The pblock used to contain the kernel and the added flops will
+     *                          not be placed inside this area.
+     * @param centroidPlacement Places flip-flops based on the centroid of the top-level net pins. Should only be
+     *                          used if a placement already exists.
      */
     private static void createAndPlaceFlopsInlineOnTopPorts(Design design, String clkNet, PBlock keepOut,
-                                                            boolean smartPlacement) {
+                                                            boolean centroidPlacement) {
         assert (design.getSiteInsts().isEmpty());
         EDIFCell top = design.getTopEDIFCell();
         Site start = keepOut.getAllSites("SLICE").iterator().next(); // TODO this is a bit wasteful
@@ -125,8 +129,8 @@ public class InlineFlopTools {
                         continue;
                     }
 
-                    if (smartPlacement) {
-                        smartFlipFlopPlacement(design, inst, keepOut, clk, siteInstsToRoute);
+                    if (centroidPlacement) {
+                        netCentroidFlipFlopPlacement(design, inst, keepOut, clk, siteInstsToRoute);
                     } else {
                         Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr);
                         Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
@@ -140,8 +144,8 @@ public class InlineFlopTools {
                         continue;
                     }
 
-                    if (smartPlacement) {
-                        smartFlipFlopPlacement(design, inst, keepOut, clk, siteInstsToRoute);
+                    if (centroidPlacement) {
+                        netCentroidFlipFlopPlacement(design, inst, keepOut, clk, siteInstsToRoute);
                     } else {
                         Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr);
                         Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
@@ -167,8 +171,8 @@ public class InlineFlopTools {
         return allLeavesAreIBUF;
     }
 
-    private static void smartFlipFlopPlacement(Design design, EDIFPortInst inst, PBlock keepOut, EDIFHierNet clk,
-                                               Set<SiteInst> siteInstsToRoute) {
+    private static void netCentroidFlipFlopPlacement(Design design, EDIFPortInst inst, PBlock keepOut, EDIFHierNet clk,
+                                                     Set<SiteInst> siteInstsToRoute) {
         EDIFHierCellInst topInst = design.getNetlist().getTopHierCellInst();
         EDIFHierPortInst hierPortInst = new EDIFHierPortInst(topInst, inst);
         List<EDIFHierPortInst> leafHierPortInsts = hierPortInst.getHierarchicalNet().getLeafHierPortInsts();
@@ -183,10 +187,8 @@ public class InlineFlopTools {
         }
 
         if (!points.isEmpty()) {
-            Set<SiteTypeEnum> validCentroidSiteTypes = new HashSet<>();
-            validCentroidSiteTypes.add(SiteTypeEnum.SLICEL);
-            validCentroidSiteTypes.add(SiteTypeEnum.SLICEM);
-            Site centroid = ECOPlacementHelper.getCentroidOfPoints(design.getDevice(), points, validCentroidSiteTypes);
+            Site centroid = ECOPlacementHelper.getCentroidOfPoints(design.getDevice(), points,
+                    VALID_CENTROID_SITE_TYPES);
             Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(centroid, keepOut, true).iterator();
             siteItr.next();
             Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr);
@@ -207,7 +209,7 @@ public class InlineFlopTools {
                     }
                 }
             }
-            if (usedFFs.size() < 5) {
+            if (usedFFs.size() < MAX_FFS_PER_SLICE) {
                 // There is an FF available, use one of them
                 List<BEL> bels = Arrays.stream(curr.getBELs()).filter((BEL b) -> b.isFF() && !b.isAnyIMR())
                         .collect(Collectors.toList());
@@ -230,7 +232,13 @@ public class InlineFlopTools {
         net.connect(flop, portInst.isInput() ? "D" : "Q");
         design.getGndNet().connect(flop, "R");
         design.getVccNet().connect(flop, "CE");
-        clk.getNet().createPortInst("C", flop);
+        EDIFHierCellInst flopHierCellInst = flop.getEDIFHierCellInst();
+        EDIFHierPortInst clkHierPortInst = flopHierCellInst.getPortInst("C");
+        if (clkHierPortInst == null) {
+            clk.getNet().createPortInst("C", flopHierCellInst.getInst());
+            clkHierPortInst = flopHierCellInst.getPortInst("C");
+        }
+        EDIFTools.connectPortInstsThruHier(clk, clkHierPortInst, name + "_clk");
         EDIFNet origNet = portInst.getNet();
         origNet.removePortInst(portInst);
         net.getLogicalNet().addPortInst(portInst);
@@ -351,7 +359,6 @@ public class InlineFlopTools {
         } else {
             System.err.println("ERROR: Unrecognized option '" + args[2] + "'");
         }
-
 
         d.writeCheckpoint(args[1]);
     }

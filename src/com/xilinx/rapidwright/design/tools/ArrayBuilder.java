@@ -27,7 +27,18 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Cell;
@@ -44,8 +55,26 @@ import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockGenerator;
 import com.xilinx.rapidwright.design.blocks.PBlockRange;
-import com.xilinx.rapidwright.device.*;
-import com.xilinx.rapidwright.edif.*;
+import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.ClockRegion;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Part;
+import com.xilinx.rapidwright.device.PartNameTools;
+import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPort;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.edif.EDIFValueType;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
@@ -55,6 +84,10 @@ import com.xilinx.rapidwright.util.VivadoTools;
 
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
+
+import static com.xilinx.rapidwright.util.Utils.isBRAM;
+import static com.xilinx.rapidwright.util.Utils.isDSP;
+import static com.xilinx.rapidwright.util.Utils.isSLICE;
 
 /**
  * A Tool to optimize, place and route a kernel and then replicate its
@@ -78,8 +111,8 @@ public class ArrayBuilder {
     private static final List<String> LIMIT_INSTS_OPTS = Arrays.asList("l", "limit-inst-count");
     private static final List<String> TOP_LEVEL_DESIGN_OPTS = Arrays.asList("t", "top-design");
     private static final List<String> WRITE_PLACEMENT_OPTS = Collections.singletonList("write-placement");
-    private static final List<String> PLACEMENT_FILE_OPTS = Collections.singletonList("placement-file");
-    private static final List<String> PLACEMENT_LOCS_OPTS = Collections.singletonList("write-placement-locs");
+    private static final List<String> PLACEMENT_FILE_OPTS = Collections.singletonList("read-placement");
+    private static final List<String> PLACEMENT_GRID_OPTS = Collections.singletonList("write-placement-grid");
     private static final List<String> OUT_OF_CONTEXT_OPTS = Collections.singletonList("out-of-context");
 
     private Design design;
@@ -131,7 +164,7 @@ public class ArrayBuilder {
                 acceptsAll(LIMIT_INSTS_OPTS, "Limit number of instance copies").withRequiredArg();
                 acceptsAll(WRITE_PLACEMENT_OPTS, "Write the chosen placement to the specified file").withRequiredArg();
                 acceptsAll(PLACEMENT_FILE_OPTS, "Use placement specified in file").withRequiredArg();
-                acceptsAll(PLACEMENT_LOCS_OPTS, "Write grid of possible placement locations to specified file").withRequiredArg();
+                acceptsAll(PLACEMENT_GRID_OPTS, "Write grid of possible placement locations to specified file").withRequiredArg();
                 acceptsAll(TOP_LEVEL_DESIGN_OPTS, "Top level design with blackboxes/kernel insts").withRequiredArg();
                 acceptsAll(OUT_OF_CONTEXT_OPTS, "Specifies that the array will be compiled out of context");
                 acceptsAll(HELP_OPTS, "Print this help message").forHelp();
@@ -386,8 +419,8 @@ public class ArrayBuilder {
             setInputPlacementFileName((String) options.valueOf(PLACEMENT_FILE_OPTS.get(0)));
         }
 
-        if (options.has(PLACEMENT_LOCS_OPTS.get(0))) {
-            setOutputPlacementLocsFileName((String) options.valueOf(PLACEMENT_LOCS_OPTS.get(0)));
+        if (options.has(PLACEMENT_GRID_OPTS.get(0))) {
+            setOutputPlacementLocsFileName((String) options.valueOf(PLACEMENT_GRID_OPTS.get(0)));
         }
     }
 
@@ -614,34 +647,15 @@ public class ArrayBuilder {
             for (Map.Entry<String, String> entry : placementMap.entrySet()) {
                 String instName = entry.getKey();
                 String anchorName = entry.getValue();
-                // TODO - Remove after createModuleInst() fix
                 EDIFHierCellInst hierInst = array.getNetlist().getHierCellInstFromName(instName);
                 if (hierInst == null) {
                     throw new RuntimeException("Instance name " + instName + " is invalid");
                 }
-                Module module = null;
-                for (Module m : modules) {
-                    if (m.getName().equals(hierInst.getCellName())) {
-                        module = m;
-                    }
+                if (modules.size() > 1) {
+                    throw new RuntimeException("Manual placement does not work with automated implementation");
                 }
-                assert module != null;
-                if (hierInst.getCellType().isLeafCellOrBlackBox()) {
-                    EDIFCell bb = hierInst.getCellType();
-                    if (bb.getLibrary() != null) {
-                        bb.getLibrary().removeCell(bb);
-                    }
-                    EDIFCell modCell = module.getNetlist().getTopCell();
-                    EDIFCell currCell = array.getNetlist().getWorkLibrary().getCell(modCell.getName());
-                    if (currCell == null) {
-                        array.getNetlist().copyCellAndSubCells(modCell);
-                    }
-                } // END TODO
+                Module module = modules.get(0);
                 ModuleInst curr = array.createModuleInst(instName, module);
-                // TODO - Remove after createModuleInst() fix
-                EDIFHierCellInst hierCellInst = array.getNetlist().getHierCellInstFromName(instName);
-                hierCellInst.getInst().removeBlackBoxProperty();
-                // END TODO
 
                 Site anchor = array.getDevice().getSite(anchorName);
 
@@ -662,29 +676,11 @@ public class ArrayBuilder {
         } else {
             ModuleInst curr = null;
             int i = 0;
-            outer:
-            for (Module module : modules) {
+            outer: for (Module module : modules) {
                 for (Site anchor : module.getAllValidPlacements()) {
                     if (curr == null) {
                         String instName = modInstNames == null ? ("inst_" + i) : modInstNames.get(i);
-                        // TODO - Remove after createModuleInst() fix
-                        EDIFHierCellInst hierInst = array.getNetlist().getHierCellInstFromName(instName);
-                        if (hierInst != null && hierInst.getCellType().isLeafCellOrBlackBox()) {
-                            EDIFCell bb = hierInst.getCellType();
-                            if (bb.getLibrary() != null) {
-                                bb.getLibrary().removeCell(bb);
-                            }
-                            EDIFCell modCell = module.getNetlist().getTopCell();
-                            EDIFCell currCell = array.getNetlist().getWorkLibrary().getCell(modCell.getName());
-                            if (currCell == null) {
-                                array.getNetlist().copyCellAndSubCells(modCell);
-                            }
-                        } // END TODO
                         curr = array.createModuleInst(instName, module);
-                        // TODO - Remove after createModuleInst() fix
-                        EDIFHierCellInst hierCellInst = array.getNetlist().getHierCellInstFromName(instName);
-                        hierCellInst.getInst().removeBlackBoxProperty();
-                        // END TODO
                         i++;
                     }
                     if (curr.place(anchor, true, false)) {
@@ -778,10 +774,12 @@ public class ArrayBuilder {
 
         if (ab.getOutOfContext()) {
             // Automatically find bounding PBlock based on used Slices, DSPs, and BRAMs
-            Set<Site> usedSites = array.getUsedSites().stream().filter(
-                    (Site s) -> Arrays.asList(SiteTypeEnum.SLICEL, SiteTypeEnum.SLICEM, SiteTypeEnum.DSP58_PRIMARY,
-                                    SiteTypeEnum.RAMB36, SiteTypeEnum.RAMB18_L, SiteTypeEnum.RAMB18_U)
-                            .contains(s.getPrimarySiteType().getTypeEnum())).collect(Collectors.toSet());
+            Set<Site> usedSites = new HashSet<>();
+            for (SiteInst siteInst : array.getSiteInsts()) {
+                if (isDSP(siteInst) || isBRAM(siteInst) || isSLICE(siteInst)) {
+                    usedSites.add(siteInst.getSite());
+                }
+            }
             PBlock pBlock = new PBlock(array.getDevice(), usedSites);
             InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsNearPins(array, ab.getTopClockName(), pBlock);
         }
@@ -844,8 +842,7 @@ public class ArrayBuilder {
     private static int getRCLKRowIndex(ClockRegion cr) {
         Tile center = cr.getApproximateCenter();
         int searchGridDim = 0;
-        outer:
-        while (!center.getName().startsWith("RCLK_")) {
+        outer: while (!center.getName().startsWith("RCLK_")) {
             searchGridDim++;
             for (int row = -searchGridDim; row < searchGridDim; row++) {
                 for (int col = -searchGridDim; col < searchGridDim; col++) {
