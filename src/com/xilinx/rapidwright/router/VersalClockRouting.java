@@ -312,6 +312,12 @@ public class VersalClockRouting {
                 crToVdist.put(cr, vNode);
             }
         }
+        // Remove any spine CRs that don't have sinks
+        for (ClockRegion cr : verticalSpineCRs) {
+            if (!clockRegions.contains(cr)) {
+                crToVdist.remove(cr);
+            }
+        }
 
         return crToVdist;
     }
