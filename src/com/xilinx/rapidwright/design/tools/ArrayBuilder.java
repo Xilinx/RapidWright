@@ -776,7 +776,7 @@ public class ArrayBuilder {
             // Automatically find bounding PBlock based on used Slices, DSPs, and BRAMs
             Set<Site> usedSites = new HashSet<>();
             for (SiteInst siteInst : array.getSiteInsts()) {
-                if (isDSP(siteInst) || isBRAM(siteInst) || isSLICE(siteInst)) {
+                if (isSLICE(siteInst) || isBRAM(siteInst) || isDSP(siteInst)) {
                     usedSites.add(siteInst.getSite());
                 }
             }
