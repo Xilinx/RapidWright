@@ -256,7 +256,7 @@ public class EDIFPort extends EDIFPropertyObject {
     public EDIFPortInst getInternalPortInst() {
         assert (!isBus());
         EDIFNet net = getInternalNet();
-        return net.getPortInst(null, getBusName());
+        return net == null ? null : net.getPortInst(null, getBusName());
     }
 
     /**
