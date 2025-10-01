@@ -122,6 +122,9 @@ public class InlineFlopTools {
         Set<SiteInst> siteInstsToRoute = new HashSet<>();
 
         for (EDIFPort port : top.getPorts()) {
+            if (port.getName().equals(clkNet)) {
+                continue;
+            }
             if (port.isBus()) {
                 for (int i : port.getBitBlastedIndicies()) {
                     EDIFPortInst inst = port.getInternalPortInstFromIndex(i);
