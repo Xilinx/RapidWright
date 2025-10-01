@@ -329,7 +329,7 @@ public class GlobalSignalRouting {
                 .routeToHorizontalDistributionLines(clk, vroute, usedCRsAndNonLCBPinsTuple.getFirst(),
                         false, getNodeStatus);
 
-        // Route non-LCB driven pins
+        // Route non-LCB driven pins (such as driving clocks off chip via an IOB)
         VersalClockRouting.routeNonLCBPins(clk, usedCRsAndNonLCBPinsTuple.getSecond(), getNodeStatus);
 
         Map<Node, List<SitePinInst>> lcbMappings = VersalClockRouting.routeLCBsToSinks(clk, getNodeStatus);
@@ -504,6 +504,8 @@ public class GlobalSignalRouting {
         return lcbMappings;
     }
 
+    private static final int MIN_CR_HEIGHT_FOR_CENTROID_ELIGIBILITY = 40;
+
     private static boolean centroidEligible(ClockRegion candidate) {
         // Check if we can use this clock region
         Tile lowerLeft = candidate.getLowerLeft();
@@ -512,7 +514,7 @@ public class GlobalSignalRouting {
         if (lowerLeft != null && upperLeft != null) {
             tileHeight = Math.abs(lowerLeft.getRow() - upperLeft.getRow());
         }
-        return tileHeight > 40;
+        return tileHeight > MIN_CR_HEIGHT_FOR_CENTROID_ELIGIBILITY;
     }
 
     /**
