@@ -326,6 +326,54 @@ public class EDIFCell extends EDIFPropertyObject {
         return port;
     }
 
+    /**
+     * Rename port with name currName to newName.
+     *
+     * @param currName The current name of the port that will be renamed.
+     * @param newName The new name of the port after renaming.
+     */
+    public void renamePort(String currName, String newName) {
+        String currNameClean = currName;
+        if (currName.matches(".*:\\d+]$")) {
+            int pos = currName.lastIndexOf('[');
+            currNameClean = currName.substring(0, pos+1);
+        }
+        String newNameClean = newName;
+        if (newName.matches(".*:\\d+]$")) {
+            int pos = newName.lastIndexOf('[');
+            newNameClean = newName.substring(0, pos+1);
+        }
+        EDIFPort port = ports.get(currNameClean);
+        // For callers who have a port name, and it's unknown if it's a bus, attempt a check with adding the '[' suffix
+        if (port == null && currNameClean.charAt(currNameClean.length() - 1) != '[') {
+            currNameClean += "[";
+            port = ports.get(currNameClean);
+        }
+
+        if (port == null) {
+            throw new RuntimeException("Attempting to rename port " + currName
+                    + " that does not exist on cell " + getName());
+        }
+
+        EDIFPort newPort = new EDIFPort(newName, port.getDirection(), port.getWidth());
+        newPort.setParentCell(this);
+        newPort.setBusName(newNameClean);
+
+        for (int i = 0; i < port.getWidth(); i++) {
+            EDIFPortInst portInst = port.getInternalPortInstFromIndex(i);
+            if (portInst == null) {
+                continue;
+            }
+            EDIFNet net = internalPortMap.remove(portInst.getFullName());
+            net.removePortInst(portInst);
+            net.createPortInst(newPort, newPort.isBus() ? i : -1);
+            internalPortMap.put(newPort.getPortInstNameFromPort(i), net);
+        }
+
+        ports.remove(currNameClean);
+        ports.put(newNameClean, newPort);
+    }
+
     public EDIFCellInst createCellInst(String name, EDIFCell parent) {
         return new EDIFCellInst(name, this, parent);
     }
