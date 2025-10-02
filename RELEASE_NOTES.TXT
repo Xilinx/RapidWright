@@ -1,3 +1,24 @@
+============= RapidWright 2025.1.2-beta released on 2025-10-02 ================
+Notes:
+  - [RWRoute] Versal fixes for clocking, static nets and general routing (#1280)
+  - [DesignTools] createCeClkOfRoutethruFFToVCC() to handle AND2B1L/OR2L (#1286)
+  - [TestBELPin] Test that BELPin.getConnectedSitePin() thru IMRs (#1285)
+  - Adds RW_COPY_EDNS_ON_DCP_WRITE and adds helper to extract EDNs (#1288)
+  - Move Site.getIntTile() -> DeviceTools.getIntTile() and fix for Versal (#1287)
+  - Cannot close the zip file (refactor?) (#1289)
+  - Cleanup gradle 9 warnings and Java linting warnings for Java 17 (#1277)
+  - [DesignTools] Handles VCC/GND connections properly in populateBlackBox() (#1278)
+  - rc2 and tests for removing alternate SPIs (#1276)
+  - [TimingGraph] Improving Report Timing Example; add some APIs (#1273)
+  - Propagates EDN files when loading RapidWright-generated DCPs
+  - [BELPin] getConnectedSitePin() to punch thru IMRs
+  - Site.getIntTile() to call DeviceTools.getIntTile(Site)
+  - Fix SitePinInst removal for alternate pins
+  - Address unplaced modules when getting BELPins
+
+API Additions:
+
+
 ============= RapidWright 2025.1.1-beta released on 2025-08-13 ================
 Notes:
   - Unisim Primitive Mappings Updates for Versal (#1271)
