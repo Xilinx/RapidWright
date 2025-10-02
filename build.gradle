@@ -7,7 +7,8 @@ plugins {
     id 'java'
     id 'maven-publish'
     id 'signing'
-    id 'org.jreleaser' version '1.19.0'
+// JReleaser adds at least an extra 20 seconds to setup time
+//    id 'org.jreleaser' version '1.20.0' // Uncomment for release
 }
 
 apply from: 'common.gradle'
@@ -211,24 +212,24 @@ publishing {
     }
 }
 
-// TODO - The next release of jreleaser will resolve a Gradle 9 warning.  Once we can update, to 1.20.0, we can restore this section (only used for releases)
-// jreleaser {
-//     signing {
-//         active = "ALWAYS"
-//         armored = true
-//     }
-//     deploy {
-//         maven {
-//             mavenCentral {
-//                 sonatype {
-//                     active = 'ALWAYS'
-//                     url = 'https://central.sonatype.com/api/v1/publisher'
-//                     stagingRepository('build/staging-deploy')
-//                 }
-//             }
-//         }
-//     }
-// }
+/* Uncomment for release
+jreleaser {
+    signing {
+        active = "ALWAYS"
+        armored = true
+    }
+    deploy {
+        maven {
+            mavenCentral {
+                sonatype {
+                    active = 'ALWAYS'
+                    url = 'https://central.sonatype.com/api/v1/publisher'
+                    stagingRepository('build/staging-deploy')
+                }
+            }
+        }
+    }
+}*/
 
 task testPython(type:Test) {
   group = "verification"
