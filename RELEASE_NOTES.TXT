@@ -1,4 +1,4 @@
-============= RapidWright 2025.1.2-beta released on 2025-10-02 ================
+============= RapidWright 2025.1.3-beta released on 2025-10-02 ================
 Notes:
   - [RWRoute] Versal fixes for clocking, static nets and general routing (#1280)
   - [DesignTools] createCeClkOfRoutethruFFToVCC() to handle AND2B1L/OR2L (#1286)
@@ -18,6 +18,9 @@ Notes:
 
 API Additions:
 
+============= RapidWright 2025.1.2-beta released on 2025-10-02 ================
+The rapidwright-api-lib jar got corrupted on Maven Central so this release version
+had to be abandoned. Please use 2025.1.3 instead.
 
 ============= RapidWright 2025.1.1-beta released on 2025-08-13 ================
 Notes:
