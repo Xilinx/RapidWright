@@ -22,25 +22,15 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import com.xilinx.rapidwright.design.Cell;
-import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.DesignTools;
-import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.NetTools;
-import com.xilinx.rapidwright.design.NetType;
-import com.xilinx.rapidwright.design.SiteInst;
-import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.design.Unisim;
-import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.device.SitePin;
-import com.xilinx.rapidwright.router.RouteThruHelper;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.ReportRouteStatusResult;
-import com.xilinx.rapidwright.util.VivadoTools;
-import com.xilinx.rapidwright.util.VivadoToolsHelper;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -50,12 +40,25 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import com.xilinx.rapidwright.design.Cell;
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetTools;
+import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.device.ClockRegion;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.router.RouteThruHelper;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.ReportRouteStatusResult;
+import com.xilinx.rapidwright.util.VivadoTools;
 
 public class TestGlobalSignalRouting {
     @ParameterizedTest
@@ -87,7 +90,8 @@ public class TestGlobalSignalRouting {
         //        This is a canary assertion that will light up when this gets fixed.
         Assertions.assertEquals(2 /* 3 */, globalNet.getPins().size());
 
-        Executable e = () -> GlobalSignalRouting.symmetricClkRouting(globalNet, design.getDevice(), (n) -> NodeStatus.AVAILABLE);
+        Executable e = () -> GlobalSignalRouting.symmetricClkRouting(globalNet, design.getDevice(),
+                (n) -> NodeStatus.AVAILABLE, null);
         if (erroringSitePinName == null) {
             e.execute();
         } else {
@@ -330,10 +334,13 @@ public class TestGlobalSignalRouting {
         // Simulate the preserve method
         Set<Node> used = new HashSet<>();
 
+        Map<Integer, Set<ClockRegion>> usedRoutingTracks = new HashMap<>();
         for (String netName : Arrays.asList("clk1_IBUF_BUFG", "clk2_IBUF_BUFG", "rst1", "rst2")) {
             Net net = design.getNet(netName);
             Assertions.assertTrue(NetTools.isGlobalClock(net));
-            GlobalSignalRouting.symmetricClkRouting(net, design.getDevice(), (n) -> used.contains(n) ? NodeStatus.UNAVAILABLE : NodeStatus.AVAILABLE);
+            GlobalSignalRouting.symmetricClkRouting(net, design.getDevice(),
+                    (n) -> used.contains(n) ? NodeStatus.UNAVAILABLE : NodeStatus.AVAILABLE,
+                    usedRoutingTracks);
             for (PIP pip: net.getPIPs()) {
                 for (Node node: Arrays.asList(pip.getStartNode(), pip.getEndNode())) {
                     if (node != null) used.add(node);

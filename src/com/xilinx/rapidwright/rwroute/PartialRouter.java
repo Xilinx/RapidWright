@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +40,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
@@ -206,6 +208,7 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected void routeGlobalClkNets() {
+        Map<Integer, Set<ClockRegion>> usedRoutingTracks = new HashMap<>();
         if (clkNets.isEmpty())
             return;
 
@@ -216,7 +219,7 @@ public class PartialRouter extends RWRoute {
             }
 
             if (!clk.hasPIPs()) {
-                super.routeGlobalClkNet(clk);
+                super.routeGlobalClkNet(clk, usedRoutingTracks);
             } else {
                 System.out.println("INFO: Routing " + clkPins.size() + " pins of clock " + clk + " (non timing-driven)");
                 Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(clk, node);

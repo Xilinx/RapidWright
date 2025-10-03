@@ -38,6 +38,8 @@ public class Params {
 
     public static String RW_DISABLE_WRITING_ADV_FLOW_DCPS_NAME = "RW_DISABLE_WRITING_ADV_FLOW_DCPS";
 
+    public static String RW_COPY_EDNS_ON_DCP_WRITE_NAME = "RW_COPY_EDNS_ON_DCP_WRITE";
+
     /**
      * Flag to have RapidWright decompress gzipped EDIF files to disk prior to
      * parsing. This is a tradeoff where pre-decompression improves runtime over the
@@ -69,6 +71,12 @@ public class Params {
      * to true.
      */
     public static boolean RW_DISABLE_WRITING_ADV_FLOW_DCPS = isParamSet(RW_DISABLE_WRITING_ADV_FLOW_DCPS_NAME);
+
+    /**
+     * Flag to indicate RapidWright should copy *.edn (encrypted cell netlist files)
+     * to the same directory where the DCP is being written to.
+     */
+    public static boolean RW_COPY_EDNS_ON_DCP_WRITE = isParamSet(RW_COPY_EDNS_ON_DCP_WRITE_NAME);
 
     /**
      * Checks if the named RapidWright parameter is set via an environment variable
