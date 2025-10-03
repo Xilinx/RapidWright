@@ -68,4 +68,24 @@ public class VivadoToolsHelper {
         ReportRouteStatusResult rrs = VivadoTools.placeAndRouteDesignAndGetStatus(design, dir);
         Assertions.assertTrue(rrs.isFullyRouted());
     }
+
+    public static void assertSamePortCountAfterRoundTripInVivado(Design design, Path dir) {
+        if (!FileTools.isVivadoOnPath()) {
+            return;
+        }
+        int beforePortCount = design.getNetlist().getTopCell().getPorts().size();
+        Design newDesign = VivadoTools.roundTripDCPInVivado(design, dir);
+        int afterPortCount = newDesign.getNetlist().getTopCell().getPorts().size();
+        Assertions.assertEquals(beforePortCount, afterPortCount);
+    }
+
+    public static void assertDifferentPortCountAfterRoundTripInVivado(Design design, Path dir) {
+        if (!FileTools.isVivadoOnPath()) {
+            return;
+        }
+        int beforePortCount = design.getNetlist().getTopCell().getPorts().size();
+        Design newDesign = VivadoTools.roundTripDCPInVivado(design, dir);
+        int afterPortCount = newDesign.getNetlist().getTopCell().getPorts().size();
+        Assertions.assertNotEquals(beforePortCount, afterPortCount);
+    }
 }

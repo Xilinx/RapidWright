@@ -33,6 +33,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
+import com.xilinx.rapidwright.util.VivadoTools;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -425,5 +427,24 @@ public class TestEDIFTools {
         }
         Assertions.assertTrue(hasDummyEDN);
 
+    }
+
+    @Test
+    public void testEnsurePreservedInterfaceVivado(@TempDir Path dir) {
+        Design design = RapidWrightDCP.loadDCP("bnn.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell topCell = netlist.getTopCell();
+
+        for (EDIFPort p : topCell.getPorts()) {
+            System.out.println(p);
+        }
+
+        topCell.renamePort("dmem_i_V_ce0", "test_port[0]");
+        topCell.renamePort("kh_i_V_ce0", "test_port[1]");
+        topCell.renamePort("wt_i_V_ce0", "test_port[2]");
+
+        VivadoToolsHelper.assertDifferentPortCountAfterRoundTripInVivado(design, dir);
+        EDIFTools.ensurePreservedInterfaceVivado(design.getNetlist());
+        VivadoToolsHelper.assertSamePortCountAfterRoundTripInVivado(design, dir);
     }
 }

@@ -117,4 +117,21 @@ public class TestEDIFCell {
         Assertions.assertEquals(2, picoblazeTop.getNonHierInstantiationCount());
         Assertions.assertEquals(1, kcpsm6.getNonHierInstantiationCount());
     }
+
+    @Test
+    public void testRenamePort() {
+        Design design = RapidWrightDCP.loadDCP("bnn.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell topCell = netlist.getTopCell();
+
+        EDIFPort p = topCell.getPort("dmem_i_V_ce0");
+        topCell.renamePort("dmem_i_V_ce0", "test_port");
+
+        Assertions.assertNull(topCell.getPort("dmem_i_V_ce0"));
+
+        EDIFPort newPort = topCell.getPort("test_port");
+        Assertions.assertNotNull(newPort);
+        Assertions.assertEquals("test_port", newPort.getInternalPortInst().getName());
+        Assertions.assertEquals("dmem_i_V_ce0", newPort.getInternalNet().getName());
+    }
 }

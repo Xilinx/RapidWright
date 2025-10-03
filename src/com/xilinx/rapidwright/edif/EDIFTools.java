@@ -1757,4 +1757,23 @@ public class EDIFTools {
 
         return flatNetlist;
     }
+
+    /**
+     * Prevents vivado from forming buses out of ports of the form `port[0]`, `port[1]`, etc.
+     *
+     * @param netlist  The netlist to preserve the interface of.
+     *
+     */
+    public static void ensurePreservedInterfaceVivado(EDIFNetlist netlist) {
+        EDIFCell top = netlist.getTopCell();
+        List<String> portsToRename = new ArrayList<>();
+        for (EDIFPort p : top.getPorts()) {
+            if (!p.isBus() && !p.getName().startsWith("[]") && p.getName().endsWith("]")) {
+                portsToRename.add(p.getName());
+            }
+        }
+        for (String p : portsToRename) {
+            top.renamePort(p, "[]" + p);
+        }
+    }
 }
