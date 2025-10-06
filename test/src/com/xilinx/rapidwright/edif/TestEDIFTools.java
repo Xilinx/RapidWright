@@ -450,19 +450,19 @@ public class TestEDIFTools {
         EDIFNetlist netlist = design.getNetlist();
         EDIFCell topCell = netlist.getTopCell();
 
-        topCell.renamePort("dmem_i_V_ce0", "[]test_port[0]");
-        topCell.renamePort("kh_i_V_ce0", "[]test_port[1]");
-        topCell.renamePort("wt_i_V_ce0", "[]test_port[2]");
+        topCell.renamePort("dmem_i_V_ce0", EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE + "test_port[0]");
+        topCell.renamePort("kh_i_V_ce0", EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE + "test_port[1]");
+        topCell.renamePort("wt_i_V_ce0", EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE + "test_port[2]");
 
         EDIFTools.removeVivadoBusPreventionAnnotations(design.getNetlist());
         EDIFPort testPort0 = topCell.getPort("test_port[0]");
         Assertions.assertNotNull(testPort0);
-        Assertions.assertFalse(testPort0.getName().startsWith("[]"));
+        Assertions.assertFalse(testPort0.getName().startsWith(EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE));
         EDIFPort testPort1 = topCell.getPort("test_port[1]");
         Assertions.assertNotNull(testPort1);
-        Assertions.assertFalse(testPort1.getName().startsWith("[]"));
+        Assertions.assertFalse(testPort1.getName().startsWith(EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE));
         EDIFPort testPort2 = topCell.getPort("test_port[2]");
         Assertions.assertNotNull(testPort2);
-        Assertions.assertFalse(testPort2.getName().startsWith("[]"));
+        Assertions.assertFalse(testPort2.getName().startsWith(EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE));
     }
 }
