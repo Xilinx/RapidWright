@@ -117,4 +117,71 @@ public class TestEDIFCell {
         Assertions.assertEquals(2, picoblazeTop.getNonHierInstantiationCount());
         Assertions.assertEquals(1, kcpsm6.getNonHierInstantiationCount());
     }
+
+    @Test
+    public void testRenamePort() {
+        Design design = RapidWrightDCP.loadDCP("bnn.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell topCell = netlist.getTopCell();
+
+        topCell.renamePort("dmem_i_V_ce0", "test_port");
+
+        Assertions.assertNull(topCell.getPort("dmem_i_V_ce0"));
+
+        EDIFPort newPort = topCell.getPort("test_port");
+        Assertions.assertNotNull(newPort);
+        Assertions.assertEquals("test_port", newPort.getInternalPortInst().getName());
+        Assertions.assertEquals("dmem_i_V_ce0", newPort.getInternalNet().getName());
+
+        // Create port `my_signal[5:2]` and associated port instances/nets
+        topCell.addPort(new EDIFPort("my_signal[5:2]", EDIFDirection.INPUT, 4));
+        EDIFNet mySignal2Net = topCell.addNet(new EDIFNet("my_signal[2]", topCell));
+        mySignal2Net.createPortInst("my_signal[3]", topCell);
+        EDIFNet mySignal3Net = topCell.addNet(new EDIFNet("my_signal[3]", topCell));
+        mySignal3Net.createPortInst("my_signal[2]", topCell);
+        EDIFNet mySignal4Net = topCell.addNet(new EDIFNet("my_signal[4]", topCell));
+        mySignal4Net.createPortInst("my_signal[1]", topCell);
+        EDIFNet mySignal5Net = topCell.addNet(new EDIFNet("my_signal[5]", topCell));
+        mySignal5Net.createPortInst("my_signal[0]", topCell);
+
+        topCell.renamePort("my_signal[5:2]", "my_new_signal[5:2]");
+
+        EDIFPort myNewSignal = topCell.getPort("my_new_signal[");
+        Assertions.assertNotNull(myNewSignal);
+
+        for (int i : myNewSignal.getBitBlastedIndicies()) {
+            EDIFPortInst portInst = myNewSignal.getInternalPortInstFromIndex(i);
+            Assertions.assertNotNull(portInst);
+        }
+
+        // Create port `test_zero[0:0]` and associated port instances/nets
+        topCell.addPort(new EDIFPort("test_zero[0:0]", EDIFDirection.INPUT, 1));
+        EDIFNet testZeroNet = topCell.addNet(new EDIFNet("test_zero[0]", topCell));
+        testZeroNet.createPortInst("test_zero[0]", topCell);
+
+        topCell.renamePort("test_zero[0:0]", "new_test_zero[0:0]");
+
+        EDIFPort newTestZero = topCell.getPort("new_test_zero[");
+        Assertions.assertNotNull(newTestZero);
+
+        for (int i : newTestZero.getBitBlastedIndicies()) {
+            EDIFPortInst portInst = newTestZero.getInternalPortInstFromIndex(i);
+            Assertions.assertNotNull(portInst);
+        }
+
+        // Create port `test_five[5:5]` and associated port instances/nets
+        topCell.addPort(new EDIFPort("test_five[5:5]", EDIFDirection.INPUT, 1));
+        EDIFNet testFiveNet = topCell.addNet(new EDIFNet("test_five[0]", topCell));
+        testFiveNet.createPortInst("test_five[0]", topCell);
+
+        topCell.renamePort("test_five[5:5]", "new_test_five[5:5]");
+
+        EDIFPort newTestFive = topCell.getPort("new_test_five[");
+        Assertions.assertNotNull(newTestFive);
+
+        for (int i : newTestFive.getBitBlastedIndicies()) {
+            EDIFPortInst portInst = newTestFive.getInternalPortInstFromIndex(i);
+            Assertions.assertNotNull(portInst);
+        }
+    }
 }

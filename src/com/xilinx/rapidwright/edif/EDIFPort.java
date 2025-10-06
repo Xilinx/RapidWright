@@ -244,7 +244,7 @@ public class EDIFPort extends EDIFPropertyObject {
     public EDIFPortInst getInternalPortInstFromIndex(int index) {
         String name = getPortInstNameFromPort(index);
         EDIFNet net = getInternalNet(index);
-        return net.getPortInst(null, name);
+        return net == null ? null : net.getPortInst(null, name);
     }
 
     /**
