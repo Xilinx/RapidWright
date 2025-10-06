@@ -186,4 +186,50 @@ public class NetTools {
         }
         return false;
     }
+
+    /**
+     * Unroutes routed nets that have one or more overlapping or conflicting nodes
+     * with another route in the design. The choice between which of two or more
+     * nets gets unrouted is arbitrary and nets are unrouted until the set of routed
+     * nets do not overlap.
+     * 
+     * @param design The design to evaluate for conflicting nodes.
+     * @return The list of nets that were unrouted.
+     */
+    public static List<Net> unrouteNetsWithOverlappingNodes(Design design) {
+        List<Net> overlappingNets = getNetsWithOverlappingNodes(design);
+        for (Net net : overlappingNets) {
+            net.unroute();
+        }
+        return overlappingNets;
+    }
+
+    /**
+     * Returns a list of nets with overlapping nodes without unrouting them.
+     *
+     * @param design The design to evaluate for conflicting nodes.
+     * @return The list of nets that overlap.
+     */
+    public static List<Net> getNetsWithOverlappingNodes(Design design) {
+        List<Net> overlappingNets = new ArrayList<>();
+        Map<Node, Net> used = new HashMap<>();
+        for (Net net : design.getNets()) {
+            for (PIP pip : net.getPIPs()) {
+                for (Node node : new Node[] { pip.getStartNode(), pip.getEndNode() }) {
+                    if (node == null)
+                        continue;
+                    Net existing = used.putIfAbsent(node, net);
+                    if (existing != null && existing != net) {
+                        for (PIP oldPip : new ArrayList<>(existing.getPIPs())) {
+                            for (Node oldNode : new Node[] { oldPip.getStartNode(), oldPip.getEndNode() }) {
+                                used.remove(oldNode);
+                            }
+                        }
+                        overlappingNets.add(existing);
+                    }
+                }
+            }
+        }
+        return overlappingNets;
+    }
 }
