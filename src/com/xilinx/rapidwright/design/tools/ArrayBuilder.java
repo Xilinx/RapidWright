@@ -314,6 +314,7 @@ public class ArrayBuilder {
                     setKernelDesign(Design.readCheckpoint(inputFile, companionEDIF, CodePerfTracker.SILENT));
                 } else {
                     setKernelDesign(Design.readCheckpoint(inputFile));
+                    EDIFTools.removeVivadoBusPreventionAnnotations(getKernelDesign().getNetlist());
                     if (!design.getNetlist().getEncryptedCells().isEmpty()) {
                         System.out.println("Design has encrypted cells");
                     } else {
@@ -403,6 +404,7 @@ public class ArrayBuilder {
         if (options.has(TOP_LEVEL_DESIGN_OPTS.get(0))) {
             Design d = Design.readCheckpoint((String) options.valueOf(TOP_LEVEL_DESIGN_OPTS.get(0)));
             setTopDesign(d);
+            EDIFTools.removeVivadoBusPreventionAnnotations(getTopDesign().getNetlist());
         }
 
         if (options.has(TOP_CLK_NAME_OPTS.get(0))) {

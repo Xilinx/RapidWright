@@ -40,6 +40,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 
 import com.xilinx.rapidwright.design.tools.InlineFlopTools;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 
@@ -512,6 +513,7 @@ public class PerformanceExplorer {
                 InlineFlopTools.removeInlineFlops(d);
             }
 
+            EDIFTools.ensurePreservedInterfaceVivado(d.getNetlist());
             d.writeCheckpoint(runDirectory + File.separator + pblock + "_best.dcp");
         }
     }
@@ -600,6 +602,7 @@ public class PerformanceExplorer {
         String runDir = opts.hasArgument(RUN_DIR_OPT) ? (String) opts.valueOf(RUN_DIR_OPT) : System.getProperty("user.dir");
 
         Design d = Design.readCheckpoint(dcpInputName);
+        EDIFTools.ensurePreservedInterfaceVivado(d.getNetlist());
         PerformanceExplorer pe = new PerformanceExplorer(d, runDir, clkName, targetPeriod);
 
         if (opts.hasArgument(MAX_CONCURRENT_JOBS_OPT)) {
