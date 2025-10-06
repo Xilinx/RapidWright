@@ -69,23 +69,17 @@ public class VivadoToolsHelper {
         Assertions.assertTrue(rrs.isFullyRouted());
     }
 
-    public static void assertSamePortCountAfterRoundTripInVivado(Design design, Path dir) {
+    public static void assertPortCountAfterRoundTripInVivado(Design design, Path dir, boolean expectEquals) {
         if (!FileTools.isVivadoOnPath()) {
             return;
         }
         int beforePortCount = design.getNetlist().getTopCell().getPorts().size();
-        Design newDesign = VivadoTools.roundTripDCPInVivado(design, dir);
+        Design newDesign = VivadoTools.roundTripDCPThruVivado(design, dir);
         int afterPortCount = newDesign.getNetlist().getTopCell().getPorts().size();
-        Assertions.assertEquals(beforePortCount, afterPortCount);
-    }
-
-    public static void assertDifferentPortCountAfterRoundTripInVivado(Design design, Path dir) {
-        if (!FileTools.isVivadoOnPath()) {
-            return;
+        if (expectEquals) {
+            Assertions.assertEquals(beforePortCount, afterPortCount);
+        } else {
+            Assertions.assertNotEquals(beforePortCount, afterPortCount);
         }
-        int beforePortCount = design.getNetlist().getTopCell().getPorts().size();
-        Design newDesign = VivadoTools.roundTripDCPInVivado(design, dir);
-        int afterPortCount = newDesign.getNetlist().getTopCell().getPorts().size();
-        Assertions.assertNotEquals(beforePortCount, afterPortCount);
     }
 }

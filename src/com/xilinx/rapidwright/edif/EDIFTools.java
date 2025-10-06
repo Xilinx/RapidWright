@@ -151,6 +151,14 @@ public class EDIFTools {
 
     public static final String LOAD_TCL_SUFFIX = "_load.tcl";
 
+    /**
+     * Vivado uses this string to prevent the grouping of ports of the form
+     * `port[0]`, `port[1]`, etc. into a single bus of port of the form
+     * `port[1:0]`. EDIF ports named `[]port[0]` and `[]port[1]` will be
+     * kept as separate ports.
+     */
+    public static final String VIVADO_PRESERVE_PORT_INTERFACE = "[]";
+
     public static final AtomicInteger UNIQUE_COUNT = new AtomicInteger();
 
     /**
@@ -1768,12 +1776,27 @@ public class EDIFTools {
         EDIFCell top = netlist.getTopCell();
         List<String> portsToRename = new ArrayList<>();
         for (EDIFPort p : top.getPorts()) {
-            if (!p.isBus() && !p.getName().startsWith("[]") && p.getName().endsWith("]")) {
+            if (!p.isBus() && !p.getName().startsWith(VIVADO_PRESERVE_PORT_INTERFACE) && p.getName().endsWith("]")) {
                 portsToRename.add(p.getName());
             }
         }
         for (String p : portsToRename) {
-            top.renamePort(p, "[]" + p);
+            top.renamePort(p, VIVADO_PRESERVE_PORT_INTERFACE + p);
+        }
+    }
+
+    public static void removeVivadoBusPreventionAnnotations(EDIFNetlist netlist) {
+        EDIFCell top = netlist.getTopCell();
+        for (EDIFCell cell : netlist.getLibrary(top.getLibrary().getName()).getCells()) {
+            List<String> portsToRename = new ArrayList<>();
+            for (EDIFPort p : cell.getPorts()) {
+                if (p.getName().startsWith(VIVADO_PRESERVE_PORT_INTERFACE)) {
+                    portsToRename.add(p.getName());
+                }
+            }
+            for (String p : portsToRename) {
+                cell.renamePort(p, p.substring(VIVADO_PRESERVE_PORT_INTERFACE.length()));
+            }
         }
     }
 }

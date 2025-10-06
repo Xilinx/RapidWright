@@ -435,16 +435,34 @@ public class TestEDIFTools {
         EDIFNetlist netlist = design.getNetlist();
         EDIFCell topCell = netlist.getTopCell();
 
-        for (EDIFPort p : topCell.getPorts()) {
-            System.out.println(p);
-        }
-
         topCell.renamePort("dmem_i_V_ce0", "test_port[0]");
         topCell.renamePort("kh_i_V_ce0", "test_port[1]");
         topCell.renamePort("wt_i_V_ce0", "test_port[2]");
 
-        VivadoToolsHelper.assertDifferentPortCountAfterRoundTripInVivado(design, dir);
+        VivadoToolsHelper.assertPortCountAfterRoundTripInVivado(design, dir, false);
         EDIFTools.ensurePreservedInterfaceVivado(design.getNetlist());
-        VivadoToolsHelper.assertSamePortCountAfterRoundTripInVivado(design, dir);
+        VivadoToolsHelper.assertPortCountAfterRoundTripInVivado(design, dir, true);
+    }
+
+    @Test
+    public void testRemoveVivadoBusPreventionAnnotations(@TempDir Path dir) {
+        Design design = RapidWrightDCP.loadDCP("bnn.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell topCell = netlist.getTopCell();
+
+        topCell.renamePort("dmem_i_V_ce0", "[]test_port[0]");
+        topCell.renamePort("kh_i_V_ce0", "[]test_port[1]");
+        topCell.renamePort("wt_i_V_ce0", "[]test_port[2]");
+
+        EDIFTools.removeVivadoBusPreventionAnnotations(design.getNetlist());
+        EDIFPort testPort0 = topCell.getPort("test_port[0]");
+        Assertions.assertNotNull(testPort0);
+        Assertions.assertFalse(testPort0.getName().startsWith("[]"));
+        EDIFPort testPort1 = topCell.getPort("test_port[1]");
+        Assertions.assertNotNull(testPort1);
+        Assertions.assertFalse(testPort1.getName().startsWith("[]"));
+        EDIFPort testPort2 = topCell.getPort("test_port[2]");
+        Assertions.assertNotNull(testPort2);
+        Assertions.assertFalse(testPort2.getName().startsWith("[]"));
     }
 }

@@ -333,6 +333,10 @@ public class EDIFCell extends EDIFPropertyObject {
      * @param newName The new name of the port after renaming.
      */
     public void renamePort(String currName, String newName) {
+        if (currName.equals(newName)) {
+            return;
+        }
+
         EDIFPort port = getPortByPortInstName(currName);
 
         if (port == null) {
@@ -342,8 +346,12 @@ public class EDIFCell extends EDIFPropertyObject {
 
         EDIFPort newPort = new EDIFPort(newName, port.getDirection(), port.getWidth());
         addPort(newPort);
+        int[] indices = {0};
+        if (port.isBus()) {
+            indices = port.getBitBlastedIndicies();
+        }
 
-        for (int i = 0; i < port.getWidth(); i++) {
+        for (int i : indices) {
             EDIFPortInst portInst = port.getInternalPortInstFromIndex(i);
             if (portInst == null) {
                 continue;
@@ -353,7 +361,6 @@ public class EDIFCell extends EDIFPropertyObject {
             net.createPortInst(newPort, newPort.isBus() ? i : -1);
             addInternalPortMapEntry(newPort.getPortInstNameFromPort(i), net);
         }
-
         removePort(port);
     }
 

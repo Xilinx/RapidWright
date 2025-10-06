@@ -475,7 +475,7 @@ public class VivadoTools {
     }
 
     /**
-     * Open a netlist in Vivado and write a new DCP.
+     * Open a DCP in Vivado and write a new DCP.
      *
      * @param dcp        Path to DCP to open in Vivado.
      * @param outputName Name of the output design.
@@ -483,7 +483,7 @@ public class VivadoTools {
      * @param encrypted  Indicates whether DCP contains encrypted EDIF cells.
      * @return Path to output dcp after round-trip.
      */
-    public static Path roundTripDCPInVivado(Path dcp, String outputName, Path workdir, boolean encrypted) {
+    public static Path roundTripDCPThruVivado(Path dcp, String outputName, Path workdir, boolean encrypted) {
         final Path outputLog = workdir.resolve("outputLog.log");
         Path outputDcp = workdir.resolve(outputName + ".dcp");
         Path outputEdif = workdir.resolve(outputName + ".edf");
@@ -498,17 +498,17 @@ public class VivadoTools {
     }
 
     /**
-     * Open a netlist in Vivado then write a new DCP and parse the new DCP back into a Design.
+     * Exports the design to Vivado and then writes a new DCP from Vivado, loads and returns it.
      *
      * @param design  The design to open in Vivado.
      * @param workdir Directory to work within.
      * @return True if the port exists in Vivado, false otherwise.
      */
-    public static Design roundTripDCPInVivado(Design design, Path workdir) {
+    public static Design roundTripDCPThruVivado(Design design, Path workdir) {
         boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
         Path dcp = workdir.resolve("roundTrip.dcp");
         design.writeCheckpoint(dcp);
-        Path outputDcp = roundTripDCPInVivado(dcp, "output", workdir, encrypted);
+        Path outputDcp = roundTripDCPThruVivado(dcp, "output", workdir, encrypted);
         return Design.readCheckpoint(outputDcp);
     }
 }
