@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.gui;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -35,6 +36,7 @@ import java.util.TreeMap;
 import org.eclipse.elk.core.IGraphLayoutEngine;
 import org.eclipse.elk.core.RecursiveGraphLayoutEngine;
 import org.eclipse.elk.core.options.CoreOptions;
+import org.eclipse.elk.core.options.NodeLabelPlacement;
 import org.eclipse.elk.core.options.PortConstraints;
 import org.eclipse.elk.core.options.PortSide;
 import org.eclipse.elk.core.util.BasicProgressMonitor;
@@ -427,21 +429,24 @@ public class SchematicScene extends QGraphicsScene {
         for (EDIFPort topPort : cell.getPorts()) {
             for (int i : (topPort.isBus() ? topPort.getBitBlastedIndicies() : new int[] { 0 })) {
                 String portInstName = topPort.getPortInstNameFromPort(0);
-                ElkNode elkTopPort = f.createElkNode();
+                ElkNode elkTopPortNode = f.createElkNode();
                 EDIFPortInst portInst = topPort.getInternalPortInstFromIndex(i);
-                elkNodeTopPortMap.put(elkTopPort, portInst);
-                elkTopPort.setDimensions(TOP_PORT_WIDTH + POINT_DIST, TOP_PORT_HEIGHT);
+                elkNodeTopPortMap.put(elkTopPortNode, portInst);
+                elkTopPortNode.setDimensions(TOP_PORT_WIDTH + POINT_DIST, TOP_PORT_HEIGHT);
+                elkTopPortNode.setIdentifier(portInstName);
+                elkTopPortNode.setParent(parent);
+                parent.getChildren().add(elkTopPortNode);
+                labelElkNode(elkTopPortNode, portInstName);
+                elkTopPortNode.setProperty(CoreOptions.NODE_LABELS_PLACEMENT,
+                        EnumSet.of(topPort.isOutput() ? NodeLabelPlacement.H_RIGHT : NodeLabelPlacement.H_LEFT));
+                ElkPort elkTopPort = f.createElkPort();
+                elkTopPort.setParent(elkTopPortNode);
                 elkTopPort.setIdentifier(portInstName);
-                elkTopPort.setParent(parent);
-                parent.getChildren().add(elkTopPort);
-                ElkPort topElkPort = f.createElkPort();
-                topElkPort.setParent(elkTopPort);
-                topElkPort.setIdentifier(portInstName);
-                topElkPort.setProperty(CoreOptions.PORT_SIDE, topPort.isOutput() ? PortSide.EAST : PortSide.WEST);
-                topElkPort.setProperty(CoreOptions.PORT_INDEX, 1);
-                topElkPort.setDimensions(PORT_SIZE, PORT_SIZE);
-                portInstMap.put(portInst, topElkPort);
-                elkTopPort.getPorts().add(topElkPort);
+                elkTopPort.setProperty(CoreOptions.PORT_SIDE, topPort.isOutput() ? PortSide.EAST : PortSide.WEST);
+                elkTopPort.setProperty(CoreOptions.PORT_INDEX, 1);
+                elkTopPort.setDimensions(PORT_SIZE, PORT_SIZE);
+                portInstMap.put(portInst, elkTopPort);
+                elkTopPortNode.getPorts().add(elkTopPort);
             }
         }
 
@@ -458,6 +463,7 @@ public class SchematicScene extends QGraphicsScene {
             boolean isHierCell = !inst.getCellType().isLeafCellOrBlackBox();
 
             // Create labels
+            elkInst.setProperty(CoreOptions.NODE_LABELS_PLACEMENT, NodeLabelPlacement.outsideTopCenter());
             labelElkNode(elkInst, inst.getName());
             labelElkNode(elkInst, inst.getCellName());
 
