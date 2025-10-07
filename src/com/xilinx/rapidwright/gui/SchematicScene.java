@@ -114,12 +114,13 @@ public class SchematicScene extends QGraphicsScene {
     private static final double MIN_NODE_HEIGHT = 20.0;
     private static final double MIN_NODE_WIDTH = 40.0;
 
-    private static final double PORT_HEIGHT = 34.0;
+    private static final double PORT_HEIGHT = 20.0;
     private static final double PORT_NAME_BUFFER = 40.0;
     private static final double TOP_PORT_WIDTH = 20.0;
     private static final double TOP_PORT_HEIGHT = 14.0;
-    private static final double PORT_MARGIN = 20.0;
     private static final double PORT_LABEL_SPACING = 4.0;
+
+    private static final double POINT_DIST = TOP_PORT_HEIGHT * 0.2; // Pointy part of the port
 
     private static final double BUTTON_SIZE = 16.0;
     private static final double BUTTON_RADIUS = 3.0;
@@ -178,7 +179,7 @@ public class SchematicScene extends QGraphicsScene {
                 portLabel.setBrush(PORT_BRUSH);
                 portLabel.setFont(FONT);
                 double portShapeX = topPort.getX() + (topPort.getWidth() - TOP_PORT_WIDTH) / 2.0;
-                double portShapeY = topPort.getY() + (topPort.getHeight() - TOP_PORT_HEIGHT - PORT_MARGIN) / 2.0;
+                double portShapeY = topPort.getY() + (topPort.getHeight() - TOP_PORT_HEIGHT) / 2.0;
                 double labelX = portShapeX + (TOP_PORT_WIDTH - portLabel.boundingRect().width()) / 2.0;
                 double labelY = portShapeY + TOP_PORT_HEIGHT + PORT_LABEL_SPACING;
                 portLabel.setPos(labelX, labelY);
@@ -332,7 +333,7 @@ public class SchematicScene extends QGraphicsScene {
             double endY = s.getEndY();
 
             if (!e.getSources().isEmpty()) {
-                ElkPort srcPort = (ElkPort) s;
+                ElkPort srcPort = (ElkPort) e.getSources().get(0);
                 ElkNode portParent = (ElkNode) srcPort.getParent();
                 EDIFPortInst portInst = elkNodeTopPortMap.get(portParent);
                 if (portInst != null && portInst.isTopLevelPort()) {
@@ -355,20 +356,16 @@ public class SchematicScene extends QGraphicsScene {
 
             double lastX = startX;
             double lastY = startY;
+            String id = e.getIdentifier();
+            String lookup = "NET:" + (id == null ? "" : id);
             for (ElkBendPoint bp : s.getBendPoints()) {
-                String id = e.getIdentifier();
-                String lookup = "NET:" + (id == null ? "" : id);
-                QGraphicsLineItem line = addLine(lastX, lastY, bp.getX(), bp.getY(), NET_PEN);
-                line.setData(0, lookup);
-                line.setZValue(0);
-                lookupMap.computeIfAbsent(lookup, l -> new ArrayList<>()).add(line);
-                QGraphicsLineItem clickLine = addLine(lastX, lastY, bp.getX(), bp.getY(), NET_CLICK_PEN);
-                clickLine.setData(0, lookup);
-                clickLine.setData(1, "CLICK");
-                lookupMap.computeIfAbsent(lookup, l -> new ArrayList<>()).add(clickLine);
+                drawSegment(lastX, lastY, bp.getX(), bp.getY(), lookup);
                 lastX = bp.getX();
                 lastY = bp.getY();
             }
+
+            // Draw final segment
+            drawSegment(lastX, lastY, endX, endY, lookup);
         }
 
         for (ElkNode child : parent.getChildren()) {
@@ -378,10 +375,21 @@ public class SchematicScene extends QGraphicsScene {
         }
     }
 
+    private void drawSegment(double lastX, double lastY, double endX, double endY, String lookup) {
+        QGraphicsLineItem line = addLine(lastX, lastY, endX, endY, NET_PEN);
+        line.setData(0, lookup);
+        line.setZValue(0);
+        lookupMap.computeIfAbsent(lookup, l -> new ArrayList<>()).add(line);
+        QGraphicsLineItem clickLine = addLine(lastX, lastY, endX, endY, NET_CLICK_PEN);
+        clickLine.setData(0, lookup);
+        clickLine.setData(1, "CLICK");
+        lookupMap.computeIfAbsent(lookup, l -> new ArrayList<>()).add(clickLine);
+    }
+
     private QPointF getTopPortConnectionPoint(ElkNode port, boolean isOutput) {
         double portX = port.getX() + (port.getWidth() - TOP_PORT_WIDTH) / 2.0;
-        double portY = port.getY() + (port.getHeight() - TOP_PORT_HEIGHT - PORT_MARGIN) / 2.0;
-        return new QPointF(portX + (isOutput ? 0 : TOP_PORT_WIDTH), portY + TOP_PORT_HEIGHT / 2);
+        double portY = port.getY() + (port.getHeight() - TOP_PORT_HEIGHT) / 2.0;
+        return new QPointF(portX + (isOutput ? -POINT_DIST : POINT_DIST + TOP_PORT_WIDTH), portY + TOP_PORT_HEIGHT / 2);
     }
 
     private static QPolygonF createPortShape(ElkNode topPort, boolean isOutput) {
@@ -390,24 +398,23 @@ public class SchematicScene extends QGraphicsScene {
         double height = topPort.getHeight();
         double width = topPort.getWidth();
         double x = portX + (width - TOP_PORT_WIDTH) / 2.0;
-        double y = portY + (height - TOP_PORT_HEIGHT - PORT_MARGIN) / 2.0;
+        double y = portY + (height - TOP_PORT_HEIGHT) / 2.0;
 
         QPolygonF portShape = new QPolygonF();
-        double pointDist = TOP_PORT_HEIGHT * 0.2; // Pointy part of the port
 
         if (isOutput) {
             // Point to the left
-            portShape.add(new QPointF(x + pointDist, y));
+            portShape.add(new QPointF(x + POINT_DIST, y));
             portShape.add(new QPointF(x + TOP_PORT_WIDTH, y));
             portShape.add(new QPointF(x + TOP_PORT_WIDTH, y + TOP_PORT_HEIGHT));
-            portShape.add(new QPointF(x + pointDist, y + TOP_PORT_HEIGHT));
-            portShape.add(new QPointF(x - pointDist, y + (TOP_PORT_HEIGHT / 2)));
+            portShape.add(new QPointF(x + POINT_DIST, y + TOP_PORT_HEIGHT));
+            portShape.add(new QPointF(x - POINT_DIST, y + (TOP_PORT_HEIGHT / 2)));
         } else {
             // Input points to the right
             portShape.add(new QPointF(x, y));
-            portShape.add(new QPointF(x + TOP_PORT_WIDTH - pointDist, y));
-            portShape.add(new QPointF(x + TOP_PORT_WIDTH + pointDist, y + (TOP_PORT_HEIGHT / 2)));
-            portShape.add(new QPointF(x + TOP_PORT_WIDTH - pointDist, y + TOP_PORT_HEIGHT));
+            portShape.add(new QPointF(x + TOP_PORT_WIDTH - POINT_DIST, y));
+            portShape.add(new QPointF(x + TOP_PORT_WIDTH + POINT_DIST, y + (TOP_PORT_HEIGHT / 2)));
+            portShape.add(new QPointF(x + TOP_PORT_WIDTH - POINT_DIST, y + TOP_PORT_HEIGHT));
             portShape.add(new QPointF(x, y + TOP_PORT_HEIGHT));
         }
 
@@ -423,7 +430,7 @@ public class SchematicScene extends QGraphicsScene {
                 ElkNode elkTopPort = f.createElkNode();
                 EDIFPortInst portInst = topPort.getInternalPortInstFromIndex(i);
                 elkNodeTopPortMap.put(elkTopPort, portInst);
-                elkTopPort.setDimensions(TOP_PORT_WIDTH, TOP_PORT_WIDTH);
+                elkTopPort.setDimensions(TOP_PORT_WIDTH + POINT_DIST, TOP_PORT_HEIGHT);
                 elkTopPort.setIdentifier(portInstName);
                 elkTopPort.setParent(parent);
                 parent.getChildren().add(elkTopPort);
