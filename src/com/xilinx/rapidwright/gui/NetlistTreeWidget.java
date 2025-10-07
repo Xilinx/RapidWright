@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.gui;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 
 import com.trolltech.qt.core.QModelIndex;
@@ -44,6 +45,8 @@ public class NetlistTreeWidget extends QTreeWidget {
     private EDIFNetlist netlist;
 
     private QTreeWidgetItem rootItem;
+
+    private HashMap<String, HierCellInstTreeWidgetItem> instLookup = new HashMap<>();
 
     private static final String DUMMY = "_*DUMMY*_";
 
@@ -116,6 +119,7 @@ public class NetlistTreeWidget extends QTreeWidget {
             HierCellInstTreeWidgetItem cellInst = new HierCellInstTreeWidgetItem(curr);
             cellInst.setText(0, i.getInst().getName() + " (" + i.getCellName() + ")");
             cellInst.setInst(i);
+            instLookup.put(i.toString(), cellInst);
             QTreeWidgetItem dummy = new QTreeWidgetItem(cellInst);
             dummy.setText(0, DUMMY);
         }
@@ -144,4 +148,13 @@ public class NetlistTreeWidget extends QTreeWidget {
     public QTreeWidgetItem getRootItem() {
         return rootItem;
     }
+
+    public QTreeWidgetItem getItemFromIndex(QModelIndex index) {
+        return this.itemFromIndex(index);
+    }
+
+    public HierCellInstTreeWidgetItem getItemByHierInstName(String name) {
+        return instLookup.get(name);
+    }
+
 }
