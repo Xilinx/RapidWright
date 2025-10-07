@@ -37,9 +37,14 @@ import java.util.Map.Entry;
 
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 
 import com.xilinx.rapidwright.design.tools.InlineFlopTools;
+import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFPort;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -511,10 +516,37 @@ public class PerformanceExplorer {
 
             if (ensureExternalRoutability()) {
                 InlineFlopTools.removeInlineFlops(d);
+                unrouteNetsThatLeavePBlock(d, getPBlock(pblockNum));
             }
 
             EDIFTools.ensurePreservedInterfaceVivado(d.getNetlist());
             d.writeCheckpoint(runDirectory + File.separator + pblock + "_best.dcp");
+        }
+    }
+
+    public void unrouteNetsThatLeavePBlock(Design d, PBlock pBlock) {
+        for (EDIFPort p : d.getNetlist().getTopCell().getPorts()) {
+            int[] indices = p.isBus() ? p.getBitBlastedIndicies() : new int[]{0};
+            for (int i : indices) {
+                EDIFPortInst portInst = p.getInternalPortInstFromIndex(i);
+                if (portInst == null) {
+                    continue;
+                }
+                EDIFHierNet hierNet = new EDIFHierNet(d.getNetlist().getTopHierCellInst(), portInst.getNet());
+                EDIFHierNet parentNet = d.getNetlist().getParentNet(hierNet);
+                Net net = d.getNet(parentNet.getHierarchicalNetName());
+
+                boolean leavesPBlock = false;
+                for (PIP pip : net.getPIPs()) {
+                    if (!pBlock.containsTile(pip.getTile())) {
+                        leavesPBlock = true;
+                        break;
+                    }
+                }
+                if (leavesPBlock) {
+                    net.unroute();
+                }
+            }
         }
     }
 
@@ -581,7 +613,6 @@ public class PerformanceExplorer {
         }
         return;
     }
-
 
     public static String printNS(double num) {
         return df.format(num);

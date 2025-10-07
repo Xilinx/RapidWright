@@ -1799,19 +1799,4 @@ public class EDIFTools {
             }
         }
     }
-
-    public static void removeVivadoBusPreventionAnnotations(EDIFNetlist netlist) {
-        EDIFCell top = netlist.getTopCell();
-        for (EDIFCell cell : netlist.getLibrary(top.getLibrary().getName()).getCells()) {
-            List<String> portsToRename = new ArrayList<>();
-            for (EDIFPort p : cell.getPorts()) {
-                if (p.getName().startsWith("[]")) {
-                    portsToRename.add(p.getName());
-                }
-            }
-            for (String p : portsToRename) {
-                cell.renamePort(p, p.substring(2));
-            }
-        }
-    }
 }
