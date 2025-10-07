@@ -28,7 +28,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeMap;
 
 import org.eclipse.elk.core.IGraphLayoutEngine;
 import org.eclipse.elk.core.RecursiveGraphLayoutEngine;
@@ -92,7 +94,7 @@ public class SchematicScene extends QGraphicsScene {
 
     private static QFontMetrics fm = new QFontMetrics(FONT);
     private static QBrush canvasBackgroundBrush = new QBrush(QColor.white);
-    private static final QBrush PORT_BRUSH = BLACK_BRUSH;
+    private static final QBrush PORT_BRUSH = new QBrush(QColor.white);
     private static final QPen PORT_PEN = BLACK_PEN;
     private static final QPen NET_PEN = new QPen(new QColor(91, 203, 75));
     private static final QPen NET_CLICK_PEN = CLICK_PEN;
@@ -391,7 +393,7 @@ public class SchematicScene extends QGraphicsScene {
         double y = portY + (height - TOP_PORT_HEIGHT - PORT_MARGIN) / 2.0;
 
         QPolygonF portShape = new QPolygonF();
-        double pointDist = TOP_PORT_HEIGHT * 0.3; // Pointy part of the port
+        double pointDist = TOP_PORT_HEIGHT * 0.2; // Pointy part of the port
 
         if (isOutput) {
             // Point to the left
@@ -399,14 +401,14 @@ public class SchematicScene extends QGraphicsScene {
             portShape.add(new QPointF(x + TOP_PORT_WIDTH, y));
             portShape.add(new QPointF(x + TOP_PORT_WIDTH, y + TOP_PORT_HEIGHT));
             portShape.add(new QPointF(x + pointDist, y + TOP_PORT_HEIGHT));
-            portShape.add(new QPointF(x + pointDist, y + (TOP_PORT_HEIGHT / 2)));
+            portShape.add(new QPointF(x - pointDist, y + (TOP_PORT_HEIGHT / 2)));
         } else {
             // Input points to the right
             portShape.add(new QPointF(x, y));
             portShape.add(new QPointF(x + TOP_PORT_WIDTH - pointDist, y));
-            portShape.add(new QPointF(x + TOP_PORT_WIDTH, y + (TOP_PORT_HEIGHT / 2)));
+            portShape.add(new QPointF(x + TOP_PORT_WIDTH + pointDist, y + (TOP_PORT_HEIGHT / 2)));
             portShape.add(new QPointF(x + TOP_PORT_WIDTH - pointDist, y + TOP_PORT_HEIGHT));
-            portShape.add(new QPointF(x, y + (TOP_PORT_HEIGHT / 2)));
+            portShape.add(new QPointF(x, y + TOP_PORT_HEIGHT));
         }
 
         return portShape;
@@ -425,6 +427,14 @@ public class SchematicScene extends QGraphicsScene {
                 elkTopPort.setIdentifier(portInstName);
                 elkTopPort.setParent(parent);
                 parent.getChildren().add(elkTopPort);
+                ElkPort topElkPort = f.createElkPort();
+                topElkPort.setParent(elkTopPort);
+                topElkPort.setIdentifier(portInstName);
+                topElkPort.setProperty(CoreOptions.PORT_SIDE, topPort.isOutput() ? PortSide.EAST : PortSide.WEST);
+                topElkPort.setProperty(CoreOptions.PORT_INDEX, 1);
+                topElkPort.setDimensions(PORT_SIZE, PORT_SIZE);
+                portInstMap.put(portInst, topElkPort);
+                elkTopPort.getPorts().add(topElkPort);
             }
         }
 
@@ -445,35 +455,22 @@ public class SchematicScene extends QGraphicsScene {
             labelElkNode(elkInst, inst.getCellName());
 
             // Create ports
-            List<String> westPorts = new ArrayList<>();
-            List<String> eastPorts = new ArrayList<>();
+            Map<String, EDIFPortInst> westPorts = new TreeMap<>();
+            Map<String, EDIFPortInst> eastPorts = new TreeMap<>();
             double longestWestName = 0;
             double longestEastName = 0;
             for (EDIFPort port : inst.getCellPorts()) {
-                if (port.isBus()) {
-                    for (int i : port.getBitBlastedIndicies()) {
-                        String name = port.getPortInstNameFromPort(i);
-                        if (port.isInput()) {
-                            westPorts.add(name);
-                            longestWestName = Math.max(longestWestName, fm.width(name));
-                        } else {
-                            eastPorts.add(name);
-                            longestEastName = Math.max(longestEastName, fm.width(name));
-                        }
-                    }
-                } else {
-                    String name = port.getPortInstNameFromPort(0);
+                for (int i : port.isBus() ? port.getBitBlastedIndicies() : new int[] { 0 }) {
+                    String name = port.getPortInstNameFromPort(i);
                     if (port.isInput()) {
-                        westPorts.add(name);
+                        westPorts.put(name, inst.getPortInst(name));
                         longestWestName = Math.max(longestWestName, fm.width(name));
                     } else {
-                        eastPorts.add(name);
+                        eastPorts.put(name, inst.getPortInst(name));
                         longestEastName = Math.max(longestEastName, fm.width(name));
                     }
                 }
             }
-            Collections.sort(westPorts);
-            Collections.sort(eastPorts);
 
             int portStartIndex = 0;
             portStartIndex = createElkPorts(portStartIndex, isHierCell, elkInst, westPorts, PortSide.WEST);
@@ -512,14 +509,13 @@ public class SchematicScene extends QGraphicsScene {
                     ElkPort sink = getOrCreateElkPort(s, prefix, instNodeMap);
                     if (driver == null || sink == null)
                         continue;
-                    if (driver.getParent() == parent && sink.getParent() == parent) {
-                        ElkEdge edge = ElkGraphFactory.eINSTANCE.createElkEdge();
-                        edge.setContainingNode(parent);
-                        edge.setIdentifier(prefix + net.getName());
-                        edge.getSources().add(driver);
-                        edge.getTargets().add(sink);
-                        parent.getContainedEdges().add(edge);                        
-                    }
+
+                    ElkEdge edge = ElkGraphFactory.eINSTANCE.createElkEdge();
+                    edge.setContainingNode(parent);
+                    edge.setIdentifier(prefix + net.getName());
+                    edge.getSources().add(driver);
+                    edge.getTargets().add(sink);
+                    parent.getContainedEdges().add(edge);
                 }
             }
         }
@@ -545,19 +541,20 @@ public class SchematicScene extends QGraphicsScene {
         return port;
     }
 
-    private int createElkPorts(int startIdx, boolean isHierCell, ElkNode parent, List<String> portNames,
+    private int createElkPorts(int startIdx, boolean isHierCell, ElkNode parent, Map<String, EDIFPortInst> portNames,
             PortSide side) {
-        for (String name : portNames) {
+        for (Entry<String, EDIFPortInst> e : portNames.entrySet()) {
             ElkPort port = ElkGraphFactory.eINSTANCE.createElkPort();
+            portInstMap.put(e.getValue(), port);
             port.setParent(parent);
             parent.getPorts().add(port);
-            port.setIdentifier(name);
+            port.setIdentifier(e.getKey());
             port.setProperty(CoreOptions.PORT_SIDE, side);
             port.setProperty(CoreOptions.PORT_INDEX, startIdx++);
             port.setDimensions(PORT_SIZE, PORT_SIZE);
 
             if (isHierCell) {
-                labelElkNode(port, name);
+                labelElkNode(port, e.getKey());
             }
 
         }
