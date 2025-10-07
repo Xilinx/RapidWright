@@ -165,7 +165,7 @@ public class SchematicScene extends QGraphicsScene {
 
         setSceneRect(new QRectF(new QPointF(0, 0), size));
 
-        // Top ports are treated as ElkNodes
+        // We create arrow-shaped top port ElkNodes to serve as targets for top ports
         for (ElkNode topPort : elkRoot.getChildren()) {
             EDIFPortInst portInst = elkNodeTopPortMap.get(topPort);
             if (portInst != null) {
@@ -178,12 +178,19 @@ public class SchematicScene extends QGraphicsScene {
                 lookupMap.computeIfAbsent(lookup, l -> new ArrayList<>()).add(port);
 
                 QGraphicsSimpleTextItem portLabel = addSimpleText(portInst.getName());
-                portLabel.setBrush(PORT_BRUSH);
+                portLabel.setBrush(BLACK_BRUSH);
                 portLabel.setFont(FONT);
                 double portShapeX = topPort.getX() + (topPort.getWidth() - TOP_PORT_WIDTH) / 2.0;
                 double portShapeY = topPort.getY() + (topPort.getHeight() - TOP_PORT_HEIGHT) / 2.0;
-                double labelX = portShapeX + (TOP_PORT_WIDTH - portLabel.boundingRect().width()) / 2.0;
-                double labelY = portShapeY + TOP_PORT_HEIGHT + PORT_LABEL_SPACING;
+                double labelX = portShapeX;
+                if (portInst.isOutput()) {
+                    // Position label to the right of top ports
+                    labelX += TOP_PORT_WIDTH + PORT_LABEL_SPACING;
+                } else {
+                    // To the left for inputs
+                    labelX -= portLabel.boundingRect().width() + PORT_LABEL_SPACING;
+                }
+                double labelY = portShapeY + (TOP_PORT_HEIGHT - portLabel.boundingRect().height()) / 2.0;
                 portLabel.setPos(labelX, labelY);
                 portLabel.setZValue(4);
             }
