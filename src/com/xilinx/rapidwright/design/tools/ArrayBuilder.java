@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -62,7 +63,6 @@ import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -142,6 +142,8 @@ public class ArrayBuilder {
     private String outputPlacementLocsFileName;
 
     private boolean outOfContext;
+
+    private ArrayNetlistGraph condensedGraph;
 
     public static final double DEFAULT_CLK_PERIOD_TARGET = 2.0;
 
@@ -298,6 +300,14 @@ public class ArrayBuilder {
 
     public void setOutOfContext(boolean outOfContext) {
         this.outOfContext = outOfContext;
+    }
+
+    public ArrayNetlistGraph getCondensedGraph() {
+        return condensedGraph;
+    }
+
+    public void setCondensedGraph(ArrayNetlistGraph condensedGraph) {
+        this.condensedGraph = condensedGraph;
     }
 
     private void initializeArrayBuilder(OptionSet options) {
@@ -625,6 +635,13 @@ public class ArrayBuilder {
             // Find instances in existing design
             modInstNames = getMatchingModuleInstanceNames(modules.get(0), array);
             ab.setInstCountLimit(modInstNames.size());
+            ab.setCondensedGraph(new ArrayNetlistGraph(array, modInstNames));
+//            System.out.println(ab.getCondensedGraph());
+            for (Iterator<String> it = ab.getCondensedGraph().getTopologicalOrderIterator(); it.hasNext(); ) {
+                String s = it.next();
+                System.out.println(s);
+            }
+            System.exit(0);
         }
 
         if (ab.getOutputPlacementLocsFileName() != null) {
