@@ -38,6 +38,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -624,26 +625,35 @@ public class ArrayBuilder {
             }
             modules.add(m);
         }
-        t.stop().start("Place Instances");
 
         Design array = null;
         List<String> modInstNames = null;
+        List<Pair<Pair<Integer, Integer>, String>> idealPlacementList = null;
         if (ab.getTopDesign() == null) {
             array = new Design("array", ab.getKernelDesign().getPartName());
         } else {
             array = ab.getTopDesign();
+            t.stop().start("Calculate ideal array placement");
             // Find instances in existing design
             modInstNames = getMatchingModuleInstanceNames(modules.get(0), array);
             ab.setInstCountLimit(modInstNames.size());
             ab.setCondensedGraph(new ArrayNetlistGraph(array, modInstNames));
-//            System.out.println(ab.getCondensedGraph());
-            for (Iterator<String> it = ab.getCondensedGraph().getTopologicalOrderIterator(); it.hasNext(); ) {
-                String s = it.next();
-                System.out.println(s);
-            }
-            System.exit(0);
+            Map<Pair<Integer, Integer>, String> idealPlacement = ab.getCondensedGraph().getOptimalPlacementGrid(6, 6);
+            idealPlacementList = idealPlacement.entrySet().stream()
+                    .map((e) -> new Pair<>(e.getKey(), e.getValue()))
+                    .sorted((p1, p2) -> {
+                        Pair<Integer, Integer> pa = p1.getFirst();
+                        Pair<Integer, Integer> pb = p2.getFirst();
+                        if (!Objects.equals(pa.getSecond(), pb.getSecond())) {
+                            return pa.getSecond().compareTo(pb.getSecond());
+                        }
+
+                        return pa.getFirst().compareTo(pb.getFirst());
+                    })
+                    .collect(Collectors.toList());
         }
 
+        t.stop().start("Place Instances");
         if (ab.getOutputPlacementLocsFileName() != null) {
             writePlacementLocsToFile(modules, ab.getOutputPlacementLocsFileName());
         }
@@ -695,10 +705,12 @@ public class ArrayBuilder {
         } else {
             ModuleInst curr = null;
             int i = 0;
+            int lastYCoordinate = 0;
             outer: for (Module module : modules) {
                 for (Site anchor : module.getAllValidPlacements()) {
                     if (curr == null) {
-                        String instName = modInstNames == null ? ("inst_" + i) : modInstNames.get(i);
+                        String instName = modInstNames == null ? ("inst_" + i) : idealPlacementList.get(i).getSecond();
+                        lastYCoordinate = idealPlacementList.get(i).getFirst().getSecond();
                         curr = array.createModuleInst(instName, module);
                         i++;
                     }
@@ -786,9 +798,13 @@ public class ArrayBuilder {
         }
 
         Net gndNet = array.getNet(Net.GND_NET);
-        gndNet.unroute();
+        if (gndNet != null) {
+            gndNet.unroute();
+        }
         Net vccNet = array.getNet(Net.VCC_NET);
-        vccNet.unroute();
+        if (vccNet != null) {
+            vccNet.unroute();
+        }
         array.getNetlist().consolidateAllToWorkLibrary();
 
         if (ab.getOutOfContext()) {
