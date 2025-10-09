@@ -2033,13 +2033,11 @@ public class EDIFNetlist extends EDIFName {
             }
 
             for (EDIFCell cell : lib.getCells()) {
-                if (cell.isLeafCellOrBlackBox()) {
-                    for (EDIFCellInst inst : cell.getCellInsts()) {
-                        if (inst.getCellType().getLibrary() == external) {
-                            EDIFCell origBB = externalMappings.get(inst.getCellType());
-                            assert (origBB != null);
-                            inst.setCellType(origBB);
-                        }
+                for (EDIFCellInst inst : cell.getCellInsts()) {
+                    if (inst.getCellType().getLibrary() == external) {
+                        EDIFCell origBB = externalMappings.get(inst.getCellType());
+                        assert (origBB != null);
+                        inst.setCellType(origBB);
                     }
                 }
             }
