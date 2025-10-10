@@ -542,7 +542,8 @@ public class ArrayBuilder {
         };
         for (Module module : modules) {
             lines.add(module.getName() + ":");
-            List<Site> validPlacements = module.getAllValidPlacements().stream().sorted(comparator).collect(Collectors.toList());
+            List<Site> validPlacements = module.getAllValidPlacements().stream().sorted(comparator)
+                    .collect(Collectors.toList());
             for (Site anchor : validPlacements) {
                 lines.add(anchor.getName());
             }
@@ -705,35 +706,48 @@ public class ArrayBuilder {
         } else {
             ModuleInst curr = null;
             int i = 0;
+
+            // TODO: Figure out how to handle placement for multiple modules
+            Module module = modules.get(0);
+            List<List<Site>> validPlacementGrid = module.getValidPlacementGrid();
+            int gridX = 0;
+            int gridY = 0;
             int lastYCoordinate = 0;
-            outer: for (Module module : modules) {
-                for (Site anchor : module.getAllValidPlacements()) {
-                    if (curr == null) {
-                        String instName = modInstNames == null ? ("inst_" + i) : idealPlacementList.get(i).getSecond();
-                        lastYCoordinate = idealPlacementList.get(i).getFirst().getSecond();
-                        curr = array.createModuleInst(instName, module);
-                        i++;
+            boolean searchDown = false;
+            while (placed < ab.getInstCountLimit()) {
+                if (curr == null) {
+                    String instName = modInstNames == null ? ("inst_" + i) : idealPlacementList.get(i).getSecond();
+                    int yCoordinate = idealPlacementList.get(i).getFirst().getSecond();
+                    if (yCoordinate > lastYCoordinate) {
+                        gridX = 0;
+                        searchDown = true;
                     }
-                    if (curr.place(anchor, true, false)) {
-                        if (straddlesClockRegion(curr)) {
-                            curr.unplace();
-                            continue;
-                        }
-
-                        List<Net> overlapping = NetTools.getNetsWithOverlappingNodes(array);
-                        if (!overlapping.isEmpty()) {
-                            curr.unplace();
-                            continue;
-                        }
-
+                    lastYCoordinate = yCoordinate;
+                    curr = array.createModuleInst(instName, module);
+                    i++;
+                }
+                if (gridY >= validPlacementGrid.size()) {
+                    throw new RuntimeException("Optimal placement is too tall for device");
+                }
+                if (gridX >= validPlacementGrid.get(gridY).size()) {
+                    throw new RuntimeException("Optimal placement is too wide for device");
+                }
+                Site anchor = validPlacementGrid.get(gridY).get(gridX);
+                if (curr.place(anchor, true, false)) {
+                    if (straddlesClockRegion(curr) || !NetTools.getNetsWithOverlappingNodes(array).isEmpty()) {
+                        curr.unplace();
+                    } else {
                         placed++;
                         newPlacementMap.put(curr, anchor);
                         System.out.println("  ** PLACED: " + placed + " " + anchor + " " + curr.getName());
                         curr = null;
-                        if (placed >= ab.getInstCountLimit()) {
-                            break outer;
-                        }
+                        searchDown = false;
                     }
+                }
+                if (!searchDown) {
+                    gridX++;
+                } else {
+                    gridY++;
                 }
             }
         }
@@ -877,7 +891,8 @@ public class ArrayBuilder {
     private static int getRCLKRowIndex(ClockRegion cr) {
         Tile center = cr.getApproximateCenter();
         int searchGridDim = 0;
-        outer: while (!center.getName().startsWith("RCLK_")) {
+        outer:
+        while (!center.getName().startsWith("RCLK_")) {
             searchGridDim++;
             for (int row = -searchGridDim; row < searchGridDim; row++) {
                 for (int col = -searchGridDim; col < searchGridDim; col++) {

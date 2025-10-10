@@ -174,6 +174,43 @@ public class InlineFlopTools {
         return allLeavesAreIBUF;
     }
 
+    private static Site getSiteOnPBlockEdgeClosestToSite(Device device, Site site, PBlock pblock) {
+        Tile topLeftTile = pblock.getTopLeftTile();
+        Tile bottomRightTile = pblock.getBottomRightTile();
+        Tile siteTile = site.getTile();
+        int pBlockTop = topLeftTile.getRow();
+        int pBlockLeft = topLeftTile.getColumn();
+        int pBlockRight = bottomRightTile.getColumn();
+        int pBlockBottom = bottomRightTile.getRow();
+        int siteTileCol = siteTile.getColumn();
+        int siteTileRow = siteTile.getRow();
+        int topDist = siteTileRow - pBlockTop;
+        int bottomDist = pBlockBottom - siteTileRow;
+        int leftDist = siteTileCol - pBlockLeft;
+        int rightDist = pBlockRight - siteTileCol;
+
+        Tile shiftedTile = null;
+        if (topDist <= leftDist && topDist <= rightDist && topDist <= bottomDist) {
+            // Shift tile up
+            shiftedTile = device.getTile(pBlockTop, siteTileCol);
+        } else if (leftDist <= topDist && leftDist <= rightDist && leftDist <= bottomDist) {
+            // Shift tile left
+            shiftedTile = device.getTile(siteTileRow, pBlockLeft);
+        } else if (rightDist <= topDist && rightDist <= leftDist && rightDist <= bottomDist) {
+            // Shift tile right
+            shiftedTile = device.getTile(siteTileRow, pBlockRight);
+        } else {
+            // Shift tile down
+            shiftedTile = device.getTile(pBlockBottom, siteTileCol);
+        }
+        Site shiftedSite = site.getCorrespondingSite(site.getSiteTypeEnum(), shiftedTile);
+        if (shiftedSite == null) {
+            throw new RuntimeException("Cannot find shifted site type for flop placement");
+        }
+
+        return site;
+    }
+
     private static void netCentroidFlipFlopPlacement(Design design, EDIFPortInst inst, PBlock keepOut, EDIFHierNet clk,
                                                      Set<SiteInst> siteInstsToRoute) {
         EDIFHierCellInst topInst = design.getNetlist().getTopHierCellInst();
@@ -192,7 +229,8 @@ public class InlineFlopTools {
         if (!points.isEmpty()) {
             Site centroid = ECOPlacementHelper.getCentroidOfPoints(design.getDevice(), points,
                     VALID_CENTROID_SITE_TYPES);
-            Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(centroid, keepOut, true).iterator();
+            Site shiftedCentroid = getSiteOnPBlockEdgeClosestToSite(design.getDevice(), centroid, keepOut);
+            Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(shiftedCentroid, keepOut, true).iterator();
             siteItr.next();
             Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr);
             Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
