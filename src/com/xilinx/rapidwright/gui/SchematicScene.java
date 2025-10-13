@@ -270,7 +270,7 @@ public class SchematicScene extends QGraphicsScene {
                 
                 if (!isLeaf) {
                     labelX += side == PortSide.EAST ? child.getWidth() + LABEL_BUFFER : - textWidth - LABEL_BUFFER;
-                    labelY += y - textHeight - 2*LABEL_BUFFER;
+                    labelY = y - textHeight + LABEL_BUFFER;
                 } else {
                     labelX += side == PortSide.EAST ? child.getWidth() - textWidth - 2*LABEL_BUFFER : 2*LABEL_BUFFER;
                     labelY = y - textHeight / 2.0;
