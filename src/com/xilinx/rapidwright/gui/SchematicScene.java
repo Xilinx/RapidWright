@@ -72,6 +72,7 @@ import com.trolltech.qt.gui.QPen;
 import com.trolltech.qt.gui.QPolygonF;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -81,13 +82,13 @@ public class SchematicScene extends QGraphicsScene {
 
     private EDIFNetlist netlist;
 
-    private EDIFCell currCell;
+    private EDIFHierCellInst currCellInst;
 
     private ElkNode elkRoot;
 
     private Map<EDIFPortInst, ElkPort> portInstMap = new HashMap<>();
     private Map<ElkNode, EDIFPortInst> elkNodeTopPortMap = new HashMap<>();
-    private Map<ElkNode, EDIFCell> elkNodeCellMap = new HashMap<>();
+    private Map<ElkNode, EDIFHierCellInst> elkNodeCellMap = new HashMap<>();
     private Map<String, List<Object>> lookupMap = new HashMap<>();
     private Set<String> expandedCellInsts = new HashSet<>();
 
@@ -146,9 +147,9 @@ public class SchematicScene extends QGraphicsScene {
         setBackgroundBrush(canvasBackgroundBrush);
     }
 
-    private ElkNode createElkRoot(EDIFCell cell) {
+    private ElkNode createElkRoot(EDIFHierCellInst cellInst) {
         ElkNode root = ElkGraphFactory.eINSTANCE.createElkNode();
-        root.setIdentifier(cell.getName());
+        root.setIdentifier(cellInst.toString());
         applyElkNodeProperties(root);
         return root;
     }
@@ -159,12 +160,16 @@ public class SchematicScene extends QGraphicsScene {
         root.setProperty(CoreOptions.SPACING_EDGE_NODE, EDGE_TO_NODE_SPACING);
     }
 
-    public void drawCell(EDIFCell cell) {
+    public void drawCell(EDIFHierCellInst cellInst) {
         clear();
-        this.currCell = cell;
-        elkRoot = createElkRoot(cell);
-        populateCellContent(cell, elkRoot, "");
-        elkNodeCellMap.put(elkRoot, cell);
+        portInstMap.clear();
+        elkNodeTopPortMap.clear();
+        elkNodeCellMap.clear();
+        lookupMap.clear();
+        this.currCellInst = cellInst;
+        elkRoot = createElkRoot(cellInst);
+        populateCellContent(cellInst, elkRoot, "");
+        elkNodeCellMap.put(elkRoot, cellInst);
 
         IGraphLayoutEngine engine = new RecursiveGraphLayoutEngine();
         IElkProgressMonitor monitor = new BasicProgressMonitor();
@@ -216,13 +221,18 @@ public class SchematicScene extends QGraphicsScene {
     }
 
     private void renderNode(ElkNode parent, double xOffset, double yOffset) {
-        EDIFCell cell = elkNodeCellMap.get(parent);
+        EDIFCell cell = elkNodeCellMap.get(parent).getCellType();
         for (ElkNode child : parent.getChildren()) {
             if (elkNodeTopPortMap.containsKey(child)) {
                 // Rendered in renderSchematic()
                 continue;
             }
-            EDIFCellInst eci = cell.getCellInst(child.getIdentifier());
+            String relCellInstName = child.getIdentifier();
+            if (relCellInstName.startsWith(parent.getIdentifier())) {
+                // Remove hierarchical reference
+                relCellInstName = relCellInstName.substring(parent.getIdentifier().length() + 1);
+            }
+            EDIFCellInst eci = cell.getCellInst(relCellInstName);
 
             boolean isLeaf = true;
             String cellInstName = elkRoot.equals(parent) ? (eci != null ? eci.getName() : "") : child.getIdentifier();
@@ -452,8 +462,9 @@ public class SchematicScene extends QGraphicsScene {
         return portShape;
     }
 
-    private void populateCellContent(EDIFCell cell, ElkNode parent, String prefix) {
+    private void populateCellContent(EDIFHierCellInst cellInst, ElkNode parent, String prefix) {
         ElkGraphFactory f = ElkGraphFactory.eINSTANCE;
+        EDIFCell cell = cellInst.getCellType();
 
         // Only create top level port shapes if this is the top cell
         if (prefix.isEmpty()) {
@@ -490,7 +501,8 @@ public class SchematicScene extends QGraphicsScene {
             elkInst.setIdentifier(prefix + inst.getName());
             elkInst.setProperty(CoreOptions.PORT_CONSTRAINTS, PortConstraints.FIXED_ORDER);
             instNodeMap.put(inst, elkInst);
-            elkNodeCellMap.put(elkInst, inst.getCellType());
+            EDIFHierCellInst childInst = cellInst.getChild(inst);
+            elkNodeCellMap.put(elkInst, childInst);
 
             boolean isHierCell = !inst.getCellType().isLeafCellOrBlackBox();
 
@@ -537,7 +549,7 @@ public class SchematicScene extends QGraphicsScene {
                         SIDE_PADDING // Side
                 ));
                 createExpandedCellInnerPorts(inst);
-                populateCellContent(inst.getCellType(), elkInst, prefix + inst.getName() + "/");
+                populateCellContent(childInst, elkInst, prefix + inst.getName() + "/");
             }
         }
 
@@ -659,6 +671,6 @@ public class SchematicScene extends QGraphicsScene {
         } else {
             expandedCellInsts.add(cellInstName);
         }
-        drawCell(currCell);
+        drawCell(currCellInst);
     }
 }

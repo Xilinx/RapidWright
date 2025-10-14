@@ -33,6 +33,8 @@ import com.trolltech.qt.gui.QTreeWidgetItem;
 import com.trolltech.qt.gui.QWidget;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
 
@@ -115,8 +117,8 @@ public class NetlistBrowser extends QMainWindow {
     public void selectNetlistItem(QModelIndex index) {
         QTreeWidgetItem item = treeWidget.getItemFromIndex(index);
         if (item instanceof HierCellInstTreeWidgetItem) {
-            EDIFCell cell = ((HierCellInstTreeWidgetItem) item).getInst().getCellType();
-            schematicScene.drawCell(cell);
+            EDIFHierCellInst cellInst = ((HierCellInstTreeWidgetItem) item).getInst();
+            schematicScene.drawCell(cellInst);
         }
     }
 
