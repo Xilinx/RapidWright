@@ -35,6 +35,7 @@ import java.util.TreeMap;
 
 import org.eclipse.elk.core.IGraphLayoutEngine;
 import org.eclipse.elk.core.RecursiveGraphLayoutEngine;
+import org.eclipse.elk.core.math.ElkPadding;
 import org.eclipse.elk.core.options.CoreOptions;
 import org.eclipse.elk.core.options.NodeLabelPlacement;
 import org.eclipse.elk.core.options.PortConstraints;
@@ -125,6 +126,11 @@ public class SchematicScene extends QGraphicsScene {
     private static final double TOP_PORT_HEIGHT = 14.0;
     private static final double PORT_LABEL_SPACING = 4.0;
 
+    private static final double NODE_TO_NODE_SPACING = 40.0;
+    private static final double EDGE_TO_NODE_SPACING = 20.0;
+    private static final double SIDE_PADDING = 10.0;
+
+
     private static final double POINT_DIST = TOP_PORT_HEIGHT * 0.2; // Pointy part of the port
 
     private static final double BUTTON_SIZE = 16.0;
@@ -143,9 +149,14 @@ public class SchematicScene extends QGraphicsScene {
     private ElkNode createElkRoot(EDIFCell cell) {
         ElkNode root = ElkGraphFactory.eINSTANCE.createElkNode();
         root.setIdentifier(cell.getName());
-        root.setProperty(CoreOptions.ALGORITHM, "org.eclipse.elk.layered");
-
+        applyElkNodeProperties(root);
         return root;
+    }
+
+    private void applyElkNodeProperties(ElkNode root) {
+        root.setProperty(CoreOptions.ALGORITHM, "org.eclipse.elk.layered");
+        root.setProperty(CoreOptions.SPACING_NODE_NODE, NODE_TO_NODE_SPACING);
+        root.setProperty(CoreOptions.SPACING_EDGE_NODE, EDGE_TO_NODE_SPACING);
     }
 
     public void drawCell(EDIFCell cell) {
@@ -517,6 +528,14 @@ public class SchematicScene extends QGraphicsScene {
             elkInst.setDimensions(width, height);
 
             if (isHierCell && expandedCellInsts.contains(prefix + inst.getName())) {
+                applyElkNodeProperties(elkInst);
+                // Extra spacing for button placement
+                elkInst.setProperty(CoreOptions.PADDING, new ElkPadding(
+                        BUTTON_SIZE * 2, // Top
+                        SIDE_PADDING, // Side
+                        fm.height() + LABEL_BUFFER * 2, // Bottom
+                        SIDE_PADDING // Side
+                ));
                 createExpandedCellInnerPorts(inst);
                 populateCellContent(inst.getCellType(), elkInst, prefix + inst.getName() + "/");
             }
