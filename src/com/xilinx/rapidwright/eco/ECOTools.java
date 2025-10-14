@@ -121,6 +121,8 @@ public class ECOTools {
     public static void disconnectNet(Design design,
                                      List<EDIFHierPortInst> pins,
                                      Map<Net, Set<SitePinInst>> deferredRemovals) {
+        List<Pair<EDIFHierPortInst,SitePinInst>> deferredIntraSiteUnrouting = new ArrayList<>();
+
         for (EDIFHierPortInst ehpi : pins) {
             EDIFHierNet ehn = ehpi.getHierarchicalNet();
             List<EDIFHierPortInst> leafPortInsts;
@@ -196,11 +198,10 @@ public class ECOTools {
                         // SPI also services a different logical port inst; skip
                         continue;
                     }
-                    BELPin otherPin = cell.getBELPin(leafEhpi);
-                    BELPin src = otherPin.isOutput() ? otherPin : spi.getBELPin();
-                    BELPin snk = otherPin.isOutput() ? spi.getBELPin() : otherPin;
 
-                    cell.getSiteInst().unrouteIntraSiteNet(src, snk);
+                    // Defer all removals until after all checks, since DesignTools.getPortInstsFromSitePinInst()
+                    // above requires site routing
+                    deferredIntraSiteUnrouting.add(new Pair<>(leafEhpi, spi));
                     DesignTools.handlePinRemovals(spi, deferredRemovals);
                 }
             }
@@ -209,6 +210,20 @@ public class ECOTools {
             // Detach from net, but do not detach from cell instance since
             // typically we would want to connect it to another net
             en.removePortInst(ehpi.getPortInst());
+        }
+
+        // Perform all deferred intra-site unrouting here
+        for (Pair<EDIFHierPortInst,SitePinInst> p : deferredIntraSiteUnrouting) {
+            EDIFHierPortInst leafEhpi = p.getFirst();
+            SitePinInst spi = p.getSecond();
+
+            Cell cell = leafEhpi.getPhysicalCell(design);
+            BELPin otherPin = cell.getBELPin(leafEhpi);
+            BELPin src = otherPin.isOutput() ? otherPin : spi.getBELPin();
+            BELPin snk = otherPin.isOutput() ? spi.getBELPin() : otherPin;
+
+            cell.getSiteInst().unrouteIntraSiteNet(src, snk);
+
         }
     }
 
