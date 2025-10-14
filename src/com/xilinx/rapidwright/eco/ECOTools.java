@@ -460,7 +460,7 @@ public class ECOTools {
 
                         // Check that all port insts serviced by this SPI are on this net
                         List<EDIFHierPortInst> portInstsOnSpi = DesignTools.getPortInstsFromSitePinInst(spi, newPhysNet);
-                        assert (portInstsOnSpi.contains(ehpi));
+                        assert(portInstsOnSpi.contains(ehpi));
                         EDIFHierNet parentNet = sourceEhpi.getHierarchicalNet();
                         for (EDIFHierPortInst otherEhpi : portInstsOnSpi) {
                             if (otherEhpi.equals(ehpi)) {
