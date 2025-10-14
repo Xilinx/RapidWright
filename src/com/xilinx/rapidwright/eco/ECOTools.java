@@ -443,38 +443,9 @@ public class ECOTools {
                         if (spi == null) {
                             continue;
                         }
-                        // Check that all port insts serviced by this SPI are on this net
-                        List<EDIFHierPortInst> portInstsOnSpi = DesignTools.getPortInstsFromSitePinInst(spi);
-                        assert(portInstsOnSpi.contains(ehpi));
-                        EDIFHierNet parentNet = sourceEhpi.getHierarchicalNet();
-                        for (EDIFHierPortInst otherEhpi : portInstsOnSpi) {
-                            if (otherEhpi.equals(ehpi)) {
-                                continue;
-                            }
-                            // TODO: Use getLeafHierPortInst() to get parent net?
-                            EDIFHierNet otherParentNet = netlist.getParentNet(otherEhpi.getHierarchicalNet());
-                            if (!otherParentNet.equals(parentNet)) {
-                                // This SPI also services a different port inst that is connected to a
-                                // different net than the new one we're trying to connect up
-                                if (LUTTools.isCellALUT(cell)) {
-                                    // Check if we can map to a different physical pin
-                                    if (createExitSitePinInst(design, ehpi, newPhysNet) != null) {
-                                        continue nextLeafPin;
-                                    }
-                                }
-                                String message = "Site pin " + spi.getSitePinName() + " cannot be used " +
-                                        "to connect to logical pin '" + ehpi + "' since it is also connected to pin '" +
-                                        otherEhpi + "'.";
-                                String warnIfCellInstStartsWith = System.getProperty("rapidwright.ecotools.connectNet.warnIfCellInstStartsWith");
-                                String cellInstName = (warnIfCellInstStartsWith != null) ? otherEhpi.getPortInst().getCellInst().getName() : null;
-                                if (cellInstName != null && cellInstName.startsWith(warnIfCellInstStartsWith)) {
-                                    System.err.println("WARNING: " + message);
-                                } else {
-                                    throw new RuntimeException("ERROR: " + message);
-                                }
-                            }
-                        }
 
+                        // Move SPI from old net to new net, since DesignTools.getPortInstsFromSitePinInst() below
+                        // determines reachable EHPIs based on this net assignment
                         Net oldPhysNet = spi.getNet();
                         if (deferredRemovals != null) {
                             deferredRemovals.computeIfPresent(oldPhysNet, (k, v) -> {
@@ -507,6 +478,38 @@ public class ECOTools {
                             }
                             newPhysNet.addPin(spi);
                             spi.setRouted(false);
+                        }
+
+                        // Check that all port insts serviced by this SPI are on this net
+                        List<EDIFHierPortInst> portInstsOnSpi = DesignTools.getPortInstsFromSitePinInst(spi);
+                        assert (portInstsOnSpi.contains(ehpi));
+                        EDIFHierNet parentNet = sourceEhpi.getHierarchicalNet();
+                        for (EDIFHierPortInst otherEhpi : portInstsOnSpi) {
+                            if (otherEhpi.equals(ehpi)) {
+                                continue;
+                            }
+                            // TODO: Use getLeafHierPortInst() to get parent net?
+                            EDIFHierNet otherParentNet = netlist.getParentNet(otherEhpi.getHierarchicalNet());
+                            if (!otherParentNet.equals(parentNet)) {
+                                // This SPI also services a different port inst that is connected to a
+                                // different net than the new one we're trying to connect up
+                                if (LUTTools.isCellALUT(cell)) {
+                                    // Check if we can map to a different physical pin
+                                    if (createExitSitePinInst(design, ehpi, newPhysNet) != null) {
+                                        continue nextLeafPin;
+                                    }
+                                }
+                                String message = "Site pin " + spi.getSitePinName() + " cannot be used " +
+                                        "to connect to logical pin '" + ehpi + "' since it is also connected to pin '" +
+                                        otherEhpi + "'.";
+                                String warnIfCellInstStartsWith = System.getProperty("rapidwright.ecotools.connectNet.warnIfCellInstStartsWith");
+                                String cellInstName = (warnIfCellInstStartsWith != null) ? otherEhpi.getPortInst().getCellInst().getName() : null;
+                                if (cellInstName != null && cellInstName.startsWith(warnIfCellInstStartsWith)) {
+                                    System.err.println("WARNING: " + message);
+                                } else {
+                                    throw new RuntimeException("ERROR: " + message);
+                                }
+                            }
                         }
                     }
                 } else {
