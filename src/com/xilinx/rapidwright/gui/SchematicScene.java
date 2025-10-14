@@ -58,11 +58,13 @@ import com.trolltech.qt.gui.QBrush;
 import com.trolltech.qt.gui.QColor;
 import com.trolltech.qt.gui.QFont;
 import com.trolltech.qt.gui.QFontMetrics;
+import com.trolltech.qt.gui.QGraphicsItemInterface;
 import com.trolltech.qt.gui.QGraphicsLineItem;
 import com.trolltech.qt.gui.QGraphicsPathItem;
 import com.trolltech.qt.gui.QGraphicsPolygonItem;
 import com.trolltech.qt.gui.QGraphicsRectItem;
 import com.trolltech.qt.gui.QGraphicsScene;
+import com.trolltech.qt.gui.QGraphicsSceneMouseEvent;
 import com.trolltech.qt.gui.QGraphicsSimpleTextItem;
 import com.trolltech.qt.gui.QPainterPath;
 import com.trolltech.qt.gui.QPen;
@@ -86,6 +88,7 @@ public class SchematicScene extends QGraphicsScene {
     private Map<ElkNode, EDIFPortInst> elkNodeTopPortMap = new HashMap<>();
     private Map<ElkNode, EDIFCell> elkNodeCellMap = new HashMap<>();
     private Map<String, List<Object>> lookupMap = new HashMap<>();
+    private Set<String> expandedCellInsts = new HashSet<>();
 
     private static QFont FONT = new QFont("Arial", 8);
     private static QFont BUTTON_TEXT_FONT = new QFont("Arial", 10, QFont.Weight.Bold.value());
@@ -129,6 +132,7 @@ public class SchematicScene extends QGraphicsScene {
     private static final double LABEL_BUFFER = 2.0;
     private static final double PIN_LINE_LENGTH = 10.0;
 
+    private static final String HIER_BUTTON = "HIER_BUTTON";
 
     public SchematicScene(EDIFNetlist netlist) {
         super();
@@ -196,11 +200,11 @@ public class SchematicScene extends QGraphicsScene {
             }
         }
 
-        renderNode(elkRoot);
-        renderEdges(elkRoot);
+        renderNode(elkRoot, 0, 0);
+        renderEdges(elkRoot, 0, 0);
     }
 
-    private void renderNode(ElkNode parent) {
+    private void renderNode(ElkNode parent, double xOffset, double yOffset) {
         EDIFCell cell = elkNodeCellMap.get(parent);
         for (ElkNode child : parent.getChildren()) {
             if (elkNodeTopPortMap.containsKey(child)) {
@@ -210,26 +214,27 @@ public class SchematicScene extends QGraphicsScene {
             EDIFCellInst eci = cell.getCellInst(child.getIdentifier());
 
             boolean isLeaf = true;
-            boolean isExpanded = false;
+            String cellInstName = elkRoot.equals(parent) ? (eci != null ? eci.getName() : "") : child.getIdentifier();
+            boolean isExpanded = expandedCellInsts.contains(cellInstName);
             if (child.getChildren().size() > 0) {
                 isLeaf = false;
             } else if (eci != null && !eci.getCellType().isLeafCellOrBlackBox()) {
                 isLeaf = false;
             }
 
+            double x = xOffset + child.getX();
+            double y = yOffset + child.getY();
+
             if (isLeaf) {
-                addRect(child.getX(), child.getY(), child.getWidth(), child.getHeight(), CELL_PEN, CELL_BRUSH);
+                addRect(x, y, child.getWidth(), child.getHeight(), CELL_PEN, CELL_BRUSH);
             } else {
                 String expandedCellName = !elkRoot.equals(parent) ? child.getIdentifier() : eci.getName();
                 if (isExpanded) {
-                    // TODO
-                    addRect(child.getX(), child.getY(), child.getWidth(), child.getHeight(),
-                            EXPANDED_HIER_CELL_PEN, EXPANDED_HIER_CELL_BRUSH);
+                    addRect(x, y, child.getWidth(), child.getHeight(), EXPANDED_HIER_CELL_PEN, EXPANDED_HIER_CELL_BRUSH);
                 } else {
-                    addRect(child.getX(), child.getY(), child.getWidth(), child.getHeight(),
-                            HIER_CELL_PEN, HIER_CELL_BRUSH);
+                    addRect(x, y, child.getWidth(), child.getHeight(), HIER_CELL_PEN, HIER_CELL_BRUSH);
                 }
-                createHierButton(child, isExpanded, expandedCellName);
+                createHierButton(child, isExpanded, expandedCellName, xOffset, yOffset);
             }
 
 
@@ -240,8 +245,8 @@ public class SchematicScene extends QGraphicsScene {
             QGraphicsSimpleTextItem instLabel = addSimpleText(instNameLabel.getText());
             instLabel.setBrush(BLACK_BRUSH);
             instLabel.setFont(FONT);
-            double instLabelX = child.getX() + (child.getWidth() - instLabel.boundingRect().width()) / 2.0;
-            double instLabelY = child.getY() - instLabel.boundingRect().height();
+            double instLabelX = x + (child.getWidth() - instLabel.boundingRect().width()) / 2.0;
+            double instLabelY = y - instLabel.boundingRect().height();
             instLabel.setPos(instLabelX, instLabelY - LABEL_BUFFER);
             instLabel.setZValue(5);
 
@@ -249,15 +254,15 @@ public class SchematicScene extends QGraphicsScene {
             QGraphicsSimpleTextItem cellLabel = addSimpleText(cellTypeLabel.getText());
             cellLabel.setBrush(BLACK_BRUSH);
             cellLabel.setFont(FONT);
-            double cellLabelX = child.getX() + (child.getWidth() - cellLabel.boundingRect().width()) / 2.0;
-            double cellLabelY = child.getY() + child.getHeight();
+            double cellLabelX = x + (child.getWidth() - cellLabel.boundingRect().width()) / 2.0;
+            double cellLabelY = y + child.getHeight();
             cellLabel.setPos(cellLabelX, cellLabelY + LABEL_BUFFER);
             cellLabel.setZValue(5);
 
             for (ElkPort port : child.getPorts()) {
-                double y = child.getY() + port.getY() + port.getHeight() / 2.0;
+                double yPort = y + port.getY() + port.getHeight() / 2.0;
                 PortSide side = port.getProperty(CoreOptions.PORT_SIDE);
-                drawPin(child, port, y, side, isExpanded);
+                drawPin(child, port, yPort, side, isExpanded, xOffset);
                                 
                 QGraphicsSimpleTextItem pinLabel = addSimpleText(port.getIdentifier());
                 pinLabel.setBrush(BLACK_BRUSH);
@@ -265,28 +270,28 @@ public class SchematicScene extends QGraphicsScene {
                 pinLabel.setZValue(6);
                 double textWidth = pinLabel.boundingRect().width();
                 double textHeight = pinLabel.boundingRect().height();
-                double labelX = child.getX();
-                double labelY = child.getY();
+                double labelX = x;
+                double labelY = y;
                 
                 if (!isLeaf) {
                     labelX += side == PortSide.EAST ? child.getWidth() + LABEL_BUFFER : - textWidth - LABEL_BUFFER;
-                    labelY = y - textHeight + LABEL_BUFFER;
+                    labelY = yPort - textHeight + LABEL_BUFFER;
                 } else {
                     labelX += side == PortSide.EAST ? child.getWidth() - textWidth - 2*LABEL_BUFFER : 2*LABEL_BUFFER;
-                    labelY = y - textHeight / 2.0;
+                    labelY = yPort - textHeight / 2.0;
                 }
                 pinLabel.setPos(labelX, labelY);
             }
 
             if (child.getChildren().size() > 0) {
-                renderNode(child);
+                renderNode(child, x, y);
             }
         }
     }
 
-    private void drawPin(ElkNode cell, ElkPort port, double y, PortSide side, boolean isExpanded) {
-        double x1 = cell.getX() + (side == PortSide.EAST ? cell.getWidth() : -PIN_LINE_LENGTH);
-        double x2 = cell.getX() + (side == PortSide.EAST ? cell.getWidth() + PIN_LINE_LENGTH : 0);
+    private void drawPin(ElkNode cell, ElkPort port, double y, PortSide side, boolean isExpanded, double xOffset) {
+        double x1 = cell.getX() + xOffset + (side == PortSide.EAST ? cell.getWidth() : -PIN_LINE_LENGTH);
+        double x2 = cell.getX() + xOffset + (side == PortSide.EAST ? cell.getWidth() + PIN_LINE_LENGTH : 0);
 
         // Draw outer pins
         QGraphicsLineItem pinLine = addLine(x1, y, x2, y, BLACK_PEN);
@@ -297,8 +302,8 @@ public class SchematicScene extends QGraphicsScene {
 
         if (isExpanded) {
             // Draw inner pins
-            x1 = cell.getX() + (side == PortSide.EAST ? cell.getWidth() - PIN_LINE_LENGTH : 0);
-            x2 = cell.getX() + (side == PortSide.EAST ? cell.getWidth() : PIN_LINE_LENGTH);
+            x1 = cell.getX() + xOffset + (side == PortSide.EAST ? cell.getWidth() - PIN_LINE_LENGTH : 0);
+            x2 = cell.getX() + xOffset + (side == PortSide.EAST ? cell.getWidth() : PIN_LINE_LENGTH);
             QGraphicsLineItem innerPinLine = addLine(x1, y, x2, y, BLACK_PEN);
             innerPinLine.setZValue(2);
             // Add a thick invisible area to make them easier to click on
@@ -307,16 +312,18 @@ public class SchematicScene extends QGraphicsScene {
         }
     }
 
-    private QGraphicsPathItem createHierButton(ElkNode node, boolean isExpanded, String expandedCellName) {
-        double buttonX = node.getX() + (node.getWidth() - BUTTON_SIZE) / 2.0;
-        double buttonY = node.getY() + (node.getHeight() - BUTTON_SIZE) / 2.0;
+    private QGraphicsPathItem createHierButton(ElkNode node, boolean isExpanded, String expandedCellName, double xOffset, double yOffset) {
+        double buttonX = xOffset + node.getX() + (node.getWidth() - BUTTON_SIZE) / 2.0;
+        double buttonY = yOffset + node.getY() + (node.getHeight() - BUTTON_SIZE) / 2.0;
         QPainterPath path = new QPainterPath();
         path.addRoundedRect(buttonX, buttonY, BUTTON_SIZE, BUTTON_SIZE, BUTTON_RADIUS, BUTTON_RADIUS);
 
         // Create a rounded rectangle for the hierarchy button
         QGraphicsPathItem button = addPath(path, BUTTON_PEN, BUTTON_BRUSH);
-        button.setData(0, "HIER_BUTTON: " + expandedCellName + " : " + (isExpanded ? "COLLAPSE" : "EXPAND"));
-        button.setToolTip(isExpanded ? "Collapse" : "Expand");
+        String data = HIER_BUTTON + ": " + expandedCellName + " : " + (isExpanded ? "COLLAPSE" : "EXPAND");
+        button.setData(0, data);
+        String tooltip = isExpanded ? "Collapse" : "Expand";
+        button.setToolTip(tooltip);
         button.setZValue(10);
 
         // Add text to the button
@@ -327,19 +334,21 @@ public class SchematicScene extends QGraphicsScene {
         double textY = buttonY + (BUTTON_SIZE - buttonText.boundingRect().height()) / 2.0;
         buttonText.setPos(textX, textY);
         buttonText.setZValue(11);
+        buttonText.setData(0, data);
+        buttonText.setToolTip(tooltip);
 
         return button;
     }
 
-    private void renderEdges(ElkNode parent) {
+    private void renderEdges(ElkNode parent, double xOffset, double yOffset) {
         for (ElkEdge e : parent.getContainedEdges()) {
             if (e.getSections().isEmpty()) continue;
             ElkEdgeSection s = e.getSections().get(0);
 
-            double startX = s.getStartX();
-            double startY = s.getStartY();
-            double endX = s.getEndX();
-            double endY = s.getEndY();
+            double startX = xOffset + s.getStartX();
+            double startY = yOffset + s.getStartY();
+            double endX = xOffset + s.getEndX();
+            double endY = yOffset + s.getEndY();
 
             if (!e.getSources().isEmpty()) {
                 ElkPort srcPort = (ElkPort) e.getSources().get(0);
@@ -369,8 +378,8 @@ public class SchematicScene extends QGraphicsScene {
             String lookup = "NET:" + (id == null ? "" : id);
             for (ElkBendPoint bp : s.getBendPoints()) {
                 drawSegment(lastX, lastY, bp.getX(), bp.getY(), lookup);
-                lastX = bp.getX();
-                lastY = bp.getY();
+                lastX = xOffset + bp.getX();
+                lastY = yOffset + bp.getY();
             }
 
             // Draw final segment
@@ -379,7 +388,7 @@ public class SchematicScene extends QGraphicsScene {
 
         for (ElkNode child : parent.getChildren()) {
             if (child.getChildren().size() > 0) {
-                renderEdges(child);
+                renderEdges(child, child.getX() + xOffset, child.getY() + yOffset);
             }
         }
     }
@@ -433,27 +442,30 @@ public class SchematicScene extends QGraphicsScene {
     private void populateCellContent(EDIFCell cell, ElkNode parent, String prefix) {
         ElkGraphFactory f = ElkGraphFactory.eINSTANCE;
 
-        for (EDIFPort topPort : cell.getPorts()) {
-            for (int i : (topPort.isBus() ? topPort.getBitBlastedIndicies() : new int[] { 0 })) {
-                String portInstName = topPort.getPortInstNameFromPort(0);
-                ElkNode elkTopPortNode = f.createElkNode();
-                EDIFPortInst portInst = topPort.getInternalPortInstFromIndex(i);
-                elkNodeTopPortMap.put(elkTopPortNode, portInst);
-                elkTopPortNode.setDimensions(TOP_PORT_WIDTH + POINT_DIST, TOP_PORT_HEIGHT);
-                elkTopPortNode.setIdentifier(portInstName);
-                elkTopPortNode.setParent(parent);
-                parent.getChildren().add(elkTopPortNode);
-                labelElkNode(elkTopPortNode, portInstName);
-                elkTopPortNode.setProperty(CoreOptions.NODE_LABELS_PLACEMENT,
-                        EnumSet.of(topPort.isOutput() ? NodeLabelPlacement.H_RIGHT : NodeLabelPlacement.H_LEFT));
-                ElkPort elkTopPort = f.createElkPort();
-                elkTopPort.setParent(elkTopPortNode);
-                elkTopPort.setIdentifier(portInstName);
-                elkTopPort.setProperty(CoreOptions.PORT_SIDE, topPort.isOutput() ? PortSide.EAST : PortSide.WEST);
-                elkTopPort.setProperty(CoreOptions.PORT_INDEX, 1);
-                elkTopPort.setDimensions(PORT_SIZE, PORT_SIZE);
-                portInstMap.put(portInst, elkTopPort);
-                elkTopPortNode.getPorts().add(elkTopPort);
+        // Only create top level port shapes if this is the top cell
+        if (prefix.isEmpty()) {
+            for (EDIFPort topPort : cell.getPorts()) {
+                for (int i : (topPort.isBus() ? topPort.getBitBlastedIndicies() : new int[] { 0 })) {
+                    String portInstName = topPort.getPortInstNameFromPort(0);
+                    ElkNode elkTopPortNode = f.createElkNode();
+                    EDIFPortInst portInst = topPort.getInternalPortInstFromIndex(i);
+                    elkNodeTopPortMap.put(elkTopPortNode, portInst);
+                    elkTopPortNode.setDimensions(TOP_PORT_WIDTH + POINT_DIST, TOP_PORT_HEIGHT);
+                    elkTopPortNode.setIdentifier(portInstName);
+                    elkTopPortNode.setParent(parent);
+                    parent.getChildren().add(elkTopPortNode);
+                    labelElkNode(elkTopPortNode, portInstName);
+                    elkTopPortNode.setProperty(CoreOptions.NODE_LABELS_PLACEMENT,
+                            EnumSet.of(topPort.isOutput() ? NodeLabelPlacement.H_RIGHT : NodeLabelPlacement.H_LEFT));
+                    ElkPort elkTopPort = f.createElkPort();
+                    elkTopPort.setParent(elkTopPortNode);
+                    elkTopPort.setIdentifier(portInstName);
+                    elkTopPort.setProperty(CoreOptions.PORT_SIDE, topPort.isOutput() ? PortSide.EAST : PortSide.WEST);
+                    elkTopPort.setProperty(CoreOptions.PORT_INDEX, 1);
+                    elkTopPort.setDimensions(PORT_SIZE, PORT_SIZE);
+                    portInstMap.put(portInst, elkTopPort);
+                    elkTopPortNode.getPorts().add(elkTopPort);
+                }
             }
         }
 
@@ -501,6 +513,10 @@ public class SchematicScene extends QGraphicsScene {
             double height = Math.max(MIN_NODE_HEIGHT, PORT_HEIGHT * maxPins);
             double width = Math.max(MIN_NODE_WIDTH, longestWestName + longestEastName + PORT_NAME_BUFFER);
             elkInst.setDimensions(width, height);
+
+            if (isHierCell && expandedCellInsts.contains(prefix + inst.getName())) {
+                populateCellContent(inst.getCellType(), elkInst, prefix + inst.getName() + "/");
+            }
         }
 
         for (EDIFNet net : cell.getNets()) {
@@ -587,5 +603,26 @@ public class SchematicScene extends QGraphicsScene {
         label.setParent(n);
         n.getLabels().add(label);
         label.setDimensions(fm.width(label.getText()), fm.height());
+    }
+
+    public void mousePressEvent(QGraphicsSceneMouseEvent event) {
+        QGraphicsItemInterface item = itemAt(event.scenePos());
+        if (item != null && item.data(0) != null) {
+            String data = item.data(0).toString();
+            if (data.startsWith(HIER_BUTTON)) {
+                String[] parts = data.split(":");
+                toggleCellInstExpansion(parts[1].trim());
+            }
+        }
+        super.mousePressEvent(event);
+    }
+
+    private void toggleCellInstExpansion(String cellInstName) {
+        if (expandedCellInsts.contains(cellInstName)) {
+            expandedCellInsts.remove(cellInstName);
+        } else {
+            expandedCellInsts.add(cellInstName);
+        }
+        drawCell(currCell);
     }
 }
