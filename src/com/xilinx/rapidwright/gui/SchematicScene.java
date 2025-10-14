@@ -377,9 +377,11 @@ public class SchematicScene extends QGraphicsScene {
             String id = e.getIdentifier();
             String lookup = "NET:" + (id == null ? "" : id);
             for (ElkBendPoint bp : s.getBendPoints()) {
-                drawSegment(lastX, lastY, bp.getX(), bp.getY(), lookup);
-                lastX = xOffset + bp.getX();
-                lastY = yOffset + bp.getY();
+                double bpX = bp.getX() + xOffset;
+                double bpY = bp.getY() + yOffset;
+                drawSegment(lastX, lastY, bpX, bpY, lookup);
+                lastX = bpX;
+                lastY = bpY;
             }
 
             // Draw final segment
@@ -446,7 +448,7 @@ public class SchematicScene extends QGraphicsScene {
         if (prefix.isEmpty()) {
             for (EDIFPort topPort : cell.getPorts()) {
                 for (int i : (topPort.isBus() ? topPort.getBitBlastedIndicies() : new int[] { 0 })) {
-                    String portInstName = topPort.getPortInstNameFromPort(0);
+                    String portInstName = topPort.getPortInstNameFromPort(i);
                     ElkNode elkTopPortNode = f.createElkNode();
                     EDIFPortInst portInst = topPort.getInternalPortInstFromIndex(i);
                     elkNodeTopPortMap.put(elkTopPortNode, portInst);
@@ -515,6 +517,7 @@ public class SchematicScene extends QGraphicsScene {
             elkInst.setDimensions(width, height);
 
             if (isHierCell && expandedCellInsts.contains(prefix + inst.getName())) {
+                createExpandedCellInnerPorts(inst);
                 populateCellContent(inst.getCellType(), elkInst, prefix + inst.getName() + "/");
             }
         }
@@ -552,6 +555,20 @@ public class SchematicScene extends QGraphicsScene {
                     edge.getSources().add(driver);
                     edge.getTargets().add(sink);
                     parent.getContainedEdges().add(edge);
+                }
+            }
+        }
+    }
+
+    private void createExpandedCellInnerPorts(EDIFCellInst inst) {
+        for (EDIFPort port : inst.getCellPorts()) {
+            for (int i : (port.isBus() ? port.getBitBlastedIndicies() : new int[] { 0 })) {
+                EDIFPortInst outerPortInst = inst.getPortInst(port.getPortInstNameFromPort(i));
+                ElkPort outerElkPort = portInstMap.get(outerPortInst);
+                // Map the inner port inst to the outer one so nets are aligned
+                if (outerElkPort != null) {
+                    EDIFPortInst innerPortInst = port.getInternalPortInstFromIndex(i);
+                    portInstMap.put(innerPortInst, outerElkPort);
                 }
             }
         }
