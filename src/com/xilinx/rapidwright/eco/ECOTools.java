@@ -491,15 +491,22 @@ public class ECOTools {
                         }
 
                         Net oldPhysNet = spi.getNet();
+                        final boolean sameNet = Objects.equals(oldPhysNet, newPhysNet);
+                        final boolean[] redoIntraSiteRouting = {false};
                         if (deferredRemovals != null) {
                             deferredRemovals.computeIfPresent(oldPhysNet, (k, v) -> {
-                                v.remove(spi);
+                                if (v.remove(spi) && sameNet) {
+                                    // Since this SPI was scheduled for removal and unrouting, assume
+                                    // that its intra-site routing needs to be redone
+                                    redoIntraSiteRouting[0] = true;
+                                }
                                 return v.isEmpty() ? null : v;
                             });
                         }
-                        if (!Objects.equals(oldPhysNet, newPhysNet)) {
+
+                        BELPin snkBp = bel.getPin(physicalPinName);
+                        if (!sameNet) {
                             // Unroute and remove pin from old net
-                            BELPin snkBp = bel.getPin(physicalPinName);
                             if (!si.unrouteIntraSiteNet(spi.getBELPin(), snkBp)) {
                                 throw new RuntimeException("ERROR: Failed to unroute intra-site connection " +
                                         spi.getSiteInst().getSiteName() + "/" + spi.getBELPin() + " to " + snkBp + ".");
@@ -515,13 +522,14 @@ public class ECOTools {
                                 }
                             }
 
-                            // Re-do intra-site routing and add pin to new net
-                            if (!si.routeIntraSiteNet(newPhysNet, spi.getBELPin(), snkBp)) {
-                                throw new RuntimeException("ERROR: Failed to route intra-site connection " +
-                                        spi.getSiteInst().getSiteName() + "/" + spi.getBELPin() + " to " + snkBp + ".");
-                            }
+                            redoIntraSiteRouting[0] = true;
+
                             newPhysNet.addPin(spi);
                             spi.setRouted(false);
+                        }
+                        if (redoIntraSiteRouting[0] && !si.routeIntraSiteNet(newPhysNet, spi.getBELPin(), snkBp)) {
+                            throw new RuntimeException("ERROR: Failed to route intra-site connection " +
+                                    spi.getSiteInst().getSiteName() + "/" + spi.getBELPin() + " to " + snkBp + ".");
                         }
                     }
                 } else {
