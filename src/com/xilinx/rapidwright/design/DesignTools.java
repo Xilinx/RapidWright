@@ -2681,6 +2681,22 @@ public class DesignTools {
      * @return A list of hierarchical port instances that can connect to the site pin.
      */
     public static List<EDIFHierPortInst> getPortInstsFromSitePinInst(SitePinInst sitePin) {
+        return getPortInstsFromSitePinInst(sitePin, sitePin.getNet());
+    }
+
+    /**
+     * Given a SitePinInst, this method will find any and all possible potential
+     * hierarchical logical cell pins within the site that can connect to the site
+     * pin. If the site has been routed, it will only return those pins that are
+     * reachable through the site routing. For those paths that are not routed in
+     * the site, it will return all possible connections that could be made based
+     * on the given net.
+     *
+     * @param sitePin The site pin to query.
+     * @param net Return port instances that are connected to this net.
+     * @return A list of hierarchical port instances that can connect to the site pin.
+     */
+    public static List<EDIFHierPortInst> getPortInstsFromSitePinInst(SitePinInst sitePin, Net net) {
         SiteInst siteInst = sitePin.getSiteInst();
         BELPin[] belPins = siteInst.getSiteWirePins(sitePin.getName());
         List<EDIFHierPortInst> portInsts = new ArrayList<>();
@@ -2695,20 +2711,20 @@ public class DesignTools {
                     SitePIP sitePIP = siteInst.getUsedSitePIP(belPin);
                     if (sitePIP != null) {
                         BELPin otherPin = belPin.isOutput() ? sitePIP.getInputPin() : sitePIP.getOutputPin();
-                        nextPin: for (BELPin belPin2 : otherPin.getSiteConns()) {
+                        for (BELPin belPin2 : otherPin.getSiteConns()) {
                             if (belPin2.equals(otherPin)) continue;
                             if (belPin2.getBEL().isSliceFFClkMod()) {
                                 for (BELPin conn : belPin2.getBEL().getPin("CLK_OUT").getSiteConns()) {
                                     EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, conn);
                                     if (portInst != null) portInsts.add(portInst);
                                 }
-                                break nextPin;
+                                break;
                             } else if (belPin2.getBEL().isSRIMR()) {
                                 for (BELPin conn : belPin2.getBEL().getPin("Q").getSiteConns()) {
                                     EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, conn);
                                     if (portInst != null) portInsts.add(portInst);
                                 }
-                                break nextPin;
+                                break;
                             }
                             EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, belPin2);
                             if (portInst != null) portInsts.add(portInst);
@@ -2737,11 +2753,10 @@ public class DesignTools {
                                 Cell c = siteInst.getCell(pin.getBEL());
                                 if (c != null) {
                                     EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, pin);
-                                    Net sitePinNet = sitePin.getNet();
-                                    if (portInst != null && sitePinNet != null) {
-                                        if (sitePinNet.isStaticNet() && sitePinNet.getType() == portInst.getNet().getPhysStaticSourceType()) { 
+                                    if (portInst != null && net != null) {
+                                        if (net.isStaticNet() && net.getType() == portInst.getNet().getPhysStaticSourceType()) {
                                             portInsts.add(portInst);
-                                        } else if (portInst.getHierarchicalNet().isAlias(sitePin.getNet().getLogicalHierNet())) {
+                                        } else if (portInst.getHierarchicalNet().isAlias(net.getLogicalHierNet())) {
                                             portInsts.add(portInst);
                                         }
                                     }
