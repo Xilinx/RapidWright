@@ -313,8 +313,8 @@ public class SchematicScene extends QGraphicsScene {
     }
 
     private QGraphicsPathItem createHierButton(ElkNode node, boolean isExpanded, String expandedCellName, double xOffset, double yOffset) {
-        double buttonX = xOffset + node.getX() + (node.getWidth() - BUTTON_SIZE) / 2.0;
-        double buttonY = yOffset + node.getY() + (node.getHeight() - BUTTON_SIZE) / 2.0;
+        double buttonX = xOffset + node.getX() + BUTTON_SIZE / 2;
+        double buttonY = yOffset + node.getY() + BUTTON_SIZE / 2;
         QPainterPath path = new QPainterPath();
         path.addRoundedRect(buttonX, buttonY, BUTTON_SIZE, BUTTON_SIZE, BUTTON_RADIUS, BUTTON_RADIUS);
 
