@@ -2674,7 +2674,8 @@ public class DesignTools {
      * hierarchical logical cell pins within the site that can connect to the site
      * pin. If the site has been routed, it will only return those pins that are
      * reachable through the site routing. For those paths that are not routed in
-     * the site, it will return all possible connections that could be made.
+     * the site, it will return all possible connections that could be made based
+     * on the net associated with the site pin.
      * 
      * @param sitePin The site pin to query.
      * @return A list of hierarchical port instances that can connect to the site pin.
