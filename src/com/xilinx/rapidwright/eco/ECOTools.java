@@ -1037,7 +1037,15 @@ public class ECOTools {
                 // Site Pin not currently used or was driven by site port
             }
 
-            if (si.getSitePinInst(sitePinName) == null) {
+            spi = si.getSitePinInst(sitePinName);
+            if (spi != null) {
+                assert(spi.getNet() != net);
+
+                // TODO: Re-use if present in deferredRemovals
+                continue;
+            }
+
+            if (spi == null) {
                 spi = net.createPin(sitePinName, si);
             } else if (LUTTools.isCellALUT(cell)) {
                 // Check if we can map to a different physical pin
@@ -1055,6 +1063,7 @@ public class ECOTools {
                 //           logical pin
             }
 
+            assert(spi != null);
             break;
         }
 
