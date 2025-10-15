@@ -1038,24 +1038,22 @@ public class ECOTools {
             }
 
             spi = si.getSitePinInst(sitePinName);
-            if (spi != null) {
-                assert(spi.getNet() != net);
-
-                // TODO: Re-use if present in deferredRemovals
-                continue;
-            }
-
             if (spi == null) {
                 spi = net.createPin(sitePinName, si);
-            } else if (LUTTools.isCellALUT(cell)) {
-                // Check if we can map to a different physical pin
-                String newPhysPin = LUTTools.getUnmappedPhysicalLUTInputPin(cell);
+            } else { // spi != null
+                assert(spi.getNet() != net);
+
+                // For LUTS only: check if we can map to a different physical pin
+                String newPhysPin = LUTTools.isCellALUT(cell) ? LUTTools.getUnmappedPhysicalLUTInputPin(cell) : null;
                 if (newPhysPin != null) {
                     String physicalPinName = cell.getPhysicalPinMapping(logicalPinName);
                     cell.removePinMapping(physicalPinName);
                     cell.addPinMapping(newPhysPin, logicalPinName);
                     spi = createExitSitePinInst(design, ehpi, net);
+                } else {
+                    continue;
                 }
+
                 // TODO: Also check for:
                 //       (a) reusing a physical pin (on the current LUT or its companion) that is
                 //           already providing 'net'
