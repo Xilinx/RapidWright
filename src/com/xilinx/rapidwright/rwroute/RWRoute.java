@@ -633,6 +633,12 @@ public class RWRoute {
         RouteNode sourceINTRnode = null;
         int indirect = 0;
         for (SitePinInst sink : sinkPins) {
+
+            if (routingGraph.isVersal && source.getTile().getSLR() != sink.getTile().getSLR()) {
+                System.err.println("WARNING: Ignoring cross-SLR sink " + sink.getSitePinName() + " on net '" + net.getName() + "'");
+                continue;
+            }
+
             Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
             Node sinkINTNode = RouterHelper.projectInputPinToINTNode(sink);
             if (sourceINTNode == null && sinkINTNode != null) {
