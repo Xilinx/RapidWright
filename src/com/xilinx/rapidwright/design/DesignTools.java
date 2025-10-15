@@ -2754,8 +2754,10 @@ public class DesignTools {
                                 if (c != null) {
                                     EDIFHierPortInst portInst = getPortInstFromBELPin(siteInst, pin);
                                     if (portInst != null && net != null) {
-                                        if (net.isStaticNet() && net.getType() == portInst.getNet().getPhysStaticSourceType()) {
-                                            portInsts.add(portInst);
+                                        if (net.isStaticNet()) {
+                                            if (net.getType() == portInst.getNet().getPhysStaticSourceType()) {
+                                                portInsts.add(portInst);
+                                            }
                                         } else if (portInst.getHierarchicalNet().isAlias(net.getLogicalHierNet())) {
                                             portInsts.add(portInst);
                                         }
