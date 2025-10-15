@@ -1090,7 +1090,9 @@ public class ECOTools {
             if (spi == null) continue;
             BELPin srcBp = DesignTools.getLogicalBELPinDriver(spi);
             SiteInst si = spi.getSiteInst();
-            si.unrouteIntraSiteNet(srcBp, spi.getBELPin());
+            if (srcBp != null) {
+                si.unrouteIntraSiteNet(srcBp, spi.getBELPin());
+            }
             net.removePin(spi);
             si.removePin(spi);
             spi.setSiteInst(null);
