@@ -239,6 +239,7 @@ public class VersalClockRouting {
                 IntentCode.NODE_GLOBAL_VDISTR_LVL2,
                 IntentCode.NODE_GLOBAL_VDISTR_LVL21,
                 IntentCode.NODE_GLOBAL_VDISTR_LVL3, 
+                IntentCode.NODE_GLOBAL_VDISTR_SHARED,
                 IntentCode.NODE_GLOBAL_GCLK);
 
         Set<NodeWithPrevAndCost> startingPoints = new HashSet<>();
