@@ -465,4 +465,28 @@ public class TestEDIFTools {
         Assertions.assertNotNull(testPort2);
         Assertions.assertFalse(testPort2.getName().startsWith(EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE));
     }
+
+    @Test
+    public void testWriteEDIFFilterUnrelatedEDNFiles(@TempDir Path dir) {
+        String name = "picoblaze_ooc_X10Y235.dcp";
+        Path dcp = dir.resolve(name);
+        Path edf = dir.resolve(name.replace(".dcp", ".edf"));
+        Path edn = dir.resolve("fake.edn");
+        Design d = RapidWrightDCP.loadDCP(name);
+        d.writeCheckpoint(dcp);
+        // All our test DCPs have unencrypted EDIF inside, we need to create an external
+        // one
+        d.getNetlist().exportEDIF(edf);
+        FileTools.writeStringToTextFile("Fake EDIF", edn.toString());
+
+        // We need to read an external EDIF in order to trigger the .edn search
+        d = Design.readCheckpoint(dcp, edf);
+
+        Assertions.assertEquals(1, d.getNetlist().getEncryptedCells().size());
+
+        String outputName = "test";
+        Path loadScript = dir.resolve(outputName + EDIFTools.LOAD_TCL_SUFFIX);
+        d.writeCheckpoint(dir.resolve(outputName + ".dcp"));
+        Assertions.assertFalse(Files.exists(loadScript));
+    }
 }
