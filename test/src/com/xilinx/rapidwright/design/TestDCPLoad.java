@@ -164,7 +164,8 @@ public class TestDCPLoad {
 
     @Test
     public void testReadEncryptedCellsFromTclLoadScript(@TempDir Path dir) {
-        Path dcp = TestEDIFTools.createEncryptedDCPExample(dir, "picoblaze_2022.2.dcp");
+        Path dcp = TestEDIFTools.createEncryptedDCPExample(dir, "picoblaze_2022.2.dcp",
+                TestEDIFTools.PICOBLAZE_BB_CELLNAME);
 
         // We need to supply the .edf directly to avoid using the edif inside the DCP
         Design d = Design.readCheckpoint(dcp,

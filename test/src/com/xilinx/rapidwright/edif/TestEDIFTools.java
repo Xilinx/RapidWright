@@ -33,8 +33,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
-import com.xilinx.rapidwright.util.VivadoTools;
-import com.xilinx.rapidwright.util.VivadoToolsHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -47,6 +45,7 @@ import com.xilinx.rapidwright.eco.ECOTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Params;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 public class TestEDIFTools {
 
@@ -385,25 +384,27 @@ public class TestEDIFTools {
      *                    directory.
      * @return The path to the resulting DCP.
      */
-    public static Path createEncryptedDCPExample(Path dir, String testDCPName) {
+    public static Path createEncryptedDCPExample(Path dir, String testDCPName, String cellName) {
         Path dcp = RapidWrightDCP.getPath(testDCPName);
         Design tmp = Design.readCheckpoint(dcp, true);
         Path edf = dir.resolve(testDCPName.replace(".dcp", ".edf"));
         tmp.getNetlist().exportEDIF(edf);
-        String dummyEDN = "dummy.edn";
+        String dummyEDN = cellName + ".edn";
         Path copyDCP = dir.resolve(testDCPName);
         FileTools.copyFile(dcp.toString(), copyDCP.toString());
         FileTools.writeStringToTextFile("Dummy EDN", dir.resolve(dummyEDN).toString());
         return copyDCP;
     }
 
+    public static final String PICOBLAZE_BB_CELLNAME = "ram_4096x8_bb";
+
     @Test
     public void testCopyEDNOnDCPWrite(@TempDir Path dir) {
         Path srcDir = dir.resolve("src");
         FileTools.makeDir(srcDir.toString());
-        Path dcp = createEncryptedDCPExample(srcDir, "picoblaze_2022.2.dcp");
+        Path dcp = createEncryptedDCPExample(srcDir, "picoblaze_2022.2.dcp", PICOBLAZE_BB_CELLNAME);
         Path edf = srcDir.resolve(dcp.getFileName().toString().replace(".dcp", ".edf"));
-        Path edn = srcDir.resolve("dummy.edn");
+        Path edn = srcDir.resolve(PICOBLAZE_BB_CELLNAME + ".edn");
 
         Design d = Design.readCheckpoint(dcp, edf);
 
