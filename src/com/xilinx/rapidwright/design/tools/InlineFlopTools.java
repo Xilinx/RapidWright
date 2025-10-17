@@ -40,6 +40,8 @@ import com.xilinx.rapidwright.placer.blockplacer.Point;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.StringTools;
 
+import static com.xilinx.rapidwright.util.Utils.isCLB;
+
 /**
  * Set of tools to add/remove flip flops inline to top level port connections.
  * This is targeted at kernel replication preparation prior to routing to ensure
@@ -135,7 +137,7 @@ public class InlineFlopTools {
                     if (centroidPlacement) {
                         netCentroidFlipFlopPlacement(design, inst, keepOut, clk, siteInstsToRoute);
                     } else {
-                        Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr);
+                        Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr, null);
                         Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
                         siteInstsToRoute.add(flop.getSiteInst());
                     }
@@ -150,7 +152,7 @@ public class InlineFlopTools {
                     if (centroidPlacement) {
                         netCentroidFlipFlopPlacement(design, inst, keepOut, clk, siteInstsToRoute);
                     } else {
-                        Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr);
+                        Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr, null);
                         Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
                         siteInstsToRoute.add(flop.getSiteInst());
                     }
@@ -174,6 +176,26 @@ public class InlineFlopTools {
         return allLeavesAreIBUF;
     }
 
+    private static Tile shiftTileUntilSlice(Device device, int row, int col, boolean shiftRow, boolean negativeShift) {
+        int offset = negativeShift ? -1 : 1;
+        Tile shiftedTile = null;
+        while (shiftedTile == null || !isCLB(shiftedTile.getTileTypeEnum())) {
+            int shiftedRow = shiftRow ? row + offset : row;
+            int shiftedCol = !shiftRow ? col + offset : col;
+            if (shiftRow && (shiftedRow < 0 || shiftedRow > device.getRows())) {
+                shiftedTile = null;
+                break;
+            }
+            if (!shiftRow && (shiftedCol < 0 || shiftedCol > device.getColumns())) {
+                shiftedTile = null;
+                break;
+            }
+            shiftedTile = device.getTile(shiftedRow, shiftedCol);
+            offset = negativeShift ? offset - 1 : offset + 1;
+        }
+        return shiftedTile;
+    }
+
     private static Site getSiteOnPBlockEdgeClosestToSite(Device device, Site site, PBlock pblock) {
         Tile topLeftTile = pblock.getTopLeftTile();
         Tile bottomRightTile = pblock.getBottomRightTile();
@@ -192,23 +214,24 @@ public class InlineFlopTools {
         Tile shiftedTile = null;
         if (topDist <= leftDist && topDist <= rightDist && topDist <= bottomDist) {
             // Shift tile up
-            shiftedTile = device.getTile(pBlockTop, siteTileCol);
+            shiftedTile = shiftTileUntilSlice(device, pBlockTop, siteTileCol, true, true);
         } else if (leftDist <= topDist && leftDist <= rightDist && leftDist <= bottomDist) {
             // Shift tile left
-            shiftedTile = device.getTile(siteTileRow, pBlockLeft);
+            shiftedTile = shiftTileUntilSlice(device, siteTileRow, pBlockLeft, false, true);
         } else if (rightDist <= topDist && rightDist <= leftDist && rightDist <= bottomDist) {
             // Shift tile right
-            shiftedTile = device.getTile(siteTileRow, pBlockRight);
+            shiftedTile = shiftTileUntilSlice(device, siteTileRow, pBlockRight, false, false);
         } else {
             // Shift tile down
-            shiftedTile = device.getTile(pBlockBottom, siteTileCol);
+            shiftedTile = shiftTileUntilSlice(device, pBlockBottom, siteTileCol, true, false);
         }
         Site shiftedSite = site.getCorrespondingSite(site.getSiteTypeEnum(), shiftedTile);
         if (shiftedSite == null) {
-            throw new RuntimeException("Cannot find shifted site type for flop placement");
+            // Can't find a site on the edge of the PBlock, return the original site
+            return site;
         }
 
-        return site;
+        return shiftedSite;
     }
 
     private static void netCentroidFlipFlopPlacement(Design design, EDIFPortInst inst, PBlock keepOut, EDIFHierNet clk,
@@ -231,16 +254,21 @@ public class InlineFlopTools {
                     VALID_CENTROID_SITE_TYPES);
             Site shiftedCentroid = getSiteOnPBlockEdgeClosestToSite(design.getDevice(), centroid, keepOut);
             Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(shiftedCentroid, keepOut, true).iterator();
-            siteItr.next();
-            Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr);
+            if (keepOut.containsTile(shiftedCentroid.getTile())) {
+                siteItr.next();
+            }
+            Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr, shiftedCentroid.getTile().getSLR());
             Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
             siteInstsToRoute.add(flop.getSiteInst());
         }
     }
 
-    private static Pair<Site, BEL> nextAvailPlacement(Design design, Iterator<Site> itr) {
+    private static Pair<Site, BEL> nextAvailPlacement(Design design, Iterator<Site> itr, SLR slr) {
         while (itr.hasNext()) {
             Site curr = itr.next();
+            if (slr != null && curr.getTile().getSLR() != slr) {
+                continue;
+            }
             SiteInst candidate = design.getSiteInstFromSite(curr);
             List<BEL> usedFFs = new ArrayList<>();
             if (candidate != null) {

@@ -42,15 +42,20 @@ import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.ClockTools;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Module;
+import com.xilinx.rapidwright.design.ModuleImplsInst;
 import com.xilinx.rapidwright.design.ModuleInst;
+import com.xilinx.rapidwright.design.ModulePlacement;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.design.RelocatableTileRectangle;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
@@ -64,6 +69,7 @@ import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -76,6 +82,9 @@ import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.edif.EDIFValueType;
+import com.xilinx.rapidwright.placer.blockplacer.AbstractOverlapCache;
+import com.xilinx.rapidwright.placer.blockplacer.RegionBasedOverlapCache;
+import com.xilinx.rapidwright.rwroute.PartialRouter;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
@@ -551,6 +560,29 @@ public class ArrayBuilder {
         FileTools.writeLinesToTextFile(lines, fileName);
     }
 
+    public static List<List<Site>> getValidPlacementGrid(Module module) {
+        List<List<Site>> placementGrid = new ArrayList<>();
+        // Sort by descending Y coordinate, then ascending X coordinate
+        List<Site> sortedValidPlacements = module.getAllValidPlacements().stream().sorted((s1, s2) -> {
+            if (s1.getInstanceY() == s2.getInstanceY()) {
+                return s1.getInstanceX() - s2.getInstanceX();
+            }
+            return s2.getInstanceY() - s1.getInstanceY();
+        }).collect(Collectors.toList());
+        int currentYCoordinate = sortedValidPlacements.get(0).getInstanceY();
+        int i = 0;
+        placementGrid.add(new ArrayList<>());
+        for (Site anchor : sortedValidPlacements) {
+            if (anchor.getInstanceY() < currentYCoordinate) {
+                i++;
+                placementGrid.add(new ArrayList<>());
+            }
+            placementGrid.get(i).add(anchor);
+            currentYCoordinate = anchor.getInstanceY();
+        }
+        return placementGrid;
+    }
+
     public static void main(String[] args) {
         CodePerfTracker t = new CodePerfTracker(ArrayBuilder.class.getName());
         t.start("Init");
@@ -616,8 +648,33 @@ public class ArrayBuilder {
             // Just use the design we loaded and replicate it
             t.stop().start("Calculate Valid Placements");
             removeBUFGs(ab.getKernelDesign());
+            Net gndNet = ab.getKernelDesign().getNet(Net.GND_NET);
+            if (gndNet != null) {
+                gndNet.unroute();
+                List<SitePinInst> staticSourcePins = new ArrayList<>();
+                Set<SiteInst> staticSourceSites = new HashSet<>();
+                for (SitePinInst pin : gndNet.getPins()) {
+                    if (pin.isOutPin() && pin.getSiteInst().getName().startsWith(SiteInst.STATIC_SOURCE)) {
+                        staticSourcePins.add(pin);
+                        staticSourceSites.add(pin.getSiteInst());
+                    }
+                }
+                for (SitePinInst pin : staticSourcePins) {
+                    gndNet.removePin(pin);
+                    pin.getSiteInst().removePin(pin);
+                }
+                for (SiteInst siteInst : staticSourceSites) {
+                    siteInst.setDesign(null);
+                    siteInst.unPlace();
+                }
+            }
+            Net vccNet = ab.getKernelDesign().getNet(Net.VCC_NET);
+            if (vccNet != null) {
+                vccNet.unroute();
+            }
             Module m = new Module(ab.getKernelDesign(), unrouteStaticNets);
             m.getNet(ab.getKernelClockName()).unroute();
+
             if (ab.getInputPlacementFileName() == null) {
                 m.calculateAllValidPlacements(ab.getDevice());
             }
@@ -639,7 +696,9 @@ public class ArrayBuilder {
             modInstNames = getMatchingModuleInstanceNames(modules.get(0), array);
             ab.setInstCountLimit(modInstNames.size());
             ab.setCondensedGraph(new ArrayNetlistGraph(array, modInstNames));
-            Map<Pair<Integer, Integer>, String> idealPlacement = ab.getCondensedGraph().getOptimalPlacementGrid(6, 6);
+            Map<Pair<Integer, Integer>, String> idealPlacement =
+                    ab.getCondensedGraph().getGreedyPlacementGrid();
+//                    ab.getCondensedGraph().getOptimalPlacementGrid(ab.getInstCountLimit(), ab.getInstCountLimit());
             idealPlacementList = idealPlacement.entrySet().stream()
                     .map((e) -> new Pair<>(e.getKey(), e.getValue()))
                     .sorted((p1, p2) -> {
@@ -709,17 +768,20 @@ public class ArrayBuilder {
 
             // TODO: Figure out how to handle placement for multiple modules
             Module module = modules.get(0);
-            List<List<Site>> validPlacementGrid = module.getValidPlacementGrid();
+            RelocatableTileRectangle boundingBox = module.getBoundingBox();
+            List<RelocatableTileRectangle> boundingBoxes = new ArrayList<>();
+            List<List<Site>> validPlacementGrid = getValidPlacementGrid(module);
             int gridX = 0;
-            int gridY = 0;
+            int gridY = 120;
             int lastYCoordinate = 0;
-            boolean searchDown = false;
+            boolean searchDown = true;
             while (placed < ab.getInstCountLimit()) {
                 if (curr == null) {
                     String instName = modInstNames == null ? ("inst_" + i) : idealPlacementList.get(i).getSecond();
                     int yCoordinate = idealPlacementList.get(i).getFirst().getSecond();
                     if (yCoordinate > lastYCoordinate) {
                         gridX = 0;
+                        gridY += 20;
                         searchDown = true;
                     }
                     lastYCoordinate = yCoordinate;
@@ -733,15 +795,35 @@ public class ArrayBuilder {
                     throw new RuntimeException("Optimal placement is too wide for device");
                 }
                 Site anchor = validPlacementGrid.get(gridY).get(gridX);
-                if (curr.place(anchor, true, false)) {
-                    if (straddlesClockRegion(curr) || !NetTools.getNetsWithOverlappingNodes(array).isEmpty()) {
-                        curr.unplace();
-                    } else {
-                        placed++;
-                        newPlacementMap.put(curr, anchor);
-                        System.out.println("  ** PLACED: " + placed + " " + anchor + " " + curr.getName());
-                        curr = null;
-                        searchDown = false;
+                RelocatableTileRectangle newBoundingBox =
+                        boundingBox.getCorresponding(anchor.getTile(), module.getAnchor().getTile());
+                boolean noOverlap = boundingBoxes.stream().noneMatch((b) -> b.overlaps(newBoundingBox));
+                if (noOverlap && !boundingBoxStraddlesClockRegion(newBoundingBox)) {
+                    if (curr.place(anchor, true, false)) {
+                        if (straddlesClockRegion(curr)
+//                            || !NetTools.getNetsWithOverlappingNodes(array).isEmpty()
+                        ) {
+                            curr.unplace();
+                        } else {
+//                            if (curr.getName().contains("y[0]")) {
+//                                if (anchor.getTile().getSLR() != array.getDevice().getSLR(2)) {
+//                                    System.out.println(anchor);
+//                                    throw new RuntimeException("Not split across slr y[0]");
+//                                }
+//                            }
+//                            if (curr.getName().contains("y[1]")) {
+//                                if (anchor.getTile().getSLR() != array.getDevice().getSLR(1)) {
+//                                    System.out.println(anchor);
+//                                    throw new RuntimeException("Not split across slr y[1]");
+//                                }
+//                            }
+                            boundingBoxes.add(newBoundingBox);
+                            placed++;
+                            newPlacementMap.put(curr, anchor);
+                            System.out.println("  ** PLACED: " + placed + " " + anchor + " " + curr.getName());
+                            curr = null;
+                            searchDown = false;
+                        }
                     }
                 }
                 if (!searchDown) {
@@ -820,11 +902,15 @@ public class ArrayBuilder {
             vccNet.unroute();
         }
         array.getNetlist().consolidateAllToWorkLibrary();
+        array.flattenDesign();
 
         if (ab.getOutOfContext()) {
             // Automatically find bounding PBlock based on used Slices, DSPs, and BRAMs
             Set<Site> usedSites = new HashSet<>();
             for (SiteInst siteInst : array.getSiteInsts()) {
+                if (siteInst.getName().contains("STATIC_SOURCE_SLICE")) {
+                    continue;
+                }
                 if (isSLICE(siteInst) || isBRAM(siteInst) || isDSP(siteInst)) {
                     usedSites.add(siteInst.getSite());
                 }
@@ -832,6 +918,22 @@ public class ArrayBuilder {
             PBlock pBlock = new PBlock(array.getDevice(), usedSites);
             InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsNearPins(array, ab.getTopClockName(), pBlock);
         }
+
+        t.stop().start("Route clock");
+        Net clockNet = array.getNet(ab.getTopClockName());
+        DesignTools.createMissingSitePinInsts(array, clockNet);
+        List<SitePinInst> pinsToRoute = clockNet.getPins();
+//        for (EDIFNet edifNet : array.getNetlist().getCell("systolic_array").getNets()) {
+//            EDIFHierNet hierNet = new EDIFHierNet(array.getNetlist().getHierCellInstFromName("u_systolic_array"), edifNet);
+//            EDIFHierNet parentNet = array.getNetlist().getParentNet(hierNet);
+//            Net net = array.getNet(parentNet.getHierarchicalNetName());
+//            if (net != null) {
+//                DesignTools.createMissingSitePinInsts(array, net);
+//                pinsToRoute.addAll(net.getPins());
+//            }
+//        }
+//        System.out.println("Pin count: " + pinsToRoute.size());
+//        PartialRouter.routeDesignPartialNonTimingDriven(array, pinsToRoute);
 
         t.stop().start("Write DCP");
         array.writeCheckpoint(ab.getOutputName());
@@ -861,6 +963,14 @@ public class ArrayBuilder {
         bufgce.addPinMapping("CE", "CE");
 
         return bufgce;
+    }
+
+    private static boolean boundingBoxStraddlesClockRegion(RelocatableTileRectangle boundingBox) {
+        ClockRegion cr0 = boundingBox.getMaxColumnTile().getClockRegion();
+        ClockRegion cr1 = boundingBox.getMinColumnTile().getClockRegion();
+        ClockRegion cr2 = boundingBox.getMaxRowTile().getClockRegion();
+        ClockRegion cr3 = boundingBox.getMinRowTile().getClockRegion();
+        return !Stream.of(cr0, cr1, cr2, cr3).allMatch(cr0::equals);
     }
 
     private static boolean straddlesClockRegion(ModuleInst mi) {

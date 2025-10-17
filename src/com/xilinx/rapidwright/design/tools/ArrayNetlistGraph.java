@@ -24,10 +24,8 @@
 package com.xilinx.rapidwright.design.tools;
 
 import com.google.ortools.Loader;
-import com.google.ortools.sat.BoolVar;
 import com.google.ortools.sat.CpModel;
 import com.google.ortools.sat.CpSolver;
-import com.google.ortools.sat.CpSolverSolutionCallback;
 import com.google.ortools.sat.CpSolverStatus;
 import com.google.ortools.sat.IntVar;
 import com.google.ortools.sat.LinearExpr;
@@ -50,6 +48,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class ArrayNetlistGraph {
     Graph<String, DefaultEdge> graph;
@@ -102,6 +101,72 @@ public class ArrayNetlistGraph {
 
     public Iterator<String> getTopologicalOrderIterator() {
         return new TopologicalOrderIterator<>(graph);
+    }
+
+    public Map<Pair<Integer, Integer>, String> getGreedyPlacementGrid() {
+        Map<Pair<Integer, Integer>, String> placementMap = new HashMap<>();
+        Map<String, Pair<Integer, Integer>> reversePlacementMap = new HashMap<>();
+        Iterator<String> iterator = getTopologicalOrderIterator();
+        while (iterator.hasNext()) {
+            String node = iterator.next();
+            if (placementMap.isEmpty()) {
+                placementMap.put(new Pair<>(0, 0), node);
+                reversePlacementMap.put(node, new Pair<>(0, 0));
+                continue;
+            }
+            Set<DefaultEdge> inEdges = graph.incomingEdgesOf(node);
+            List<String> inNeighbors = new ArrayList<>();
+            for (DefaultEdge e : inEdges) {
+                inNeighbors.add(graph.getEdgeSource(e));
+            }
+            if (inNeighbors.size() > 3) {
+                throw new RuntimeException("Greedy placement does not work for given netlist");
+            }
+            List<Pair<Integer, Integer>> inNeighborPlacements = new ArrayList<>();
+            for (String inNeighbor : inNeighbors) {
+                inNeighborPlacements.add(reversePlacementMap.get(inNeighbor));
+            }
+            inNeighborPlacements = inNeighborPlacements.stream().sorted(
+                    (p1, p2) -> {
+                        if (p1.getSecond().equals(p2.getSecond())) {
+                            return p1.getFirst() - p2.getFirst();
+                        }
+                        return p1.getSecond() - p2.getSecond();
+                    }).collect(Collectors.toList());
+            List<Pair<Integer, Integer>> validPlacements = new ArrayList<>();
+            if (inNeighbors.size() == 1) {
+                Pair<Integer, Integer> neighborPlacement = inNeighborPlacements.get(0);
+                validPlacements.add(new Pair<>(neighborPlacement.getFirst() + 1, neighborPlacement.getSecond()));
+                validPlacements.add(new Pair<>(neighborPlacement.getFirst(), neighborPlacement.getSecond() + 1));
+            } else if (inNeighbors.size() == 2) {
+                int x = inNeighborPlacements.get(0).getFirst();
+                int y = inNeighborPlacements.get(1).getSecond();
+                validPlacements.add(new Pair<>(x, y));
+            } else {
+                throw new RuntimeException("Not yet implemented, try using OR-tools based placement");
+            }
+            Pair<Integer, Integer> placement = null;
+            for (Pair<Integer, Integer> location : validPlacements) {
+                if (!placementMap.containsKey(location)) {
+                    placement = location;
+                }
+            }
+            if (placement == null) {
+                throw new RuntimeException("Could not find valid greedy placement for cell: " + node);
+            }
+            placementMap.put(placement, node);
+            reversePlacementMap.put(node, placement);
+        }
+
+        for (int y = 0; y < graph.vertexSet().size(); y++) {
+            for (int x = 0; x < graph.vertexSet().size(); x++) {
+                if (placementMap.containsKey(new Pair<>(x, y))) {
+                    System.out.println("Placed " + placementMap.get(new Pair<>(x, y)) + " at (" + x + ", " + y + ")");
+                }
+            }
+        }
+
+        return placementMap;
     }
 
     public Map<Pair<Integer, Integer>, String> getOptimalPlacementGrid(int width, int height) {
@@ -213,7 +278,7 @@ public class ArrayNetlistGraph {
                 // Neighbors must be adjacent
                 LinearExprBuilder xDistPlusYDist = LinearExpr.newBuilder();
                 xDistPlusYDist.addSum(new IntVar[]{xDistVar, yDistVar});
-//                model.addLessOrEqual(xDistPlusYDist, 1);
+                model.addLessOrEqual(xDistPlusYDist, 1);
 //                model.addLessOrEqual(xDistVar, 3);
 //                model.addLessOrEqual(yDistVar, 3);
             }
@@ -248,7 +313,7 @@ public class ArrayNetlistGraph {
 //        model.minimize(obj);
 
         CpSolver solver = new CpSolver();
-        solver.getParameters().setMaxTimeInSeconds(10.0);
+//        solver.getParameters().setMaxTimeInSeconds(10.0);
         CpSolverStatus status = solver.solve(model);
 
         if (status == CpSolverStatus.FEASIBLE || status == CpSolverStatus.OPTIMAL) {
@@ -264,6 +329,8 @@ public class ArrayNetlistGraph {
                     }
                 }
             }
+        } else {
+            throw new RuntimeException("Failed to find optimal placement grid, solver returned status: " + status);
         }
 
         return placementMap;
