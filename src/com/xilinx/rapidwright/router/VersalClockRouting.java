@@ -104,7 +104,7 @@ public class VersalClockRouting {
         public NodeWithPrevAndCost(Node node, NodeWithPrevAndCost prev, int cost) {
             super(node, prev);
             setCost(cost);
-            setDepth(prev.depth + 1);
+            setDepth((prev == null ? 0 : prev.depth) + 1);
         }
 
         public void setCost(int cost) {
