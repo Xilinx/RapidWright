@@ -368,6 +368,5 @@ public class NetTools {
                         + n.getTile().getClockRegion();
         Function<Node, Boolean> excludeFilter = n -> n.getIntentCode() == IntentCode.NODE_PINFEED;
         return getNetNodeTree(net, excludeFilter, customToString);
->>>>>>> upstream/print_clk_spine
     }
 }
