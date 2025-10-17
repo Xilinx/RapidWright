@@ -26,16 +26,24 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 
 public class NetTools {
+    public static final String CONTINUE_ELBOW = "\u251c\u2500 ";
+    public static final String LAST_ELBOW = "\u2514\u2500 ";
+    public static final String VERTICAL_BAR = "\u2502  ";
+    public static final String WHITE_SPACE = "   ";
+
     private static Set<SiteTypeEnum> clkSrcSiteTypeEnums = EnumSet.noneOf(SiteTypeEnum.class);
     static {
         clkSrcSiteTypeEnums.add(SiteTypeEnum.BUFGCE);       // All supported series
@@ -57,6 +65,7 @@ public class NetTools {
     }
 
     public static class NodeTree extends Node {
+        private static final long serialVersionUID = 8522818939039826954L;
         public List<NodeTree> fanouts = Collections.emptyList();
         public NodeTree(Node node) {
             super(node);
@@ -124,6 +133,47 @@ public class NetTools {
             buildString(sb, branchStart, subtreeStart, branchEndIfNoFanouts, subTreeEndIfNoFanouts);
             return sb.toString();
         }
+
+        /**
+         * Returns a string representation of this NodeTree using tree characters (├─, └─).
+         * @return String representation with tree characters.
+         */
+        public String toTreeString() {
+            StringBuilder sb = new StringBuilder();
+            buildTreeString(sb, "", "", new HashSet<>(), n -> n.toString());
+            return sb.toString();
+        }
+
+        /**
+         * Returns a string representation of this NodeTree using tree characters (├─, └─).
+         * 
+         * @param customToString Allows a custom toString() method to be applied to the Node when 
+         *        generating the String.
+         * @return String representation with tree characters.
+         */
+        public String toTreeString(Function<Node, String> customToString) {
+            StringBuilder sb = new StringBuilder();
+            buildTreeString(sb, "", "", new HashSet<>(), customToString);
+            return sb.toString();
+        }
+
+        private void buildTreeString(StringBuilder sb, String prefix, String childPrefix, 
+                Set<NetTools.NodeTree> visited, Function<Node, String> customToString) { 
+            sb.append(prefix);
+            sb.append(customToString.apply(this));
+            if (multiplyDriven && !visited.add(this)) {
+                sb.append(" (multiply driven, already visited)\n");
+                return;
+            }
+            sb.append("\n");
+            for (int i = 0; i < fanouts.size(); i++) {
+                NodeTree fanout = fanouts.get(i);
+                boolean isLast = i == fanouts.size() - 1;
+                String newPrefix = childPrefix + (isLast ? LAST_ELBOW : CONTINUE_ELBOW);
+                String newChildPrefix = childPrefix + (isLast ? WHITE_SPACE : VERTICAL_BAR);
+                fanout.buildTreeString(sb, newPrefix, newChildPrefix, visited, customToString);
+            }
+        }
     }
 
     /**
@@ -135,15 +185,34 @@ public class NetTools {
      * @return A list of NodeTree objects, corresponding to the root of each subtree.
      */
     public static List<NodeTree> getNodeTrees(Net net) {
+        return getNodeTrees(net, n -> false);
+    }
+    
+    /**
+     * Compute the node routing tree of the given Net by examining its PIPs.
+     * Note that this method only discovers subtrees that start at an output SitePinInst or a node tied to VCC/GND
+     * (i.e. gaps and islands will be ignored).
+     * Nodes that are multiply-driven (indicative of routing loops) will have their NodeTree.multiplyDriven flag set.
+     * @param net Net to analyze.
+     * @param filter A function that when is applied to a node, if it returns true will be excluded from the tree.
+     * @return A list of NodeTree objects, corresponding to the root of each subtree.
+     */
+    public static List<NodeTree> getNodeTrees(Net net, Function<Node, Boolean> filter) {
         List<NodeTree> subtrees = new ArrayList<>();
         Map<Node, NodeTree> nodeMap = new HashMap<>();
         for (PIP pip : net.getPIPs()) {
             if (pip.isEndWireNull()) {
                 continue;
             }
+
+            Node start = pip.getStartNode();
+            if (filter.apply(start)) continue;
+            Node end = pip.getEndNode();
+            if (filter.apply(end)) continue;
+            
             boolean isReversed = pip.isReversed();
-            NodeTree startNode = nodeMap.computeIfAbsent(isReversed ? pip.getEndNode() : pip.getStartNode(), NodeTree::new);
-            NodeTree endNode = nodeMap.compute(isReversed ? pip.getStartNode() : pip.getEndNode(), (k,v) -> {
+            NodeTree startNode = nodeMap.computeIfAbsent(isReversed ? end : start, NodeTree::new);
+            NodeTree endNode = nodeMap.compute(isReversed ? start : end, (k,v) -> {
                 if (v == null) {
                     v = new NodeTree(k);
                 } else {
@@ -185,5 +254,73 @@ public class NetTools {
             if (sink.getName().contains("CLK")) return true;
         }
         return false;
+    }
+
+    /**
+     * Returns a string representation of the net's routing tree using tree
+     * characters (├─, └─).
+     * 
+     * @param net The net to generate the tree of nodes from.
+     * @return String representation of the net's routing tree with tree characters.
+     */
+    public static String getNetNodeTree(Net net) { 
+        return getNetNodeTree(net, n -> false);
+    }
+
+    /**
+     * Returns a string representation of the net's routing tree using tree
+     * characters (├─, └─).
+     * 
+     * @param net    The net to generate the tree of nodes from.
+     * @param filter A function that when returns true for a node, the node should
+     *               be excluded.
+     * @return String representation of the net's routing tree with tree characters.
+     */
+    public static String getNetNodeTree(Net net, Function<Node, Boolean> filter) {
+        return getNetNodeTree(net, filter, n -> n.toString());
+    }
+
+    /**
+     * Returns a string representation of the net's routing tree using tree
+     * characters (├─, └─).
+     * 
+     * @param net            The net to generate the tree of nodes from.
+     * @param filter         A function that when returns true for a node, the node
+     *                       should be excluded.
+     * @param customToString A custom toString() function to be applied to the Node
+     *                       when printed.
+     * @return String representation of the net's routing tree with tree characters.
+     */
+    public static String getNetNodeTree(Net net, Function<Node, Boolean> filter,
+            Function<Node, String> customToString) {
+        List<NodeTree> subtrees = getNodeTrees(net, filter);
+        if (subtrees.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < subtrees.size(); i++) {
+            sb.append("\nSubtree ");
+            sb.append(i);
+            sb.append(":\n");
+            sb.append(subtrees.get(i).toTreeString(customToString));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Generates the clock tree up to the horizontal distribution nodes of the
+     * provided clock net up to the NODE_PINFEED nodes.
+     * 
+     * @param net The clock net
+     * @return A string tree representation from the source of the clock out to all
+     *         horizontal distribution nodes.
+     */
+    public static String getClockTreeSpine(Net net) {
+        Function<Node,String> customToString = 
+                n -> n.getTileName() + "/" + n.getWireName() 
+                + " (" + n.getIntentCode() + ") CR="
+                        + n.getTile().getClockRegion();
+        Function<Node, Boolean> excludeFilter = n -> n.getIntentCode() == IntentCode.NODE_PINFEED;
+        return getNetNodeTree(net, excludeFilter, customToString);
     }
 }
