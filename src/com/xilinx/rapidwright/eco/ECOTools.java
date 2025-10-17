@@ -60,6 +60,7 @@ import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.Params;
 
 /**
  * A collection of methods for performing ECO operations.
@@ -117,10 +118,16 @@ public class ECOTools {
      *                         if this method is called many times as the process is expensive
      *                         without batching.  This map can also allow SitePinInst objects to be
      *                         reused by {@link #connectNet(Design, Map, Map)}.
+     * By default, this method will unroute any intra-site routing associated with the disconnected
+     * pin. The Java property "rapidwright.ecotools.connectNet.skipUnrouteIntraSite" disables this
+     * behaviour which can be helpful for when disconnectNet() is followed by connectNet() that
+     * will re-use this intra-site routing.
      */
     public static void disconnectNet(Design design,
                                      List<EDIFHierPortInst> pins,
                                      Map<Net, Set<SitePinInst>> deferredRemovals) {
+        final boolean unrouteIntraSite = !Params.isParamSet("rapidwright.ecotools.disconnectNet.skipUnrouteIntraSite");
+
         for (EDIFHierPortInst ehpi : pins) {
             EDIFHierNet ehn = ehpi.getHierarchicalNet();
             List<EDIFHierPortInst> leafPortInsts;
@@ -165,7 +172,7 @@ public class ECOTools {
                     }
 
                     if (sourcePresent) {
-                        // Downstream does contains a source, remove everything upstream instead
+                        // Downstream does contain a source, remove everything upstream instead
                         visitedNets.clear();
                         visitedNets.add(internalEhn);
                         leafPortInsts = ehn.getLeafHierPortInsts(false, visitedNets);
@@ -196,11 +203,14 @@ public class ECOTools {
                         // SPI also services a different logical port inst; skip
                         continue;
                     }
-                    BELPin otherPin = cell.getBELPin(leafEhpi);
-                    BELPin src = otherPin.isOutput() ? otherPin : spi.getBELPin();
-                    BELPin snk = otherPin.isOutput() ? spi.getBELPin() : otherPin;
 
-                    cell.getSiteInst().unrouteIntraSiteNet(src, snk);
+                    if (unrouteIntraSite) {
+                        BELPin otherPin = cell.getBELPin(leafEhpi);
+                        BELPin src = otherPin.isOutput() ? otherPin : spi.getBELPin();
+                        BELPin snk = otherPin.isOutput() ? spi.getBELPin() : otherPin;
+                        cell.getSiteInst().unrouteIntraSiteNet(src, snk);
+                    }
+
                     DesignTools.handlePinRemovals(spi, deferredRemovals);
                 }
             }
@@ -465,7 +475,7 @@ public class ECOTools {
                                 String message = "Site pin " + spi.getSitePinName() + " cannot be used " +
                                         "to connect to logical pin '" + ehpi + "' since it is also connected to pin '" +
                                         otherEhpi + "'.";
-                                String warnIfCellInstStartsWith = System.getProperty("rapidwright.ecotools.connectNet.warnIfCellInstStartsWith");
+                                String warnIfCellInstStartsWith = Params.getParamValue("rapidwright.ecotools.connectNet.warnIfCellInstStartsWith");
                                 String cellInstName = (warnIfCellInstStartsWith != null) ? otherEhpi.getPortInst().getCellInst().getName() : null;
                                 if (cellInstName != null && cellInstName.startsWith(warnIfCellInstStartsWith)) {
                                     System.err.println("WARNING: " + message);
