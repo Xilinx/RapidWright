@@ -119,7 +119,7 @@ public class ECOTools {
      *                         without batching.  This map can also allow SitePinInst objects to be
      *                         reused by {@link #connectNet(Design, Map, Map)}.
      * By default, this method will unroute any intra-site routing associated with the disconnected
-     * pin. The Java property "rapidwright.ecotools.connectNet.skipUnrouteIntraSite" disables this
+     * pin. The Java property "rapidwright.ecotools.disconnectNet.skipUnrouteIntraSite" disables this
      * behaviour which can be helpful for when disconnectNet() is followed by connectNet() that
      * will re-use this intra-site routing.
      */
