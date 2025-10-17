@@ -263,8 +263,8 @@ public class NetTools {
      * @param net The net to generate the tree of nodes from.
      * @return String representation of the net's routing tree with tree characters.
      */
-    public static String getNetNodeTree(Net net) { 
-        return getNetNodeTree(net, n -> false);
+    public static String getNetTreeString(Net net) { 
+        return getNetTreeString(net, n -> false);
     }
 
     /**
@@ -276,8 +276,8 @@ public class NetTools {
      *               be excluded.
      * @return String representation of the net's routing tree with tree characters.
      */
-    public static String getNetNodeTree(Net net, Function<Node, Boolean> filter) {
-        return getNetNodeTree(net, filter, n -> n.toString());
+    public static String getNetTreeString(Net net, Function<Node, Boolean> filter) {
+        return getNetTreeString(net, filter, n -> n.toString());
     }
 
     /**
@@ -291,7 +291,7 @@ public class NetTools {
      *                       when printed.
      * @return String representation of the net's routing tree with tree characters.
      */
-    public static String getNetNodeTree(Net net, Function<Node, Boolean> filter,
+    public static String getNetTreeString(Net net, Function<Node, Boolean> filter,
             Function<Node, String> customToString) {
         List<NodeTree> subtrees = getNodeTrees(net, filter);
         if (subtrees.isEmpty()) {
@@ -321,6 +321,6 @@ public class NetTools {
                 + " (" + n.getIntentCode() + ") CR="
                         + n.getTile().getClockRegion();
         Function<Node, Boolean> excludeFilter = n -> n.getIntentCode() == IntentCode.NODE_PINFEED;
-        return getNetNodeTree(net, excludeFilter, customToString);
+        return getNetTreeString(net, excludeFilter, customToString);
     }
 }
