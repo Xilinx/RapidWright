@@ -325,6 +325,11 @@ public class GlobalSignalRouting {
         Node vroute = centroidResult.getFirst();
         centroid = centroidResult.getSecond();
         
+        // Attach the CLOCK_ROOT property <CLOCK_REGION>:<NODE>
+        clk.getLogicalNet().addProperty("CLOCK_ROOT", centroid.toString() + ":" + vroute.toString());
+        // We will only support balanced for now
+        clk.getLogicalNet().addProperty("CLOCK_VTREE_TYPE", "balanced");
+
         Map<ClockRegion, Node> upDownDistLines = VersalClockRouting
                 .routeToHorizontalDistributionLines(clk, vroute, usedCRsAndNonLCBPinsTuple.getFirst(),
                         false, getNodeStatus);
@@ -341,6 +346,7 @@ public class GlobalSignalRouting {
             if (track == null) {
                 System.err.println("WARNING: Unable to identify clock track for " + clk);
             } else {
+                clk.getLogicalNet().addProperty("CLOCK_TRACK", track);
                 Set<ClockRegion> collision = usedRoutingTracks.put(track,
                         new HashSet<>(usedCRsAndNonLCBPinsTuple.getFirst()));
                 assert (collision == null);
