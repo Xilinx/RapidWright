@@ -471,11 +471,9 @@ public class ECOTools {
                             if (!otherParentNet.equals(parentNet)) {
                                 // This SPI also services a different port inst that is connected to a
                                 // different net than the new one we're trying to connect up
-                                if (LUTTools.isCellALUT(cell)) {
-                                    // Check if we can map to a different physical pin
-                                    if (createExitSitePinInst(design, ehpi, newPhysNet) != null) {
-                                        continue nextLeafPin;
-                                    }
+                                // Check if we can use to a different SPI
+                                if (createExitSitePinInst(design, ehpi, newPhysNet) != null) {
+                                    continue nextLeafPin;
                                 }
                                 String message = "Site pin " + spi.getSitePinName() + " cannot be used " +
                                         "to connect to logical pin '" + ehpi + "' since it is also connected to pin '" +
@@ -1031,6 +1029,17 @@ public class ECOTools {
 
                 if (!netAliases.contains(siteWireNet)) {
                     // Site wire net is not an alias of the exit net
+
+                    // Check if it's a net we can clobber
+                    EDIFNet siteWireLogNet = siteWireNet.getLogicalNet();
+                    String clobberSitePinInstIfNetStartsWith = (siteWireLogNet != null) ? System.getProperty("rapidwright.ecotools.connectNet.clobberSitePinInstIfNetStartsWith") : null;
+                    if (clobberSitePinInstIfNetStartsWith != null && siteWireLogNet.getName().startsWith(clobberSitePinInstIfNetStartsWith)) {
+                        spi = si.getSitePinInst(sitePinName);
+                        assert(spi != null);
+                        assert(spi.getNet() == siteWireNet);
+                        break;
+                    }
+
                     continue;
                 }
             } else {
@@ -1040,37 +1049,40 @@ public class ECOTools {
             spi = si.getSitePinInst(sitePinName);
             if (spi == null) {
                 spi = net.createPin(sitePinName, si);
-            } else { // spi != null
-                assert(spi.getNet() != net);
+                break;
+            }
+            assert(spi.getNet() == siteWireNet);
+            if (spi.getNet() != net) {
+                // SPI does not drive desired net, continue search
+                spi = null;
+            }
+        }
 
-                // For LUTS only: check if we can map to a different physical pin
-                String newPhysPin = LUTTools.isCellALUT(cell) ? LUTTools.getUnmappedPhysicalLUTInputPin(cell) : null;
-                if (newPhysPin != null) {
-                    String physicalPinName = cell.getPhysicalPinMapping(logicalPinName);
-                    cell.removePinMapping(physicalPinName);
-                    cell.addPinMapping(newPhysPin, logicalPinName);
-                    spi = createExitSitePinInst(design, ehpi, net);
-                } else {
-                    continue;
-                }
-
-                // TODO: Also check for:
-                //       (a) reusing a physical pin (on the current LUT or its companion) that is
-                //           already providing 'net'
-                //       (b) reclaiming a mapped physical pin that corresponds to an unconnected
-                //           logical pin
+        if (spi == null) {
+            // For LUTs only: check if we can map to a different physical pin
+            String newPhysPin = LUTTools.isCellALUT(cell) ? LUTTools.getUnmappedPhysicalLUTInputPin(cell) : null;
+            if (newPhysPin != null) {
+                String physicalPinName = cell.getPhysicalPinMapping(logicalPinName);
+                cell.removePinMapping(physicalPinName);
+                cell.addPinMapping(newPhysPin, logicalPinName);
+                spi = createExitSitePinInst(design, ehpi, net);
             }
 
-            assert(spi != null);
-            break;
+            // TODO: Also check for:
+            //       (a) reusing a different physical pin (on the current LUT or its companion) that is
+            //           already providing 'net'
+            //       (b) reclaiming a mapped physical pin that corresponds to an unconnected
+            //           logical pin
+            //       (c) reusing a SitePinInst from deferredRemovals
         }
 
         if (spi == null) {
             throw new RuntimeException("ERROR: Unable to route pin '" + ehpi + "' out of site " + si.getSiteName() + ".");
         }
+        assert(spi.getNet() != null);
 
         BELPin snkBp = cell.getBELPin(ehpi);
-        if (!si.unrouteIntraSiteNet(spi.getBELPin(), snkBp)) {
+        if (spi.getNet() != net && !si.unrouteIntraSiteNet(spi.getBELPin(), snkBp)) {
             throw new RuntimeException("ERROR: Failed to unroute intra-site connection " +
                     spi.getSiteInst().getSiteName() + "/" + spi.getBELPin() + " to " + snkBp + ".");
         }
