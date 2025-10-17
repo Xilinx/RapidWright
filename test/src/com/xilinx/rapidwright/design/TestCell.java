@@ -66,6 +66,29 @@ public class TestCell {
         Assertions.assertEquals(expectedSitePins, sitePinNames.toString());
     }
 
+    @Test
+    public void testGetAllCorrespondingSitePinNamesLUTRouteThruTwice() {
+        Design d = new Design("testGetAllCorrespondingSitePinNamesLUTRouteThruTwice", Device.KCU105);
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
+        d.createAndPlaceCell("f7mux", Unisim.MUXF7, si.getSiteName() + "/F7MUX_GH");
+        Cell cell = d.createAndPlaceCell("fdre", Unisim.FDRE, si.getSiteName() + "/GFF");
+
+        Net netS = d.createNet("netS");
+        Assertions.assertTrue(si.routeIntraSiteNet(netS, si.getBELPin("GX", "GX"),
+                si.getBELPin("F7MUX_GH", "S0")));
+
+        boolean considerRoutethru = true;
+        List<String> sitePinNames = cell.getAllCorrespondingSitePinNames("D", considerRoutethru);
+        Assertions.assertEquals("[GX, G1, G2, G3, G4, G5, G6]", sitePinNames.toString());
+
+        Net net1 = d.createNet("net1");
+        Assertions.assertTrue(si.routeIntraSiteNet(net1, si.getBELPin("G5", "G5"),
+                si.getBELPin("F7MUX_GH", "1")));
+
+        cell.getAllCorrespondingSitePinNames("D", considerRoutethru);
+        Assertions.assertEquals("[GX, G1, G2, G3, G4, G5, G6]", sitePinNames.toString());
+    }
+
     @ParameterizedTest
     @CsvSource({
             // Versal input pins
