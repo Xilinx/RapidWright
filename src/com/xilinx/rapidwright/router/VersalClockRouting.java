@@ -81,18 +81,38 @@ public class VersalClockRouting {
     }
     
     public static class NodeWithPrevAndCost extends NodeWithPrev implements Comparable<NodeWithPrevAndCost> {
+        private static final long serialVersionUID = 2103669135320260630L;
         protected int cost;
+        protected int depth;
         public NodeWithPrevAndCost(Node node) {
             super(node);
             setCost(0);
+            setDepth(1);
         }
         public NodeWithPrevAndCost(Node node, NodeWithPrev prev, int cost) {
             super(node, prev);
             setCost(cost);
+            int depth = 1;
+            NodeWithPrev curr = prev;
+            while (curr.getPrev() != null) {
+                depth++;
+                curr = curr.getPrev();
+            }
+            setDepth(depth);
+        }
+
+        public NodeWithPrevAndCost(Node node, NodeWithPrevAndCost prev, int cost) {
+            super(node, prev);
+            setCost(cost);
+            setDepth(prev.depth + 1);
         }
 
         public void setCost(int cost) {
             this.cost = cost;
+        }
+
+        public void setDepth(int depth) {
+            this.depth = depth;
         }
 
         @Override
@@ -297,7 +317,7 @@ public class VersalClockRouting {
                     if (!visited.add(downhill)) {
                         continue;
                     }
-                    int cost = downhill.getTile().getManhattanDistance(crApproxCenterTile);
+                    int cost = downhill.getTile().getManhattanDistance(crApproxCenterTile) + curr.depth;
                     q.add(new NodeWithPrevAndCost(downhill, curr, cost));
                 }
             }
@@ -452,7 +472,7 @@ public class VersalClockRouting {
                     if (!visited.add(downhill)) {
                         continue;
                     }
-                    int cost = downhill.getTile().getManhattanDistance(lcbTile);
+                    int cost = downhill.getTile().getManhattanDistance(lcbTile) + curr.depth;
                     q.add(new NodeWithPrevAndCost(downhill, curr, cost));
                 }
             }
@@ -603,14 +623,14 @@ public class VersalClockRouting {
             }
 
             while (!q.isEmpty()) {
-                NodeWithPrev curr = q.poll();
+                NodeWithPrevAndCost curr = q.poll();
                 if (getNodeStatus.apply(curr) != NodeStatus.AVAILABLE) {
                     continue;
                 }
                 visited.add(curr);
                 if (sink.equals(curr)) {
                     if (sinkOneHopLater) {
-                        curr = new NodeWithPrev(p.getConnectedNode(), curr);
+                        curr = new NodeWithPrevAndCost(p.getConnectedNode(), curr, curr.cost + 1);
                     }
                     List<Node> path = curr.getPrevPath();
                     allPIPs.addAll(RouterHelper.getPIPsFromNodes(path));
@@ -622,7 +642,7 @@ public class VersalClockRouting {
                     if (!visited.add(downhill)) {
                         continue;
                     }
-                    int cost = downhill.getTile().getManhattanDistance(sink.getTile());
+                    int cost = downhill.getTile().getManhattanDistance(sink.getTile()) + curr.depth;
                     q.add(new NodeWithPrevAndCost(downhill, curr, cost));
                 }
             }
