@@ -407,12 +407,12 @@ public class TestRWRoute {
             // Versal
             // One SLR crossing
             // (Too) close
-            "xcv80,SLICE_X54Y331,SLICE_X54Y332,39700",          // Adjacent to crossing SLL (east)
-            "xcv80,SLICE_X51Y331,SLICE_X51Y332,39000",
+            "xcv80,SLICE_X54Y331,SLICE_X54Y332,800",            // Adjacent to crossing SLL (east)
+            "xcv80,SLICE_X51Y331,SLICE_X51Y332,400",            // Close to crossing SLL
             // Perfect
             "xcv80,SLICE_X54Y331,SLICE_X54Y406,500",            // Adjacent to crossing SLL (east)
             "xcv80,SLICE_X53Y331,SLICE_X53Y406,200",            // Adjacent to crossing SLL (west)
-            "xcv80,SLICE_X51Y331,SLICE_X51Y406,400",
+            "xcv80,SLICE_X51Y331,SLICE_X51Y406,400",            // Close to crossing SLL
 
             // US+
             // One SLR crossing

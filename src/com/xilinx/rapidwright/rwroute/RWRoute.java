@@ -2099,8 +2099,7 @@ public class RWRoute {
             ));
 
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
-            if (deltaSLR != 0
-                    && !routingGraph.isVersal) {    // FIXME: Update this for Versal
+            if (deltaSLR != 0) {
                 // Check for overshooting which occurs when child and sink node are in
                 // adjacent SLRs and less than a SLL wire's length apart in the Y axis.
                 if (deltaSLR == 1) {
@@ -2111,54 +2110,56 @@ public class RWRoute {
                     }
                 }
 
-                // Account for any detours that must be taken to get to the closest Laguna column
-                // and from there onto the sink
-                int nextLagunaColumn = routingGraph.nextLagunaColumn[childX];
-                int prevLagunaColumn = routingGraph.prevLagunaColumn[childX];
-                if (nextLagunaColumn == prevLagunaColumn) {
-                    // On top of the column
-                    assert(deltaX == Math.abs(sinkX - nextLagunaColumn));
-                } else {
-                    assert(rnode.getType() != RouteNodeType.SUPER_LONG_LINE);
+                if (!routingGraph.isVersal) { // FIXME: Update this for Versal
+                    // Account for any detours that must be taken to get to the closest Laguna column
+                    // and from there onto the sink
+                    int nextLagunaColumn = routingGraph.nextLagunaColumn[childX];
+                    int prevLagunaColumn = routingGraph.prevLagunaColumn[childX];
+                    if (nextLagunaColumn == prevLagunaColumn) {
+                        // On top of the column
+                        assert(deltaX == Math.abs(sinkX - nextLagunaColumn));
+                    } else {
+                        assert(rnode.getType() != RouteNodeType.SUPER_LONG_LINE);
 
-                    final int deltaXToNextColumn;
-                    final int deltaXToPrevColumn;
-                    final int deltaXToAndFromNextColumn;
-                    final int deltaXToAndFromPrevColumn;
-                    if (nextLagunaColumn == Integer.MAX_VALUE  || nextLagunaColumn >= connection.getXMaxBB()) {
-                        deltaXToNextColumn = Integer.MAX_VALUE;
-                        deltaXToAndFromNextColumn = Integer.MAX_VALUE;
-                    } else {
-                        deltaXToNextColumn = Math.abs(nextLagunaColumn - childX);
-                        deltaXToAndFromNextColumn = deltaXToNextColumn + Math.abs(sinkX - nextLagunaColumn);
+                        final int deltaXToNextColumn;
+                        final int deltaXToPrevColumn;
+                        final int deltaXToAndFromNextColumn;
+                        final int deltaXToAndFromPrevColumn;
+                        if (nextLagunaColumn == Integer.MAX_VALUE  || nextLagunaColumn >= connection.getXMaxBB()) {
+                            deltaXToNextColumn = Integer.MAX_VALUE;
+                            deltaXToAndFromNextColumn = Integer.MAX_VALUE;
+                        } else {
+                            deltaXToNextColumn = Math.abs(nextLagunaColumn - childX);
+                            deltaXToAndFromNextColumn = deltaXToNextColumn + Math.abs(sinkX - nextLagunaColumn);
+                        }
+                        if (prevLagunaColumn == Integer.MIN_VALUE || prevLagunaColumn <= connection.getXMinBB()) {
+                            deltaXToPrevColumn = Integer.MAX_VALUE;
+                            deltaXToAndFromPrevColumn = Integer.MAX_VALUE;
+                        } else {
+                            deltaXToPrevColumn = Math.abs(prevLagunaColumn - childX);
+                            deltaXToAndFromPrevColumn = deltaXToPrevColumn + Math.abs(sinkX - prevLagunaColumn);
+                        }
+                        if (deltaXToNextColumn == deltaXToPrevColumn) {
+                            // Equidistant from both columns, prefer the one closer when considering to/from the sink
+                            deltaX = Math.min(deltaXToAndFromNextColumn, deltaXToAndFromPrevColumn);
+                        } else if (deltaXToNextColumn < deltaXToPrevColumn &&
+                                deltaXToAndFromNextColumn <= deltaXToAndFromPrevColumn + maxDetourToSnapBackToPrevLagunaColumn) {
+                            // Closer to the next column and not detouring more than 4 tiles extra to/from using the prev column
+                            assert(deltaX <= deltaXToAndFromNextColumn);
+                            deltaX = deltaXToAndFromNextColumn;
+                        } else if (deltaXToPrevColumn < deltaXToNextColumn &&
+                                deltaXToAndFromPrevColumn <= deltaXToAndFromNextColumn + maxDetourToSnapBackToPrevLagunaColumn) {
+                            // Closer to the next column and not detouring more than 4 tiles extra to/from using the prev column
+                            assert(deltaX <= deltaXToAndFromPrevColumn);
+                            deltaX = deltaXToAndFromPrevColumn;
+                        } else {
+                            // Pretty much same distance to/from both columns; prefer the closer to column
+                            deltaX = (deltaXToNextColumn < deltaXToPrevColumn) ? deltaXToAndFromNextColumn
+                                                                               : deltaXToAndFromPrevColumn;
+                        }
                     }
-                    if (prevLagunaColumn == Integer.MIN_VALUE || prevLagunaColumn <= connection.getXMinBB()) {
-                        deltaXToPrevColumn = Integer.MAX_VALUE;
-                        deltaXToAndFromPrevColumn = Integer.MAX_VALUE;
-                    } else {
-                        deltaXToPrevColumn = Math.abs(prevLagunaColumn - childX);
-                        deltaXToAndFromPrevColumn = deltaXToPrevColumn + Math.abs(sinkX - prevLagunaColumn);
-                    }
-                    if (deltaXToNextColumn == deltaXToPrevColumn) {
-                        // Equidistant from both columns, prefer the one closer when considering to/from the sink
-                        deltaX = Math.min(deltaXToAndFromNextColumn, deltaXToAndFromPrevColumn);
-                    } else if (deltaXToNextColumn < deltaXToPrevColumn &&
-                            deltaXToAndFromNextColumn <= deltaXToAndFromPrevColumn + maxDetourToSnapBackToPrevLagunaColumn) {
-                        // Closer to the next column and not detouring more than 4 tiles extra to/from using the prev column
-                        assert(deltaX <= deltaXToAndFromNextColumn);
-                        deltaX = deltaXToAndFromNextColumn;
-                    } else if (deltaXToPrevColumn < deltaXToNextColumn &&
-                            deltaXToAndFromPrevColumn <= deltaXToAndFromNextColumn + maxDetourToSnapBackToPrevLagunaColumn) {
-                        // Closer to the next column and not detouring more than 4 tiles extra to/from using the prev column
-                        assert(deltaX <= deltaXToAndFromPrevColumn);
-                        deltaX = deltaXToAndFromPrevColumn;
-                    } else {
-                        // Pretty much same distance to/from both columns; prefer the closer to column
-                        deltaX = (deltaXToNextColumn < deltaXToPrevColumn) ? deltaXToAndFromNextColumn
-                                                                           : deltaXToAndFromPrevColumn;
-                    }
+                    assert(deltaX >= 0 && deltaX < Integer.MAX_VALUE);
                 }
-                assert(deltaX >= 0 && deltaX < Integer.MAX_VALUE);
             }
         }
 
