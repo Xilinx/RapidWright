@@ -72,12 +72,16 @@ public class RouteNodeInfo {
         RouteNodeType type = getType(node, routingGraph);
         short endTileXCoordinate = getEndTileXCoordinate(node, (short) endTile.getTileXCoordinate());
         short endTileYCoordinate = (short) endTile.getTileYCoordinate();
-        short length = getLength(baseTile, type, endTileXCoordinate, endTileYCoordinate);
+        short length = getLength(baseTile, type, endTileXCoordinate, endTileYCoordinate, routingGraph);
 
         return new RouteNodeInfo(type, endTileXCoordinate, endTileYCoordinate, length);
     }
 
-    private static short getLength(Tile baseTile, RouteNodeType type, short endTileXCoordinate, short endTileYCoordinate) {
+    private static short getLength(Tile baseTile,
+                                   RouteNodeType type,
+                                   short endTileXCoordinate,
+                                   short endTileYCoordinate,
+                                   RouteNodeGraph routingGraph) {
         TileTypeEnum tileType = baseTile.getTileTypeEnum();
         short length = (short) Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate());
         if (tileType == TileTypeEnum.LAG_LAG) {
@@ -89,7 +93,7 @@ public class RouteNodeInfo {
         switch (tileType) {
             case LAG_LAG:
             case LAGUNA_TILE:
-                assert(length == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES ||
+                assert(length == routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES ||
                        // U-turn
                        length == 0);
                 break;

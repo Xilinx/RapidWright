@@ -95,7 +95,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         endTileYCoordinate = nodeInfo.endTileYCoordinate;
         length = nodeInfo.length;
         children = null;
-        setBaseCost(routingGraph.design.getSeries());
+        setBaseCost(routingGraph);
         historicalCongestionCost = initialHistoricalCongestionCost;
         usersConnectionCounts = null;
         visited = 0;
@@ -110,7 +110,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         return (int) Math.signum(this.lowerBoundTotalPathCost - that.lowerBoundTotalPathCost);
     }
 
-    private void setBaseCost(Series series) {
+    private void setBaseCost(RouteNodeGraph routingGraph) {
+        final Series series = routingGraph.design.getSeries();
         baseCost = 0.4f;
         switch (getType()) {
             case EXCLUSIVE_SOURCE:
@@ -151,8 +152,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 break;
             case SUPER_LONG_LINE:
                 assert(length == 0 ||
-                       length == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
-                baseCost = 0.3f * RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
+                       length == routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
+                baseCost = 0.3f * routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
                 break;
             case NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
             case NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:

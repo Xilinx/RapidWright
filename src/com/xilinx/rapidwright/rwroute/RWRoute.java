@@ -2104,10 +2104,10 @@ public class RWRoute {
                 // Check for overshooting which occurs when child and sink node are in
                 // adjacent SLRs and less than a SLL wire's length apart in the Y axis.
                 if (deltaSLR == 1) {
-                    int overshootByY = deltaY - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
+                    int overshootByY = deltaY - routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
                     if (overshootByY < 0) {
-                        assert(deltaY < RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
-                        deltaY = RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - overshootByY;
+                        assert(deltaY < routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
+                        deltaY = routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - overshootByY;
                     }
                 }
 

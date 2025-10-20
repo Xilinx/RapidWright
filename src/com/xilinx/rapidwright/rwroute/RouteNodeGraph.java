@@ -88,7 +88,7 @@ public class RouteNodeGraph {
 
     private long createRnodeTime;
 
-    public static final short SUPER_LONG_LINE_LENGTH_IN_TILES = 60;
+    public final short SUPER_LONG_LINE_LENGTH_IN_TILES;
 
     /** Array mapping an INT tile's Y coordinate, to its SLR index */
     public final int[] intYToSLRIndex;
@@ -190,6 +190,8 @@ public class RouteNodeGraph {
             ultraScalesLocalWires.put(tile.getTileTypeEnum(), localWires);
 
             eastWestPattern = Pattern.compile("(((BOUNCE|BYPASS|IMUX|INODE(_[12])?)_(?<eastwest>[EW]))|INT_NODE_IMUX_(?<inode>\\d+)_).*");
+
+            SUPER_LONG_LINE_LENGTH_IN_TILES = 60;
         } else {
             assert(isVersal);
 
@@ -218,6 +220,8 @@ public class RouteNodeGraph {
             ultraScalesLocalWires = null;
 
             eastWestPattern = Pattern.compile("(((BOUNCE|IMUX_B|[BC]NODE_OUTS)_(?<eastwest>[EW]))|INT_NODE_IMUX_ATOM_(?<inode>\\d+)_).*");
+
+            SUPER_LONG_LINE_LENGTH_IN_TILES = 75;
         }
 
         for (Tile intTile : intTilesToExamine) {
@@ -1111,7 +1115,11 @@ public class RouteNodeGraph {
                     return false;
                 case NODE_CLE_BNODE:
                 case NODE_INTF_BNODE:
-                    if (connection.isCrossSLR()) {
+                    if (connection.isCrossSLR() &&
+                            childTile.getTileTypeEnum() == TileTypeEnum.SLL &&
+                            childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
+                        // Allow BNODEs since these are used to reach NODE_SLL_INPUT nodes
+                        // TODO: Only allow BNODEs into SLLs that contain SLR crossings
                         return true;
                     }
                 case NODE_CLE_CNODE:
@@ -1138,7 +1146,8 @@ public class RouteNodeGraph {
                     // CTRL pins that are not our target EXCLUSIVE_SINK will have been isExcluded() from the graph
                     break;
                 case NODE_SLL_INPUT:
-                    if (connection.isCrossSLR()) {
+                    if (connection.isCrossSLR() &&
+                            childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
                         assert(parentRnode.getIntentCode() != IntentCode.NODE_SLL_OUTPUT);
                         return true;
                     }
