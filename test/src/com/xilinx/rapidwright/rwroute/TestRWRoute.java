@@ -413,6 +413,7 @@ public class TestRWRoute {
             "xcv80,SLICE_X54Y331,SLICE_X54Y406,500",            // Adjacent to crossing SLL (east)
             "xcv80,SLICE_X53Y331,SLICE_X53Y406,200",            // Adjacent to crossing SLL (west)
             "xcv80,SLICE_X51Y331,SLICE_X51Y406,400",            // Close to crossing SLL
+            "xcv80,SLICE_X0Y331,SLICE_X49Y406,2000",            // Far from crossing SLL
 
             // US+
             // One SLR crossing
