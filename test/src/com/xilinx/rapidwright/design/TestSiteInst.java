@@ -259,6 +259,32 @@ public class TestSiteInst {
                 si.getBELPin(unisim.toString(), "DI0")));
     }
 
+    @Test
+    public void testRouteLUTRouteThruTwice() {
+        Design d = new Design("testRouteLUTRouteThruTwice", Device.KCU105);
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
+        d.createAndPlaceCell("f7mux", Unisim.MUXF7, si.getSiteName() + "/F7MUX_GH");
+        d.createAndPlaceCell("fdre", Unisim.FDRE, si.getSiteName() + "/GFF");
+
+        Net netS = d.createNet("netS");
+        Assertions.assertTrue(si.routeIntraSiteNet(netS, si.getBELPin("GX", "GX"),
+                si.getBELPin("F7MUX_GH", "S0")));
+
+        Net net1 = d.createNet("net1");
+        Assertions.assertTrue(si.routeIntraSiteNet(net1, si.getBELPin("G5", "G5"),
+                si.getBELPin("F7MUX_GH", "1")));
+
+        Net netD = d.createNet("netD");
+        Assertions.assertTrue(si.routeIntraSiteNet(netD, si.getBELPin("G2", "G2"),
+                si.getBELPin("GFF", "D")));
+
+        Assertions.assertTrue(si.getCell("G6LUT").isRoutethru());
+        Assertions.assertSame(net1, si.getNetFromSiteWire("G_O"));
+        Assertions.assertTrue(si.getCell("G5LUT").isRoutethru());
+        Assertions.assertSame(netD, si.getNetFromSiteWire("G5LUT_O5"));
+        Assertions.assertEquals("D5", si.getUsedSitePIP("FFMUXG1").getInputPinName());
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {Device.KCU105, Device.PYNQ_Z1})
     public void testUnrouteLUTRouteThruToCarry(String deviceName) {

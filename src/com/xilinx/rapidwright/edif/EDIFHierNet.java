@@ -34,6 +34,8 @@ import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
 
+import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.design.Unisim;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -355,5 +357,32 @@ public class EDIFHierNet implements Comparable<EDIFHierNet> {
             }
         }
         return false;
+    }
+
+    /**
+     * Checks if this net is a GND or VCC net and if so returns the appropriate
+     * NetType. If it is not a static net, it returns NetType.UNKNOWN.
+     * This method doesn't use any cached information about the netlist and so
+     * doesn't require an up-to-date {@link EDIFNetlist#getParentNetMap()},
+     * instead always operating on the current state of the netlist
+     * connectivity.
+     *
+     * @return The static source type or UNKNOWN if it is not a static net.
+     */
+    public NetType getPhysStaticSourceType() {
+        NetType sourceType = getNet().getPhysStaticSourceType();
+        if (sourceType != NetType.UNKNOWN) {
+            return sourceType;
+        }
+        for (EDIFHierPortInst portInst : getLeafHierPortInsts(true, false)) {
+            String cellType = portInst.getCellType().getName();
+            if (cellType.equals(Unisim.GND.name())) {
+                return NetType.GND;
+            }
+            if (cellType.equals(Unisim.VCC.name())) {
+                return NetType.VCC;
+            }
+        }
+        return NetType.UNKNOWN;
     }
 }
