@@ -481,6 +481,8 @@ public class TestEDIFTools {
         FileTools.writeStringToTextFile("Fake EDIF", edn.toString());
 
         // We need to read an external EDIF in order to trigger the .edn search
+        // When provided with an external EDIF, RapidWright will look for encrypted cells in the same directory as the 
+        // .edn file, keeping a record of possible encrypted cells as it goes.  
         d = Design.readCheckpoint(dcp, edf);
 
         Assertions.assertEquals(1, d.getNetlist().getEncryptedCells().size());
