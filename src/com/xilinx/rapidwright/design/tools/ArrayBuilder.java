@@ -805,18 +805,6 @@ public class ArrayBuilder {
                         ) {
                             curr.unplace();
                         } else {
-//                            if (curr.getName().contains("y[0]")) {
-//                                if (anchor.getTile().getSLR() != array.getDevice().getSLR(2)) {
-//                                    System.out.println(anchor);
-//                                    throw new RuntimeException("Not split across slr y[0]");
-//                                }
-//                            }
-//                            if (curr.getName().contains("y[1]")) {
-//                                if (anchor.getTile().getSLR() != array.getDevice().getSLR(1)) {
-//                                    System.out.println(anchor);
-//                                    throw new RuntimeException("Not split across slr y[1]");
-//                                }
-//                            }
                             boundingBoxes.add(newBoundingBox);
                             placed++;
                             newPlacementMap.put(curr, anchor);
@@ -921,6 +909,8 @@ public class ArrayBuilder {
 
         t.stop().start("Route clock");
         Net clockNet = array.getNet(ab.getTopClockName());
+        DesignTools.makePhysNetNamesConsistent(array);
+        DesignTools.createPossiblePinsToStaticNets(array);
         DesignTools.createMissingSitePinInsts(array, clockNet);
         List<SitePinInst> pinsToRoute = clockNet.getPins();
 //        for (EDIFNet edifNet : array.getNetlist().getCell("systolic_array").getNets()) {
@@ -932,8 +922,8 @@ public class ArrayBuilder {
 //                pinsToRoute.addAll(net.getPins());
 //            }
 //        }
-//        System.out.println("Pin count: " + pinsToRoute.size());
-//        PartialRouter.routeDesignPartialNonTimingDriven(array, pinsToRoute);
+        System.out.println("Pin count: " + pinsToRoute.size());
+        PartialRouter.routeDesignPartialNonTimingDriven(array, pinsToRoute);
 
         t.stop().start("Write DCP");
         array.writeCheckpoint(ab.getOutputName());

@@ -96,6 +96,103 @@ public class InlineFlopTools {
         createAndPlaceFlopsInlineOnTopPorts(design, clkNet, keepOut, true);
     }
 
+    private static Site shiftSiteToSide(Device device, Site site, PBlock pblock, PBlockSide side) {
+        Tile topLeftTile = pblock.getTopLeftTile();
+        Tile bottomRightTile = pblock.getBottomRightTile();
+        Tile siteTile = site.getTile();
+        int pBlockTop = topLeftTile.getRow();
+        int pBlockLeft = topLeftTile.getColumn();
+        int pBlockRight = bottomRightTile.getColumn();
+        int pBlockBottom = bottomRightTile.getRow();
+        int siteTileCol = siteTile.getColumn();
+        int siteTileRow = siteTile.getRow();
+
+        Tile shiftedTile;
+        if (side == PBlockSide.TOP) {
+            // Shift tile up
+            shiftedTile = shiftTileUntilSlice(device, pBlockTop, siteTileCol, true, true);
+        } else if (side == PBlockSide.LEFT) {
+            // Shift tile left
+            shiftedTile = shiftTileUntilSlice(device, siteTileRow, pBlockLeft, false, true);
+        } else if (side == PBlockSide.RIGHT) {
+            // Shift tile right
+            shiftedTile = shiftTileUntilSlice(device, siteTileRow, pBlockRight, false, false);
+        } else {
+            // Shift tile down
+            shiftedTile = shiftTileUntilSlice(device, pBlockBottom, siteTileCol, true, false);
+        }
+        Site shiftedSite = site.getCorrespondingSite(site.getSiteTypeEnum(), shiftedTile);
+        if (shiftedSite == null) {
+            // Can't find a site on the edge of the PBlock, return the original site
+            return site;
+        }
+
+        return shiftedSite;
+    }
+
+    /**
+     * Add flip-flops inline on all the top-level ports of an out-of-context design.
+     * This is useful for out-of-context kernels so that after the flops have been
+     * placed, the router is forced to route connections of each of the ports to
+     * each of the flops. This can help alleviate congestion when the kernels are
+     * placed/relocated in context.
+     *
+     * @param design      The design to modify
+     * @param clkNet      Name of the clock net to use on which to add the flops
+     * @param keepOut     The pblock used to contain the kernel and the added flops will
+     *                    not be placed inside this area.
+     * @param portSideMap Map from ports to side of the pblock the flop should be placed on
+     */
+    public static void createAndPlacePortFlopsOnSide(Design design, String clkNet, PBlock keepOut,
+                                                      Map<EDIFPort, PBlockSide> portSideMap) {
+        assert (design.getSiteInsts().isEmpty());
+        Site start = keepOut.getAllSites("SLICE").iterator().next(); // TODO this is a bit wasteful
+        boolean exclude = true;
+
+        EDIFHierNet clk = design.getNetlist().getHierNetFromName(clkNet);
+
+        Set<SiteInst> siteInstsToRoute = new HashSet<>();
+
+        for (Map.Entry<EDIFPort, PBlockSide> entry : portSideMap.entrySet()) {
+            EDIFPort port = entry.getKey();
+            PBlockSide side = entry.getValue();
+            if (port.getName().equals(clkNet)) {
+                continue;
+            }
+            Site shiftedSite = shiftSiteToSide(design.getDevice(), start, keepOut, side);
+            if (port.isBus()) {
+                for (int i : port.getBitBlastedIndicies()) {
+                    EDIFPortInst inst = port.getInternalPortInstFromIndex(i);
+                    if (allLeavesAreIBUF(design, inst)) {
+                        continue;
+                    }
+
+                    Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(shiftedSite, keepOut, exclude).iterator();
+                    siteItr.next(); // Skip the first site, as we are suggesting one inside the pblock
+                    Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr, null);
+                    Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
+                    siteInstsToRoute.add(flop.getSiteInst());
+                }
+            } else {
+                EDIFPortInst inst = port.getInternalPortInst();
+                if (inst != null) {
+                    if (allLeavesAreIBUF(design, inst)) {
+                        continue;
+                    }
+
+                    Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(shiftedSite, keepOut, exclude).iterator();
+                    siteItr.next(); // Skip the first site, as we are suggesting one inside the pblock
+                    Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr, null);
+                    Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
+                    siteInstsToRoute.add(flop.getSiteInst());
+                }
+            }
+        }
+        for (SiteInst si : siteInstsToRoute) {
+            si.routeSite();
+        }
+    }
+
     /**
      * Add flip-flops inline on all the top-level ports of an out-of-context design.
      * This is useful for out-of-context kernels so that after the flops have been
@@ -116,8 +213,6 @@ public class InlineFlopTools {
         EDIFCell top = design.getTopEDIFCell();
         Site start = keepOut.getAllSites("SLICE").iterator().next(); // TODO this is a bit wasteful
         boolean exclude = true;
-        Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(start, keepOut, exclude).iterator();
-        siteItr.next(); // Skip the first site, as we are suggesting one inside the pblock
 
         EDIFHierNet clk = design.getNetlist().getHierNetFromName(clkNet);
 
@@ -137,6 +232,8 @@ public class InlineFlopTools {
                     if (centroidPlacement) {
                         netCentroidFlipFlopPlacement(design, inst, keepOut, clk, siteInstsToRoute);
                     } else {
+                        Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(start, keepOut, exclude).iterator();
+                        siteItr.next(); // Skip the first site, as we are suggesting one inside the pblock
                         Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr, null);
                         Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
                         siteInstsToRoute.add(flop.getSiteInst());
@@ -152,6 +249,8 @@ public class InlineFlopTools {
                     if (centroidPlacement) {
                         netCentroidFlipFlopPlacement(design, inst, keepOut, clk, siteInstsToRoute);
                     } else {
+                        Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(start, keepOut, exclude).iterator();
+                        siteItr.next(); // Skip the first site, as we are suggesting one inside the pblock
                         Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr, null);
                         Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
                         siteInstsToRoute.add(flop.getSiteInst());
