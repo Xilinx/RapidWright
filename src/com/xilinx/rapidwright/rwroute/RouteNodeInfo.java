@@ -245,6 +245,8 @@ public class RouteNodeInfo {
             case NODE_CLE_CTRL:     // CLE_BC_CORE*.CTRL_[LR]_B*
             case NODE_INTF_CTRL:    // INTF_[LR]OCF_[TB][LR]_TILE.INTF_IRI*
                 return RouteNodeType.LOCAL_BOTH;
+            case NODE_SLL_DATA:
+                return RouteNodeType.SUPER_LONG_LINE;
 
             case NODE_LAGUNA_DATA: // UltraScale+ only
                 assert(tileTypeEnum == TileTypeEnum.LAG_LAG);

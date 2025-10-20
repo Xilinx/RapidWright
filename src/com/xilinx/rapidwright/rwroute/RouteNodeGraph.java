@@ -555,11 +555,17 @@ public class RouteNodeGraph {
      */
     protected int getBaseWireCount(Tile tile, int startWireIndex) {
         return baseWireCounts.computeIfAbsent(tile.getTileTypeEnum(), (e) -> {
+            boolean isSLLType = isVersal && e == TileTypeEnum.SLL;
             // Check all wires in tile to find the index of the last base wire
             int lastBaseWire = startWireIndex;
             for (int i = lastBaseWire + 1; i < tile.getWireCount(); i++) {
                 Node node = Node.getNode(tile, i);
-                if (node != null && node.getTile() == tile && node.getWireIndex() == i) {
+                if (node == null) {
+                    continue;
+                }
+                if ((node.getTile() == tile && node.getWireIndex() == i) ||
+                        // Count Versal SLLs even if they're not based in this tile, since they are bidir
+                        (isSLLType && node.getTile().getTileTypeEnum() == e && node.getIntentCode() == IntentCode.NODE_SLL_DATA)) {
                     lastBaseWire = i;
                 }
             }
@@ -722,6 +728,24 @@ public class RouteNodeGraph {
         }
 
         if (isExcludedTile(child)) {
+            if (isVersal) {
+                IntentCode parentIc = parent.getIntentCode();
+                if (parentIc == IntentCode.NODE_SLL_OUTPUT) {
+                    // Allow NODE_SLL_OUTPUT -> CLE/*LAG*_PIN
+                    return false;
+                }
+                if (parentIc == IntentCode.NODE_CLE_OUTPUT) {
+                    // Allow NODE_CLE_OUTPUT -> NODE_CLE_OUTPUT (e.g. [A-H]Q_PIN -> [A-H]Q)
+                    assert(child.getIntentCode() == IntentCode.NODE_CLE_OUTPUT);
+                    return false;
+                }
+                if (child.getIntentCode() == IntentCode.NODE_CLE_OUTPUT && parentIc == IntentCode.NODE_PINFEED &&
+                    parent.getWireName().matches("CLE_SLICE[LM]_TOP_[01]_LAG_([NS]|[EW][12])_PIN")) {
+                    assert(child.getWireName().matches("CLE_SLICE[LM]_TOP_[01]_[A-H]Q2?_PIN"));
+                    // Allow CLE/*LAG*_PIN -> CLE/*[A-H]Q2?_PIN
+                    return false;
+                }
+            }
             if (!allowRoutethru(parent, child)) {
                 return true;
             }
@@ -737,6 +761,11 @@ public class RouteNodeGraph {
             if ((!lutRoutethru && ic == IntentCode.NODE_IMUX) || ic == IntentCode.NODE_CLE_CTRL || ic == IntentCode.NODE_INTF_CTRL) {
                 // Disallow these site pin projections if they aren't already in the routing graph (as a potential sink)
                 return childRnode == null;
+            }
+
+            if (ic == IntentCode.NODE_SLL_INPUT && parent.getIntentCode() == IntentCode.NODE_SLL_OUTPUT) {
+                // Disallow NODE_SLL_OUTPUT -> NODE_SLL_INPUT arcs (why are you able to come off an SLL just to go back onto one?)
+                return true;
             }
         } else {
             assert(design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus);
@@ -893,6 +922,9 @@ public class RouteNodeGraph {
             rnodes = new RouteNode[baseWireCount];
             nodesMap[tileAddress] = rnodes;
         }
+        if (wireIndex >= rnodes.length) {
+            System.err.print("");
+        }
         RouteNode rnode = rnodes[wireIndex];
         if (rnode == null) {
             rnode = create(node, type);
@@ -937,7 +969,8 @@ public class RouteNodeGraph {
                                 return false;
                             }
                         } else {
-                            assert(lutRoutethru);
+                            assert(lutRoutethru ||
+                                    isVersal && connection.isCrossSLR() && isVersalLagOutRoutethru(parentRnode, childRnode));
                             assert(Utils.isCLB(childTileType));
                             // IMUX_[EW]\\d+ -> CLE_CLE_L_SITE_0_[A-H]_O
                             assert(childRnode.getIntentCode() == IntentCode.NODE_CLE_OUTPUT);
@@ -958,10 +991,12 @@ public class RouteNodeGraph {
 
         TileTypeEnum childTileType = childRnode.getTile().getTileTypeEnum();
         assert(childTileType == TileTypeEnum.INT ||
-               isVersal && EnumSet.of(TileTypeEnum.INTF_LOCF_TR_TILE, TileTypeEnum.INTF_LOCF_BR_TILE, TileTypeEnum.INTF_ROCF_TR_TILE, TileTypeEnum.INTF_ROCF_BR_TILE,
-                                      TileTypeEnum.INTF_LOCF_TL_TILE, TileTypeEnum.INTF_LOCF_BL_TILE, TileTypeEnum.INTF_ROCF_TL_TILE, TileTypeEnum.INTF_ROCF_BL_TILE,
+                (isVersal && EnumSet.of(TileTypeEnum.INTF_LOCF_TR_TILE, TileTypeEnum.INTF_LOCF_BR_TILE, TileTypeEnum.INTF_ROCF_TR_TILE, TileTypeEnum.INTF_ROCF_BR_TILE,
+                                        TileTypeEnum.INTF_LOCF_TL_TILE, TileTypeEnum.INTF_LOCF_BL_TILE, TileTypeEnum.INTF_ROCF_TL_TILE, TileTypeEnum.INTF_ROCF_BL_TILE,
                                       TileTypeEnum.CLE_BC_CORE, TileTypeEnum.SLL)
-                       .contains(childTileType));
+                       .contains(childTileType)) ||
+                (isVersal && parentRnode.getIntentCode() == IntentCode.NODE_SLL_OUTPUT && childRnode.getIntentCode() == IntentCode.NODE_PINFEED && Utils.isCLB(childTileType))
+        );
 
         if (lutRoutethru && !type.leadsToLaguna()) {
             // (a) considering LUT routethrus (that do not lead to a Laguna)
@@ -1076,9 +1111,12 @@ public class RouteNodeGraph {
                     return false;
                 case NODE_CLE_BNODE:
                 case NODE_INTF_BNODE:
+                    if (connection.isCrossSLR()) {
+                        return true;
+                    }
                 case NODE_CLE_CNODE:
                 case NODE_INTF_CNODE:
-                    // Only allow [BC]NODEs that reach into the sink tile
+                    // Allow [BC]NODEs that reach into the sink tile
                     return childTile.getTileYCoordinate() == sinkTile.getTileYCoordinate() &&
                            childRnode.getEndTileXCoordinate() == sinkTile.getTileXCoordinate();
                 case NODE_PINBOUNCE:
@@ -1089,6 +1127,10 @@ public class RouteNodeGraph {
                     // LUT routethrus are enabled (which would have already returned true above)
                     break;
                 case NODE_PINFEED:
+                    if (connection.isCrossSLR()) {
+                        // Allow NODE_SLL_OUTPUT -> NODE_PINFEED
+                        return parentRnode.getIntentCode() == IntentCode.NODE_SLL_OUTPUT;
+                    }
                     // Expected to be projected away
                     break;
                 case NODE_CLE_CTRL:
@@ -1096,6 +1138,10 @@ public class RouteNodeGraph {
                     // CTRL pins that are not our target EXCLUSIVE_SINK will have been isExcluded() from the graph
                     break;
                 case NODE_SLL_INPUT:
+                    if (connection.isCrossSLR()) {
+                        assert(parentRnode.getIntentCode() != IntentCode.NODE_SLL_OUTPUT);
+                        return true;
+                    }
                     // Temporarily only allow NODE_SLL_INPUT to be explored if they are the sink
                     // TODO: Revisit when SLR crossings are supported
                     return childRnode == sinkRnode;
@@ -1152,5 +1198,13 @@ public class RouteNodeGraph {
 
     public float getPresentCongestionCost(int occupancy) {
         return presentCongestionCosts[occupancy];
+    }
+
+    public boolean isVersalLagOutRoutethru(Node parent, Node child) {
+        assert(isVersal);
+        return parent.getIntentCode() == IntentCode.NODE_PINFEED &&
+                child.getIntentCode() == IntentCode.NODE_CLE_OUTPUT &&
+                parent.getWireName().matches("CLE_SLICE[LM]_TOP_[01]_LAG_([NS]|[EW][12])_PIN") &&
+                child.getWireName().matches("CLE_SLICE[LM]_TOP_[01]_[A-H]Q2?_PIN");
     }
 }

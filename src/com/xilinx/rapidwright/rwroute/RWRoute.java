@@ -755,14 +755,13 @@ public class RWRoute {
         }
 
         if (indirect > 0) {
-            netWrapper.computeHPWLAndCenterCoordinates(routingGraph.nextLagunaColumn, routingGraph.prevLagunaColumn);
+            netWrapper.computeHPWLAndCenterCoordinates(routingGraph);
             if (config.isUseBoundingBox()) {
                 for (Connection connection : netWrapper.getConnections()) {
                     if (connection.isDirect()) continue;
                     connection.computeConnectionBoundingBox(config.getBoundingBoxExtensionX(),
                             config.getBoundingBoxExtensionY(),
-                            routingGraph.nextLagunaColumn,
-                            routingGraph.prevLagunaColumn);
+                            routingGraph);
                 }
             }
         }
@@ -1940,9 +1939,13 @@ public class RWRoute {
                         // Verify invariant that east/west wires stay east/west ...
                         assert(!rnodeType.isEastLocal() || childType.isEastLocal() ||
                                 // ... unless it's an exclusive sink using a LOCAL_RESERVED node
-                                (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH));
+                                (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH) ||
+                                // ... or unless it's a Versal SLL input
+                                childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT);
                         assert(!rnodeType.isWestLocal() || childType.isWestLocal() ||
-                                (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH));
+                                (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH) ||
+                                // ... or unless it's a Versal  SLL input
+                                childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT);
                         break;
                     case NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
                     case NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
@@ -1959,7 +1962,11 @@ public class RWRoute {
                         //   (a) IMUX (LOCAL_*_LEADING_TO_*_LAGUNA) -> LAG_MUX_ATOM_\\d+_TXOUT
                         //   (b) via a LUT routethru: IMUX (LOCAL*) -> CLE_CLE_*_SITE_0_[A-H]_O
                         assert(!rnodeType.isAnyLocal() || rnodeType.isLocalLeadingToLaguna() ||
-                               (routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED));
+                               (routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED) ||
+                                // Allow CLE/*LAG*_PIN -> CLE/*[A-H]Q2?_PIN
+                                (routingGraph.isVersal && connection.isCrossSLR() &&
+                                       routingGraph.isVersalLagOutRoutethru(rnode, childRNode))
+                        );
 
                         if (!routingGraph.isAccessible(childRNode, rnode, connection)) {
                             continue;
@@ -2092,7 +2099,8 @@ public class RWRoute {
             ));
 
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
-            if (deltaSLR != 0) {
+            if (deltaSLR != 0
+                    && !routingGraph.isVersal) {    // FIXME: Update this for Versal
                 // Check for overshooting which occurs when child and sink node are in
                 // adjacent SLRs and less than a SLL wire's length apart in the Y axis.
                 if (deltaSLR == 1) {

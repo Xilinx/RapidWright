@@ -118,7 +118,7 @@ public class Connection implements Comparable<Connection>{
      * @param prevLagunaColumn Array mapping arbitrary tile columns to the previous Laguna column
      */
     public void computeConnectionBoundingBox(short boundingBoxExtensionX, short boundingBoxExtensionY,
-                                             int[] nextLagunaColumn, int[] prevLagunaColumn) {
+                                             RouteNodeGraph routingGraph) {
         short xMin, xMax, yMin, yMax;
         short xNetCenter = (short) Math.ceil(netWrapper.getXCenter());
         short yNetCenter = (short) Math.ceil(netWrapper.getYCenter());
@@ -127,11 +127,11 @@ public class Connection implements Comparable<Connection>{
         yMax = maxOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
         yMin = minOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
 
-        if (isCrossSLR()) {
+        if (isCrossSLR() && !routingGraph.isVersal) {
             // For SLR-crossing connections, ensure the bounding box width contains at least one Laguna column
             // before bounding box extension
-            int nextLaguna = nextLagunaColumn[xMin];
-            int prevLaguna = prevLagunaColumn[xMax];
+            int nextLaguna = routingGraph.nextLagunaColumn[xMin];
+            int prevLaguna = routingGraph.prevLagunaColumn[xMax];
             if (nextLaguna != Integer.MAX_VALUE) {
                 xMax = (short) Math.max(xMax, nextLaguna);
             }
@@ -282,10 +282,6 @@ public class Connection implements Comparable<Connection>{
 
         assert(sourceRnode != null);
         if (!sourceRnode.getTile().getSLR().equals(sinkRnode.getTile().getSLR())) {
-            if (source.getSiteInst().getDesign().getSeries() == Series.Versal) {
-                throw new RuntimeException("ERROR: Cross-SLR connections not yet supported on Versal.");
-            }
-
             if (sourceRnode.getTile().getTileYCoordinate() < sinkRnode.getTile().getTileYCoordinate()) {
                 crossSLRnorth = true;
                 assert(!crossSLRsouth);
