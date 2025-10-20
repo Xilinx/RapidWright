@@ -926,9 +926,6 @@ public class RouteNodeGraph {
             rnodes = new RouteNode[baseWireCount];
             nodesMap[tileAddress] = rnodes;
         }
-        if (wireIndex >= rnodes.length) {
-            System.err.print("");
-        }
         RouteNode rnode = rnodes[wireIndex];
         if (rnode == null) {
             rnode = create(node, type);

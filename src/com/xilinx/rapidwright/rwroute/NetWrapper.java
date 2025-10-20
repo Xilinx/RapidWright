@@ -77,7 +77,8 @@ public class NetWrapper{
                 xMax = Integer.max(xMax, x);
                 yMax = Integer.max(yMax, y);
 
-                if (connection.isCrossSLR() && !routingGraph.isVersal) {
+                if (connection.isCrossSLR()
+                        && !routingGraph.isVersal) { // FIXME: Update this for Versal
                     // For SLR-crossing connections, ensure it contains at least one Laguna column
                     int nextLaguna = routingGraph.nextLagunaColumn[xMin];
                     int prevLaguna = routingGraph.prevLagunaColumn[xMax];
