@@ -559,7 +559,7 @@ public class RouteNodeGraph {
      */
     protected int getBaseWireCount(Tile tile, int startWireIndex) {
         return baseWireCounts.computeIfAbsent(tile.getTileTypeEnum(), (e) -> {
-            boolean isSLLType = isVersal && e == TileTypeEnum.SLL;
+            final boolean isSLLType = e == TileTypeEnum.SLL; // Versal only
             // Check all wires in tile to find the index of the last base wire
             int lastBaseWire = startWireIndex;
             for (int i = lastBaseWire + 1; i < tile.getWireCount(); i++) {

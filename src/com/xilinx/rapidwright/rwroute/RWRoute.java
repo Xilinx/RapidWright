@@ -1944,7 +1944,7 @@ public class RWRoute {
                                 childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT);
                         assert(!rnodeType.isWestLocal() || childType.isWestLocal() ||
                                 (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH) ||
-                                // ... or unless it's a Versal  SLL input
+                                // ... or unless it's a Versal SLL input
                                 childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT);
                         break;
                     case NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
