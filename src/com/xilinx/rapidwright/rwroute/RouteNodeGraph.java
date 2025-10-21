@@ -90,8 +90,9 @@ public class RouteNodeGraph {
 
     public final short SUPER_LONG_LINE_LENGTH_IN_TILES;
 
-    /** Array mapping an INT tile's Y coordinate, to its SLR index */
+    /** Array mapping an INT tile's Y coordinate to its SLR index */
     public final int[] intYToSLRIndex;
+    /** Array mapping an INT tile's X coordinate to the X of the next/previous Laguna column */
     public final int[] nextLagunaColumn;
     public final int[] prevLagunaColumn;
 
@@ -126,7 +127,8 @@ public class RouteNodeGraph {
     /** Flag for whether design targets the Versal series */
     protected final boolean isVersal;
 
-    protected final Map<TileTypeEnum, Integer> baseWireCounts;
+    /** Map of the TileTypeEnum to the highest base wire index */
+    protected final Map<TileTypeEnum, Integer> highestBaseWireIndex;
 
     protected final static int MAX_OCCUPANCY = 256;
     protected final float[] presentCongestionCosts;
@@ -152,7 +154,7 @@ public class RouteNodeGraph {
         preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
         createRnodeTime = 0;
-        baseWireCounts = new ConcurrentHashMap<>();
+        highestBaseWireIndex = new ConcurrentHashMap<>();
 
         Device device = design.getDevice();
         intYToSLRIndex = new int[device.getRows()];
@@ -555,10 +557,10 @@ public class RouteNodeGraph {
     }
 
     /*
-     * Return the maximum base wire index across all Nodes in this tile
+     * Return the highest base wire index across all Nodes in this tile
      */
-    protected int getBaseWireCount(Tile tile, int startWireIndex) {
-        return baseWireCounts.computeIfAbsent(tile.getTileTypeEnum(), (e) -> {
+    protected int getHighestBaseWireIndex(Tile tile, int startWireIndex) {
+        return highestBaseWireIndex.computeIfAbsent(tile.getTileTypeEnum(), (e) -> {
             final boolean isSLLType = e == TileTypeEnum.SLL; // Versal only
             // Check all wires in tile to find the index of the last base wire
             int lastBaseWire = startWireIndex;
@@ -591,7 +593,7 @@ public class RouteNodeGraph {
         int tileAddress = tile.getUniqueAddress();
         Net[] nets = preservedMap.get(tileAddress);
         if (nets == null) {
-            int baseWireCount = getBaseWireCount(tile, wireIndex);
+            int baseWireCount = getHighestBaseWireIndex(tile, wireIndex);
             nets = new Net[baseWireCount];
             if (!preservedMap.compareAndSet(tileAddress, null, nets)) {
                 // Another thread must have beat us to a compareAndSet, use that result
@@ -916,7 +918,7 @@ public class RouteNodeGraph {
         int tileAddress = tile.getUniqueAddress();
         RouteNode[] rnodes = nodesMap[tileAddress];
         if (rnodes == null) {
-            int baseWireCount = getBaseWireCount(tile, wireIndex);
+            int baseWireCount = getHighestBaseWireIndex(tile, wireIndex);
             rnodes = new RouteNode[baseWireCount];
             nodesMap[tileAddress] = rnodes;
         }
