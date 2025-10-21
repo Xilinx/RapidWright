@@ -407,13 +407,16 @@ public class TestRWRoute {
             // Versal
             // One SLR crossing
             // (Too) close
-            "xcv80,SLICE_X54Y331,SLICE_X54Y332,800",            // Adjacent to crossing SLL (east)
-            "xcv80,SLICE_X51Y331,SLICE_X51Y332,400",            // Close to crossing SLL
+            "xcv80,SLICE_X54Y331,SLICE_X54Y332,500",            // Source adjacent to crossing SLL (east)
+            "xcv80,SLICE_X53Y332,SLICE_X53Y331,700",            // Source adjacent to crossing SLL (west)
+            "xcv80,SLICE_X51Y331,SLICE_X51Y332,300",            // Close to crossing SLL
             // Perfect
-            "xcv80,SLICE_X54Y331,SLICE_X54Y406,500",            // Adjacent to crossing SLL (east)
-            "xcv80,SLICE_X53Y331,SLICE_X53Y406,200",            // Adjacent to crossing SLL (west)
-            "xcv80,SLICE_X51Y331,SLICE_X51Y406,400",            // Close to crossing SLL
-            "xcv80,SLICE_X0Y331,SLICE_X49Y406,2000",            // Far from crossing SLL
+            "xcv80,SLICE_X54Y331,SLICE_X54Y406,700",            // Source adjacent to crossing SLL (east, north)
+            "xcv80,SLICE_X53Y331,SLICE_X53Y406,200",            // Source adjacent to crossing SLL (west, north)
+            "xcv80,SLICE_X54Y406,SLICE_X54Y331,1400",           // Sink adjacent to crossing SLL (east, south)
+            "xcv80,SLICE_X53Y406,SLICE_X53Y331,100",            // Sink adjacent to crossing SLL (west, south)
+            "xcv80,SLICE_X51Y331,SLICE_X51Y406,300",            // Source close to crossing SLL
+            "xcv80,SLICE_X0Y331,SLICE_X49Y406,2000",            // Source far from crossing SLL
 
             // US+
             // One SLR crossing

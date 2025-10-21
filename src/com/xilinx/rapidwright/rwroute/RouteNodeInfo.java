@@ -51,9 +51,10 @@ public class RouteNodeInfo {
         Wire[] wires = node.getAllWiresInNode();
         assert(wires[0].getTile() == node.getTile() && wires[0].getWireIndex() == node.getWireIndex());
         Tile baseTile = node.getTile();
+        TileTypeEnum baseTileType = baseTile.getTileTypeEnum();
         TileTypeEnum endTileType;
-        if (Utils.isLaguna(baseTile.getTileTypeEnum())) {
-            endTileType = baseTile.getTileTypeEnum();
+        if (Utils.isLaguna(baseTileType) || Utils.isInterConnect(baseTileType)) {
+            endTileType = baseTileType;
         } else {
             endTileType = TileTypeEnum.INT;
         }
