@@ -1099,7 +1099,21 @@ public class EDIFTools {
             edif.exportEDIF(out);
             if (dcpFileName != null && edif.getEncryptedCells() != null) {
                 if (edif.getEncryptedCells().size() > 0) {
-                    writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
+                    // Verify that at least one of the edn files collected are actually in the design
+                    boolean verifiedEncryptedCell = false;
+                    for (String edn : edif.getEncryptedCells()) {
+                        int start = edn.lastIndexOf(File.separator);
+                        int end = edn.lastIndexOf(".edn");
+                        String cellName = edn.substring(start == -1 ? 0 : start + 1, end);
+                        EDIFCell cell = edif.getCell(cellName);
+                        if (cell != null && cell.isLeafCellOrBlackBox()) {
+                            verifiedEncryptedCell = true;
+                            break;
+                        }
+                    }
+                    if (verifiedEncryptedCell) {
+                        writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
+                    }
                 }
             }
         } catch (IOException e) {
