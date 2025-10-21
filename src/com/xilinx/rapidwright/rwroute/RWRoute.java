@@ -1468,9 +1468,7 @@ public class RWRoute {
         nodeUsageForVersal.add(IntentCode.NODE_IMUX);
         // NODE_PINFEED exists on Versal but is behind a NODE_IMUX
         // and gets projectInputPinToINTNode() -ed away
-
-        // TODO: Enable when SLR crossings are supported
-        // nodeUsageForVersal.add(IntentCode.NODE_SLL_DATA);
+        nodeUsageForVersal.add(IntentCode.NODE_SLL_DATA);
     }
 
     /**
