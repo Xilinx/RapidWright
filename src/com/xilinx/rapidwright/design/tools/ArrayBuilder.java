@@ -429,7 +429,7 @@ public class ArrayBuilder {
 
         if (options.has(TOP_CLK_NAME_OPTS.get(0))) {
             setTopClockName(((String) options.valueOf(TOP_CLK_NAME_OPTS.get(0))));
-        } else {
+        } else if (options.has(TOP_LEVEL_DESIGN_OPTS.get(0))) {
             setTopClockName(ClockTools.getClockFromDesign(getTopDesign()).toString());
         }
 
