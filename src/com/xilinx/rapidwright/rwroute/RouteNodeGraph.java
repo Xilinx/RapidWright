@@ -1103,6 +1103,12 @@ public class RouteNodeGraph {
             IntentCode childIntentCode = childRnode.getIntentCode();
             switch (childIntentCode) {
                 case NODE_INODE:
+                    if (connection.isCrossSLR() &&
+                            childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
+                        // Allow INODEs needed for PINBOUNCE -> BNODE -> NODE_SLL_INPUT
+                        // TODO: Only allow those that lead to a SLR crossing
+                        return true;
+                    }
                     // Block access to all INODEs outside the sink tile, since NODE_INODE -> NODE_IMUX -> NODE_PINFEED (or NODE_INODE -> NODE_PINBOUNCE)
                     assert(childTile != sinkTile);
                     return false;
@@ -1111,18 +1117,24 @@ public class RouteNodeGraph {
                             childTile.getTileTypeEnum() == TileTypeEnum.SLL &&
                             childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
                         // Allow CLE BNODEs since these are used to reach NODE_SLL_INPUT nodes
-                        // TODO: Only allow BNODEs into SLLs that contain SLR crossings
+                        // TODO: Only allow those that lead to a SLR crossing
                         return true;
                     }
                 case NODE_INTF_BNODE:
                 case NODE_CLE_CNODE:
                 case NODE_INTF_CNODE:
-                    // Allow [BC]NODEs that reach into the sink tile
-                    return childTile.getTileYCoordinate() == sinkTile.getTileYCoordinate() &&
-                           childRnode.getEndTileXCoordinate() == sinkTile.getTileXCoordinate();
+                    if (childTile.getTileYCoordinate() != sinkTile.getTileYCoordinate() ||
+                        childRnode.getEndTileXCoordinate() != sinkTile.getTileXCoordinate()) {
+                        assert(parentRnode.getIntentCode() != IntentCode.NODE_INODE);
+                        return false;
+                    }
+                    // Only allow [BC]NODEs that reach into the sink tile
+                    return true;
                 case NODE_PINBOUNCE:
-                    // BOUNCEs are only accessible through INODEs, so transitively this intent code is unreachable
-                    break;
+                    // PINBOUNCEs are only accessible through an INODE, so arriving here means that this must be an inter-SLR connection
+                    assert(connection.isCrossSLR() &&
+                            childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this));
+                    return true;
                 case NODE_IMUX:
                     // IMUXes that are not our target EXCLUSIVE_SINK will have been isExcluded() from the graph unless
                     // LUT routethrus are enabled (which would have already returned true above)
