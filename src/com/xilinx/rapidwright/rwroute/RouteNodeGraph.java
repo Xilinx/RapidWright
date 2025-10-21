@@ -1107,14 +1107,14 @@ public class RouteNodeGraph {
                     assert(childTile != sinkTile);
                     return false;
                 case NODE_CLE_BNODE:
-                case NODE_INTF_BNODE:
                     if (connection.isCrossSLR() &&
                             childTile.getTileTypeEnum() == TileTypeEnum.SLL &&
                             childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
-                        // Allow BNODEs since these are used to reach NODE_SLL_INPUT nodes
+                        // Allow CLE BNODEs since these are used to reach NODE_SLL_INPUT nodes
                         // TODO: Only allow BNODEs into SLLs that contain SLR crossings
                         return true;
                     }
+                case NODE_INTF_BNODE:
                 case NODE_CLE_CNODE:
                 case NODE_INTF_CNODE:
                     // Allow [BC]NODEs that reach into the sink tile
