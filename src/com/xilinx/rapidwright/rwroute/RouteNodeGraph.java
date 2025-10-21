@@ -743,12 +743,6 @@ public class RouteNodeGraph {
                     assert(child.getIntentCode() == IntentCode.NODE_CLE_OUTPUT);
                     return false;
                 }
-                if (child.getIntentCode() == IntentCode.NODE_CLE_OUTPUT && parentIc == IntentCode.NODE_PINFEED &&
-                    parent.getWireName().matches("CLE_SLICE[LM]_TOP_[01]_LAG_([NS]|[EW][12])_PIN")) {
-                    assert(child.getWireName().matches("CLE_SLICE[LM]_TOP_[01]_[A-H]Q2?_PIN"));
-                    // Allow CLE/*LAG*_PIN -> CLE/*[A-H]Q2?_PIN
-                    return false;
-                }
             }
             if (!allowRoutethru(parent, child)) {
                 return true;
@@ -1161,17 +1155,28 @@ public class RouteNodeGraph {
     }
 
     protected boolean allowRoutethru(Node head, Node tail) {
+        final boolean isCLB = Utils.isCLB(tail.getTile().getTileTypeEnum());
+
+        if (isVersal) {
+            if (tail.getIntentCode() == IntentCode.NODE_CLE_OUTPUT && head.getIntentCode() == IntentCode.NODE_PINFEED &&
+                    // TODO: Speedup
+                    head.getWireName().matches("CLE_SLICE[LM]_TOP_[01]_LAG_([NS]|[EW][12])_PIN")) {
+                assert(isVersalLagOutRoutethru(head, tail));
+                // Allow CLE/*LAG*_PIN -> CLE/*[A-H]Q2?_PIN routethru
+                return true;
+            }
+        }
+
         if (!lutRoutethru) {
             return false;
         }
 
-        if (!Utils.isCLB(tail.getTile().getTileTypeEnum())) {
+        if (!isCLB) {
             return false;
         }
 
         if (tail.getIntentCode() == IntentCode.NODE_PINFEED) {
             assert(isVersal);
-            assert(!lutRoutethru);
             assert(head.getIntentCode() == IntentCode.NODE_IMUX ||
                    head.getIntentCode() == IntentCode.NODE_PINBOUNCE);
             return false;
