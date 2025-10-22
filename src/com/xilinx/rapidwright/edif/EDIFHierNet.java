@@ -284,6 +284,11 @@ public class EDIFHierNet implements Comparable<EDIFHierNet> {
                         if (upNet != null) {
                             queue.add(upPort.getHierarchicalNet());
                         }
+                    } else {
+                        // Add top-level hierarchical port insts
+                        if ((includeSinkPins && p.isOutput()) || (includeSourcePins && p.isInput())) {
+                            leafCellPins.add(p);
+                        }
                     }
                 } else {
                     // Moving down in hierarchy
