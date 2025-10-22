@@ -51,9 +51,10 @@ public class RouteNodeInfo {
         Wire[] wires = node.getAllWiresInNode();
         assert(wires[0].getTile() == node.getTile() && wires[0].getWireIndex() == node.getWireIndex());
         Tile baseTile = node.getTile();
+        TileTypeEnum baseTileType = baseTile.getTileTypeEnum();
         TileTypeEnum endTileType;
-        if (Utils.isLaguna(baseTile.getTileTypeEnum())) {
-            endTileType = baseTile.getTileTypeEnum();
+        if (Utils.isLaguna(baseTileType) || Utils.isInterConnect(baseTileType)) {
+            endTileType = baseTileType;
         } else {
             endTileType = TileTypeEnum.INT;
         }
@@ -72,12 +73,16 @@ public class RouteNodeInfo {
         RouteNodeType type = getType(node, routingGraph);
         short endTileXCoordinate = getEndTileXCoordinate(node, (short) endTile.getTileXCoordinate());
         short endTileYCoordinate = (short) endTile.getTileYCoordinate();
-        short length = getLength(baseTile, type, endTileXCoordinate, endTileYCoordinate);
+        short length = getLength(baseTile, type, endTileXCoordinate, endTileYCoordinate, routingGraph);
 
         return new RouteNodeInfo(type, endTileXCoordinate, endTileYCoordinate, length);
     }
 
-    private static short getLength(Tile baseTile, RouteNodeType type, short endTileXCoordinate, short endTileYCoordinate) {
+    private static short getLength(Tile baseTile,
+                                   RouteNodeType type,
+                                   short endTileXCoordinate,
+                                   short endTileYCoordinate,
+                                   RouteNodeGraph routingGraph) {
         TileTypeEnum tileType = baseTile.getTileTypeEnum();
         short length = (short) Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate());
         if (tileType == TileTypeEnum.LAG_LAG) {
@@ -89,7 +94,7 @@ public class RouteNodeInfo {
         switch (tileType) {
             case LAG_LAG:
             case LAGUNA_TILE:
-                assert(length == RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES ||
+                assert(length == routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES ||
                        // U-turn
                        length == 0);
                 break;
@@ -245,6 +250,8 @@ public class RouteNodeInfo {
             case NODE_CLE_CTRL:     // CLE_BC_CORE*.CTRL_[LR]_B*
             case NODE_INTF_CTRL:    // INTF_[LR]OCF_[TB][LR]_TILE.INTF_IRI*
                 return RouteNodeType.LOCAL_BOTH;
+            case NODE_SLL_DATA:
+                return RouteNodeType.SUPER_LONG_LINE;
 
             case NODE_LAGUNA_DATA: // UltraScale+ only
                 assert(tileTypeEnum == TileTypeEnum.LAG_LAG);
