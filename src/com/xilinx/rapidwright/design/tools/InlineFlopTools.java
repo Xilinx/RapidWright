@@ -394,6 +394,9 @@ public class InlineFlopTools {
     private static Cell createAndPlaceFlopInlineOnTopPortInst(Design design, EDIFPortInst portInst, Pair<Site, BEL> loc,
                                                               EDIFHierNet clk) {
         String name = portInst.getFullName() + INLINE_SUFFIX;
+        if (portInst.getFullName().startsWith("[]")) {
+            System.out.println();
+        }
         Cell flop = design.createAndPlaceCell(design.getTopEDIFCell(), name, Unisim.FDRE, loc.getFirst(),
                 loc.getSecond());
         Net net = design.createNet(name);
@@ -441,6 +444,9 @@ public class InlineFlopTools {
         for (EDIFCellInst inst : design.getTopEDIFCell().getCellInsts()) {
             if (inst.getName().endsWith(INLINE_SUFFIX)) {
                 Cell flop = design.getCell(inst.getName());
+                if (flop == null) {
+                    System.out.println();
+                }
                 SiteInst si = flop.getSiteInst();
                 // Assume we only placed one flop per SiteInst
                 siteInstToRemove.add(si);

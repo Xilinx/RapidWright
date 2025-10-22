@@ -33,7 +33,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -49,9 +48,7 @@ import com.xilinx.rapidwright.design.ClockTools;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Module;
-import com.xilinx.rapidwright.design.ModuleImplsInst;
 import com.xilinx.rapidwright.design.ModuleInst;
-import com.xilinx.rapidwright.design.ModulePlacement;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.design.NetType;
@@ -69,7 +66,6 @@ import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -82,8 +78,6 @@ import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.edif.EDIFValueType;
-import com.xilinx.rapidwright.placer.blockplacer.AbstractOverlapCache;
-import com.xilinx.rapidwright.placer.blockplacer.RegionBasedOverlapCache;
 import com.xilinx.rapidwright.rwroute.PartialRouter;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
@@ -120,6 +114,7 @@ public class ArrayBuilder {
     private static final List<String> SKIP_IMPL_OPTS = Arrays.asList("k", "skip-impl");
     private static final List<String> LIMIT_INSTS_OPTS = Arrays.asList("l", "limit-inst-count");
     private static final List<String> TOP_LEVEL_DESIGN_OPTS = Arrays.asList("t", "top-design");
+    private static final List<String> FAST_PLACEMENT_OPTS = Arrays.asList("f", "fast");
     private static final List<String> WRITE_PLACEMENT_OPTS = Collections.singletonList("write-placement");
     private static final List<String> PLACEMENT_FILE_OPTS = Collections.singletonList("read-placement");
     private static final List<String> PLACEMENT_GRID_OPTS = Collections.singletonList("write-placement-grid");
@@ -155,6 +150,8 @@ public class ArrayBuilder {
 
     private ArrayNetlistGraph condensedGraph;
 
+    private boolean fastPlacement;
+
     public static final double DEFAULT_CLK_PERIOD_TARGET = 2.0;
 
     private OptionParser createOptionParser() {
@@ -178,6 +175,7 @@ public class ArrayBuilder {
                 acceptsAll(PLACEMENT_FILE_OPTS, "Use placement specified in file").withRequiredArg();
                 acceptsAll(PLACEMENT_GRID_OPTS, "Write grid of possible placement locations to specified file").withRequiredArg();
                 acceptsAll(TOP_LEVEL_DESIGN_OPTS, "Top level design with blackboxes/kernel insts").withRequiredArg();
+                acceptsAll(FAST_PLACEMENT_OPTS, "Use bounding-box based overlap to quickly place modules");
                 acceptsAll(OUT_OF_CONTEXT_OPTS, "Specifies that the array will be compiled out of context");
                 acceptsAll(HELP_OPTS, "Print this help message").forHelp();
             }
@@ -304,7 +302,7 @@ public class ArrayBuilder {
         this.outputPlacementLocsFileName = outputPlacementLocsFileName;
     }
 
-    public boolean getOutOfContext() {
+    public boolean isOutOfContext() {
         return outOfContext;
     }
 
@@ -320,11 +318,20 @@ public class ArrayBuilder {
         this.condensedGraph = condensedGraph;
     }
 
+    public boolean isFastPlacement() {
+        return outOfContext;
+    }
+
+    public void setFastPlacement(boolean outOfContext) {
+        this.outOfContext = outOfContext;
+    }
+
     private void initializeArrayBuilder(OptionSet options) {
         Path inputFile = null;
 
         setSkipImpl(options.has(SKIP_IMPL_OPTS.get(0)));
         setOutOfContext(options.has(OUT_OF_CONTEXT_OPTS.get(0)));
+        setFastPlacement(options.has(FAST_PLACEMENT_OPTS.get(0)));
 
         if (options.has(KERNEL_DESIGN_OPTS.get(0))) {
             inputFile = Paths.get((String) options.valueOf(KERNEL_DESIGN_OPTS.get(0)));
@@ -772,7 +779,7 @@ public class ArrayBuilder {
             List<RelocatableTileRectangle> boundingBoxes = new ArrayList<>();
             List<List<Site>> validPlacementGrid = getValidPlacementGrid(module);
             int gridX = 0;
-            int gridY = 120;
+            int gridY = 0;
             int lastYCoordinate = 0;
             boolean searchDown = true;
             while (placed < ab.getInstCountLimit()) {
@@ -781,7 +788,6 @@ public class ArrayBuilder {
                     int yCoordinate = idealPlacementList.get(i).getFirst().getSecond();
                     if (yCoordinate > lastYCoordinate) {
                         gridX = 0;
-                        gridY += 20;
                         searchDown = true;
                     }
                     lastYCoordinate = yCoordinate;
@@ -798,10 +804,10 @@ public class ArrayBuilder {
                 RelocatableTileRectangle newBoundingBox =
                         boundingBox.getCorresponding(anchor.getTile(), module.getAnchor().getTile());
                 boolean noOverlap = boundingBoxes.stream().noneMatch((b) -> b.overlaps(newBoundingBox));
-                if (noOverlap && !boundingBoxStraddlesClockRegion(newBoundingBox)) {
+                if (!ab.isFastPlacement() || (noOverlap && !boundingBoxStraddlesClockRegion(newBoundingBox))) {
                     if (curr.place(anchor, true, false)) {
-                        if (straddlesClockRegion(curr)
-//                            || !NetTools.getNetsWithOverlappingNodes(array).isEmpty()
+                        if (!ab.isFastPlacement() && (straddlesClockRegion(curr)
+                            || !NetTools.getNetsWithOverlappingNodes(array).isEmpty())
                         ) {
                             curr.unplace();
                         } else {
@@ -892,7 +898,7 @@ public class ArrayBuilder {
         array.getNetlist().consolidateAllToWorkLibrary();
         array.flattenDesign();
 
-        if (ab.getOutOfContext()) {
+        if (ab.isOutOfContext()) {
             // Automatically find bounding PBlock based on used Slices, DSPs, and BRAMs
             Set<Site> usedSites = new HashSet<>();
             for (SiteInst siteInst : array.getSiteInsts()) {

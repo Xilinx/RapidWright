@@ -1801,16 +1801,14 @@ public class EDIFTools {
 
     public static void removeVivadoBusPreventionAnnotations(EDIFNetlist netlist) {
         EDIFCell top = netlist.getTopCell();
-        for (EDIFCell cell : netlist.getLibrary(top.getLibrary().getName()).getCells()) {
-            List<String> portsToRename = new ArrayList<>();
-            for (EDIFPort p : cell.getPorts()) {
-                if (p.getName().startsWith(VIVADO_PRESERVE_PORT_INTERFACE)) {
-                    portsToRename.add(p.getName());
-                }
+        List<String> portsToRename = new ArrayList<>();
+        for (EDIFPort p : top.getPorts()) {
+            if (p.getName().startsWith(VIVADO_PRESERVE_PORT_INTERFACE)) {
+                portsToRename.add(p.getName());
             }
-            for (String p : portsToRename) {
-                cell.renamePort(p, p.substring(VIVADO_PRESERVE_PORT_INTERFACE.length()));
-            }
+        }
+        for (String p : portsToRename) {
+            top.renamePort(p, p.substring(VIVADO_PRESERVE_PORT_INTERFACE.length()));
         }
     }
 }
