@@ -463,11 +463,11 @@ public class PerformanceExplorer {
                         String instDir = runDirectory + File.separator + uniqueID;
                         FileTools.makeDir(instDir);
                         String encryptedTcl = null;
-                        boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
-//                        if (encrypted) {
-//                            encryptedTcl = runDirectory + File.separator + "pblock" + pb +
-//                                           "_" + INITIAL_ENCRYPTED_TCL_NAME;
-//                        }
+                        boolean encrypted = design.getNetlist().hasEncryptedCells();
+                        if (encrypted) {
+                            encryptedTcl = runDirectory + File.separator + "pblock" + pb +
+                                           "_" + INITIAL_ENCRYPTED_TCL_NAME;
+                        }
                         ArrayList<String> tcl = createTclScript(pblockDcpName, instDir, p, r, roundedC, e, encryptedTcl);
                         String scriptName = instDir + File.separator + RUN_TCL_NAME;
 
@@ -585,9 +585,6 @@ public class PerformanceExplorer {
                 EDIFHierNet parentNet = d.getNetlist().getParentNet(hierNet);
                 Net net = d.getNet(parentNet.getHierarchicalNetName());
 
-                if (net == null) {
-                    System.out.println();
-                }
                 boolean leavesPBlock = false;
                 for (PIP pip : net.getPIPs()) {
                     if (!pBlock.containsTile(pip.getTile())) {
@@ -685,9 +682,7 @@ public class PerformanceExplorer {
         String runDir = opts.hasArgument(RUN_DIR_OPT) ? (String) opts.valueOf(RUN_DIR_OPT) : System.getProperty("user.dir");
 
         Design d = Design.readCheckpoint(dcpInputName, "sa_tile_synth.edf");
-//        d.writeCheckpoint("test.dcp");
-
-//        EDIFTools.ensurePreservedInterfaceVivado(d.getNetlist());
+        EDIFTools.ensurePreservedInterfaceVivado(d.getNetlist());
         PerformanceExplorer pe = new PerformanceExplorer(d, runDir, clkName, targetPeriod);
 
         if (opts.hasArgument(MAX_CONCURRENT_JOBS_OPT)) {

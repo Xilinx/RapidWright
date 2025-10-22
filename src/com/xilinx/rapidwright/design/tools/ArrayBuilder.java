@@ -779,7 +779,7 @@ public class ArrayBuilder {
             List<RelocatableTileRectangle> boundingBoxes = new ArrayList<>();
             List<List<Site>> validPlacementGrid = getValidPlacementGrid(module);
             int gridX = 0;
-            int gridY = 0;
+            int gridY = 5;
             int lastYCoordinate = 0;
             boolean searchDown = true;
             while (placed < ab.getInstCountLimit()) {
