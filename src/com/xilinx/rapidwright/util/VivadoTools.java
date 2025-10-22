@@ -135,8 +135,8 @@ public class VivadoTools {
      */
     public static ReportRouteStatusResult reportRouteStatus(Design design) {
         final Path dcp = writeCheckpoint(design);
-        boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
-        ReportRouteStatusResult rrs = reportRouteStatus(dcp, dcp.getParent(), encrypted);
+        boolean hasEncryptedCells = design.getNetlist().hasEncryptedCells();
+        ReportRouteStatusResult rrs = reportRouteStatus(dcp, dcp.getParent(), hasEncryptedCells);
 
         FileTools.deleteFolder(dcp.getParent().toString());
 
@@ -153,8 +153,8 @@ public class VivadoTools {
     public static String reportRouteStatus(Design design, String netName) {
         final Path dcp = writeCheckpoint(design);
         try {
-            boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
-            return reportRouteStatus(netName, dcp, dcp.getParent(), encrypted);
+            boolean hasEncryptedCells = design.getNetlist().hasEncryptedCells();
+            return reportRouteStatus(netName, dcp, dcp.getParent(), hasEncryptedCells);
         } finally {
             FileTools.deleteFolder(dcp.getParent().toString());
         }
@@ -382,10 +382,10 @@ public class VivadoTools {
      * @return The results of `report_route_status`.
      */
     public static ReportRouteStatusResult routeDesignAndGetStatus(Design design, Path workdir) {
-        boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
+        boolean hasEncryptedCells = design.getNetlist().hasEncryptedCells();
         Path dcp = workdir.resolve("routeDesignAndGetStatus.dcp");
         design.writeCheckpoint(dcp);
-        return routeDesignAndGetStatus(dcp, workdir, encrypted);
+        return routeDesignAndGetStatus(dcp, workdir, hasEncryptedCells);
     }
 
     /**
@@ -398,10 +398,10 @@ public class VivadoTools {
      * @return The results of `report_route_status`.
      */
     public static ReportRouteStatusResult placeAndRouteDesignAndGetStatus(Design design, Path workdir) {
-        boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
+        boolean hasEncryptedCells = design.getNetlist().hasEncryptedCells();
         Path dcp = workdir.resolve("placeAndRouteDesignAndGetStatus.dcp");
         design.writeCheckpoint(dcp);
-        return placeAndRouteDesignAndGetStatus(dcp, workdir, encrypted);
+        return placeAndRouteDesignAndGetStatus(dcp, workdir, hasEncryptedCells);
     }
 
     /**
@@ -505,10 +505,10 @@ public class VivadoTools {
      * @return True if the port exists in Vivado, false otherwise.
      */
     public static Design roundTripDCPThruVivado(Design design, Path workdir) {
-        boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
+        boolean hasEncryptedCells = design.getNetlist().hasEncryptedCells();
         Path dcp = workdir.resolve("roundTrip.dcp");
         design.writeCheckpoint(dcp);
-        Path outputDcp = roundTripDCPThruVivado(dcp, "output", workdir, encrypted);
+        Path outputDcp = roundTripDCPThruVivado(dcp, "output", workdir, hasEncryptedCells);
         return Design.readCheckpoint(outputDcp);
     }
 }
