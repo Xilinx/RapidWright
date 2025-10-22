@@ -991,9 +991,8 @@ public class DesignTools {
 
         postBlackBoxCleanup(hierarchicalCellName, design, keepBoundaryRouting);
 
-        List<String> encryptedCells = cell.getNetlist().getEncryptedCells();
-        if (encryptedCells != null && encryptedCells.size() > 0) {
-            design.getNetlist().addEncryptedCells(encryptedCells);
+        if (cell.getNetlist().hasEncryptedCells()) {
+            design.getNetlist().addEncryptedCells(cell.getNetlist().getEncryptedCells());
         }
     }
 
