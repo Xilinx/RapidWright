@@ -109,6 +109,10 @@ public class EDIFNetlist extends EDIFName {
     private String origDirectory;
 
     private List<String> encryptedCells;
+    
+    private EDIFLibrary external;
+
+    private Map<EDIFCell, EDIFCell> externalMappings;
 
     private boolean encryptedCellsValidated = false;
 
@@ -1897,6 +1901,28 @@ public class EDIFNetlist extends EDIFName {
             }
         }
     }
+    
+    public void populateExternalCells() {
+        externalMappings = new HashMap<>();
+        for (EDIFLibrary lib : getLibraries()) {
+            if (lib.isHDIPrimitivesLibrary()) {
+                continue;
+            }
+            
+            for (EDIFCell cell : lib.getCells()) { 
+                for (EDIFCellInst inst : cell.getCellInsts()) {
+                    if (!inst.getCellType().isPrimitive() && inst.getCellType().isLeafCellOrBlackBox()) {
+                        // Likely an encrypted cell, see if we have a substitute netlist in external lib
+                        EDIFCell sub = external.getCell(inst.getCellName());
+                        externalMappings.put(sub, inst.getCellType());
+                        if (sub != null) {
+                            inst.setCellType(sub);
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     private Boolean checkIOStandardForExpansion(EDIFCellInst inst, Pair<String, EnumSet<IOStandard>> exception) {
         Boolean expand = null;
@@ -1994,8 +2020,31 @@ public class EDIFNetlist extends EDIFName {
         for (String name : primsToRemoveOnCollapse) {
             prims.removeCell(name);
         }
+
+        if (external != null) {
+            blackBoxExternalCells();
+        }
+
         // Invalidate parent net map due to macro collapses
         resetParentNetMap();
+    }
+
+    public void blackBoxExternalCells() {
+        for (EDIFLibrary lib : getLibraries()) {
+            if (lib.isHDIPrimitivesLibrary()) {
+                continue;
+            }
+
+            for (EDIFCell cell : lib.getCells()) {
+                for (EDIFCellInst inst : cell.getCellInsts()) {
+                    if (inst.getCellType().getLibrary() == external) {
+                        EDIFCell origBB = externalMappings.get(inst.getCellType());
+                        assert (origBB != null);
+                        inst.setCellType(origBB);
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -2230,6 +2279,17 @@ public class EDIFNetlist extends EDIFName {
      */
     public void resetCellInstIOStandardFallbackMap() {
         cellInstIOStandardFallback = null;
+    }
+
+    public void setExternalLibrary(EDIFLibrary external) {
+        this.external = external;
+        if (external != null) {
+            populateExternalCells();
+        }
+    }
+
+    public EDIFLibrary getExternalLibrary() {
+        return external;
     }
 
     public static void main(String[] args) throws FileNotFoundException {
