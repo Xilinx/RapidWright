@@ -69,6 +69,14 @@ public class VivadoToolsHelper {
         Assertions.assertTrue(rrs.isFullyRouted());
     }
 
+    public static void assertCanBeFullyRoutedByVivado(Path dcp, Path dir, boolean hasEncryptedCells) {
+        if (!FileTools.isVivadoOnPath()) {
+            return;
+        }
+        ReportRouteStatusResult rrs = VivadoTools.routeDesignAndGetStatus(dcp, dir, hasEncryptedCells);
+        Assertions.assertTrue(rrs.isFullyRouted());
+    }
+    
     public static void assertPortCountAfterRoundTripInVivado(Design design, Path dir, boolean expectEquals) {
         if (!FileTools.isVivadoOnPath()) {
             return;
