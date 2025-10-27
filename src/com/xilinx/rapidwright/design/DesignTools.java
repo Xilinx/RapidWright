@@ -4060,6 +4060,10 @@ public class DesignTools {
      */
     public static ModuleImplsInst createModuleImplsInst(Design design, String name, ModuleImpls module) {
         EDIFCellInst cell = design.createOrFindEDIFCellInst(name, module.getNetlist().getTopCell());
+        EDIFLibrary work = design.getNetlist().getWorkLibrary();
+        if (!work.containsCell(cell.getCellType())) {
+            design.getNetlist().copyCellAndSubCells(cell.getCellType(), /*uniquifyCollisions=*/true);
+        }
         return new ModuleImplsInst(name, cell, module);
     }
 
