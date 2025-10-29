@@ -40,9 +40,17 @@ import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
 
+/**
+ * Finds all terminal hierarchical port insts (pins) which either drive a given
+ * hierarchical net through only combinational logic or which gate the driving of that
+ * net through sequential logic. When any of these pins encounter a change of value,
+ * the hierarchical net's value may change. These pins can be considered gating drivers
+ * and/or likely terminal clock signal pins for the input hierarchical net.
+ */
 public class NetlistClockDetection {
 
-    /** A map whose keys are FPGA series and whose values are maps from the names of
+    /**
+     * A map whose keys are FPGA series and whose values are maps from the names of
      * those series' primitives which have clock input pins to those clock input pins.
      */
     public static Map<Series, Map<String, Set<String>>> seriesPrimsToClockPins = new HashMap<>();
@@ -91,6 +99,14 @@ public class NetlistClockDetection {
     }
 
     /**
+     * Gets a map from the names of an FPGA series' primitives which have clock input
+     * pins to those clock input pins.
+     */
+    public static Map<String, Set<String>> getPrimsToClockPins(Series series) {
+        return seriesPrimsToClockPins.get(series);
+    }
+
+    /**
      * Finds all terminal hierarchical port insts (pins) which gate changes to the given
      * hierarchical net's value, i.e., finds all terminal pins which may be drivers of
      * the net through non-clocked primitives and all likely terminal clock signal pins
@@ -108,10 +124,10 @@ public class NetlistClockDetection {
      * @param encountered      A set of already-encountered EDIFHierNets to skip during
      *                         netlist traversal.
      */
-    static Set<EDIFHierPortInst> getGatingDrivers(EDIFHierNet hNet, Map<String, Set<String>> primsToClockPins, Set<EDIFHierNet> encountered) {
+    private static Set<EDIFHierPortInst> getGatingDrivers(EDIFHierNet hNet, Map<String, Set<String>> primsToClockPins, Set<EDIFHierNet> encountered) {
         Set<EDIFHierPortInst> out = new HashSet<EDIFHierPortInst>();
 
-        for (EDIFHierPortInst hPI : hNet.getLeafHierPortInsts(true, false)) {
+        for (EDIFHierPortInst hPI : hNet.getLeafHierPortInsts(true, false, true)) {
             if (hPI.getPortInst().getCellInst() == null) {
                 out.add(hPI);
             } else {
@@ -140,7 +156,28 @@ public class NetlistClockDetection {
         return out;
     }
 
-    static Set<EDIFHierPortInst> getGatingDrivers(EDIFHierNet hNet, Map<String, Set<String>> primsToClockPins) {
+    /**
+     * Finds all terminal hierarchical port insts (pins) which gate changes to the given
+     * hierarchical net's value, i.e., finds all terminal pins which may be drivers of
+     * the net through non-clocked primitives and all likely terminal clock signal pins
+     * that gate signals which drive the net through clocked primitives.
+     *
+     * For example, when run on the output hierarchical net of a LUT2 whose inputs come
+     * from a flop and a LUT, this will return the terminal hierarchical port inst(s)
+     * driving the flop's clock pin as well as any gating drivers of the input LUT's
+     * inputs, determined recursively.
+     *
+     * @param hNet   The hierarchical net to find gating drivers of.
+     * @param series The FPGA series that the containing netlist targets.
+     */
+    public static Set<EDIFHierPortInst> getGatingDrivers(EDIFHierNet hNet, Series series) {
+        Map<String, Set<String>> primsToClockPins = getPrimsToClockPins(series);
+
+        if (primsToClockPins == null) {
+            throw new RuntimeException("ERROR: NetlistClockDetection only supports likely clock pin detection for Versal-targeting netlists. "
+                + "The provided netlist targets " + series + ".");
+        }
+
         return getGatingDrivers(hNet, primsToClockPins, new HashSet<>());
     }
 
@@ -151,14 +188,6 @@ public class NetlistClockDetection {
         }
 
         EDIFNetlist nl = args[0].endsWith(".dcp") ? Design.readCheckpoint(args[0]).getNetlist() : EDIFTools.readEdifFile(args[0]);
-
-        Map<String, Set<String>> primsToClockPins = seriesPrimsToClockPins.get(nl.getDevice().getSeries());
-
-        if (primsToClockPins == null) {
-            throw new RuntimeException("ERROR: NetlistClockDetection only supports likely clock pin detection for Versal-targeting netlists. "
-                + "The provided netlist targets " + nl.getDevice().getSeries() + ".");
-        }
-
         nl.expandMacroUnisims();
 
         JSONObject out = new JSONObject();
@@ -172,7 +201,7 @@ public class NetlistClockDetection {
                 continue;
             }
 
-            out.put(hNetName, getGatingDrivers(hNet, primsToClockPins).stream().map(EDIFHierPortInst::toString).toArray());
+            out.put(hNetName, getGatingDrivers(hNet, nl.getDevice().getSeries()).stream().map(EDIFHierPortInst::toString).toArray());
         }
 
         System.out.println(out.toString(4));

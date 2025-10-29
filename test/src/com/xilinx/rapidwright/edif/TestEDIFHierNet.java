@@ -23,6 +23,8 @@
 
 package com.xilinx.rapidwright.edif;
 
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -36,12 +38,18 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestEDIFHierNet {
 
+    private <T> void assertEqualsAnyOrder(Collection<T> expected, Collection<T> actual) {
+        Assertions.assertEquals(new HashSet<>(expected), new HashSet<>(actual));
+    }
+
     @Test
     public void testGetLeafHierPortInsts() {
+        //////// Test using existing DCP ////////
         Design design = RapidWrightDCP.loadDCP("bnn.dcp");
 
         EDIFNetlist netlist = design.getNetlist();
@@ -56,6 +64,111 @@ public class TestEDIFHierNet {
             }
             Assertions.assertTrue(testSet.isEmpty());
         }
+
+        //////// Test with from-scratch netlist ////////
+        EDIFNetlist testTopLevelPinsNetlist = EDIFTools.createNewNetlist("topLevelPins");
+
+        ///// Create inner
+        EDIFCell inner = new EDIFCell(testTopLevelPinsNetlist.getTopCell().getLibrary(), "inner");
+        EDIFPort inner_i = new EDIFPort("i", EDIFDirection.INPUT, 1);
+        EDIFPort inner_o1 = new EDIFPort("o1", EDIFDirection.OUTPUT, 1);
+        EDIFPort inner_o2 = new EDIFPort("o2", EDIFDirection.OUTPUT, 1);
+        inner.addPort(inner_i);
+        inner.addPort(inner_o1);
+        inner.addPort(inner_o2);
+        EDIFCellInst inv = new EDIFCellInst("inv", Design.getUnisimCell(Unisim.LUT1), inner);
+        EDIFTools.ensureCellInLibraries(testTopLevelPinsNetlist, inv.getCellType());
+        LUTTools.configureLUT(inv, "O=!I0");
+        inner.addCellInst(inv);
+        EDIFNet inner_i_to_o1_and_inv = new EDIFNet("inner_i_to_o1_and_inv", inner);
+        EDIFNet inner_inv_to_o2 = new EDIFNet("inner_inv_to_o2", inner);
+
+        // First net conns
+        new EDIFPortInst(inner_i, inner_i_to_o1_and_inv, null);
+        new EDIFPortInst(inner_o1, inner_i_to_o1_and_inv, null);
+        new EDIFPortInst(inv.getPort("I0"), inner_i_to_o1_and_inv, inv);
+
+        // Second net conns
+        new EDIFPortInst(inv.getPort("O"), inner_inv_to_o2, inv);
+        new EDIFPortInst(inner_o2, inner_inv_to_o2, null);
+
+        ///// Create top
+        EDIFCell top = testTopLevelPinsNetlist.getTopCell();
+        EDIFPort top_i = new EDIFPort("i", EDIFDirection.INPUT, 1);
+        EDIFPort top_o1 = new EDIFPort("o1", EDIFDirection.OUTPUT, 1);
+        EDIFPort top_o2 = new EDIFPort("o2", EDIFDirection.OUTPUT, 1);
+        top.addPort(top_i);
+        top.addPort(top_o1);
+        top.addPort(top_o2);
+        EDIFCellInst innerInst = new EDIFCellInst("inner", inner, top);
+        top.addCellInst(innerInst);
+
+        EDIFNet top_i_to_i = new EDIFNet("top_i_to_i", top);
+        EDIFNet top_o1_to_o1 = new EDIFNet("top_o1_to_o1", top);
+        EDIFNet top_o2_to_o2 = new EDIFNet("top_o2_to_o2", top);
+
+        // First net conns
+        new EDIFPortInst(top_i, top_i_to_i, null);
+        new EDIFPortInst(inner_i, top_i_to_i, innerInst);
+
+        // Second net conns
+        new EDIFPortInst(top_o1, top_o1_to_o1, null);
+        new EDIFPortInst(inner_o1, top_o1_to_o1, innerInst);
+
+        // Third net conns
+        new EDIFPortInst(top_o2, top_o2_to_o2, null);
+        new EDIFPortInst(inner_o2, top_o2_to_o2, innerInst);
+
+        EDIFHierNet h_top_i_to_i = testTopLevelPinsNetlist.getTopHierCellInst().getNet("top_i_to_i");
+        EDIFHierNet h_top_o1_to_o1 = testTopLevelPinsNetlist.getTopHierCellInst().getNet("top_o1_to_o1");
+        EDIFHierNet h_top_o2_to_o2 = testTopLevelPinsNetlist.getTopHierCellInst().getNet("top_o2_to_o2");
+        EDIFHierNet h_inner_i_to_o1_and_inv = testTopLevelPinsNetlist.getTopHierCellInst().getChild("inner").getNet("inner_i_to_o1_and_inv");
+        EDIFHierNet h_inner_inv_to_o2 = testTopLevelPinsNetlist.getTopHierCellInst().getChild("inner").getNet("inner_inv_to_o2");
+
+        assertEqualsAnyOrder(
+            Arrays.asList("i", "o1", "inner/inv/I0"),
+            h_top_i_to_i.getLeafHierPortInsts(true, true, true).stream().map(hPI -> hPI.toString()).toList()
+        );
+
+        assertEqualsAnyOrder(
+            Arrays.asList("inner/inv/I0"),
+            h_top_i_to_i.getLeafHierPortInsts().stream().map(hPI -> hPI.toString()).toList()
+        );
+
+        assertEqualsAnyOrder(
+            h_top_i_to_i.getLeafHierPortInsts(true, true, true),
+            h_inner_i_to_o1_and_inv.getLeafHierPortInsts(true, true, true)
+        );
+
+        assertEqualsAnyOrder(
+            h_top_i_to_i.getLeafHierPortInsts(true, true, true),
+            h_top_o1_to_o1.getLeafHierPortInsts(true, true, true)
+        );
+
+        assertEqualsAnyOrder(
+            Arrays.asList("o2", "inner/inv/O"),
+            h_inner_inv_to_o2.getLeafHierPortInsts(true, true, true).stream().map(hPI -> hPI.toString()).toList()
+        );
+
+        assertEqualsAnyOrder(
+            h_inner_inv_to_o2.getLeafHierPortInsts(true, true, true),
+            h_top_o2_to_o2.getLeafHierPortInsts(true, true, true)
+        );
+
+        assertEqualsAnyOrder(
+            Arrays.asList("inner/inv/I0", "o1"),
+            h_top_i_to_i.getLeafHierPortInsts(false, true, true).stream().map(hPI -> hPI.toString()).toList()
+        );
+
+        assertEqualsAnyOrder(
+            h_top_i_to_i.getLeafHierPortInsts(false, true, true),
+            h_top_o1_to_o1.getLeafHierPortInsts(false, true, true)
+        );
+
+        assertEqualsAnyOrder(
+            Arrays.asList("inner/inv/O"),
+            h_inner_inv_to_o2.getLeafHierPortInsts(true, false, true).stream().map(hPI -> hPI.toString()).toList()
+        );
     }
 
     @ParameterizedTest
