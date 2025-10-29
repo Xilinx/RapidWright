@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -127,12 +128,12 @@ public class TestEDIFHierNet {
 
         assertEqualsAnyOrder(
             Arrays.asList("i", "o1", "inner/inv/I0"),
-            h_top_i_to_i.getLeafHierPortInsts(true, true, true).stream().map(hPI -> hPI.toString()).toList()
+            h_top_i_to_i.getLeafHierPortInsts(true, true, true).stream().map(hPI -> hPI.toString()).collect(Collectors.toList())
         );
 
         assertEqualsAnyOrder(
             Arrays.asList("inner/inv/I0"),
-            h_top_i_to_i.getLeafHierPortInsts().stream().map(hPI -> hPI.toString()).toList()
+            h_top_i_to_i.getLeafHierPortInsts().stream().map(hPI -> hPI.toString()).collect(Collectors.toList())
         );
 
         assertEqualsAnyOrder(
@@ -147,7 +148,7 @@ public class TestEDIFHierNet {
 
         assertEqualsAnyOrder(
             Arrays.asList("o2", "inner/inv/O"),
-            h_inner_inv_to_o2.getLeafHierPortInsts(true, true, true).stream().map(hPI -> hPI.toString()).toList()
+            h_inner_inv_to_o2.getLeafHierPortInsts(true, true, true).stream().map(hPI -> hPI.toString()).collect(Collectors.toList())
         );
 
         assertEqualsAnyOrder(
@@ -157,7 +158,7 @@ public class TestEDIFHierNet {
 
         assertEqualsAnyOrder(
             Arrays.asList("inner/inv/I0", "o1"),
-            h_top_i_to_i.getLeafHierPortInsts(false, true, true).stream().map(hPI -> hPI.toString()).toList()
+            h_top_i_to_i.getLeafHierPortInsts(false, true, true).stream().map(hPI -> hPI.toString()).collect(Collectors.toList())
         );
 
         assertEqualsAnyOrder(
@@ -167,7 +168,7 @@ public class TestEDIFHierNet {
 
         assertEqualsAnyOrder(
             Arrays.asList("inner/inv/O"),
-            h_inner_inv_to_o2.getLeafHierPortInsts(true, false, true).stream().map(hPI -> hPI.toString()).toList()
+            h_inner_inv_to_o2.getLeafHierPortInsts(true, false, true).stream().map(hPI -> hPI.toString()).collect(Collectors.toList())
         );
     }
 
