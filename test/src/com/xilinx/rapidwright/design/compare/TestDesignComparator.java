@@ -109,12 +109,12 @@ public class TestDesignComparator {
         String oldType = removedCell.getType();
         removedCell.setType("MISMATCHEDTYPE");
 
-        compareDesign(4, 1, DesignDiffType.PLACED_CELL_TYPE, dc, gold, test2);
+        compareDesign(6, 1, DesignDiffType.PLACED_CELL_TYPE, dc, gold, test2);
 
         removedCell.setType(oldType);
         removedCell.updateName("NEWNAME");
 
-        compareDesign(4, 1, DesignDiffType.PLACED_CELL_NAME, dc, gold, test2);
+        compareDesign(6, 1, DesignDiffType.PLACED_CELL_NAME, dc, gold, test2);
 
         SitePIP sitePIP = siteInst.getUsedSitePIP("CLKINV");
         Net clk = siteInst.getNetFromSiteWire(sitePIP.getInputPin().getSiteWireName());
@@ -122,11 +122,11 @@ public class TestDesignComparator {
         siteInst.routeIntraSiteNet(clk, sitePIP.getInputPin(), sitePIP.getInputPin());
         siteInst.routeIntraSiteNet(clk, sitePIP.getOutputPin(), sitePIP.getOutputPin());
 
-        compareDesign(5, 1, DesignDiffType.SITEPIP_MISSING, dc, gold, test2);
+        compareDesign(7, 1, DesignDiffType.SITEPIP_MISSING, dc, gold, test2);
 
         siteInst.addSitePIP("FFMUXC1", "D6");
 
-        compareDesign(6, 1, DesignDiffType.SITEPIP_EXTRA, dc, gold, test2);
+        compareDesign(8, 1, DesignDiffType.SITEPIP_EXTRA, dc, gold, test2);
 
         sitePIP = siteInst.getUsedSitePIP("FFMUXA1");
         Net net = siteInst.getNetFromSiteWire(sitePIP.getInputPin().getSiteWireName());
@@ -135,21 +135,21 @@ public class TestDesignComparator {
         siteInst.routeIntraSiteNet(net, sitePIP.getOutputPin(), sitePIP.getOutputPin());
         siteInst.addSitePIP("FFMUXA1", "D6");
 
-        compareDesign(8, 1, DesignDiffType.SITEPIP_INPIN_NAME, dc, gold, test2);
+        compareDesign(10, 1, DesignDiffType.SITEPIP_INPIN_NAME, dc, gold, test2);
         Assertions.assertEquals(1, dc.getDiffList(DesignDiffType.SITEWIRE_NET_EXTRA).size());
 
         siteInst.unrouteIntraSiteNet(sitePIP.getInputPin(), sitePIP.getInputPin());
 
-        compareDesign(9, 1, DesignDiffType.SITEWIRE_NET_MISSING, dc, gold, test2);
+        compareDesign(11, 1, DesignDiffType.SITEWIRE_NET_MISSING, dc, gold, test2);
 
         siteInst.routeIntraSiteNet(new Net("mismatch"), sitePIP.getInputPin(), sitePIP.getInputPin());
 
-        compareDesign(9, 1, DesignDiffType.SITEWIRE_NET_NAME, dc, gold, test2);
+        compareDesign(11, 1, DesignDiffType.SITEWIRE_NET_NAME, dc, gold, test2);
 
         Assertions.assertTrue(net.hasPIPs());
         test2.removeNet(net);
 
-        compareDesign(28, 1, DesignDiffType.NET_MISSING, dc, gold, test2);
+        compareDesign(30, 1, DesignDiffType.NET_MISSING, dc, gold, test2);
 
         Net extra = new Net("extraNet");
         for (PIP p : net.getPIPs()) {
@@ -157,17 +157,17 @@ public class TestDesignComparator {
         }
         test2.addNet(extra);
 
-        compareDesign(29, 1, DesignDiffType.NET_EXTRA, dc, gold, test2);
+        compareDesign(31, 1, DesignDiffType.NET_EXTRA, dc, gold, test2);
 
         Assertions.assertTrue(extra.hasPIPs());
         clk.addPIP(extra.getPIPs().get(0));
 
-        compareDesign(30, 1, DesignDiffType.PIP_EXTRA, dc, gold, test2);
+        compareDesign(32, 1, DesignDiffType.PIP_EXTRA, dc, gold, test2);
 
         clk.getPIPs().remove(clk.getPIPs().size() - 1);
         clk.getPIPs().remove(clk.getPIPs().size() - 1);
 
-        compareDesign(30, 1, DesignDiffType.PIP_MISSING, dc, gold, test2);
+        compareDesign(32, 1, DesignDiffType.PIP_MISSING, dc, gold, test2);
 
         if (dc.comparePIPFlags()) {
             clk.getPIPs().get(clk.getPIPs().size() - 1).setIsStub(true);
