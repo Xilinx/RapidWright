@@ -110,16 +110,17 @@ public class ArrayBuilder {
     private static final List<String> TARGET_CLK_PERIOD_OPTS = Arrays.asList("c", "clk-period");
     private static final List<String> KERNEL_CLK_NAME_OPTS = Arrays.asList("n", "kernel-clk-name");
     private static final List<String> TOP_CLK_NAME_OPTS = Arrays.asList("m", "top-clk-name");
-    private static final List<String> TOP_RESET_NAME_OPTS = Collections.singletonList("top-reset-name");
     private static final List<String> REUSE_RESULTS_OPTS = Arrays.asList("r", "reuse");
     private static final List<String> SKIP_IMPL_OPTS = Arrays.asList("k", "skip-impl");
     private static final List<String> LIMIT_INSTS_OPTS = Arrays.asList("l", "limit-inst-count");
     private static final List<String> TOP_LEVEL_DESIGN_OPTS = Arrays.asList("t", "top-design");
-    private static final List<String> FAST_PLACEMENT_OPTS = Arrays.asList("f", "fast");
+    private static final List<String> EXACT_PLACEMENT_OPTS = Collections.singletonList("exact-placement");
     private static final List<String> WRITE_PLACEMENT_OPTS = Collections.singletonList("write-placement");
     private static final List<String> PLACEMENT_FILE_OPTS = Collections.singletonList("read-placement");
     private static final List<String> PLACEMENT_GRID_OPTS = Collections.singletonList("write-placement-grid");
     private static final List<String> OUT_OF_CONTEXT_OPTS = Collections.singletonList("out-of-context");
+    private static final List<String> UNROUTE_STATIC_NETS_OPTS = Collections.singletonList("unroute-static-nets");
+    private static final List<String> ROUTE_CLOCK_OPTS = Collections.singletonList("route-clk");
 
     private Design design;
 
@@ -132,8 +133,6 @@ public class ArrayBuilder {
     private String kernelClkName;
 
     private String topClkName;
-
-    private String topResetName;
 
     private boolean skipImpl;
 
@@ -153,7 +152,11 @@ public class ArrayBuilder {
 
     private ArrayNetlistGraph condensedGraph;
 
-    private boolean fastPlacement;
+    private boolean exactPlacement;
+
+    private boolean unrouteStaticNets;
+
+    private boolean routeClock;
 
     public static final double DEFAULT_CLK_PERIOD_TARGET = 2.0;
 
@@ -171,7 +174,6 @@ public class ArrayBuilder {
                 acceptsAll(TARGET_CLK_PERIOD_OPTS, "Target Clock Period (ns)").withRequiredArg();
                 acceptsAll(KERNEL_CLK_NAME_OPTS, "Kernel Clock Name").withRequiredArg();
                 acceptsAll(TOP_CLK_NAME_OPTS, "Top Clock Name").withRequiredArg();
-                acceptsAll(TOP_RESET_NAME_OPTS, "Top Reset Name").withRequiredArg();
                 acceptsAll(REUSE_RESULTS_OPTS, "Reuse Previous Implementation Results");
                 acceptsAll(SKIP_IMPL_OPTS, "Skip Implementation of the Kernel");
                 acceptsAll(LIMIT_INSTS_OPTS, "Limit number of instance copies").withRequiredArg();
@@ -179,8 +181,10 @@ public class ArrayBuilder {
                 acceptsAll(PLACEMENT_FILE_OPTS, "Use placement specified in file").withRequiredArg();
                 acceptsAll(PLACEMENT_GRID_OPTS, "Write grid of possible placement locations to specified file").withRequiredArg();
                 acceptsAll(TOP_LEVEL_DESIGN_OPTS, "Top level design with blackboxes/kernel insts").withRequiredArg();
-                acceptsAll(FAST_PLACEMENT_OPTS, "Use bounding-box based overlap to quickly place modules");
+                acceptsAll(EXACT_PLACEMENT_OPTS, "Use exact module overlap calculation instead of the faster bounding-box method");
                 acceptsAll(OUT_OF_CONTEXT_OPTS, "Specifies that the array will be compiled out of context");
+                acceptsAll(UNROUTE_STATIC_NETS_OPTS, "Unroute static (GND/VCC) nets to potentially help with routability");
+                acceptsAll(ROUTE_CLOCK_OPTS, "Route clock using RWRoute");
                 acceptsAll(HELP_OPTS, "Print this help message").forHelp();
             }
         };
@@ -258,14 +262,6 @@ public class ArrayBuilder {
         return topClkName;
     }
 
-    public void setTopResetName(String resetName) {
-        this.topResetName = resetName;
-    }
-
-    public String getTopResetName() {
-        return topResetName;
-    }
-
     public boolean isSkipImpl() {
         return skipImpl;
     }
@@ -330,12 +326,28 @@ public class ArrayBuilder {
         this.condensedGraph = condensedGraph;
     }
 
-    public boolean isFastPlacement() {
-        return outOfContext;
+    public boolean isExactPlacement() {
+        return exactPlacement;
     }
 
-    public void setFastPlacement(boolean outOfContext) {
-        this.outOfContext = outOfContext;
+    public void setExactPlacement(boolean exactPlacement) {
+        this.exactPlacement = exactPlacement;
+    }
+
+    public boolean unrouteStaticNets() {
+        return unrouteStaticNets;
+    }
+
+    public void setUnrouteStaticNets(boolean unrouteStaticNets) {
+        this.unrouteStaticNets = unrouteStaticNets;
+    }
+
+    public boolean isRouteClock() {
+        return routeClock;
+    }
+
+    public void setRouteClock(boolean routeClock) {
+        this.routeClock = routeClock;
     }
 
     private void initializeArrayBuilder(OptionSet options) {
@@ -343,7 +355,9 @@ public class ArrayBuilder {
 
         setSkipImpl(options.has(SKIP_IMPL_OPTS.get(0)));
         setOutOfContext(options.has(OUT_OF_CONTEXT_OPTS.get(0)));
-        setFastPlacement(options.has(FAST_PLACEMENT_OPTS.get(0)));
+        setExactPlacement(options.has(EXACT_PLACEMENT_OPTS.get(0)));
+        setUnrouteStaticNets(options.has(UNROUTE_STATIC_NETS_OPTS.get(0)));
+        setRouteClock(options.has(ROUTE_CLOCK_OPTS.get(0)));
 
         if (options.has(KERNEL_DESIGN_OPTS.get(0))) {
             inputFile = Paths.get((String) options.valueOf(KERNEL_DESIGN_OPTS.get(0)));
@@ -450,12 +464,6 @@ public class ArrayBuilder {
             setTopClockName(((String) options.valueOf(TOP_CLK_NAME_OPTS.get(0))));
         } else if (options.has(TOP_LEVEL_DESIGN_OPTS.get(0))) {
             setTopClockName(ClockTools.getClockFromDesign(getTopDesign()).toString());
-        }
-
-        if (options.has(TOP_RESET_NAME_OPTS.get(0))) {
-            setTopResetName(((String) options.valueOf(TOP_RESET_NAME_OPTS.get(0))));
-        } else {
-            setTopResetName(null);
         }
 
         if (options.has(WRITE_PLACEMENT_OPTS.get(0))) {
@@ -632,7 +640,6 @@ public class ArrayBuilder {
         }
 
         List<Module> modules = new ArrayList<>();
-        boolean unrouteStaticNets = false;
         if (!ab.isSkipImpl()) {
             t.stop().start("Implement Kernel");
             FileTools.makeDirs(workDir.toString());
@@ -660,7 +667,7 @@ public class ArrayBuilder {
                     System.out.println("Reading... " + dcpPath);
                     Design d = Design.readCheckpoint(dcpPath);
                     d.setName(d.getName() + "_" + i);
-                    Module m = new Module(d, unrouteStaticNets);
+                    Module m = new Module(d, ab.unrouteStaticNets());
                     modules.add(m);
                     m.setPBlock(pe.getPBlock(i));
                     m.calculateAllValidPlacements(d.getDevice());
@@ -673,31 +680,33 @@ public class ArrayBuilder {
             // Just use the design we loaded and replicate it
             t.stop().start("Calculate Valid Placements");
             removeBUFGs(ab.getKernelDesign());
-//            Net gndNet = ab.getKernelDesign().getNet(Net.GND_NET);
-//            if (gndNet != null) {
-//                gndNet.unroute();
-//                List<SitePinInst> staticSourcePins = new ArrayList<>();
-//                Set<SiteInst> staticSourceSites = new HashSet<>();
-//                for (SitePinInst pin : gndNet.getPins()) {
-//                    if (pin.isOutPin() && pin.getSiteInst().getName().startsWith(SiteInst.STATIC_SOURCE)) {
-//                        staticSourcePins.add(pin);
-//                        staticSourceSites.add(pin.getSiteInst());
-//                    }
-//                }
-//                for (SitePinInst pin : staticSourcePins) {
-//                    gndNet.removePin(pin);
-//                    pin.getSiteInst().removePin(pin);
-//                }
-//                for (SiteInst siteInst : staticSourceSites) {
-//                    siteInst.setDesign(null);
-//                    siteInst.unPlace();
-//                }
-//            }
-//            Net vccNet = ab.getKernelDesign().getNet(Net.VCC_NET);
-//            if (vccNet != null) {
-//                vccNet.unroute();
-//            }
-            Module m = new Module(ab.getKernelDesign(), unrouteStaticNets);
+            if (ab.unrouteStaticNets()) {
+                Net gndNet = ab.getKernelDesign().getNet(Net.GND_NET);
+                if (gndNet != null) {
+                    gndNet.unroute();
+                    List<SitePinInst> staticSourcePins = new ArrayList<>();
+                    Set<SiteInst> staticSourceSites = new HashSet<>();
+                    for (SitePinInst pin : gndNet.getPins()) {
+                        if (pin.isOutPin() && pin.getSiteInst().getName().startsWith(SiteInst.STATIC_SOURCE)) {
+                            staticSourcePins.add(pin);
+                            staticSourceSites.add(pin.getSiteInst());
+                        }
+                    }
+                    for (SitePinInst pin : staticSourcePins) {
+                        gndNet.removePin(pin);
+                        pin.getSiteInst().removePin(pin);
+                    }
+                    for (SiteInst siteInst : staticSourceSites) {
+                        siteInst.setDesign(null);
+                        siteInst.unPlace();
+                    }
+                }
+                Net vccNet = ab.getKernelDesign().getNet(Net.VCC_NET);
+                if (vccNet != null) {
+                    vccNet.unroute();
+                }
+            }
+            Module m = new Module(ab.getKernelDesign(), ab.unrouteStaticNets());
             m.getNet(ab.getKernelClockName()).unroute();
 
             if (ab.getInputPlacementFileName() == null) {
@@ -726,12 +735,12 @@ public class ArrayBuilder {
             ab.setCondensedGraph(new ArrayNetlistGraph(array, modInstNames));
             Map<Pair<Integer, Integer>, String> idealPlacement =
                     ab.getCondensedGraph().getGreedyPlacementGrid();
-            Map<Integer, Integer> foldingMap = new HashMap<>();
-            foldingMap.put(17, 21);
-            foldingMap.put(18, 20);
-            foldingMap.put(20, 18);
-            foldingMap.put(21, 17);
-            idealPlacement = foldIdealPlacement(idealPlacement, foldingMap);
+//            Map<Integer, Integer> foldingMap = new HashMap<>();
+//            foldingMap.put(17, 21);
+//            foldingMap.put(18, 20);
+//            foldingMap.put(20, 18);
+//            foldingMap.put(21, 17);
+//            idealPlacement = foldIdealPlacement(idealPlacement, foldingMap);
 //                    ab.getCondensedGraph().getOptimalPlacementGrid(ab.getInstCountLimit(), ab.getInstCountLimit());
             idealPlacementList = idealPlacement.entrySet().stream()
                     .map((e) -> new Pair<>(e.getKey(), e.getValue()))
@@ -831,9 +840,9 @@ public class ArrayBuilder {
                 RelocatableTileRectangle newBoundingBox =
                         boundingBox.getCorresponding(anchor.getTile(), module.getAnchor().getTile());
                 boolean noOverlap = boundingBoxes.stream().noneMatch((b) -> b.overlaps(newBoundingBox));
-                if (!ab.isFastPlacement() || (noOverlap && !boundingBoxStraddlesClockRegion(newBoundingBox))) {
+                if (ab.isExactPlacement() || (noOverlap && !boundingBoxStraddlesClockRegion(newBoundingBox))) {
                     if (curr.place(anchor, true, false)) {
-                        if (!ab.isFastPlacement() && (straddlesClockRegion(curr)
+                        if (ab.isExactPlacement() && (straddlesClockRegion(curr)
                             || !NetTools.getNetsWithOverlappingNodes(array).isEmpty())
                         ) {
                             curr.unplace();
@@ -915,14 +924,16 @@ public class ArrayBuilder {
             array.setAutoIOBuffers(false);
         }
 
-//        Net gndNet = array.getNet(Net.GND_NET);
-//        if (gndNet != null) {
-//            gndNet.unroute();
-//        }
-//        Net vccNet = array.getNet(Net.VCC_NET);
-//        if (vccNet != null) {
-//            vccNet.unroute();
-//        }
+        if (ab.unrouteStaticNets()) {
+            Net gndNet = array.getNet(Net.GND_NET);
+            if (gndNet != null) {
+                gndNet.unroute();
+            }
+            Net vccNet = array.getNet(Net.VCC_NET);
+            if (vccNet != null) {
+                vccNet.unroute();
+            }
+        }
         array.getNetlist().consolidateAllToWorkLibrary();
         array.flattenDesign();
 
@@ -939,30 +950,18 @@ public class ArrayBuilder {
             }
             PBlock pBlock = new PBlock(array.getDevice(), usedSites);
             InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsNearPins(array, ab.getTopClockName(), pBlock);
-            if (ab.getTopResetName() != null) {
-                EDIFPort resetPort = array.getNetlist().getTopCell().getPort(ab.getTopResetName());
-                System.out.println();
-            }
         }
 
-//        t.stop().start("Route clock");
-//        Net clockNet = array.getNet(ab.getTopClockName());
-//        DesignTools.makePhysNetNamesConsistent(array);
-//        DesignTools.createPossiblePinsToStaticNets(array);
-//        DesignTools.createMissingSitePinInsts(array, clockNet);
-//        List<SitePinInst> pinsToRoute = clockNet.getPins();
+        if (ab.isRouteClock()) {
+            t.stop().start("Route clock");
+            Net clockNet = array.getNet(ab.getTopClockName());
+            DesignTools.makePhysNetNamesConsistent(array);
+            DesignTools.createPossiblePinsToStaticNets(array);
+            DesignTools.createMissingSitePinInsts(array, clockNet);
+            List<SitePinInst> pinsToRoute = clockNet.getPins();
 
-//        for (EDIFNet edifNet : array.getNetlist().getCell("systolic_array").getNets()) {
-//            EDIFHierNet hierNet = new EDIFHierNet(array.getNetlist().getHierCellInstFromName("u_systolic_array"), edifNet);
-//            EDIFHierNet parentNet = array.getNetlist().getParentNet(hierNet);
-//            Net net = array.getNet(parentNet.getHierarchicalNetName());
-//            if (net != null) {
-//                DesignTools.createMissingSitePinInsts(array, net);
-//                pinsToRoute.addAll(net.getPins());
-//            }
-//        }
-//        System.out.println("Pin count: " + pinsToRoute.size());
-//        PartialRouter.routeDesignPartialNonTimingDriven(array, pinsToRoute);
+            PartialRouter.routeDesignPartialNonTimingDriven(array, pinsToRoute);
+        }
 
         t.stop().start("Write DCP");
         array.writeCheckpoint(ab.getOutputName());
