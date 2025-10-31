@@ -36,13 +36,16 @@ import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.util.Pair;
 import org.jgrapht.Graph;
+import org.jgrapht.GraphPath;
 import org.jgrapht.alg.cycle.CycleDetector;
+import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultEdge;
 import org.jgrapht.traverse.TopologicalOrderIterator;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -106,13 +109,45 @@ public class ArrayNetlistGraph {
     public Map<Pair<Integer, Integer>, String> getGreedyPlacementGrid() {
         Map<Pair<Integer, Integer>, String> placementMap = new HashMap<>();
         Map<String, Pair<Integer, Integer>> reversePlacementMap = new HashMap<>();
+        Map<String, Integer> candidateMap = new HashMap<>();
         Iterator<String> iterator = getTopologicalOrderIterator();
-        while (iterator.hasNext()) {
-            String node = iterator.next();
-            if (placementMap.isEmpty()) {
-                placementMap.put(new Pair<>(0, 0), node);
-                reversePlacementMap.put(node, new Pair<>(0, 0));
-                continue;
+        DijkstraShortestPath<String, DefaultEdge> dsp = new DijkstraShortestPath<>(graph);
+        String topLeftNode = iterator.next();
+        placementMap.put(new Pair<>(0, 0), topLeftNode);
+        reversePlacementMap.put(topLeftNode, new Pair<>(0, 0));
+        for (DefaultEdge edge : graph.outgoingEdgesOf(topLeftNode)) {
+            String node = graph.getEdgeTarget(edge);
+            candidateMap.put(node, 1);
+        }
+        // TODO: Generalize
+        String extraConstraintNode = "u_systolic_array/x[1].y[0].u_tile";
+        candidateMap.remove(extraConstraintNode);
+        placementMap.put(new Pair<>(1, 0), extraConstraintNode);
+        reversePlacementMap.put(extraConstraintNode, new Pair<>(1, 0));
+        for (DefaultEdge edge : graph.outgoingEdgesOf(extraConstraintNode)) {
+            String targetNode = graph.getEdgeTarget(edge);
+            int count = candidateMap.computeIfAbsent(targetNode, (n) -> 0);
+            candidateMap.put(targetNode, count + 1);
+        }
+        // END TODO
+        while (!candidateMap.isEmpty()) {
+            List<String> sortedCandidates = candidateMap.entrySet().stream()
+                    .sorted((e1, e2) -> {
+                      if (e1.getValue() == e2.getValue()) {
+                          // Tie-break of shorted path distance
+                          GraphPath<String, DefaultEdge> shortestPathE1 = dsp.getPath(topLeftNode, e1.getKey());
+                          GraphPath<String, DefaultEdge> shortestPathE2 = dsp.getPath(topLeftNode, e2.getKey());
+                          return shortestPathE1.getLength() - shortestPathE2.getLength();
+                      }
+                      return e2.getValue().compareTo(e1.getValue());
+                    })
+                    .map(Map.Entry::getKey).collect(Collectors.toList());
+            String node = sortedCandidates.get(0);
+            candidateMap.remove(node);
+            for (DefaultEdge edge : graph.outgoingEdgesOf(node)) {
+                String targetNode = graph.getEdgeTarget(edge);
+                int count = candidateMap.computeIfAbsent(targetNode, (n) -> 0);
+                candidateMap.put(targetNode, count + 1);
             }
             Set<DefaultEdge> inEdges = graph.incomingEdgesOf(node);
             List<String> inNeighbors = new ArrayList<>();

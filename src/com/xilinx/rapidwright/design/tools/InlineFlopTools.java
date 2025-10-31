@@ -394,9 +394,6 @@ public class InlineFlopTools {
     private static Cell createAndPlaceFlopInlineOnTopPortInst(Design design, EDIFPortInst portInst, Pair<Site, BEL> loc,
                                                               EDIFHierNet clk) {
         String name = portInst.getFullName() + INLINE_SUFFIX;
-        if (portInst.getFullName().startsWith("[]")) {
-            System.out.println();
-        }
         Cell flop = design.createAndPlaceCell(design.getTopEDIFCell(), name, Unisim.FDRE, loc.getFirst(),
                 loc.getSecond());
         Net net = design.createNet(name);
@@ -440,17 +437,17 @@ public class InlineFlopTools {
         Net vcc = design.getVccNet();
         Set<SitePinInst> vccPins = new HashSet<>();
         pinsToRemove.put(vcc, vccPins);
-        String[] staticPins = new String[]{"CKEN1", design.getSeries() == Series.Versal ? "RST" : "SRST1"};
+        String[] staticPins = new String[]{"CKEN1", "CKEN2", design.getSeries() == Series.Versal ? "RST" : "SRST1"};
         for (EDIFCellInst inst : design.getTopEDIFCell().getCellInsts()) {
             if (inst.getName().endsWith(INLINE_SUFFIX)) {
                 Cell flop = design.getCell(inst.getName());
-                if (flop == null) {
-                    System.out.println();
-                }
                 SiteInst si = flop.getSiteInst();
                 // Assume we only placed one flop per SiteInst
                 siteInstToRemove.add(si);
                 for (SitePinInst pin : si.getSitePinInsts()) {
+                    if (pin.getNet().isGNDNet()) {
+                        continue;
+                    }
                     pinsToRemove.computeIfAbsent(pin.getNet(), p -> new HashSet<>()).add(pin);
                 }
                 for (String staticPin : staticPins) {
@@ -463,9 +460,7 @@ public class InlineFlopTools {
             }
         }
 
-        for (SiteInst si : siteInstToRemove) {
-            design.removeSiteInst(si);
-        }
+
         DesignTools.batchRemoveSitePins(pinsToRemove, true);
 
         String[] ctrlPins = new String[]{"C", "R", "CE"};
@@ -474,7 +469,9 @@ public class InlineFlopTools {
             // Remove control set pins
             for (String pin : ctrlPins) {
                 EDIFPortInst p = c.getPortInst(pin);
-                p.getNet().removePortInst(p);
+                if (p != null && p.getNet() != null) {
+                    p.getNet().removePortInst(p);
+                }
             }
             // Merge 'D' sources and 'Q' sinks, restore original net
             EDIFPortInst d = c.getPortInst("D");
@@ -507,6 +504,13 @@ public class InlineFlopTools {
             design.removeCell(c.getName());
         }
 
+        for (SiteInst si : siteInstToRemove) {
+            boolean isStaticSource = si.getSitePinInsts().stream()
+                    .anyMatch((p) -> p.getNet().isGNDNet() && p.isOutPin());
+            if (!isStaticSource) {
+                design.removeSiteInst(si);
+            }
+        }
     }
 
     public static void main(String[] args) {

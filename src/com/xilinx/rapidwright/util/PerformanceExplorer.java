@@ -321,7 +321,7 @@ public class PerformanceExplorer {
                     port = netlist.getTopCell().getPort(EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE + splitLine[0]);
                 }
                 if (port == null) {
-                    throw new RuntimeException("Invalid port name in external routability side file");
+                    throw new RuntimeException("Invalid port name in external routability side file: " + splitLine[0]);
                 }
                 PBlockSide side = PBlockSide.valueOf(splitLine[1].toUpperCase());
                 externalRoutabilitySideMap.put(port, side);
@@ -681,7 +681,7 @@ public class PerformanceExplorer {
         double targetPeriod = (double) opts.valueOf(TARGET_PERIOD_OPT);
         String runDir = opts.hasArgument(RUN_DIR_OPT) ? (String) opts.valueOf(RUN_DIR_OPT) : System.getProperty("user.dir");
 
-        Design d = Design.readCheckpoint(dcpInputName, "sa_tile_synth.edf");
+        Design d = Design.readCheckpoint(dcpInputName);
         EDIFTools.ensurePreservedInterfaceVivado(d.getNetlist());
         PerformanceExplorer pe = new PerformanceExplorer(d, runDir, clkName, targetPeriod);
 

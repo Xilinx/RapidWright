@@ -110,6 +110,7 @@ public class ArrayBuilder {
     private static final List<String> TARGET_CLK_PERIOD_OPTS = Arrays.asList("c", "clk-period");
     private static final List<String> KERNEL_CLK_NAME_OPTS = Arrays.asList("n", "kernel-clk-name");
     private static final List<String> TOP_CLK_NAME_OPTS = Arrays.asList("m", "top-clk-name");
+    private static final List<String> TOP_RESET_NAME_OPTS = Collections.singletonList("top-reset-name");
     private static final List<String> REUSE_RESULTS_OPTS = Arrays.asList("r", "reuse");
     private static final List<String> SKIP_IMPL_OPTS = Arrays.asList("k", "skip-impl");
     private static final List<String> LIMIT_INSTS_OPTS = Arrays.asList("l", "limit-inst-count");
@@ -131,6 +132,8 @@ public class ArrayBuilder {
     private String kernelClkName;
 
     private String topClkName;
+
+    private String topResetName;
 
     private boolean skipImpl;
 
@@ -168,6 +171,7 @@ public class ArrayBuilder {
                 acceptsAll(TARGET_CLK_PERIOD_OPTS, "Target Clock Period (ns)").withRequiredArg();
                 acceptsAll(KERNEL_CLK_NAME_OPTS, "Kernel Clock Name").withRequiredArg();
                 acceptsAll(TOP_CLK_NAME_OPTS, "Top Clock Name").withRequiredArg();
+                acceptsAll(TOP_RESET_NAME_OPTS, "Top Reset Name").withRequiredArg();
                 acceptsAll(REUSE_RESULTS_OPTS, "Reuse Previous Implementation Results");
                 acceptsAll(SKIP_IMPL_OPTS, "Skip Implementation of the Kernel");
                 acceptsAll(LIMIT_INSTS_OPTS, "Limit number of instance copies").withRequiredArg();
@@ -252,6 +256,14 @@ public class ArrayBuilder {
 
     public String getTopClockName() {
         return topClkName;
+    }
+
+    public void setTopResetName(String resetName) {
+        this.topResetName = resetName;
+    }
+
+    public String getTopResetName() {
+        return topResetName;
     }
 
     public boolean isSkipImpl() {
@@ -438,6 +450,12 @@ public class ArrayBuilder {
             setTopClockName(((String) options.valueOf(TOP_CLK_NAME_OPTS.get(0))));
         } else if (options.has(TOP_LEVEL_DESIGN_OPTS.get(0))) {
             setTopClockName(ClockTools.getClockFromDesign(getTopDesign()).toString());
+        }
+
+        if (options.has(TOP_RESET_NAME_OPTS.get(0))) {
+            setTopResetName(((String) options.valueOf(TOP_RESET_NAME_OPTS.get(0))));
+        } else {
+            setTopResetName(null);
         }
 
         if (options.has(WRITE_PLACEMENT_OPTS.get(0))) {
@@ -655,30 +673,30 @@ public class ArrayBuilder {
             // Just use the design we loaded and replicate it
             t.stop().start("Calculate Valid Placements");
             removeBUFGs(ab.getKernelDesign());
-            Net gndNet = ab.getKernelDesign().getNet(Net.GND_NET);
-            if (gndNet != null) {
-                gndNet.unroute();
-                List<SitePinInst> staticSourcePins = new ArrayList<>();
-                Set<SiteInst> staticSourceSites = new HashSet<>();
-                for (SitePinInst pin : gndNet.getPins()) {
-                    if (pin.isOutPin() && pin.getSiteInst().getName().startsWith(SiteInst.STATIC_SOURCE)) {
-                        staticSourcePins.add(pin);
-                        staticSourceSites.add(pin.getSiteInst());
-                    }
-                }
-                for (SitePinInst pin : staticSourcePins) {
-                    gndNet.removePin(pin);
-                    pin.getSiteInst().removePin(pin);
-                }
-                for (SiteInst siteInst : staticSourceSites) {
-                    siteInst.setDesign(null);
-                    siteInst.unPlace();
-                }
-            }
-            Net vccNet = ab.getKernelDesign().getNet(Net.VCC_NET);
-            if (vccNet != null) {
-                vccNet.unroute();
-            }
+//            Net gndNet = ab.getKernelDesign().getNet(Net.GND_NET);
+//            if (gndNet != null) {
+//                gndNet.unroute();
+//                List<SitePinInst> staticSourcePins = new ArrayList<>();
+//                Set<SiteInst> staticSourceSites = new HashSet<>();
+//                for (SitePinInst pin : gndNet.getPins()) {
+//                    if (pin.isOutPin() && pin.getSiteInst().getName().startsWith(SiteInst.STATIC_SOURCE)) {
+//                        staticSourcePins.add(pin);
+//                        staticSourceSites.add(pin.getSiteInst());
+//                    }
+//                }
+//                for (SitePinInst pin : staticSourcePins) {
+//                    gndNet.removePin(pin);
+//                    pin.getSiteInst().removePin(pin);
+//                }
+//                for (SiteInst siteInst : staticSourceSites) {
+//                    siteInst.setDesign(null);
+//                    siteInst.unPlace();
+//                }
+//            }
+//            Net vccNet = ab.getKernelDesign().getNet(Net.VCC_NET);
+//            if (vccNet != null) {
+//                vccNet.unroute();
+//            }
             Module m = new Module(ab.getKernelDesign(), unrouteStaticNets);
             m.getNet(ab.getKernelClockName()).unroute();
 
@@ -701,10 +719,19 @@ public class ArrayBuilder {
             t.stop().start("Calculate ideal array placement");
             // Find instances in existing design
             modInstNames = getMatchingModuleInstanceNames(modules.get(0), array);
+            if (modInstNames.isEmpty()) {
+                throw new RuntimeException("Failed to find module instances in top design that match kernel interface");
+            }
             ab.setInstCountLimit(modInstNames.size());
             ab.setCondensedGraph(new ArrayNetlistGraph(array, modInstNames));
             Map<Pair<Integer, Integer>, String> idealPlacement =
                     ab.getCondensedGraph().getGreedyPlacementGrid();
+            Map<Integer, Integer> foldingMap = new HashMap<>();
+            foldingMap.put(17, 21);
+            foldingMap.put(18, 20);
+            foldingMap.put(20, 18);
+            foldingMap.put(21, 17);
+            idealPlacement = foldIdealPlacement(idealPlacement, foldingMap);
 //                    ab.getCondensedGraph().getOptimalPlacementGrid(ab.getInstCountLimit(), ab.getInstCountLimit());
             idealPlacementList = idealPlacement.entrySet().stream()
                     .map((e) -> new Pair<>(e.getKey(), e.getValue()))
@@ -814,7 +841,8 @@ public class ArrayBuilder {
                             boundingBoxes.add(newBoundingBox);
                             placed++;
                             newPlacementMap.put(curr, anchor);
-                            System.out.println("  ** PLACED: " + placed + " " + anchor + " " + curr.getName());
+                            System.out.println("  ** PLACED: " + placed + " " + anchor + " " + curr.getName()
+                                    + " " + curr.getAnchor().getTile().getSLR());
                             curr = null;
                             searchDown = false;
                         }
@@ -887,14 +915,14 @@ public class ArrayBuilder {
             array.setAutoIOBuffers(false);
         }
 
-        Net gndNet = array.getNet(Net.GND_NET);
-        if (gndNet != null) {
-            gndNet.unroute();
-        }
-        Net vccNet = array.getNet(Net.VCC_NET);
-        if (vccNet != null) {
-            vccNet.unroute();
-        }
+//        Net gndNet = array.getNet(Net.GND_NET);
+//        if (gndNet != null) {
+//            gndNet.unroute();
+//        }
+//        Net vccNet = array.getNet(Net.VCC_NET);
+//        if (vccNet != null) {
+//            vccNet.unroute();
+//        }
         array.getNetlist().consolidateAllToWorkLibrary();
         array.flattenDesign();
 
@@ -911,14 +939,19 @@ public class ArrayBuilder {
             }
             PBlock pBlock = new PBlock(array.getDevice(), usedSites);
             InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsNearPins(array, ab.getTopClockName(), pBlock);
+            if (ab.getTopResetName() != null) {
+                EDIFPort resetPort = array.getNetlist().getTopCell().getPort(ab.getTopResetName());
+                System.out.println();
+            }
         }
 
-        t.stop().start("Route clock");
-        Net clockNet = array.getNet(ab.getTopClockName());
-        DesignTools.makePhysNetNamesConsistent(array);
-        DesignTools.createPossiblePinsToStaticNets(array);
-        DesignTools.createMissingSitePinInsts(array, clockNet);
-        List<SitePinInst> pinsToRoute = clockNet.getPins();
+//        t.stop().start("Route clock");
+//        Net clockNet = array.getNet(ab.getTopClockName());
+//        DesignTools.makePhysNetNamesConsistent(array);
+//        DesignTools.createPossiblePinsToStaticNets(array);
+//        DesignTools.createMissingSitePinInsts(array, clockNet);
+//        List<SitePinInst> pinsToRoute = clockNet.getPins();
+
 //        for (EDIFNet edifNet : array.getNetlist().getCell("systolic_array").getNets()) {
 //            EDIFHierNet hierNet = new EDIFHierNet(array.getNetlist().getHierCellInstFromName("u_systolic_array"), edifNet);
 //            EDIFHierNet parentNet = array.getNetlist().getParentNet(hierNet);
@@ -928,12 +961,54 @@ public class ArrayBuilder {
 //                pinsToRoute.addAll(net.getPins());
 //            }
 //        }
-        System.out.println("Pin count: " + pinsToRoute.size());
-        PartialRouter.routeDesignPartialNonTimingDriven(array, pinsToRoute);
+//        System.out.println("Pin count: " + pinsToRoute.size());
+//        PartialRouter.routeDesignPartialNonTimingDriven(array, pinsToRoute);
 
         t.stop().start("Write DCP");
         array.writeCheckpoint(ab.getOutputName());
         t.stop().printSummary();
+    }
+
+    private static Map<Pair<Integer, Integer>, String> foldIdealPlacement(Map<Pair<Integer, Integer>, String> placement,
+                                                                          Map<Integer, Integer> newRowMap) {
+        if (newRowMap.isEmpty()) {
+            return placement;
+        }
+        Map<Pair<Integer, Integer>, String> newPlacement = new HashMap<>(placement);
+
+        // Check if row updates are unique
+        Set<Integer> fromSet = new HashSet<>();
+        Set<Integer> toSet = new HashSet<>();
+        for (Map.Entry<Integer, Integer> rowUpdate : newRowMap.entrySet()) {
+            if (fromSet.contains(rowUpdate.getKey())) {
+                throw new RuntimeException("Non-unique source row when folding placement");
+            }
+            if (toSet.contains(rowUpdate.getValue())) {
+                throw new RuntimeException("Non-unique destination row when folding placement");
+            }
+            fromSet.add(rowUpdate.getKey());
+            toSet.add(rowUpdate.getValue());
+        }
+        if (!fromSet.containsAll(toSet)) {
+            throw new RuntimeException("Ideal placement folding provided with a non one-to-one mapping");
+        }
+
+        for (Map.Entry<Integer, Integer> rowUpdate : newRowMap.entrySet()) {
+            int fromRow = rowUpdate.getKey();
+            int toRow = rowUpdate.getValue();
+            int currColumn = 0;
+            while (placement.containsKey(new Pair<>(currColumn, fromRow))) {
+                String cell = placement.get(new Pair<>(currColumn, fromRow));
+                newPlacement.put(new Pair<>(currColumn, toRow), cell);
+                currColumn++;
+            }
+            // Remove rest of destination row if rows are not equal length
+            while (placement.containsKey(new Pair<>(currColumn, toRow))) {
+                newPlacement.remove(new Pair<>(currColumn, toRow));
+                currColumn++;
+            }
+        }
+        return newPlacement;
     }
 
     public static Cell createBUFGCE(Design design, EDIFCell parent, String name, Site location) {
