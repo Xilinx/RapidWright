@@ -1097,24 +1097,8 @@ public class EDIFTools {
         try {
             ensureCorrectPartInEDIF(edif, partName);
             edif.exportEDIF(out);
-            if (dcpFileName != null && edif.getEncryptedCells() != null) {
-                if (edif.getEncryptedCells().size() > 0) {
-                    // Verify that at least one of the edn files collected are actually in the design
-                    boolean verifiedEncryptedCell = false;
-                    for (String edn : edif.getEncryptedCells()) {
-                        int start = edn.lastIndexOf(File.separator);
-                        int end = edn.lastIndexOf(".edn");
-                        String cellName = edn.substring(start == -1 ? 0 : start + 1, end);
-                        EDIFCell cell = edif.getCell(cellName);
-                        if (cell != null && cell.isLeafCellOrBlackBox()) {
-                            verifiedEncryptedCell = true;
-                            break;
-                        }
-                    }
-                    if (verifiedEncryptedCell) {
-                        writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
-                    }
-                }
+            if (dcpFileName != null && edif.hasEncryptedCells()) {
+                writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -1801,16 +1785,14 @@ public class EDIFTools {
 
     public static void removeVivadoBusPreventionAnnotations(EDIFNetlist netlist) {
         EDIFCell top = netlist.getTopCell();
-        for (EDIFCell cell : netlist.getLibrary(top.getLibrary().getName()).getCells()) {
-            List<String> portsToRename = new ArrayList<>();
-            for (EDIFPort p : cell.getPorts()) {
-                if (p.getName().startsWith(VIVADO_PRESERVE_PORT_INTERFACE)) {
-                    portsToRename.add(p.getName());
-                }
+        List<String> portsToRename = new ArrayList<>();
+        for (EDIFPort p : top.getPorts()) {
+            if (p.getName().startsWith(VIVADO_PRESERVE_PORT_INTERFACE)) {
+                portsToRename.add(p.getName());
             }
-            for (String p : portsToRename) {
-                cell.renamePort(p, p.substring(VIVADO_PRESERVE_PORT_INTERFACE.length()));
-            }
+        }
+        for (String p : portsToRename) {
+            top.renamePort(p, p.substring(VIVADO_PRESERVE_PORT_INTERFACE.length()));
         }
     }
 }

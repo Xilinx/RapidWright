@@ -108,9 +108,8 @@ public class MergeDesigns {
         }
 
         // Merge encrypted cells
-        List<String> encryptedCells = design1.getNetlist().getEncryptedCells();
-        if (encryptedCells != null && encryptedCells.size() > 0) {
-            design0.getNetlist().addEncryptedCells(encryptedCells);
+        if (design1.getNetlist().hasEncryptedCells()) {
+            design0.getNetlist().addEncryptedCells(design1.getNetlist().getEncryptedCells());
         }
 
         design0.getNetlist().removeUnusedCellsFromAllWorkLibraries();

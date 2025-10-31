@@ -284,13 +284,13 @@ public class NetTools {
         Map<Node, Net> used = new HashMap<>();
         for (Net net : design.getNets()) {
             for (PIP pip : net.getPIPs()) {
-                for (Node node : new Node[] { pip.getStartNode(), pip.getEndNode() }) {
+                for (Node node : new Node[]{pip.getStartNode(), pip.getEndNode()}) {
                     if (node == null)
                         continue;
                     Net existing = used.putIfAbsent(node, net);
                     if (existing != null && existing != net) {
                         for (PIP oldPip : new ArrayList<>(existing.getPIPs())) {
-                            for (Node oldNode : new Node[] { oldPip.getStartNode(), oldPip.getEndNode() }) {
+                            for (Node oldNode : new Node[]{oldPip.getStartNode(), oldPip.getEndNode()}) {
                                 used.remove(oldNode);
                             }
                         }
