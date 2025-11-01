@@ -64,7 +64,7 @@ check_new_line:
 		echo ; \
 		echo "$$FILES_NO_NEWLINE" | sed 's/^/    /'; \
 		echo ; \
-		echo "Use make_check_new_line to automatically detect the new line at the end of file"; \
+		echo "Use make check_new_line to automatically detect the new line at the end of file"; \
 		exit 1; \
 	fi
 
