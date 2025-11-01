@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.design;
 
 import java.util.HashMap;
+import java.util.Map;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.ConstraintGroup;
 
@@ -31,16 +32,9 @@ import com.xilinx.rapidwright.design.ConstraintGroup;
  *
  * Created on: Oct 31, 2025
  */
-public class ConstraintsTools {
-    private static HashMap<String, PBlock> pblockMap = new HashMap<>();
-    private Design d;
-
-    public ConstraintsTools(Design d){
-        this.d = d;
-        parsePBlockFromXDCConstraints();
-    }
-
-    private void parsePBlockFromXDCConstraints(){
+public class XDC {
+    public Map<String, PBlock> getPBlockFromXDCConstraints(Design d){
+        Map<String, PBlock> pblockMap = new HashMap<>();
         for (ConstraintGroup cg : ConstraintGroup.values()) {
             for (String tclLine : d.getXDCConstraints(cg)) {
                 if (tclLine.contains("resize_pblock")) {
@@ -53,13 +47,6 @@ public class ConstraintsTools {
                 }
             }
         }
-    }
-
-    public static PBlock getPBlock(String name) {
-        return pblockMap.get(name);
-    }
-
-    public static HashMap<String, PBlock> getPBlockMap() {
         return pblockMap;
     }
 }

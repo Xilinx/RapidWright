@@ -22,20 +22,24 @@
 
 package com.xilinx.rapidwright.design;
 
+import java.util.HashMap;
+import java.util.Map;
+import com.xilinx.rapidwright.design.blocks.PBlock;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
-public class TestConstraintsTools {
+public class TestXDC {
 
     @Test
-    public void testParsePBlockFromXDCConstraints() {
+    public void testGetPBlockFromXDCConstraints() {
         String dcpPath = RapidWrightDCP.getString("microblazeAndILA_3pblocks.dcp");
         Design d = Design.readCheckpoint(dcpPath);
-        ConstraintsTools ct = new ConstraintsTools(d);
-        Assertions.assertEquals(3, ct.getPBlockMap().size());
-        Assertions.assertTrue(ct.getPBlockMap().containsKey("pblock_dbg_hub"));
-        Assertions.assertTrue(ct.getPBlockMap().containsKey("pblock_base_mb_i"));
-        Assertions.assertTrue(ct.getPBlockMap().containsKey("pblock_u_ila_0"));
+        XDC xdc = new XDC();
+        Map<String, PBlock> pblockMap = xdc.getPBlockFromXDCConstraints(d);
+        Assertions.assertEquals(3, pblockMap.size());
+        Assertions.assertTrue(pblockMap.containsKey("pblock_dbg_hub"));
+        Assertions.assertTrue(pblockMap.containsKey("pblock_base_mb_i"));
+        Assertions.assertTrue(pblockMap.containsKey("pblock_u_ila_0"));
     }
 }
