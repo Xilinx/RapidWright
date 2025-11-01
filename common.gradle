@@ -48,6 +48,7 @@ dependencies {
   api 'commons-io:commons-io:2.20.0'
   api 'com.xilinx.rapidwright:qtjambi-'+os+':4.5.2_01'
   api 'com.xilinx.rapidwright:jupyter-kernel-jsr223:1.0.1'
+  api 'com.xilinx.rapidwright:jacl:1.4.1'
   testFixturesApi 'org.junit.jupiter:junit-jupiter-api:5.7.1'
   testFixturesApi 'org.junit.jupiter:junit-jupiter-engine:5.7.1'
   testFixturesApi 'org.junit.jupiter:junit-jupiter-params:5.7.1'
