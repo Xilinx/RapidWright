@@ -20,10 +20,12 @@
  *
  */
 
-package com.xilinx.rapidwright.design;
+package com.xilinx.rapidwright.design.xdc;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.ConstraintGroup;
 
@@ -32,7 +34,7 @@ import com.xilinx.rapidwright.design.ConstraintGroup;
  *
  * Created on: Oct 31, 2025
  */
-public class XDC {
+public class ConstraintTools {
     public Map<String, PBlock> getPBlockFromXDCConstraints(Design d){
         Map<String, PBlock> pblockMap = new HashMap<>();
         for (ConstraintGroup cg : ConstraintGroup.values()) {
