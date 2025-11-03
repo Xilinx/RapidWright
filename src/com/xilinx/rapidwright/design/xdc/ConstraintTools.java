@@ -35,7 +35,7 @@ import com.xilinx.rapidwright.design.ConstraintGroup;
  * Created on: Oct 31, 2025
  */
 public class ConstraintTools {
-    public static Map<String, PBlock> getPBlockFromXDCConstraints(Design d){
+    public static Map<String, PBlock> getPBlockFromXDCConstraints(Design d) {
         Map<String, PBlock> pblockMap = new HashMap<>();
         for (ConstraintGroup cg : ConstraintGroup.values()) {
             for (String tclLine : d.getXDCConstraints(cg)) {
