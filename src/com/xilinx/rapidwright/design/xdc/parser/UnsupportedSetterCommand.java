@@ -20,27 +20,29 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi.xdcParserCommands;
+package com.xilinx.rapidwright.design.xdc.parser;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import com.xilinx.rapidwright.ipi.EdifCellLookup;
-import com.xilinx.rapidwright.ipi.UnsupportedConstraintElement;
-import com.xilinx.rapidwright.ipi.XDCConstraints;
+import com.xilinx.rapidwright.design.xdc.UnsupportedConstraintElement;
+import com.xilinx.rapidwright.design.xdc.XDCConstraints;
 import tcl.lang.Command;
 import tcl.lang.Interp;
 import tcl.lang.TclException;
 import tcl.lang.TclObject;
 import tcl.lang.TclString;
 
-public class UnsupportedCommand implements Command {
+/**
+ * A setter command that is not supported in detail
+ */
+public class UnsupportedSetterCommand implements Command {
 
     private final XDCConstraints constraints;
     private final EdifCellLookup<?> cellLookup;
 
-    public UnsupportedCommand(XDCConstraints constraints, EdifCellLookup<?> cellLookup) {
+    public UnsupportedSetterCommand(XDCConstraints constraints, EdifCellLookup<?> cellLookup) {
 
         this.constraints = constraints;
         this.cellLookup = cellLookup;

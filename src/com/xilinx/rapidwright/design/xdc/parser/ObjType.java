@@ -20,7 +20,7 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi.xdcParserCommands;
+package com.xilinx.rapidwright.design.xdc.parser;
 
 public enum ObjType {
     Design("current_design"),

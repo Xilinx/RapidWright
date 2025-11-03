@@ -20,15 +20,18 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi.xdcParserCommands;
+package com.xilinx.rapidwright.design.xdc.parser;
 
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.xilinx.rapidwright.ipi.EdifCellLookup;
-import com.xilinx.rapidwright.ipi.UnsupportedConstraintElement;
+import com.xilinx.rapidwright.design.xdc.UnsupportedConstraintElement;
 
+/**
+ * TCL representation of a list of cells
+ * @param <T> the cell representation
+ */
 public class CellObject<T> extends DesignObject {
     private final List<T> cells;
     private final EdifCellLookup<? super T> cellLookup;

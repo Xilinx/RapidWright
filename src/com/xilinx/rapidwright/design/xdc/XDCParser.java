@@ -23,28 +23,32 @@
 /**
  *
  */
-package com.xilinx.rapidwright.ipi;
+package com.xilinx.rapidwright.design.xdc;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.xdc.parser.DebugDumpCommand;
+import com.xilinx.rapidwright.design.xdc.parser.EdifCellLookup;
+import com.xilinx.rapidwright.design.xdc.parser.RegularEdifCellLookup;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
-import com.xilinx.rapidwright.ipi.xdcParserCommands.CreateClockCommand;
-import com.xilinx.rapidwright.ipi.xdcParserCommands.DesignObject;
-import com.xilinx.rapidwright.ipi.xdcParserCommands.DumpObjsCommand;
-import com.xilinx.rapidwright.ipi.xdcParserCommands.GetCellsCommand;
-import com.xilinx.rapidwright.ipi.xdcParserCommands.ObjType;
-import com.xilinx.rapidwright.ipi.xdcParserCommands.ObjectGetterCommand;
-import com.xilinx.rapidwright.ipi.xdcParserCommands.SetPropertyCommand;
-import com.xilinx.rapidwright.ipi.xdcParserCommands.UnsupportedCmdResult;
-import com.xilinx.rapidwright.ipi.xdcParserCommands.UnsupportedCommand;
-import com.xilinx.rapidwright.ipi.xdcParserCommands.UnsupportedGetterCommand;
-import com.xilinx.rapidwright.ipi.xdcParserCommands.UnsupportedIfCommand;
+import com.xilinx.rapidwright.design.xdc.parser.CreateClockCommand;
+import com.xilinx.rapidwright.design.xdc.parser.DesignObject;
+import com.xilinx.rapidwright.design.xdc.parser.DumpObjsCommand;
+import com.xilinx.rapidwright.design.xdc.parser.GetCellsCommand;
+import com.xilinx.rapidwright.design.xdc.parser.ObjType;
+import com.xilinx.rapidwright.design.xdc.parser.ObjectGetterCommand;
+import com.xilinx.rapidwright.design.xdc.parser.SetPropertyCommand;
+import com.xilinx.rapidwright.design.xdc.parser.UnsupportedCmdResult;
+import com.xilinx.rapidwright.design.xdc.parser.UnsupportedSetterCommand;
+import com.xilinx.rapidwright.design.xdc.parser.UnsupportedGetterCommand;
+import com.xilinx.rapidwright.design.xdc.parser.UnsupportedIfCommand;
 import com.xilinx.rapidwright.util.FileTools;
 import tcl.lang.Command;
 import tcl.lang.Interp;
@@ -58,9 +62,21 @@ import tcl.lang.WrappedCommand;
 
 
 /**
- * Parses an XDC file for package constraints only.  Does not
- * perform full XDC parsing.
- *
+ * Parses an XDC file for a limited subset of constraint types. It uses a full TCL interpreter, so
+ * complex language constructs are possible.
+ * <p />
+ * The parser can match cell references in constraints to modified designs. Users can supply their own
+ * {@link EdifCellLookup} to specify how to rewrite constraints.
+ * <p />
+ * For a regular, non-rewritten netlist, users should use {@link RegularEdifCellLookup}.
+ * <p />
+ * Parsing constraints without a netlist present can be accomplished in two different ways:
+ * <ul>
+ * <li>Use <code>null</code> as lookup: All <code>get_cells</code> calls will end up as unsupported constraints</li>
+ * <li>Use {@link com.xilinx.rapidwright.design.xdc.parser.NoNetlistLookup}:
+ * <code>get_cells</code> calls without wildcards will work, but more complex calls will throw exceptions.</li>
+ * </ul>
+ * <p />
  * Created on: Jul 27, 2015
  */
 public class XDCParser {
@@ -75,6 +91,19 @@ public class XDCParser {
     }
 
 
+    /**
+     * Create a tcl interpreter with XDC parsing commands
+     *
+     * Cell references are intentionally never disposed
+     * (see {@link com.xilinx.rapidwright.design.xdc.parser.TclHashIdentifiedObject}), so lifetime of this interpreter
+     * should be limited.
+     *
+     * @param constraints Constraints object to output to
+     * @param dev Device
+     * @param cellLookup the cell lookup
+     * @return interpreter
+     * @param <T> lookup's cell representation
+     */
     public static <T> Interp makeTclInterp(XDCConstraints constraints, Device dev, EdifCellLookup<T> cellLookup) {
         Interp interp = new Interp();
         interp.createCommand("set_property", new SetPropertyCommand<>(constraints, dev, cellLookup));
@@ -90,12 +119,12 @@ public class XDCParser {
 
         interp.createCommand("dump_objs", new DumpObjsCommand(cellLookup));
 
-        UnsupportedCommand unsupportedCommand = new UnsupportedCommand(constraints, cellLookup);
-        interp.createCommand("set_false_path", unsupportedCommand);
-        interp.createCommand("set_input_delay", unsupportedCommand);
-        interp.createCommand("set_output_delay", unsupportedCommand);
-        interp.createCommand("set_max_delay", unsupportedCommand);
-        interp.createCommand("set_bus_skew", unsupportedCommand);
+        UnsupportedSetterCommand unsupportedSetterCommand = new UnsupportedSetterCommand(constraints, cellLookup);
+        interp.createCommand("set_false_path", unsupportedSetterCommand);
+        interp.createCommand("set_input_delay", unsupportedSetterCommand);
+        interp.createCommand("set_output_delay", unsupportedSetterCommand);
+        interp.createCommand("set_max_delay", unsupportedSetterCommand);
+        interp.createCommand("set_bus_skew", unsupportedSetterCommand);
 
         UnsupportedGetterCommand unsupportedGetterCommand = new UnsupportedGetterCommand(cellLookup);
         interp.createCommand("get_pins", unsupportedGetterCommand);
@@ -200,7 +229,7 @@ public class XDCParser {
      * @param cellLookup optional cell lookup, if given allows for more complex get_cells calls
      * @return A map of port names to package pin information.
      */
-    public static XDCConstraints parseXDCNew(String fileName, Device dev, EdifCellLookup<?> cellLookup){
+    public static XDCConstraints parseXDC(String fileName, Device dev, EdifCellLookup<?> cellLookup){
         return parseXDC(dev, FileTools.getLinesFromTextFile(fileName), cellLookup);
     }
 
@@ -210,7 +239,7 @@ public class XDCParser {
      * @param netlist optional netlist to enable more advanced get_cells calls
      * @return A map of port names to package pin information.
      */
-    public static XDCConstraints parseXDCNew(String fileName, Device dev, EDIFNetlist netlist){
+    public static XDCConstraints parseXDC(String fileName, Device dev, EDIFNetlist netlist){
         return parseXDC(dev, FileTools.getLinesFromTextFile(fileName), new RegularEdifCellLookup(netlist));
     }
 
@@ -219,12 +248,8 @@ public class XDCParser {
      * @param design The design
      * @return A map of port names to package pin information.
      */
-    public static XDCConstraints parseXDCNew(String fileName, Design design){
+    public static XDCConstraints parseXDC(String fileName, Design design){
         return parseXDC(design.getDevice(), FileTools.getLinesFromTextFile(fileName), new RegularEdifCellLookup(design.getNetlist()));
-    }
-
-    public static Map<String,PackagePinConstraint> parseXDC(String fileName, Design design) {
-        return parseXDCNew(fileName, design).getPinConstraints();
     }
 
     /**
@@ -232,12 +257,8 @@ public class XDCParser {
      * @param dev the device
      * @return A map of port names to package pin information.
      */
-    public static XDCConstraints parseXDCNew(String fileName, Device dev){
+    public static XDCConstraints parseXDC(String fileName, Device dev){
         return parseXDC(dev, FileTools.getLinesFromTextFile(fileName), null);
-    }
-
-    public static Map<String,PackagePinConstraint> parseXDC(String fileName, Device dev) {
-        return parseXDCNew(fileName, dev).getPinConstraints();
     }
 
     public static void writeXDC(List<String> constraints, OutputStream out){
@@ -248,7 +269,7 @@ public class XDCParser {
                 out.write('\n');
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            throw new UncheckedIOException(e);
         }
     }
 }

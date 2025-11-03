@@ -20,7 +20,7 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi;
+package com.xilinx.rapidwright.design.xdc.parser;
 
 import java.util.function.Consumer;
 
@@ -29,9 +29,13 @@ import tcl.lang.ReflectObject;
 import tcl.lang.TclException;
 import tcl.lang.TclObject;
 
+/**
+ * Helper methods for registering java objects via their identity hash code and looking them up.
+ */
 public class TclHashIdentifiedObject {
     private static final String NAME_START = "-%%javahashstart%%-";
     private static final String NAME_END = "-%%javahashend%%-";
+
     public static <T> TclObject createReflectObject(Interp interp, Class<?> clazz, Object obj) throws TclException {
         TclObject tclObject = ReflectObject.newInstance(interp, clazz, obj, NAME_START + ReflectObject.getHashString(clazz, obj) + NAME_END);
         //Normally, TCL objects are removed from internal table once no variable refers to them.

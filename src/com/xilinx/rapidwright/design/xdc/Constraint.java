@@ -20,7 +20,7 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi;
+package com.xilinx.rapidwright.design.xdc;
 public interface Constraint<T extends Constraint<T>> {
     T clone();
 }

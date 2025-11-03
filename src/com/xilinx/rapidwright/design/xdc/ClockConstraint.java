@@ -20,10 +20,13 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi;
+package com.xilinx.rapidwright.design.xdc;
 
 import java.util.Locale;
 
+/**
+ * A constraint representing a clock
+ */
 public class ClockConstraint implements Constraint<ClockConstraint>{
     private String clockName;
     private double period;

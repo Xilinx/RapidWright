@@ -51,6 +51,8 @@ import com.xilinx.rapidwright.design.blocks.BlockGuide;
 import com.xilinx.rapidwright.design.blocks.BlockInst;
 import com.xilinx.rapidwright.design.blocks.ImplGuide;
 import com.xilinx.rapidwright.design.blocks.PBlock;
+import com.xilinx.rapidwright.design.xdc.PackagePinConstraint;
+import com.xilinx.rapidwright.design.xdc.XDCParser;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.EDIFCell;
@@ -138,7 +140,7 @@ public class BlockStitcher {
      * @param design
      * @param constraints
      */
-    public void stitchDesign(Design design, Map<String,PackagePinConstraint> constraints) {
+    public void stitchDesign(Design design, Map<String, PackagePinConstraint> constraints) {
         boolean debug = false;
         EDIFNetlist n = design.getNetlist();
         // Create a reverse parent net map (Parent Net -> Children Nets: all logical nets that are physically equivalent)
@@ -565,7 +567,7 @@ public class BlockStitcher {
         String xdcFileName = args[1].replace(".edf", ".xdc");
         Map<String,PackagePinConstraint> constraints = null;
         if (new File(xdcFileName).exists()) {
-            constraints = XDCParser.parseXDC(xdcFileName,stitched.getDevice());
+            constraints = XDCParser.parseXDC(xdcFileName,stitched.getDevice()).getPinConstraints();
         } else {
             MessageGenerator.briefError("WARNING: Could not find XDC file " + xdcFileName);
         }

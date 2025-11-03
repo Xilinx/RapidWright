@@ -20,16 +20,18 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi.xdcParserCommands;
+package com.xilinx.rapidwright.design.xdc.parser;
 
 import java.util.Optional;
 
-import com.xilinx.rapidwright.ipi.EdifCellLookup;
 import tcl.lang.Command;
 import tcl.lang.Interp;
 import tcl.lang.TclException;
 import tcl.lang.TclObject;
 
+/**
+ * TCL command to dump the arguments' as unwrapped DesignObjects
+ */
 public class DumpObjsCommand implements Command {
     private final EdifCellLookup<?> cellLookup;
     public DumpObjsCommand(EdifCellLookup<?> cellLookup) {

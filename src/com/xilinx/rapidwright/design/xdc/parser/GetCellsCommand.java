@@ -20,7 +20,7 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi.xdcParserCommands;
+package com.xilinx.rapidwright.design.xdc.parser;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -41,8 +41,6 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.xilinx.rapidwright.ipi.EdifCellLookup;
-import com.xilinx.rapidwright.ipi.TclHashIdentifiedObject;
 import com.xilinx.rapidwright.util.Pair;
 import tcl.lang.Command;
 import tcl.lang.Interp;
@@ -50,6 +48,11 @@ import tcl.lang.TclException;
 import tcl.lang.TclList;
 import tcl.lang.TclObject;
 
+/**
+ * TCL command: get_cells
+ *
+ *
+ */
 public class GetCellsCommand<T> implements Command {
 
     private final EdifCellLookup<T> cellLookup;
@@ -129,7 +132,7 @@ public class GetCellsCommand<T> implements Command {
         Set<String> refname = oredClauses.get("REF_NAME");
         Set<String> origrefname = oredClauses.get("ORIG_REF_NAME");
         if (!Objects.equals(refname, origrefname)) {
-            throw new RuntimeException("expression too complex2: " + expr);
+            throw new RuntimeException("expression too complex: " + expr);
         }
         oredClauses.remove("ORIG_REF_NAME");
 

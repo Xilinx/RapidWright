@@ -20,18 +20,20 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi.xdcParserCommands;
+package com.xilinx.rapidwright.design.xdc.parser;
 
 import java.util.List;
 
-import com.xilinx.rapidwright.ipi.ClockConstraint;
-import com.xilinx.rapidwright.ipi.EdifCellLookup;
-import com.xilinx.rapidwright.ipi.XDCConstraints;
+import com.xilinx.rapidwright.design.xdc.ClockConstraint;
+import com.xilinx.rapidwright.design.xdc.XDCConstraints;
 import tcl.lang.Command;
 import tcl.lang.Interp;
 import tcl.lang.TclException;
 import tcl.lang.TclObject;
 
+/**
+ * TCL command: create_clock
+ */
 public class CreateClockCommand implements Command {
 
     private final XDCConstraints constraints;

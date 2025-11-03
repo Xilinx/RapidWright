@@ -20,7 +20,7 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi.xdcParserCommands;
+package com.xilinx.rapidwright.design.xdc.parser;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,9 +29,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.xilinx.rapidwright.ipi.EdifCellLookup;
-import com.xilinx.rapidwright.ipi.TclHashIdentifiedObject;
-import com.xilinx.rapidwright.ipi.UnsupportedConstraintElement;
+import com.xilinx.rapidwright.design.xdc.UnsupportedConstraintElement;
 import tcl.lang.Interp;
 import tcl.lang.TclException;
 import tcl.lang.TclObject;

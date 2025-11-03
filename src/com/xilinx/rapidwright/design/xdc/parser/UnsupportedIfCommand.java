@@ -20,9 +20,8 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi.xdcParserCommands;
+package com.xilinx.rapidwright.design.xdc.parser;
 
-import com.xilinx.rapidwright.ipi.EdifCellLookup;
 import tcl.lang.CharPointer;
 import tcl.lang.Command;
 import tcl.lang.ExprValue;
@@ -38,6 +37,9 @@ import tcl.lang.TclRuntimeError;
 import tcl.lang.TclString;
 import tcl.lang.TclToken;
 
+/**
+ * Replacement for if that supports the condition returning an UnsupportedConstraintElement
+ */
 public class UnsupportedIfCommand extends UnsupportedGetterCommand {
     public UnsupportedIfCommand(EdifCellLookup<?> lookup, Command replacedCommand) {
         super(lookup, replacedCommand);

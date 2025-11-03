@@ -20,12 +20,15 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi;
+package com.xilinx.rapidwright.design.xdc.parser;
 
 import java.util.stream.Stream;
 
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 
+/**
+ * Minimal cell lookup that does as much as it can without a netlist present.
+ */
 public class NoNetlistLookup  extends EdifCellLookup<String>{
 
     @Override

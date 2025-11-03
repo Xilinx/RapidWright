@@ -20,14 +20,11 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi.xdcParserCommands;
+package com.xilinx.rapidwright.design.xdc.parser;
 
 import java.util.Arrays;
 import java.util.Optional;
 
-import com.xilinx.rapidwright.ipi.DebugDumpCommand;
-import com.xilinx.rapidwright.ipi.EdifCellLookup;
-import com.xilinx.rapidwright.ipi.TclHashIdentifiedObject;
 import tcl.lang.Command;
 import tcl.lang.Interp;
 import tcl.lang.ReflectObject;
@@ -36,6 +33,9 @@ import tcl.lang.TclList;
 import tcl.lang.TclObject;
 import tcl.lang.TclString;
 
+/**
+ * A setter command that is not supported in detail
+ */
 public class UnsupportedGetterCommand implements Command {
     protected final EdifCellLookup<?> lookup;
     protected final Command replacedCommand;

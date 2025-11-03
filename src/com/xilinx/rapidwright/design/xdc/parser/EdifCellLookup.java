@@ -20,7 +20,7 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi;
+package com.xilinx.rapidwright.design.xdc.parser;
 
 import java.util.Arrays;
 import java.util.Set;
@@ -39,17 +39,37 @@ import tcl.lang.TclException;
 import tcl.lang.TclObject;
 
 /**
- * Lookup Cells for use in the XDC Parser
- * @param <T>
+ * Lookup Cells for use in the XDC Parser.
+ *
+ * Cells can have different names in the source XDC versus the actual objects in the design. This allows rewriting
+ * constraints to match a possibly restructured design. Cells have an <i>original</i> and a <i>final</i> name to
+ * support this.
+ *
+ * A derived class can specify how to do this mapping. {@link RegularEdifCellLookup} operates on EDIF netlists without
+ * rewriting.
+ *
+ * @param <T> Representation of Cells
  */
 public abstract class EdifCellLookup<T> {
 
 
+    /**
+     * Convert a cell to a TCL Object
+     * @param interp the interpreter
+     * @param cell the cell
+     * @return TCL object representing the cell
+     * @throws TclException
+     */
     @NotNull
     public TclObject toReflectObj(Interp interp, T cell) throws TclException {
         return TclHashIdentifiedObject.createReflectObject(interp, getCellClass(), cell);
     }
 
+    /**
+     * Stream of the tree of cells rooted at the current cell
+     * @param ci base of the tree
+     * @return stream of all children
+     */
     public Stream<T> allCellInsts(T ci) {
         Stream<T> self = Stream.of(ci);
         Stream<? extends T> directChildren = getChildrenOf(ci);;

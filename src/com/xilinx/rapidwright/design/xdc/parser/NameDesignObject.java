@@ -20,7 +20,7 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi.xdcParserCommands;
+package com.xilinx.rapidwright.design.xdc.parser;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
-import com.xilinx.rapidwright.ipi.UnsupportedConstraintElement;
+import com.xilinx.rapidwright.design.xdc.UnsupportedConstraintElement;
 
 public class NameDesignObject<T> extends DesignObject<T> {
     private final ObjType type;

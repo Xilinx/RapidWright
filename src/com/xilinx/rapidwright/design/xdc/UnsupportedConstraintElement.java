@@ -20,7 +20,7 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi;
+package com.xilinx.rapidwright.design.xdc;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,14 +30,21 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.xilinx.rapidwright.ipi.xdcParserCommands.CellObject;
-import com.xilinx.rapidwright.ipi.xdcParserCommands.DesignObject;
+import com.xilinx.rapidwright.design.xdc.parser.CellObject;
+import com.xilinx.rapidwright.design.xdc.parser.DesignObject;
+import com.xilinx.rapidwright.design.xdc.parser.EdifCellLookup;
+import com.xilinx.rapidwright.design.xdc.parser.TclHashIdentifiedObject;
 import org.apache.commons.io.FilenameUtils;
 import tcl.lang.Interp;
 import tcl.lang.TclException;
 import tcl.lang.TclList;
 import tcl.lang.TclObject;
 
+/**
+ * Stringified representation of a (partial) constraint that our parser does not currently support.
+ *
+ * Subclasses specify what type of data a class instance contains
+ */
 public abstract class UnsupportedConstraintElement {
     public static String toXdc(Stream<UnsupportedConstraintElement> unsupportedConstraintElements) {
         return unsupportedConstraintElements.map(e->e.toXdc()).collect(Collectors.joining());
@@ -103,6 +110,9 @@ public abstract class UnsupportedConstraintElement {
     public abstract boolean referencesCell(String name);
 
 
+    /**
+     * Unsupported Constraint Element that contains any text or command name except cells
+     */
     public static class NameConstraintElement extends UnsupportedConstraintElement {
         private final String text;
 
@@ -125,6 +135,10 @@ public abstract class UnsupportedConstraintElement {
             return "N<"+toXdc()+">";
         }
     }
+
+    /**
+     * Unsupported Constraint Element that contains TCL syntax
+     */
     public static class SyntaxConstraintElement extends UnsupportedConstraintElement {
         private final String text;
 
@@ -147,6 +161,10 @@ public abstract class UnsupportedConstraintElement {
             return "S<"+toXdc()+">";
         }
     }
+
+    /**
+     * Unsupported Constraint Element that references a cell name
+     */
     public static class CellConstraintElement extends UnsupportedConstraintElement{
         private final String cellName;
 
@@ -175,6 +193,9 @@ public abstract class UnsupportedConstraintElement {
     }
 
 
+    /**
+     * Convert a TclObject into UnsupportedConstraintElements
+     */
     public static <T> Stream<UnsupportedConstraintElement> objToUnsupportedConstraintElement(Interp interp, TclObject obj, EdifCellLookup<T> lookup, boolean replaceProbableCells, boolean applyWildcardsChooseAny) {
         try {
             Optional<DesignObject<?>> designObject = DesignObject.unwrapTclObject(interp, obj, lookup);
@@ -227,6 +248,9 @@ public abstract class UnsupportedConstraintElement {
         }
     }
 
+    /**
+     * If a cell name is followed by text that looks like a subcell reference, absorb that text into the cell name
+     */
     private static <T> void absorbIntoCells(EdifCellLookup<T> lookup, List<UnsupportedConstraintElement> res, T cell, boolean applyWildcardsChooseAny) {
         if (res.size()!=1) {
             return;

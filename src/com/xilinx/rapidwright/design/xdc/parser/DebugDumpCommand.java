@@ -20,7 +20,7 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi;
+package com.xilinx.rapidwright.design.xdc.parser;
 
 import tcl.lang.Command;
 import tcl.lang.Interp;
@@ -29,6 +29,9 @@ import tcl.lang.TclException;
 import tcl.lang.TclList;
 import tcl.lang.TclObject;
 
+/**
+ * TCL command to dump the arguments' internal representation
+ */
 public class DebugDumpCommand implements Command {
     @Override
     public void cmdProc(Interp interp, TclObject[] tclObjects) throws TclException {

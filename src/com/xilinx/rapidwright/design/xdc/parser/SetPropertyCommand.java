@@ -20,7 +20,7 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi.xdcParserCommands;
+package com.xilinx.rapidwright.design.xdc.parser;
 
 import java.util.HashMap;
 import java.util.List;
@@ -29,15 +29,18 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.ipi.EdifCellLookup;
-import com.xilinx.rapidwright.ipi.PackagePinConstraint;
-import com.xilinx.rapidwright.ipi.UnsupportedConstraintElement;
-import com.xilinx.rapidwright.ipi.XDCConstraints;
+import com.xilinx.rapidwright.design.xdc.PackagePinConstraint;
+import com.xilinx.rapidwright.design.xdc.UnsupportedConstraintElement;
+import com.xilinx.rapidwright.design.xdc.XDCConstraints;
 import tcl.lang.Command;
 import tcl.lang.Interp;
 import tcl.lang.TclException;
 import tcl.lang.TclObject;
 
+/**
+ * TCL command: set_property
+ * @param <T>
+ */
 public class SetPropertyCommand<T> implements Command {
     private final XDCConstraints constraints;
     private final Device dev;

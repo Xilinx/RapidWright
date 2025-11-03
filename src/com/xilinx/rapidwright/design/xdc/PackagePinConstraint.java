@@ -24,7 +24,7 @@
 /**
  *
  */
-package com.xilinx.rapidwright.ipi;
+package com.xilinx.rapidwright.design.xdc;
 
 import java.util.stream.Stream;
 

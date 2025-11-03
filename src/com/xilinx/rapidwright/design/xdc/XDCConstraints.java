@@ -20,7 +20,7 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi;
+package com.xilinx.rapidwright.design.xdc;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -118,15 +118,6 @@ public class XDCConstraints {
         return Stream.of(clocks, unsupported, cellProps, pinConstrs).flatMap(e->e);
     }
 
-    /**
-     * Create a copy of
-     * @param netlist
-     * @return
-     */
-    public XDCConstraints newNetlistCopy(EDIFNetlist netlist) {
-        return null;
-    }
-
     public void writeToFile(Path file) {
         try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(file))) {
             getAllAsXdc().forEach(pw::println);
@@ -136,7 +127,6 @@ public class XDCConstraints {
     }
 
     private List<UnsupportedConstraintElement> rewriteUnsupported(List<UnsupportedConstraintElement> list, UnaryOperator<String> cellNameMapper) {
-        System.out.println("rewriting unsupported: "+list);
         return list.stream().map(elem -> {
             if (!(elem instanceof UnsupportedConstraintElement.CellConstraintElement)) {
                 return elem;

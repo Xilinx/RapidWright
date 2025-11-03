@@ -20,7 +20,7 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi.xdcParserCommands;
+package com.xilinx.rapidwright.design.xdc.parser;
 
 import java.util.Arrays;
 
@@ -31,6 +31,9 @@ import tcl.lang.TclException;
 import tcl.lang.TclNumArgsException;
 import tcl.lang.TclObject;
 
+/**
+ * TCL command to get something that will probably be passed onto a <code>set_property</code> call later
+ */
 public class ObjectGetterCommand implements Command {
 
     private final boolean takesObjects;

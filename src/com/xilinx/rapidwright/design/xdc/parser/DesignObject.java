@@ -20,7 +20,7 @@
  *
  */
 
-package com.xilinx.rapidwright.ipi.xdcParserCommands;
+package com.xilinx.rapidwright.design.xdc.parser;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,21 +31,41 @@ import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.xilinx.rapidwright.ipi.EdifCellLookup;
-import com.xilinx.rapidwright.ipi.UnsupportedConstraintElement;
+import com.xilinx.rapidwright.design.xdc.UnsupportedConstraintElement;
 import tcl.lang.Interp;
 import tcl.lang.ReflectObject;
 import tcl.lang.TclException;
 import tcl.lang.TclList;
 import tcl.lang.TclObject;
 
+/**
+ * Base class for any object that will be referenced from TCL
+ * @param <T> Representation of Cells
+ */
 public abstract class DesignObject<T> {
+    /**
+     * Cast an
+     * @param obj
+     * @param lookup
+     * @return
+     * @param <T>
+     */
     public static <T> DesignObject<?> requireCastUnwrappedObject(Object obj, EdifCellLookup<T> lookup) {
         if (lookup != null && lookup.getCellClass().isInstance(obj)) {
             return new CellObject<T>(Collections.singletonList(lookup.castCellInst(obj)), lookup);
         }
         return (DesignObject<?>) obj;
     }
+
+    /**
+     * Try to convert a TclObject into the DesignObject it represents
+     * @param interp the interpreter
+     * @param obj the object to unwrap
+     * @param lookup the cell lookup
+     * @return the design object or an empty optional if it isn't one
+     * @param <T> the lookup's cell representation
+     * @throws TclException
+     */
     public static <T> Optional<DesignObject<?>> unwrapTclObject(Interp interp, TclObject obj, EdifCellLookup<T> lookup) throws TclException {
         if (obj.getInternalRep() instanceof TclList) {
             TclObject[] elements = TclList.getElements(interp, obj);
@@ -87,6 +107,16 @@ public abstract class DesignObject<T> {
             throw new RuntimeException(e);
         }
     }
+
+    /**
+     * Convert a TclObject into the DesignObject it represents or throw if it isn't one
+     * @param interp the interpreter
+     * @param obj the object to unwrap
+     * @param lookup the cell lookup
+     * @return the design object
+     * @param <T> the lookup's cell representation
+     * @throws TclException
+     */
     public static <T> DesignObject<?> requireUnwrapTclObject(Interp interp, TclObject obj, EdifCellLookup<T> lookup) throws TclException {
         return unwrapTclObject(interp, obj, lookup)
                 .orElseThrow(()-> {
@@ -94,38 +124,6 @@ public abstract class DesignObject<T> {
                     return new IllegalArgumentException("expected DesignObject but got " + obj + moreInfo);
                 });
 
-    }
-
-
-    protected static Collector<DesignObject<?>, ?, Optional<DesignObject<?>>> tryMerge() {
-
-        return Collectors.reducing((a, b) -> {
-            if (a == null) {
-                return null;
-            }
-            if (b == null) {
-                return null;
-            }
-            if (a instanceof NameDesignObject && b instanceof NameDesignObject) {
-                if (!((NameDesignObject<?>) a).getType().equals(((NameDesignObject<?>) b).getType())) {
-                    return null;
-                }
-                boolean aHasObjs = ((NameDesignObject<?>) a).getObjects() == null;
-                boolean bHasObjs = ((NameDesignObject<?>) b).getObjects() == null;
-                if (aHasObjs != bHasObjs) {
-                    return null;
-                }
-                if (!aHasObjs) {
-                    return a;
-                }
-
-                List<String> res = new ArrayList<>();
-                res.addAll(((NameDesignObject<?>) a).getObjects());
-                res.addAll(((NameDesignObject<?>) b).getObjects());
-                return new NameDesignObject<>(((NameDesignObject<?>) a).getType(), res);
-            }
-            return null;
-        });
     }
 
     public abstract String toXdc();
