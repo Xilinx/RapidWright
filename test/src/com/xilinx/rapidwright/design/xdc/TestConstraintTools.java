@@ -38,8 +38,7 @@ public class TestConstraintTools {
     public void testGetPBlockFromXDCConstraints() {
         String dcpPath = RapidWrightDCP.getString("microblazeAndILA_3pblocks.dcp");
         Design d = Design.readCheckpoint(dcpPath);
-        ConstraintTools ct = new ConstraintTools();
-        Map<String, PBlock> pblockMap = ct.getPBlockFromXDCConstraints(d);
+        Map<String, PBlock> pblockMap = ConstraintTools.getPBlockFromXDCConstraints(d);
         Assertions.assertEquals(3, pblockMap.size());
         Assertions.assertTrue(pblockMap.containsKey("pblock_dbg_hub"));
         Assertions.assertTrue(pblockMap.containsKey("pblock_base_mb_i"));
