@@ -1131,6 +1131,61 @@ public class TestDesignTools {
         DesignTools.createCeSrRstPinsToVCC(design);
     }
 
+    @Test
+    public void testCalculateUtilization7Series() {
+        Device device = Device.getDevice("xc7z020");
+        Design design = new Design("testDesign", device.getName());
+
+        design.createAndPlaceCell("ram18_1", Unisim.RAMB18E1, "RAMB18_X1Y17/RAMB18E1");
+        design.createAndPlaceCell("ram18_2", Unisim.RAMB18E1, "RAMB18_X2Y21/RAMB18E1");
+        design.createAndPlaceCell("ram36_1", Unisim.RAMB36E1, "RAMB36_X1Y7/RAMB36E1");
+        // design.createAndPlaceCell("ram36_2", Unisim.RAMB36E1, "RAMB36_X2Y12/RAMBFIFO36E1");
+
+        Map<UtilizationType, Integer> util = DesignTools.calculateUtilization(design);
+        Assertions.assertEquals(2, util.get(UtilizationType.RAMB18S));
+        Assertions.assertEquals(1, util.get(UtilizationType.RAMB36S_FIFOS));
+    }
+
+    @Test
+    public void testCalculateUtilizationUltraScale() {
+        Design design = new Design("testDesign", Device.KCU105);
+
+        design.createAndPlaceCell("ram18_1", Unisim.RAMB18E2, "RAMB18_X1Y0/RAMB18E2_L");
+        design.createAndPlaceCell("ram18_2", Unisim.RAMB18E2, "RAMB18_X1Y1/RAMB18E2_U");
+        design.createAndPlaceCell("ram36_1", Unisim.RAMB36E2, "RAMB36_X1Y0/RAMB36E2");
+
+        Map<UtilizationType, Integer> util = DesignTools.calculateUtilization(design);
+        Assertions.assertEquals(2, util.get(UtilizationType.RAMB18S));
+        Assertions.assertEquals(1, util.get(UtilizationType.RAMB36S_FIFOS));
+    }
+
+    @Test
+    public void testCalculateUtilizationUltraScalePlus() {
+        Design design = new Design("testDesign", Device.AWS_F1);
+
+        design.createAndPlaceCell("ram18_1", Unisim.RAMB18E2, "RAMB18_X1Y0/RAMB18E2_L");
+        design.createAndPlaceCell("ram18_2", Unisim.RAMB18E2, "RAMB18_X1Y1/RAMB18E2_U");
+        design.createAndPlaceCell("ram36_1", Unisim.RAMB36E2, "RAMB36_X1Y0/RAMB36E2");
+
+        Map<UtilizationType, Integer> util = DesignTools.calculateUtilization(design);
+        Assertions.assertEquals(2, util.get(UtilizationType.RAMB18S));
+        Assertions.assertEquals(1, util.get(UtilizationType.RAMB36S_FIFOS));
+    }
+
+    @Test
+    public void testCalculateUtilizationVersal() {
+        Device device = Device.getDevice("xcvp1002");
+        Design design = new Design("testDesign", device.getName());
+
+        design.createAndPlaceCell("ram18_1", Unisim.RAMB18E5_INT, "RAMB18_X1Y0/RAMB18_L");
+        design.createAndPlaceCell("ram18_2", Unisim.RAMB18E5_INT, "RAMB18_X1Y1/RAMB18_U");
+        design.createAndPlaceCell("ram36_1", Unisim.RAMB36E5_INT, "RAMB36_X2Y11/RAMB36");
+
+        Map<UtilizationType, Integer> util = DesignTools.calculateUtilization(design);
+        Assertions.assertEquals(2, util.get(UtilizationType.RAMB18S));
+        Assertions.assertEquals(1, util.get(UtilizationType.RAMB36S_FIFOS));
+    }
+
     @ParameterizedTest
     @CsvSource({
             // US+
@@ -1624,6 +1679,35 @@ public class TestDesignTools {
         for (SitePinInst p : unrouted) {
             Assertions.assertTrue(p.getName().equals("CLKAU_X") || p.getName().equals("CLKAL_X"));
         }
+    }
 
+    @ParameterizedTest
+    @CsvSource({
+            // Versal
+            "xcvp1202,SLICE_X64Y105,AND2B1L",
+            "xcvp1202,SLICE_X64Y105,OR2L",
+
+            // US+
+            "xcvu3p,SLICE_X0Y0,AND2B1L",
+            "xcvu3p,SLICE_X0Y0,OR2L"
+    })
+    public void testCreateCeClkOfRoutethruFFToVCC(String deviceName, String siteName, String unisimName) {
+        Design design = new Design("testCreateCeClkOfRoutethruFFToVCC", deviceName);
+        Cell cell = design.createAndPlaceCell("ff", Unisim.valueOf(unisimName), siteName + "/AFF");
+
+        Assertions.assertTrue(design.getNets().isEmpty());
+
+        DesignTools.createCeClkOfRoutethruFFToVCC(design);
+
+        SiteInst si = cell.getSiteInst();
+        SitePinInst ceSpi = si.getSitePinInst("CKEN1");
+        Assertions.assertTrue(ceSpi.getNet().isVCCNet());
+
+        boolean isVersal = design.getSeries() == Series.Versal;
+        SitePinInst clkSpi = si.getSitePinInst(isVersal ? "CLK" : "CLK1");
+        Assertions.assertTrue(clkSpi.getNet().isVCCNet());
+        if (isVersal) {
+            Assertions.assertTrue(si.getNetFromSiteWire("FF_CLK_MOD_CLK_OUT").isGNDNet());
+        }
     }
 }

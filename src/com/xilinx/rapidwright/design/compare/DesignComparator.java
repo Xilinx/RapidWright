@@ -270,6 +270,14 @@ public class DesignComparator {
             if (!Objects.equals(e.getValue().getType(), testCell.getType())) {
                 addDiff(DesignDiffType.PLACED_CELL_TYPE, e.getValue(), testCell, gold, "");
             }
+
+            if (!Objects.equals(e.getValue().isBELFixed(), testCell.isBELFixed())) {
+                addDiff(DesignDiffType.PLACED_CELL_IS_BEL_FIXED, e.getValue(), testCell, gold, "");
+            }
+
+            if (!Objects.equals(e.getValue().isSiteFixed(), testCell.isSiteFixed())) {
+                addDiff(DesignDiffType.PLACED_CELL_IS_SITE_FIXED, e.getValue(), testCell, gold, "");
+            }
         }
         for (Entry<String, Cell> e : testMap.entrySet()) {
             Cell extraCell = e.getValue();

@@ -24,7 +24,10 @@
 
 package com.xilinx.rapidwright.edif;
 
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +36,7 @@ import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -40,6 +44,9 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.eco.ECOTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Params;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 public class TestEDIFTools {
 
@@ -366,5 +373,131 @@ public class TestEDIFTools {
         Assertions.assertEquals(321, flatNetlist.getAllLeafHierCellInstances().size());
         boolean includeBlackBoxes = true;
         Assertions.assertEquals(322, flatNetlist.getAllLeafHierCellInstances(includeBlackBoxes).size());
+    }
+
+    /**
+     * In the provided directory, it will create 3 files: (1) <name>.dcp, (2)
+     * <name>.edf, (3) dummy.edn. This is to simulate a DCP that contains encrypted
+     * cells.
+     * 
+     * @param dir         Destination directory to write the three files
+     * @param testDCPName Name of the test DCP to read from the RapidWrightDCP
+     *                    directory.
+     * @return The path to the resulting DCP.
+     */
+    public static Path createEncryptedDCPExample(Path dir, String testDCPName, String cellName) {
+        Path dcp = RapidWrightDCP.getPath(testDCPName);
+        Design tmp = Design.readCheckpoint(dcp, true);
+        Path edf = dir.resolve(testDCPName.replace(".dcp", ".edf"));
+        tmp.getNetlist().exportEDIF(edf);
+        String dummyEDN = cellName + ".edn";
+        Path copyDCP = dir.resolve(testDCPName);
+        FileTools.copyFile(dcp.toString(), copyDCP.toString());
+        FileTools.writeStringToTextFile("Dummy EDN", dir.resolve(dummyEDN).toString());
+        return copyDCP;
+    }
+
+    public static final String PICOBLAZE_BB_CELLNAME = "ram_4096x8_bb";
+
+    @Test
+    public void testCopyEDNOnDCPWrite(@TempDir Path dir) {
+        Path srcDir = dir.resolve("src");
+        FileTools.makeDir(srcDir.toString());
+        Path dcp = createEncryptedDCPExample(srcDir, "picoblaze_2022.2.dcp", PICOBLAZE_BB_CELLNAME);
+        Path edf = srcDir.resolve(dcp.getFileName().toString().replace(".dcp", ".edf"));
+        Path edn = srcDir.resolve(PICOBLAZE_BB_CELLNAME + ".edn");
+
+        Design d = Design.readCheckpoint(dcp, edf);
+
+        Assertions.assertEquals(1, d.getNetlist().getEncryptedCells().size());
+
+        Params.RW_COPY_EDNS_ON_DCP_WRITE = true;
+
+        d.writeCheckpoint(dir.resolve(dcp.getFileName()));
+        Assertions.assertTrue(Files.exists(dir.resolve(edn.getFileName())));
+
+        Path tclLoadScript = dir
+                .resolve(dcp.getFileName().toString().replace(".dcp", EDIFTools.LOAD_TCL_SUFFIX));
+        Assertions.assertTrue(Files.exists(tclLoadScript));
+
+        boolean hasDummyEDN = false;
+        for (String line : FileTools.getLinesFromTextFile(tclLoadScript.toString())) {
+            if (line.contains("read_edif") && line.contains(edn.getFileName().toString())) {
+                hasDummyEDN = true;
+                break;
+            }
+        }
+        Assertions.assertTrue(hasDummyEDN);
+
+    }
+
+    @Test
+    public void testEnsurePreservedInterfaceVivado(@TempDir Path dir) {
+        Design design = RapidWrightDCP.loadDCP("bnn.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell topCell = netlist.getTopCell();
+
+        topCell.renamePort("dmem_i_V_ce0", "test_port[0]");
+        topCell.renamePort("kh_i_V_ce0", "test_port[1]");
+        topCell.renamePort("wt_i_V_ce0", "test_port[2]");
+
+        VivadoToolsHelper.assertPortCountAfterRoundTripInVivado(design, dir, false);
+        EDIFTools.ensurePreservedInterfaceVivado(design.getNetlist());
+        VivadoToolsHelper.assertPortCountAfterRoundTripInVivado(design, dir, true);
+    }
+
+    @Test
+    public void testRemoveVivadoBusPreventionAnnotations(@TempDir Path dir) {
+        Design design = RapidWrightDCP.loadDCP("bnn.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell topCell = netlist.getTopCell();
+
+        topCell.renamePort("dmem_i_V_ce0", EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE + "test_port[0]");
+        topCell.renamePort("kh_i_V_ce0", EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE + "test_port[1]");
+        topCell.renamePort("wt_i_V_ce0", EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE + "test_port[2]");
+
+        EDIFTools.removeVivadoBusPreventionAnnotations(design.getNetlist());
+        EDIFPort testPort0 = topCell.getPort("test_port[0]");
+        Assertions.assertNotNull(testPort0);
+        Assertions.assertFalse(testPort0.getName().startsWith(EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE));
+        EDIFPort testPort1 = topCell.getPort("test_port[1]");
+        Assertions.assertNotNull(testPort1);
+        Assertions.assertFalse(testPort1.getName().startsWith(EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE));
+        EDIFPort testPort2 = topCell.getPort("test_port[2]");
+        Assertions.assertNotNull(testPort2);
+        Assertions.assertFalse(testPort2.getName().startsWith(EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void testWriteEDIFFilterUnrelatedEDNFiles(@TempDir Path dir)
+            throws NoSuchFieldException, SecurityException, IllegalArgumentException,
+            IllegalAccessException {
+        String name = "picoblaze_ooc_X10Y235.dcp";
+        Path dcp = dir.resolve(name);
+        Path edf = dir.resolve(name.replace(".dcp", ".edf"));
+        Path edn = dir.resolve("fake.edn");
+        Design d = RapidWrightDCP.loadDCP(name);
+        d.writeCheckpoint(dcp);
+        // All our test DCPs have unencrypted EDIF inside, we need to create an external
+        // one
+        d.getNetlist().exportEDIF(edf);
+        FileTools.writeStringToTextFile("Fake EDIF", edn.toString());
+
+        // We need to read an external EDIF in order to trigger the .edn search
+        // When provided with an external EDIF, RapidWright will look for encrypted cells in the same directory as the 
+        // .edn file, keeping a record of possible encrypted cells as it goes.  
+        d = Design.readCheckpoint(dcp, edf);
+
+        {
+            Field encCellsList = EDIFNetlist.class.getDeclaredField("encryptedCells");
+            encCellsList.setAccessible(true);
+            Assertions.assertEquals(1, ((List<String>) encCellsList.get(d.getNetlist())).size());
+        }
+
+        String outputName = "test";
+        Path loadScript = dir.resolve(outputName + EDIFTools.LOAD_TCL_SUFFIX);
+        d.writeCheckpoint(dir.resolve(outputName + ".dcp"));
+        Assertions.assertFalse(Files.exists(loadScript));
     }
 }

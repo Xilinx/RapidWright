@@ -7,6 +7,8 @@ plugins {
     id 'java'
     id 'maven-publish'
     id 'signing'
+// JReleaser adds at least an extra 20 seconds to setup time
+//    id 'org.jreleaser' version '1.20.0' // Uncomment for release
 }
 
 apply from: 'common.gradle'
@@ -28,6 +30,9 @@ def read_rapidwright_version() {
     return sw.toString().replace("RAPIDWRIGHT_VERSION: v", "").replace("-beta", "").trim() + ""
 }
 def rapidwright_version = project.hasProperty('override_rapidwright_version') ? override_rapidwright_version : read_rapidwright_version()
+
+group = 'com.xilinx.rapidwright'
+version = rapidwright_version
 
 // Skipping test-fixtures for publication, see https://github.com/Xilinx/RapidWright/issues/697
 components["java"].withVariantsFromConfiguration(configurations["testFixturesApiElements"]) { skip() }
@@ -60,17 +65,32 @@ sourceSets {
   }
 }
 
+tasks.named('jar', Jar) {
+  archiveFileName = 'rapidwright.jar'
+}
+
+tasks.named('testJar', Jar) {
+  archiveFileName = 'rapidwright-tests.jar'
+}
+
+tasks.named('testFixturesJar', Jar) {
+  archiveFileName = 'rapidwright-test-fixtures.jar'
+}
+
 task preserveBin(type: Copy) {
      from "bin/rapidwright", "bin/rapidwright.bat"
      into preserveDir
 }
 
 task copyJars(type: Copy) {
-    from configurations.api
+    from({
+        configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts.collect { it.file } .findAll { it.name != tasks.getByName("jar").archiveFile.get().asFile.name }
+	})
+	
     into 'jars'
-    //testFixturesImplementation contains the output jar, as well as an implicit dependency on the task.
-    //Filter to remove the jar itself, getFiles() to remove the implicit dependency
-    from configurations.testFixturesImplementation.filter { !tasks.getByName("jar").outputs.files.contains(it) } .getFiles()
+    from({
+        configurations.testFixturesRuntimeClasspath.resolvedConfiguration.resolvedArtifacts.collect { it.file } .findAll { it.name != tasks.getByName("jar").archiveFile.get().asFile.name }
+	})
     into 'jars'
 }
 compileJava.dependsOn(copyJars)
@@ -92,12 +112,12 @@ task restoreScripts(type: Copy) {
 run.dependsOn(restoreScripts)
 
 task mainJar(type: Jar, dependsOn: classes) {
-    archiveBaseName = 'main'
+    archiveFileName = 'main.jar'
     from sourceSets.main.output include mainEntrypointClassName
     manifest {
         attributes 'Main-Class': mainEntrypointClassName
         attributes 'Class-Path': ([destinationDirectory.get().getAsFile().toPath().relativize(sourceSets.main.java.destinationDirectory.get().getAsFile().toPath()).toString() + File.separator]
-            + configurations.implementation.collect { destinationDirectory.get().getAsFile().toPath().relativize(projectDir.toPath()).resolve('jars').resolve(it.getName()) }).join(' ')
+            + configurations.runtimeClasspath.collect { destinationDirectory.get().getAsFile().toPath().relativize(projectDir.toPath()).resolve('jars').resolve(it.getName()) }).join(' ')
     }
     finalizedBy(restoreScripts)
 }
@@ -128,7 +148,7 @@ task sourceJar(type: Jar) {
 
 javadoc {
     source = sourceSets.main.allJava
-    classpath = configurations.implementation
+    classpath = configurations.runtimeClasspath
     options.addStringOption('Xdoclint:none', '-quiet')
 }
 
@@ -187,23 +207,29 @@ publishing {
     }
     repositories {
         maven {
-            credentials {
-                username = project.findProperty("ossrhUsername") ?: ""
-                password = project.findProperty("ossrhPassword") ?: ""
-            }
-            url = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+            url = layout.buildDirectory.dir('staging-deploy')
         }
     }
 }
 
-signing {
-    setRequired {
-        // signing is only required when publishing to maven central
-        gradle.taskGraph.allTasks.any { it.equals( publishMavenJavaPublicationToMavenRepository ) }
+/* Uncomment for release
+jreleaser {
+    signing {
+        active = "ALWAYS"
+        armored = true
     }
-    sign configurations.archives
-    sign publishing.publications.mavenJava
-}
+    deploy {
+        maven {
+            mavenCentral {
+                sonatype {
+                    active = 'ALWAYS'
+                    url = 'https://central.sonatype.com/api/v1/publisher'
+                    stagingRepository('build/staging-deploy')
+                }
+            }
+        }
+    }
+}*/
 
 task testPython(type:Test) {
   group = "verification"

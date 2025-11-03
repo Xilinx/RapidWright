@@ -234,6 +234,32 @@ public class EDIFPort extends EDIFPropertyObject {
     }
 
     /**
+     * Gets the internal port instance connected to this port at the specified
+     * index.
+     * 
+     * @param index Index of the bussed port instance to get.
+     * @return The EDIFPortInst connected to this port at the specified index, or
+     *         null if none exists.
+     */
+    public EDIFPortInst getInternalPortInstFromIndex(int index) {
+        String name = getPortInstNameFromPort(index);
+        EDIFNet net = getInternalNet(index);
+        return net == null ? null : net.getPortInst(null, name);
+    }
+
+    /**
+     * Gets the internal port instance connect to this port. Assumes this is a
+     * single bit port.
+     * 
+     * @return The EDIFPortInst connected to this port, or null if none exists.
+     */
+    public EDIFPortInst getInternalPortInst() {
+        assert (!isBus());
+        EDIFNet net = getInternalNet();
+        return net.getPortInst(null, getBusName());
+    }
+
+    /**
      * Gets the internal port instance index from the named index for this port.
      * Given a bussed port 'bus[4:0]', the bus has an ordered list of named indices
      * [4, 3, 2, 1, 0]. If the named index is 'bus[1]', the port index is 3. When

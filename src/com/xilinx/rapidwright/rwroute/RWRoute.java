@@ -24,6 +24,25 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.PriorityQueue;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
+
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
@@ -34,6 +53,7 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
@@ -57,25 +77,6 @@ import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 import com.xilinx.rapidwright.util.Utils;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.IdentityHashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.PriorityQueue;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Function;
 
 /**
  * RWRoute class provides the main methods for routing a design.
@@ -228,6 +229,9 @@ public class RWRoute {
         DesignTools.makePhysNetNamesConsistent(design);
         DesignTools.createPossiblePinsToStaticNets(design);
         DesignTools.createMissingSitePinInsts(design);
+        if (series == Series.Versal) {
+            DesignTools.updateVersalXPHYPinsForDMC(design);
+        }
     }
 
     protected void preprocess() {
@@ -294,7 +298,8 @@ public class RWRoute {
     protected RouteNodeGraph createRouteNodeGraph() {
         if (config.isTimingDriven()) {
             /* An instantiated delay estimator that is used to calculate delay of routing resources */
-            DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+            DelayEstimatorBase<InterconnectInfo> estimator = new DelayEstimatorBase<InterconnectInfo>(
+                    design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
             return new RouteNodeGraphTimingDriven(design, config, estimator);
         } else {
             return new RouteNodeGraph(design, config);
@@ -458,12 +463,13 @@ public class RWRoute {
      * TODO: fix the potential issue.
      */
     protected void routeGlobalClkNets() {
+        Map<Integer, Set<ClockRegion>> usedRoutingTracks = new HashMap<>();
         for (Net clk : clkNets) {
-            routeGlobalClkNet(clk);
+            routeGlobalClkNet(clk, usedRoutingTracks);
         }
     }
 
-    protected void routeGlobalClkNet(Net clk) {
+    protected void routeGlobalClkNet(Net clk, Map<Integer, Set<ClockRegion>> usedRoutingTracks) {
         // Since we preserved all pins in addGlobalClkRoutingTargets(), unpreserve them here
         for (SitePinInst spi : clk.getPins()) {
             routingGraph.unpreserve(spi.getConnectedNode());
@@ -476,7 +482,7 @@ public class RWRoute {
         } else {
             // routes clock nets from scratch
             System.out.println("INFO: Routing " + clk.getPins().size() + " pins of clock " + clk + " (non timing-driven)");
-            GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), gns);
+            GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), gns, usedRoutingTracks);
         }
         preserveNet(clk, false);
 
@@ -799,6 +805,7 @@ public class RWRoute {
             for (Connection connection : indirectConnections) {
                 RouteNode sinkRnode = connection.getSinkRnode();
                 if (sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH) {
+                    IntentCode sinkIntent = sinkRnode.getIntentCode();
                     for (Node uphill : sinkRnode.getAllUphillNodes()) {
                         if (uphill.isTiedToVcc()) {
                             continue;
@@ -807,10 +814,17 @@ public class RWRoute {
                         if (preservedNet != null && preservedNet != connection.getNet()) {
                             continue;
                         }
-                        assert((sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL &&
-                                (uphill.getIntentCode() == IntentCode.NODE_CLE_CNODE || uphill.getIntentCode() == IntentCode.NODE_CLE_BNODE)) ||
-                                (sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL &&
-                                        (uphill.getIntentCode() == IntentCode.NODE_INTF_CNODE || uphill.getIntentCode() == IntentCode.NODE_INTF_BNODE)));
+                        if (sinkIntent == IntentCode.NODE_SLL_INPUT && uphill.getIntentCode() == IntentCode.NODE_SLL_OUTPUT) {
+                            // No need to reserve NODE_SLL_OUTPUT nodes of a NODE_SLL_INPUT
+                            continue;
+                        }
+                        assert((sinkIntent == IntentCode.NODE_CLE_CTRL &&
+                                        (uphill.getIntentCode() == IntentCode.NODE_CLE_CNODE || uphill.getIntentCode() == IntentCode.NODE_CLE_BNODE)) ||
+                                (sinkIntent == IntentCode.NODE_INTF_CTRL &&
+                                        (uphill.getIntentCode() == IntentCode.NODE_INTF_CNODE || uphill.getIntentCode() == IntentCode.NODE_INTF_BNODE)) ||
+                                (sinkIntent == IntentCode.NODE_SLL_INPUT &&
+                                        uphill.getIntentCode() == IntentCode.NODE_CLE_BNODE)
+                        );
                         RouteNode rnode = routingGraph.getOrCreate(uphill, RouteNodeType.LOCAL_RESERVED);
                         rnode.setType(RouteNodeType.LOCAL_RESERVED);
                     }

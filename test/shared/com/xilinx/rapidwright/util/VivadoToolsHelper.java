@@ -60,4 +60,34 @@ public class VivadoToolsHelper {
         ReportRouteStatusResult rrs = VivadoTools.routeDesignAndGetStatus(design, dir);
         Assertions.assertTrue(rrs.isFullyRouted());
     }
+
+    public static void assertCanBeFullyPlacedAndRoutedByVivado(Design design, Path dir) {
+        if (!FileTools.isVivadoOnPath()) {
+            return;
+        }
+        ReportRouteStatusResult rrs = VivadoTools.placeAndRouteDesignAndGetStatus(design, dir);
+        Assertions.assertTrue(rrs.isFullyRouted());
+    }
+
+    public static void assertCanBeFullyRoutedByVivado(Path dcp, Path dir, boolean hasEncryptedCells) {
+        if (!FileTools.isVivadoOnPath()) {
+            return;
+        }
+        ReportRouteStatusResult rrs = VivadoTools.routeDesignAndGetStatus(dcp, dir, hasEncryptedCells);
+        Assertions.assertTrue(rrs.isFullyRouted());
+    }
+    
+    public static void assertPortCountAfterRoundTripInVivado(Design design, Path dir, boolean expectEquals) {
+        if (!FileTools.isVivadoOnPath()) {
+            return;
+        }
+        int beforePortCount = design.getNetlist().getTopCell().getPorts().size();
+        Design newDesign = VivadoTools.roundTripDCPThruVivado(design, dir);
+        int afterPortCount = newDesign.getNetlist().getTopCell().getPorts().size();
+        if (expectEquals) {
+            Assertions.assertEquals(beforePortCount, afterPortCount);
+        } else {
+            Assertions.assertNotEquals(beforePortCount, afterPortCount);
+        }
+    }
 }

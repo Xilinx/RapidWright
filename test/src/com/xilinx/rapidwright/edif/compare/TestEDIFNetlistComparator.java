@@ -53,6 +53,27 @@ public class TestEDIFNetlistComparator {
         Assertions.assertEquals(0, diffs);
     }
 
+    private void checkSinglePropertyType(EDIFNetlist gold, EDIFNetlist test,
+            EDIFNetlistComparator comparator, String expectedKey) {
+        int diffs = comparator.compareNetlists(gold, test);
+        Assertions.assertEquals(1, diffs);
+        Assertions.assertEquals(1, comparator.getDiffMap().size());
+        Assertions.assertTrue(comparator.getDiffMap().containsKey(EDIFDiffType.PROPERTY_VALUE));
+
+        EDIFDiff diff = comparator.getDiffMap().values().iterator().next().get(0);
+        Assertions.assertEquals(expectedKey, diff.getPropertyKey());
+    }
+
+    private void checkSingleCellName(EDIFNetlist gold, EDIFNetlist test,
+            EDIFNetlistComparator comparator, String expectedCellName) {
+        int diffs = comparator.compareNetlists(gold, test);
+        Assertions.assertEquals(1, diffs);
+    
+        EDIFDiff diff = comparator.getDiffMap().values().iterator().next().get(0);
+        Assertions.assertNotNull(diff.getSourceInst());
+        Assertions.assertEquals(expectedCellName, diff.getSourceInst().getName());
+    }
+
     @Test
     public void testEDIFNetlistComparator() {
         Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
@@ -144,6 +165,22 @@ public class TestEDIFNetlistComparator {
         comparator.filterVivadoChanges = true;
 
         testTop.removeProperty(propKey);
+        checkNetlistMatch(gold, test, comparator);
+
+        comparator.filterVivadoChanges = false;
+        final String K = "RW_TEST_PROP";
+        EDIFCellInst testCellInst = test.getTopCell().getCellInsts().iterator().next();
+        EDIFCellInst goldCellInst = gold.getTopCell().getCellInsts().iterator().next();
+        testCellInst.addProperty(K, "A");
+        goldCellInst.addProperty(K, "B");
+
+        checkSinglePropertyType(gold, test, comparator, K);
+        checkSingleCellName(gold, test, comparator, testCellInst.getName());
+
+        testCellInst.removeProperty(K);
+        goldCellInst.removeProperty(K);
+
+        comparator.filterVivadoChanges = true;
         checkNetlistMatch(gold, test, comparator);
     }
 

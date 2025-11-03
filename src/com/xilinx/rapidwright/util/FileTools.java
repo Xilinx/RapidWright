@@ -143,7 +143,7 @@ public class FileTools {
     /** Part Database File Version */
     public static final int PART_DB_FILE_VERSION = 1;
     /** Unisim Data File Version */
-    public static final int UNISIM_DATA_FILE_VERSION = 1;
+    public static final int UNISIM_DATA_FILE_VERSION = 2;
     /** Base URL for download data files */
     public static final String RAPIDWRIGHT_DATA_URL = "http://data.rapidwright.io/";
     /** Suffix added to data file names to capture md5 status */
@@ -1501,6 +1501,7 @@ public class FileTools {
 
     public static Pair<InputStream,Long> getInputStreamFromZipFile(String zipFileName, String fileEndsWith) {
         try {
+            @SuppressWarnings("resource")
             final ZipFile zip = new ZipFile(zipFileName);
             Enumeration<? extends ZipEntry> entries = zip.entries();
             ZipEntry match = null;
