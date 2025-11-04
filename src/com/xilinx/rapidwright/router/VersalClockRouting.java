@@ -51,6 +51,8 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.rwroute.NodeStatus;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.rwroute.RouterHelper.NodeWithPrev;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
 
 /**
@@ -64,6 +66,8 @@ public class VersalClockRouting {
     private static final EnumSet<IntentCode> hRouteTypes;
     private static final EnumSet<IntentCode> vRouteTypes;
     private static final EnumSet<IntentCode> allRouteTypes;
+    
+    private static Map<String, Map<Integer, int[][]>> vdistrTrees;
     
     static {
         hRouteTypes = EnumSet.of(
@@ -648,5 +652,64 @@ public class VersalClockRouting {
             }
         }
         clk.getPIPs().addAll(allPIPs);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static Map<String, Map<Integer, int[][]>> readVersalVDistrTrees() {
+        // TODO Switch to getRapidWrightResourceInputStream() once the file has been uploaded
+        //InputStream is = FileTools.getRapidWrightResourceInputStream(FileTools.VERSAL_VDISTR_TREES_FILE_NAME);
+        String fileName = FileTools.getRapidWrightResourceFileName(FileTools.VERSAL_VDISTR_TREES_FILE_NAME);
+        return (Map<String, Map<Integer, int[][]>>) FileTools.readObjectFromKryoFile(fileName);
+    }
+
+    public static void writeVersalVDistrTreesFile() {
+        String fileName = FileTools.getRapidWrightResourceFileName(FileTools.VERSAL_VDISTR_TREES_FILE_NAME);
+        if (vdistrTrees == null) {
+            throw new RuntimeException("ERROR: Cannot write file '" + fileName + "', source map is null.");
+        }
+        FileTools.writeObjectToKryoFile(fileName, vdistrTrees);
+    }
+
+    private static Map<Integer, int[][]> getDeviceVDistrTrees(String deviceName) {
+        if (vdistrTrees == null) {
+            vdistrTrees = readVersalVDistrTrees();
+        }
+        return vdistrTrees.get(deviceName);
+    }
+
+    private static int getVDistTreeKey(ClockRegion clockRoot, int minY, int maxY) {
+        assert (clockRoot != null && minY >= 0 && maxY >= 0);
+        // [31:16] -> Clock Root CR Y coordinate
+        // [15:8] -> Minimum Y coordinate of clocked logic
+        // [7:0] -> Maximum Y coordinate of clocked logic
+        return clockRoot.getInstanceY() << 16 | minY << 8 | maxY;
+    }
+
+    private static List<Pair<IntentCode, Integer>> getClockRegionVDistrPath(ClockRegion target,
+            int vdistrTreeKey) {
+        String deviceName = target.getDevice().getName();
+        Map<Integer, int[][]> map = getDeviceVDistrTrees(deviceName);
+        if (map == null) {
+            System.err.println("Missing VDISTR tree for " + deviceName + " targeting CR " + target);
+            Pair<IntentCode, Integer> simple = new Pair<>(IntentCode.NODE_GLOBAL_VDISTR,
+                    target.getInstanceY());
+            return Collections.singletonList(simple);
+        }
+        int[][] pathData = map.get(vdistrTreeKey);
+        if (pathData == null || pathData.length <= target.getInstanceY()) {
+            System.err.println("Missing VDISTR tree for " + deviceName + " targeting CR " + target
+                    + " key=" + vdistrTreeKey);
+            Pair<IntentCode, Integer> simple = new Pair<>(IntentCode.NODE_GLOBAL_VDISTR,
+                    target.getInstanceY());
+            return Collections.singletonList(simple);
+        }
+        int[] crPathData = pathData[target.getInstanceY()];
+        List<Pair<IntentCode, Integer>> vdistrPath = new ArrayList<>(crPathData.length);
+        for (int value : crPathData) {
+            IntentCode vdistrCode = IntentCode.values()[value >>> 16];
+            int crY = value & 0xffff;
+            vdistrPath.add(new Pair<IntentCode, Integer>(vdistrCode, crY));
+        }
+        return vdistrPath;
     }
 }
