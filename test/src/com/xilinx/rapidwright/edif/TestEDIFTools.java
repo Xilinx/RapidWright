@@ -24,6 +24,7 @@
 
 package com.xilinx.rapidwright.edif;
 
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -467,8 +468,11 @@ public class TestEDIFTools {
         Assertions.assertFalse(testPort2.getName().startsWith(EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE));
     }
 
+    @SuppressWarnings("unchecked")
     @Test
-    public void testWriteEDIFFilterUnrelatedEDNFiles(@TempDir Path dir) {
+    public void testWriteEDIFFilterUnrelatedEDNFiles(@TempDir Path dir)
+            throws NoSuchFieldException, SecurityException, IllegalArgumentException,
+            IllegalAccessException {
         String name = "picoblaze_ooc_X10Y235.dcp";
         Path dcp = dir.resolve(name);
         Path edf = dir.resolve(name.replace(".dcp", ".edf"));
@@ -485,7 +489,11 @@ public class TestEDIFTools {
         // .edn file, keeping a record of possible encrypted cells as it goes.  
         d = Design.readCheckpoint(dcp, edf);
 
-        Assertions.assertEquals(1, d.getNetlist().getEncryptedCells().size());
+        {
+            Field encCellsList = EDIFNetlist.class.getDeclaredField("encryptedCells");
+            encCellsList.setAccessible(true);
+            Assertions.assertEquals(1, ((List<String>) encCellsList.get(d.getNetlist())).size());
+        }
 
         String outputName = "test";
         Path loadScript = dir.resolve(outputName + EDIFTools.LOAD_TCL_SUFFIX);
