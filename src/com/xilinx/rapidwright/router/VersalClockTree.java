@@ -48,6 +48,13 @@ public class VersalClockTree {
      */
     private Map<Integer, int[][]> clockRootPathSets;
 
+    /**
+     * Only used for serialization purposes
+     */
+    public VersalClockTree() {
+
+    }
+
     public VersalClockTree(int minY, int maxY) {
         this.minMaxYKey = getMinMaxYRangeKey(minY, maxY);
     }

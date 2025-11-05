@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.router;
 import java.io.InputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -287,13 +288,17 @@ public class VersalClockRouting {
         }
 
         VersalClockTree clkTree = getVersalClockTree(device, minY, maxY);
+        if (clkTree == null) {
+            System.err.println("ERROR: No clock tree found for " + device + " Y" + minY + "-Y" + maxY
+                    + " while routing clock " + clk + ", skew will be suboptimal.");
+        }
 
         for (ClockRegion cr : verticalSpineCRs) {
             q.clear();
             visited.clear();
             q.add(clockRootNode);
 
-            List<Pair<IntentCode, ClockRegion>> distrPath = clkTree.getClockRegionVDistrPath(cr);
+            List<Pair<IntentCode, ClockRegion>> distrPath = getVDistrPath(clkTree, cr);
             nextDistrLevel: for (Pair<IntentCode, ClockRegion> target : distrPath) {
                 IntentCode targetIC = target.getFirst();
                 ClockRegion targetCR = target.getSecond();
@@ -349,6 +354,12 @@ public class VersalClockRouting {
         }
 
         return crToVdist;
+    }
+
+    private static List<Pair<IntentCode, ClockRegion>> getVDistrPath(VersalClockTree clkTree,
+            ClockRegion target) {
+        return clkTree == null ? Arrays.asList(new Pair<>(IntentCode.NODE_GLOBAL_VDISTR, target))
+                : clkTree.getClockRegionVDistrPath(target);
     }
 
     /**

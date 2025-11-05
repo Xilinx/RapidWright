@@ -26,6 +26,7 @@ package com.xilinx.rapidwright.rwroute;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -379,11 +380,6 @@ public class GlobalSignalRouting {
             Set<ClockRegion> clockRegions) {
         Node vroute = null;
         int currIdx = 0;
-        // TODO Revisit
-        List<Integer> rowOffsets = new ArrayList<>();
-        rowOffsets.add(0);
-        rowOffsets.add(-2);
-        rowOffsets.add(2);
         
         int minY = Integer.MAX_VALUE;
         int maxY = 0;
@@ -392,14 +388,20 @@ public class GlobalSignalRouting {
             maxY = Math.max(maxY, cr.getInstanceY());
         }
         Device device = origCentroid.getDevice();
-        int clkRootYCoord = VersalClockRouting.getPreferredClockRootYCoord(device, minY, maxY);
-        int clkRootXCoord = origCentroid.getColumn() % 2 == 0 ? origCentroid.getInstanceX()
-                : origCentroid.getInstanceX() + 1;
+        // Clock roots on Versal appear to only be possible on odd-numbered columns
+        int clkRootXCoord = origCentroid.getColumn() % 2 == 0 ? origCentroid.getInstanceX() + 1
+                : origCentroid.getInstanceX();
+        Integer preferredYCoord = VersalClockRouting.getPreferredClockRootYCoord(device, minY, maxY);
+        int clkRootYCoord = preferredYCoord == null ? origCentroid.getInstanceY() : preferredYCoord;
+
+        // If the current column doesn't work, try both neighboring ones
+        List<Integer> colOffsets = Arrays.asList(0, -2, 2);
+
         ClockRegion proposedClkRoot = null;
         
         do {
             proposedClkRoot = device.getClockRegion(clkRootYCoord,
-                    clkRootXCoord + rowOffsets.get(currIdx));
+                    clkRootXCoord + colOffsets.get(currIdx));
             if (proposedClkRoot != null && proposedClkRoot.getApproximateCenter() != null) {
                 vroute = VersalClockRouting.routeToCentroid(clk, start, proposedClkRoot,
                         noVrouteNeeded,
@@ -407,7 +409,7 @@ public class GlobalSignalRouting {
             }
             // If we weren't successful, loop around and try neighbors
             currIdx++;
-        } while (vroute == null && currIdx < rowOffsets.size());
+        } while (vroute == null && currIdx < colOffsets.size());
         if (vroute == null) {
             throw new RuntimeException("ERROR: Unable to find a centroid CR for clock " + clk);
         }
