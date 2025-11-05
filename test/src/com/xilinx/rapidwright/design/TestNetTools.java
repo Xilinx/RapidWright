@@ -26,9 +26,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -245,5 +247,16 @@ public class TestNetTools {
                 "             INT_X9Y235/INT_NODE_IMUX_39_INT_OUT1 ( 0) INT_X9Y235/INT.BYPASS_W1->>INT_NODE_IMUX_39_INT_OUT1\n" +
                 "                       INT_X9Y235/BYPASS_W4 ( 4) INT_X9Y235/INT.INT_NODE_IMUX_39_INT_OUT1->>BYPASS_W4\n" +
                 "         }]        INT_X9Y235/INODE_W_1_FT1 ( 0) INT_X9Y235/INT.BYPASS_W4->>INODE_W_1_FT1");
+    }
+
+    @Test
+    public void testFindClockRootVRoute() {
+        Design design = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
+        EDIFHierNet clkParentNet = design.getNetlist().getParentNet(
+                design.getNetlist().getHierNetFromName("u_ila_0_clk_out1"));
+        Net clkNet = design.getNet(clkParentNet.getHierarchicalNetName());
+        Assertions.assertNotNull(clkNet);
+        ClockRegion clockRoot = NetTools.findClockRootVRoute(clkNet).getTile().getClockRegion();
+        Assertions.assertEquals(clockRoot, design.getDevice().getClockRegion(1, 1));
     }
 }
