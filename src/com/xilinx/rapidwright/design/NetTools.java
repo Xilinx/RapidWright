@@ -323,4 +323,146 @@ public class NetTools {
         Function<Node, Boolean> excludeFilter = n -> n.getIntentCode() == IntentCode.NODE_PINFEED;
         return getNetTreeString(net, excludeFilter, customToString);
     }
+
+    /**
+     * Gets a string representation of the vertical clock routing spine for the given net.
+     * This method is similar to getClockTreeSpine but only includes vertical distribution nodes.
+     * Only the clock root VROUTE node is included; all other VROUTE nodes are filtered out.
+     * 
+     * @param net The net to analyze
+     * @return A string tree representation showing only vertical clock routing nodes
+     */
+    public static String getVerticalClockTreeSpine(Net net) {
+        Function<Node,String> customToString = 
+                n -> n.getIntentCode() + " CR=" + n.getTile().getClockRegion();
+
+        // Build the full tree without filtering (except PINFEED)
+        Function<Node, Boolean> minimalFilter = n -> n.getIntentCode() == IntentCode.NODE_PINFEED;
+        List<NodeTree> subtrees = getNodeTrees(net, minimalFilter);
+
+        if (subtrees.isEmpty()) {
+            return "";
+        }
+
+        // Find the clock root VROUTE node
+        Node clockRoot = findClockRootVRoute(net);
+
+        // Define the set of nodes we want to display
+        Set<IntentCode> displayIntentCodes = EnumSet.of(
+            IntentCode.NODE_GLOBAL_VDISTR_SHARED,
+            IntentCode.NODE_GLOBAL_VROUTE,
+            IntentCode.NODE_GLOBAL_VDISTR_LVL1,
+            IntentCode.NODE_GLOBAL_VDISTR,
+            IntentCode.NODE_GLOBAL_VDISTR_LVL2,
+            IntentCode.NODE_GLOBAL_VDISTR_LVL21,
+            IntentCode.NODE_GLOBAL_VDISTR_LVL3
+        );
+
+        if (subtrees.size() > 1) {
+            throw new RuntimeException("Clock route might have multiple clock roots");
+        }
+
+        Function<Node, Boolean> includeFilter = n -> {
+            IntentCode intentCode = n.getIntentCode();
+            if (displayIntentCodes.contains(intentCode)) {
+                if (intentCode == IntentCode.NODE_GLOBAL_VROUTE) {
+                    return n.equals(clockRoot);
+                }
+                return true;
+            }
+            return false;
+        };
+
+        StringBuilder sb = new StringBuilder();
+        NodeTree subtree = subtrees.get(0);
+        NodeTree filteredSubtree = buildFilteredTree(subtree, includeFilter);
+        sb.append(filteredSubtree.toTreeString(customToString));
+        return sb.toString();
+    }
+    
+    /**
+     * Builds a tree string with selective node display while maintaining connectivity.
+     * Nodes that don't match the display criteria are skipped, but their children are still processed.
+     */
+    private static NodeTree buildFilteredTree(NodeTree nodeTree, Function<Node, Boolean> includeFilter) {
+        class WorkItem {
+            final NodeTree original;
+            final NodeTree parentInFilteredTree;
+            WorkItem(NodeTree original, NodeTree parentInFilteredTree) {
+                this.original = original;
+                this.parentInFilteredTree = parentInFilteredTree;
+            }
+        }
+        
+        NodeTree filteredRoot = nodeTree;
+        
+        while (!includeFilter.apply(filteredRoot)) {
+            if (filteredRoot.fanouts.size() != 1) {
+                throw new RuntimeException("Failed to find clock root");
+            }
+            filteredRoot = filteredRoot.fanouts.get(0);
+        }
+
+        List<WorkItem> worklist = new ArrayList<>();
+        NodeTree filteredNodeTree = new NodeTree(filteredRoot);
+
+        for (NodeTree fanout : filteredRoot.fanouts) {
+            worklist.add(new WorkItem(fanout, filteredNodeTree));
+        }
+
+        // Process worklist for the normal case (root passed filter)
+        while (!worklist.isEmpty()) {
+            WorkItem item = worklist.remove(0);
+            NodeTree curr = item.original;
+            NodeTree filteredParent = item.parentInFilteredTree;
+            
+            if (includeFilter.apply(curr)) {
+                NodeTree filteredNode = new NodeTree(curr);
+                filteredNode.multiplyDriven = curr.multiplyDriven;
+                filteredParent.addFanout(filteredNode);
+                
+                for (NodeTree fanout : curr.fanouts) {
+                    worklist.add(new WorkItem(fanout, filteredNode));
+                }
+            } else {
+                for (NodeTree fanout : curr.fanouts) {
+                    worklist.add(new WorkItem(fanout, filteredParent));
+                }
+            }
+        }
+        
+        return filteredNodeTree;
+    }
+    
+    /**
+     * Finds the clock root VROUTE node.
+     * The clock root is the deepest (furthest from source) NODE_GLOBAL_VROUTE node in the tree.
+     * 
+     * @param net The net to analyze
+     * @return The clock root VROUTE node, or null if none found
+     */
+    public static Node findClockRootVRoute(Net net) {
+        List<NodeTree> subtrees = getNodeTrees(net);
+
+        if (subtrees.size() > 1) {
+            throw new RuntimeException("Clock route potentially has multiple clock roots");
+        }
+
+        // Find the last GLOBAL_VROUTE node before transitioning VDISTR nodes
+        NodeTree curr = subtrees.get(0);
+        NodeTree deepestVRoute = null;
+
+        while (curr.fanouts.size() == 1) {
+            if (curr.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE) {
+                deepestVRoute = curr;
+            }
+            curr = curr.fanouts.get(0);
+        }
+
+        if (curr.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE) {
+            deepestVRoute = curr;
+        }
+
+        return deepestVRoute;
+    }
 }
