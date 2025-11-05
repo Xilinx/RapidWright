@@ -68,7 +68,7 @@ public class VersalClockRouting {
     private static final EnumSet<IntentCode> vRouteTypes;
     private static final EnumSet<IntentCode> allRouteTypes;
     
-    private static Map<String, Map<Integer, int[][]>> vdistrTrees;
+    private static Map<String, Map<Integer, VersalClockTree>> vdistrTrees;
     
     static {
         hRouteTypes = EnumSet.of(
@@ -275,7 +275,6 @@ public class VersalClockRouting {
         // Identify top and bottom clock region spine targets
         int minY = Integer.MAX_VALUE;
         int maxY = 0;
-        ClockRegion clockRoot = vroute.getTile().getClockRegion();
         int x = vroute.getTile().getClockRegion().getInstanceX();
         Device device = clk.getDesign().getDevice();
         for (ClockRegion cr : clockRegions) {
@@ -287,14 +286,14 @@ public class VersalClockRouting {
             verticalSpineCRs.add(device.getClockRegion(i, x));
         }
 
-        int vdistrKey = getVDistrTreeKey(clockRoot, minY, maxY);
+        VersalClockTree clkTree = getVersalClockTree(device, minY, maxY);
 
         for (ClockRegion cr : verticalSpineCRs) {
             q.clear();
             visited.clear();
             q.add(clockRootNode);
 
-            List<Pair<IntentCode, ClockRegion>> distrPath = getClockRegionVDistrPath(cr, vdistrKey);
+            List<Pair<IntentCode, ClockRegion>> distrPath = clkTree.getClockRegionVDistrPath(cr);
             nextDistrLevel: for (Pair<IntentCode, ClockRegion> target : distrPath) {
                 IntentCode targetIC = target.getFirst();
                 ClockRegion targetCR = target.getSecond();
@@ -660,9 +659,9 @@ public class VersalClockRouting {
     }
 
     @SuppressWarnings("unchecked")
-    public static Map<String, Map<Integer, int[][]>> readVersalVDistrTrees() {
+    public static Map<String, Map<Integer, VersalClockTree>> readVersalVDistrTrees() {
         InputStream is = FileTools.getRapidWrightResourceInputStream(FileTools.VERSAL_VDISTR_TREES_FILE_NAME);
-        return (Map<String, Map<Integer, int[][]>>) FileTools.readObjectFromKryoFile(is);
+        return (Map<String, Map<Integer, VersalClockTree>>) FileTools.readObjectFromKryoFile(is);
     }
 
     public static void writeVersalVDistrTreesFile() {
@@ -673,50 +672,30 @@ public class VersalClockRouting {
         FileTools.writeObjectToKryoFile(fileName, vdistrTrees);
     }
 
-    private static Map<Integer, int[][]> getDeviceVDistrTrees(String deviceName) {
+    public static VersalClockTree getVersalClockTree(Device device, int minY, int maxY) {
+        Map<Integer, VersalClockTree> map = getDeviceVDistrTrees(device.getName());
+        return map == null ? null : map.get(VersalClockTree.getMinMaxYRangeKey(minY, maxY));
+    }
+
+    private static Map<Integer, VersalClockTree> getDeviceVDistrTrees(String deviceName) {
         if (vdistrTrees == null) {
             vdistrTrees = readVersalVDistrTrees();
         }
         return vdistrTrees.get(deviceName);
     }
 
-    public static boolean hasVDistrTree(ClockRegion clockRoot, int minY, int maxY) {
-        Map<Integer, int[][]> map = getDeviceVDistrTrees(clockRoot.getDevice().getName());
-        return map == null ? false : (map.get(getVDistrTreeKey(clockRoot, minY, maxY)) != null);
-    }
-
-    private static int getVDistrTreeKey(ClockRegion clockRoot, int minY, int maxY) {
-        assert (clockRoot != null && minY >= 0 && maxY >= 0);
-        // [31:16] -> Clock Root CR Y coordinate
-        // [15:8] -> Minimum Y coordinate of clocked logic
-        // [7:0] -> Maximum Y coordinate of clocked logic
-        return (clockRoot.getInstanceY() << 16) | (minY << 8) | maxY;
-    }
-    
-    private static List<Pair<IntentCode, ClockRegion>> getClockRegionVDistrPath(ClockRegion target,
-            int vdistrTreeKey) {
-        String deviceName = target.getDevice().getName();
-        Map<Integer, int[][]> map = getDeviceVDistrTrees(deviceName);
-        if (map == null) {
-            System.err.println("Missing VDISTR tree for " + deviceName + " targeting CR " + target);
-            Pair<IntentCode, ClockRegion> simple = new Pair<>(IntentCode.NODE_GLOBAL_VDISTR, target);
-            return Collections.singletonList(simple);
-        }
-        int[][] pathData = map.get(vdistrTreeKey);
-        if (pathData == null || pathData.length <= target.getInstanceY()) {
-            System.err.println("Missing VDISTR tree for " + deviceName + " targeting CR " + target
-                    + " key=" + vdistrTreeKey);
-            Pair<IntentCode, ClockRegion> simple = new Pair<>(IntentCode.NODE_GLOBAL_VDISTR, target);
-            return Collections.singletonList(simple);
-        }
-        int[] crPathData = pathData[target.getInstanceY()];
-        List<Pair<IntentCode, ClockRegion>> vdistrPath = new ArrayList<>(crPathData.length);
-        for (int value : crPathData) {
-            IntentCode vdistrCode = IntentCode.values()[value >>> 16];
-            int crY = value & 0xffff;
-            ClockRegion cr = target.getDevice().getClockRegion(crY, target.getInstanceX());
-            vdistrPath.add(new Pair<>(vdistrCode, cr));
-        }
-        return vdistrPath;
+    /**
+     * Given a range of occupied clock region Y coordinates, get the preferred clock
+     * root Y coordinate.
+     * 
+     * @param device The current device to target.
+     * @param minY   The smallest Y coordinate of the clock region range.
+     * @param maxY   The largest Y coordinate of the clock region range.
+     * @return The preferred clock region Y coordinate for the given range or null
+     *         if none could be found.
+     */
+    public static Integer getPreferredClockRootYCoord(Device device, int minY, int maxY) {
+        VersalClockTree clkTree = getVersalClockTree(device, minY, maxY);
+        return clkTree == null ? null : clkTree.getPreferredClockRootYCoord();
     }
 }

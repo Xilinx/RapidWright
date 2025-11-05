@@ -379,8 +379,11 @@ public class GlobalSignalRouting {
             Set<ClockRegion> clockRegions) {
         Node vroute = null;
         int currIdx = 0;
-        List<Integer> rowOffsets = getOtherRowCentroidCandidates(origCentroid);
-        ClockRegion neighbor = null;
+        // TODO Revisit
+        List<Integer> rowOffsets = new ArrayList<>();
+        rowOffsets.add(0);
+        rowOffsets.add(-2);
+        rowOffsets.add(2);
         
         int minY = Integer.MAX_VALUE;
         int maxY = 0;
@@ -388,14 +391,18 @@ public class GlobalSignalRouting {
             minY = Math.min(minY, cr.getInstanceY());
             maxY = Math.max(maxY, cr.getInstanceY());
         }
+        Device device = origCentroid.getDevice();
+        int clkRootYCoord = VersalClockRouting.getPreferredClockRootYCoord(device, minY, maxY);
+        int clkRootXCoord = origCentroid.getColumn() % 2 == 0 ? origCentroid.getInstanceX()
+                : origCentroid.getInstanceX() + 1;
+        ClockRegion proposedClkRoot = null;
         
         do {
-            // Start with estimate centroid
-            neighbor = origCentroid.getNeighborClockRegion(rowOffsets.get(currIdx),
-                    (origCentroid.getInstanceX() % 2 == 0) ? 1 : 0);
-            if (neighbor != null && neighbor.getApproximateCenter() != null
-                    && VersalClockRouting.hasVDistrTree(neighbor, minY, maxY)) {
-                vroute = VersalClockRouting.routeToCentroid(clk, start, neighbor, noVrouteNeeded,
+            proposedClkRoot = device.getClockRegion(clkRootYCoord,
+                    clkRootXCoord + rowOffsets.get(currIdx));
+            if (proposedClkRoot != null && proposedClkRoot.getApproximateCenter() != null) {
+                vroute = VersalClockRouting.routeToCentroid(clk, start, proposedClkRoot,
+                        noVrouteNeeded,
                         getNodeStatus, unavailableTracks);
             }
             // If we weren't successful, loop around and try neighbors
@@ -404,8 +411,8 @@ public class GlobalSignalRouting {
         if (vroute == null) {
             throw new RuntimeException("ERROR: Unable to find a centroid CR for clock " + clk);
         }
-        assert (neighbor != null);
-        return new Pair<Node, ClockRegion>(vroute, neighbor);
+        assert (proposedClkRoot != null);
+        return new Pair<Node, ClockRegion>(vroute, proposedClkRoot);
     }
 
     /**
