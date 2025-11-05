@@ -303,7 +303,7 @@ public class GlobalSignalRouting {
             // we may fail to do so. Thus, we need to force the Y-coordinate of centroid to be 1.
             Node clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk, getNodeStatus);// first HROUTE
             Pair<Node, ClockRegion> result = findCentroid(clk, clkRoutingLine, centroid, true,
-                    getNodeStatus, unavailableTracks);
+                    getNodeStatus, unavailableTracks, usedCRsAndNonLCBPinsTuple.getFirst());
             centroidHRouteNode = result.getFirst();
             centroid = result.getSecond();
         } else if (sourceTypeEnum == SiteTypeEnum.BUFG_PS) {
@@ -321,7 +321,8 @@ public class GlobalSignalRouting {
         boolean noVrouteNeeded = centroidHRouteNode.getTile().getClockRegion().getRow() == centroid.getRow();
 
         Pair<Node, ClockRegion> centroidResult = findCentroid(clk, centroidHRouteNode, centroid,
-                noVrouteNeeded, getNodeStatus, unavailableTracks);
+                noVrouteNeeded, getNodeStatus, unavailableTracks,
+                usedCRsAndNonLCBPinsTuple.getFirst());
         Node vroute = centroidResult.getFirst();
         centroid = centroidResult.getSecond();
         
@@ -373,17 +374,27 @@ public class GlobalSignalRouting {
      *                          print of this clock net.
      * @return
      */
-    private static Pair<Node, ClockRegion> findCentroid(Net clk, Node start,
-            ClockRegion origCentroid, boolean noVrouteNeeded,
-            Function<Node, NodeStatus> getNodeStatus, Set<Integer> unavailableTracks) {
+    private static Pair<Node, ClockRegion> findCentroid(Net clk, Node start, ClockRegion origCentroid, 
+            boolean noVrouteNeeded, Function<Node, NodeStatus> getNodeStatus, Set<Integer> unavailableTracks,
+            Set<ClockRegion> clockRegions) {
         Node vroute = null;
         int currIdx = 0;
         List<Integer> rowOffsets = getOtherRowCentroidCandidates(origCentroid);
         ClockRegion neighbor = null;
+        
+        int minY = Integer.MAX_VALUE;
+        int maxY = 0;
+        for (ClockRegion cr : clockRegions) {
+            minY = Math.min(minY, cr.getInstanceY());
+            maxY = Math.max(maxY, cr.getInstanceY());
+        }
+        
         do {
             // Start with estimate centroid
-            neighbor = origCentroid.getNeighborClockRegion(0, rowOffsets.get(currIdx));
-            if (neighbor.getApproximateCenter() != null) {
+            neighbor = origCentroid.getNeighborClockRegion(rowOffsets.get(currIdx),
+                    (origCentroid.getInstanceX() % 2 == 0) ? 1 : 0);
+            if (neighbor != null && neighbor.getApproximateCenter() != null
+                    && VersalClockRouting.hasVDistrTree(neighbor, minY, maxY)) {
                 vroute = VersalClockRouting.routeToCentroid(clk, start, neighbor, noVrouteNeeded,
                         getNodeStatus, unavailableTracks);
             }
@@ -547,6 +558,7 @@ public class GlobalSignalRouting {
                 centroid = centroid.getNeighborClockRegion(-1, 0);
             }
         }
+
         return centroid;
     }
 

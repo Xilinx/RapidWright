@@ -22,6 +22,7 @@
 
 package com.xilinx.rapidwright.router;
 
+import java.io.InputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -266,15 +267,15 @@ public class VersalClockRouting {
                 IntentCode.NODE_GLOBAL_VDISTR_SHARED,
                 IntentCode.NODE_GLOBAL_GCLK);
 
-        Set<NodeWithPrevAndCost> startingPoints = new HashSet<>();
         // The VROUTE node is the precursor to the clock root, technically the first
         // VDISTR node is the center point. If we have more than one VROUTE->VDISTR
         // transition we end up with multiple clock roots
-        startingPoints.add(new NodeWithPrevAndCost(vroute));
+        NodeWithPrevAndCost clockRootNode = new NodeWithPrevAndCost(vroute);
 
         // Identify top and bottom clock region spine targets
         int minY = Integer.MAX_VALUE;
         int maxY = 0;
+        ClockRegion clockRoot = vroute.getTile().getClockRegion();
         int x = vroute.getTile().getClockRegion().getInstanceX();
         Device device = clk.getDesign().getDevice();
         for (ClockRegion cr : clockRegions) {
@@ -286,46 +287,50 @@ public class VersalClockRouting {
             verticalSpineCRs.add(device.getClockRegion(i, x));
         }
 
-        nextClockRegion: for (ClockRegion cr : verticalSpineCRs) {
+        int vdistrKey = getVDistrTreeKey(clockRoot, minY, maxY);
+
+        for (ClockRegion cr : verticalSpineCRs) {
             q.clear();
             visited.clear();
-            q.addAll(startingPoints);
-            Tile crApproxCenterTile = cr.getApproximateCenter();
-            while (!q.isEmpty()) {
-                NodeWithPrevAndCost curr = q.poll();
-                if (getNodeStatus.apply(curr) != NodeStatus.AVAILABLE) {
-                    continue;
-                }
-                IntentCode c = curr.getIntentCode();
-                ClockRegion currCR = curr.getTile().getClockRegion();
-                if (currCR != null && cr.getRow() == currCR.getRow() && c == IntentCode.NODE_GLOBAL_VDISTR) {
-                    // Only consider base wires
-                    if (getNodeStatus.apply(curr) == NodeStatus.INUSE) {
-                        startingPoints.add(curr);
-                    } else {
-                        List<Node> path = curr.getPrevPath();
+            q.add(clockRootNode);
 
-                        for (Node node : path) {
-                            startingPoints.add(new NodeWithPrevAndCost(node));
+            List<Pair<IntentCode, ClockRegion>> distrPath = getClockRegionVDistrPath(cr, vdistrKey);
+            nextDistrLevel: for (Pair<IntentCode, ClockRegion> target : distrPath) {
+                IntentCode targetIC = target.getFirst();
+                ClockRegion targetCR = target.getSecond();
+                Tile crApproxCenterTile = targetCR.getApproximateCenter();
+                
+                while (!q.isEmpty()) {
+                    NodeWithPrevAndCost curr = q.poll();
+                    if (getNodeStatus.apply(curr) != NodeStatus.AVAILABLE) {
+                        continue;
+                    }
+                    IntentCode currIC = curr.getIntentCode();
+                    ClockRegion currCR = curr.getTile().getClockRegion();
+                    if (currCR != null && targetCR == currCR && currIC == targetIC) {
+                        q.clear();
+                        visited.clear();
+                        q.add(curr);
+                        allPIPs.addAll(RouterHelper.getPIPsFromNodes(curr.getPrevPath()));
+                        if (targetIC == IntentCode.NODE_GLOBAL_VDISTR) {
+                            crToVdist.put(cr, curr);
                         }
-                        allPIPs.addAll(RouterHelper.getPIPsFromNodes(path));
+                        continue nextDistrLevel;
                     }
-                    crToVdist.put(cr, curr);
-                    continue nextClockRegion;
+    
+                    for (Node downhill : curr.getAllDownhillNodes()) {
+                        if (!allowedIntentCodes.contains(downhill.getIntentCode())) {
+                            continue;
+                        }
+                        if (!visited.add(downhill)) {
+                            continue;
+                        }
+                        int cost = downhill.getTile().getManhattanDistance(crApproxCenterTile) + (curr.depth * 100);
+                        q.add(new NodeWithPrevAndCost(downhill, curr, cost));
+                    }
                 }
-
-                for (Node downhill : curr.getAllDownhillNodes()) {
-                    if (!allowedIntentCodes.contains(downhill.getIntentCode())) {
-                        continue;
-                    }
-                    if (!visited.add(downhill)) {
-                        continue;
-                    }
-                    int cost = downhill.getTile().getManhattanDistance(crApproxCenterTile) + curr.depth;
-                    q.add(new NodeWithPrevAndCost(downhill, curr, cost));
-                }
+                throw new RuntimeException("ERROR: Couldn't route to distribution line in clock region " + cr);
             }
-            throw new RuntimeException("ERROR: Couldn't route to distribution line in clock region " + cr);
         }
         clk.getPIPs().addAll(allPIPs);
 
@@ -656,10 +661,8 @@ public class VersalClockRouting {
 
     @SuppressWarnings("unchecked")
     public static Map<String, Map<Integer, int[][]>> readVersalVDistrTrees() {
-        // TODO Switch to getRapidWrightResourceInputStream() once the file has been uploaded
-        //InputStream is = FileTools.getRapidWrightResourceInputStream(FileTools.VERSAL_VDISTR_TREES_FILE_NAME);
-        String fileName = FileTools.getRapidWrightResourceFileName(FileTools.VERSAL_VDISTR_TREES_FILE_NAME);
-        return (Map<String, Map<Integer, int[][]>>) FileTools.readObjectFromKryoFile(fileName);
+        InputStream is = FileTools.getRapidWrightResourceInputStream(FileTools.VERSAL_VDISTR_TREES_FILE_NAME);
+        return (Map<String, Map<Integer, int[][]>>) FileTools.readObjectFromKryoFile(is);
     }
 
     public static void writeVersalVDistrTreesFile() {
@@ -677,38 +680,42 @@ public class VersalClockRouting {
         return vdistrTrees.get(deviceName);
     }
 
-    private static int getVDistTreeKey(ClockRegion clockRoot, int minY, int maxY) {
+    public static boolean hasVDistrTree(ClockRegion clockRoot, int minY, int maxY) {
+        Map<Integer, int[][]> map = getDeviceVDistrTrees(clockRoot.getDevice().getName());
+        return map == null ? false : (map.get(getVDistrTreeKey(clockRoot, minY, maxY)) != null);
+    }
+
+    private static int getVDistrTreeKey(ClockRegion clockRoot, int minY, int maxY) {
         assert (clockRoot != null && minY >= 0 && maxY >= 0);
         // [31:16] -> Clock Root CR Y coordinate
         // [15:8] -> Minimum Y coordinate of clocked logic
         // [7:0] -> Maximum Y coordinate of clocked logic
-        return clockRoot.getInstanceY() << 16 | minY << 8 | maxY;
+        return (clockRoot.getInstanceY() << 16) | (minY << 8) | maxY;
     }
-
-    private static List<Pair<IntentCode, Integer>> getClockRegionVDistrPath(ClockRegion target,
+    
+    private static List<Pair<IntentCode, ClockRegion>> getClockRegionVDistrPath(ClockRegion target,
             int vdistrTreeKey) {
         String deviceName = target.getDevice().getName();
         Map<Integer, int[][]> map = getDeviceVDistrTrees(deviceName);
         if (map == null) {
             System.err.println("Missing VDISTR tree for " + deviceName + " targeting CR " + target);
-            Pair<IntentCode, Integer> simple = new Pair<>(IntentCode.NODE_GLOBAL_VDISTR,
-                    target.getInstanceY());
+            Pair<IntentCode, ClockRegion> simple = new Pair<>(IntentCode.NODE_GLOBAL_VDISTR, target);
             return Collections.singletonList(simple);
         }
         int[][] pathData = map.get(vdistrTreeKey);
         if (pathData == null || pathData.length <= target.getInstanceY()) {
             System.err.println("Missing VDISTR tree for " + deviceName + " targeting CR " + target
                     + " key=" + vdistrTreeKey);
-            Pair<IntentCode, Integer> simple = new Pair<>(IntentCode.NODE_GLOBAL_VDISTR,
-                    target.getInstanceY());
+            Pair<IntentCode, ClockRegion> simple = new Pair<>(IntentCode.NODE_GLOBAL_VDISTR, target);
             return Collections.singletonList(simple);
         }
         int[] crPathData = pathData[target.getInstanceY()];
-        List<Pair<IntentCode, Integer>> vdistrPath = new ArrayList<>(crPathData.length);
+        List<Pair<IntentCode, ClockRegion>> vdistrPath = new ArrayList<>(crPathData.length);
         for (int value : crPathData) {
             IntentCode vdistrCode = IntentCode.values()[value >>> 16];
             int crY = value & 0xffff;
-            vdistrPath.add(new Pair<IntentCode, Integer>(vdistrCode, crY));
+            ClockRegion cr = target.getDevice().getClockRegion(crY, target.getInstanceX());
+            vdistrPath.add(new Pair<>(vdistrCode, cr));
         }
         return vdistrPath;
     }
