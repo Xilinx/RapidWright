@@ -2282,7 +2282,9 @@ public class DesignTools {
                     if (siteWireNet == null) {
                         if (isVersal && net.isStaticNet() && bel.isLUT()) {
                             siteWireNet = net;
-                            si.routeIntraSiteNet(net, belPin, belPin);
+                            synchronized (si) {
+                                si.routeIntraSiteNet(net, belPin, belPin);
+                            }
                         } else {
                             continue;
                         }
@@ -2299,16 +2301,19 @@ public class DesignTools {
                                     "'" + net.getName() + "'");
                         }
                     }
-                    String sitePinName = getRoutedSitePinFromPhysicalPin(c, siteWireNet, physPin);
-                    if (sitePinName == null) continue;
-                    SitePinInst newPin = si.getSitePinInst(sitePinName);
-                    if (newPin != null) continue;
-                    if (sitePinName.equals("IO") && Utils.isIOB(si)) {
-                        // Do not create a SitePinInst for the "IO" input site pin of any IOB site,
-                        // since the sitewire it drives is assumed to be driven by the IO PAD.
-                        continue;
+                    SitePinInst newPin;
+                    synchronized (si) {
+                        String sitePinName = getRoutedSitePinFromPhysicalPin(c, siteWireNet, physPin);
+                        if (sitePinName == null) continue;
+                        newPin = si.getSitePinInst(sitePinName);
+                        if (newPin != null) continue;
+                        if (sitePinName.equals("IO") && Utils.isIOB(si)) {
+                            // Do not create a SitePinInst for the "IO" input site pin of any IOB site,
+                            // since the sitewire it drives is assumed to be driven by the IO PAD.
+                            continue;
+                        }
+                        newPin = net.createPin(sitePinName, si);
                     }
-                    newPin = net.createPin(sitePinName, si);
                     if (newPin != null) newPins.add(newPin);
                 }
             }
@@ -2460,9 +2465,9 @@ public class DesignTools {
      */
     public static void createMissingSitePinInsts(Design design) {
         EDIFNetlist netlist = design.getNetlist();
-        for (Net net : design.getNets()) {
+        design.getNets().parallelStream().forEach((net) -> {
             if (net.isUsedNet()) {
-                continue;
+                return;
             }
             EDIFHierNet ehn = net.getLogicalHierNet();
             EDIFHierNet parentEhn = (ehn != null) ? netlist.getParentNet(ehn) : null;
@@ -2472,11 +2477,11 @@ public class DesignTools {
                     // 'net' is not a parent net (which normally causes createMissingSitePinInsts(Design, Net)
                     // to analyze its parent net) but that parent net also exist in the design and has been/
                     // will be analyzed in due course, so skip doing so here
-                    continue;
+                    return;
                 }
             }
             createMissingSitePinInsts(design,net);
-        }
+        });
     }
 
     private static HashSet<String> muxPins;
@@ -3308,7 +3313,7 @@ public class DesignTools {
     public static void makePhysNetNamesConsistent(Design design) {
         Map<EDIFHierNet, EDIFHierNet> netParentMap = design.getNetlist().getParentNetMap();
         EDIFNetlist netlist = design.getNetlist();
-        for (Net net : new ArrayList<>(design.getNets())) {
+        new ArrayList<>(design.getNets()).parallelStream().forEach((net) -> {
             Net parentPhysNet = null;
             if (net.isStaticNet()) {
                 if (net.getType() == NetType.GND) {
@@ -3319,19 +3324,19 @@ public class DesignTools {
                     throw new RuntimeException();
                 }
                 if (parentPhysNet == net) {
-                    continue;
+                    return;
                 }
             } else {
                 EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
                 if (hierNet == null) {
                     // Likely an encrypted cell
-                    continue;
+                    return;
                 }
                 EDIFHierNet parentHierNet = netParentMap.get(hierNet);
                 if (parentHierNet == null) {
                     // System.out.println("WARNING: Couldn't find parent net for '" +
                     //         hierNet.getHierarchicalNetName() + "'");
-                    continue;
+                    return;
                 }
 
                 // Check to make sure net is not improperly categorized
@@ -3366,7 +3371,7 @@ public class DesignTools {
             if (parentPhysNet != null) {
                 design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
             }
-        }
+        });
     }
 
     public static void createPossiblePinsToStaticNets(Design design) {
