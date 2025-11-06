@@ -252,9 +252,7 @@ public class TestNetTools {
     @Test
     public void testFindClockRootVRoute() {
         Design design = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
-        EDIFHierNet clkParentNet = design.getNetlist().getParentNet(
-                design.getNetlist().getHierNetFromName("u_ila_0_clk_out1"));
-        Net clkNet = design.getNet(clkParentNet.getHierarchicalNetName());
+        Net clkNet = design.getNet("base_mb_i/clk_wiz_1/inst/clk_out1");
         Assertions.assertNotNull(clkNet);
         ClockRegion clockRoot = NetTools.findClockRootVRoute(clkNet).getTile().getClockRegion();
         Assertions.assertEquals(clockRoot, design.getDevice().getClockRegion(1, 1));
