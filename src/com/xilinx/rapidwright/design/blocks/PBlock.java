@@ -201,7 +201,12 @@ public class PBlock extends ArrayList<PBlockRange> {
         if (containRouting()) {
             tcl.add("set_property CONTAIN_ROUTING 1 [get_pblocks "+name+"]");
         }
-
+        if (isSoft()) {
+            tcl.add("set_property IS_SOFT 1 [get_pblocks "+name+"]");
+        }
+        if (excludePlacement()) {
+            tcl.add("set_property EXCLUDE_PLACEMENT  1 [get_pblocks "+name+"]");
+        }
         return tcl;
     }
 
