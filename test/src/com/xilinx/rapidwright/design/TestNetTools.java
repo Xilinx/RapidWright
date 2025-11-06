@@ -254,6 +254,7 @@ public class TestNetTools {
         Design design = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
         Net clkNet = design.getNet("base_mb_i/clk_wiz_1/inst/clk_out1");
         Assertions.assertNotNull(clkNet);
+        Assertions.assertTrue(clkNet.hasPIPs());
         ClockRegion clockRoot = NetTools.findClockRootVRoute(clkNet).getTile().getClockRegion();
         Assertions.assertEquals(clockRoot, design.getDevice().getClockRegion(1, 1));
     }
