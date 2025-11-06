@@ -36,12 +36,28 @@ public class TestConstraintTools {
 
     @Test
     public void testGetPBlockFromXDCConstraints() {
-        String dcpPath = RapidWrightDCP.getString("microblazeAndILA_3pblocks.dcp");
+        String dcpPath = RapidWrightDCP.getString("microblazeAndILA_3pblocks_properties.dcp");
         Design d = Design.readCheckpoint(dcpPath);
         Map<String, PBlock> pblockMap = ConstraintTools.getPBlockFromXDCConstraints(d);
         Assertions.assertEquals(3, pblockMap.size());
         Assertions.assertTrue(pblockMap.containsKey("pblock_dbg_hub"));
         Assertions.assertTrue(pblockMap.containsKey("pblock_base_mb_i"));
         Assertions.assertTrue(pblockMap.containsKey("pblock_u_ila_0"));
+
+        // Check for the property
+        PBlock dbgHub = pblockMap.get("pblock_dbg_hub");
+        Assertions.assertTrue(dbgHub.containRouting());
+        Assertions.assertTrue(dbgHub.isSoft());
+        Assertions.assertFalse(dbgHub.excludePlacement());
+
+        PBlock baseMb = pblockMap.get("pblock_base_mb_i");
+        Assertions.assertTrue(baseMb.containRouting());
+        Assertions.assertFalse(baseMb.isSoft());
+        Assertions.assertFalse(baseMb.excludePlacement());
+
+        PBlock uila0 = pblockMap.get("pblock_u_ila_0");
+        Assertions.assertTrue(uila0.containRouting());
+        Assertions.assertFalse(uila0.isSoft());
+        Assertions.assertTrue(uila0.excludePlacement());
     }
 }

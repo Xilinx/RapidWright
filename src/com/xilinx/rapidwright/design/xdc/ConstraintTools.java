@@ -24,6 +24,9 @@ package com.xilinx.rapidwright.design.xdc;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.EnumSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.blocks.PBlock;
@@ -35,20 +38,71 @@ import com.xilinx.rapidwright.design.ConstraintGroup;
  * Created on: Oct 31, 2025
  */
 public class ConstraintTools {
+
+    /** Enum representing different PBlock properties that may be set in XDC. */
+    public enum PBlockProperty {
+        CONTAIN_ROUTING,
+        IS_SOFT,
+        EXCLUDE_PLACEMENT
+    }
+
+    private static final Pattern PBLOCK_NAME_PATTERN = Pattern.compile("\\[get_pblocks\\s+(\\S+)]");
+    private static final Pattern RANGE_PATTERN = Pattern.compile("\\{([^}]+)}");
+
     public static Map<String, PBlock> getPBlockFromXDCConstraints(Design d) {
         Map<String, PBlock> pblockMap = new HashMap<>();
+        Map<String, EnumSet<PBlockProperty>> pblockProperties = new HashMap<>();
+
         for (ConstraintGroup cg : ConstraintGroup.values()) {
             for (String tclLine : d.getXDCConstraints(cg)) {
+                String name = extractPBlockName(tclLine);
+                if (name == null) continue;
+
+                EnumSet<PBlockProperty> props =
+                        pblockProperties.computeIfAbsent(name, k -> EnumSet.noneOf(PBlockProperty.class));
+
                 if (tclLine.contains("resize_pblock")) {
-                    //resize_pblock [get_pblocks pblock_base_mb_i] -add {CLOCKREGION_X1Y1:CLOCKREGION_X1Y1}
-                    //resize_pblock [get_pblocks pblock_dbg_hub] -add {CLOCKREGION_X0Y1:CLOCKREGION_X0Y1}
-                    //resize_pblock [get_pblocks pblock_u_ila_0] -add {CLOCKREGION_X2Y1:CLOCKREGION_X2Y1}
-                    String name = tclLine.substring(tclLine.indexOf("[get_pblocks ") + 13, tclLine.indexOf("]"));
-                    String range = tclLine.substring(tclLine.indexOf("{") + 1, tclLine.indexOf("}"));
-                    pblockMap.put(name, new PBlock(d.getDevice(), range));
+                    String range = extractRange(tclLine);
+                    if (range != null) {
+                        pblockMap.put(name, new PBlock(d.getDevice(), range));
+                    }
+                } else if (tclLine.contains("CONTAIN_ROUTING 1")) {
+                    props.add(PBlockProperty.CONTAIN_ROUTING);
+                } else if (tclLine.contains("IS_SOFT 1")) {
+                    props.add(PBlockProperty.IS_SOFT);
+                } else if (tclLine.contains("EXCLUDE_PLACEMENT 1")) {
+                    props.add(PBlockProperty.EXCLUDE_PLACEMENT);
                 }
             }
         }
+
+        // set property
+        for (Map.Entry<String, EnumSet<PBlockProperty>> entry : pblockProperties.entrySet()) {
+            String name = entry.getKey();
+            EnumSet<PBlockProperty> props = entry.getValue();
+            PBlock pb = pblockMap.get(name);
+            if (pb == null) continue;
+
+            if (props.contains(PBlockProperty.CONTAIN_ROUTING)) {
+                pb.setContainRouting(true);
+            }
+            if (props.contains(PBlockProperty.IS_SOFT)) {
+                pb.setIsSoft(true);
+            }
+            if (props.contains(PBlockProperty.EXCLUDE_PLACEMENT)) {
+                pb.setExcludePlacement(true);
+            }
+        }
         return pblockMap;
+    }
+
+    private static String extractPBlockName(String line) {
+        Matcher m = PBLOCK_NAME_PATTERN.matcher(line);
+        return m.find() ? m.group(1) : null;
+    }
+
+    private static String extractRange(String line) {
+        Matcher m = RANGE_PATTERN.matcher(line);
+        return m.find() ? m.group(1) : null;
     }
 }

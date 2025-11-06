@@ -58,6 +58,11 @@ public class PBlock extends ArrayList<PBlockRange> {
     private PBlock parent;
 
     private boolean containRouting;
+
+    private boolean isSoft;
+
+    private boolean excludePlacement;
+    
     /** Set of all basic sites that can be referenced in a PBlock */
     private static HashSet<SiteTypeEnum> pblockTypes;
 
@@ -563,6 +568,22 @@ public class PBlock extends ArrayList<PBlockRange> {
 
     public void setContainRouting(boolean containRouting) {
         this.containRouting = containRouting;
+    }
+
+    public boolean isSoft() {
+        return isSoft;
+    }
+
+    public void setIsSoft(boolean isSoft) {
+        this.isSoft = isSoft;
+    }
+
+    public boolean excludePlacement() {
+        return excludePlacement;
+    }
+
+    public void setExcludePlacement(boolean excludePlacement) {
+        this.excludePlacement = excludePlacement;
     }
 
     /**
