@@ -38,6 +38,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -50,6 +51,7 @@ import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.Future;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -85,6 +87,7 @@ import com.xilinx.rapidwright.placer.blockplacer.ImplsInstancePort;
 import com.xilinx.rapidwright.placer.blockplacer.ImplsPath;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Installer;
 import com.xilinx.rapidwright.util.Job;
@@ -92,6 +95,7 @@ import com.xilinx.rapidwright.util.JobQueue;
 import com.xilinx.rapidwright.util.LocalJob;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.StringTools;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -2465,23 +2469,32 @@ public class DesignTools {
      */
     public static void createMissingSitePinInsts(Design design) {
         EDIFNetlist netlist = design.getNetlist();
-        design.getNets().parallelStream().forEach((net) -> {
-            if (net.isUsedNet()) {
-                return;
-            }
-            EDIFHierNet ehn = net.getLogicalHierNet();
-            EDIFHierNet parentEhn = (ehn != null) ? netlist.getParentNet(ehn) : null;
-            if (parentEhn != null && !parentEhn.equals(ehn)) {
-                Net parentNet = design.getNet(parentEhn.getHierarchicalNetName());
-                if (parentNet != null) {
-                    // 'net' is not a parent net (which normally causes createMissingSitePinInsts(Design, Net)
-                    // to analyze its parent net) but that parent net also exist in the design and has been/
-                    // will be analyzed in due course, so skip doing so here
-                    return;
+        final CountUpDownLatch netsOutstanding = new CountUpDownLatch();
+        for (Net net : design.getNets()) {
+            netsOutstanding.countUp();
+            ParallelismTools.submit(() -> {
+                try {
+                    if (net.isUsedNet()) {
+                        return;
+                    }
+                    EDIFHierNet ehn = net.getLogicalHierNet();
+                    EDIFHierNet parentEhn = (ehn != null) ? netlist.getParentNet(ehn) : null;
+                    if (parentEhn != null && !parentEhn.equals(ehn)) {
+                        Net parentNet = design.getNet(parentEhn.getHierarchicalNetName());
+                        if (parentNet != null) {
+                            // 'net' is not a parent net (which normally causes createMissingSitePinInsts(Design, Net)
+                            // to analyze its parent net) but that parent net also exist in the design and has been/
+                            // will be analyzed in due course, so skip doing so here
+                            return;
+                        }
+                    }
+                    createMissingSitePinInsts(design, net);
+                } finally {
+                    netsOutstanding.countDown();
                 }
-            }
-            createMissingSitePinInsts(design,net);
-        });
+            });
+        }
+        netsOutstanding.await();
     }
 
     private static HashSet<String> muxPins;
