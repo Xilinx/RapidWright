@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Jakob Wenzel
+ * Author: Jakob Wenzel, Technical University of Darmstadt
  *
  * This file is part of RapidWright.
  *
@@ -29,6 +29,12 @@ import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 
+/**
+ * Default cell lookup for normal designs.
+ * <p>
+ * This assumes that the EDIFNetlist matches what a regular synthesis run would produce. No rewriting of cell names
+ * is performed.
+ */
 public class RegularEdifCellLookup extends EdifCellLookup<EDIFHierCellInst> {
 
     private final EDIFNetlist netlist;

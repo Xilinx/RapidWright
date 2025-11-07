@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Jakob Wenzel
+ * Author: Jakob Wenzel, Technical University of Darmstadt
  *
  * This file is part of RapidWright.
  *
@@ -29,7 +29,7 @@ import java.util.stream.Stream;
 import com.xilinx.rapidwright.design.xdc.UnsupportedConstraintElement;
 
 /**
- * TCL representation of a list of cells
+ * Tcl representation of a list of cells
  * @param <T> the cell representation
  */
 public class CellObject<T> extends DesignObject {

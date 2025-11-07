@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Jakob Wenzel
+ * Author: Jakob Wenzel, Technical University of Darmstadt
  *
  * This file is part of RapidWright.
  *
@@ -32,7 +32,7 @@ import tcl.lang.TclException;
 import tcl.lang.TclObject;
 
 /**
- * TCL command: create_clock
+ * Tcl command: create_clock
  */
 public class CreateClockCommand implements Command {
 

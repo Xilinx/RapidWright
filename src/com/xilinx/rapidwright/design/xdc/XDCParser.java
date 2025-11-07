@@ -60,7 +60,7 @@ import tcl.lang.WrappedCommand;
 
 
 /**
- * Parses an XDC file for a limited subset of constraint types. It uses a full TCL interpreter, so
+ * Parses an XDC file for a limited subset of constraint types. It uses a full Tcl interpreter, so
  * complex language constructs are possible.
  * <p />
  * The parser can match cell references in constraints to modified designs. Users can supply their own

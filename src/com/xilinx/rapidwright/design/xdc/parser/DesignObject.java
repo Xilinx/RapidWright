@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Jakob Wenzel
+ * Author: Jakob Wenzel, Technical University of Darmstadt
  *
  * This file is part of RapidWright.
  *
@@ -39,16 +39,20 @@ import tcl.lang.TclList;
 import tcl.lang.TclObject;
 
 /**
- * Base class for any object that will be referenced from TCL
+ * Base class for any object that will be referenced from Tcl
  * @param <T> Representation of Cells
  */
 public abstract class DesignObject<T> {
     /**
-     * Cast an
-     * @param obj
-     * @param lookup
-     * @return
-     * @param <T>
+     * Casting helper:
+     * <ul>
+     *     <li>If the object is an instance of the cell class (T), casts and wraps it into a DesignObject o</li>
+     *     <li>Casts DesignObjects</li>
+     * </ul
+     * @param obj cell (T) or DesignObject
+     * @param lookup the cell lookup
+     * @return casted object
+     * @param <T> the lookup's cell representation
      */
     public static <T> DesignObject<?> requireCastUnwrappedObject(Object obj, EdifCellLookup<T> lookup) {
         if (lookup != null && lookup.getCellClass().isInstance(obj)) {

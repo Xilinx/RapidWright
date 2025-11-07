@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Jakob Wenzel
+ * Author: Jakob Wenzel, Technical University of Darmstadt
  *
  * This file is part of RapidWright.
  *
@@ -30,7 +30,7 @@ import tcl.lang.TclException;
 import tcl.lang.TclObject;
 
 /**
- * TCL command to dump the arguments' as unwrapped DesignObjects
+ * Tcl command to dump the arguments' as unwrapped DesignObjects
  */
 public class DumpObjsCommand implements Command {
     private final EdifCellLookup<?> cellLookup;

@@ -1,10 +1,8 @@
 /*
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Jakob Wenzel
- *
- * This file is part of RapidWright.
+ * Author: Jakob Wenzel, Technical University of Darmstadt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +30,7 @@ import tcl.lang.TclNumArgsException;
 import tcl.lang.TclObject;
 
 /**
- * TCL command to get something that will probably be passed onto a <code>set_property</code> call later
+ * Tcl command to get something that will probably be passed onto a <code>set_property</code> call later
  */
 public class ObjectGetterCommand implements Command {
 

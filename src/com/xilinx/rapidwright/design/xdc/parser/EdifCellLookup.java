@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Jakob Wenzel
+ * Author: Jakob Wenzel, Technical University of Darmstadt
  *
  * This file is part of RapidWright.
  *
@@ -40,11 +40,11 @@ import tcl.lang.TclObject;
 
 /**
  * Lookup Cells for use in the XDC Parser.
- *
+ * <p>
  * Cells can have different names in the source XDC versus the actual objects in the design. This allows rewriting
  * constraints to match a possibly restructured design. Cells have an <i>original</i> and a <i>final</i> name to
  * support this.
- *
+ * <p>
  * A derived class can specify how to do this mapping. {@link RegularEdifCellLookup} operates on EDIF netlists without
  * rewriting.
  *
@@ -54,10 +54,10 @@ public abstract class EdifCellLookup<T> {
 
 
     /**
-     * Convert a cell to a TCL Object
+     * Convert a cell to a Tcl Object
      * @param interp the interpreter
      * @param cell the cell
-     * @return TCL object representing the cell
+     * @return Tcl object representing the cell
      * @throws TclException
      */
     @NotNull

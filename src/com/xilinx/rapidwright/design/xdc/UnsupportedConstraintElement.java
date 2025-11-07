@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Jakob Wenzel
+ * Author: Jakob Wenzel, Technical University of Darmstadt
  *
  * This file is part of RapidWright.
  *
@@ -137,7 +137,7 @@ public abstract class UnsupportedConstraintElement {
     }
 
     /**
-     * Unsupported Constraint Element that contains TCL syntax
+     * Unsupported Constraint Element that contains Tcl syntax
      */
     public static class SyntaxConstraintElement extends UnsupportedConstraintElement {
         private final String text;

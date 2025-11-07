@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Jakob Wenzel
+ * Author: Jakob Wenzel, Technical University of Darmstadt
  *
  * This file is part of RapidWright.
  *
@@ -38,7 +38,7 @@ public class TclHashIdentifiedObject {
 
     public static <T> TclObject createReflectObject(Interp interp, Class<?> clazz, Object obj) throws TclException {
         TclObject tclObject = ReflectObject.newInstance(interp, clazz, obj, NAME_START + ReflectObject.getHashString(clazz, obj) + NAME_END);
-        //Normally, TCL objects are removed from internal table once no variable refers to them.
+        //Normally, Tcl objects are removed from internal table once no variable refers to them.
         //We want to keep them around till the end of life of the interpreter (since a stringified reference may still exist)
         //Therefore, increase reference count by 1
         tclObject.preserve();

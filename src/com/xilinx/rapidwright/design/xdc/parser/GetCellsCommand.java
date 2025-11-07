@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Jakob Wenzel
+ * Author: Jakob Wenzel, Technical University of Darmstadt
  *
  * This file is part of RapidWright.
  *
@@ -49,9 +49,7 @@ import tcl.lang.TclList;
 import tcl.lang.TclObject;
 
 /**
- * TCL command: get_cells
- *
- *
+ * Tcl command: get_cells
  */
 public class GetCellsCommand<T> implements Command {
 

@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * Author: Jakob Wenzel
+ * Author: Jakob Wenzel, Technical University of Darmstadt
  *
  * This file is part of RapidWright.
  *
@@ -38,7 +38,7 @@ import tcl.lang.TclException;
 import tcl.lang.TclObject;
 
 /**
- * TCL command: set_property
+ * Tcl command: set_property
  * @param <T>
  */
 public class SetPropertyCommand<T> implements Command {
