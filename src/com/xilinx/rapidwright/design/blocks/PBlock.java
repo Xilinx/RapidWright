@@ -58,6 +58,11 @@ public class PBlock extends ArrayList<PBlockRange> {
     private PBlock parent;
 
     private boolean containRouting;
+
+    private boolean isSoft;
+
+    private boolean excludePlacement;
+    
     /** Set of all basic sites that can be referenced in a PBlock */
     private static HashSet<SiteTypeEnum> pblockTypes;
 
@@ -194,9 +199,14 @@ public class PBlock extends ArrayList<PBlockRange> {
             tcl.add("resize_pblock "+ name +" -add " + p.toString());
         }
         if (containRouting()) {
-            tcl.add("set_property CONTAIN_ROUTING 1 [get_pblocks "+name+"]");
+            tcl.add("set_property " + PblockProperty.CONTAIN_ROUTING + " 1 [get_pblocks " + name + "]");
         }
-
+        if (isSoft()) {
+            tcl.add("set_property " + PblockProperty.IS_SOFT + " 1 [get_pblocks " + name + "]");
+        }
+        if (excludePlacement()) {
+            tcl.add("set_property " + PblockProperty.EXCLUDE_PLACEMENT + " 1 [get_pblocks " + name + "]");
+        }
         return tcl;
     }
 
@@ -563,6 +573,22 @@ public class PBlock extends ArrayList<PBlockRange> {
 
     public void setContainRouting(boolean containRouting) {
         this.containRouting = containRouting;
+    }
+
+    public boolean isSoft() {
+        return isSoft;
+    }
+
+    public void setIsSoft(boolean isSoft) {
+        this.isSoft = isSoft;
+    }
+
+    public boolean excludePlacement() {
+        return excludePlacement;
+    }
+
+    public void setExcludePlacement(boolean excludePlacement) {
+        this.excludePlacement = excludePlacement;
     }
 
     /**
