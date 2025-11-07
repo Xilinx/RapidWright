@@ -822,6 +822,9 @@ public class EDIFCell extends EDIFPropertyObject {
         Map<String, EDIFPort> otherPorts = other.getPortMap();
         for (EDIFPort port : getPorts()) {
             EDIFPort otherPort = otherPorts.get(port.getBusName(true));
+            if (otherPort == null) {
+                otherPort = otherPorts.get("[]" + port.getBusName(true));
+            }
             if (otherPort == null || port.getWidth() != otherPort.getWidth()
                     || port.getDirection() != otherPort.getDirection()) {
                 return false;
