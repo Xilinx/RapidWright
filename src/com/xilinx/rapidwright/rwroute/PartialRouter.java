@@ -856,12 +856,6 @@ public class PartialRouter extends RWRoute {
         // Reads in a design checkpoint and routes it
         String[] rwrouteArgs = Arrays.copyOfRange(args, 2, args.length);
         Design d = Design.readCheckpoint(args[0]);
-        t.start("create parent net map");
-        Map<EDIFHierNet, EDIFHierNet> parentNetMap = d.getNetlist().getParentNetMap();
-        t.stop();
-//        t.stop().start("create site inst to net site wires map");
-//        Map<SiteInst, Map<Net, List<String>>> siteInstMapMap = DesignTools.getSiteInstToNetSiteWiresMap(d);
-//        t.stop();
         Design routed = routeDesignWithUserDefinedArguments(d, rwrouteArgs);
 
         // Writes out the routed design checkpoint

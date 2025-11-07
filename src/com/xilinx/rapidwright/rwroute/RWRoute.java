@@ -226,19 +226,12 @@ public class RWRoute {
         }
 
         // Pre-processing of the design regarding physical net names pins
-        CodePerfTracker t = new CodePerfTracker(RWRoute.class.getName());
-
-        t.start("make phys net names consistent");
         DesignTools.makePhysNetNamesConsistent(design);
-        t.stop().start("create possible pins to static nets");
         DesignTools.createPossiblePinsToStaticNets(design);
-        t.stop().start("missing site pin insts");
         DesignTools.createMissingSitePinInsts(design);
-        t.stop().start("update Versal xphy pins");
         if (series == Series.Versal) {
             DesignTools.updateVersalXPHYPinsForDMC(design);
         }
-        t.stop();
     }
 
     protected void preprocess() {
