@@ -205,7 +205,7 @@ public class PBlock extends ArrayList<PBlockRange> {
             tcl.add("set_property IS_SOFT 1 [get_pblocks "+name+"]");
         }
         if (excludePlacement()) {
-            tcl.add("set_property EXCLUDE_PLACEMENT  1 [get_pblocks "+name+"]");
+            tcl.add("set_property EXCLUDE_PLACEMENT 1 [get_pblocks "+name+"]");
         }
         return tcl;
     }
