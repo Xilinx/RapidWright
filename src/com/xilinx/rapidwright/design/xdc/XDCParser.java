@@ -98,7 +98,7 @@ public class XDCParser {
      *
      * @param constraints Constraints object to output to
      * @param dev Device
-     * @param cellLookup the cell lookup
+     * @param cellLookup the cell lookup (see  {@link XDCParser class level documentation} for parameter details)
      * @return interpreter
      * @param <T> lookup's cell representation
      */
@@ -184,7 +184,7 @@ public class XDCParser {
      * Parse XDC
      * @param dev the device
      * @param lines XDC content
-     * @param cellLookup optional cell lookup, if given allows for more complex get_cells calls
+     * @param cellLookup the cell lookup (see  {@link XDCParser class level documentation} for parameter details)
      * @return parsed constraints
      */
     public static XDCConstraints parseXDC(Device dev, List<String> lines, EdifCellLookup<?> cellLookup) {
@@ -224,7 +224,7 @@ public class XDCParser {
     /**
      * @param fileName Name of the XDC file to parse
      * @param dev the design
-     * @param cellLookup optional cell lookup, if given allows for more complex get_cells calls
+     * @param cellLookup the cell lookup (see  {@link XDCParser class level documentation} for parameter details)
      * @return A map of port names to package pin information.
      */
     public static XDCConstraints parseXDC(String fileName, Device dev, EdifCellLookup<?> cellLookup){
