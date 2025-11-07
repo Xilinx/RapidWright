@@ -25,7 +25,6 @@ package com.xilinx.rapidwright.design.xdc.parser;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.xdc.UnsupportedConstraintElement;
 import com.xilinx.rapidwright.design.xdc.XDCConstraints;
@@ -55,9 +54,7 @@ public class UnsupportedSetterCommand implements Command {
         if (replacedCommand!=null && Arrays.stream(objv).noneMatch(obj -> UnsupportedGetterCommand.containsUnsupportedCmdResults(cellLookup, interp, obj, false))) {
             replacedCommand.cmdProc(interp, objv);
         } else {
-            List<UnsupportedConstraintElement> constraint = Arrays.stream(objv)
-                    .flatMap(UnsupportedConstraintElement.addSpacesBetween(obj -> UnsupportedConstraintElement.objToUnsupportedConstraintElement(interp, obj, cellLookup, false, false)))
-                    .collect(Collectors.toList());
+            List<UnsupportedConstraintElement> constraint = UnsupportedConstraintElement.commandToUnsupportedConstraints(interp, objv, cellLookup);
             constraints.getUnsupportedConstraints().add(constraint);
 
             interp.resetResult();

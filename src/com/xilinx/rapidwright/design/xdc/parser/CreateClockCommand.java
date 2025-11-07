@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.design.xdc.parser;
 import java.util.List;
 
 import com.xilinx.rapidwright.design.xdc.ClockConstraint;
+import com.xilinx.rapidwright.design.xdc.UnsupportedConstraintElement;
 import com.xilinx.rapidwright.design.xdc.XDCConstraints;
 import tcl.lang.Command;
 import tcl.lang.Interp;
@@ -69,8 +70,16 @@ public class CreateClockCommand implements Command {
                 }
             } else {
                 DesignObject obj = DesignObject.requireUnwrapTclObject(interp, objv[i], cellLookup);
-                if (!(obj instanceof NameDesignObject) || ((NameDesignObject) obj).getType() != ObjType.Port) {
-                    throw new RuntimeException("expected port but got " + obj.toXdc());
+                if (obj instanceof UnsupportedCmdResult<?>) {
+
+                    List<UnsupportedConstraintElement> constraint = UnsupportedConstraintElement.commandToUnsupportedConstraints(interp, objv, cellLookup);
+                    constraints.getUnsupportedConstraints().add(constraint);
+
+                    interp.resetResult();
+                    return;
+                }
+                if (!(obj instanceof NameDesignObject) || (((NameDesignObject) obj).getType() != ObjType.Port && ((NameDesignObject) obj).getType() != ObjType.Pin)) {
+                    throw new RuntimeException("expected port or pin but got " + obj.toXdc()+" (a "+obj.getClass());
                 }
                 ports = ((NameDesignObject) obj).getObjects();
 

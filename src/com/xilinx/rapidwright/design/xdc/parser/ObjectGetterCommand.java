@@ -34,10 +34,12 @@ import tcl.lang.TclObject;
  */
 public class ObjectGetterCommand implements Command {
 
+    private final EdifCellLookup<?> lookup;
     private final boolean takesObjects;
     private final ObjType objType;
 
-    public ObjectGetterCommand(boolean takesObjects, ObjType objType) {
+    public ObjectGetterCommand(EdifCellLookup<?> lookup, boolean takesObjects, ObjType objType) {
+        this.lookup = lookup;
         this.takesObjects = takesObjects;
 
         this.objType = objType;
@@ -53,7 +55,7 @@ public class ObjectGetterCommand implements Command {
             res = new NameDesignObject(objType, null);
         } else {
             if (argv.length > 2 || TclHashIdentifiedObject.containsStringifiedObject(argv)) {
-                interp.setResult(UnsupportedCmdResult.makeTclObj(interp, argv, null, false, false));
+                interp.setResult(UnsupportedCmdResult.makeTclObj(interp, argv, lookup, false, false));
                 return;
             }
 

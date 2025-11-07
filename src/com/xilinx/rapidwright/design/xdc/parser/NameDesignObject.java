@@ -89,4 +89,11 @@ public class NameDesignObject<T> extends DesignObject<T> {
     public List<String> getObjects() {
         return objects;
     }
+
+    public String requireOneObject() {
+        if (objects.size()!=1) {
+            throw new RuntimeException("requiring one object but got: "+objects);
+        }
+        return objects.get(0);
+    }
 }

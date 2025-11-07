@@ -30,7 +30,9 @@ import java.util.List;
 import java.util.Objects;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.xdc.parser.AddCellsToPblockCommand;
 import com.xilinx.rapidwright.design.xdc.parser.CreateClockCommand;
+import com.xilinx.rapidwright.design.xdc.parser.CreatePBlockCommand;
 import com.xilinx.rapidwright.design.xdc.parser.DebugDumpCommand;
 import com.xilinx.rapidwright.design.xdc.parser.DumpObjsCommand;
 import com.xilinx.rapidwright.design.xdc.parser.EdifCellLookup;
@@ -38,6 +40,7 @@ import com.xilinx.rapidwright.design.xdc.parser.GetCellsCommand;
 import com.xilinx.rapidwright.design.xdc.parser.ObjType;
 import com.xilinx.rapidwright.design.xdc.parser.ObjectGetterCommand;
 import com.xilinx.rapidwright.design.xdc.parser.RegularEdifCellLookup;
+import com.xilinx.rapidwright.design.xdc.parser.ResizePBlockCommand;
 import com.xilinx.rapidwright.design.xdc.parser.SetPropertyCommand;
 import com.xilinx.rapidwright.design.xdc.parser.UnsupportedGetterCommand;
 import com.xilinx.rapidwright.design.xdc.parser.UnsupportedIfCommand;
@@ -92,15 +95,21 @@ public class XDCParser {
     public static <T> Interp makeTclInterp(XDCConstraints constraints, Device dev, EdifCellLookup<T> cellLookup) {
         Interp interp = new Interp();
         interp.createCommand("set_property", new SetPropertyCommand<>(constraints, dev, cellLookup));
-        interp.createCommand("current_design", new ObjectGetterCommand(false,ObjType.Design));
+        interp.createCommand("current_design", new ObjectGetterCommand(cellLookup, false,ObjType.Design));
 
         if (cellLookup!=null) {
             interp.createCommand("get_cells", new GetCellsCommand<>(cellLookup));
         } else {
-            interp.createCommand("get_cells", new ObjectGetterCommand(true, ObjType.Cell));
+            interp.createCommand("get_cells", new ObjectGetterCommand(cellLookup, true, ObjType.Cell));
         }
-        interp.createCommand("get_ports", new ObjectGetterCommand(true, ObjType.Port));
+        interp.createCommand("get_ports", new ObjectGetterCommand(cellLookup, true, ObjType.Port));
+        interp.createCommand("get_pins", new ObjectGetterCommand(cellLookup, true, ObjType.Pin));
+        interp.createCommand("get_pblocks", new ObjectGetterCommand(cellLookup, true, ObjType.PBlock));
         interp.createCommand("create_clock", new CreateClockCommand(constraints, cellLookup));
+
+        interp.createCommand("create_pblock", new CreatePBlockCommand(constraints));
+        interp.createCommand("add_cells_to_pblock", new AddCellsToPblockCommand<>(constraints, cellLookup));
+        interp.createCommand("resize_pblock", new ResizePBlockCommand(constraints, dev));
 
         interp.createCommand("dump_objs", new DumpObjsCommand(cellLookup));
 
@@ -110,12 +119,16 @@ public class XDCParser {
         interp.createCommand("set_output_delay", unsupportedSetterCommand);
         interp.createCommand("set_max_delay", unsupportedSetterCommand);
         interp.createCommand("set_bus_skew", unsupportedSetterCommand);
+        interp.createCommand("current_instance", unsupportedSetterCommand);
+        interp.createCommand("set_clock_groups", unsupportedSetterCommand);
+        interp.createCommand("set_input_jitter", unsupportedSetterCommand);
 
         UnsupportedGetterCommand unsupportedGetterCommand = new UnsupportedGetterCommand(cellLookup);
-        interp.createCommand("get_pins", unsupportedGetterCommand);
         interp.createCommand("get_clocks", unsupportedGetterCommand);
         interp.createCommand("get_property", unsupportedGetterCommand);
         interp.createCommand("get_nets", unsupportedGetterCommand);
+        interp.createCommand("all_fanout", unsupportedGetterCommand);
+        interp.createCommand("filter", unsupportedGetterCommand);
         UnsupportedGetterCommand.replaceInInterp(interp, cellLookup, "llength");
         UnsupportedGetterCommand.replaceInInterp(interp, cellLookup,  "expr");
 

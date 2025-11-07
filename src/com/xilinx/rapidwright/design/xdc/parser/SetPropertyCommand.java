@@ -26,10 +26,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.xilinx.rapidwright.design.xdc.PBlockConstraint;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.design.xdc.PackagePinConstraint;
 import com.xilinx.rapidwright.design.xdc.UnsupportedConstraintElement;
@@ -143,8 +145,37 @@ public class SetPropertyCommand<T> implements Command {
 
                 }
                 break;
+            case PBlock:
+                PBlockConstraint pBlockConstraint = Objects.requireNonNull(constraints.getPBlockConstraints().get(obj.requireOneObject()));
+                switch (k) {
+                    case "CONTAIN_ROUTING":
+                        pBlockConstraint.getPblock().setContainRouting(parseBool(v));
+                        break;
+                    case "IS_SOFT":
+                        pBlockConstraint.getPblock().setIsSoft(parseBool(v));
+                        break;
+                    case "EXCLUDE_PLACEMENT":
+                        pBlockConstraint.getPblock().setExcludePlacement(parseBool(v));
+                        break;
+                    default:
+                        throw new RuntimeException("Trying to set unknown property "+k+" on pblock "+obj.requireOneObject());
+                }
+                break;
             default:
-                throw new RuntimeException("Unexpected obj type");
+                throw new RuntimeException("Unexpected obj type "+obj.getType());
+        }
+    }
+
+    private boolean parseBool(String v) {
+        switch (v) {
+            case "true":
+            case "1":
+                return true;
+            case "false":
+            case "0":
+                return false;
+            default:
+                throw new RuntimeException("invalid bool: "+v);
         }
     }
 }

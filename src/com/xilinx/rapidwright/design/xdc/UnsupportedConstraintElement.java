@@ -35,6 +35,7 @@ import com.xilinx.rapidwright.design.xdc.parser.DesignObject;
 import com.xilinx.rapidwright.design.xdc.parser.EdifCellLookup;
 import com.xilinx.rapidwright.design.xdc.parser.TclHashIdentifiedObject;
 import org.apache.commons.io.FilenameUtils;
+import org.jetbrains.annotations.NotNull;
 import tcl.lang.Interp;
 import tcl.lang.TclException;
 import tcl.lang.TclList;
@@ -103,6 +104,12 @@ public abstract class UnsupportedConstraintElement {
             }
             return Stream.of(new SyntaxConstraintElement(" "), e);
         };
+    }
+
+    public static @NotNull List<UnsupportedConstraintElement> commandToUnsupportedConstraints(Interp interp, TclObject[] objv, EdifCellLookup<?> cellLookup) {
+        return Arrays.stream(objv)
+                .flatMap(addSpacesBetween(obj -> objToUnsupportedConstraintElement(interp, obj, cellLookup, false, false)))
+                .collect(Collectors.toList());
     }
 
     public abstract String toXdc();

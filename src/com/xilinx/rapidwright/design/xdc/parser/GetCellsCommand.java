@@ -41,6 +41,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.xilinx.rapidwright.design.xdc.UnsupportedConstraintElement;
 import com.xilinx.rapidwright.util.Pair;
 import tcl.lang.Command;
 import tcl.lang.ExprValue;
@@ -71,6 +72,7 @@ public class GetCellsCommand<T> implements Command {
             String item = argv[i].toString();
             switch (item) {
                 case "-hier":
+                case "-hierarchical":
                     hierFlag = true;
                     break;
                 case "-filter":
@@ -98,7 +100,9 @@ public class GetCellsCommand<T> implements Command {
         if (cellNameStr != null && !regexpFlag && filter == null && !hierFlag) {
             simpleGetCells(interp, cellNameStr);
         } else {
-            complexGetCells(interp, hierFlag, regexpFlag, cellNameStr, filter, argv);
+            if (!complexGetCells(interp, hierFlag, regexpFlag, cellNameStr, filter, argv)) {
+                interp.setResult(UnsupportedCmdResult.makeTclObj(interp, argv, cellLookup, false, false));
+            }
         }
     }
 
@@ -118,9 +122,9 @@ public class GetCellsCommand<T> implements Command {
             try {
                 ExprValue exprValue = interp.evalExpression(expr.toString());
             } catch (TclException e) {
-                throw new RuntimeException(e);
+                //Ignore
             }
-            throw new RuntimeException("expression too complex: " + expr);
+            return null; //Give up
         }
         String[] split = expr.split("\\s*\\|\\|\\s*");
 
@@ -128,7 +132,7 @@ public class GetCellsCommand<T> implements Command {
         for (String s : split) {
             String[] clause = s.split("\\s*==\\s*");
             if (clause.length != 2) {
-                throw new RuntimeException("unexpected clause " + s + " in " + expr);
+                return null; //Give up
             }
             oredClauses.computeIfAbsent(clause[0], x -> new HashSet<>()).add(clause[1]);
         }
@@ -145,19 +149,22 @@ public class GetCellsCommand<T> implements Command {
 
     private static int cellDebugCallCout = 0;
 
-    private void complexGetCells(Interp interp, boolean hierFlag, boolean regexFlag, String cellNames, TclObject filterArg, TclObject[] argv) throws TclException {
+    private boolean complexGetCells(Interp interp, boolean hierFlag, boolean regexFlag, String cellNames, TclObject filterArg, TclObject[] argv) throws TclException {
         Stream<T> candidateSupplier = null;
         List<Pair<Predicate<T>, Function<T, String>>> filter = new ArrayList<>();
 
         if (!hierFlag) {
-            throw new RuntimeException("no hier flag? not implemented");
+            return false;
         }
 
         if (filterArg != null) {
             Map<String, Set<String>> s = parseFilterExpression(interp, filterArg.toString());
+            if (s==null) {
+                return false;
+            }
 
             if (s.size() > 1) {
-                throw new RuntimeException("Filter too complex");
+                return false;
             }
             String entryType = s.keySet().iterator().next();
             Set<String> values = s.get(entryType);
@@ -251,6 +258,7 @@ public class GetCellsCommand<T> implements Command {
                     });
         }
         interp.setResult(list);
+        return true;
     }
 
 

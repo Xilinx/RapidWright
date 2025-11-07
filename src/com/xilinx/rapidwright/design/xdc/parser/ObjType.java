@@ -25,7 +25,9 @@ package com.xilinx.rapidwright.design.xdc.parser;
 public enum ObjType {
     Design("current_design"),
     Cell("get_cells"),
-    Port("get_ports");
+    Port("get_ports"),
+    Pin("get_pins"),
+    PBlock("get_pblocks");
 
     private final String xdcCommand;
 

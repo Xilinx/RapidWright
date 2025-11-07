@@ -28,7 +28,6 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +36,6 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.util.Pair;
 
 public class XDCConstraints {
@@ -45,6 +43,8 @@ public class XDCConstraints {
     private Map<String, ClockConstraint> clockConstraints = new HashMap<>();
     private Map<String, Map<String, String>> cellProperties = new HashMap<>();
     private List<List<UnsupportedConstraintElement>> unsupportedConstraints = new ArrayList<>();
+    private Map<String, PBlockConstraint> pBlockConstraints = new HashMap<>();
+
 
 
     public XDCConstraints(Map<String, PackagePinConstraint> pinConstraints,
@@ -93,6 +93,10 @@ public class XDCConstraints {
 
     public List<List<UnsupportedConstraintElement>> getUnsupportedConstraints() {
         return unsupportedConstraints;
+    }
+
+    public Map<String, PBlockConstraint> getPBlockConstraints() {
+        return pBlockConstraints;
     }
 
     private static Stream<String> cellPropsToXdc(int counter, String cell, Map<String, String> properties) {
