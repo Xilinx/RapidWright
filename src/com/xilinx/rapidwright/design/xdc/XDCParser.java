@@ -20,9 +20,7 @@
  * limitations under the License.
  *
  */
-/**
- *
- */
+
 package com.xilinx.rapidwright.design.xdc;
 
 import java.io.IOException;

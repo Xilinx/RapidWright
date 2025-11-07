@@ -68,7 +68,6 @@ public class CreateClockCommand implements Command {
                         throw new RuntimeException("expected -name | -period | -waveform but got " + objv[i]);
                 }
             } else {
-
                 DesignObject obj = DesignObject.requireUnwrapTclObject(interp, objv[i], cellLookup);
                 if (!(obj instanceof NameDesignObject) || ((NameDesignObject) obj).getType() != ObjType.Port) {
                     throw new RuntimeException("expected port but got " + obj.toXdc());

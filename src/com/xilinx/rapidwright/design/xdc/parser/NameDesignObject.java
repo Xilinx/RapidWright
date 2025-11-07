@@ -63,8 +63,6 @@ public class NameDesignObject<T> extends DesignObject<T> {
         }
         boolean braces = objects.size()!=1 || objects.stream().anyMatch(o->o.contains("*") || o.contains("$"));
 
-
-
         List<UnsupportedConstraintElement> before = new ArrayList<>(Arrays.asList(
                 new UnsupportedConstraintElement.SyntaxConstraintElement("["),
                 new UnsupportedConstraintElement.NameConstraintElement(type.getXdcCommand()),

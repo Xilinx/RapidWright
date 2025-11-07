@@ -97,7 +97,6 @@ public class GetCellsCommand<T> implements Command {
         }
 
         if (cellNameStr != null && !regexpFlag && filter == null && !hierFlag) {
-
             simpleGetCells(interp, cellNameStr);
         } else {
             complexGetCells(interp, hierFlag, regexpFlag, cellNameStr, filter, argv);
@@ -148,7 +147,6 @@ public class GetCellsCommand<T> implements Command {
         if (!hierFlag) {
             throw new RuntimeException("no hier flag? not implemented");
         }
-
 
         if (filterArg != null) {
             Map<String, Set<String>> s = parseFilterExpression(filterArg.toString());
