@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.blocks.PBlock;
+import com.xilinx.rapidwright.design.blocks.PblockProperty;
 import com.xilinx.rapidwright.design.ConstraintGroup;
 
 /**
@@ -38,58 +39,50 @@ import com.xilinx.rapidwright.design.ConstraintGroup;
  * Created on: Oct 31, 2025
  */
 public class ConstraintTools {
-
-    /** Enum representing different PBlock properties that may be set in XDC. */
-    public enum PBlockProperty {
-        CONTAIN_ROUTING,
-        IS_SOFT,
-        EXCLUDE_PLACEMENT
-    }
-
     private static final Pattern PBLOCK_NAME_PATTERN = Pattern.compile("\\[get_pblocks\\s+(\\S+)]");
     private static final Pattern RANGE_PATTERN = Pattern.compile("\\{([^}]+)}");
 
     public static Map<String, PBlock> getPBlockFromXDCConstraints(Design d) {
         Map<String, PBlock> pblockMap = new HashMap<>();
-        Map<String, EnumSet<PBlockProperty>> pblockProperties = new HashMap<>();
+        Map<String, EnumSet<PblockProperty>> pblockProperties = new HashMap<>();
 
         for (ConstraintGroup cg : ConstraintGroup.values()) {
             for (String tclLine : d.getXDCConstraints(cg)) {
                 String name = extractPBlockName(tclLine);
                 if (name == null) continue;
 
-                EnumSet<PBlockProperty> props =
-                        pblockProperties.computeIfAbsent(name, k -> EnumSet.noneOf(PBlockProperty.class));
+                EnumSet<PblockProperty> props =
+                        pblockProperties.computeIfAbsent(name, k -> EnumSet.noneOf(PblockProperty.class));
 
                 if (tclLine.contains("resize_pblock")) {
                     String range = extractRange(tclLine);
                     if (range != null) {
                         pblockMap.put(name, new PBlock(d.getDevice(), range));
                     }
-                } else if (tclLine.contains("CONTAIN_ROUTING 1")) {
-                    props.add(PBlockProperty.CONTAIN_ROUTING);
-                } else if (tclLine.contains("IS_SOFT 1")) {
-                    props.add(PBlockProperty.IS_SOFT);
-                } else if (tclLine.contains("EXCLUDE_PLACEMENT 1")) {
-                    props.add(PBlockProperty.EXCLUDE_PLACEMENT);
+                } else if (tclLine.contains(PblockProperty.CONTAIN_ROUTING + " 1")) {
+                    props.add(PblockProperty.CONTAIN_ROUTING);
+                } else if (tclLine.contains(PblockProperty.IS_SOFT + " 1")) {
+                    props.add(PblockProperty.IS_SOFT);
+                } else if (tclLine.contains(PblockProperty.EXCLUDE_PLACEMENT + " 1")) {
+                    props.add(PblockProperty.EXCLUDE_PLACEMENT);
                 }
             }
         }
 
         // set property
-        for (Map.Entry<String, EnumSet<PBlockProperty>> entry : pblockProperties.entrySet()) {
+        for (Map.Entry<String, EnumSet<PblockProperty>> entry : pblockProperties.entrySet()) {
             String name = entry.getKey();
-            EnumSet<PBlockProperty> props = entry.getValue();
+            EnumSet<PblockProperty> props = entry.getValue();
             PBlock pb = pblockMap.get(name);
             if (pb == null) continue;
 
-            if (props.contains(PBlockProperty.CONTAIN_ROUTING)) {
+            if (props.contains(PblockProperty.CONTAIN_ROUTING)) {
                 pb.setContainRouting(true);
             }
-            if (props.contains(PBlockProperty.IS_SOFT)) {
+            if (props.contains(PblockProperty.IS_SOFT)) {
                 pb.setIsSoft(true);
             }
-            if (props.contains(PBlockProperty.EXCLUDE_PLACEMENT)) {
+            if (props.contains(PblockProperty.EXCLUDE_PLACEMENT)) {
                 pb.setExcludePlacement(true);
             }
         }
