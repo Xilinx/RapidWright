@@ -22,6 +22,7 @@
 
 package com.xilinx.rapidwright.design.xdc.parser;
 
+import java.util.Arrays;
 import java.util.function.Consumer;
 
 import tcl.lang.Interp;
@@ -37,10 +38,11 @@ public class TclHashIdentifiedObject {
     private static final String NAME_END = "+%%javahashend%%+";
 
     public static <T> TclObject createReflectObject(Interp interp, Class<?> clazz, Object obj) throws TclException {
-        TclObject tclObject = ReflectObject.newInstance(interp, clazz, obj, NAME_START + ReflectObject.getHashString(clazz, obj) + NAME_END);
-        //Normally, Tcl objects are removed from internal table once no variable refers to them.
-        //We want to keep them around till the end of life of the interpreter (since a stringified reference may still exist)
-        //Therefore, increase reference count by 1
+        String customRefID = NAME_START + ReflectObject.getHashString(clazz, obj) + NAME_END;
+        TclObject tclObject = ReflectObject.newInstance(interp, clazz, obj, customRefID);
+        // Normally, Tcl objects are removed from internal table once no variable refers to them.
+        // We want to keep them around till the end of life of the interpreter (since a stringified reference may still exist)
+        // Therefore, increase reference count by 1
         tclObject.preserve();
         return tclObject;
     }
@@ -71,6 +73,10 @@ public class TclHashIdentifiedObject {
 
     public static boolean containsStringifiedObject(String s) {
         return s.contains(NAME_START);
+    }
+
+    public static boolean containsStringifiedObject(TclObject[] args) {
+        return Arrays.stream(args).anyMatch(o->containsStringifiedObject(o.toString()));
     }
 
     public static <T> String unpackAsString(Interp interp, String s, EdifCellLookup<T> lookup) {

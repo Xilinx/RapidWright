@@ -28,7 +28,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -38,15 +40,17 @@ import com.xilinx.rapidwright.design.xdc.parser.CellObject;
 import com.xilinx.rapidwright.design.xdc.parser.DesignObject;
 import com.xilinx.rapidwright.design.xdc.parser.EdifCellLookup;
 import com.xilinx.rapidwright.design.xdc.parser.RegularEdifCellLookup;
+import com.xilinx.rapidwright.design.xdc.parser.TclHashIdentifiedObject;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import tcl.lang.Interp;
 import tcl.lang.TCL;
@@ -65,8 +69,8 @@ public class TestXDCParser {
     }
 
 
-    public static List<Arguments> getSimpleArgs() {
-        return Arrays.asList(
+    public static Stream<Arguments> getSimpleArgs() {
+        Stream<Arguments> list = Stream.of(
                 Arguments.of(
                         (Function<EDIFNetlist, EdifCellLookup<?>>) RegularEdifCellLookup::new,
                         Arrays.asList(
@@ -86,7 +90,8 @@ public class TestXDCParser {
                         ),
                         5,
                         6,
-                        1
+                        1,
+                        (Predicate<RoundtripMode>) rm -> true
                 ),
                 Arguments.of(
                         (Function<EDIFNetlist, EdifCellLookup<?>>) netlist -> null,
@@ -104,16 +109,19 @@ public class TestXDCParser {
                         ),
                         6,
                         2,
-                        1
+                        1,
+                        (Predicate<RoundtripMode>) rm -> rm!=RoundtripMode.Roundtrip_with_netlist
                 )
         );
+        return withRoundtripMode(list);
 
     }
 
     @MethodSource("getSimpleArgs")
     @ParameterizedTest
-    public void testSimple(Function<EDIFNetlist, EdifCellLookup<?>> lookupFactory, List<String> expectedOutput, int unsupportedConstraints, int cellProperties, int pinConstraints) {
-        XDCConstraints xdcConstraints = XDCParser.parseXDC(getEthernetDesign().getDevice(), Arrays.asList(
+    public void testSimple(Function<EDIFNetlist, EdifCellLookup<?>> lookupFactory, List<String> expectedOutput, int unsupportedConstraints, int cellProperties, int pinConstraints, Predicate<RoundtripMode> canHandleRoundtrip, RoundtripMode roundtripMode) {
+        Assumptions.assumeTrue(canHandleRoundtrip.test(roundtripMode));
+        List<String> orig = Arrays.asList(
                 "set_property IDELAY_VALUE 0 [get_cells {phy_rx_ctl_idelay phy_rxd_idelay_*}]",
                 "set_property -dict {LOC AA14 IOSTANDARD LVCMOS25 SLEW FAST DRIVE 16} [get_ports phy_tx_clk]",
                 "set_input_delay 0 [get_ports {uart_rxd}]",
@@ -122,7 +130,9 @@ public class TestXDCParser {
                 "set_output_delay 0 [get_ports {phy_reset_n}]",
                 "set fifo_inst [get_cells core_inst/eth_mac_inst/rx_fifo/fifo_inst]",
                 "set_property DUMMY 0 [get_cells \"$fifo_inst/rd_ptr_reg_reg[0]\"]"
-        ), lookupFactory.apply(getEthernetDesign().getNetlist()));
+        );
+        List<String> roundtripped = roundtripMode.doRoundtrip(getEthernetDesign().getNetlist(), orig);
+        XDCConstraints xdcConstraints = XDCParser.parseXDC(getEthernetDesign().getDevice(), roundtripped, lookupFactory.apply(getEthernetDesign().getNetlist()));
         List<String> actual = xdcConstraints.getAllAsXdc().sorted().collect(Collectors.toList());
         Collections.sort(expectedOutput);
         Assertions.assertEquals(new NicerStringifyList<>(expectedOutput), new NicerStringifyList<>(actual));
@@ -135,6 +145,11 @@ public class TestXDCParser {
     @FunctionalInterface
     interface TclObjConsumer<T> {
         void accept(Interp interp, TclObject obj, EDIFNetlist netlist, EdifCellLookup<T> lookup) throws TclException;
+    }
+
+    private void eval(RoundtripMode roundtripMode, String tcl, XDCConstraints constraints, TclObjConsumer<EDIFHierCellInst> downstream) {
+        String roundtripped = roundtripMode.doRoundtrip(getEthernetDesign().getNetlist(), Arrays.asList(tcl)).stream().collect(Collectors.joining("\n"));
+        eval(roundtripped, constraints, downstream);
     }
 
     private void eval(String tcl, XDCConstraints constraints, TclObjConsumer<EDIFHierCellInst> downstream) {
@@ -253,9 +268,22 @@ public class TestXDCParser {
         });
     }
 
+    private static Stream<Arguments> withRoundtripMode(Stream<Arguments> args) {
+        return args.flatMap(arg-> Arrays.stream(RoundtripMode.values()).map(mode-> new Arguments() {
+            @Override
+            public Object[] get() {
+                Object[] objects = arg.get();
+                Object[] res = new Object[objects.length+1];
+                System.arraycopy(objects, 0, res, 0, objects.length);
+                res[objects.length] = mode;
+                return res;
+            }
+        }));
+    }
+
 
     private static Stream<Arguments> getComplexSetterArgs() {
-        return Stream.of(
+        Stream<Arguments> args = Stream.of(
                 Arguments.of(
                         "set if_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst\n" +
                                 "set src_clk [get_clocks -of_objects [get_pins $if_inst/rgmii_tx_clk_1_reg/C]]\n" +
@@ -288,24 +316,72 @@ public class TestXDCParser {
                         )
                 )
         );
+        return withRoundtripMode(args);
+
     }
 
     @ParameterizedTest
     @MethodSource("getComplexSetterArgs")
-    public void testComplexSetters(String tcl, List<String> expected) {
+    public void testComplexSetters(String tcl, List<String> expected, RoundtripMode roundtripMode) {
         XDCConstraints constraints = new XDCConstraints();
-        eval(tcl, constraints, (interp, res, netlist, cellLookup) -> {
+        eval(roundtripMode, tcl, constraints, (interp, res, netlist, cellLookup) -> {
             List<String> actual = constraints.getAllAsXdc().collect(Collectors.toList());
             Assertions.assertEquals(new NicerStringifyList<>(expected), new NicerStringifyList<>(actual));
         });
     }
 
 
-    @Test
-    void compareToVivadoConstraints() throws IOException {
+    public enum RoundtripMode {
+        /**
+         * Use constraints directly
+         */
+        Normal((n,x)->x),
+        /**
+         * Parse constraints with netlist, stringify, then run testcase
+         */
+        Roundtrip_with_netlist(roundtrip(RegularEdifCellLookup::new)),
+        /**
+         * Parse constraints without netlist, stringify, then run testcase
+         */
+        Roundtrip_without_netlist(roundtrip(n->null));
+
+        private final BiFunction<EDIFNetlist, List<String>, List<String>> func;
+
+        RoundtripMode(BiFunction<EDIFNetlist, List<String>, List<String>> func) {
+            this.func = func;
+        }
+
+        public List<String> doRoundtrip(EDIFNetlist netlist, List<String> input) {
+            return func.apply(netlist, input);
+        }
+
+        private static BiFunction<EDIFNetlist, List<String>, List<String>> roundtrip(Function<EDIFNetlist, EdifCellLookup<?>> lookupFactory) {
+            return (netlist, lines) -> {
+                XDCConstraints xdcConstraints = XDCParser.parseXDC(netlist.getDevice(), lines, lookupFactory.apply(netlist));
+                List<String> res = xdcConstraints.getAllAsXdc().collect(Collectors.toList());
+                for (String line : res) {
+                    Assertions.assertFalse(TclHashIdentifiedObject.containsStringifiedObject(line), ()->"Output line contains hash object: "+line);
+                }
+                System.out.println("script after roundtrip:");
+
+                for (String line : res) {
+                    System.out.println(line);
+                }
+                return res;
+            };
+
+        }
+    }
+
+
+    @ParameterizedTest
+    @EnumSource(RoundtripMode.class)
+    void compareToVivadoConstraints(RoundtripMode roundtripMode) throws IOException {
         EDIFNetlist netlist = getEthernetDesign().getNetlist();
         String xdcFilename = RapidWrightDCP.getString("verilog_ethernet_source_constraints.xdc");
-        XDCConstraints xdcConstraints = XDCParser.parseXDC(netlist.getDevice(), FileTools.getLinesFromTextFile(xdcFilename), new RegularEdifCellLookup(netlist));
+        List<String> origConstraints = FileTools.getLinesFromTextFile(xdcFilename);
+        List<String> afterRoundtrip = roundtripMode.doRoundtrip(netlist, origConstraints);
+        XDCConstraints xdcConstraints = XDCParser.parseXDC(netlist.getDevice(), afterRoundtrip, new RegularEdifCellLookup(netlist));
 
 
         Map<String, String> actualReplacements = getReplacementsForActual();

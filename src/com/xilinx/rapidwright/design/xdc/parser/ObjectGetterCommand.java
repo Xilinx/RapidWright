@@ -52,11 +52,7 @@ public class ObjectGetterCommand implements Command {
             }
             res = new NameDesignObject(objType, null);
         } else {
-            if (argv.length != 2) {
-                throw new TclNumArgsException(interp, 2, argv, "");
-            }
-
-            if (TclHashIdentifiedObject.containsStringifiedObject(argv[1].toString())) {
+            if (argv.length > 2 || TclHashIdentifiedObject.containsStringifiedObject(argv)) {
                 interp.setResult(UnsupportedCmdResult.makeTclObj(interp, argv, null, false, false));
                 return;
             }

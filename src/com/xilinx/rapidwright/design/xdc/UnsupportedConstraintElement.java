@@ -252,7 +252,7 @@ public abstract class UnsupportedConstraintElement {
      * If a cell name is followed by text that looks like a subcell reference, absorb that text into the cell name
      */
     private static <T> void absorbIntoCells(EdifCellLookup<T> lookup, List<UnsupportedConstraintElement> res, T cell, boolean applyWildcardsChooseAny) {
-        if (res.size()!=1) {
+        if (res.size()!=1 || lookup==null) {
             return;
         }
         String suffix = res.get(0).toXdc();

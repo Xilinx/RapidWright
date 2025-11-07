@@ -43,6 +43,7 @@ import java.util.stream.Stream;
 
 import com.xilinx.rapidwright.util.Pair;
 import tcl.lang.Command;
+import tcl.lang.ExprValue;
 import tcl.lang.Interp;
 import tcl.lang.TclException;
 import tcl.lang.TclList;
@@ -104,15 +105,21 @@ public class GetCellsCommand<T> implements Command {
     /**
      * This only supports OR-in together different == clauses.
      *
+     * @param interp
      * @param expr
      * @return
      */
-    private static Map<String, Set<String>> parseFilterExpression(String expr) {
+    private static Map<String, Set<String>> parseFilterExpression(Interp interp, String expr) {
         //Remove unneeded parens
         if (expr.matches("\\([^)]*\\)")) {
             expr = expr.substring(1, expr.length() - 1);
         }
         if (expr.contains("&&") || expr.contains("(")) {
+            try {
+                ExprValue exprValue = interp.evalExpression(expr.toString());
+            } catch (TclException e) {
+                throw new RuntimeException(e);
+            }
             throw new RuntimeException("expression too complex: " + expr);
         }
         String[] split = expr.split("\\s*\\|\\|\\s*");
@@ -147,7 +154,7 @@ public class GetCellsCommand<T> implements Command {
         }
 
         if (filterArg != null) {
-            Map<String, Set<String>> s = parseFilterExpression(filterArg.toString());
+            Map<String, Set<String>> s = parseFilterExpression(interp, filterArg.toString());
 
             if (s.size() > 1) {
                 throw new RuntimeException("Filter too complex");

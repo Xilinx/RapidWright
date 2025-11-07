@@ -27,26 +27,23 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.xdc.parser.DebugDumpCommand;
-import com.xilinx.rapidwright.design.xdc.parser.EdifCellLookup;
-import com.xilinx.rapidwright.design.xdc.parser.RegularEdifCellLookup;
-import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.design.xdc.parser.CreateClockCommand;
-import com.xilinx.rapidwright.design.xdc.parser.DesignObject;
+import com.xilinx.rapidwright.design.xdc.parser.DebugDumpCommand;
 import com.xilinx.rapidwright.design.xdc.parser.DumpObjsCommand;
+import com.xilinx.rapidwright.design.xdc.parser.EdifCellLookup;
 import com.xilinx.rapidwright.design.xdc.parser.GetCellsCommand;
 import com.xilinx.rapidwright.design.xdc.parser.ObjType;
 import com.xilinx.rapidwright.design.xdc.parser.ObjectGetterCommand;
+import com.xilinx.rapidwright.design.xdc.parser.RegularEdifCellLookup;
 import com.xilinx.rapidwright.design.xdc.parser.SetPropertyCommand;
-import com.xilinx.rapidwright.design.xdc.parser.UnsupportedCmdResult;
-import com.xilinx.rapidwright.design.xdc.parser.UnsupportedSetterCommand;
 import com.xilinx.rapidwright.design.xdc.parser.UnsupportedGetterCommand;
 import com.xilinx.rapidwright.design.xdc.parser.UnsupportedIfCommand;
+import com.xilinx.rapidwright.design.xdc.parser.UnsupportedSetterCommand;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.util.FileTools;
 import tcl.lang.Command;
 import tcl.lang.Interp;
@@ -78,15 +75,6 @@ import tcl.lang.WrappedCommand;
  */
 public class XDCParser {
 
-    private static <T> void replaceCommand(Interp interp, EdifCellLookup<T> cellLookup, String commandName) {
-        Command replacedCommand = Objects.requireNonNull(interp.getCommand(commandName));
-        if (commandName.equals("if")) {
-            interp.createCommand(commandName, new UnsupportedIfCommand(cellLookup, replacedCommand));
-        } else {
-            interp.createCommand(commandName, new UnsupportedGetterCommand(cellLookup, replacedCommand));
-        }
-    }
-
 
     /**
      * Create a tcl interpreter with XDC parsing commands
@@ -116,7 +104,7 @@ public class XDCParser {
 
         interp.createCommand("dump_objs", new DumpObjsCommand(cellLookup));
 
-        UnsupportedSetterCommand unsupportedSetterCommand = new UnsupportedSetterCommand(constraints, cellLookup);
+        UnsupportedSetterCommand unsupportedSetterCommand = new UnsupportedSetterCommand(constraints, cellLookup, null);
         interp.createCommand("set_false_path", unsupportedSetterCommand);
         interp.createCommand("set_input_delay", unsupportedSetterCommand);
         interp.createCommand("set_output_delay", unsupportedSetterCommand);
@@ -128,25 +116,13 @@ public class XDCParser {
         interp.createCommand("get_clocks", unsupportedGetterCommand);
         interp.createCommand("get_property", unsupportedGetterCommand);
         interp.createCommand("get_nets", unsupportedGetterCommand);
-        replaceCommand(interp, cellLookup, "if");
-        replaceCommand(interp, cellLookup, "llength");
-        replaceCommand(interp, cellLookup, "expr");
+        UnsupportedGetterCommand.replaceInInterp(interp, cellLookup, "llength");
+        UnsupportedGetterCommand.replaceInInterp(interp, cellLookup,  "expr");
+
+        UnsupportedIfCommand.replaceInInterp(interp, constraints, cellLookup);
+        UnsupportedSetterCommand.replaceInInterp(interp, constraints, cellLookup, "foreach");
 
         interp.createCommand("debugDump", new DebugDumpCommand());
-
-
-        /*interp.setCommandDoneCallback(()-> {
-            try {
-                DesignObject.unwrapTclObject(interp, interp.getResult(), cellLookup).ifPresent(obj -> {
-                    if (obj instanceof UnsupportedCmdResult<?>) {
-                        constraints.getUnsupportedConstraints().add(((UnsupportedCmdResult<?>) obj).withoutOutsideBrackets().getCmd());
-                    }
-                });
-            } catch (TclException e) {
-                throw new RuntimeException(e);
-            }
-        });*/
-
 
         //We need to allow [*] and bracketed numbers (e.h. [1] ) as suffix on quoted strings, so we need to hook into the command lookup
         //This actually mirrors Vivado's behaviour very closely! Just enter * on Vivado's tcl prompt to see

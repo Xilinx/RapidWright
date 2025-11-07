@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.design.xdc.parser;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.xdc.UnsupportedConstraintElement;
@@ -32,45 +33,39 @@ import tcl.lang.Command;
 import tcl.lang.Interp;
 import tcl.lang.TclException;
 import tcl.lang.TclObject;
-import tcl.lang.TclString;
 
 /**
  * A setter command that is not supported in detail
  */
 public class UnsupportedSetterCommand implements Command {
 
-    private final XDCConstraints constraints;
-    private final EdifCellLookup<?> cellLookup;
+    protected final XDCConstraints constraints;
+    protected final EdifCellLookup<?> cellLookup;
+    protected final Command replacedCommand;
 
-    public UnsupportedSetterCommand(XDCConstraints constraints, EdifCellLookup<?> cellLookup) {
+    public UnsupportedSetterCommand(XDCConstraints constraints, EdifCellLookup<?> cellLookup, Command replacedCommand) {
 
         this.constraints = constraints;
         this.cellLookup = cellLookup;
+        this.replacedCommand = replacedCommand;
     }
 
     @Override
     public void cmdProc(Interp interp, TclObject[] objv) throws TclException {
-        List<UnsupportedConstraintElement> constraint = Arrays.stream(objv)
-                .flatMap(UnsupportedConstraintElement.addSpacesBetween(obj -> UnsupportedConstraintElement.objToUnsupportedConstraintElement(interp, obj, cellLookup, false, false)))
-                .collect(Collectors.toList());
-        constraints.getUnsupportedConstraints().add(constraint);
+        if (replacedCommand!=null && Arrays.stream(objv).noneMatch(obj -> UnsupportedGetterCommand.containsUnsupportedCmdResults(cellLookup, interp, obj, false))) {
+            replacedCommand.cmdProc(interp, objv);
+        } else {
+            List<UnsupportedConstraintElement> constraint = Arrays.stream(objv)
+                    .flatMap(UnsupportedConstraintElement.addSpacesBetween(obj -> UnsupportedConstraintElement.objToUnsupportedConstraintElement(interp, obj, cellLookup, false, false)))
+                    .collect(Collectors.toList());
+            constraints.getUnsupportedConstraints().add(constraint);
 
-        interp.resetResult();
+            interp.resetResult();
+        }
     }
 
-    private String toSource(Interp interp, TclObject o) {
-        if (o.getInternalRep() instanceof TclString) {
-            String s = o.toString();
-            if (s.contains(" ")) {
-                return '{' + s + '}';
-            }
-            return s;
-        }
-        try {
-            DesignObject designObject = DesignObject.requireUnwrapTclObject(interp, o, cellLookup);
-            return designObject.toXdc();
-        } catch (TclException e) {
-            throw new RuntimeException(e);
-        }
+    public static void replaceInInterp(Interp interp, XDCConstraints constraints, EdifCellLookup<?> lookup, String name) {
+        Command replacedCommand = Objects.requireNonNull(interp.getCommand(name));
+        interp.createCommand(name, new UnsupportedSetterCommand(constraints, lookup, replacedCommand));
     }
 }

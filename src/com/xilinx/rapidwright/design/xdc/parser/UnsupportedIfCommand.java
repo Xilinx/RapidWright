@@ -22,6 +22,9 @@
 
 package com.xilinx.rapidwright.design.xdc.parser;
 
+import java.util.Objects;
+
+import com.xilinx.rapidwright.design.xdc.XDCConstraints;
 import tcl.lang.CharPointer;
 import tcl.lang.Command;
 import tcl.lang.ExprValue;
@@ -40,9 +43,9 @@ import tcl.lang.TclToken;
 /**
  * Replacement for if that supports the condition returning an UnsupportedConstraintElement
  */
-public class UnsupportedIfCommand extends UnsupportedGetterCommand {
-    public UnsupportedIfCommand(EdifCellLookup<?> lookup, Command replacedCommand) {
-        super(lookup, replacedCommand);
+public class UnsupportedIfCommand extends UnsupportedSetterCommand {
+    public UnsupportedIfCommand(XDCConstraints constraints, EdifCellLookup<?> lookup, Command replacedCommand) {
+        super(constraints, lookup, replacedCommand);
     }
 
     private TclObject exprValueToObj(ExprValue exprValue) {
@@ -120,7 +123,7 @@ public class UnsupportedIfCommand extends UnsupportedGetterCommand {
             System.out.println("from "+obj+" to "+s);
             objv[i] = TclString.newInstance(s);
         }
-        interp.setResult(UnsupportedCmdResult.makeTclObj(interp, objv, lookup, true, true));
+        interp.setResult(UnsupportedCmdResult.makeTclObj(interp, objv, cellLookup, true, true));
     }
 
     @Override
@@ -237,5 +240,10 @@ public class UnsupportedIfCommand extends UnsupportedGetterCommand {
             }
             throw e;
         }
+    }
+
+    public static void replaceInInterp(Interp interp, XDCConstraints xdcConstraints, EdifCellLookup<?> lookup) {
+        Command replacedCommand = Objects.requireNonNull(interp.getCommand("if"));
+        interp.createCommand("if", new UnsupportedIfCommand(xdcConstraints, lookup, replacedCommand));
     }
 }

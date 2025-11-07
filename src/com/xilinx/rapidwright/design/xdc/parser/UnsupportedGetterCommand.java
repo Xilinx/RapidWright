@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.design.xdc.parser;
 
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Optional;
 
 import tcl.lang.Command;
@@ -51,18 +52,18 @@ public class UnsupportedGetterCommand implements Command {
 
     @Override
     public void cmdProc(Interp interp, TclObject[] objv) throws TclException {
-        if (replacedCommand!=null && Arrays.stream(objv).noneMatch(obj -> containsUnsupportedCmdResults(interp, obj, false))) {
+        if (replacedCommand!=null && Arrays.stream(objv).noneMatch(obj -> containsUnsupportedCmdResults(lookup, interp, obj, false))) {
             replacedCommand.cmdProc(interp, objv);
         } else {
             interp.setResult(UnsupportedCmdResult.makeTclObj(interp, objv, lookup, true, true));
         }
     }
 
-    protected boolean containsUnsupportedCmdResults(Interp interp, TclObject obj, boolean isInList) {
+    public static boolean containsUnsupportedCmdResults(EdifCellLookup<?> lookup, Interp interp, TclObject obj, boolean isInList) {
         try {
             if (obj.getInternalRep() instanceof TclList) {
                 TclObject[] elements = TclList.getElements(interp, obj);
-                return Arrays.stream(elements).anyMatch(elem -> containsUnsupportedCmdResults(interp, elem, true));
+                return Arrays.stream(elements).anyMatch(elem -> containsUnsupportedCmdResults(lookup, interp, elem, true));
             } else if (obj.getInternalRep() instanceof ReflectObject) {
                 Optional<?> designObject = DesignObject.unwrapTclObject(interp, obj, lookup);
                 if (!designObject.isPresent()) {
@@ -77,5 +78,10 @@ public class UnsupportedGetterCommand implements Command {
         } catch (TclException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static void replaceInInterp(Interp interp, EdifCellLookup<?> lookup, String name) {
+        Command replacedCommand = Objects.requireNonNull(interp.getCommand(name));
+        interp.createCommand(name, new UnsupportedGetterCommand(lookup, replacedCommand));
     }
 }
