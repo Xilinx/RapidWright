@@ -23,11 +23,15 @@
 package com.xilinx.rapidwright.design.xdc;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -41,8 +45,10 @@ import com.xilinx.rapidwright.design.xdc.parser.DesignObject;
 import com.xilinx.rapidwright.design.xdc.parser.EdifCellLookup;
 import com.xilinx.rapidwright.design.xdc.parser.RegularEdifCellLookup;
 import com.xilinx.rapidwright.design.xdc.parser.TclHashIdentifiedObject;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
 import org.jetbrains.annotations.NotNull;
@@ -946,5 +952,43 @@ public class TestXDCParser {
                 })
                 .sorted()
                 .collect(Collectors.toList());
+    }
+
+    private static List<Path> findAllDcp(Path dir) {
+
+        try (Stream<Path> list = Files.list(dir)) {
+            return list.flatMap(path -> {
+                if (Files.isDirectory(path)) {
+                    return findAllDcp(path).stream();
+                }
+                if (path.toString().endsWith(".dcp")) {
+                    return Stream.of(path);
+                }
+                return Stream.empty();
+            }).collect(Collectors.toList());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static Stream<Arguments> getAllTheDesigns() {
+        Set<String> skippedDcps = new HashSet<>();
+        skippedDcps.add("picoblaze_ooc_X10Y235_unreadable_edif.dcp"); //Needs Vivado
+        return findAllDcp(RapidWrightDCP.dirPath).stream()
+                .filter(p->!skippedDcps.contains(p.getFileName().toString()))
+                .map(path -> Arguments.of(path));
+    }
+
+    @ParameterizedTest
+    @MethodSource("getAllTheDesigns")
+    void checkAllTheDesigns(Path p) {
+        Design design = Design.readCheckpoint(p, true);
+        EDIFNetlist netlist = design.getNetlist();
+
+        for (ConstraintGroup cg : ConstraintGroup.values()) {
+            List<String> xdcConstraints = design.getXDCConstraints(cg);
+            XDCParser.parseXDC(design.getDevice(), xdcConstraints, new RegularEdifCellLookup(netlist));
+        }
+
     }
 }

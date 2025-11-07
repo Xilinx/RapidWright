@@ -85,11 +85,13 @@ public class GetCellsCommand<T> implements Command {
                     //Ignore
                     break;
                 case "-of_objects":
+                case "-of":
                     interp.setResult(UnsupportedCmdResult.makeTclObj(interp, argv, cellLookup, false, false));
                     return;
                 default:
                     if (cellNameStr != null) {
-                        throw new RuntimeException("Duplicate cell-name string");
+                        String s = new UnsupportedCmdResult<>(interp, argv, cellLookup, false, false).toString();
+                        throw new RuntimeException("Duplicate cell-name string or unsupported flag: "+s);
                     }
                     cellNameStr = TclHashIdentifiedObject.unpackAsString(interp, argv[i].toString(), cellLookup);
                     break;

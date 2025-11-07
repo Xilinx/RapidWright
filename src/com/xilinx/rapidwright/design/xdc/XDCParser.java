@@ -122,6 +122,7 @@ public class XDCParser {
         interp.createCommand("current_instance", unsupportedSetterCommand);
         interp.createCommand("set_clock_groups", unsupportedSetterCommand);
         interp.createCommand("set_input_jitter", unsupportedSetterCommand);
+        interp.createCommand("set_clock_uncertainty", unsupportedSetterCommand);
 
         UnsupportedGetterCommand unsupportedGetterCommand = new UnsupportedGetterCommand(cellLookup);
         interp.createCommand("get_clocks", unsupportedGetterCommand);
@@ -129,6 +130,9 @@ public class XDCParser {
         interp.createCommand("get_nets", unsupportedGetterCommand);
         interp.createCommand("all_fanout", unsupportedGetterCommand);
         interp.createCommand("filter", unsupportedGetterCommand);
+        interp.createCommand("get_bels", unsupportedGetterCommand);
+        interp.createCommand("get_wires", unsupportedGetterCommand);
+        interp.createCommand("get_nodes", unsupportedGetterCommand);
         UnsupportedGetterCommand.replaceInInterp(interp, cellLookup, "llength");
         UnsupportedGetterCommand.replaceInInterp(interp, cellLookup,  "expr");
 

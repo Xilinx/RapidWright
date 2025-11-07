@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.design.xdc.parser;
 
 import java.util.List;
+import java.util.Objects;
 
 import com.xilinx.rapidwright.design.xdc.PBlockConstraint;
 import com.xilinx.rapidwright.design.xdc.UnsupportedConstraintElement;
@@ -57,8 +58,12 @@ public class AddCellsToPblockCommand<T> implements Command {
             throw new RuntimeException("wrong argument type: "+pblock.getType());
         }
 
-        PBlockConstraint pBlockConstraint = constraints.getPBlockConstraints().get(pblock.getObjects().get(0));
+        PBlockConstraint pBlockConstraint = Objects.requireNonNull(constraints.getPBlockConstraints().get(pblock.getObjects().get(0)));
 
+        if (objv[2].toString().equals("-top")) {
+            pBlockConstraint.getCells().add("");
+            return;
+        }
         DesignObject<?> cellsDO = DesignObject.requireUnwrapTclObject(interp, objv[2], cellLookup);
 
         if (cellsDO instanceof UnsupportedCmdResult<?>) {

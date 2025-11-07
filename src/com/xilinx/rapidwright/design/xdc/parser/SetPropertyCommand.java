@@ -167,7 +167,7 @@ public class SetPropertyCommand<T> implements Command {
     }
 
     private boolean parseBool(String v) {
-        switch (v) {
+        switch (v.toLowerCase()) {
             case "true":
             case "1":
                 return true;
