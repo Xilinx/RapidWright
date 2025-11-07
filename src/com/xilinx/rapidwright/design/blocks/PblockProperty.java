@@ -31,9 +31,4 @@ public enum PblockProperty {
     CONTAIN_ROUTING,
     IS_SOFT,
     EXCLUDE_PLACEMENT;
-
-    @Override
-    public String toString() {
-        return name();
-    }
 }
