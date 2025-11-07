@@ -37,9 +37,18 @@ import java.util.Map.Entry;
 
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 
 import com.xilinx.rapidwright.design.tools.InlineFlopTools;
+import com.xilinx.rapidwright.design.tools.PBlockSide;
+import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPort;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 
@@ -104,6 +113,10 @@ public class PerformanceExplorer {
     private boolean reusePreviousResults;
 
     private boolean ensureExternalRoutability;
+
+    private String externalRoutabilitySideFile;
+
+    Map<EDIFPort, PBlockSide> externalRoutabilitySideMap = null;
 
     public PerformanceExplorer(Design d, String testDir, String clkName, double targetPeriod) {
         init(d, testDir, clkName, targetPeriod, null);
@@ -288,6 +301,35 @@ public class PerformanceExplorer {
         this.ensureExternalRoutability = ensureExternalRoutability;
     }
 
+    public String getExternalRoutabilitySideFile() {
+        return externalRoutabilitySideFile;
+    }
+
+    public void setExternalRoutabilitySideFile(String externalRoutabilitySideFile) {
+        this.externalRoutabilitySideFile = externalRoutabilitySideFile;
+    }
+
+    public Map<EDIFPort, PBlockSide> getExternalRoutabilitySideMap(EDIFNetlist netlist) {
+        if (externalRoutabilitySideMap == null) {
+            externalRoutabilitySideMap = new HashMap<>();
+            List<String> lines = FileTools.getLinesFromTextFile(getExternalRoutabilitySideFile());
+
+            for (String line : lines) {
+                String[] splitLine = line.split("\\s+");
+                EDIFPort port = netlist.getTopCell().getPort(splitLine[0]);
+                if (port == null) {
+                    port = netlist.getTopCell().getPort(EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE + splitLine[0]);
+                }
+                if (port == null) {
+                    throw new RuntimeException("Invalid port name in external routability side file: " + splitLine[0]);
+                }
+                PBlockSide side = PBlockSide.valueOf(splitLine[1].toUpperCase());
+                externalRoutabilitySideMap.put(port, side);
+            }
+        }
+        return externalRoutabilitySideMap;
+    }
+
     public PBlock getPBlock(int i) {
         return pblockLookup[i];
     }
@@ -388,14 +430,23 @@ public class PerformanceExplorer {
 
         int pb = 0;
         int jobsStarted = 0;
-        int maxConcurrentJobs = JobQueue.isLSFAvailable() ? JobQueue.MAX_LSF_CONCURRENT_JOBS : JobQueue.MAX_LOCAL_CONCURRENT_JOBS;
+        int maxConcurrentJobs = JobQueue.isLSFAvailable() ? JobQueue.MAX_LSF_CONCURRENT_JOBS
+                : JobQueue.MAX_LOCAL_CONCURRENT_JOBS;
         pblockLookup = new PBlock[pblocks.size()];
         for (Entry<PBlock, String> e : pblocks.entrySet()) {
             PBlock pblock = e.getKey();
 
             String pblockDcpName = dcpName;
             if (ensureExternalRoutability()) {
-                InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsArbitrarily(design, clkName, pblock);
+                EDIFTools.removeVivadoBusPreventionAnnotations(design.getNetlist());
+                design.getNetlist().resetParentNetMap();
+                if (getExternalRoutabilitySideFile() == null) {
+                    InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsArbitrarily(design, clkName, pblock);
+                } else {
+                    Map<EDIFPort, PBlockSide> sideMap = getExternalRoutabilitySideMap(design.getNetlist());
+                    InlineFlopTools.createAndPlacePortFlopsOnSide(design, clkName, pblock, sideMap);
+                }
+                EDIFTools.ensurePreservedInterfaceVivado(design.getNetlist());
                 pblockDcpName = runDirectory + File.separator + "pblock" + pb + "_" + INITIAL_DCP_NAME;
                 design.writeCheckpoint(pblockDcpName);
             }
@@ -412,7 +463,7 @@ public class PerformanceExplorer {
                         String instDir = runDirectory + File.separator + uniqueID;
                         FileTools.makeDir(instDir);
                         String encryptedTcl = null;
-                        boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
+                        boolean encrypted = design.getNetlist().hasEncryptedCells();
                         if (encrypted) {
                             encryptedTcl = runDirectory + File.separator + "pblock" + pb +
                                            "_" + INITIAL_ENCRYPTED_TCL_NAME;
@@ -506,13 +557,45 @@ public class PerformanceExplorer {
                 System.out.println("No implementation passes timing for " + pblock);
             }
 
+            System.out.println("Best result found at: " + bestPath);
             Design d = Design.readCheckpoint(bestPath + File.separator + "routed.dcp");
 
             if (ensureExternalRoutability()) {
                 InlineFlopTools.removeInlineFlops(d);
+                unrouteNetsThatLeavePBlock(d, getPBlock(pblockNum));
             }
 
+            EDIFTools.ensurePreservedInterfaceVivado(d.getNetlist());
             d.writeCheckpoint(runDirectory + File.separator + pblock + "_best.dcp");
+        }
+    }
+
+    public void unrouteNetsThatLeavePBlock(Design d, PBlock pBlock) {
+        DesignTools.makePhysNetNamesConsistent(d);
+        d.getNetlist().resetParentNetMap();
+        d.getNetlist().expandMacroUnisims();
+        for (EDIFPort p : d.getNetlist().getTopCell().getPorts()) {
+            int[] indices = p.isBus() ? p.getBitBlastedIndicies() : new int[]{0};
+            for (int i : indices) {
+                EDIFPortInst portInst = p.getInternalPortInstFromIndex(i);
+                if (portInst == null) {
+                    continue;
+                }
+                EDIFHierNet hierNet = new EDIFHierNet(d.getNetlist().getTopHierCellInst(), portInst.getNet());
+                EDIFHierNet parentNet = d.getNetlist().getParentNet(hierNet);
+                Net net = d.getNet(parentNet.getHierarchicalNetName());
+
+                boolean leavesPBlock = false;
+                for (PIP pip : net.getPIPs()) {
+                    if (!pBlock.containsTile(pip.getTile())) {
+                        leavesPBlock = true;
+                        break;
+                    }
+                }
+                if (leavesPBlock) {
+                    net.unroute();
+                }
+            }
         }
     }
 
@@ -556,7 +639,7 @@ public class PerformanceExplorer {
             accepts(VIVADO_PATH_OPT).withOptionalArg().defaultsTo(DEFAULT_VIVADO).describedAs("Specifies vivado path");
             accepts(CONTAIN_ROUTING_OPT).withOptionalArg().ofType(Boolean.class).defaultsTo(DEFAULT_CONTAIN_ROUTING).describedAs("Sets attribute on pblock to contain routing");
             accepts(MAX_CONCURRENT_JOBS_OPT).withOptionalArg().ofType(Integer.class).defaultsTo(JobQueue.MAX_LOCAL_CONCURRENT_JOBS).describedAs("Max number of concurrent job when run locally");
-            accepts(ENSURE_EXT_ROUTABILITY, "Ensure all I/O are routable outside the pblock");
+            accepts(ENSURE_EXT_ROUTABILITY).withOptionalArg().describedAs("Ensure all I/O are routable outside the pblock. Optionally provide a text file specifying which side of the pblock each top-level port should route to.");
             accepts(COLLECT_RESULTS_OPT,"Collect results into output csv");
             accepts(REUSE_PREVIOUS_RESULTS, "Reuse previous results if they exist");
             acceptsAll( Arrays.asList(HELP_OPT, "?"), "Print Help" ).forHelp();
@@ -580,7 +663,6 @@ public class PerformanceExplorer {
         return;
     }
 
-
     public static String printNS(double num) {
         return df.format(num);
     }
@@ -600,6 +682,7 @@ public class PerformanceExplorer {
         String runDir = opts.hasArgument(RUN_DIR_OPT) ? (String) opts.valueOf(RUN_DIR_OPT) : System.getProperty("user.dir");
 
         Design d = Design.readCheckpoint(dcpInputName);
+        EDIFTools.ensurePreservedInterfaceVivado(d.getNetlist());
         PerformanceExplorer pe = new PerformanceExplorer(d, runDir, clkName, targetPeriod);
 
         if (opts.hasArgument(MAX_CONCURRENT_JOBS_OPT)) {
@@ -625,6 +708,9 @@ public class PerformanceExplorer {
         pe.setGetBestPerPBlock(opts.has(COLLECT_RESULTS_OPT));
         pe.setReusePreviousResults(opts.has(REUSE_PREVIOUS_RESULTS));
         pe.setEnsureExternalRoutability(opts.has(ENSURE_EXT_ROUTABILITY));
+        if (opts.hasArgument(ENSURE_EXT_ROUTABILITY)) {
+            pe.setExternalRoutabilitySideFile((String) opts.valueOf(ENSURE_EXT_ROUTABILITY));
+        }
 
         if (opts.hasArgument(PBLOCK_FILE_OPT)) {
             String fileName = (String) opts.valueOf(PBLOCK_FILE_OPT);
