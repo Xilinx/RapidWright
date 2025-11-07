@@ -28,6 +28,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -95,6 +96,12 @@ public class XDCConstraints {
     }
 
     private static Stream<String> cellPropsToXdc(int counter, String cell, Map<String, String> properties) {
+        if (properties.size()<2) {
+            return properties.entrySet().stream().map(propToValue->
+                    "set_property " + propToValue.getKey() + " " + propToValue.getValue() + " [get_cells {" + cell + "}]"
+            );
+        }
+
         String varName = "rw_getcell_"+counter;
         String initVarLine = "set "+varName+  " [get_cells {" + cell + "}]";
         return Stream.concat(

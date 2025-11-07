@@ -198,7 +198,7 @@ public abstract class UnsupportedConstraintElement {
      */
     public static <T> Stream<UnsupportedConstraintElement> objToUnsupportedConstraintElement(Interp interp, TclObject obj, EdifCellLookup<T> lookup, boolean replaceProbableCells, boolean applyWildcardsChooseAny) {
         try {
-            Optional<DesignObject<?>> designObject = DesignObject.unwrapTclObject(interp, obj, lookup);
+            Optional<DesignObject<T>> designObject = DesignObject.unwrapTclObject(interp, obj, lookup);
             if (designObject.isPresent()) {
                 return designObject.get().toUnsupportedConstraintElement();
             }

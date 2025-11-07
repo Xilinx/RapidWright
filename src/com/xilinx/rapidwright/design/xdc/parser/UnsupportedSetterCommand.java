@@ -54,6 +54,8 @@ public class UnsupportedSetterCommand implements Command {
                 .flatMap(UnsupportedConstraintElement.addSpacesBetween(obj -> UnsupportedConstraintElement.objToUnsupportedConstraintElement(interp, obj, cellLookup, false, false)))
                 .collect(Collectors.toList());
         constraints.getUnsupportedConstraints().add(constraint);
+
+        interp.resetResult();
     }
 
     private String toSource(Interp interp, TclObject o) {

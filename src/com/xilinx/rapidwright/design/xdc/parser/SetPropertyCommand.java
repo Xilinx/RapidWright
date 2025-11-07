@@ -22,6 +22,8 @@
 
 package com.xilinx.rapidwright.design.xdc.parser;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.function.BiConsumer;

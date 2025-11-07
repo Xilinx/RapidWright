@@ -64,7 +64,7 @@ public class UnsupportedGetterCommand implements Command {
                 TclObject[] elements = TclList.getElements(interp, obj);
                 return Arrays.stream(elements).anyMatch(elem -> containsUnsupportedCmdResults(interp, elem, true));
             } else if (obj.getInternalRep() instanceof ReflectObject) {
-                Optional<DesignObject<?>> designObject = DesignObject.unwrapTclObject(interp, obj, lookup);
+                Optional<?> designObject = DesignObject.unwrapTclObject(interp, obj, lookup);
                 if (!designObject.isPresent()) {
                     return true;
                 }

@@ -54,11 +54,11 @@ public abstract class DesignObject<T> {
      * @return casted object
      * @param <T> the lookup's cell representation
      */
-    public static <T> DesignObject<?> requireCastUnwrappedObject(Object obj, EdifCellLookup<T> lookup) {
+    public static <T> DesignObject<T> requireCastUnwrappedObject(Object obj, EdifCellLookup<T> lookup) {
         if (lookup != null && lookup.getCellClass().isInstance(obj)) {
             return new CellObject<T>(Collections.singletonList(lookup.castCellInst(obj)), lookup);
         }
-        return (DesignObject<?>) obj;
+        return (DesignObject<T>) obj;
     }
 
     /**
@@ -70,7 +70,7 @@ public abstract class DesignObject<T> {
      * @param <T> the lookup's cell representation
      * @throws TclException
      */
-    public static <T> Optional<DesignObject<?>> unwrapTclObject(Interp interp, TclObject obj, EdifCellLookup<T> lookup) throws TclException {
+    public static <T> Optional<DesignObject<T>> unwrapTclObject(Interp interp, TclObject obj, EdifCellLookup<T> lookup) throws TclException {
         if (obj.getInternalRep() instanceof TclList) {
             TclObject[] elements = TclList.getElements(interp, obj);
             if (!Arrays.stream(elements).allMatch(e-> {
@@ -89,7 +89,7 @@ public abstract class DesignObject<T> {
                     throw new RuntimeException(e);
                 }
             }).collect(Collectors.toList());
-            return Optional.<DesignObject<?>>of(new CellObject<>(cells, lookup));
+            return Optional.of(new CellObject<>(cells, lookup));
         }
         if (obj.getInternalRep() instanceof ReflectObject) {
             return Optional.of(requireCastUnwrappedObject(ReflectObject.get(interp, obj), lookup));

@@ -56,8 +56,13 @@ public class ObjectGetterCommand implements Command {
                 throw new TclNumArgsException(interp, 2, argv, "");
             }
 
+            if (TclHashIdentifiedObject.containsStringifiedObject(argv[1].toString())) {
+                interp.setResult(UnsupportedCmdResult.makeTclObj(interp, argv, null, false, false));
+                return;
+            }
+
             res = new NameDesignObject(objType, Arrays.asList(argv[1].toString().split(" ")));
         }
-        interp.setResult(ReflectObject.newInstance(interp, res.getClass(), res));
+        interp.setResult(TclHashIdentifiedObject.createReflectObject(interp, res.getClass(), res));
     }
 }

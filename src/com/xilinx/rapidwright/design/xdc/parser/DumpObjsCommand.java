@@ -43,7 +43,7 @@ public class DumpObjsCommand implements Command {
     @Override
     public void cmdProc(Interp interp, TclObject[] objv) throws TclException {
         TclObject tclObject = objv[1];
-        Optional<DesignObject<?>> obj = DesignObject.unwrapTclObject(interp, tclObject, cellLookup);
+        Optional<?> obj = DesignObject.unwrapTclObject(interp, tclObject, cellLookup);
         if (obj.isPresent()) {
             System.out.println(obj.get());
         } else {

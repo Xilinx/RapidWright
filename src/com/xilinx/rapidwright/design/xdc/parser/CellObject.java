@@ -32,7 +32,7 @@ import com.xilinx.rapidwright.design.xdc.UnsupportedConstraintElement;
  * Tcl representation of a list of cells
  * @param <T> the cell representation
  */
-public class CellObject<T> extends DesignObject {
+public class CellObject<T> extends DesignObject<T> {
     private final List<T> cells;
     private final EdifCellLookup<? super T> cellLookup;
 

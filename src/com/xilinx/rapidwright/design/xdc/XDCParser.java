@@ -63,17 +63,16 @@ import tcl.lang.WrappedCommand;
  * Parses an XDC file for a limited subset of constraint types. It uses a full Tcl interpreter, so
  * complex language constructs are possible.
  * <p />
+ * If the Parser encounters unsupported commands or command options, the parsed TCL code is converted back to strings
+ * and returned as UnsupportedConstraintElements.
+ * <p />
  * The parser can match cell references in constraints to modified designs. Users can supply their own
  * {@link EdifCellLookup} to specify how to rewrite constraints.
  * <p />
  * For a regular, non-rewritten netlist, users should use {@link RegularEdifCellLookup}.
  * <p />
- * Parsing constraints without a netlist present can be accomplished in two different ways:
- * <ul>
- * <li>Use <code>null</code> as lookup: All <code>get_cells</code> calls will end up as unsupported constraints</li>
- * <li>Use {@link com.xilinx.rapidwright.design.xdc.parser.NoNetlistLookup}:
- * <code>get_cells</code> calls without wildcards will work, but more complex calls will throw exceptions.</li>
- * </ul>
+ * If no netlist is present, a <code>null</code> lookup will leave more complex <code>get_cells</code> calls unevaluated
+ * as unsupported constraints.
  * <p />
  * Created on: Jul 27, 2015
  */
@@ -136,7 +135,7 @@ public class XDCParser {
         interp.createCommand("debugDump", new DebugDumpCommand());
 
 
-        interp.setCommandDoneCallback(()-> {
+        /*interp.setCommandDoneCallback(()-> {
             try {
                 DesignObject.unwrapTclObject(interp, interp.getResult(), cellLookup).ifPresent(obj -> {
                     if (obj instanceof UnsupportedCmdResult<?>) {
@@ -146,7 +145,7 @@ public class XDCParser {
             } catch (TclException e) {
                 throw new RuntimeException(e);
             }
-        });
+        });*/
 
 
         //We need to allow [*] and bracketed numbers (e.h. [1] ) as suffix on quoted strings, so we need to hook into the command lookup

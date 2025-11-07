@@ -33,8 +33,8 @@ import tcl.lang.TclObject;
  * Helper methods for registering java objects via their identity hash code and looking them up.
  */
 public class TclHashIdentifiedObject {
-    private static final String NAME_START = "-%%javahashstart%%-";
-    private static final String NAME_END = "-%%javahashend%%-";
+    private static final String NAME_START = "+%%javahashstart%%+";
+    private static final String NAME_END = "+%%javahashend%%+";
 
     public static <T> TclObject createReflectObject(Interp interp, Class<?> clazz, Object obj) throws TclException {
         TclObject tclObject = ReflectObject.newInstance(interp, clazz, obj, NAME_START + ReflectObject.getHashString(clazz, obj) + NAME_END);
