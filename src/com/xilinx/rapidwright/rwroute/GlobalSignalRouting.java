@@ -394,7 +394,7 @@ public class GlobalSignalRouting {
         Integer preferredYCoord = VersalClockRouting.getPreferredClockRootYCoord(device, minY, maxY);
         int clkRootYCoord = preferredYCoord == null ? origCentroid.getInstanceY() : preferredYCoord;
 
-        // If the current column doesn't work, try both neighboring ones
+        // If the current column doesn't work, try neighboring ones on both sides
         List<Integer> colOffsets = Arrays.asList(0, -2, 2, -4, 4, -6, 6);
 
         ClockRegion proposedClkRoot = null;
