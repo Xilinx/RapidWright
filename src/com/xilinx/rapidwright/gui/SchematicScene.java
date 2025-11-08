@@ -54,6 +54,7 @@ import org.eclipse.elk.graph.ElkPort;
 import com.trolltech.qt.core.QPointF;
 import com.trolltech.qt.core.QRectF;
 import com.trolltech.qt.core.QSizeF;
+import com.trolltech.qt.core.Qt.KeyboardModifier;
 import com.trolltech.qt.gui.QAbstractGraphicsShapeItem;
 import com.trolltech.qt.gui.QBrush;
 import com.trolltech.qt.gui.QColor;
@@ -91,6 +92,9 @@ public class SchematicScene extends QGraphicsScene {
     private Map<ElkNode, EDIFHierCellInst> elkNodeCellMap = new HashMap<>();
     private Map<String, List<Object>> lookupMap = new HashMap<>();
     private Set<String> expandedCellInsts = new HashSet<>();
+    private Set<String> selectedObjects = new HashSet<>();
+
+    public Signal1<String> objectSelected = new Signal1<>();
 
     private static QFont FONT = new QFont("Arial", 8);
     private static QFont BUTTON_TEXT_FONT = new QFont("Arial", 10, QFont.Weight.Bold.value());
@@ -105,6 +109,7 @@ public class SchematicScene extends QGraphicsScene {
     private static final QPen PORT_PEN = BLACK_PEN;
     private static final QPen NET_PEN = new QPen(new QColor(91, 203, 75));
     private static final QPen NET_CLICK_PEN = CLICK_PEN;
+    private static final QPen SELECTED_PEN = new QPen(new QColor(0, 0, 255), 3);
 
     private static final QBrush CELL_BRUSH = new QBrush(new QColor(255, 255, 210));
     private static final QPen CELL_PEN = new QPen(QColor.black);
@@ -140,6 +145,7 @@ public class SchematicScene extends QGraphicsScene {
     private static final double PIN_LINE_LENGTH = 10.0;
 
     private static final String HIER_BUTTON = "HIER_BUTTON";
+    private static final String CLICK = "CLICK";
 
     public SchematicScene(EDIFNetlist netlist) {
         super();
@@ -166,6 +172,7 @@ public class SchematicScene extends QGraphicsScene {
         elkNodeTopPortMap.clear();
         elkNodeCellMap.clear();
         lookupMap.clear();
+        selectedObjects.clear();
         this.currCellInst = cellInst;
         elkRoot = createElkRoot(cellInst);
         populateCellContent(cellInst, elkRoot, "");
@@ -246,18 +253,21 @@ public class SchematicScene extends QGraphicsScene {
             double x = xOffset + child.getX();
             double y = yOffset + child.getY();
 
+            QGraphicsRectItem rect = null;
             if (isLeaf) {
-                addRect(x, y, child.getWidth(), child.getHeight(), CELL_PEN, CELL_BRUSH);
+                rect = addRect(x, y, child.getWidth(), child.getHeight(), CELL_PEN, CELL_BRUSH);
             } else {
                 String expandedCellName = !elkRoot.equals(parent) ? child.getIdentifier() : eci.getName();
                 if (isExpanded) {
-                    addRect(x, y, child.getWidth(), child.getHeight(), EXPANDED_HIER_CELL_PEN, EXPANDED_HIER_CELL_BRUSH);
+                    rect = addRect(x, y, child.getWidth(), child.getHeight(), EXPANDED_HIER_CELL_PEN, EXPANDED_HIER_CELL_BRUSH);
                 } else {
-                    addRect(x, y, child.getWidth(), child.getHeight(), HIER_CELL_PEN, HIER_CELL_BRUSH);
+                    rect = addRect(x, y, child.getWidth(), child.getHeight(), HIER_CELL_PEN, HIER_CELL_BRUSH);
                 }
                 createHierButton(child, isExpanded, expandedCellName, xOffset, yOffset);
             }
-
+            String instLookup = "INST:" + relCellInstName;
+            rect.setData(0, instLookup);
+            lookupMap.computeIfAbsent(instLookup, l -> new ArrayList<>()).add(rect);
 
             ElkLabel instNameLabel = child.getLabels().get(0); // instance name
             ElkLabel cellTypeLabel = child.getLabels().get(1); // cell type
@@ -423,7 +433,7 @@ public class SchematicScene extends QGraphicsScene {
         lookupMap.computeIfAbsent(lookup, l -> new ArrayList<>()).add(line);
         QGraphicsLineItem clickLine = addLine(lastX, lastY, endX, endY, NET_CLICK_PEN);
         clickLine.setData(0, lookup);
-        clickLine.setData(1, "CLICK");
+        clickLine.setData(1, CLICK);
         lookupMap.computeIfAbsent(lookup, l -> new ArrayList<>()).add(clickLine);
     }
 
@@ -660,6 +670,9 @@ public class SchematicScene extends QGraphicsScene {
             if (data.startsWith(HIER_BUTTON)) {
                 String[] parts = data.split(":");
                 toggleCellInstExpansion(parts[1].trim());
+            } else if (data.startsWith("INST:") || data.startsWith("NET:") || data.startsWith("PORT:")) {
+                boolean ctrlPressed = event.modifiers().isSet(KeyboardModifier.ControlModifier);
+                toggleSelection(data, ctrlPressed);
             }
         }
         super.mousePressEvent(event);
@@ -672,5 +685,62 @@ public class SchematicScene extends QGraphicsScene {
             expandedCellInsts.add(cellInstName);
         }
         drawCell(currCellInst);
+    }
+
+    private void toggleSelection(String lookup, boolean multipleSelection) {
+        if (!multipleSelection) {
+            clearSelections();
+        }
+        
+        if (selectedObjects.contains(lookup)) {
+            updateSelectionHighlight(lookup, false);
+            selectedObjects.remove(lookup);
+        } else {
+            updateSelectionHighlight(lookup, true);
+            selectedObjects.add(lookup);
+        }
+        
+        objectSelected.emit(lookup);
+    }
+
+    private void clearSelections() {
+        for (String unselected : selectedObjects) {
+            updateSelectionHighlight(unselected, false);
+        }
+        selectedObjects.clear();
+    }
+
+    public void selectObject(String lookup, boolean clearPreviousSelections) {
+        if (clearPreviousSelections) {
+            clearSelection();
+        }
+        selectedObjects.remove(lookup);
+        toggleSelection(lookup, !clearPreviousSelections);
+    }
+
+    private void updateSelectionHighlight(String lookup, boolean isSelected) {
+        List<Object> guiObjects = lookupMap.get(lookup);
+        for (Object guiObject : guiObjects == null ? Collections.EMPTY_LIST : guiObjects) {
+            if (guiObject instanceof QAbstractGraphicsShapeItem) {
+                QAbstractGraphicsShapeItem shape = (QAbstractGraphicsShapeItem) guiObject;
+                if (isSelected) {
+                    if (shape.data(1) == null || !shape.data(1).toString().equals(CLICK)) {
+                        shape.setPen(SELECTED_PEN);
+                    }
+                } else {
+                    if (lookup.startsWith("INST:")) {
+                        shape.setPen(CELL_PEN);
+                    } else if (lookup.startsWith("PORT:")) {
+                        shape.setPen(PORT_PEN);
+                    }
+                }
+            } else if (guiObject instanceof QGraphicsLineItem) {
+                QGraphicsLineItem line = (QGraphicsLineItem) guiObject;
+                if (line.data(1) == null || !line.data(1).toString().equals(CLICK)) {
+                    line.setPen(isSelected ? SELECTED_PEN : NET_PEN);
+                }
+            }
+
+        }
     }
 }
