@@ -52,10 +52,11 @@ import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+
+import org.python.google.common.collect.Lists;
 
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
@@ -100,7 +101,6 @@ import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.StringTools;
 import com.xilinx.rapidwright.util.Utils;
-import org.python.google.common.collect.Lists;
 
 /**
  * A collection of methods to operate on {@link Design} objects.
@@ -2383,21 +2383,22 @@ public class DesignTools {
         return (!sitePins.isEmpty()) ? sitePins.get(0) : null;
     }
 
+    @SuppressWarnings("unchecked")
     public static Map<SiteInst, Map<Net, List<String>>> getSiteInstToNetSiteWiresMap(Design design) {
-        ConcurrentMap<SiteInst, Map<Net, List<String>>> siteInstToNetSiteWiresMap = new ConcurrentHashMap<>();
-        CountUpDownLatch activeJobs = new CountUpDownLatch();
+        Map<SiteInst, Map<Net, List<String>>> siteInstToNetSiteWiresMap = new ConcurrentHashMap<>();
+        Deque<Future<Void>> futures = new ArrayDeque<>();
         for (Cell c : design.getCells()) {
-            activeJobs.countUp();
-            ParallelismTools.submit(() -> {
-                try {
-                    SiteInst inst = c.getSiteInst();
-                    siteInstToNetSiteWiresMap.put(inst, inst.getNetToSiteWiresMap());
-                } finally {
-                    activeJobs.countDown();
-                }
+            Future<?> f = ParallelismTools.submit(() -> {
+                SiteInst inst = c.getSiteInst();
+                siteInstToNetSiteWiresMap.put(inst, inst.getNetToSiteWiresMap());
             });
+            if (f != null) {
+                futures.add((Future<Void>) f);
+            }
         }
-        activeJobs.await();
+        while (!futures.isEmpty()) {
+            ParallelismTools.joinFirst(futures);
+        }
         return siteInstToNetSiteWiresMap;
     }
 
@@ -2537,41 +2538,43 @@ public class DesignTools {
      * See also {@link #createMissingSitePinInsts(Design, Net)}.
      * @param design The current design
      */
+    @SuppressWarnings("unchecked")
     public static void createMissingSitePinInsts(Design design) {
         EDIFNetlist netlist = design.getNetlist();
         Map<SiteInst, Map<Net, List<String>>> siteInstToNetSiteWiresMap = DesignTools.getSiteInstToNetSiteWiresMap(design);
-        final CountUpDownLatch threadsOutstanding = new CountUpDownLatch();
         int numNets = design.getNets().size();
         int numJobs = ParallelismTools.maxParallelism() * 100;
         List<Net> designNets = new ArrayList<>(design.getNets());
         List<List<Net>> partitionedNets = Lists.partition(designNets, (int) Math.ceil((double) numNets / numJobs));
+        Deque<Future<Void>> futures = new ArrayDeque<>();
         for (List<Net> nets : partitionedNets) {
-            threadsOutstanding.countUp();
-            ParallelismTools.submit(() -> {
-                try {
-                    for (Net net : nets) {
-                        if (net.isUsedNet()) {
+            Future<?> f = ParallelismTools.submit(() -> {
+                for (Net net : nets) {
+                    if (net.isUsedNet()) {
+                        return;
+                    }
+                    EDIFHierNet ehn = net.getLogicalHierNet();
+                    EDIFHierNet parentEhn = (ehn != null) ? netlist.getParentNet(ehn) : null;
+                    if (parentEhn != null && !parentEhn.equals(ehn)) {
+                        Net parentNet = design.getNet(parentEhn.getHierarchicalNetName());
+                        if (parentNet != null) {
+                            // 'net' is not a parent net (which normally causes createMissingSitePinInsts(Design, Net)
+                            // to analyze its parent net) but that parent net also exist in the design and has been/
+                            // will be analyzed in due course, so skip doing so here
                             return;
                         }
-                        EDIFHierNet ehn = net.getLogicalHierNet();
-                        EDIFHierNet parentEhn = (ehn != null) ? netlist.getParentNet(ehn) : null;
-                        if (parentEhn != null && !parentEhn.equals(ehn)) {
-                            Net parentNet = design.getNet(parentEhn.getHierarchicalNetName());
-                            if (parentNet != null) {
-                                // 'net' is not a parent net (which normally causes createMissingSitePinInsts(Design, Net)
-                                // to analyze its parent net) but that parent net also exist in the design and has been/
-                                // will be analyzed in due course, so skip doing so here
-                                return;
-                            }
-                        }
-                        createMissingSitePinInsts(design, net, siteInstToNetSiteWiresMap);
                     }
-                } finally {
-                    threadsOutstanding.countDown();
+                    createMissingSitePinInsts(design, net, siteInstToNetSiteWiresMap);
                 }
             });
+            if (f != null) {
+                futures.add((Future<Void>) f);
+            }
         }
-        threadsOutstanding.await();
+
+        while (!futures.isEmpty()) {
+            ParallelismTools.joinFirst(futures);
+        }
     }
 
     private static HashSet<String> muxPins;
@@ -3400,83 +3403,84 @@ public class DesignTools {
      * non-parent Net-s.
      * @param design Design object to be modified in-place.
      */
+    @SuppressWarnings("unchecked")
     public static void makePhysNetNamesConsistent(Design design) {
         Map<EDIFHierNet, EDIFHierNet> netParentMap = design.getNetlist().getParentNetMap();
         EDIFNetlist netlist = design.getNetlist();
-        CountUpDownLatch activeJobs = new CountUpDownLatch();
         int numNets = design.getNets().size();
         int numJobs = ParallelismTools.maxParallelism() * 100;
         List<Net> designNets = new ArrayList<>(design.getNets());
         List<List<Net>> partitionedNets = Lists.partition(designNets, (int) Math.ceil((double) numNets / numJobs));
+        Deque<Future<Void>> futures = new ArrayDeque<>();
         for (List<Net> nets : partitionedNets) {
-            activeJobs.countUp();
-            ParallelismTools.submit(() -> {
-                try {
-                    for (Net net : nets) {
-                        Net parentPhysNet = null;
-                        if (net.isStaticNet()) {
-                            if (net.getType() == NetType.GND) {
-                                parentPhysNet = design.getGndNet();
-                            } else if (net.getType() == NetType.VCC) {
-                                parentPhysNet = design.getVccNet();
-                            } else {
-                                throw new RuntimeException();
-                            }
-                            if (parentPhysNet == net) {
-                                return;
-                            }
+            Future<?> f = ParallelismTools.submit(() -> {
+                for (Net net : nets) {
+                    Net parentPhysNet = null;
+                    if (net.isStaticNet()) {
+                        if (net.getType() == NetType.GND) {
+                            parentPhysNet = design.getGndNet();
+                        } else if (net.getType() == NetType.VCC) {
+                            parentPhysNet = design.getVccNet();
                         } else {
-                            EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
-                            if (hierNet == null) {
-                                // Likely an encrypted cell
-                                return;
-                            }
-                            EDIFHierNet parentHierNet = netParentMap.get(hierNet);
-                            if (parentHierNet == null) {
-                                // System.out.println("WARNING: Couldn't find parent net for '" +
-                                //         hierNet.getHierarchicalNetName() + "'");
-                                return;
-                            }
-
-                            // Check to make sure net is not improperly categorized
-                            EDIFNet srcNetAlias = parentHierNet.getNet();
-                            if (srcNetAlias.isGND()) {
-                                parentPhysNet = design.getGndNet();
-                            } else if (srcNetAlias.isVCC()) {
-                                parentPhysNet = design.getVccNet();
-                            }
-
-                            if (!hierNet.equals(parentHierNet)) {
-                                String parentNetName = parentHierNet.getNet().getName();
-                                // Assume that a net named <const1> or <const0> is always a VCC or GND net
-                                if (parentNetName.equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
-                                    parentPhysNet = design.getVccNet();
-                                } else if (parentNetName.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
-                                    parentPhysNet = design.getGndNet();
-                                } else {
-                                    parentPhysNet = design.getNet(parentHierNet.getHierarchicalNetName());
-                                }
-
-                                if (parentPhysNet != null) {
-                                    // Fall through
-                                } else if (net.rename(parentHierNet.getHierarchicalNetName())) {
-                                    // Fall through
-                                } else {
-                                    System.out.println("WARNING: Failed to adjust physical net name " + net.getName());
-                                }
-                            }
+                            throw new RuntimeException();
+                        }
+                        if (parentPhysNet == net) {
+                            return;
+                        }
+                    } else {
+                        EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
+                        if (hierNet == null) {
+                            // Likely an encrypted cell
+                            return;
+                        }
+                        EDIFHierNet parentHierNet = netParentMap.get(hierNet);
+                        if (parentHierNet == null) {
+                            // System.out.println("WARNING: Couldn't find parent net for '" +
+                            //         hierNet.getHierarchicalNetName() + "'");
+                            return;
                         }
 
-                        if (parentPhysNet != null) {
-                            design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
+                        // Check to make sure net is not improperly categorized
+                        EDIFNet srcNetAlias = parentHierNet.getNet();
+                        if (srcNetAlias.isGND()) {
+                            parentPhysNet = design.getGndNet();
+                        } else if (srcNetAlias.isVCC()) {
+                            parentPhysNet = design.getVccNet();
+                        }
+
+                        if (!hierNet.equals(parentHierNet)) {
+                            String parentNetName = parentHierNet.getNet().getName();
+                            // Assume that a net named <const1> or <const0> is always a VCC or GND net
+                            if (parentNetName.equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
+                                parentPhysNet = design.getVccNet();
+                            } else if (parentNetName.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
+                                parentPhysNet = design.getGndNet();
+                            } else {
+                                parentPhysNet = design.getNet(parentHierNet.getHierarchicalNetName());
+                            }
+
+                            if (parentPhysNet != null) {
+                                // Fall through
+                            } else if (net.rename(parentHierNet.getHierarchicalNetName())) {
+                                // Fall through
+                            } else {
+                                System.out.println("WARNING: Failed to adjust physical net name " + net.getName());
+                            }
                         }
                     }
-                } finally {
-                    activeJobs.countDown();
+
+                    if (parentPhysNet != null) {
+                        design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
+                    }
                 }
             });
+            if (f != null) {
+                futures.add((Future<Void>) f);
+            }
         }
-        activeJobs.await();
+        while (!futures.isEmpty()) {
+            ParallelismTools.joinFirst(futures);
+        }
     }
 
     public static void createPossiblePinsToStaticNets(Design design) {
