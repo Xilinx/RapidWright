@@ -45,10 +45,8 @@ import com.xilinx.rapidwright.design.xdc.parser.DesignObject;
 import com.xilinx.rapidwright.design.xdc.parser.EdifCellLookup;
 import com.xilinx.rapidwright.design.xdc.parser.RegularEdifCellLookup;
 import com.xilinx.rapidwright.design.xdc.parser.TclHashIdentifiedObject;
-import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
-import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
 import org.jetbrains.annotations.NotNull;
@@ -359,6 +357,20 @@ public class TestXDCParser {
 
         public List<String> doRoundtrip(EDIFNetlist netlist, List<String> input) {
             return func.apply(netlist, input);
+        }
+
+        public void doRoundtrip(Design design) {
+            for (ConstraintGroup value : ConstraintGroup.values()) {
+                List<String> constraints = design.getXDCConstraints(value);
+                if (constraints == null) {
+                    continue;
+                }
+                List<String> roundtripped = doRoundtrip(design.getNetlist(), constraints);
+                if (roundtripped != constraints) {
+                    constraints.clear();
+                    constraints.addAll(roundtripped);
+                }
+            }
         }
 
         private static BiFunction<EDIFNetlist, List<String>, List<String>> roundtrip(Function<EDIFNetlist, EdifCellLookup<?>> lookupFactory) {

@@ -24,13 +24,9 @@ package com.xilinx.rapidwright.design.xdc;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.EnumSet;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.blocks.PBlock;
-import com.xilinx.rapidwright.design.blocks.PblockProperty;
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.xdc.parser.RegularEdifCellLookup;
 

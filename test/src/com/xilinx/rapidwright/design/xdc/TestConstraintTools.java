@@ -33,14 +33,20 @@ import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PblockProperty;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public class TestConstraintTools {
 
-    @Test
-    public void testGetPBlockFromXDCConstraints() {
+    @ParameterizedTest
+    @EnumSource(TestXDCParser.RoundtripMode.class)
+    public void testGetPBlockFromXDCConstraints(TestXDCParser.RoundtripMode roundtripMode) {
         Design d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
         d.getXDCConstraints(ConstraintGroup.LATE).add("set_property " + PblockProperty.IS_SOFT + " 1 [get_pblocks pblock_dbg_hub]");
         d.getXDCConstraints(ConstraintGroup.LATE).add("set_property " + PblockProperty.EXCLUDE_PLACEMENT + " 1 [get_pblocks pblock_u_ila_0]");
+        roundtripMode.doRoundtrip(d);
+
         Map<String, PBlock> pblockMap = ConstraintTools.getPBlockFromXDCConstraints(d);
         Assertions.assertEquals(3, pblockMap.size());
         Assertions.assertTrue(pblockMap.containsKey("pblock_dbg_hub"));
