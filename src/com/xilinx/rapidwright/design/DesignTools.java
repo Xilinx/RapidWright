@@ -2287,15 +2287,25 @@ public class DesignTools {
 
         EDIFNetlist netlist = design.getNetlist();
         EDIFHierNet parentEhn = null;
+        Map<EDIFHierPortInst, Cell> cellCache = new HashMap<>();
+        Map<Cell, Set<String>> physPinMappingsCache = new HashMap<>();
         for (EDIFHierPortInst p :  physPins) {
-            Cell c = design.getCell(p.getFullHierarchicalInstName());
+            Cell c = cellCache.containsKey(p) ? cellCache.get(p) : design.getCell(p.getFullHierarchicalInstName());
+            if (!cellCache.containsKey(p)) {
+                cellCache.put(p, c);
+            }
             if (c == null) continue;
             BEL bel = c.getBEL();
             if (bel == null) continue;
             String logicalPinName = p.getPortInst().getName();
             Set<String> physPinMappings;
-            synchronized (c) {
-                physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
+            if (physPinMappingsCache.containsKey(c)) {
+                physPinMappings = physPinMappingsCache.get(c);
+            } else {
+                synchronized (design.getCell(c.getName())) {
+                    physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
+                }
+                physPinMappingsCache.put(c, physPinMappings);
             }
             // BRAMs can have two (or more) physical pin mappings for a logical pin
             if (physPinMappings != null) {
@@ -2310,6 +2320,7 @@ public class DesignTools {
                             synchronized (si) {
                                 si.routeIntraSiteNet(net, belPin, belPin);
                             }
+                            siteInstToNetSiteWiresMap.get(si).put(net, si.getSiteWiresFromNet(net));
                         } else {
                             continue;
                         }
@@ -2340,7 +2351,12 @@ public class DesignTools {
                         }
                         newPin = net.createPin(sitePinName, si);
                     }
-                    if (newPin != null) newPins.add(newPin);
+                    if (newPin != null) {
+                        newPins.add(newPin);
+                        siteInstToNetSiteWiresMap.get(si)
+                                .computeIfAbsent(net, k -> new ArrayList<>()).add(newPin.getSiteWireName());
+
+                    }
                 }
             }
         }
@@ -2390,10 +2406,16 @@ public class DesignTools {
     public static Map<SiteInst, Map<Net, List<String>>> getSiteInstToNetSiteWiresMap(Design design) {
         Map<SiteInst, Map<Net, List<String>>> siteInstToNetSiteWiresMap = new ConcurrentHashMap<>();
         Deque<Future<Void>> futures = new ArrayDeque<>();
-        for (Cell c : design.getCells()) {
+        int numCells = design.getCells().size();
+        int numJobs = ParallelismTools.maxParallelism() * 100;
+        List<Cell> designCells = new ArrayList<>(design.getCells());
+        List<List<Cell>> partitionedCells = Lists.partition(designCells, (int) Math.ceil((double) numCells / numJobs));
+        for (List<Cell> cells : partitionedCells) {
             Future<?> f = ParallelismTools.submit(() -> {
-                SiteInst inst = c.getSiteInst();
-                siteInstToNetSiteWiresMap.put(inst, inst.getNetToSiteWiresMap());
+                for (Cell c : cells) {
+                    SiteInst inst = c.getSiteInst();
+                    siteInstToNetSiteWiresMap.put(inst, inst.getNetToSiteWiresMap());
+                }
             });
             if (f != null) {
                 futures.add((Future<Void>) f);
@@ -2438,6 +2460,9 @@ public class DesignTools {
         }
         List<String> sitePins = new ArrayList<>();
         List<String> siteWires = netSiteWiresMap != null ? netSiteWiresMap.get(net) : inst.getSiteWiresFromNet(net);
+        if (siteWires == null) {
+            throw new RuntimeException("Failed to find siteWires for net: " + net);
+        }
         if (net.isGNDNet()) {
             // Since GND sitewires may be inverted for easier routing, also accept VCC sitewires
             Net vccNet = cell.getSiteInst().getDesign().getVccNet();
@@ -3433,7 +3458,7 @@ public class DesignTools {
                             return;
                         }
                     } else {
-                        EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
+                        EDIFHierNet hierNet = net.getLogicalHierNet();
                         if (hierNet == null) {
                             // Likely an encrypted cell
                             return;
@@ -3475,9 +3500,7 @@ public class DesignTools {
                     }
 
                     if (parentPhysNet != null) {
-                        synchronized (design) {
-                            design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
-                        }
+                        design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
                     }
                 }
             });
