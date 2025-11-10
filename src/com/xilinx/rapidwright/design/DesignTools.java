@@ -2440,7 +2440,9 @@ public class DesignTools {
             Net vccNet = cell.getSiteInst().getDesign().getVccNet();
             List<String> vccSiteWires = netSiteWiresMap != null ?
                     netSiteWiresMap.get(vccNet) : inst.getSiteWiresFromNet(vccNet);
-            siteWires.addAll(vccSiteWires);
+            if (vccSiteWires != null) {
+                siteWires.addAll(vccSiteWires);
+            }
         }
         Queue<BELPin> queue = new LinkedList<>();
         queue.add(cell.getBEL().getPin(belPinName));
