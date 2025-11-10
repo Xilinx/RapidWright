@@ -2293,7 +2293,10 @@ public class DesignTools {
             BEL bel = c.getBEL();
             if (bel == null) continue;
             String logicalPinName = p.getPortInst().getName();
-            Set<String> physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
+            Set<String> physPinMappings;
+            synchronized (c) {
+                physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
+            }
             // BRAMs can have two (or more) physical pin mappings for a logical pin
             if (physPinMappings != null) {
                 SiteInst si = c.getSiteInst();
@@ -3472,7 +3475,9 @@ public class DesignTools {
                     }
 
                     if (parentPhysNet != null) {
-                        design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
+                        synchronized (design.getNet(parentPhysNet.getName())) {
+                            design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
+                        }
                     }
                 }
             });
