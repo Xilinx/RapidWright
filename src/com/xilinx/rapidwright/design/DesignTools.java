@@ -3475,7 +3475,7 @@ public class DesignTools {
                     }
 
                     if (parentPhysNet != null) {
-                        synchronized (design.getNet(parentPhysNet.getName())) {
+                        synchronized (design) {
                             design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
                         }
                     }
