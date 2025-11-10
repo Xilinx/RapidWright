@@ -85,14 +85,15 @@ public class SetPropertyCommand<T> implements Command {
     }
 
     private void addUnsupportedKV(String k, String v, DesignObject<?> someObj) {
+        boolean needsBraces = XDCTools.stringNeedsBraces(v);
         Stream<UnsupportedConstraintElement> line = Stream.concat(
                 Stream.of(
                         new UnsupportedConstraintElement.NameConstraintElement("set_property"),
                         new UnsupportedConstraintElement.SyntaxConstraintElement(" "),
                         new UnsupportedConstraintElement.NameConstraintElement(k),
-                        new UnsupportedConstraintElement.SyntaxConstraintElement(" "),
+                        new UnsupportedConstraintElement.SyntaxConstraintElement(needsBraces ? " {" : " "),
                         new UnsupportedConstraintElement.NameConstraintElement(v),
-                        new UnsupportedConstraintElement.SyntaxConstraintElement(" ")
+                        new UnsupportedConstraintElement.SyntaxConstraintElement(needsBraces ? "} " : " ")
                 ),
                 someObj.toUnsupportedConstraintElement()
         );

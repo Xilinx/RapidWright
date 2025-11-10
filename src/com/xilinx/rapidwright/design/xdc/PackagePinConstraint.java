@@ -92,10 +92,14 @@ public class PackagePinConstraint implements Constraint<PackagePinConstraint> {
     }
 
     public Stream<String> asXdc() {
-        return Stream.of(
-                "set_property PACKAGE_PIN "+packagePin+" [get_ports "+portName+"]",
-                "set_property IOSTANDARD "+ioStandard+" [get_ports "+portName+"]"
-        );
+        Stream.Builder<String> res = Stream.builder();
+        if (packagePin!=null) {
+            res.add("set_property PACKAGE_PIN "+packagePin+" [get_ports "+portName+"]");
+        }
+        if (ioStandard!=null) {
+            res.add("set_property IOSTANDARD "+ioStandard+" [get_ports "+portName+"]");
+        }
+        return res.build();
     }
 
     public void setPortName(String portName) {

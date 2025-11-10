@@ -61,7 +61,19 @@ public class NameDesignObject<T> extends DesignObject<T> {
                     new UnsupportedConstraintElement.SyntaxConstraintElement("]")
                     );
         }
-        boolean braces = objects.size()!=1 || objects.stream().anyMatch(o->o.contains("*") || o.contains("$"));
+
+        if (objects.isEmpty()) {
+            return Stream.of(
+                    new UnsupportedConstraintElement.SyntaxConstraintElement("["),
+                    new UnsupportedConstraintElement.NameConstraintElement(type.getXdcCommand()),
+                    new UnsupportedConstraintElement.SyntaxConstraintElement(" ["),
+                    new UnsupportedConstraintElement.NameConstraintElement("list"),
+                    new UnsupportedConstraintElement.SyntaxConstraintElement("]]")
+            );
+
+        }
+
+        boolean braces = objects.size()!=1 || objects.stream().anyMatch(XDCTools::stringNeedsBraces);
 
         List<UnsupportedConstraintElement> before = new ArrayList<>(Arrays.asList(
                 new UnsupportedConstraintElement.SyntaxConstraintElement("["),

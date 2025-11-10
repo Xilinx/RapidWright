@@ -66,7 +66,7 @@ public class GetCellsCommand<T> implements Command {
         boolean hierFlag = false;
         boolean regexpFlag = false;
         TclObject filter = null;
-        String cellNameStr = null;
+        TclObject cellName = null;
 
         for (int i = 1; i < argv.length; i++) {
             String item = argv[i].toString();
@@ -89,19 +89,20 @@ public class GetCellsCommand<T> implements Command {
                     interp.setResult(UnsupportedCmdResult.makeTclObj(interp, argv, cellLookup, false, false));
                     return;
                 default:
-                    if (cellNameStr != null) {
+                    if (cellName != null) {
                         String s = new UnsupportedCmdResult<>(interp, argv, cellLookup, false, false).toString();
                         throw new RuntimeException("Duplicate cell-name string or unsupported flag: "+s);
                     }
-                    cellNameStr = TclHashIdentifiedObject.unpackAsString(interp, argv[i].toString(), cellLookup);
+                    cellName = argv[i];
                     break;
             }
 
         }
 
-        if (cellNameStr != null && !regexpFlag && filter == null && !hierFlag) {
-            simpleGetCells(interp, cellNameStr);
+        if (cellName != null && !regexpFlag && filter == null && !hierFlag) {
+            simpleGetCells(interp, cellName);
         } else {
+            String cellNameStr = cellName != null ?  TclHashIdentifiedObject.unpackAsString(interp, cellName.toString(), cellLookup) : null;
             if (!complexGetCells(interp, hierFlag, regexpFlag, cellNameStr, filter, argv)) {
                 interp.setResult(UnsupportedCmdResult.makeTclObj(interp, argv, cellLookup, false, false));
             }
@@ -186,9 +187,17 @@ public class GetCellsCommand<T> implements Command {
 
         if (cellNames != null) {
             if (regexFlag) {
-                filter.add(new Pair<>(cellLookup.getAbsoluteRegexFilter(cellNames), eci -> "Checking if " + eci + " matches regex " + cellNames));
+                if (candidateSupplier == null) {
+                    candidateSupplier = cellLookup.getHierCellInstsFromRegexpName(cellNames);
+                } else {
+                    filter.add(new Pair<>(cellLookup.getAbsoluteRegexFilter(cellNames), eci -> "Checking if " + eci + " matches regex " + cellNames));
+                }
             } else {
-                filter.add(new Pair<>(cellLookup.getAbsoluteWildcardFilter(cellNames), eci -> "Checking if " + eci + " matches wildcard " + cellNames));
+                if (candidateSupplier == null) {
+                    candidateSupplier = cellLookup.getHierCellInstsFromWildcardName(cellNames);
+                } else {
+                    filter.add(new Pair<>(cellLookup.getAbsoluteWildcardFilter(cellNames), eci -> "Checking if " + eci + " matches wildcard " + cellNames));
+                }
             }
         }
 
@@ -264,8 +273,26 @@ public class GetCellsCommand<T> implements Command {
     }
 
 
-    private void simpleGetCells(Interp interp, String cellNameStr) throws TclException {
-        String[] cellNames = cellNameStr.split(" ");
+    private void simpleGetCells(Interp interp, TclObject cellName) throws TclException {
+        if (cellName.getInternalRep() instanceof TclList) {
+            System.out.println("started get cells list");
+            TclObject[] elements = TclList.getElements(interp, cellName);
+            String[] cellNames = new String[elements.length];
+            for (int i=0; i<cellNames.length; i++){
+                cellNames[i] = TclHashIdentifiedObject.unpackAsString(interp, elements[i].toString(), cellLookup);
+            }
+            System.out.println("started get cells list find objects");
+            simpleGetCellsList(interp, cellNames);
+
+            System.out.println("finished get cells list");
+        } else {
+            String cellNameStr = TclHashIdentifiedObject.unpackAsString(interp, cellName.toString(), cellLookup);
+            String[] cellNames = cellNameStr.split(" ");
+            simpleGetCellsList(interp, cellNames);
+        }
+    }
+
+    private void simpleGetCellsList(Interp interp, String[] cellNames) throws TclException {
         TclObject list = TclList.newInstance();
         for (String cellName : cellNames) {
             List<T> cells = cellLookup.getHierCellInstsFromWildcardName(cellName).collect(Collectors.toList());

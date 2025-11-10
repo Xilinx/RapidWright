@@ -46,7 +46,9 @@ public class CreatePBlockCommand implements Command {
         if (constraints.getPBlockConstraints().containsKey(pBlockName)) {
             throw new RuntimeException("duplicate pblock name: "+pBlockName);
         }
-        constraints.getPBlockConstraints().put(pBlockName, new PBlockConstraint());
+        PBlockConstraint constraint = new PBlockConstraint();
+        constraint.getPblock().setName(pBlockName);
+        constraints.getPBlockConstraints().put(pBlockName, constraint);
         NameDesignObject<?> res = new NameDesignObject<>(ObjType.PBlock, Collections.singletonList(pBlockName));
         interp.setResult(TclHashIdentifiedObject.createReflectObject(interp, NameDesignObject.class, res));
     }

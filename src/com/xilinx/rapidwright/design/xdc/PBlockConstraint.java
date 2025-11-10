@@ -24,6 +24,8 @@ package com.xilinx.rapidwright.design.xdc;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.xilinx.rapidwright.design.blocks.PBlock;
 
@@ -45,5 +47,15 @@ public class PBlockConstraint implements Constraint<PBlockConstraint> {
 
     public List<String> getCells() {
         return cells;
+    }
+
+    public Stream<String> asXdc() {
+        List<String> res = getPblock().getTclConstraints();
+        if (cells.size()==1 && cells.get(0).isEmpty()) {
+            res.add("add_cells_to_pblock [get_pblocks "+pblock.getName()+"] -top");
+        } else if (!cells.isEmpty()) {
+            res.add("add_cells_to_pblock [get_pblocks "+pblock.getName()+"] [get_cells {"+String.join(" ", cells)+"}]");
+        }
+        return res.stream();
     }
 }

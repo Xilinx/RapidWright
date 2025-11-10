@@ -28,6 +28,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,7 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.xilinx.rapidwright.design.xdc.parser.XDCTools;
 import com.xilinx.rapidwright.util.Pair;
 
 public class XDCConstraints {
@@ -102,7 +104,7 @@ public class XDCConstraints {
     private static Stream<String> cellPropsToXdc(int counter, String cell, Map<String, String> properties) {
         if (properties.size()<2) {
             return properties.entrySet().stream().map(propToValue->
-                    "set_property " + propToValue.getKey() + " " + propToValue.getValue() + " [get_cells {" + cell + "}]"
+                    "set_property " + propToValue.getKey() + " " + XDCTools.braceEnclosedIfNeeded(propToValue.getValue()) + " [get_cells {" + cell + "}]"
             );
         }
 
@@ -110,23 +112,24 @@ public class XDCConstraints {
         String initVarLine = "set "+varName+  " [get_cells {" + cell + "}]";
         return Stream.concat(
                 Stream.of(initVarLine),
-                properties.entrySet().stream().map(propToValue->
-                                "set_property " + propToValue.getKey() + " " + propToValue.getValue() + " $"+varName
+                properties.entrySet().stream().sorted(Map.Entry.comparingByKey()).map(propToValue->
+                                "set_property " + propToValue.getKey() + " " + XDCTools.braceEnclosedIfNeeded(propToValue.getValue()) + " $"+varName
                         )
         );
     }
 
     public Stream<String> getAllAsXdc() {
-        Stream<String> clocks = clockConstraints.values().stream().map(ClockConstraint::asXdc);
+        Stream<String> clocks = clockConstraints.values().stream().sorted(Comparator.comparing(ClockConstraint::getPortName)).map(ClockConstraint::asXdc);
         Stream<String> unsupported = unsupportedConstraints.stream().map(e->UnsupportedConstraintElement.toXdc(e.stream()));
 
         AtomicInteger varCounter = new AtomicInteger();
-        Stream<String> cellProps = cellProperties.entrySet().stream().flatMap(
+        Stream<String> cellProps = cellProperties.entrySet().stream().sorted(Map.Entry.comparingByKey()).flatMap(
                 cellToProps -> cellPropsToXdc(varCounter.getAndIncrement(), cellToProps.getKey(), cellToProps.getValue()));
-        Stream<String> pinConstrs = pinConstraints.values().stream().flatMap(PackagePinConstraint::asXdc);
+        Stream<String> pinConstrs = pinConstraints.values().stream().sorted(Comparator.comparing(PackagePinConstraint::getPortName)).flatMap(PackagePinConstraint::asXdc);
+        Stream<String> pblockConstrs = pBlockConstraints.values().stream().sorted(Comparator.comparing(pBlockConstraint -> pBlockConstraint.getPblock().getName())).flatMap(PBlockConstraint::asXdc);
 
 
-        return Stream.of(clocks, unsupported, cellProps, pinConstrs).flatMap(e->e);
+        return Stream.of(clocks, cellProps, pinConstrs, pblockConstrs, unsupported).flatMap(e->e);
     }
 
     public void writeToFile(Path file) {

@@ -34,12 +34,14 @@ import com.xilinx.rapidwright.design.xdc.parser.CellObject;
 import com.xilinx.rapidwright.design.xdc.parser.DesignObject;
 import com.xilinx.rapidwright.design.xdc.parser.EdifCellLookup;
 import com.xilinx.rapidwright.design.xdc.parser.TclHashIdentifiedObject;
+import com.xilinx.rapidwright.design.xdc.parser.XDCTools;
 import org.apache.commons.io.FilenameUtils;
 import org.jetbrains.annotations.NotNull;
 import tcl.lang.Interp;
 import tcl.lang.TclException;
 import tcl.lang.TclList;
 import tcl.lang.TclObject;
+import tcl.lang.TclToken;
 
 /**
  * Stringified representation of a (partial) constraint that our parser does not currently support.
@@ -245,7 +247,7 @@ public abstract class UnsupportedConstraintElement {
                 res.add(0, new UnsupportedConstraintElement.CellConstraintElement(lookup.getAbsoluteFinalName(cell[0])));
             }
 
-            if (s.contains(" ")) {
+            if (XDCTools.stringNeedsBraces(s)) {
                 return wrapStream(res.stream(), "{", "}");
             }
             return res.stream();

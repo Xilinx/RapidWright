@@ -21,11 +21,14 @@
 package com.xilinx.rapidwright.design.xdc.parser;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import tcl.lang.Command;
 import tcl.lang.Interp;
 import tcl.lang.ReflectObject;
 import tcl.lang.TclException;
+import tcl.lang.TclList;
 import tcl.lang.TclNumArgsException;
 import tcl.lang.TclObject;
 
@@ -54,12 +57,20 @@ public class ObjectGetterCommand implements Command {
             }
             res = new NameDesignObject(objType, null);
         } else {
-            if (argv.length > 2 || TclHashIdentifiedObject.containsStringifiedObject(argv)) {
+            boolean argCountOk = argv.length == 2 || (argv.length==3 && argv[1].toString().equals("-quiet"));
+            if (!argCountOk || TclHashIdentifiedObject.containsStringifiedObject(argv)) {
                 interp.setResult(UnsupportedCmdResult.makeTclObj(interp, argv, lookup, false, false));
                 return;
             }
 
-            res = new NameDesignObject(objType, Arrays.asList(argv[1].toString().split(" ")));
+            TclObject objs = argv[argv.length-1];
+            if (objs.getInternalRep() instanceof TclList) {
+                TclObject[] elements = TclList.getElements(interp, objs);
+                List<String> strings = Arrays.stream(elements).map(Object::toString).collect(Collectors.toList());
+                res = new NameDesignObject(objType, strings);
+            } else {
+                res = new NameDesignObject(objType, Arrays.asList(argv[1].toString().split(" ")));
+            }
         }
         interp.setResult(TclHashIdentifiedObject.createReflectObject(interp, res.getClass(), res));
     }

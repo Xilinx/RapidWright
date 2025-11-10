@@ -56,7 +56,6 @@ public class TestConstraintTools {
         // Check for the property and cooresponding TclConstraints
         String TclConstraints;
         PBlock dbgHub = pblockMap.get("pblock_dbg_hub");
-        dbgHub.setName("pblock_dbg_hub");
         Assertions.assertTrue(dbgHub.containRouting());
         Assertions.assertTrue(dbgHub.isSoft());
         Assertions.assertFalse(dbgHub.excludePlacement());
@@ -68,7 +67,6 @@ public class TestConstraintTools {
         );
 
         PBlock baseMb = pblockMap.get("pblock_base_mb_i");
-        baseMb.setName("pblock_base_mb_i");
         Assertions.assertTrue(baseMb.containRouting());
         Assertions.assertFalse(baseMb.isSoft());
         Assertions.assertFalse(baseMb.excludePlacement());
@@ -80,7 +78,6 @@ public class TestConstraintTools {
         );
 
         PBlock uila0 = pblockMap.get("pblock_u_ila_0");
-        uila0.setName("pblock_u_ila_0");
         Assertions.assertTrue(uila0.containRouting());
         Assertions.assertFalse(uila0.isSoft());
         Assertions.assertTrue(uila0.excludePlacement());

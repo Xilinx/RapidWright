@@ -54,6 +54,15 @@ public class CellObject<T> extends DesignObject<T> {
 
     @Override
     public Stream<UnsupportedConstraintElement> toUnsupportedConstraintElement() {
+        if (cells.isEmpty()) {
+            return Stream.of(
+                    new UnsupportedConstraintElement.SyntaxConstraintElement("["),
+                    new UnsupportedConstraintElement.NameConstraintElement("get_cells"),
+                    new UnsupportedConstraintElement.SyntaxConstraintElement(" ["),
+                    new UnsupportedConstraintElement.NameConstraintElement("list"),
+                    new UnsupportedConstraintElement.SyntaxConstraintElement("]]")
+            );
+        }
         if (cells.size()==1) {
             String onlyCell = cellLookup.getAbsoluteFinalName(cells.get(0));
             if (!onlyCell.contains("[")) {

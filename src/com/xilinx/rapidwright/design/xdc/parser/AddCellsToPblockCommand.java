@@ -58,7 +58,11 @@ public class AddCellsToPblockCommand<T> implements Command {
             throw new RuntimeException("wrong argument type: "+pblock.getType());
         }
 
-        PBlockConstraint pBlockConstraint = Objects.requireNonNull(constraints.getPBlockConstraints().get(pblock.getObjects().get(0)));
+        String pblockName = pblock.requireOneObject();
+        PBlockConstraint pBlockConstraint = Objects.requireNonNull(
+                constraints.getPBlockConstraints().get(pblockName),
+                ()->"Did not find pblock "+pblockName
+        );
 
         if (objv[2].toString().equals("-top")) {
             pBlockConstraint.getCells().add("");

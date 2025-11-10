@@ -78,8 +78,20 @@ public abstract class EdifCellLookup<T> {
     }
 
     public Stream<T> getHierCellInstsFromWildcardName(String cellName) {
+        if (!cellName.contains("*")) {
+            T res = getInstFromOriginalName(cellName);
+            if (res == null) {
+                return Stream.empty();
+            }
+            return Stream.of(res);
+        }
         return getChildBySomeAbsoluteName(cellName, (s, item) -> FilenameUtils.wildcardMatch(getRelativeOriginalName(item), s));
     }
+
+    public Stream<T> getHierCellInstsFromRegexpName(String cellName) {
+        return getChildBySomeAbsoluteName(cellName, (s, item) -> getRelativeOriginalName(item).matches(s));
+    }
+
     public abstract T getInstFromOriginalName(String cellName);
 
     public abstract Stream<? extends T> getChildrenOf(T f);
@@ -90,13 +102,9 @@ public abstract class EdifCellLookup<T> {
         if (level==parts.length) {
             return Stream.of(current);
         }
-        return IntStream.range(level, parts.length)
-                .boxed().flatMap(end-> {
-                    String nameAtCurrentLevel = Arrays.stream(parts, level, end+1).collect(Collectors.joining(EDIFTools.EDIF_HIER_SEP));
-                    return getChildrenOf(current)
-                            .filter(item->filter.test(nameAtCurrentLevel, item))
-                            .flatMap(c->getChildBySomeAbsoluteNameWorker(parts, end+1, c, filter));
-                });
+        return getChildrenOf(current)
+                .filter(child -> filter.test(parts[level], child))
+                .flatMap(c->getChildBySomeAbsoluteNameWorker(parts, level+1, c, filter));
     }
 
 

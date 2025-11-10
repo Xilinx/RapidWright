@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.design.xdc;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -32,7 +33,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BiFunction;
+import java.util.WeakHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -63,11 +64,20 @@ import tcl.lang.TclObject;
 
 public class TestXDCParser {
 
+    //Shared between all test class instances, but weak reference
+    private static WeakReference<Design> ethernetDesignShared = new WeakReference<>(null);
+    //Strong reference in our test class instance
     private Design ethernetDesign;
 
     private Design getEthernetDesign() {
         if (ethernetDesign == null) {
-            ethernetDesign = RapidWrightDCP.loadDCP("verilog_ethernet.dcp", true);
+            Design fromShared = ethernetDesignShared.get();
+            if (fromShared != null) {
+                ethernetDesign = fromShared;
+            } else {
+                ethernetDesign = RapidWrightDCP.loadDCP("verilog_ethernet.dcp", true);
+                //ethernetDesignShared = new WeakReference<>(ethernetDesign);
+            }
         }
         return ethernetDesign;
     }
@@ -257,6 +267,17 @@ public class TestXDCParser {
                                 "core_inst/eth_mac_inst/rx_fifo/fifo_inst/rd_ptr_gray_reg_reg[3]",
                                 "core_inst/eth_mac_inst/rx_fifo/fifo_inst/rd_ptr_reg_reg[2]"
                         )
+                ),
+                Arguments.of(
+                        "get_cells [list]",
+                        Collections.emptyList()
+                ),
+                Arguments.of(
+                        "get_cells [list clk90_bufg_inst clk_200_bufg_inst]",
+                        Arrays.asList(
+                                "clk90_bufg_inst",
+                                "clk_200_bufg_inst"
+                        )
                 )
         );
     }
@@ -318,6 +339,15 @@ public class TestXDCParser {
                                 "set_max_delay [get_pins core_inst/eth_mac_inst/rx_fifo/fifo_inst/rd_ptr_reg_reg[0]/C]",
                                 "set_max_delay [get_pins core_inst/eth_mac_inst/tx_fifo/fifo_inst/rd_ptr_reg_reg[0]/C]"
                         )
+                ),
+                Arguments.of(
+                        "set_max_delay -datapath_only -from [get_cells [list]] " +
+                                "-to [get_cells [list]] " +
+                                "8.000",
+                        Arrays.asList(
+                                "set_max_delay -datapath_only -from [get_cells [list]] " +
+                                        "-to [get_cells [list]] " +
+                                        "8.000")
                 )
         );
         return withRoundtripMode(args);
@@ -339,24 +369,37 @@ public class TestXDCParser {
         /**
          * Use constraints directly
          */
-        Normal((n,x)->x),
+        Normal(null),
         /**
          * Parse constraints with netlist, stringify, then run testcase
          */
-        Roundtrip_with_netlist(roundtrip(RegularEdifCellLookup::new)),
+        Roundtrip_with_netlist(RegularEdifCellLookup::new),
         /**
          * Parse constraints without netlist, stringify, then run testcase
          */
-        Roundtrip_without_netlist(roundtrip(n->null));
+        Roundtrip_without_netlist(n->null);
 
-        private final BiFunction<EDIFNetlist, List<String>, List<String>> func;
+        private final Function<EDIFNetlist, EdifCellLookup<?>> lookupFactory;
 
-        RoundtripMode(BiFunction<EDIFNetlist, List<String>, List<String>> func) {
-            this.func = func;
+
+        public EdifCellLookup<?> getLookup(EDIFNetlist netlist) {
+            return lookupFactory.apply(netlist);
         }
 
-        public List<String> doRoundtrip(EDIFNetlist netlist, List<String> input) {
-            return func.apply(netlist, input);
+        RoundtripMode(Function<EDIFNetlist, EdifCellLookup<?>> lookupFactory) {
+            this.lookupFactory = lookupFactory;
+        }
+
+        public List<String> doRoundtrip(EDIFNetlist netlist, List<String> lines) {
+            if (lookupFactory == null) {
+                return lines;
+            }
+            XDCConstraints xdcConstraints = XDCParser.parseXDC(netlist.getDevice(), lines, lookupFactory.apply(netlist));
+            List<String> res = xdcConstraints.getAllAsXdc().collect(Collectors.toList());
+            for (String line : res) {
+                Assertions.assertFalse(TclHashIdentifiedObject.containsStringifiedObject(line), ()->"Output line contains hash object: "+line);
+            }
+            return res;
         }
 
         public void doRoundtrip(Design design) {
@@ -371,23 +414,6 @@ public class TestXDCParser {
                     constraints.addAll(roundtripped);
                 }
             }
-        }
-
-        private static BiFunction<EDIFNetlist, List<String>, List<String>> roundtrip(Function<EDIFNetlist, EdifCellLookup<?>> lookupFactory) {
-            return (netlist, lines) -> {
-                XDCConstraints xdcConstraints = XDCParser.parseXDC(netlist.getDevice(), lines, lookupFactory.apply(netlist));
-                List<String> res = xdcConstraints.getAllAsXdc().collect(Collectors.toList());
-                for (String line : res) {
-                    Assertions.assertFalse(TclHashIdentifiedObject.containsStringifiedObject(line), ()->"Output line contains hash object: "+line);
-                }
-                System.out.println("script after roundtrip:");
-
-                for (String line : res) {
-                    System.out.println(line);
-                }
-                return res;
-            };
-
         }
     }
 
@@ -983,23 +1009,62 @@ public class TestXDCParser {
         }
     }
 
+    public static class DesignReference {
+        public final Path path;
+        private WeakReference<Design> design;
+
+        public DesignReference(Path path) {
+            this.path = path;
+        }
+
+        public Design getDesign() {
+            Design d = design == null ? null : design.get();
+            if (d == null) {
+                d = Design.readCheckpoint(path, true);
+                this.design = new WeakReference<>(d);
+            }
+            return d;
+        }
+
+        public String toString() {
+            return path.toString();
+        }
+
+
+    }
+
     public static Stream<Arguments> getAllTheDesigns() {
         Set<String> skippedDcps = new HashSet<>();
         skippedDcps.add("picoblaze_ooc_X10Y235_unreadable_edif.dcp"); //Needs Vivado
+
+        List<RoundtripMode> modes = Arrays.asList(
+                RoundtripMode.Roundtrip_without_netlist,
+                RoundtripMode.Roundtrip_with_netlist
+        );
+
         return findAllDcp(RapidWrightDCP.dirPath).stream()
                 .filter(p->!skippedDcps.contains(p.getFileName().toString()))
-                .map(path -> Arguments.of(path));
+                .flatMap(path -> {
+                    DesignReference r = new  DesignReference(path);
+                    return modes.stream().map(factory -> Arguments.of(r, factory));
+                });
     }
+
+    HashMap<Path, WeakReference<Design>> designCache = new HashMap<>();
 
     @ParameterizedTest
     @MethodSource("getAllTheDesigns")
-    void checkAllTheDesigns(Path p) {
-        Design design = Design.readCheckpoint(p, true);
+    void checkAllTheDesigns(DesignReference p, RoundtripMode mode) {
+        Design design = p.getDesign();
         EDIFNetlist netlist = design.getNetlist();
 
         for (ConstraintGroup cg : ConstraintGroup.values()) {
-            List<String> xdcConstraints = design.getXDCConstraints(cg);
-            XDCParser.parseXDC(design.getDevice(), xdcConstraints, new RegularEdifCellLookup(netlist));
+            List<String> sourceText = design.getXDCConstraints(cg);
+            EdifCellLookup<?> lookup = mode.getLookup(netlist);
+            XDCConstraints xdcConstraints = XDCParser.parseXDC(design.getDevice(), sourceText, lookup);
+            List<String> stringified = xdcConstraints.getAllAsXdc().collect(Collectors.toList());
+            XDCConstraints reparse = XDCParser.parseXDC(design.getDevice(), stringified, lookup);
+            Assertions.assertEquals(new NicerStringifyList<>(stringified), new NicerStringifyList<>(reparse.getAllAsXdc().collect(Collectors.toList())));
         }
 
     }
