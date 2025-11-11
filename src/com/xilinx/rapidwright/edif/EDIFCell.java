@@ -823,7 +823,7 @@ public class EDIFCell extends EDIFPropertyObject {
         for (EDIFPort port : getPorts()) {
             EDIFPort otherPort = otherPorts.get(port.getBusName(true));
             if (otherPort == null) {
-                otherPort = otherPorts.get("[]" + port.getBusName(true));
+                otherPort = otherPorts.get(EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE + port.getBusName(true));
             }
             if (otherPort == null || port.getWidth() != otherPort.getWidth()
                     || port.getDirection() != otherPort.getDirection()) {
