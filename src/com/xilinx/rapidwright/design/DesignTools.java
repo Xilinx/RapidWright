@@ -3524,7 +3524,9 @@ public class DesignTools {
                     }
 
                     if (parentPhysNet != null) {
-                        design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
+                        synchronized (design) {
+                            design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
+                        }
                     }
                 }
             });
