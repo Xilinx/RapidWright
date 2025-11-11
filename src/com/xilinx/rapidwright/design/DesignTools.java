@@ -3477,19 +3477,19 @@ public class DesignTools {
                             throw new RuntimeException();
                         }
                         if (parentPhysNet == net) {
-                            return;
+                            continue;
                         }
                     } else {
                         EDIFHierNet hierNet = net.getLogicalHierNet();
                         if (hierNet == null) {
                             // Likely an encrypted cell
-                            return;
+                            continue;
                         }
                         EDIFHierNet parentHierNet = netParentMap.get(hierNet);
                         if (parentHierNet == null) {
                             // System.out.println("WARNING: Couldn't find parent net for '" +
                             //         hierNet.getHierarchicalNetName() + "'");
-                            return;
+                            continue;
                         }
 
                         // Check to make sure net is not improperly categorized
