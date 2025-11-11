@@ -105,7 +105,16 @@ public class PBlockRange {
         this.upperRight = upperRight;
     }
 
+    private static String getPrefixedCornerName(PBlockCorner corner) {
+        if (corner instanceof ClockRegion) {
+            return CLOCK_REGION_RANGE_STR+"_"+corner.getName();
+        }
+        return corner.getName();
+    }
     public String toString() {
+        if (isClockRegionRange()) {
+            return CLOCK_REGION_RANGE_STR + "_" + lowerLeft.getName() + ":" + CLOCK_REGION_RANGE_STR + "_" + upperRight.getName();
+        }
         return lowerLeft.getName() + ":" + upperRight.getName();
     }
 
