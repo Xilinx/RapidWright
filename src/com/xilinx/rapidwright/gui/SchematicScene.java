@@ -592,9 +592,9 @@ public class SchematicScene extends QGraphicsScene {
             }
 
             for (EDIFHierPortInst d : drivers) {
-                ElkPort driver = getOrCreateElkPort(d, prefix, instNodeMap);
+                ElkPort driver = getOrCreateElkPort(d, prefix, instNodeMap, cellInst);
                 for (EDIFHierPortInst s : sinks) {
-                    ElkPort sink = getOrCreateElkPort(s, prefix, instNodeMap);
+                    ElkPort sink = getOrCreateElkPort(s, prefix, instNodeMap, cellInst);
                     if (driver == null || sink == null)
                         continue;
 
@@ -623,12 +623,14 @@ public class SchematicScene extends QGraphicsScene {
         }
     }
 
-    private ElkPort getOrCreateElkPort(EDIFHierPortInst p, String prefix, Map<EDIFHierCellInst, ElkNode> instNodeMap) {
+    private ElkPort getOrCreateElkPort(EDIFHierPortInst p, String prefix, Map<EDIFHierCellInst, ElkNode> instNodeMap,
+            EDIFHierCellInst cellInst) {
         ElkPort port = portInstMap.get(p);
         if (port == null) {
             port = ElkGraphFactory.eINSTANCE.createElkPort();
             if (p.getPortInst().isTopLevelPort()) {
-                return null;
+                p = cellInst.getPortInst(p.getPortInst().getName());
+                port = portInstMap.get(p);
             } else {
                 ElkNode inst = instNodeMap.get(p.getFullHierarchicalInst());
                 port.setParent(inst);
