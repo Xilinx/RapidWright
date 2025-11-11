@@ -3511,12 +3511,14 @@ public class DesignTools {
                                 parentPhysNet = design.getNet(parentHierNet.getHierarchicalNetName());
                             }
 
-                            if (parentPhysNet != null) {
-                                // Fall through
-                            } else if (net.rename(parentHierNet.getHierarchicalNetName())) {
-                                // Fall through
-                            } else {
-                                System.out.println("WARNING: Failed to adjust physical net name " + net.getName());
+                            synchronized (design) {
+                                if (parentPhysNet != null) {
+                                    // Fall through
+                                } else if (net.rename(parentHierNet.getHierarchicalNetName())) {
+                                    // Fall through
+                                } else {
+                                    System.out.println("WARNING: Failed to adjust physical net name " + net.getName());
+                                }
                             }
                         }
                     }
