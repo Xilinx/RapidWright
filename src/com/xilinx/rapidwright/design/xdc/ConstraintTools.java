@@ -37,7 +37,7 @@ import com.xilinx.rapidwright.design.xdc.parser.RegularEdifCellLookup;
  */
 public class ConstraintTools {
 
-    public static Map<String, PBlock> getPBlocksFromXDCConstraints(Design d) {
+    public static Map<String, PBlock> getPBlocksFromXDC(Design d) {
         Map<String, PBlock> pblockMap = new HashMap<>();
 
         for (ConstraintGroup cg : ConstraintGroup.values()) {
