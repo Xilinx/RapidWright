@@ -25,9 +25,10 @@ package com.xilinx.rapidwright.design.xdc;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.blocks.PBlock;
-import com.xilinx.rapidwright.design.ConstraintGroup;
+import com.xilinx.rapidwright.design.xdc.parser.RegularEdifCellLookup;
 
 /**
  * A collection of methods to access design constraints.
@@ -35,20 +36,17 @@ import com.xilinx.rapidwright.design.ConstraintGroup;
  * Created on: Oct 31, 2025
  */
 public class ConstraintTools {
-    public static Map<String, PBlock> getPBlockFromXDCConstraints(Design d) {
+
+    public static Map<String, PBlock> getPBlocksFromXDC(Design d) {
         Map<String, PBlock> pblockMap = new HashMap<>();
+
         for (ConstraintGroup cg : ConstraintGroup.values()) {
-            for (String tclLine : d.getXDCConstraints(cg)) {
-                if (tclLine.contains("resize_pblock")) {
-                    //resize_pblock [get_pblocks pblock_base_mb_i] -add {CLOCKREGION_X1Y1:CLOCKREGION_X1Y1}
-                    //resize_pblock [get_pblocks pblock_dbg_hub] -add {CLOCKREGION_X0Y1:CLOCKREGION_X0Y1}
-                    //resize_pblock [get_pblocks pblock_u_ila_0] -add {CLOCKREGION_X2Y1:CLOCKREGION_X2Y1}
-                    String name = tclLine.substring(tclLine.indexOf("[get_pblocks ") + 13, tclLine.indexOf("]"));
-                    String range = tclLine.substring(tclLine.indexOf("{") + 1, tclLine.indexOf("}"));
-                    pblockMap.put(name, new PBlock(d.getDevice(), range));
-                }
-            }
+            XDCConstraints xdcConstraints = XDCParser.parseXDC(d.getDevice(), d.getXDCConstraints(cg), new RegularEdifCellLookup(d.getNetlist()));
+            xdcConstraints.getPBlockConstraints().forEach((k,v)->{
+                pblockMap.put(k, v.getPblock());
+            });
         }
+
         return pblockMap;
     }
 }
