@@ -2282,6 +2282,10 @@ public class DesignTools {
 
                         currPin = net.createPin(pin.getName(), siteInst);
                         newPins.add(currPin);
+                        if (siteInstToNetSiteWiresMap != null) {
+                            siteInstToNetSiteWiresMap.get(siteInst)
+                                    .computeIfAbsent(net, k -> new ArrayList<>()).add(currPin.getSiteWireName());
+                        }
                     }
                 }
             }
@@ -2309,7 +2313,7 @@ public class DesignTools {
                 synchronized (design.getCell(c.getName())) {
                     physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
                 }
-                physPinMappingsCache.put(c, physPinMappings);
+//                physPinMappingsCache.put(c, physPinMappings);
             }
             // BRAMs can have two (or more) physical pin mappings for a logical pin
             if (physPinMappings != null) {
@@ -2618,7 +2622,7 @@ public class DesignTools {
                             return;
                         }
                     }
-                    createMissingSitePinInsts(design, net, siteInstToNetSiteWiresMap);
+                    createMissingSitePinInsts(design, net, null);
                 }
             });
             if (f != null) {
