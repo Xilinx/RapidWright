@@ -447,7 +447,7 @@ public class SchematicScene extends QGraphicsScene {
     private QPointF getTopPortConnectionPoint(ElkNode port, boolean isOutput) {
         double portX = port.getX() + (port.getWidth() - TOP_PORT_WIDTH) / 2.0;
         double portY = port.getY() + (port.getHeight() - TOP_PORT_HEIGHT) / 2.0;
-        return new QPointF(portX + (isOutput ? -POINT_DIST : POINT_DIST + TOP_PORT_WIDTH), portY + TOP_PORT_HEIGHT / 2);
+        return new QPointF(portX + (isOutput ? -POINT_DIST : POINT_DIST) + TOP_PORT_WIDTH, portY + TOP_PORT_HEIGHT / 2);
     }
 
     private static QPolygonF createPortShape(ElkNode topPort, boolean isOutput) {
@@ -489,8 +489,7 @@ public class SchematicScene extends QGraphicsScene {
                 for (int i : (topPort.isBus() ? topPort.getBitBlastedIndicies() : new int[] { 0 })) {
                     String portInstName = topPort.getPortInstNameFromPort(i);
                     ElkNode elkTopPortNode = f.createElkNode();
-                    EDIFPortInst portInst = topPort.getInternalPortInstFromIndex(i);
-                    EDIFHierPortInst hierPortInst = cellInst.getPortInst(portInst.getName());
+                    EDIFHierPortInst hierPortInst = cellInst.getPortInst(portInstName);
                     elkNodeTopPortMap.put(elkTopPortNode, hierPortInst);
                     elkTopPortNode.setDimensions(TOP_PORT_WIDTH + POINT_DIST, TOP_PORT_HEIGHT);
                     elkTopPortNode.setIdentifier(portInstName);
