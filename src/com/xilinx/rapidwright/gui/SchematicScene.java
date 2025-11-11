@@ -88,8 +88,8 @@ public class SchematicScene extends QGraphicsScene {
 
     private ElkNode elkRoot;
 
-    private Map<EDIFPortInst, ElkPort> portInstMap = new HashMap<>();
-    private Map<ElkNode, EDIFPortInst> elkNodeTopPortMap = new HashMap<>();
+    private Map<EDIFHierPortInst, ElkPort> portInstMap = new HashMap<>();
+    private Map<ElkNode, EDIFHierPortInst> elkNodeTopPortMap = new HashMap<>();
     private Map<ElkNode, EDIFHierCellInst> elkNodeCellMap = new HashMap<>();
     private Map<String, List<Object>> lookupMap = new HashMap<>();
     private Set<String> expandedCellInsts = new HashSet<>();
@@ -195,25 +195,24 @@ public class SchematicScene extends QGraphicsScene {
 
         // We create arrow-shaped top port ElkNodes to serve as targets for top ports
         for (ElkNode topPort : elkRoot.getChildren()) {
-            EDIFPortInst portInst = elkNodeTopPortMap.get(topPort);
-            if (portInst != null) {
-                EDIFHierPortInst hierPortInst = currCellInst.getPortInst(portInst.toString());
-
-                QPolygonF portShape = createPortShape(topPort, portInst.isOutput());
+            EDIFHierPortInst hierPortInst = elkNodeTopPortMap.get(topPort);
+            if (hierPortInst != null) {
+                QPolygonF portShape = createPortShape(topPort, hierPortInst.isOutput());
                 QGraphicsPolygonItem port = addPolygon(portShape, PORT_PEN, PORT_BRUSH);
                 String lookup = "PORT:" + hierPortInst.toString();
                 port.setData(0, lookup);
-                port.setToolTip(portInst.getName() + (portInst.isOutput() ? "(Output)" : "(Input)"));
+                String portInstName = hierPortInst.getPortInst().getName();
+                port.setToolTip(portInstName + (hierPortInst.isOutput() ? "(Output)" : "(Input)"));
                 port.setAcceptsHoverEvents(true);
                 lookupMap.computeIfAbsent(lookup, l -> new ArrayList<>()).add(port);
 
-                QGraphicsSimpleTextItem portLabel = addSimpleText(portInst.getName());
+                QGraphicsSimpleTextItem portLabel = addSimpleText(portInstName);
                 portLabel.setBrush(BLACK_BRUSH);
                 portLabel.setFont(FONT);
                 double portShapeX = topPort.getX() + (topPort.getWidth() - TOP_PORT_WIDTH) / 2.0;
                 double portShapeY = topPort.getY() + (topPort.getHeight() - TOP_PORT_HEIGHT) / 2.0;
                 double labelX = portShapeX;
-                if (portInst.isOutput()) {
+                if (hierPortInst.isOutput()) {
                     // Position label to the right of top ports
                     labelX += TOP_PORT_WIDTH + PORT_LABEL_SPACING;
                 } else {
@@ -391,8 +390,8 @@ public class SchematicScene extends QGraphicsScene {
             if (!e.getSources().isEmpty()) {
                 ElkPort srcPort = (ElkPort) e.getSources().get(0);
                 ElkNode portParent = (ElkNode) srcPort.getParent();
-                EDIFPortInst portInst = elkNodeTopPortMap.get(portParent);
-                if (portInst != null && portInst.isTopLevelPort()) {
+                EDIFHierPortInst portInst = elkNodeTopPortMap.get(portParent);
+                if (portInst != null && portInst.getPortInst().isTopLevelPort()) {
                     QPointF topPortLoc = getTopPortConnectionPoint(portParent, portInst.isOutput());
                     startX = topPortLoc.x();
                     startY = topPortLoc.y();
@@ -402,8 +401,8 @@ public class SchematicScene extends QGraphicsScene {
             if (!e.getTargets().isEmpty()) {
                 ElkPort snkPort = (ElkPort) e.getTargets().get(0);
                 ElkNode portParent = (ElkNode) snkPort.getParent();
-                EDIFPortInst portInst = elkNodeTopPortMap.get(portParent);
-                if (portInst != null && portInst.isTopLevelPort()) {
+                EDIFHierPortInst portInst = elkNodeTopPortMap.get(portParent);
+                if (portInst != null && portInst.getPortInst().isTopLevelPort()) {
                     QPointF topPortLoc = getTopPortConnectionPoint(portParent, portInst.isOutput());
                     endX = topPortLoc.x();
                     endY = topPortLoc.y();
@@ -491,7 +490,8 @@ public class SchematicScene extends QGraphicsScene {
                     String portInstName = topPort.getPortInstNameFromPort(i);
                     ElkNode elkTopPortNode = f.createElkNode();
                     EDIFPortInst portInst = topPort.getInternalPortInstFromIndex(i);
-                    elkNodeTopPortMap.put(elkTopPortNode, portInst);
+                    EDIFHierPortInst hierPortInst = cellInst.getPortInst(portInst.getName());
+                    elkNodeTopPortMap.put(elkTopPortNode, hierPortInst);
                     elkTopPortNode.setDimensions(TOP_PORT_WIDTH + POINT_DIST, TOP_PORT_HEIGHT);
                     elkTopPortNode.setIdentifier(portInstName);
                     elkTopPortNode.setParent(parent);
@@ -505,13 +505,13 @@ public class SchematicScene extends QGraphicsScene {
                     elkTopPort.setProperty(CoreOptions.PORT_SIDE, topPort.isOutput() ? PortSide.EAST : PortSide.WEST);
                     elkTopPort.setProperty(CoreOptions.PORT_INDEX, 1);
                     elkTopPort.setDimensions(PORT_SIZE, PORT_SIZE);
-                    portInstMap.put(portInst, elkTopPort);
+                    portInstMap.put(cellInst.getPortInst(portInstName), elkTopPort);
                     elkTopPortNode.getPorts().add(elkTopPort);
                 }
             }
         }
 
-        Map<EDIFCellInst, ElkNode> instNodeMap = new HashMap<>();
+        Map<EDIFHierCellInst, ElkNode> instNodeMap = new HashMap<>();
         for (EDIFCellInst inst : cell.getCellInsts()) {
             ElkNode elkInst = f.createElkNode();
             elkInst.setParent(parent);
@@ -519,7 +519,7 @@ public class SchematicScene extends QGraphicsScene {
             EDIFHierCellInst childInst = cellInst.getChild(inst);
             elkInst.setIdentifier(childInst.toString());
             elkInst.setProperty(CoreOptions.PORT_CONSTRAINTS, PortConstraints.FIXED_ORDER);
-            instNodeMap.put(inst, elkInst);
+            instNodeMap.put(childInst, elkInst);
             elkNodeCellMap.put(elkInst, childInst);
 
             boolean isHierCell = !inst.getCellType().isLeafCellOrBlackBox();
@@ -530,20 +530,19 @@ public class SchematicScene extends QGraphicsScene {
             labelElkNode(elkInst, inst.getCellName());
 
             // Create ports
-            Map<String, EDIFPortInst> westPorts = new TreeMap<>();
-            Map<String, EDIFPortInst> eastPorts = new TreeMap<>();
+            Map<String, EDIFHierPortInst> westPorts = new TreeMap<>();
+            Map<String, EDIFHierPortInst> eastPorts = new TreeMap<>();
             double longestWestName = 0;
             double longestEastName = 0;
-            for (EDIFPort port : inst.getCellPorts()) {
-                for (int i : port.isBus() ? port.getBitBlastedIndicies() : new int[] { 0 }) {
-                    String name = port.getPortInstNameFromPort(i);
-                    if (port.isInput()) {
-                        westPorts.put(name, inst.getPortInst(name));
-                        longestWestName = Math.max(longestWestName, fm.width(name));
-                    } else {
-                        eastPorts.put(name, inst.getPortInst(name));
-                        longestEastName = Math.max(longestEastName, fm.width(name));
-                    }
+            // for (EDIFPort port : inst.getCellPorts()) {
+            for (EDIFHierPortInst hierPortInst : childInst.getHierPortInsts()) {
+                String name = hierPortInst.getPortInst().getName();
+                if (hierPortInst.isInput()) {
+                    westPorts.put(name, hierPortInst);
+                    longestWestName = Math.max(longestWestName, fm.width(name));
+                } else {
+                    eastPorts.put(name, hierPortInst);
+                    longestEastName = Math.max(longestEastName, fm.width(name));
                 }
             }
 
@@ -566,34 +565,35 @@ public class SchematicScene extends QGraphicsScene {
                         fm.height() + LABEL_BUFFER * 2, // Bottom
                         SIDE_PADDING // Side
                 ));
-                createExpandedCellInnerPorts(inst);
+                createExpandedCellInnerPorts(childInst);
                 populateCellContent(childInst, elkInst, prefix + inst.getName() + "/");
             }
         }
 
         for (EDIFNet net : cell.getNets()) {
-            List<EDIFPortInst> drivers = new ArrayList<>();
-            List<EDIFPortInst> sinks = new ArrayList<>();
+            List<EDIFHierPortInst> drivers = new ArrayList<>();
+            List<EDIFHierPortInst> sinks = new ArrayList<>();
 
             for (EDIFPortInst p : net.getPortInsts()) {
+                EDIFHierPortInst hierPortInst = new EDIFHierPortInst(cellInst, p);
                 if (p.isTopLevelPort()) {
                     if (p.isOutput()) {
-                        sinks.add(p);
+                        sinks.add(hierPortInst);
                     } else {
-                        drivers.add(p);
+                        drivers.add(hierPortInst);
                     }
                 } else {
                     if (p.isOutput()) {
-                        drivers.add(p);
+                        drivers.add(hierPortInst);
                     } else {
-                        sinks.add(p);
+                        sinks.add(hierPortInst);
                     }
                 }
             }
 
-            for (EDIFPortInst d : drivers) {
+            for (EDIFHierPortInst d : drivers) {
                 ElkPort driver = getOrCreateElkPort(d, prefix, instNodeMap);
-                for (EDIFPortInst s : sinks) {
+                for (EDIFHierPortInst s : sinks) {
                     ElkPort sink = getOrCreateElkPort(s, prefix, instNodeMap);
                     if (driver == null || sink == null)
                         continue;
@@ -609,31 +609,31 @@ public class SchematicScene extends QGraphicsScene {
         }
     }
 
-    private void createExpandedCellInnerPorts(EDIFCellInst inst) {
-        for (EDIFPort port : inst.getCellPorts()) {
+    private void createExpandedCellInnerPorts(EDIFHierCellInst inst) {
+        for (EDIFPort port : inst.getCellType().getPorts()) {
             for (int i : (port.isBus() ? port.getBitBlastedIndicies() : new int[] { 0 })) {
-                EDIFPortInst outerPortInst = inst.getPortInst(port.getPortInstNameFromPort(i));
+                EDIFPortInst outerPortInst = inst.getInst().getPortInst(port.getPortInstNameFromPort(i));
                 ElkPort outerElkPort = portInstMap.get(outerPortInst);
                 // Map the inner port inst to the outer one so nets are aligned
                 if (outerElkPort != null) {
                     EDIFPortInst innerPortInst = port.getInternalPortInstFromIndex(i);
-                    portInstMap.put(innerPortInst, outerElkPort);
+                    portInstMap.put(inst.getPortInst(innerPortInst.getName()), outerElkPort);
                 }
             }
         }
     }
 
-    private ElkPort getOrCreateElkPort(EDIFPortInst p, String prefix, Map<EDIFCellInst, ElkNode> instNodeMap) {
+    private ElkPort getOrCreateElkPort(EDIFHierPortInst p, String prefix, Map<EDIFHierCellInst, ElkNode> instNodeMap) {
         ElkPort port = portInstMap.get(p);
         if (port == null) {
             port = ElkGraphFactory.eINSTANCE.createElkPort();
-            if (p.isTopLevelPort()) {
+            if (p.getPortInst().isTopLevelPort()) {
                 return null;
             } else {
-                ElkNode inst = instNodeMap.get(p.getCellInst());
+                ElkNode inst = instNodeMap.get(p.getFullHierarchicalInst());
                 port.setParent(inst);
                 inst.getPorts().add(port);
-                port.setIdentifier(p.getName());
+                port.setIdentifier(p.getPortInst().getName());
                 port.setDimensions(PORT_SIZE, PORT_SIZE);
                 port.setProperty(CoreOptions.PORT_SIDE, p.isOutput() ? PortSide.EAST : PortSide.WEST);
             }
@@ -643,9 +643,9 @@ public class SchematicScene extends QGraphicsScene {
         return port;
     }
 
-    private int createElkPorts(int startIdx, boolean isHierCell, ElkNode parent, Map<String, EDIFPortInst> portNames,
+    private int createElkPorts(int startIdx, boolean isHierCell, ElkNode parent, Map<String, EDIFHierPortInst> portNames,
             PortSide side) {
-        for (Entry<String, EDIFPortInst> e : portNames.entrySet()) {
+        for (Entry<String, EDIFHierPortInst> e : portNames.entrySet()) {
             ElkPort port = ElkGraphFactory.eINSTANCE.createElkPort();
             portInstMap.put(e.getValue(), port);
             port.setParent(parent);
