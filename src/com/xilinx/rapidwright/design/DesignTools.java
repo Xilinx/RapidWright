@@ -2609,7 +2609,7 @@ public class DesignTools {
             Future<?> f = ParallelismTools.submit(() -> {
                 for (Net net : nets) {
                     if (net.isUsedNet()) {
-                        return;
+                        continue;
                     }
                     EDIFHierNet ehn = net.getLogicalHierNet();
                     EDIFHierNet parentEhn = (ehn != null) ? netlist.getParentNet(ehn) : null;
@@ -2619,10 +2619,10 @@ public class DesignTools {
                             // 'net' is not a parent net (which normally causes createMissingSitePinInsts(Design, Net)
                             // to analyze its parent net) but that parent net also exist in the design and has been/
                             // will be analyzed in due course, so skip doing so here
-                            return;
+                            continue;
                         }
                     }
-                    createMissingSitePinInsts(design, net, null);
+                    createMissingSitePinInsts(design, net, siteInstToNetSiteWiresMap);
                 }
             });
             if (f != null) {
