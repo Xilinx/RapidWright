@@ -24,14 +24,10 @@ package com.xilinx.rapidwright.design.xdc;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.EnumSet;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
+import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.blocks.PBlock;
-import com.xilinx.rapidwright.design.blocks.PblockProperty;
-import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.xdc.parser.RegularEdifCellLookup;
 
 /**
@@ -41,7 +37,7 @@ import com.xilinx.rapidwright.design.xdc.parser.RegularEdifCellLookup;
  */
 public class ConstraintTools {
 
-    public static Map<String, PBlock> getPBlockFromXDCConstraints(Design d) {
+    public static Map<String, PBlock> getPBlocksFromXDCConstraints(Design d) {
         Map<String, PBlock> pblockMap = new HashMap<>();
 
         for (ConstraintGroup cg : ConstraintGroup.values()) {
@@ -52,15 +48,5 @@ public class ConstraintTools {
         }
 
         return pblockMap;
-    }
-
-    private static String extractPBlockName(String line) {
-        Matcher m = PBLOCK_NAME_PATTERN.matcher(line);
-        return m.find() ? m.group(1) : null;
-    }
-
-    private static String extractRange(String line) {
-        Matcher m = RANGE_PATTERN.matcher(line);
-        return m.find() ? m.group(1) : null;
     }
 }

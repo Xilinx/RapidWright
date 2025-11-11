@@ -47,7 +47,7 @@ public class TestConstraintTools {
         d.getXDCConstraints(ConstraintGroup.LATE).add("set_property " + PblockProperty.EXCLUDE_PLACEMENT + " 1 [get_pblocks pblock_u_ila_0]");
         roundtripMode.doRoundtrip(d);
 
-        Map<String, PBlock> pblockMap = ConstraintTools.getPBlockFromXDCConstraints(d);
+        Map<String, PBlock> pblockMap = ConstraintTools.getPBlocksFromXDCConstraints(d);
         Assertions.assertEquals(3, pblockMap.size());
         Assertions.assertTrue(pblockMap.containsKey("pblock_dbg_hub"));
         Assertions.assertTrue(pblockMap.containsKey("pblock_base_mb_i"));
