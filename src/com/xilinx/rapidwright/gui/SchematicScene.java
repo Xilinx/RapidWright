@@ -74,6 +74,7 @@ import com.trolltech.qt.gui.QPolygonF;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -196,9 +197,11 @@ public class SchematicScene extends QGraphicsScene {
         for (ElkNode topPort : elkRoot.getChildren()) {
             EDIFPortInst portInst = elkNodeTopPortMap.get(topPort);
             if (portInst != null) {
+                EDIFHierPortInst hierPortInst = currCellInst.getPortInst(portInst.toString());
+
                 QPolygonF portShape = createPortShape(topPort, portInst.isOutput());
                 QGraphicsPolygonItem port = addPolygon(portShape, PORT_PEN, PORT_BRUSH);
-                String lookup = "PORT:" + portInst.getName();
+                String lookup = "PORT:" + hierPortInst.toString();
                 port.setData(0, lookup);
                 port.setToolTip(portInst.getName() + (portInst.isOutput() ? "(Output)" : "(Input)"));
                 port.setAcceptsHoverEvents(true);
@@ -265,7 +268,7 @@ public class SchematicScene extends QGraphicsScene {
                 }
                 createHierButton(child, isExpanded, expandedCellName, xOffset, yOffset);
             }
-            String instLookup = "INST:" + relCellInstName;
+            String instLookup = "INST:" + child.getIdentifier();
             rect.setData(0, instLookup);
             lookupMap.computeIfAbsent(instLookup, l -> new ArrayList<>()).add(rect);
 
@@ -293,12 +296,12 @@ public class SchematicScene extends QGraphicsScene {
             for (ElkPort port : child.getPorts()) {
                 double yPort = y + port.getY() + port.getHeight() / 2.0;
                 PortSide side = port.getProperty(CoreOptions.PORT_SIDE);
-                drawPin(child, port, yPort, side, isExpanded, xOffset);
+                drawPin(child, port, yPort, side, isExpanded, xOffset, child.getIdentifier());
                                 
                 QGraphicsSimpleTextItem pinLabel = addSimpleText(port.getIdentifier());
                 pinLabel.setBrush(BLACK_BRUSH);
                 pinLabel.setFont(FONT);
-                pinLabel.setZValue(6);
+                pinLabel.setZValue(2);
                 double textWidth = pinLabel.boundingRect().width();
                 double textHeight = pinLabel.boundingRect().height();
                 double labelX = x;
@@ -320,17 +323,21 @@ public class SchematicScene extends QGraphicsScene {
         }
     }
 
-    private void drawPin(ElkNode cell, ElkPort port, double y, PortSide side, boolean isExpanded, double xOffset) {
+    private void drawPin(ElkNode cell, ElkPort port, double y, PortSide side, boolean isExpanded, double xOffset, String parentInst) {
         double x1 = cell.getX() + xOffset + (side == PortSide.EAST ? cell.getWidth() : -PIN_LINE_LENGTH);
         double x2 = cell.getX() + xOffset + (side == PortSide.EAST ? cell.getWidth() + PIN_LINE_LENGTH : 0);
 
         // Draw outer pins
         QGraphicsLineItem pinLine = addLine(x1, y, x2, y, BLACK_PEN);
         pinLine.setZValue(2);
+        String lookup = "PORT:" + parentInst + "/" + port.getIdentifier();
+        pinLine.setData(0, lookup);
+        lookupMap.computeIfAbsent(lookup, l -> new ArrayList<>()).add(pinLine);
         // Add a thick invisible area to make them easier to click on
         QGraphicsLineItem clickLine = addLine(x1, y, x2, y, CLICK_PEN);
-        clickLine.setZValue(2);
-
+        clickLine.setZValue(3);
+        clickLine.setData(0, lookup);
+        
         if (isExpanded) {
             // Draw inner pins
             x1 = cell.getX() + xOffset + (side == PortSide.EAST ? cell.getWidth() - PIN_LINE_LENGTH : 0);
@@ -434,6 +441,7 @@ public class SchematicScene extends QGraphicsScene {
         QGraphicsLineItem clickLine = addLine(lastX, lastY, endX, endY, NET_CLICK_PEN);
         clickLine.setData(0, lookup);
         clickLine.setData(1, CLICK);
+        clickLine.setZValue(5);
         lookupMap.computeIfAbsent(lookup, l -> new ArrayList<>()).add(clickLine);
     }
 
@@ -508,10 +516,10 @@ public class SchematicScene extends QGraphicsScene {
             ElkNode elkInst = f.createElkNode();
             elkInst.setParent(parent);
             parent.getChildren().add(elkInst);
-            elkInst.setIdentifier(prefix + inst.getName());
+            EDIFHierCellInst childInst = cellInst.getChild(inst);
+            elkInst.setIdentifier(childInst.toString());
             elkInst.setProperty(CoreOptions.PORT_CONSTRAINTS, PortConstraints.FIXED_ORDER);
             instNodeMap.put(inst, elkInst);
-            EDIFHierCellInst childInst = cellInst.getChild(inst);
             elkNodeCellMap.put(elkInst, childInst);
 
             boolean isHierCell = !inst.getCellType().isLeafCellOrBlackBox();
@@ -592,7 +600,7 @@ public class SchematicScene extends QGraphicsScene {
 
                     ElkEdge edge = ElkGraphFactory.eINSTANCE.createElkEdge();
                     edge.setContainingNode(parent);
-                    edge.setIdentifier(prefix + net.getName());
+                    edge.setIdentifier(cellInst.toString() + "/" + net.getName());
                     edge.getSources().add(driver);
                     edge.getTargets().add(sink);
                     parent.getContainedEdges().add(edge);
