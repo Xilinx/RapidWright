@@ -316,15 +316,18 @@ public class PerformanceExplorer {
 
             for (String line : lines) {
                 String[] splitLine = line.split("\\s+");
-                EDIFPort port = netlist.getTopCell().getPort(splitLine[0]);
-                if (port == null) {
-                    port = netlist.getTopCell().getPort(EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE + splitLine[0]);
+                String portRegex = splitLine[0];
+                String pblockSide = splitLine[1].toUpperCase();
+                for (EDIFPort port : netlist.getTopCell().getPorts()) {
+                    if (port.getBusName().matches(portRegex) ||
+                            port.getName().matches("\\" + EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE + portRegex)) {
+                        if (externalRoutabilitySideMap.containsKey(port)) {
+                            throw new RuntimeException("Port " + port + " matches multiple expressions in side map");
+                        }
+                        PBlockSide side = PBlockSide.valueOf(pblockSide);
+                        externalRoutabilitySideMap.put(port, side);
+                    }
                 }
-                if (port == null) {
-                    throw new RuntimeException("Invalid port name in external routability side file: " + splitLine[0]);
-                }
-                PBlockSide side = PBlockSide.valueOf(splitLine[1].toUpperCase());
-                externalRoutabilitySideMap.put(port, side);
             }
         }
         return externalRoutabilitySideMap;
@@ -471,7 +474,7 @@ public class PerformanceExplorer {
                         ArrayList<String> tcl = createTclScript(pblockDcpName, instDir, p, r, roundedC, e, encryptedTcl);
                         String scriptName = instDir + File.separator + RUN_TCL_NAME;
 
-                        if (!reusePreviousResults) {
+                        if (!reusePreviousResults()) {
                             FileTools.writeLinesToTextFile(tcl, scriptName);
                             Job j = JobQueue.createJob();
                             j.setRunDir(instDir);
