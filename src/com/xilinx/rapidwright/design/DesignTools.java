@@ -2296,7 +2296,6 @@ public class DesignTools {
         EDIFNetlist netlist = design.getNetlist();
         EDIFHierNet parentEhn = null;
         Map<EDIFHierPortInst, Cell> cellCache = new HashMap<>();
-        Map<Cell, Set<String>> physPinMappingsCache = new HashMap<>();
         for (EDIFHierPortInst p :  physPins) {
             Cell c = cellCache.containsKey(p) ? cellCache.get(p) : design.getCell(p.getFullHierarchicalInstName());
             if (!cellCache.containsKey(p)) {
@@ -2307,13 +2306,8 @@ public class DesignTools {
             if (bel == null) continue;
             String logicalPinName = p.getPortInst().getName();
             Set<String> physPinMappings;
-            if (physPinMappingsCache.containsKey(c)) {
-                physPinMappings = physPinMappingsCache.get(c);
-            } else {
-                synchronized (design.getCell(c.getName())) {
-                    physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
-                }
-//                physPinMappingsCache.put(c, physPinMappings);
+            synchronized (design.getCell(c.getName())) {
+                physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
             }
             // BRAMs can have two (or more) physical pin mappings for a logical pin
             if (physPinMappings != null) {
