@@ -1736,7 +1736,7 @@ public class EDIFTools {
         for (EDIFPort topPort : netlist.getTopCell().getPorts()) {
             EDIFPort flatPort = flatTop.createPort(topPort);
             if (flatPort.isBus()) {
-                int[] indicies = flatPort.getBitBlastedIndicies();
+                int[] indicies = flatPort.getBitBlastedIndices();
                 int i = 0;
                 for (EDIFNet net : topPort.getInternalNets()) {
                     if (net == null) continue;

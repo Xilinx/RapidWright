@@ -356,13 +356,31 @@ public class EDIFPort extends EDIFPropertyObject {
         return width > 1 || !getName().equals(busName);
     }
 
+    private static final int[] SINGLE_BIT_INDICES = new int[] { 0 };
+
+    /**
+     * @see #getBitBlastedIndicies()
+     * @deprecated Misspelling in name, to be removed in 2026.1.0
+     */
     public int[] getBitBlastedIndicies() {
+        return getBitBlastedIndices();
+    }
+
+    /**
+     * Returns an array of all the integer indices of this port. If the port is a
+     * single bit it returns an array with a single entry of '0'. This is useful
+     * when needing to iterate over a port's PortInst objects.
+     * 
+     * @return The integer list of indices of this port, or {0} for a single bit
+     *         port.
+     */
+    public int[] getBitBlastedIndices() {
         int lastLeftBracket = getName().lastIndexOf('[');
         if (getName().contains(":"))
             return EDIFTools.bitBlastBus(getName().substring(lastLeftBracket));
         if (getName().contains("["))
             return new int[] {Integer.parseInt(getName().substring(lastLeftBracket,getName().length()-1))};
-        return null;
+        return SINGLE_BIT_INDICES;
     }
 
     public boolean isBusRangeEqual(EDIFPort otherPort) {
