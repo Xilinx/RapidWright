@@ -123,7 +123,6 @@ public class NetlistBrowser extends QMainWindow {
         if (item instanceof HierCellInstTreeWidgetItem) {
             EDIFHierCellInst cellInst = ((HierCellInstTreeWidgetItem) item).getInst();
             schematicScene.drawCell(cellInst);
-            // TODO We need to check the current parent to see if that we can select in the schematic
         } else if (item.data(0, 0) instanceof EDIFPort) {
             EDIFPort port = (EDIFPort) item.data(0, 0);
             schematicScene.selectObject(item.data(1, 0).toString(), true);
