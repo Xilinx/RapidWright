@@ -225,11 +225,11 @@ public class SchematicScene extends QGraphicsScene {
             }
         }
 
-        renderNode(elkRoot, 0, 0);
+        renderNode(elkRoot, 0, 0, "");
         renderEdges(elkRoot, 0, 0);
     }
 
-    private void renderNode(ElkNode parent, double xOffset, double yOffset) {
+    private void renderNode(ElkNode parent, double xOffset, double yOffset, String prefix) {
         EDIFCell cell = elkNodeCellMap.get(parent).getCellType();
         for (ElkNode child : parent.getChildren()) {
             if (elkNodeTopPortMap.containsKey(child)) {
@@ -244,7 +244,7 @@ public class SchematicScene extends QGraphicsScene {
             EDIFCellInst eci = cell.getCellInst(relCellInstName);
 
             boolean isLeaf = true;
-            String cellInstName = elkRoot.equals(parent) ? (eci != null ? eci.getName() : "") : child.getIdentifier();
+            String cellInstName = prefix + relCellInstName;
             boolean isExpanded = expandedCellInsts.contains(cellInstName);
             if (child.getChildren().size() > 0) {
                 isLeaf = false;
@@ -259,13 +259,12 @@ public class SchematicScene extends QGraphicsScene {
             if (isLeaf) {
                 rect = addRect(x, y, child.getWidth(), child.getHeight(), CELL_PEN, CELL_BRUSH);
             } else {
-                String expandedCellName = !elkRoot.equals(parent) ? child.getIdentifier() : eci.getName();
                 if (isExpanded) {
                     rect = addRect(x, y, child.getWidth(), child.getHeight(), EXPANDED_HIER_CELL_PEN, EXPANDED_HIER_CELL_BRUSH);
                 } else {
                     rect = addRect(x, y, child.getWidth(), child.getHeight(), HIER_CELL_PEN, HIER_CELL_BRUSH);
                 }
-                createHierButton(child, isExpanded, expandedCellName, xOffset, yOffset);
+                createHierButton(child, isExpanded, cellInstName, xOffset, yOffset);
             }
             String instLookup = "INST:" + child.getIdentifier();
             rect.setData(0, instLookup);
@@ -317,7 +316,7 @@ public class SchematicScene extends QGraphicsScene {
             }
 
             if (child.getChildren().size() > 0) {
-                renderNode(child, x, y);
+                renderNode(child, x, y, prefix + relCellInstName + "/");
             }
         }
     }
