@@ -26,9 +26,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -39,7 +41,7 @@ import com.xilinx.rapidwright.support.RapidWrightDCP;
 public class TestNetTools {
     /**
      * Tests the method NetTools.isGlobalClock(Net net).
-     * For each DCP file, Vivado uses the TCL command 
+     * For each DCP file, Vivado uses the Tcl command
      *      get_nets -hier -parent_net -filter { TYPE == "GLOBAL_CLOCK" } 
      * to retrieve all nets of type GLOBAL_CLOCK. 
      * The method NetTools.isGlobalClock(Net net) returns true for these nets and false for others.
@@ -245,5 +247,15 @@ public class TestNetTools {
                 "             INT_X9Y235/INT_NODE_IMUX_39_INT_OUT1 ( 0) INT_X9Y235/INT.BYPASS_W1->>INT_NODE_IMUX_39_INT_OUT1\n" +
                 "                       INT_X9Y235/BYPASS_W4 ( 4) INT_X9Y235/INT.INT_NODE_IMUX_39_INT_OUT1->>BYPASS_W4\n" +
                 "         }]        INT_X9Y235/INODE_W_1_FT1 ( 0) INT_X9Y235/INT.BYPASS_W4->>INODE_W_1_FT1");
+    }
+
+    @Test
+    public void testFindClockRootVRoute() {
+        Design design = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
+        Net clkNet = design.getNet("base_mb_i/clk_wiz_1/inst/clk_out1");
+        Assertions.assertNotNull(clkNet);
+        Assertions.assertTrue(clkNet.hasPIPs());
+        ClockRegion clockRoot = NetTools.findClockRootVRoute(clkNet).getTile().getClockRegion();
+        Assertions.assertEquals(clockRoot, design.getDevice().getClockRegion(1, 1));
     }
 }

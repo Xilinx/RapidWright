@@ -1097,10 +1097,8 @@ public class EDIFTools {
         try {
             ensureCorrectPartInEDIF(edif, partName);
             edif.exportEDIF(out);
-            if (dcpFileName != null && edif.getEncryptedCells() != null) {
-                if (edif.getEncryptedCells().size() > 0) {
-                    writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
-                }
+            if (dcpFileName != null && edif.hasEncryptedCells()) {
+                writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
             }
         } catch (IOException e) {
             e.printStackTrace();
