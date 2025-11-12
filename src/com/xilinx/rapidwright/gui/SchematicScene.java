@@ -103,6 +103,7 @@ public class SchematicScene extends QGraphicsScene {
     private static final QBrush BLACK_BRUSH = new QBrush(QColor.black);
     private static final QPen BLACK_PEN = new QPen(QColor.black);
     private static final QPen CLICK_PEN = new QPen(new QColor(0, 0, 0, 0), 10);
+    private static final QBrush CLICK_BRUSH = new QBrush(new QColor(0, 0, 0, 0));
 
     private static QFontMetrics fm = new QFontMetrics(FONT);
     private static QBrush canvasBackgroundBrush = new QBrush(QColor.white);
@@ -256,18 +257,23 @@ public class SchematicScene extends QGraphicsScene {
             double y = yOffset + child.getY();
 
             QGraphicsRectItem rect = null;
+            QGraphicsRectItem clickRect = addRect(x, y, child.getWidth(), child.getHeight(), CLICK_PEN, CLICK_BRUSH);
+            ;
             if (isLeaf) {
                 rect = addRect(x, y, child.getWidth(), child.getHeight(), CELL_PEN, CELL_BRUSH);
+                clickRect.setZValue(6);
             } else {
                 if (isExpanded) {
                     rect = addRect(x, y, child.getWidth(), child.getHeight(), EXPANDED_HIER_CELL_PEN, EXPANDED_HIER_CELL_BRUSH);
+                    clickRect.setZValue(4);
                 } else {
                     rect = addRect(x, y, child.getWidth(), child.getHeight(), HIER_CELL_PEN, HIER_CELL_BRUSH);
+                    clickRect.setZValue(6);
                 }
                 createHierButton(child, isExpanded, cellInstName, xOffset, yOffset);
             }
             String instLookup = "INST:" + child.getIdentifier();
-            rect.setData(0, instLookup);
+            clickRect.setData(0, instLookup);
             lookupMap.computeIfAbsent(instLookup, l -> new ArrayList<>()).add(rect);
 
             ElkLabel instNameLabel = child.getLabels().get(0); // instance name
@@ -299,7 +305,7 @@ public class SchematicScene extends QGraphicsScene {
                 QGraphicsSimpleTextItem pinLabel = addSimpleText(port.getIdentifier());
                 pinLabel.setBrush(BLACK_BRUSH);
                 pinLabel.setFont(FONT);
-                pinLabel.setZValue(2);
+                pinLabel.setZValue(5);
                 double textWidth = pinLabel.boundingRect().width();
                 double textHeight = pinLabel.boundingRect().height();
                 double labelX = x;
