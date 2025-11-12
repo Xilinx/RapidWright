@@ -4,9 +4,6 @@ on:
   push:
   pull_request:
 
-env:
-  GRADLE_USER_HOME: gradle_home
-
 jobs:
   build:
     strategy:
