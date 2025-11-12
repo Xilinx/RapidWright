@@ -18,10 +18,10 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '11'
-          cache: 'gradle-2'
+          cache: 'gradle'
 
       - name: Compile
-        run: ./gradlew compileJava
+        run: GRADLE_USER_HOME=gradle_home ./gradlew compileJava
 
       - name: Test RapidWright Wrapper
         run: bin/rapidwright
