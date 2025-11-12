@@ -21,7 +21,7 @@
  *
  */
 
-package com.xilinx.rapidwright.design.tools;
+package com.xilinx.rapidwright.design.blocks;
 
 public enum PBlockSide {
     LEFT,

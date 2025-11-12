@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.design.tools;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.Map.Entry;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -33,10 +34,12 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.blocks.PBlock;
+import com.xilinx.rapidwright.design.blocks.PBlockSide;
 import com.xilinx.rapidwright.device.*;
 import com.xilinx.rapidwright.eco.ECOPlacementHelper;
 import com.xilinx.rapidwright.edif.*;
 import com.xilinx.rapidwright.placer.blockplacer.Point;
+import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.StringTools;
 
@@ -153,39 +156,28 @@ public class InlineFlopTools {
 
         Set<SiteInst> siteInstsToRoute = new HashSet<>();
 
-        for (Map.Entry<EDIFPort, PBlockSide> entry : portSideMap.entrySet()) {
+        for (Entry<EDIFPort, PBlockSide> entry : portSideMap.entrySet()) {
             EDIFPort port = entry.getKey();
             PBlockSide side = entry.getValue();
             if (port.getName().equals(clkNet)) {
                 continue;
             }
             Site shiftedSite = shiftSiteToSide(design.getDevice(), start, keepOut, side);
-            if (port.isBus()) {
-                for (int i : port.getBitBlastedIndicies()) {
-                    EDIFPortInst inst = port.getInternalPortInstFromIndex(i);
-                    if (allLeavesAreIBUF(design, inst)) {
-                        continue;
-                    }
-
-                    Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(shiftedSite, keepOut, exclude).iterator();
-                    siteItr.next(); // Skip the first site, as we are suggesting one inside the pblock
-                    Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr, null);
-                    Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
-                    siteInstsToRoute.add(flop.getSiteInst());
+            int[] indices = port.isBus() ? port.getBitBlastedIndicies() : new int[] { 0 };
+            for (int i : indices) {
+                EDIFPortInst inst = port.getInternalPortInstFromIndex(i);
+                if (allLeavesAreIBUF(design, inst)) {
+                    continue;
                 }
-            } else {
-                EDIFPortInst inst = port.getInternalPortInst();
-                if (inst != null) {
-                    if (allLeavesAreIBUF(design, inst)) {
-                        continue;
-                    }
 
-                    Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(shiftedSite, keepOut, exclude).iterator();
-                    siteItr.next(); // Skip the first site, as we are suggesting one inside the pblock
-                    Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr, null);
-                    Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
-                    siteInstsToRoute.add(flop.getSiteInst());
+                Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(shiftedSite, keepOut, exclude).iterator();
+                siteItr.next(); // Skip the first site, as we are suggesting one inside the pblock
+                Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr, null);
+                if (loc == null) {
+                    throw new RuntimeException("Failed to find valid placement location for flip-flop");
                 }
+                Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
+                siteInstsToRoute.add(flop.getSiteInst());
             }
         }
         for (SiteInst si : siteInstsToRoute) {
@@ -222,39 +214,21 @@ public class InlineFlopTools {
             if (port.getName().equals(clkNet)) {
                 continue;
             }
-            if (port.isBus()) {
-                for (int i : port.getBitBlastedIndicies()) {
-                    EDIFPortInst inst = port.getInternalPortInstFromIndex(i);
-                    if (allLeavesAreIBUF(design, inst)) {
-                        continue;
-                    }
-
-                    if (centroidPlacement) {
-                        netCentroidFlipFlopPlacement(design, inst, keepOut, clk, siteInstsToRoute);
-                    } else {
-                        Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(start, keepOut, exclude).iterator();
-                        siteItr.next(); // Skip the first site, as we are suggesting one inside the pblock
-                        Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr, null);
-                        Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
-                        siteInstsToRoute.add(flop.getSiteInst());
-                    }
+            int[] indices = port.isBus() ? port.getBitBlastedIndicies() : new int[] { 0 };
+            for (int i : indices) {
+                EDIFPortInst inst = port.getInternalPortInstFromIndex(i);
+                if (allLeavesAreIBUF(design, inst)) {
+                    continue;
                 }
-            } else {
-                EDIFPortInst inst = port.getInternalPortInst();
-                if (inst != null) {
-                    if (allLeavesAreIBUF(design, inst)) {
-                        continue;
-                    }
 
-                    if (centroidPlacement) {
-                        netCentroidFlipFlopPlacement(design, inst, keepOut, clk, siteInstsToRoute);
-                    } else {
-                        Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(start, keepOut, exclude).iterator();
-                        siteItr.next(); // Skip the first site, as we are suggesting one inside the pblock
-                        Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr, null);
-                        Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
-                        siteInstsToRoute.add(flop.getSiteInst());
-                    }
+                if (centroidPlacement) {
+                    netCentroidFlipFlopPlacement(design, inst, keepOut, clk, siteInstsToRoute);
+                } else {
+                    Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(start, keepOut, exclude).iterator();
+                    siteItr.next(); // Skip the first site, as we are suggesting one inside the pblock
+                    Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr, null);
+                    Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
+                    siteInstsToRoute.add(flop.getSiteInst());
                 }
             }
         }
@@ -437,7 +411,16 @@ public class InlineFlopTools {
         Net vcc = design.getVccNet();
         Set<SitePinInst> vccPins = new HashSet<>();
         pinsToRemove.put(vcc, vccPins);
-        String[] staticPins = new String[]{"CKEN1", "CKEN2", design.getSeries() == Series.Versal ? "RST" : "SRST1"};
+        String[] versalStaticPins = new String[]{"CKEN1", "CKEN2", "CKEN3", "CKEN4", "RST"};
+        String[] ultrascaleStaticPins = new String[]{"CKEN1", "CKEN2", "CKEN3", "CKEN4", "SRST1", "SRST2"};
+        String[] series7StaticPins = new String[]{"CE", "SR"};
+        if (design.getSeries() != Series.Versal && design.getSeries() != Series.UltraScale
+                && design.getSeries() != Series.UltraScalePlus && design.getSeries() != Series.Series7) {
+            throw new RuntimeException("Unsupported device series for removing inline flops");
+        }
+        String[] staticPins = design.getSeries() == Series.Versal ? versalStaticPins :
+                              design.getSeries() == Series.UltraScalePlus
+                              || design.getSeries() == Series.UltraScale ? ultrascaleStaticPins : series7StaticPins;
         for (EDIFCellInst inst : design.getTopEDIFCell().getCellInsts()) {
             if (inst.getName().endsWith(INLINE_SUFFIX)) {
                 Cell flop = design.getCell(inst.getName());
@@ -512,6 +495,43 @@ public class InlineFlopTools {
             }
         }
     }
+
+    /**
+     * Parses the PBlock side map into a map from EDIFPorts to PBlockSide enums. The input file should be made up of
+     * some number of lines where each line contains a port name regex and a PBlockSide separated by a space. An
+     * example file:
+     * <pre>
+     * example_inputs.* TOP
+     * reset LEFT
+     * example_outputs.* BOTTOM
+     * </pre>
+     *
+     * @param netlist The netlist that the side map will be created for.
+     * @param filename The name of the input side map file.
+     * @return A map from EDIFPort to the PBlockSide the inline flop should be placed on.
+     */
+    public static Map<EDIFPort, PBlockSide> parseSideMap(EDIFNetlist netlist, String filename) {
+        Map<EDIFPort, PBlockSide> externalRoutabilitySideMap = new HashMap<>();
+        List<String> lines = FileTools.getLinesFromTextFile(filename);
+
+        for (String line : lines) {
+            String[] splitLine = line.split("\\s+");
+            String portRegex = splitLine[0];
+            String pblockSide = splitLine[1].toUpperCase();
+            for (EDIFPort port : netlist.getTopCell().getPorts()) {
+                if (port.getBusName().matches(portRegex) ||
+                        port.getName().matches("\\" + EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE + portRegex)) {
+                    if (externalRoutabilitySideMap.containsKey(port)) {
+                        throw new RuntimeException("Port " + port + " matches multiple expressions in side map");
+                    }
+                    PBlockSide side = PBlockSide.valueOf(pblockSide);
+                    externalRoutabilitySideMap.put(port, side);
+                }
+            }
+        }
+        return externalRoutabilitySideMap;
+    }
+
 
     public static void main(String[] args) {
         if (args.length < 3 || args.length > 4) {
