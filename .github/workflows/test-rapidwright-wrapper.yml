@@ -18,13 +18,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '11'
-          cache: 'gradle'
-
-      - name: Update Jars
-        run: ./gradlew updateJars
-
-      - name: List Jars
-        run: ls -l jars
+          cache: 'gradle-2'
 
       - name: Compile
         run: ./gradlew compileJava
