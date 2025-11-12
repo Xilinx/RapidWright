@@ -125,7 +125,7 @@ public class SchematicScene extends QGraphicsScene {
     private static final QBrush BUTTON_TEXT_BRUSH = new QBrush(QColor.white);
 
     private static final double PORT_SIZE = 6.0;
-    private static final double MIN_NODE_HEIGHT = 20.0;
+    private static final double MIN_NODE_HEIGHT = 30.0;
     private static final double MIN_NODE_WIDTH = 40.0;
 
     private static final double PORT_HEIGHT = 20.0;
@@ -238,7 +238,7 @@ public class SchematicScene extends QGraphicsScene {
                 continue;
             }
             String relCellInstName = child.getIdentifier();
-            if (relCellInstName.startsWith(parent.getIdentifier())) {
+            if (relCellInstName.startsWith(parent.getIdentifier()) && parent.getIdentifier().length() > 0) {
                 // Remove hierarchical reference
                 relCellInstName = relCellInstName.substring(parent.getIdentifier().length() + 1);
             }

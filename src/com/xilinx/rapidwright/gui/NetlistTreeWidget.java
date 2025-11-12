@@ -57,7 +57,8 @@ public class NetlistTreeWidget extends QTreeWidget {
         this.netlist = netlist;
         setColumnCount(1);
         setHeaderLabel(header);
-        QTreeWidgetItem root = new QTreeWidgetItem(this);
+        HierCellInstTreeWidgetItem root = new HierCellInstTreeWidgetItem(this);
+        root.setInst(netlist.getTopHierCellInst());
         QTreeWidgetItem dummy = new QTreeWidgetItem(root);
         dummy.setText(0, DUMMY);
         rootItem = populateCellInst(root, netlist.getTopHierCellInst());
