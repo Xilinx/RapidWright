@@ -621,7 +621,9 @@ public class SchematicScene extends QGraphicsScene {
                 // Map the inner port inst to the outer one so nets are aligned
                 if (outerElkPort != null) {
                     EDIFPortInst innerPortInst = port.getInternalPortInstFromIndex(i);
-                    portInstMap.put(inst.getPortInst(innerPortInst.getName()), outerElkPort);
+                    if (innerPortInst != null) {
+                        portInstMap.put(inst.getPortInst(innerPortInst.getName()), outerElkPort);
+                    }
                 }
             }
         }
