@@ -23,6 +23,9 @@ jobs:
       - name: Update Jars
         run: ./gradlew updateJars
 
+      - name: List Jars
+        run: ls -l jars
+
       - name: Compile
         run: ./gradlew compileJava
 
