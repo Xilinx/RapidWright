@@ -20,6 +20,9 @@ jobs:
           java-version: '11'
           cache: 'gradle'
 
+      - name: Update Jars
+        run: ./gradlew updateJars
+
       - name: Compile
         run: ./gradlew compileJava
 
