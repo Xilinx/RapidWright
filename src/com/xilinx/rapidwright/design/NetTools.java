@@ -33,10 +33,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
+import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFPort;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
 
 public class NetTools {
     public static final String CONTINUE_ELBOW = "\u251c\u2500 ";
@@ -516,5 +520,42 @@ public class NetTools {
         }
 
         return deepestVRoute;
+    }
+
+    /**
+     * Unroute top-level port nets that have PIPs outside the specified PBlock. Vivado can potentially create designs
+     * where the top-level port nets leave the PBlock if the InlineFlopTools flop harness was used and the top-level
+     * port net also has a sink inside the PBlock.
+     *
+     * @param d The design to unroute nets from.
+     * @param pBlock The bounding box for the placed and routed design.
+     */
+    public static void unrouteTopLevelNetsThatLeavePBlock(Design d, PBlock pBlock) {
+        DesignTools.makePhysNetNamesConsistent(d);
+        d.getNetlist().resetParentNetMap();
+        d.getNetlist().expandMacroUnisims();
+        for (EDIFPort p : d.getNetlist().getTopCell().getPorts()) {
+            int[] indices = p.isBus() ? p.getBitBlastedIndicies() : new int[]{0};
+            for (int i : indices) {
+                EDIFPortInst portInst = p.getInternalPortInstFromIndex(i);
+                if (portInst == null) {
+                    continue;
+                }
+                EDIFHierNet hierNet = new EDIFHierNet(d.getNetlist().getTopHierCellInst(), portInst.getNet());
+                EDIFHierNet parentNet = d.getNetlist().getParentNet(hierNet);
+                Net net = d.getNet(parentNet.getHierarchicalNetName());
+
+                boolean leavesPBlock = false;
+                for (PIP pip : net.getPIPs()) {
+                    if (!pBlock.containsTile(pip.getTile())) {
+                        leavesPBlock = true;
+                        break;
+                    }
+                }
+                if (leavesPBlock) {
+                    net.unroute();
+                }
+            }
+        }
     }
 }
