@@ -377,10 +377,10 @@ public class EDIFPort extends EDIFPropertyObject {
     public int[] getBitBlastedIndices() {
         if (isBus()) {
             int lastLeftBracket = getName().lastIndexOf('[');
-            if (getName().contains(":"))
-                return EDIFTools.bitBlastBus(getName().substring(lastLeftBracket));
-            if (getName().contains("["))
-                return new int[] { Integer.parseInt(getName().substring(lastLeftBracket, getName().length() - 1)) };
+            assert(lastLeftBracket != -1);
+            return getName().contains(":") ? 
+                EDIFTools.bitBlastBus(getName().substring(lastLeftBracket)) : 
+                new int[] { Integer.parseInt(getName().substring(lastLeftBracket, getName().length() - 1)) };
         }
         return SINGLE_BIT_INDICES;
     }
