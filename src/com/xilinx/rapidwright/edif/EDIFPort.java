@@ -108,7 +108,7 @@ public class EDIFPort extends EDIFPropertyObject {
             }
         }
         if (colonIdx == -1 || leftBracket == -1) {
-            throw new RuntimeException("ERROR: Interpreting port " + getName() + ", couldn't identify indicies.");
+            throw new RuntimeException("ERROR: Interpreting port " + getName() + ", couldn't identify indices.");
         }
 
         int left = Integer.parseInt(name.substring(leftBracket+1, colonIdx));
@@ -356,13 +356,33 @@ public class EDIFPort extends EDIFPropertyObject {
         return width > 1 || !getName().equals(busName);
     }
 
+    private static final int[] SINGLE_BIT_INDICES = new int[] { 0 };
+
+    /**
+     * @see #getBitBlastedIndicies()
+     * @deprecated Misspelling in name, to be removed in 2026.1.0
+     */
     public int[] getBitBlastedIndicies() {
-        int lastLeftBracket = getName().lastIndexOf('[');
-        if (getName().contains(":"))
-            return EDIFTools.bitBlastBus(getName().substring(lastLeftBracket));
-        if (getName().contains("["))
-            return new int[] {Integer.parseInt(getName().substring(lastLeftBracket,getName().length()-1))};
-        return null;
+        return getBitBlastedIndices();
+    }
+
+    /**
+     * Returns an array of all the integer indices of this port. If the port is a
+     * single bit it returns an array with a single entry of '0'. This is useful
+     * when needing to iterate over a port's PortInst objects.
+     * 
+     * @return The integer list of indices of this port, or {0} for a single bit
+     *         port.
+     */
+    public int[] getBitBlastedIndices() {
+        if (isBus()) {
+            int lastLeftBracket = getName().lastIndexOf('[');
+            assert(lastLeftBracket != -1);
+            return getName().indexOf(':', lastLeftBracket) != -1 ? 
+                EDIFTools.bitBlastBus(getName().substring(lastLeftBracket)) : 
+                new int[] { Integer.parseInt(getName().substring(lastLeftBracket, getName().length() - 1)) };
+        }
+        return SINGLE_BIT_INDICES;
     }
 
     public boolean isBusRangeEqual(EDIFPort otherPort) {

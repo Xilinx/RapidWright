@@ -149,7 +149,7 @@ public class TestEDIFCell {
         EDIFPort myNewSignal = topCell.getPort("my_new_signal[");
         Assertions.assertNotNull(myNewSignal);
 
-        for (int i : myNewSignal.getBitBlastedIndicies()) {
+        for (int i : myNewSignal.getBitBlastedIndices()) {
             EDIFPortInst portInst = myNewSignal.getInternalPortInstFromIndex(i);
             Assertions.assertNotNull(portInst);
         }
@@ -164,7 +164,7 @@ public class TestEDIFCell {
         EDIFPort newTestZero = topCell.getPort("new_test_zero[");
         Assertions.assertNotNull(newTestZero);
 
-        for (int i : newTestZero.getBitBlastedIndicies()) {
+        for (int i : newTestZero.getBitBlastedIndices()) {
             EDIFPortInst portInst = newTestZero.getInternalPortInstFromIndex(i);
             Assertions.assertNotNull(portInst);
         }
@@ -179,7 +179,7 @@ public class TestEDIFCell {
         EDIFPort newTestFive = topCell.getPort("new_test_five[");
         Assertions.assertNotNull(newTestFive);
 
-        for (int i : newTestFive.getBitBlastedIndicies()) {
+        for (int i : newTestFive.getBitBlastedIndices()) {
             EDIFPortInst portInst = newTestFive.getInternalPortInstFromIndex(i);
             Assertions.assertNotNull(portInst);
         }
