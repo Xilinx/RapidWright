@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.BufferedOutputStream;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -112,6 +113,8 @@ public class EDIFNetlist extends EDIFName {
     private EDIFLibrary external;
 
     private Map<EDIFCell, EDIFCell> externalMappings;
+
+    private boolean encryptedCellsValidated = false;
 
     private boolean trackCellChanges = false;
 
@@ -2063,13 +2066,47 @@ public class EDIFNetlist extends EDIFName {
      * @return A list of EDN filenames that may populate encrypted cells within the netlist.
      */
     public List<String> getEncryptedCells() {
-        return encryptedCells != null ? encryptedCells : Collections.emptyList();
+        if (encryptedCells != null) {
+            if (!encryptedCellsValidated) {
+                validateEncryptedCells();
+            }
+            return encryptedCells;
+        }
+        return Collections.emptyList();
+    }
+    
+    /**
+     * Checks if this design has encrypted cells.
+     * 
+     * @return If this design has at least one encrypted cell in it, false if none.
+     */
+    public boolean hasEncryptedCells() { 
+       return getEncryptedCells().size() > 0; 
+    }
+
+    private void validateEncryptedCells() {
+        // Verify that at least one of the edn files collected are actually in the design
+        for (String edn : encryptedCells) {
+            int start = edn.lastIndexOf(File.separator);
+            int end = edn.lastIndexOf(".edn");
+            String cellName = edn.substring(start == -1 ? 0 : start + 1, end);
+            EDIFCell cell = getCell(cellName);
+            if (cell != null && cell.isLeafCellOrBlackBox()) {
+                encryptedCellsValidated = true;
+                return;
+            }
+        }
+        // The EDN files in encryptedCells are unrelated to this design, let's remove them.
+        encryptedCells.clear();
+        encryptedCellsValidated = true;
     }
 
     public void setEncryptedCells(List<String> encryptedCells) {
         if (encryptedCells == null || encryptedCells.isEmpty()) {
+            encryptedCellsValidated = true;
             this.encryptedCells = null;
         } else {
+            encryptedCellsValidated = false;
             this.encryptedCells = encryptedCells;
         }
     }
@@ -2082,6 +2119,7 @@ public class EDIFNetlist extends EDIFName {
             setEncryptedCells(encryptedCells);
             return;
         }
+        encryptedCellsValidated = false;
         this.encryptedCells.addAll(encryptedCells);
     }
 
@@ -2093,7 +2131,6 @@ public class EDIFNetlist extends EDIFName {
      * @param tclPath Path to the existing Tcl load script for the accompanying DCP file
      */
     public void addTclLoadEncryptedCells(Path tclPath) {
-
         List<String> encryptedCells = new ArrayList<>();
         for (String line : FileTools.getLinesFromTextFile(tclPath.toFile().getAbsolutePath())) {
             if (line.startsWith(READ_EDIF_CMD) && line.endsWith(".edn")) {

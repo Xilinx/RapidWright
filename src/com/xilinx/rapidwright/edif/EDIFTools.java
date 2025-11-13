@@ -475,7 +475,7 @@ public class EDIFTools {
             }
         }
         if (colonIdx == -1 || leftBracket == -1) {
-            throw new RuntimeException("ERROR: Interpreting port " + name + ", couldn't identify indicies.");
+            throw new RuntimeException("ERROR: Interpreting port " + name + ", couldn't identify indices.");
         }
 
         int left = Integer.parseInt(name.substring(leftBracket+1, colonIdx));
@@ -1097,10 +1097,8 @@ public class EDIFTools {
         try {
             ensureCorrectPartInEDIF(edif, partName);
             edif.exportEDIF(out);
-            if (dcpFileName != null && edif.getEncryptedCells() != null) {
-                if (edif.getEncryptedCells().size() > 0) {
-                    writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
-                }
+            if (dcpFileName != null && edif.hasEncryptedCells()) {
+                writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -1738,7 +1736,7 @@ public class EDIFTools {
         for (EDIFPort topPort : netlist.getTopCell().getPorts()) {
             EDIFPort flatPort = flatTop.createPort(topPort);
             if (flatPort.isBus()) {
-                int[] indicies = flatPort.getBitBlastedIndicies();
+                int[] indices = flatPort.getBitBlastedIndices();
                 int i = 0;
                 for (EDIFNet net : topPort.getInternalNets()) {
                     if (net == null) continue;
@@ -1746,7 +1744,7 @@ public class EDIFTools {
                     if (flatNet == null) {
                         flatNet = flatTop.createNet(net.getName());
                     }
-                    flatNet.createPortInst(flatPort, indicies[i++]);
+                    flatNet.createPortInst(flatPort, indices[i++]);
                 }
             } else {
                 EDIFNet net = topPort.getInternalNet();
