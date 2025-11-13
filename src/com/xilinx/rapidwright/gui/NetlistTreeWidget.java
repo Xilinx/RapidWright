@@ -24,7 +24,9 @@ package com.xilinx.rapidwright.gui;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.trolltech.qt.core.QModelIndex;
 import com.trolltech.qt.gui.QTreeWidget;
@@ -32,6 +34,8 @@ import com.trolltech.qt.gui.QTreeWidgetItem;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -45,13 +49,16 @@ public class NetlistTreeWidget extends QTreeWidget {
 
     private QTreeWidgetItem rootItem;
 
+    private Map<String, QTreeWidgetItem> objectLookup = new HashMap<>();
+
     private static final String DUMMY = "_*DUMMY*_";
 
     public NetlistTreeWidget(String header, EDIFNetlist netlist) {
         this.netlist = netlist;
         setColumnCount(1);
         setHeaderLabel(header);
-        QTreeWidgetItem root = new QTreeWidgetItem(this);
+        HierCellInstTreeWidgetItem root = new HierCellInstTreeWidgetItem(this);
+        root.setInst(netlist.getTopHierCellInst());
         QTreeWidgetItem dummy = new QTreeWidgetItem(root);
         dummy.setText(0, DUMMY);
         rootItem = populateCellInst(root, netlist.getTopHierCellInst());
@@ -68,14 +75,18 @@ public class NetlistTreeWidget extends QTreeWidget {
 
         EDIFCell cell = inst.getCellType();
         curr.setText(0, inst.getInst().getName() + " (" + cell.getName() + ")");
+        boolean isTop = inst.isTopLevelInst();
 
         QTreeWidgetItem ports = new QTreeWidgetItem(curr);
         ports.setText(0, "Ports (" + cell.getPorts().size() + ")");
-        List<EDIFPort> edifPorts = new ArrayList<>(cell.getPorts());
-        Collections.sort(edifPorts);
-        for (EDIFPort port : edifPorts) {
+
+        for (EDIFHierPortInst portInst : inst.getHierPortInsts()) {
             QTreeWidgetItem n = new QTreeWidgetItem(ports);
-            n.setText(0, port.getName() + " (" + port.getDirection() + ")");
+            n.setData(0, 0, portInst);
+            String portLookup = "PORT:" + (isTop ? portInst.getPortInst().getName() : portInst.toString());
+            n.setData(1, 0, portLookup);
+            n.setText(0, portInst.getPortInst().getName() + " (" + portInst.getPortInst().getDirection() + ")");
+            objectLookup.put(portLookup, n);
         }
         ports.setExpanded(false);
 
@@ -86,16 +97,21 @@ public class NetlistTreeWidget extends QTreeWidget {
         Collections.sort(edifNets);
         for (EDIFNet net : edifNets) {
             QTreeWidgetItem n = new QTreeWidgetItem(nets);
+            EDIFHierNet hierNet = inst.getNet(net.getName());
+            n.setData(0, 0, hierNet);
+            String netLookup = "NET:" + hierNet.toString();
+            n.setData(1, 0, netLookup);
             n.setText(0, net.getName());
+            objectLookup.put(netLookup, n);
         }
         nets.setExpanded(false);
 
 
-        List<EDIFCellInst> leaves = new ArrayList<>();
+        List<EDIFHierCellInst> leaves = new ArrayList<>();
         List<EDIFHierCellInst> nonLeaves = new ArrayList<>();
         for (EDIFCellInst child : cell.getCellInsts()) {
             if (child.getCellType().isLeafCellOrBlackBox()) {
-                leaves.add(child);
+                leaves.add(inst.getChild(child));
             } else {
                 nonLeaves.add(inst.getChild(child));
             }
@@ -105,9 +121,13 @@ public class NetlistTreeWidget extends QTreeWidget {
 
         QTreeWidgetItem leafCells = new QTreeWidgetItem(curr);
         leafCells.setText(0, "Leaf Cells (" + leaves.size() + ")");
-        for (EDIFCellInst i : leaves) {
+        for (EDIFHierCellInst i : leaves) {
             QTreeWidgetItem leaf = new QTreeWidgetItem(leafCells);
-            leaf.setText(0, i.getName() + " (" + i.getCellName() + ")");
+            leaf.setText(0, i.getInst().getName() + " (" + i.getCellName() + ")");
+            leaf.setData(0, 0, i);
+            String leafLookup = "INST:" + i.toString();
+            leaf.setData(1, 0, leafLookup);
+            objectLookup.put(leafLookup, leaf);
         }
         leafCells.setExpanded(false);
 
@@ -116,6 +136,9 @@ public class NetlistTreeWidget extends QTreeWidget {
             HierCellInstTreeWidgetItem cellInst = new HierCellInstTreeWidgetItem(curr);
             cellInst.setText(0, i.getInst().getName() + " (" + i.getCellName() + ")");
             cellInst.setInst(i);
+            String instLookup = "INST:" + i.toString();
+            cellInst.setData(1, 0, instLookup);
+            objectLookup.put(instLookup, cellInst);
             QTreeWidgetItem dummy = new QTreeWidgetItem(cellInst);
             dummy.setText(0, DUMMY);
         }
@@ -143,5 +166,13 @@ public class NetlistTreeWidget extends QTreeWidget {
 
     public QTreeWidgetItem getRootItem() {
         return rootItem;
+    }
+
+    public QTreeWidgetItem getItemFromIndex(QModelIndex index) {
+        return this.itemFromIndex(index);
+    }
+
+    public QTreeWidgetItem getItemByStringLookup(String lookup) {
+        return objectLookup.get(lookup);
     }
 }

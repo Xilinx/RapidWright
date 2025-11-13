@@ -22,20 +22,30 @@
  */
 package com.xilinx.rapidwright.gui;
 
+import com.trolltech.qt.core.QModelIndex;
 import com.trolltech.qt.core.Qt.DockWidgetArea;
 import com.trolltech.qt.gui.QApplication;
 import com.trolltech.qt.gui.QDockWidget;
 import com.trolltech.qt.gui.QDockWidget.DockWidgetFeature;
 import com.trolltech.qt.gui.QMainWindow;
 import com.trolltech.qt.gui.QTreeWidget;
+import com.trolltech.qt.gui.QTreeWidgetItem;
 import com.trolltech.qt.gui.QWidget;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFTools;
 
 public class NetlistBrowser extends QMainWindow {
 
-    private QTreeWidget treeWidget;
+    private NetlistTreeWidget treeWidget;
+    private QDockWidget schematicWidget;
+    private SchematicScene schematicScene;
+    private SchematicView schematicView;
 
     private Design design;
 
@@ -90,12 +100,44 @@ public class NetlistBrowser extends QMainWindow {
         resize(1280, 1024);
 
         treeWidget = new NetlistTreeWidget("Netlist", netlist);
-        // treeWidget.doubleClicked.connect(this,"showPart(QModelIndex)");
+        treeWidget.clicked.connect(this, "selectNetlistItem(QModelIndex)");
 
         QDockWidget dockWidget = new QDockWidget(tr("Design"), this);
         dockWidget.setWidget(treeWidget);
         dockWidget.setFeatures(DockWidgetFeature.DockWidgetMovable);
         addDockWidget(DockWidgetArea.LeftDockWidgetArea, dockWidget);
+
+        // Add schematic viewer on the right
+        schematicScene = new SchematicScene(netlist);
+        schematicView = new SchematicView(schematicScene);
+        schematicWidget = new QDockWidget(tr("Schematic"), this);
+        schematicWidget.setWidget(schematicView);
+        schematicWidget.setFeatures(DockWidgetFeature.DockWidgetMovable);
+        addDockWidget(DockWidgetArea.RightDockWidgetArea, schematicWidget);
+
+        schematicScene.objectSelected.connect(this, "selectFromSchematic(String)");
+        schematicScene.cellDrawn.connect(schematicView, "zoomToFit()");
+    }
+
+    public void selectNetlistItem(QModelIndex index) {
+        QTreeWidgetItem item = treeWidget.getItemFromIndex(index);
+        if (item instanceof HierCellInstTreeWidgetItem) {
+            EDIFHierCellInst cellInst = ((HierCellInstTreeWidgetItem) item).getInst();
+            schematicScene.drawCell(cellInst, true);
+        } else if (item.data(0, 0) instanceof EDIFPort) {
+            EDIFPort port = (EDIFPort) item.data(0, 0);
+            schematicScene.selectObject(item.data(1, 0).toString(), true);
+        } else if (item.data(0, 0) instanceof EDIFNet) {
+            schematicScene.selectObject(item.data(1, 0).toString(), true);
+        }
+    }
+
+    public void selectFromSchematic(String lookup) {
+        QTreeWidgetItem item = treeWidget.getItemByStringLookup(lookup);
+        if (item != null) {
+            treeWidget.setCurrentItem(item);
+            treeWidget.scrollToItem(item);
+        }
     }
 
     /**
