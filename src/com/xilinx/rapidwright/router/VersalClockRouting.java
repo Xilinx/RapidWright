@@ -288,6 +288,7 @@ public class VersalClockRouting {
         }
 
         VersalClockTree clkTree = getVersalClockTree(device, minY, maxY);
+        assert (clkTree != null);
         if (clkTree == null) {
             System.err.println("ERROR: No clock tree found for " + device + " Y" + minY + "-Y" + maxY
                     + " while routing clock " + clk + ", skew will be suboptimal.");
