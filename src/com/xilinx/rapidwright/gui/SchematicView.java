@@ -24,7 +24,9 @@ package com.xilinx.rapidwright.gui;
 
 import com.trolltech.qt.core.QPoint;
 import com.trolltech.qt.core.QPointF;
+import com.trolltech.qt.core.QRectF;
 import com.trolltech.qt.core.Qt;
+import com.trolltech.qt.core.Qt.AspectRatioMode;
 import com.trolltech.qt.core.Qt.CursorShape;
 import com.trolltech.qt.core.Qt.Key;
 import com.trolltech.qt.gui.QCursor;
@@ -158,5 +160,22 @@ public class SchematicView extends QGraphicsView {
         // Zoom out (if not at limit)
         if (this.matrix().m11() > zoomMin)
             scale(1.0 / scaleFactor, 1.0 / scaleFactor);
+    }
+
+    public void zoomToFit() {
+        QRectF sceneRect = scene().sceneRect();
+        if (sceneRect != null) {
+            fitInView(sceneRect, AspectRatioMode.KeepAspectRatio);
+            double zoom = this.matrix().m11();
+            if (zoom > zoomMax) {
+                resetMatrix();
+                scale(zoomMax, zoomMax);
+                fitInView(sceneRect, AspectRatioMode.KeepAspectRatio);
+            } else if (zoom < zoomMin) {
+                resetMatrix();
+                scale(zoomMin, zoomMin);
+                fitInView(sceneRect, AspectRatioMode.KeepAspectRatio);
+            }
+        }
     }
 }

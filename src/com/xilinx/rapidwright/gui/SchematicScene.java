@@ -96,6 +96,7 @@ public class SchematicScene extends QGraphicsScene {
     private Set<String> selectedObjects = new HashSet<>();
 
     public Signal1<String> objectSelected = new Signal1<>();
+    public Signal0 cellDrawn = new Signal0();
 
     private static QFont FONT = new QFont("Arial", 8);
     private static QFont BUTTON_TEXT_FONT = new QFont("Arial", 10, QFont.Weight.Bold.value());
@@ -168,7 +169,7 @@ public class SchematicScene extends QGraphicsScene {
         root.setProperty(CoreOptions.SPACING_EDGE_NODE, EDGE_TO_NODE_SPACING);
     }
 
-    public void drawCell(EDIFHierCellInst cellInst) {
+    public void drawCell(EDIFHierCellInst cellInst, boolean zoomFit) {
         clear();
         portInstMap.clear();
         elkNodeTopPortMap.clear();
@@ -185,6 +186,9 @@ public class SchematicScene extends QGraphicsScene {
         engine.layout(elkRoot, monitor);
 
         renderSchematic();
+        if (zoomFit) {
+            cellDrawn.emit();
+        }
     }
 
     public void renderSchematic() {
@@ -700,7 +704,8 @@ public class SchematicScene extends QGraphicsScene {
         } else {
             expandedCellInsts.add(cellInstName);
         }
-        drawCell(currCellInst);
+        boolean zoomFit = false;
+        drawCell(currCellInst, zoomFit);
     }
 
     private void toggleSelection(String lookup, boolean multipleSelection) {

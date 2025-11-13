@@ -116,13 +116,14 @@ public class NetlistBrowser extends QMainWindow {
         addDockWidget(DockWidgetArea.RightDockWidgetArea, schematicWidget);
 
         schematicScene.objectSelected.connect(this, "selectFromSchematic(String)");
+        schematicScene.cellDrawn.connect(schematicView, "zoomToFit()");
     }
 
     public void selectNetlistItem(QModelIndex index) {
         QTreeWidgetItem item = treeWidget.getItemFromIndex(index);
         if (item instanceof HierCellInstTreeWidgetItem) {
             EDIFHierCellInst cellInst = ((HierCellInstTreeWidgetItem) item).getInst();
-            schematicScene.drawCell(cellInst);
+            schematicScene.drawCell(cellInst, true);
         } else if (item.data(0, 0) instanceof EDIFPort) {
             EDIFPort port = (EDIFPort) item.data(0, 0);
             schematicScene.selectObject(item.data(1, 0).toString(), true);
