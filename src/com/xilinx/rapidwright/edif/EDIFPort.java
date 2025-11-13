@@ -378,7 +378,7 @@ public class EDIFPort extends EDIFPropertyObject {
         if (isBus()) {
             int lastLeftBracket = getName().lastIndexOf('[');
             assert(lastLeftBracket != -1);
-            return getName().contains(":") ? 
+            return getName().indexOf(':', lastLeftBracket) != -1 ? 
                 EDIFTools.bitBlastBus(getName().substring(lastLeftBracket)) : 
                 new int[] { Integer.parseInt(getName().substring(lastLeftBracket, getName().length() - 1)) };
         }
