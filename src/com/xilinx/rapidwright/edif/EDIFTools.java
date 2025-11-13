@@ -424,10 +424,10 @@ public class EDIFTools {
     }
 
     /**
-     * Determines if the char[] ends with the pattern [#:#] where # are positive bus
-     * values (e.g., [7:0]) and then returns the length of the string without the
-     * bus suffix (if it exists). If the name does not end with the bus pattern, it
-     * returns the original length of the char[].
+     * Determines if the char[] ends with the pattern [#:#] where # are integer bus
+     * values (e.g., [7:0] or [0:-1]) and then returns the length of the string
+     * without the bus suffix (if it exists). If the name does not end with the bus
+     * pattern, it returns the original length of the char[].
      * 
      * @param name
      * @param keepOpenBracket In the case of a bussed name, this will return the
@@ -439,11 +439,11 @@ public class EDIFTools {
         int len = name.length;
         int i = len-1;
         if (name[i--] != ']') return len;
-        while (Character.isDigit(name[i])) {
+        while (Character.isDigit(name[i]) || name[i] == '-') {
             i--;
         }
         if (name[i--] != ':') return len;
-        while (Character.isDigit(name[i])) {
+        while (Character.isDigit(name[i]) || name[i] == '-') {
             i--;
         }
         if (name[i] != '[') return len;
