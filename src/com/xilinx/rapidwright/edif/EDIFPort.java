@@ -108,7 +108,7 @@ public class EDIFPort extends EDIFPropertyObject {
             }
         }
         if (colonIdx == -1 || leftBracket == -1) {
-            throw new RuntimeException("ERROR: Interpreting port " + getName() + ", couldn't identify indicies.");
+            throw new RuntimeException("ERROR: Interpreting port " + getName() + ", couldn't identify indices.");
         }
 
         int left = Integer.parseInt(name.substring(leftBracket+1, colonIdx));
