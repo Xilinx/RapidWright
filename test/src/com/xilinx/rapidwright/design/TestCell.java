@@ -68,6 +68,29 @@ public class TestCell {
 
     @ParameterizedTest
     @CsvSource({
+            "false,[G5]",
+            "true,'[G5, G1, G2, G3, G4, G6]'",
+    })
+    public void testGetAllCorrespondingSitePinNamesLUTRouteThru(boolean considerLutRoutethru, String expectedSitePins) {
+        Design d = new Design("testGetAllCorrespondingSitePinNamesLUTRouteThru", Device.KCU105);
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
+        Cell cell = d.createAndPlaceCell("f7mux", Unisim.MUXF7, si.getSiteName() + "/F7MUX_GH");
+
+        Net netS = d.createNet("netS");
+        Assertions.assertTrue(si.routeIntraSiteNet(netS, si.getBELPin("GX", "GX"),
+                si.getBELPin("F7MUX_GH", "S0")));
+        List<String> sitePinNames = cell.getAllCorrespondingSitePinNames("S", considerLutRoutethru);
+        Assertions.assertEquals("[GX]", sitePinNames.toString());
+
+        Net net1 = d.createNet("net1");
+        Assertions.assertTrue(si.routeIntraSiteNet(net1, si.getBELPin("G5", "G5"),
+                si.getBELPin("F7MUX_GH", "1")));
+        sitePinNames = cell.getAllCorrespondingSitePinNames("I1", considerLutRoutethru);
+        Assertions.assertEquals(expectedSitePins, sitePinNames.toString());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
             // Versal input pins
             "xcvp1502,SLICE_X148Y0,BFF,D,D,BX",
     })

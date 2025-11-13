@@ -196,7 +196,7 @@ public class PBlock extends ArrayList<PBlockRange> {
         ArrayList<String> tcl = new ArrayList<>();
         tcl.add("create_pblock " + name + (parent != null ? " -parent " + parent.getName() : ""));
         for (PBlockRange p : this) {
-            tcl.add("resize_pblock "+ name +" -add " + p.toString());
+            tcl.add("resize_pblock [get_pblocks "+ name +"] -add " + p.toString());
         }
         if (containRouting()) {
             tcl.add("set_property " + PblockProperty.CONTAIN_ROUTING + " 1 [get_pblocks " + name + "]");

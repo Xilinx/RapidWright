@@ -29,7 +29,7 @@ import java.util.List;
 
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.ipi.XDCParser;
+import com.xilinx.rapidwright.design.xdc.XDCParser;
 import com.xilinx.rapidwright.util.FileTools;
 
 public class DcpToInterchange {

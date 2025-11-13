@@ -96,7 +96,7 @@ public class TestEDIFPort {
             EDIFPort copy = cell.getPort("bus_output[" + outer + "][");
             Assertions.assertEquals(busOutput, copy);
 
-            int[] portIndices = busOutput.getBitBlastedIndicies();
+            int[] portIndices = busOutput.getBitBlastedIndices();
             Assertions.assertEquals(width, portIndices.length);
             Assertions.assertEquals(left, portIndices[0]);
             Assertions.assertEquals(right, portIndices[portIndices.length - 1]);
