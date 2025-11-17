@@ -2281,8 +2281,9 @@ public class DesignTools {
                         currPin = net.createPin(pin.getName(), siteInst);
                         newPins.add(currPin);
                         if (siteInstToNetSiteWiresMap != null) {
-                            siteInstToNetSiteWiresMap.get(siteInst)
-                                    .computeIfAbsent(net, k -> new ArrayList<>()).add(currPin.getSiteWireIndex());
+//                            siteInstToNetSiteWiresMap.get(siteInst)
+//                                    .computeIfAbsent(net, k -> new ArrayList<>()).add(currPin.getSiteWireIndex());
+                            siteInstToNetSiteWiresMap.get(siteInst).get(net).add(currPin.getSiteWireIndex());
                         }
                     }
                 }
@@ -2553,6 +2554,7 @@ public class DesignTools {
                         queue.add(sitePIP.getOutputPin());
                     } else if (bel.isFF()) {
                         // FF pass thru option (not a site PIP)
+                        siteWireIndex = bel.getPin("Q").getSiteWireIndex();
                         siteWireName = bel.getPin("Q").getSiteWireName();
                         if (siteWires.contains(siteWireIndex)) {
                             sitePins.add(siteWireName);
