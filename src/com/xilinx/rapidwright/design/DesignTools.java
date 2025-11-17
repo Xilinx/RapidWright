@@ -2281,9 +2281,7 @@ public class DesignTools {
                         currPin = net.createPin(pin.getName(), siteInst);
                         newPins.add(currPin);
                         if (siteInstToNetSiteWiresMap != null) {
-//                            siteInstToNetSiteWiresMap.get(siteInst)
-//                                    .computeIfAbsent(net, k -> new ArrayList<>()).add(currPin.getSiteWireIndex());
-                            siteInstToNetSiteWiresMap.get(siteInst).get(net).add(currPin.getSiteWireIndex());
+                            netSiteWiresMap.get(net).add(currPin.getSiteWireIndex());
                         }
                     }
                 }
