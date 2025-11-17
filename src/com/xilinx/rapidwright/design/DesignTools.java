@@ -2293,12 +2293,8 @@ public class DesignTools {
 
         EDIFNetlist netlist = design.getNetlist();
         EDIFHierNet parentEhn = null;
-        Map<EDIFHierPortInst, Cell> cellCache = new HashMap<>();
         for (EDIFHierPortInst p :  physPins) {
-            Cell c = cellCache.containsKey(p) ? cellCache.get(p) : design.getCell(p.getFullHierarchicalInstName());
-            if (!cellCache.containsKey(p)) {
-                cellCache.put(p, c);
-            }
+            Cell c = design.getCell(p.getFullHierarchicalInstName());
             if (c == null) continue;
             BEL bel = c.getBEL();
             if (bel == null) continue;
