@@ -2223,7 +2223,7 @@ public class DesignTools {
      * @return The list of pins that were created or an empty list if none were created.
      */
     public static List<SitePinInst> createMissingSitePinInsts(Design design, Net net,
-                                                              Map<SiteInst, Map<Net, List<String>>> siteInstToNetSiteWiresMap) {
+                                                              Map<SiteInst, Map<Net, List<Integer>>> siteInstToNetSiteWiresMap) {
         boolean isVersal = design.getSeries() == Series.Versal;
         EDIFNetlist n = design.getNetlist();
         List<EDIFHierPortInst> physPins = n.getPhysicalPins(net);
@@ -2246,11 +2246,11 @@ public class DesignTools {
             // Likely net inside encrypted IP, let's see if we can infer anything from existing
             // physical description
             for (SiteInst siteInst : new ArrayList<>(net.getSiteInsts())) {
-                Map<Net, List<String>> netSiteWiresMap = siteInstToNetSiteWiresMap != null ?
+                Map<Net, List<Integer>> netSiteWiresMap = siteInstToNetSiteWiresMap != null ?
                         siteInstToNetSiteWiresMap.get(siteInst) : null;
-                List<String> netSiteWires = netSiteWiresMap != null ?
-                        netSiteWiresMap.get(net) : siteInst.getSiteWiresFromNet(net);
-                for (String siteWire : new ArrayList<>(netSiteWires)) {
+                List<Integer> netSiteWires = netSiteWiresMap != null ?
+                        netSiteWiresMap.get(net) : siteInst.getSiteWireIndicesFromNet(net);
+                for (int siteWire : netSiteWires) {
                     for (BELPin pin : siteInst.getSiteWirePins(siteWire)) {
                         if (!pin.isSitePort()) {
                             continue;
@@ -2282,7 +2282,7 @@ public class DesignTools {
                         newPins.add(currPin);
                         if (siteInstToNetSiteWiresMap != null) {
                             siteInstToNetSiteWiresMap.get(siteInst)
-                                    .computeIfAbsent(net, k -> new ArrayList<>()).add(currPin.getSiteWireName());
+                                    .computeIfAbsent(net, k -> new ArrayList<>()).add(currPin.getSiteWireIndex());
                         }
                     }
                 }
@@ -2309,7 +2309,10 @@ public class DesignTools {
                 for (String physPin : physPinMappings) {
                     BELPin belPin = bel.getPin(physPin);
                     // Use the net attached to the phys pin
-                    Net siteWireNet = si.getNetFromSiteWire(belPin.getSiteWireName());
+                    Net siteWireNet;
+                    synchronized (si) {
+                        siteWireNet = si.getNetFromSiteWire(belPin.getSiteWireName());
+                    }
                     if (siteWireNet == null) {
                         if (isVersal && net.isStaticNet() && bel.isLUT()) {
                             siteWireNet = net;
@@ -2317,7 +2320,7 @@ public class DesignTools {
                                 si.routeIntraSiteNet(net, belPin, belPin);
                             }
                             if (siteInstToNetSiteWiresMap != null) {
-                                siteInstToNetSiteWiresMap.get(si).put(net, si.getSiteWiresFromNet(net));
+                                siteInstToNetSiteWiresMap.get(si).put(net, si.getSiteWireIndicesFromNet(net));
                             }
                         } else {
                             continue;
@@ -2353,7 +2356,7 @@ public class DesignTools {
                         newPins.add(newPin);
                         if (siteInstToNetSiteWiresMap != null) {
                             siteInstToNetSiteWiresMap.get(si)
-                                    .computeIfAbsent(net, k -> new ArrayList<>()).add(newPin.getSiteWireName());
+                                    .computeIfAbsent(net, k -> new ArrayList<>()).add(newPin.getSiteWireIndex());
                         }
 
                     }
@@ -2400,7 +2403,7 @@ public class DesignTools {
      * @return The name of the first site pin on the cell's site to which the pin is routed.
      */
     public static String getRoutedSitePinFromPhysicalPin(Cell cell, Net net, String belPinName,
-                                                         Map<SiteInst, Map<Net, List<String>>> siteInstToNetSiteWiresMap) {
+                                                         Map<SiteInst, Map<Net, List<Integer>>> siteInstToNetSiteWiresMap) {
         List<String> sitePins = getAllRoutedSitePinsFromPhysicalPin(cell, net, belPinName, siteInstToNetSiteWiresMap);
         return (!sitePins.isEmpty()) ? sitePins.get(0) : null;
     }
@@ -2414,8 +2417,8 @@ public class DesignTools {
      * @return
      */
     @SuppressWarnings("unchecked")
-    public static Map<SiteInst, Map<Net, List<String>>> getSiteInstToNetSiteWiresMap(Design design) {
-        Map<SiteInst, Map<Net, List<String>>> siteInstToNetSiteWiresMap = new ConcurrentHashMap<>();
+    public static Map<SiteInst, Map<Net, List<Integer>>> getSiteInstToNetSiteWiresMap(Design design) {
+        Map<SiteInst, Map<Net, List<Integer>>> siteInstToNetSiteWiresMap = new ConcurrentHashMap<>();
         List<Future<Void>> futures = new ArrayList<>();
         int numCells = design.getCells().size();
         // Experimentally best performing number of jobs
@@ -2426,7 +2429,7 @@ public class DesignTools {
             Future<?> f = ParallelismTools.submit(() -> {
                 for (Cell c : cells) {
                     SiteInst inst = c.getSiteInst();
-                    siteInstToNetSiteWiresMap.put(inst, inst.getNetToSiteWiresMap());
+                    siteInstToNetSiteWiresMap.put(inst, inst.getNetToSiteWireIndicesMap());
                 }
             });
             if (f != null) {
@@ -2462,25 +2465,25 @@ public class DesignTools {
      * @since 2025.2.0
      */
     public static List<String> getAllRoutedSitePinsFromPhysicalPin(Cell cell, Net net, String belPinName, Map<SiteInst,
-                                                                   Map<Net, List<String>>> siteInstToNetSiteWiresMap) {
+                                                                   Map<Net, List<Integer>>> siteInstToNetSiteWiresMap) {
         if (belPinName == null) {
             return Collections.emptyList();
         }
         SiteInst inst = cell.getSiteInst();
-        Map<Net, List<String>> netSiteWiresMap = null;
+        Map<Net, List<Integer>> netSiteWiresMap = null;
         if (siteInstToNetSiteWiresMap != null) {
             netSiteWiresMap = siteInstToNetSiteWiresMap.get(inst);
         }
         List<String> sitePins = new ArrayList<>();
-        List<String> siteWires = netSiteWiresMap != null ? netSiteWiresMap.get(net) : inst.getSiteWiresFromNet(net);
+        List<Integer> siteWires = netSiteWiresMap != null ? netSiteWiresMap.get(net) : inst.getSiteWireIndicesFromNet(net);
         if (siteWires == null) {
             throw new RuntimeException("Failed to find siteWires for net: " + net);
         }
         if (net.isGNDNet()) {
             // Since GND sitewires may be inverted for easier routing, also accept VCC sitewires
             Net vccNet = cell.getSiteInst().getDesign().getVccNet();
-            List<String> vccSiteWires = netSiteWiresMap != null ?
-                    netSiteWiresMap.get(vccNet) : inst.getSiteWiresFromNet(vccNet);
+            List<Integer> vccSiteWires = netSiteWiresMap != null ?
+                    netSiteWiresMap.get(vccNet) : inst.getSiteWireIndicesFromNet(vccNet);
             if (vccSiteWires != null) {
                 siteWires.addAll(vccSiteWires);
             }
@@ -2489,8 +2492,9 @@ public class DesignTools {
         queue.add(cell.getBEL().getPin(belPinName));
         while (!queue.isEmpty()) {
             BELPin curr = queue.remove();
+            int siteWireIndex = curr.getSiteWireIndex();
             String siteWireName = curr.getSiteWireName();
-            if (!siteWires.contains(siteWireName)) {
+            if (!siteWires.contains(siteWireIndex)) {
                 // Allow dedicated paths to pass without site routing
                 if (siteWireName.equals("CIN") || siteWireName.equals("COUT")) {
                     return Collections.singletonList(siteWireName);
@@ -2532,7 +2536,7 @@ public class DesignTools {
                 }
             } else { // output
                 for (BELPin sink : curr.getSiteConns()) {
-                    if (!siteWires.contains(sink.getSiteWireName())) continue;
+                    if (!siteWires.contains(sink.getSiteWireIndex())) continue;
                     if (sink.isSitePort()) {
                         sitePins.add(sink.getName());
                         continue;
@@ -2550,7 +2554,7 @@ public class DesignTools {
                     } else if (bel.isFF()) {
                         // FF pass thru option (not a site PIP)
                         siteWireName = bel.getPin("Q").getSiteWireName();
-                        if (siteWires.contains(siteWireName)) {
+                        if (siteWires.contains(siteWireIndex)) {
                             sitePins.add(siteWireName);
                         }
                     } else if (bel.getBELType().equals("DSP_CAS_DELAY")) {
@@ -2584,7 +2588,7 @@ public class DesignTools {
     @SuppressWarnings("unchecked")
     public static void createMissingSitePinInsts(Design design) {
         EDIFNetlist netlist = design.getNetlist();
-        Map<SiteInst, Map<Net, List<String>>> siteInstToNetSiteWiresMap = DesignTools.getSiteInstToNetSiteWiresMap(design);
+        Map<SiteInst, Map<Net, List<Integer>>> siteInstToNetSiteWiresMap = DesignTools.getSiteInstToNetSiteWiresMap(design);
         int numNets = design.getNets().size();
         // Experimentally best performing number of jobs
         int numJobs = ParallelismTools.maxParallelism() * 100;
