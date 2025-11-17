@@ -525,15 +525,13 @@ public class NetTools {
     /**
      * Unroute top-level port nets that have PIPs outside the specified PBlock. Vivado can potentially create designs
      * where the top-level port nets leave the PBlock if the InlineFlopTools flop harness was used and the top-level
-     * port net also has a sink inside the PBlock.
+     * port net also has a sink inside the PBlock. Physical net names must be consistent and macro unisims must be
+     * expanded before calling this method.
      *
      * @param d The design to unroute nets from.
      * @param pBlock The bounding box for the placed and routed design.
      */
     public static void unrouteTopLevelNetsThatLeavePBlock(Design d, PBlock pBlock) {
-        DesignTools.makePhysNetNamesConsistent(d);
-        d.getNetlist().resetParentNetMap();
-        d.getNetlist().expandMacroUnisims();
         for (EDIFPort p : d.getNetlist().getTopCell().getPorts()) {
             for (int i : p.getBitBlastedIndices()) {
                 EDIFPortInst portInst = p.getInternalPortInstFromIndex(i);
