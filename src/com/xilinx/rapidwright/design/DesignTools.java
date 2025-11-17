@@ -2300,7 +2300,7 @@ public class DesignTools {
             if (bel == null) continue;
             String logicalPinName = p.getPortInst().getName();
             Set<String> physPinMappings;
-            synchronized (design.getCell(c.getName())) {
+            synchronized (c) {
                 physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
             }
             // BRAMs can have two (or more) physical pin mappings for a logical pin
