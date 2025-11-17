@@ -38,7 +38,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Deque;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -90,7 +89,6 @@ import com.xilinx.rapidwright.placer.blockplacer.ImplsInstancePort;
 import com.xilinx.rapidwright.placer.blockplacer.ImplsPath;
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Installer;
 import com.xilinx.rapidwright.util.Job;
@@ -2422,7 +2420,7 @@ public class DesignTools {
     @SuppressWarnings("unchecked")
     public static Map<SiteInst, Map<Net, List<String>>> getSiteInstToNetSiteWiresMap(Design design) {
         Map<SiteInst, Map<Net, List<String>>> siteInstToNetSiteWiresMap = new ConcurrentHashMap<>();
-        Deque<Future<Void>> futures = new ArrayDeque<>();
+        List<Future<Void>> futures = new ArrayList<>();
         int numCells = design.getCells().size();
         // Experimentally best performing number of jobs
         int numJobs = ParallelismTools.maxParallelism() * 100;
@@ -2439,9 +2437,7 @@ public class DesignTools {
                 futures.add((Future<Void>) f);
             }
         }
-        while (!futures.isEmpty()) {
-            ParallelismTools.joinFirst(futures);
-        }
+        ParallelismTools.join(futures);
         return siteInstToNetSiteWiresMap;
     }
 
@@ -2598,7 +2594,7 @@ public class DesignTools {
         int numJobs = ParallelismTools.maxParallelism() * 100;
         List<Net> designNets = new ArrayList<>(design.getNets());
         List<List<Net>> partitionedNets = Lists.partition(designNets, (int) Math.ceil((double) numNets / numJobs));
-        Deque<Future<Void>> futures = new ArrayDeque<>();
+        List<Future<Void>> futures = new ArrayList<>();
         for (List<Net> nets : partitionedNets) {
             Future<?> f = ParallelismTools.submit(() -> {
                 for (Net net : nets) {
@@ -2624,9 +2620,7 @@ public class DesignTools {
             }
         }
 
-        while (!futures.isEmpty()) {
-            ParallelismTools.joinFirst(futures);
-        }
+        ParallelismTools.join(futures);
     }
 
     private static HashSet<String> muxPins;
@@ -3463,7 +3457,7 @@ public class DesignTools {
         int numJobs = ParallelismTools.maxParallelism() * 100;
         List<Net> designNets = new ArrayList<>(design.getNets());
         List<List<Net>> partitionedNets = Lists.partition(designNets, (int) Math.ceil((double) numNets / numJobs));
-        Deque<Future<Void>> futures = new ArrayDeque<>();
+        List<Future<Void>> futures = new ArrayList<>();
         for (List<Net> nets : partitionedNets) {
             Future<?> f = ParallelismTools.submit(() -> {
                 for (Net net : nets) {
@@ -3532,9 +3526,7 @@ public class DesignTools {
                 futures.add((Future<Void>) f);
             }
         }
-        while (!futures.isEmpty()) {
-            ParallelismTools.joinFirst(futures);
-        }
+        ParallelismTools.join(futures);
     }
 
     public static void createPossiblePinsToStaticNets(Design design) {
