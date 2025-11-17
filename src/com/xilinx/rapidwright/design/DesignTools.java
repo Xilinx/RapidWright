@@ -2250,7 +2250,7 @@ public class DesignTools {
                         siteInstToNetSiteWiresMap.get(siteInst) : null;
                 List<Integer> netSiteWires = netSiteWiresMap != null ?
                         netSiteWiresMap.get(net) : siteInst.getSiteWireIndicesFromNet(net);
-                for (int siteWire : netSiteWires) {
+                for (int siteWire : new ArrayList<>(netSiteWires)) {
                     for (BELPin pin : siteInst.getSiteWirePins(siteWire)) {
                         if (!pin.isSitePort()) {
                             continue;
@@ -2281,7 +2281,7 @@ public class DesignTools {
                         currPin = net.createPin(pin.getName(), siteInst);
                         newPins.add(currPin);
                         if (siteInstToNetSiteWiresMap != null) {
-                            netSiteWiresMap.get(net).add(currPin.getSiteWireIndex());
+                            netSiteWires.add(currPin.getSiteWireIndex());
                         }
                     }
                 }
