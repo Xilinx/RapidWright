@@ -2299,6 +2299,7 @@ public class DesignTools {
             if (bel == null) continue;
             String logicalPinName = p.getPortInst().getName();
             Set<String> physPinMappings;
+            // Need to synchronize on the cell to prevent concurrent modification of the logical to physical pin map
             synchronized (c) {
                 physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
             }
