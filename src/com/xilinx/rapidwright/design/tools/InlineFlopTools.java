@@ -163,8 +163,7 @@ public class InlineFlopTools {
                 continue;
             }
             Site shiftedSite = shiftSiteToSide(design.getDevice(), start, keepOut, side);
-            int[] indices = port.isBus() ? port.getBitBlastedIndicies() : new int[] { 0 };
-            for (int i : indices) {
+            for (int i : port.getBitBlastedIndices()) {
                 EDIFPortInst inst = port.getInternalPortInstFromIndex(i);
                 if (allLeavesAreIBUF(design, inst)) {
                     continue;
@@ -214,8 +213,7 @@ public class InlineFlopTools {
             if (port.getName().equals(clkNet)) {
                 continue;
             }
-            int[] indices = port.isBus() ? port.getBitBlastedIndicies() : new int[] { 0 };
-            for (int i : indices) {
+            for (int i : port.getBitBlastedIndices()) {
                 EDIFPortInst inst = port.getInternalPortInstFromIndex(i);
                 if (allLeavesAreIBUF(design, inst)) {
                     continue;

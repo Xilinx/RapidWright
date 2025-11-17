@@ -535,8 +535,7 @@ public class NetTools {
         d.getNetlist().resetParentNetMap();
         d.getNetlist().expandMacroUnisims();
         for (EDIFPort p : d.getNetlist().getTopCell().getPorts()) {
-            int[] indices = p.isBus() ? p.getBitBlastedIndicies() : new int[]{0};
-            for (int i : indices) {
+            for (int i : p.getBitBlastedIndices()) {
                 EDIFPortInst portInst = p.getInternalPortInstFromIndex(i);
                 if (portInst == null) {
                     continue;
