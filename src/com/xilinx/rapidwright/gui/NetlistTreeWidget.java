@@ -192,22 +192,19 @@ public class NetlistTreeWidget extends QTreeWidget {
         QTreeWidgetItem currItem = rootItem;
         EDIFHierCellInst currInst = netlist.getTopHierCellInst();
 
-        boolean isInst = lookup.startsWith(INST_ID);
         for (int i = 0; i < parts.length; i++) {
-            EDIFHierCellInst nextInst = currInst.getChild(parts[i]);
-            currInst = nextInst == null ? currInst : nextInst;
-            currItem = getChildItem(i == parts.length - 1, currInst, parts[i], currItem, isInst);
+            // Expand this instance if it hasn't been expanded yet
+            if (currItem.childCount() == 1 && currItem.child(0).text(0).equals(DUMMY)) {
+                currItem = populateCellInst(currItem, currInst);
+            }
+            currItem = getChildItem(i == parts.length - 1, parts[i], currItem);
+            currInst = currInst.getChild(parts[i]);
         }
 
         return currItem;
     }
 
-    private QTreeWidgetItem getChildItem(boolean isLastLevel, EDIFHierCellInst cellInst, String instName,
-            QTreeWidgetItem currItem, boolean isInst) {
-        // Expand this instance if it hasn't been expanded yet
-        if (currItem.childCount() == 1 && currItem.child(0).text(0).equals(DUMMY)) {
-            currItem = populateCellInst(currItem, isInst ? cellInst.getParent() : cellInst);
-        }
+    private QTreeWidgetItem getChildItem(boolean isLastLevel, String instName, QTreeWidgetItem currItem) {
         for (int j = 0; j < currItem.childCount(); j++) {
             QTreeWidgetItem child = currItem.child(j);
             String text = child.text(0);
