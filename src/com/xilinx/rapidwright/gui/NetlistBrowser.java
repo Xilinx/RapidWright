@@ -22,22 +22,24 @@
  */
 package com.xilinx.rapidwright.gui;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import com.trolltech.qt.QSignalEmitter.Signal1;
+import com.trolltech.qt.QThread;
 import com.trolltech.qt.core.QModelIndex;
 import com.trolltech.qt.core.Qt.DockWidgetArea;
 import com.trolltech.qt.gui.QApplication;
 import com.trolltech.qt.gui.QDockWidget;
 import com.trolltech.qt.gui.QDockWidget.DockWidgetFeature;
 import com.trolltech.qt.gui.QMainWindow;
-import com.trolltech.qt.gui.QTreeWidget;
 import com.trolltech.qt.gui.QTreeWidgetItem;
 import com.trolltech.qt.gui.QWidget;
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.edif.EDIFCell;
-import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
-import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
-import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFTools;
 
 public class NetlistBrowser extends QMainWindow {
@@ -51,38 +53,59 @@ public class NetlistBrowser extends QMainWindow {
 
     private EDIFNetlist netlist;
 
-    public NetlistBrowser(QWidget parent, Design design) {
+    private static Map<EDIFNetlist, NetlistBrowser> browsers = new HashMap<>();
+
+    public Signal1<String> selectInst = new Signal1<>();
+    public Signal1<String> selectNet = new Signal1<>();
+    public Signal1<String> selectPort = new Signal1<>();
+
+    protected static NetlistBrowser getBrowser(EDIFNetlist netlist) {
+        NetlistBrowser browser = browsers.get(netlist);
+        if (browser == null) {
+            browseNetlist(netlist, /* nonBlocking= */true);
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
+        return browsers.get(netlist);
+    }
+
+    private NetlistBrowser(QWidget parent, Design design) {
         super(parent);
         this.design = design;
         this.netlist = design.getNetlist();
         init();
     }
 
-    public NetlistBrowser(QWidget parent, EDIFNetlist netlist) {
+    private NetlistBrowser(QWidget parent, EDIFNetlist netlist) {
         super(parent);
         this.netlist = netlist;
         init();
     }
 
     public static void browseNetlist(Design design) {
-        browseNetlist(design.getNetlist());
-    }
-
-    public static void browseNetlist(EDIFNetlist netlist) {
         QApplication.setGraphicsSystem("raster");
         QApplication.initialize(new String[] {});
-        NetlistBrowser browser = new NetlistBrowser(null, netlist);
+        NetlistBrowser browser = new NetlistBrowser(null, design);
+        browsers.put(design.getNetlist(), browser);
         browser.show();
         QApplication.exec();
     }
 
+    public static void browseNetlist(EDIFNetlist netlist) {
+        browseNetlist(new Design(netlist));
+    }
+
     public static void browseNetlist(Design design, boolean nonBlocking) {
-        browseNetlist(design.getNetlist(), nonBlocking);
+        browseNetlist(design, nonBlocking);
     }
 
     public static void browseNetlist(EDIFNetlist netlist, boolean nonBlocking) {
         if (nonBlocking) {
-            new Thread(new Runnable() {
+            new QThread(new Runnable() {
                 public void run() {
                     browseNetlist(netlist);
                 }
@@ -117,26 +140,59 @@ public class NetlistBrowser extends QMainWindow {
 
         schematicScene.objectSelected.connect(this, "selectFromSchematic(String)");
         schematicScene.cellDrawn.connect(schematicView, "zoomToFit()");
+        this.selectInst.connect(this, "selectExternal(String)");
     }
 
     public void selectNetlistItem(QModelIndex index) {
-        QTreeWidgetItem item = treeWidget.getItemFromIndex(index);
+        selectNetlistItem(treeWidget.getItemFromIndex(index));
+    }
+
+    public void selectExternal(String lookup) {
+        QTreeWidgetItem item = selectFromSchematic(lookup);
+        if (item != null) {
+            selectNetlistItem(item);
+        }
+    }
+
+    public void selectNetlistItem(QTreeWidgetItem item) {
         if (item instanceof HierCellInstTreeWidgetItem) {
             EDIFHierCellInst cellInst = ((HierCellInstTreeWidgetItem) item).getInst();
             schematicScene.drawCell(cellInst, true);
-        } else if (item.data(0, 0) instanceof EDIFPort) {
-            EDIFPort port = (EDIFPort) item.data(0, 0);
-            schematicScene.selectObject(item.data(1, 0).toString(), true);
-        } else if (item.data(0, 0) instanceof EDIFNet) {
+        } else {
             schematicScene.selectObject(item.data(1, 0).toString(), true);
         }
     }
 
-    public void selectFromSchematic(String lookup) {
+    public QTreeWidgetItem selectFromSchematic(String lookup) {
         QTreeWidgetItem item = treeWidget.getItemByStringLookup(lookup);
         if (item != null) {
             treeWidget.setCurrentItem(item);
             treeWidget.scrollToItem(item);
+        }
+        return item;
+    }
+    
+    public static void select(EDIFHierCellInst inst) {
+        NetlistBrowser browser = getBrowser(inst.getCellType().getNetlist());
+        String lookup = NetlistTreeWidget.INST_ID + inst.toString();
+        browser.selectInst.emit(lookup);
+    }
+
+    public static void select(EDIFHierNet net) {
+        NetlistBrowser browser = getBrowser(net.getHierarchicalInst().getCellType().getNetlist());
+        String lookup = NetlistTreeWidget.NET_ID + net.toString();
+        QTreeWidgetItem item = browser.selectFromSchematic(lookup);
+        if (item != null) {
+            browser.selectNetlistItem(item);
+        }
+    }
+
+    public void select(EDIFHierPortInst portInst) {
+        NetlistBrowser browser = getBrowser(portInst.getCellType().getNetlist());
+        String lookup = NetlistTreeWidget.PORT_ID + portInst.toString();
+        QTreeWidgetItem item = browser.selectFromSchematic(lookup);
+        if (item != null) {
+            browser.selectNetlistItem(item);
         }
     }
 

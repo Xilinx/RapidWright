@@ -204,7 +204,7 @@ public class SchematicScene extends QGraphicsScene {
             if (hierPortInst != null) {
                 QPolygonF portShape = createPortShape(topPort, hierPortInst.isOutput());
                 QGraphicsPolygonItem port = addPolygon(portShape, PORT_PEN, PORT_BRUSH);
-                String lookup = "PORT:" + hierPortInst.toString();
+                String lookup = NetlistTreeWidget.PORT_ID + hierPortInst.toString();
                 port.setData(0, lookup);
                 String portInstName = hierPortInst.getPortInst().getName();
                 port.setToolTip(portInstName + (hierPortInst.isOutput() ? "(Output)" : "(Input)"));
@@ -276,7 +276,7 @@ public class SchematicScene extends QGraphicsScene {
                 }
                 createHierButton(child, isExpanded, cellInstName, xOffset, yOffset);
             }
-            String instLookup = "INST:" + child.getIdentifier();
+            String instLookup = NetlistTreeWidget.INST_ID + child.getIdentifier();
             clickRect.setData(0, instLookup);
             lookupMap.computeIfAbsent(instLookup, l -> new ArrayList<>()).add(rect);
 
@@ -338,7 +338,7 @@ public class SchematicScene extends QGraphicsScene {
         // Draw outer pins
         QGraphicsLineItem pinLine = addLine(x1, y, x2, y, BLACK_PEN);
         pinLine.setZValue(2);
-        String lookup = "PORT:" + parentInst + "/" + port.getIdentifier();
+        String lookup = NetlistTreeWidget.PORT_ID + parentInst + "/" + port.getIdentifier();
         pinLine.setData(0, lookup);
         lookupMap.computeIfAbsent(lookup, l -> new ArrayList<>()).add(pinLine);
         // Add a thick invisible area to make them easier to click on
@@ -421,7 +421,7 @@ public class SchematicScene extends QGraphicsScene {
             double lastX = startX;
             double lastY = startY;
             String id = e.getIdentifier();
-            String lookup = "NET:" + (id == null ? "" : id);
+            String lookup = NetlistTreeWidget.NET_ID + (id == null ? "" : id);
             for (ElkBendPoint bp : s.getBendPoints()) {
                 double bpX = bp.getX() + xOffset;
                 double bpY = bp.getY() + yOffset;
@@ -690,7 +690,8 @@ public class SchematicScene extends QGraphicsScene {
             if (data.startsWith(HIER_BUTTON)) {
                 String[] parts = data.split(":");
                 toggleCellInstExpansion(parts[1].trim());
-            } else if (data.startsWith("INST:") || data.startsWith("NET:") || data.startsWith("PORT:")) {
+            } else if (data.startsWith(NetlistTreeWidget.INST_ID) || data.startsWith(NetlistTreeWidget.NET_ID)
+                    || data.startsWith(NetlistTreeWidget.PORT_ID)) {
                 boolean ctrlPressed = event.modifiers().isSet(KeyboardModifier.ControlModifier);
                 toggleSelection(data, ctrlPressed);
             }
@@ -751,7 +752,7 @@ public class SchematicScene extends QGraphicsScene {
                 } else {
                     if (lookup.startsWith("INST:")) {
                         shape.setPen(CELL_PEN);
-                    } else if (lookup.startsWith("PORT:")) {
+                    } else if (lookup.startsWith(NetlistTreeWidget.PORT_ID)) {
                         shape.setPen(PORT_PEN);
                     }
                 }
