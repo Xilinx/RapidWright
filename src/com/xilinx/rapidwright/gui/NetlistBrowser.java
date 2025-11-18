@@ -58,10 +58,13 @@ public class NetlistBrowser extends QMainWindow {
         NetlistBrowser browser = browsers.get(netlist);
         if (browser == null) {
             browseNetlist(netlist, /* nonBlocking= */true);
-            try {
-                QThread.sleep(1000);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+            // Wait until the GUI has been created
+            while ((browser = browsers.get(netlist)) == null) {
+                try {
+                    QThread.sleep(10);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
         return browsers.get(netlist);
@@ -84,8 +87,8 @@ public class NetlistBrowser extends QMainWindow {
         QApplication.setGraphicsSystem("raster");
         QApplication.initialize(new String[] {});
         NetlistBrowser browser = new NetlistBrowser(null, design);
-        browsers.put(design.getNetlist(), browser);
         browser.show();
+        browsers.put(design.getNetlist(), browser);
         QApplication.exec();
     }
 
