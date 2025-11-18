@@ -90,8 +90,14 @@ public class NetlistTreeWidget extends QTreeWidget {
 
         if (inst.isTopLevelInst()) {
             for (EDIFPort port : cell.getPorts()) {
-                for (int i : port.getBitBlastedIndicies()) {
-			// TODO
+                for (int i : port.getBitBlastedIndices()) {
+                    String portInstName = port.getPortInstNameFromPort(i);
+                    QTreeWidgetItem n = new QTreeWidgetItem(ports);
+                    n.setData(0, 0, portInstName);
+                    String portLookup = PORT_ID + portInstName;
+                    n.setData(1, 0, portLookup);
+                    n.setText(0, portInstName + " (" + port.getDirection() + ")");
+                    objectLookup.put(portLookup, n);
                 }
             }
         } else {

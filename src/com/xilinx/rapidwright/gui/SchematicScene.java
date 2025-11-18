@@ -495,7 +495,7 @@ public class SchematicScene extends QGraphicsScene {
         // Only create top level port shapes if this is the top cell
         if (prefix.isEmpty()) {
             for (EDIFPort topPort : cell.getPorts()) {
-                for (int i : (topPort.isBus() ? topPort.getBitBlastedIndicies() : new int[] { 0 })) {
+                for (int i : topPort.getBitBlastedIndices()) {
                     String portInstName = topPort.getPortInstNameFromPort(i);
                     ElkNode elkTopPortNode = f.createElkNode();
                     EDIFHierPortInst hierPortInst = cellInst.getPortInst(portInstName);
@@ -620,7 +620,7 @@ public class SchematicScene extends QGraphicsScene {
 
     private void createExpandedCellInnerPorts(EDIFHierCellInst inst) {
         for (EDIFPort port : inst.getCellType().getPorts()) {
-            for (int i : (port.isBus() ? port.getBitBlastedIndicies() : new int[] { 0 })) {
+            for (int i : port.getBitBlastedIndices()) {
                 EDIFPortInst outerPortInst = inst.getInst().getPortInst(port.getPortInstNameFromPort(i));
                 ElkPort outerElkPort = portInstMap.get(outerPortInst);
                 // Map the inner port inst to the outer one so nets are aligned
