@@ -608,7 +608,8 @@ public class SchematicScene extends QGraphicsScene {
 
                     ElkEdge edge = ElkGraphFactory.eINSTANCE.createElkEdge();
                     edge.setContainingNode(parent);
-                    edge.setIdentifier(cellInst.toString() + "/" + net.getName());
+                    String id = cellInst.isTopLevelInst() ? net.getName() : (cellInst + "/" + net.getName());
+                    edge.setIdentifier(id);
                     edge.getSources().add(driver);
                     edge.getTargets().add(sink);
                     parent.getContainedEdges().add(edge);

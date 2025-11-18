@@ -38,6 +38,7 @@ import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFTools;
 
 /**
@@ -87,13 +88,21 @@ public class NetlistTreeWidget extends QTreeWidget {
         QTreeWidgetItem ports = new QTreeWidgetItem(curr);
         ports.setText(0, PORTS + " (" + cell.getPorts().size() + ")");
 
-        for (EDIFHierPortInst portInst : inst.getHierPortInsts()) {
-            QTreeWidgetItem n = new QTreeWidgetItem(ports);
-            n.setData(0, 0, portInst);
-            String portLookup = PORT_ID + (isTop ? portInst.getPortInst().getName() : portInst.toString());
-            n.setData(1, 0, portLookup);
-            n.setText(0, portInst.getPortInst().getName() + " (" + portInst.getPortInst().getDirection() + ")");
-            objectLookup.put(portLookup, n);
+        if (inst.isTopLevelInst()) {
+            for (EDIFPort port : cell.getPorts()) {
+                for (int i : port.getBitBlastedIndicies()) {
+			// TODO
+                }
+            }
+        } else {
+            for (EDIFHierPortInst portInst : inst.getHierPortInsts()) {
+                QTreeWidgetItem n = new QTreeWidgetItem(ports);
+                n.setData(0, 0, portInst);
+                String portLookup = PORT_ID + (isTop ? portInst.getPortInst().getName() : portInst.toString());
+                n.setData(1, 0, portLookup);
+                n.setText(0, portInst.getPortInst().getName() + " (" + portInst.getPortInst().getDirection() + ")");
+                objectLookup.put(portLookup, n);
+            }
         }
         ports.setExpanded(false);
 
