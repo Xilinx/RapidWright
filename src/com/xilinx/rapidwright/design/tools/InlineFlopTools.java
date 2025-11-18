@@ -98,7 +98,7 @@ public class InlineFlopTools {
                 continue;
             }
             if (port.isBus()) {
-                for (int i : port.getBitBlastedIndicies()) {
+                for (int i : port.getBitBlastedIndices()) {
                     EDIFPortInst inst = port.getInternalPortInstFromIndex(i);
                     Pair<Site, BEL> loc = nextAvailPlacement(design, siteItr);
                     Cell flop = createAndPlaceFlopInlineOnTopPortInst(design, inst, loc, clk);
