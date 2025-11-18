@@ -188,7 +188,8 @@ public class NetlistTreeWidget extends QTreeWidget {
         // We need to expand the tree to create the item first
         String hierPath = lookup.substring(lookup.indexOf(":") + 1);
 
-        String[] parts = hierPath.split(EDIFTools.EDIF_HIER_SEP);
+        // If hierPath is empty, we are trying to get the root
+        String[] parts = hierPath.length() == 0 ? new String[] {} : hierPath.split(EDIFTools.EDIF_HIER_SEP);
         QTreeWidgetItem currItem = rootItem;
         EDIFHierCellInst currInst = netlist.getTopHierCellInst();
 
