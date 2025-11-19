@@ -29,6 +29,11 @@ import java.util.List;
 import java.util.Map;
 
 import com.trolltech.qt.core.QModelIndex;
+import com.trolltech.qt.core.QPoint;
+import com.trolltech.qt.core.Qt.ContextMenuPolicy;
+import com.trolltech.qt.gui.QAction;
+import com.trolltech.qt.gui.QApplication;
+import com.trolltech.qt.gui.QMenu;
 import com.trolltech.qt.gui.QTreeWidget;
 import com.trolltech.qt.gui.QTreeWidgetItem;
 import com.xilinx.rapidwright.edif.EDIFCell;
@@ -72,6 +77,8 @@ public class NetlistTreeWidget extends QTreeWidget {
         rootItem = populateCellInst(root, netlist.getTopHierCellInst());
         this.clicked.connect(this, "expandCell(QModelIndex)");
         this.expanded.connect(this, "expandCell(QModelIndex)");
+        setContextMenuPolicy(ContextMenuPolicy.CustomContextMenu);
+        this.customContextMenuRequested.connect(this, "showCopyMenu(QPoint)");
     }
 
     public QTreeWidgetItem populateCellInst(QTreeWidgetItem curr, EDIFHierCellInst inst) {
@@ -241,5 +248,35 @@ public class NetlistTreeWidget extends QTreeWidget {
             }
         }
         return null;
+    }
+
+    public void showCopyMenu(QPoint pos) {
+        QTreeWidgetItem item = itemAt(pos);
+        if (item == null) {
+            return;
+        }
+
+        String displayName = item.text(0);
+        String lookup = item.data(1, 0).toString();
+        String hierName = lookup != null ? lookup.substring(lookup.indexOf(':') + 1) : null;
+
+        QMenu menu = new QMenu(this);
+        createCopyAction(displayName, menu);
+        createCopyAction(hierName, menu);
+        menu.exec(mapToGlobal(pos));
+    }
+
+    private void createCopyAction(String text, QMenu menu) {
+        if (text == null) return;
+        QAction copyName = new QAction("Copy '" + text + "'", menu);
+        copyName.triggered.connect(new Runnable() {
+            @Override
+            public void run() {
+                if (text != null && !text.isEmpty()) {
+                    QApplication.clipboard().setText(text);
+                }
+            }
+        }, "run()");
+        menu.addAction(copyName);
     }
 }
