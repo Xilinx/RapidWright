@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.trolltech.qt.QThread;
+import com.trolltech.qt.core.QCoreApplication;
 import com.trolltech.qt.core.QModelIndex;
 import com.trolltech.qt.core.Qt.DockWidgetArea;
 import com.trolltech.qt.gui.QApplication;
@@ -137,6 +138,7 @@ public class NetlistBrowser extends QMainWindow {
 
         schematicScene.objectSelected.connect(this, "selectFromSchematic(String)");
         schematicScene.cellDrawn.connect(schematicView, "zoomToFit()");
+        QCoreApplication.instance().aboutToQuit.connect(this, "cleanup()");
     }
 
     public void selectNetlistItem(QModelIndex index) {
@@ -189,6 +191,10 @@ public class NetlistBrowser extends QMainWindow {
                 browser.selectNetlistItem(item);
             }
         });
+    }
+
+    public void cleanup() {
+        browsers.remove(netlist);
     }
 
     /**
