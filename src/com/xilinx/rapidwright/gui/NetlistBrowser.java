@@ -148,7 +148,10 @@ public class NetlistBrowser extends QMainWindow {
             EDIFHierCellInst cellInst = ((HierCellInstTreeWidgetItem) item).getInst();
             schematicScene.drawCell(cellInst, true);
         } else {
-            schematicScene.selectObject(item.data(1, 0).toString(), true);
+            Object data = item.data(1, 0);
+            if (data != null) {
+                schematicScene.selectObject(data.toString(), true);
+            }
         }
     }
 

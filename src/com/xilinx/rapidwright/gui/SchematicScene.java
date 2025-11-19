@@ -206,6 +206,7 @@ public class SchematicScene extends QGraphicsScene {
                 QGraphicsPolygonItem port = addPolygon(portShape, PORT_PEN, PORT_BRUSH);
                 String lookup = NetlistTreeWidget.PORT_ID + hierPortInst.toString();
                 port.setData(0, lookup);
+                port.setZValue(1);
                 String portInstName = hierPortInst.getPortInst().getName();
                 port.setToolTip(portInstName + (hierPortInst.isOutput() ? "(Output)" : "(Input)"));
                 port.setAcceptsHoverEvents(true);
@@ -499,6 +500,14 @@ public class SchematicScene extends QGraphicsScene {
                     String portInstName = topPort.getPortInstNameFromPort(i);
                     ElkNode elkTopPortNode = f.createElkNode();
                     EDIFHierPortInst hierPortInst = cellInst.getPortInst(portInstName);
+                    if (hierPortInst == null) {
+                        EDIFPortInst portInst = topPort.isBus() ? topPort.getInternalPortInstFromIndex(i)
+                                : topPort.getInternalPortInst();
+                        if (portInst == null) {
+                            portInst = new EDIFPortInst(topPort, null, i);
+                        }
+                        hierPortInst = new EDIFHierPortInst(cellInst, portInst);
+                    }
                     elkNodeTopPortMap.put(elkTopPortNode, hierPortInst);
                     elkTopPortNode.setDimensions(TOP_PORT_WIDTH + POINT_DIST, TOP_PORT_HEIGHT);
                     elkTopPortNode.setIdentifier(portInstName);
@@ -513,7 +522,7 @@ public class SchematicScene extends QGraphicsScene {
                     elkTopPort.setProperty(CoreOptions.PORT_SIDE, topPort.isOutput() ? PortSide.EAST : PortSide.WEST);
                     elkTopPort.setProperty(CoreOptions.PORT_INDEX, 1);
                     elkTopPort.setDimensions(PORT_SIZE, PORT_SIZE);
-                    portInstMap.put(cellInst.getPortInst(portInstName), elkTopPort);
+                    portInstMap.put(hierPortInst, elkTopPort);
                     elkTopPortNode.getPorts().add(elkTopPort);
                 }
             }
