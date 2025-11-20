@@ -189,7 +189,7 @@ public class DeviceResourcesVerifier {
 
         Reader<SiteType.Reader> stReaders = dReader.getSiteTypeList();
         for (SiteType.Reader stReader : stReaders) {
-            Set<Integer> belPinIndicies = new HashSet<Integer>();
+            Set<Integer> belPinIndices = new HashSet<Integer>();
             SiteTypeEnum siteTypeEnum = SiteTypeEnum.valueOf(allStrings.get(stReader.getName()));
 
             Site site = siteTypes.get(siteTypeEnum);
@@ -212,7 +212,7 @@ public class DeviceResourcesVerifier {
                 for (int j=0; j < belPins.length; j++) {
                     BELPin pin = belPins[j];
                     int belPinIndex = pinsReader.get(j);
-                    belPinIndicies.add(belPinIndex);
+                    belPinIndices.add(belPinIndex);
                     verifyBelPin(belPinsReader, pin, belPinIndex);
                 }
 
@@ -223,11 +223,11 @@ public class DeviceResourcesVerifier {
                     BELInverter.Reader belInverter = belReader.getInverting();
 
                     BELPin nonInverting = bel.getNonInvertingPin();
-                    belPinIndicies.add(belInverter.getNonInvertingPin());
+                    belPinIndices.add(belInverter.getNonInvertingPin());
                     verifyBelPin(belPinsReader, nonInverting, belInverter.getNonInvertingPin());
 
                     BELPin inverting = bel.getInvertingPin();
-                    belPinIndicies.add(belInverter.getInvertingPin());
+                    belPinIndices.add(belInverter.getInvertingPin());
                     verifyBelPin(belPinsReader, inverting, belInverter.getInvertingPin());
                 } else {
                     expect(false, belReader.hasInverting());
@@ -274,7 +274,7 @@ public class DeviceResourcesVerifier {
                 }
 
                 BELPin belPin = belPins[0];
-                belPinIndicies.add(pinReader.getBelpin());
+                belPinIndices.add(pinReader.getBelpin());
                 verifyBelPin(belPinsReader, belPin, pinReader.getBelpin());
             }
 
@@ -297,12 +297,12 @@ public class DeviceResourcesVerifier {
                 expect(belPins.length, wiresReader.size());
 
                 for (int i=0; i < belPins.length; i++) {
-                    belPinIndicies.add(wiresReader.get(i));
+                    belPinIndices.add(wiresReader.get(i));
                     verifyBelPin(belPinsReader, belPins[i], wiresReader.get(i));
                 }
             }
 
-            expect(belPinIndicies.size(), belPinsReader.size());
+            expect(belPinIndices.size(), belPinsReader.size());
 
             StructList.Reader<DeviceResources.Device.SitePIP.Reader> sitePipsReader = stReader.getSitePIPs();
             SitePIP[] sitePIPs = siteInst.getSitePIPs();
