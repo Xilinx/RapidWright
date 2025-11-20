@@ -2488,7 +2488,7 @@ public class DesignTools {
         int numJobs = ParallelismTools.maxParallelism() * 100;
         List<Net> designNets = new ArrayList<>(design.getNets());
         List<List<Net>> partitionedNets = Lists.partition(designNets, (int) Math.ceil((double) numNets / numJobs));
-        List<Future<Void>> futures = new ArrayList<>();
+        List<Future<?>> futures = new ArrayList<>();
         for (List<Net> nets : partitionedNets) {
             Future<?> f = ParallelismTools.submit(() -> {
                 for (Net net : nets) {
@@ -2500,9 +2500,7 @@ public class DesignTools {
                     createMissingSitePinInsts(design, net);
                 }
             });
-            if (f != null) {
-                futures.add((Future<Void>) f);
-            }
+            futures.add(f);
         }
 
         ParallelismTools.join(futures);
@@ -3342,7 +3340,7 @@ public class DesignTools {
         int numJobs = ParallelismTools.maxParallelism() * 100;
         List<Net> designNets = new ArrayList<>(design.getNets());
         List<List<Net>> partitionedNets = Lists.partition(designNets, (int) Math.ceil((double) numNets / numJobs));
-        List<Future<Void>> futures = new ArrayList<>();
+        List<Future<?>> futures = new ArrayList<>();
         for (List<Net> nets : partitionedNets) {
             Future<?> f = ParallelismTools.submit(() -> {
                 for (Net net : nets) {
@@ -3407,9 +3405,7 @@ public class DesignTools {
                     }
                 }
             });
-            if (f != null) {
-                futures.add((Future<Void>) f);
-            }
+            futures.add(f);
         }
         ParallelismTools.join(futures);
     }
