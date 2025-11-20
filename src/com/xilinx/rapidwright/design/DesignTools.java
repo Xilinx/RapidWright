@@ -2204,33 +2204,25 @@ public class DesignTools {
      * Creates any and all missing SitePinInsts for this net.  This is common as a placed
      * DCP will not have SitePinInsts annotated and this information is generally necessary
      * for routing to take place.
+     * It is required that the supplied `Net` object refers to a parent logical net
+     * (use {@link #makePhysNetNamesConsistent(Design)} to make this the case).
      * @param design The current design of this net.
      * @param net The net to create missing site pin insts for.
      * @return The list of pins that were created or an empty list if none were created.
      */
     public static List<SitePinInst> createMissingSitePinInsts(Design design, Net net) {
         boolean isVersal = design.getSeries() == Series.Versal;
-        EDIFNetlist n = design.getNetlist();
-        List<EDIFHierPortInst> physPins = n.getPhysicalPins(net);
-        if (physPins == null) {
-            // Perhaps net is not a parent net name
-            final EDIFHierNet hierNet = n.getHierNetFromName(net.getName());
-            if (hierNet != null) {
-                final EDIFHierNet parentHierNet = n.getParentNet(hierNet);
-                if (!hierNet.equals(parentHierNet)) {
-                    physPins = n.getPhysicalPins(parentHierNet);
-                    if (physPins != null) {
-                        System.out.println("WARNING: Physical net '" + net.getName() +
-                                "' is not the parent net but is treated as such." );
-                    }
-                }
-            }
-        }
+        EDIFNetlist netlist = design.getNetlist();
+        List<EDIFHierPortInst> physPins = netlist.getPhysicalPins(net);
         List<SitePinInst> newPins = new ArrayList<>();
         if (physPins == null) {
+            // Assert that this physical net is a parent logical net
+            EDIFHierNet hierNet;
+            assert((hierNet = net.getLogicalHierNet()) == null || hierNet.equals(netlist.getParentNet(hierNet)));
+
             // Likely net inside encrypted IP, let's see if we can infer anything from existing
             // physical description
-            for (SiteInst siteInst : new ArrayList<>(net.getSiteInsts())) {
+            for (SiteInst siteInst : net.getSiteInsts()) {
                 for (int siteWire : siteInst.getSiteWireIndicesFromNet(net)) {
                     for (BELPin pin : siteInst.getSiteWirePins(siteWire)) {
                         if (!pin.isSitePort()) {
@@ -2268,7 +2260,6 @@ public class DesignTools {
             return newPins;
         }
 
-        EDIFNetlist netlist = design.getNetlist();
         EDIFHierNet parentEhn = null;
         for (EDIFHierPortInst p :  physPins) {
             Cell c = design.getCell(p.getFullHierarchicalInstName());
@@ -2301,15 +2292,12 @@ public class DesignTools {
                         }
                     }
                     if (siteWireNet != net && !siteWireNet.isStaticNet()) {
-                        if (parentEhn == null) {
-                            parentEhn = netlist.getParentNet(net.getLogicalHierNet());
-                        }
-                        EDIFHierNet parentSiteWireEhn = netlist.getParentNet(siteWireNet.getLogicalHierNet());
-                        if (parentSiteWireEhn != null && !parentSiteWireEhn.equals(parentEhn)) {
-                            // Site wire net is not an alias of the net
-                            throw new RuntimeException("ERROR: Net on " + si.getSiteName() + "/" + belPin +
-                                    "'" + siteWireNet.getName() + "' is not an alias of " +
-                                    "'" + net.getName() + "'");
+                        EDIFHierNet hierNet = null;
+                        assert((hierNet = net.getLogicalHierNet()) == null || hierNet.equals(netlist.getParentNet(hierNet)));
+                        if (hierNet != null) {
+                            EDIFHierNet siteWireHierNet = null;
+                            assert((siteWireHierNet = siteWireNet.getLogicalHierNet()) == null || siteWireHierNet.equals(netlist.getParentNet(siteWireHierNet)));
+                            assert(hierNet.equals(siteWireHierNet));
                         }
                     }
                     SitePinInst newPin;
@@ -2483,11 +2471,18 @@ public class DesignTools {
     /**
      * Creates all missing SitePinInsts in a design, except GLOBAL_USEDNET. This method is multi-threaded based on the
      * setting in {@link ParallelismTools}. See also {@link #createMissingSitePinInsts(Design, Net)}.
+     * It is required that the `Design` object only contains physical nets that refer to parent logical nets
+     * (use {@link #makePhysNetNamesConsistent(Design)} to make this the case).
      * @param design The current design
      */
     @SuppressWarnings("unchecked")
     public static void createMissingSitePinInsts(Design design) {
         EDIFNetlist netlist = design.getNetlist();
+
+        // Compute (if needed) the physical net pin map outside of parallel loop below
+        // (Note that this also computes the parent net map used in assertions)
+        netlist.getPhysicalNetPinMap();
+
         int numNets = design.getNets().size();
         // Experimentally best performing number of jobs
         int numJobs = ParallelismTools.maxParallelism() * 100;
@@ -2500,17 +2495,8 @@ public class DesignTools {
                     if (net.isUsedNet()) {
                         continue;
                     }
-                    EDIFHierNet ehn = net.getLogicalHierNet();
-                    EDIFHierNet parentEhn = (ehn != null) ? netlist.getParentNet(ehn) : null;
-                    if (parentEhn != null && !parentEhn.equals(ehn)) {
-                        Net parentNet = design.getNet(parentEhn.getHierarchicalNetName());
-                        if (parentNet != null) {
-                            // 'net' is not a parent net (which normally causes createMissingSitePinInsts(Design, Net)
-                            // to analyze its parent net) but that parent net also exist in the design and has been/
-                            // will be analyzed in due course, so skip doing so here
-                            continue;
-                        }
-                    }
+                    EDIFHierNet ehn;
+                    assert((ehn = net.getLogicalHierNet()) == null || ehn.equals(netlist.getParentNet(ehn)));
                     createMissingSitePinInsts(design, net);
                 }
             });

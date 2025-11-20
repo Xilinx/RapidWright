@@ -214,6 +214,7 @@ public class TestDesignTools {
     public void testCreateMissingSitePinInstsInPins() {
         String dcpPath = RapidWrightDCP.getString("picoblaze_partial.dcp");
         Design design = Design.readCheckpoint(dcpPath);
+        DesignTools.makePhysNetNamesConsistent(design);
         DesignTools.createMissingSitePinInsts(design);
 
         final Set<String> dualOutputNets = new HashSet<String>() {{
