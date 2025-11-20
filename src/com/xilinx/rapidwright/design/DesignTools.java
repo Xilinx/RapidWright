@@ -3346,7 +3346,7 @@ public class DesignTools {
         List<List<Net>> partitionedNets = Lists.partition(designNets, (int) Math.ceil((double) numNets / numJobs));
         List<Future<?>> futures = new ArrayList<>();
         for (List<Net> nets : partitionedNets) {
-            /*Future<?> f = ParallelismTools.submit(() ->*/ {
+            Future<?> f = ParallelismTools.submit(() -> {
                 for (Net net : nets) {
                     Net parentPhysNet = null;
                     if (net.isStaticNet()) {
@@ -3408,8 +3408,8 @@ public class DesignTools {
                         }
                     }
                 }
-            }/*);
-            futures.add(f);*/
+            });
+            futures.add(f);
         }
         ParallelismTools.join(futures);
     }
