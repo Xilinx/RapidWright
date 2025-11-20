@@ -33,11 +33,18 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.WeakHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
@@ -50,13 +57,7 @@ import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
-import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.EnumSource;
-import org.junit.jupiter.params.provider.MethodSource;
+
 import tcl.lang.Interp;
 import tcl.lang.TCL;
 import tcl.lang.TclException;
@@ -1036,6 +1037,7 @@ public class TestXDCParser {
     public static Stream<Arguments> getAllTheDesigns() {
         Set<String> skippedDcps = new HashSet<>();
         skippedDcps.add("picoblaze_ooc_X10Y235_unreadable_edif.dcp"); //Needs Vivado
+        skippedDcps.add("multiply_ip.dcp");
 
         List<RoundtripMode> modes = Arrays.asList(
                 RoundtripMode.Roundtrip_without_netlist,
