@@ -346,9 +346,8 @@ public class EDIFCell extends EDIFPropertyObject {
 
         EDIFPort newPort = new EDIFPort(newName, port.getDirection(), port.getWidth());
         addPort(newPort);
-        int[] indices = port.isBus() ? port.getBitBlastedIndicies() : new int[]{0};
 
-        for (int i : indices) {
+        for (int i : port.getBitBlastedIndices()) {
             EDIFPortInst portInst = port.getInternalPortInstFromIndex(i);
             if (portInst == null) {
                 continue;
