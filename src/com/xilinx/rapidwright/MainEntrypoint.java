@@ -54,6 +54,7 @@ import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFParser;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.edif.compare.EDIFNetlistComparator;
 import com.xilinx.rapidwright.examples.AddSubGenerator;
 import com.xilinx.rapidwright.examples.CopyMMCMCell;
 import com.xilinx.rapidwright.examples.CountRoutedNets;
@@ -153,6 +154,7 @@ public class MainEntrypoint {
         addFunction("DeviceLoader", DeviceLoader::main);
         addFunction("DeviceResourcesExample", DeviceResourcesExample::main);
         addFunction("EDIFNetlist", EDIFNetlist::main);
+        addFunction("EDIFNetlistComparator", EDIFNetlistComparator::main);
         addFunction("EDIFParser", EDIFParser::main);
         addFunction("EDIFPropertyValue", EDIFPropertyValue::main);
         addFunction("EDIFToLogicalNetlist", EdifToLogicalNetlist::main);

@@ -676,4 +676,36 @@ public class TestRWRoute {
 
         VivadoToolsHelper.assertFullyRouted(designWithBlackBox);
     }
+
+    @Test
+    public void testRWRouteSubstituteNetlist(@TempDir Path dir) {
+        if (FileTools.isVivadoOnPath() && FileTools.isVivadoAtLeastVersion(2024, 1)) {
+            Path dcp = RapidWrightDCP.getPath("multiply_ip.dcp");
+            Path outputLog = dir.resolve("output.log");
+            Path tclScript = dir.resolve("run.tcl");
+            Path subNetlist = dir.resolve("sub.edf");
+
+            List<String> tclCmds = new ArrayList<>();
+            tclCmds.add("open_checkpoint " + dcp.toString());
+            tclCmds.add("source " + FileTools.getRapidWrightPath() + "/tcl/rapidwright.tcl");
+            tclCmds.add("set cell_to_write [get_cells [lsort -unique [get_cells [get_property PARENT "
+                    + "[get_cells -hierarchical -filter {is_du_within_envelope==1}]]]] "
+                    + "-filter {is_du_within_envelope!=1}]");
+            tclCmds.add("write_cell_to_edif $cell_to_write " + subNetlist.toString());
+            FileTools.writeLinesToTextFile(tclCmds, tclScript.toString());
+            VivadoTools.runTcl(outputLog, tclScript, true);
+
+            Design d = Design.readCheckpoint(dcp);
+            EDIFNetlist externalLib = EDIFTools.readEdifFile(subNetlist);
+            d.getNetlist().setExternalLibrary(externalLib.getHDIPrimitivesLibrary());
+
+            RWRoute.routeDesignFullNonTimingDriven(d);
+
+            d.getNetlist().blackBoxExternalCells();
+            d.getNetlist().setExternalLibrary(null);
+
+            VivadoToolsHelper.assertFullyRouted(d);
+
+        }
+    }
 }
