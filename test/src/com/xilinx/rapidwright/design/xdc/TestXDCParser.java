@@ -1021,6 +1021,7 @@ public class TestXDCParser {
         public Design getDesign() {
             Design d = design == null ? null : design.get();
             if (d == null) {
+                Design.setAutoGenerateReadableEdif(true);
                 d = Design.readCheckpoint(path, true);
                 this.design = new WeakReference<>(d);
             }
@@ -1037,7 +1038,6 @@ public class TestXDCParser {
     public static Stream<Arguments> getAllTheDesigns() {
         Set<String> skippedDcps = new HashSet<>();
         skippedDcps.add("picoblaze_ooc_X10Y235_unreadable_edif.dcp"); //Needs Vivado
-        skippedDcps.add("multiply_ip.dcp");
 
         List<RoundtripMode> modes = Arrays.asList(
                 RoundtripMode.Roundtrip_without_netlist,
