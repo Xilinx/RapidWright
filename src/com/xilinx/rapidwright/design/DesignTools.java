@@ -2199,6 +2199,7 @@ public class DesignTools {
         return false;
     }
 
+
     /**
      * Creates any and all missing SitePinInsts for this net.  This is common as a placed
      * DCP will not have SitePinInsts annotated and this information is generally necessary
@@ -2368,7 +2369,7 @@ public class DesignTools {
      * @param net The physical net to which this pin belongs
      * @param belPinName The physical pin name of the cell
      * @return A list of site pin names on the cell's site to which the pin is routed.
-     * @since 2025.2.0
+     * @since 2023.1.2
      */
     public static List<String> getAllRoutedSitePinsFromPhysicalPin(Cell cell, Net net, String belPinName) {
         if (belPinName == null) {
