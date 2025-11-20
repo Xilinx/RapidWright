@@ -94,10 +94,17 @@ public class TestRelocationTools {
             }
 
             for (Net n2 : mi.getNets()) {
-                Net n1 = design1.getNet(n2.getName());
-                if (n1 == null && n2.getName().startsWith(mi.getName() + EDIFTools.EDIF_HIER_SEP)) {
-                    // Retry without ModuleInst hierarchy in case it was flattened
-                    n1 = design1.getNet(n2.getName().substring(mi.getName().length() + 1));
+                boolean n2IsSpecial = n2.isStaticNet() || n2.isUsedNet();
+                Net n1;
+                if (n2IsSpecial) {
+                    n1 = design1.getNet(n2.getName());
+                } else {
+                    String n1Name = design1.getNetlist().getParentNetName(n2.getName());
+                    if (n1Name == null) {
+                        // Without ModuleInst hierarchy in case it was flattened
+                        n1Name = design1.getNetlist().getParentNetName(n2.getName().substring(mi.getName().length() + 1));
+                    }
+                    n1 = design1.getNet(n1Name);
                 }
                 Assertions.assertNotNull(n1);
 
@@ -108,6 +115,9 @@ public class TestRelocationTools {
                 }
 
                 Set<PIP> p1 = new HashSet<>(n1.getPIPs());
+                if (!n2IsSpecial) {
+                    n2 = n2.getDesign().getNet(n2.getDesign().getNetlist().getParentNetName(n2.getName()));
+                }
                 Set<PIP> p2 = new HashSet<>(n2.getPIPs());
                 if (!n1.isStaticNet()) {
                     Assertions.assertEquals(p1, p2);

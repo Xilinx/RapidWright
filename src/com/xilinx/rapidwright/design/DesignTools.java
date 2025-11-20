@@ -2218,7 +2218,9 @@ public class DesignTools {
         if (physPins == null) {
             // Assert that this physical net is a parent logical net
             EDIFHierNet hierNet;
-            assert((hierNet = net.getLogicalHierNet()) == null || hierNet.equals(netlist.getParentNet(hierNet)));
+            EDIFHierNet parentHierNet;
+            assert((hierNet = net.getLogicalHierNet()) == null || (parentHierNet = netlist.getParentNet(hierNet)) == null ||
+                    hierNet.equals(parentHierNet));
 
             // Likely net inside encrypted IP, let's see if we can infer anything from existing
             // physical description
@@ -2492,11 +2494,13 @@ public class DesignTools {
         for (List<Net> nets : partitionedNets) {
             Future<?> f = ParallelismTools.submit(() -> {
                 for (Net net : nets) {
-                    if (net.isUsedNet()) {
+                    if (net.isUsedNet() || net.isZNet()) {
                         continue;
                     }
                     EDIFHierNet ehn;
-                    assert((ehn = net.getLogicalHierNet()) == null || ehn.equals(netlist.getParentNet(ehn)));
+                    EDIFHierNet parentEhn;
+                    assert((ehn = net.getLogicalHierNet()) == null || (parentEhn = netlist.getParentNet(ehn)) == null ||
+                            ehn.equals(parentEhn));
                     createMissingSitePinInsts(design, net);
                 }
             });
@@ -3342,7 +3346,7 @@ public class DesignTools {
         List<List<Net>> partitionedNets = Lists.partition(designNets, (int) Math.ceil((double) numNets / numJobs));
         List<Future<?>> futures = new ArrayList<>();
         for (List<Net> nets : partitionedNets) {
-            Future<?> f = ParallelismTools.submit(() -> {
+            /*Future<?> f = ParallelismTools.submit(() ->*/ {
                 for (Net net : nets) {
                     Net parentPhysNet = null;
                     if (net.isStaticNet()) {
@@ -3404,8 +3408,8 @@ public class DesignTools {
                         }
                     }
                 }
-            });
-            futures.add(f);
+            }/*);
+            futures.add(f);*/
         }
         ParallelismTools.join(futures);
     }

@@ -466,6 +466,8 @@ public class TestDesignTools {
         si.routeIntraSiteNet(alias, c1, c1);
         Assertions.assertEquals(alias, si.getNetFromSiteWire("C1"));
 
+        DesignTools.makePhysNetNamesConsistent(design);
+
         // Only one site pin since it's an out-of-context hierarchical port
         Assertions.assertEquals("[IN SLICE_X15Y235.C1]", DesignTools.createMissingSitePinInsts(design, net).toString());
     }

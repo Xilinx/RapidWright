@@ -378,6 +378,8 @@ public class PolynomialGenerator {
 
         buildOperatorTree(p, d, results);
 
+        d.flattenDesign();
+
         // This is redundant if the design will be routed later, but is necessary
         // for correct visualization in the Hand Placer tool
         RWRoute.preprocess(d);
