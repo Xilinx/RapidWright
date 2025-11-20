@@ -2277,7 +2277,7 @@ public class DesignTools {
             if (bel == null) continue;
             String logicalPinName = p.getPortInst().getName();
             Set<String> physPinMappings;
-            // Need to synchronize on the cell to prevent concurrent modification of the logical to physical pin map
+            // Need to synchronize on the cell since its internally cached logical-to-physical map is computed lazily
             synchronized (c) {
                 physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
             }
@@ -2287,10 +2287,9 @@ public class DesignTools {
                 for (String physPin : physPinMappings) {
                     BELPin belPin = bel.getPin(physPin);
                     // Use the net attached to the phys pin
-                    Net siteWireNet;
-                    synchronized (si) {
-                        siteWireNet = si.getNetFromSiteWire(belPin.getSiteWireName());
-                    }
+                    // This call (a read operation) does not need to be synchronized since it is assumed that this thread
+                    // is the only one that performs (i.e. modifies) intra-site routing for this net (or its aliases)
+                    Net siteWireNet = si.getNetFromSiteWire(belPin.getSiteWireName());
                     if (siteWireNet == null) {
                         if (isVersal && net.isStaticNet() && bel.isLUT()) {
                             siteWireNet = net;
@@ -2314,6 +2313,8 @@ public class DesignTools {
                         }
                     }
                     SitePinInst newPin;
+                    // Similarly, this call (a read operation) does not need to be synchronized since it is assumed that
+                    // this thread is the only one that performs (i.e. modifies) intra-site routing for this net
                     String sitePinName = getRoutedSitePinFromPhysicalPin(c, siteWireNet, physPin);
                     if (sitePinName == null) continue;
                     synchronized (si) {
