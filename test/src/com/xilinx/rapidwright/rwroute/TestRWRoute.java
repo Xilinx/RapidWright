@@ -32,9 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import com.xilinx.rapidwright.design.tools.LUTTools;
-import com.xilinx.rapidwright.eco.ECOTools;
-import com.xilinx.rapidwright.util.VivadoToolsHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -51,12 +48,17 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.eco.ECOTools;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.support.LargeTest;
@@ -64,6 +66,7 @@ import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
 import com.xilinx.rapidwright.util.VivadoTools;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 public class TestRWRoute {
     private static void assertAllPinsRouted(Net net) {
@@ -613,4 +616,96 @@ public class TestRWRoute {
         VivadoToolsHelper.assertFullyRouted(test_route);
     }
 
+    @Test
+    public void testRWRouteSubstituteBlackBoxFlow(@TempDir Path dir) {
+        // Load an example design, make sure RWRoute can route it
+        Path dcp = RapidWrightDCP.getPath("optical-flow.dcp");
+        Design design = Design.readCheckpoint(dcp);
+        RWRoute.routeDesignFullNonTimingDriven(design);
+        // VivadoToolsHelper.assertFullyRouted(design);
+        
+        // Pick a cell to blackbox
+        String instToBlackBox = "bd_0_i/hls_inst/inst/Loop_FRAMES_CP_OUTER_U0";
+        EDIFHierCellInst inst = design.getNetlist().getHierCellInstFromName(instToBlackBox);
+        
+        // Create example external library, store the guts of this netlist in external lib
+        String cellType = "bd_0_hls_inst_0_Loop_FRAMES_CP_OUTER";
+        EDIFNetlist external = EDIFTools.createNewNetlist(inst.getInst());
+        Path externalEDIF = dir.resolve(cellType + ".edn");
+        external.exportEDIF(externalEDIF);
+        
+        inst.getCellType().makePrimitive(); // makeBlackBox
+        
+        // Write out top EDIF that now has a black boxed cell
+        Path opticalFlowTopEDIF = dir.resolve("optical-flow.edf");
+        design.getNetlist().collapseMacroUnisims(design.getSeries());
+        design.getNetlist().exportEDIF(opticalFlowTopEDIF);
+        
+        // Re-load DCP with black boxed netlist
+        Design designWithBlackBox = Design.readCheckpoint(dcp, opticalFlowTopEDIF);
+
+        // Load external lib, set it as the netlist's external library
+        EDIFNetlist externalLib = EDIFTools.readEdifFile(externalEDIF);
+        EDIFCell cell = designWithBlackBox.getNetlist().getCellInstFromHierName(instToBlackBox).getCellType();
+        Assertions.assertTrue(cell.isLeafCellOrBlackBox() && !cell.isPrimitive());
+        designWithBlackBox.getNetlist().setExternalLibrary(externalLib.getLibrary("work"));
+        cell = designWithBlackBox.getNetlist().getCellInstFromHierName(instToBlackBox).getCellType();
+        Assertions.assertFalse(cell.isLeafCellOrBlackBox());
+        
+        // Run RWRoute
+        RWRoute.routeDesignFullNonTimingDriven(designWithBlackBox);
+
+        // Sanity check on routing
+        for (Net net : design.getNets()) {
+            Net other = designWithBlackBox.getNet(net.getName());
+            Assertions.assertNotNull(other);
+            Assertions.assertEquals(net.getPins().size(), other.getPins().size());
+            Assertions.assertEquals(net.hasPIPs(), other.hasPIPs());
+        }
+
+        // Return the netlist back to its original state for Vivado to read it correctly
+        designWithBlackBox.getNetlist().blackBoxExternalCells();
+        designWithBlackBox.getNetlist().setExternalLibrary(null);
+        EDIFCell guts = externalLib.getCell(cellType);
+        EDIFHierCellInst instToRestore = designWithBlackBox.getNetlist()
+                .getHierCellInstFromName(instToBlackBox);
+        designWithBlackBox.getNetlist().getWorkLibrary().removeCell(instToRestore.getCellType());
+        designWithBlackBox.getNetlist().copyCellAndSubCells(guts);
+        guts = designWithBlackBox.getNetlist().getWorkLibrary().getCell(cellType);
+        instToRestore.getInst().setCellType(guts);
+
+        VivadoToolsHelper.assertFullyRouted(designWithBlackBox);
+    }
+
+    @Test
+    public void testRWRouteSubstituteNetlist(@TempDir Path dir) {
+        if (FileTools.isVivadoOnPath() && FileTools.isVivadoAtLeastVersion(2024, 1)) {
+            Path dcp = RapidWrightDCP.getPath("multiply_ip.dcp");
+            Path outputLog = dir.resolve("output.log");
+            Path tclScript = dir.resolve("run.tcl");
+            Path subNetlist = dir.resolve("sub.edf");
+
+            List<String> tclCmds = new ArrayList<>();
+            tclCmds.add("open_checkpoint " + dcp.toString());
+            tclCmds.add("source " + FileTools.getRapidWrightPath() + "/tcl/rapidwright.tcl");
+            tclCmds.add("set cell_to_write [get_cells [lsort -unique [get_cells [get_property PARENT "
+                    + "[get_cells -hierarchical -filter {is_du_within_envelope==1}]]]] "
+                    + "-filter {is_du_within_envelope!=1}]");
+            tclCmds.add("write_cell_to_edif $cell_to_write " + subNetlist.toString());
+            FileTools.writeLinesToTextFile(tclCmds, tclScript.toString());
+            VivadoTools.runTcl(outputLog, tclScript, true);
+
+            Design d = Design.readCheckpoint(dcp);
+            EDIFNetlist externalLib = EDIFTools.readEdifFile(subNetlist);
+            d.getNetlist().setExternalLibrary(externalLib.getHDIPrimitivesLibrary());
+
+            RWRoute.routeDesignFullNonTimingDriven(d);
+
+            d.getNetlist().blackBoxExternalCells();
+            d.getNetlist().setExternalLibrary(null);
+
+            VivadoToolsHelper.assertFullyRouted(d);
+
+        }
+    }
 }
