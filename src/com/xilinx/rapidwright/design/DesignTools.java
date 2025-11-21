@@ -3394,7 +3394,10 @@ public class DesignTools {
 
                             if (parentPhysNet == null) {
                                 synchronized (design) {
-                                    if (!net.rename(parentHierNet.getHierarchicalNetName())) {
+                                    // Double check (inside this synchronized section) that no other thread has created
+                                    // the physical parent net since we fetched it above
+                                    parentPhysNet = design.getNet(parentHierNet.getHierarchicalNetName());
+                                    if (parentPhysNet == null && !net.rename(parentHierNet.getHierarchicalNetName())) {
                                         System.out.println("WARNING: Failed to adjust physical net name " + net.getName());
                                     }
                                 }
