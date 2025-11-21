@@ -525,17 +525,16 @@ public class TestSiteInst {
         SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X0Y0"));
 
         String pinName = "H_O";
+        boolean isOutPin = true;
         SitePinInst spi = new SitePinInst(pinName, si);
         Assertions.assertNotNull(spi);
 
         Assertions.assertThrows(RuntimeException.class, () -> new SitePinInst(pinName, si));
         Assertions.assertThrows(RuntimeException.class, () -> {
-            boolean isOutPin = true;
             SitePinInst spi2 = new SitePinInst(isOutPin, pinName, null);
             spi2.setSiteInst(si);
         });
         Assertions.assertThrows(RuntimeException.class, () -> {
-            boolean isOutPin = true;
             SitePinInst spi2 = new SitePinInst(isOutPin, pinName, null);
             si.addPin(spi2);
         });
