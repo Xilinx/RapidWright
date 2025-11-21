@@ -723,4 +723,16 @@ public class TestRWRoute {
 
         }
     }
+
+    @Test
+    public void testRWRouteVersalSLRCrossing() {
+        Path dcp = RapidWrightDCP.getPath("versal_slr_crossing.dcp");
+
+        Design design = Design.readCheckpoint(dcp);
+        design.unrouteDesign();
+        RWRoute.routeDesignFullNonTimingDriven(design);
+        assertAllSourcesRoutedFlagSet(design);
+        assertAllPinsRouted(design);
+        VivadoToolsHelper.assertFullyRouted(design);
+    }
 }
