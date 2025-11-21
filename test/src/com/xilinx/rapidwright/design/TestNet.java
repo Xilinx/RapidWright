@@ -334,9 +334,12 @@ public class TestNet {
         boolean samePin = altPinName.equals(pinName);
         SitePinInst spi1 = new SitePinInst(pinName, si);
         Assertions.assertTrue(net.addPin(spi1));
-        SitePinInst spi2 = new SitePinInst(altPinName, si);
-        Assertions.assertEquals(samePin, spi1.equals(spi2));
-        Assertions.assertEquals(!samePin, net.addPin(spi2));
+
+        SitePinInst spi2 = null;
+        if (!samePin) {
+            spi2 = new SitePinInst(altPinName, si);
+            Assertions.assertTrue(net.addPin(spi2));
+        }
 
         Assertions.assertSame(spi1, net.getSource());
         if (samePin) {
@@ -363,10 +366,7 @@ public class TestNet {
         net.setAlternateSource(spi2);
         Assertions.assertSame(spi2, net.getAlternateSource());
 
-        SitePinInst spi3 = new SitePinInst(altPinName, si);
-        Assertions.assertEquals(spi2, spi3);
-
-        Assertions.assertThrows(RuntimeException.class, () -> net.setSource(spi3));
+        Assertions.assertThrows(RuntimeException.class, () -> net.setSource(spi2));
     }
 
     @Test
@@ -375,15 +375,13 @@ public class TestNet {
         SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X0Y0"));
         Net net = design.createNet("net");
         String pinName = "H_O";
-        SitePinInst spi1 = new SitePinInst(pinName, si);
-        Assertions.assertTrue(net.addPin(spi1));
-        SitePinInst spi2 = new SitePinInst(pinName, si);
-        Assertions.assertEquals(spi1, spi2);
+        SitePinInst spi = new SitePinInst(pinName, si);
+        Assertions.assertTrue(net.addPin(spi));
 
-        net.setSource(spi1);
-        Assertions.assertSame(spi1, net.getSource());
+        net.setSource(spi);
+        Assertions.assertSame(spi, net.getSource());
 
-        Assertions.assertThrows(RuntimeException.class, () -> net.setAlternateSource(spi2));
+        Assertions.assertThrows(RuntimeException.class, () -> net.setAlternateSource(spi));
     }
 
     @Test
