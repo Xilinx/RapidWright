@@ -103,7 +103,7 @@ public class TestRelocationTools {
                 } else {
                     String n1Name = netlist1.getParentNetName(n2.getName());
                     if (n1Name == null) {
-                        // Without ModuleInst hierarchy in case it was flattened
+                        // Retry without ModuleInst hierarchy in case it was flattened
                         n1Name = netlist1.getParentNetName(n2.getName().substring(mi.getName().length() + 1));
                     }
                     n1 = design1.getNet(n1Name);
