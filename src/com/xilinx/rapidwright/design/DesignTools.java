@@ -2231,7 +2231,11 @@ public class DesignTools {
                             continue;
                         }
 
-                        SitePinInst currPin = siteInst.getSitePinInst(pin.getName());
+                        String pinName = pin.getName();
+                        SitePinInst currPin;
+                        synchronized(siteInst) {
+                            currPin = siteInst.getSitePinInst(pinName);
+                        }
                         if (currPin != null) {
                             // SitePinInst already exists
                             continue;
@@ -2253,7 +2257,10 @@ public class DesignTools {
                             }
                         }
 
-                        currPin = net.createPin(pin.getName(), siteInst);
+                        synchronized (siteInst) {
+                            currPin = new SitePinInst(pinName, siteInst);
+                        }
+                        net.addPin(currPin);
                         newPins.add(currPin);
                     }
                 }
@@ -2262,7 +2269,6 @@ public class DesignTools {
             return newPins;
         }
 
-        EDIFHierNet parentEhn = null;
         for (EDIFHierPortInst p :  physPins) {
             Cell c = design.getCell(p.getFullHierarchicalInstName());
             if (c == null) continue;
