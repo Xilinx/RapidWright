@@ -3344,7 +3344,10 @@ public class DesignTools {
      */
     @SuppressWarnings("unchecked")
     public static void makePhysNetNamesConsistent(Design design) {
-        Map<EDIFHierNet, EDIFHierNet> netParentMap = design.getNetlist().getParentNetMap();
+        final Map<EDIFHierNet, EDIFHierNet> netParentMap = design.getNetlist().getParentNetMap();
+        final Net gndNet = design.getGndNet();
+        final Net vccNet = design.getVccNet();
+
         int numNets = design.getNets().size();
         // Experimentally best performing number of jobs
         int numJobs = ParallelismTools.maxParallelism() * 100;
@@ -3357,9 +3360,9 @@ public class DesignTools {
                     Net parentPhysNet = null;
                     if (net.isStaticNet()) {
                         if (net.getType() == NetType.GND) {
-                            parentPhysNet = design.getGndNet();
+                            parentPhysNet = gndNet;
                         } else if (net.getType() == NetType.VCC) {
-                            parentPhysNet = design.getVccNet();
+                            parentPhysNet = vccNet;
                         } else {
                             throw new RuntimeException();
                         }
@@ -3382,18 +3385,18 @@ public class DesignTools {
                         // Check to make sure net is not improperly categorized
                         EDIFNet srcNetAlias = parentHierNet.getNet();
                         if (srcNetAlias.isGND()) {
-                            parentPhysNet = design.getGndNet();
+                            parentPhysNet = gndNet;
                         } else if (srcNetAlias.isVCC()) {
-                            parentPhysNet = design.getVccNet();
+                            parentPhysNet = vccNet;
                         }
 
                         if (!hierNet.equals(parentHierNet)) {
                             String parentNetName = parentHierNet.getNet().getName();
                             // Assume that a net named <const1> or <const0> is always a VCC or GND net
                             if (parentNetName.equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
-                                parentPhysNet = design.getVccNet();
+                                parentPhysNet = vccNet;
                             } else if (parentNetName.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
-                                parentPhysNet = design.getGndNet();
+                                parentPhysNet = gndNet;
                             } else {
                                 parentPhysNet = design.getNet(parentHierNet.getHierarchicalNetName());
                             }
