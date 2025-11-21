@@ -39,7 +39,8 @@ import com.xilinx.rapidwright.device.BELPin.Direction;
 public enum EDIFDirection {
     INPUT,
     OUTPUT,
-    INOUT;
+    INOUT,
+    INTERNAL;
 
     private final byte[] arr;
 
