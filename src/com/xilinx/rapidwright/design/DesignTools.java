@@ -2492,8 +2492,8 @@ public class DesignTools {
         netlist.getPhysicalNetPinMap();
 
         int numNets = design.getNets().size();
-        // Experimentally best performing number of jobs
-        int numJobs = ParallelismTools.maxParallelism() * 100;
+        // Experimentally best performing number of jobs, where each job cannot have less than 100 objects
+        int numJobs = Math.min(ParallelismTools.maxParallelism() * 100, numNets / 100);
         List<Net> designNets = new ArrayList<>(design.getNets());
         List<List<Net>> partitionedNets = Lists.partition(designNets, (int) Math.ceil((double) numNets / numJobs));
         List<Future<?>> futures = new ArrayList<>();
@@ -3345,12 +3345,14 @@ public class DesignTools {
     @SuppressWarnings("unchecked")
     public static void makePhysNetNamesConsistent(Design design) {
         final Map<EDIFHierNet, EDIFHierNet> netParentMap = design.getNetlist().getParentNetMap();
+
+        // Static nets are lazily created; do them before going parallel
         final Net gndNet = design.getGndNet();
         final Net vccNet = design.getVccNet();
 
         int numNets = design.getNets().size();
-        // Experimentally best performing number of jobs
-        int numJobs = ParallelismTools.maxParallelism() * 100;
+        // Experimentally best performing number of jobs, where each job cannot have less than 100 objects
+        int numJobs = Math.min(ParallelismTools.maxParallelism() * 100, numNets / 100);
         List<Net> designNets = new ArrayList<>(design.getNets());
         List<List<Net>> partitionedNets = Lists.partition(designNets, (int) Math.ceil((double) numNets / numJobs));
         List<Future<?>> futures = new ArrayList<>();
