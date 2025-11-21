@@ -2483,7 +2483,6 @@ public class DesignTools {
      * (use {@link #makePhysNetNamesConsistent(Design)} to make this the case).
      * @param design The current design
      */
-    @SuppressWarnings("unchecked")
     public static void createMissingSitePinInsts(Design design) {
         EDIFNetlist netlist = design.getNetlist();
 
@@ -3342,7 +3341,6 @@ public class DesignTools {
      * non-parent Net-s.
      * @param design Design object to be modified in-place.
      */
-    @SuppressWarnings("unchecked")
     public static void makePhysNetNamesConsistent(Design design) {
         final Map<EDIFHierNet, EDIFHierNet> netParentMap = design.getNetlist().getParentNetMap();
 
