@@ -729,7 +729,6 @@ public class TestRWRoute {
         Path dcp = RapidWrightDCP.getPath("versal_slr_crossing.dcp");
 
         Design design = Design.readCheckpoint(dcp);
-        design.unrouteDesign();
         RWRoute.routeDesignFullNonTimingDriven(design);
         assertAllSourcesRoutedFlagSet(design);
         assertAllPinsRouted(design);
