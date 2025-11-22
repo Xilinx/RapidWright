@@ -338,7 +338,7 @@ public class GlobalSignalRouting {
         VersalClockRouting.routeNonLCBPins(clk, usedCRsAndNonLCBPinsTuple.getSecond(), getNodeStatus);
 
         Map<Node, List<SitePinInst>> lcbMappings = VersalClockRouting.routeLCBsToSinks(clk, getNodeStatus);
-        VersalClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet(), getNodeStatus);
+        VersalClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings, getNodeStatus);
 
         // Populate used routing track for any other clocks being routed
         if (usedRoutingTracks != null) {
