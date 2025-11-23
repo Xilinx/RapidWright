@@ -395,6 +395,6 @@ public class DataVersions {
         dataVersionMap.put("data/partdump.csv", new Pair<>("partdump-csv", "7e74868f1d6f8a1b3e4084097ef72d1b"));
         dataVersionMap.put("data/parts.db", new Pair<>("parts-db", "516e1d369674451dc29498a99d7f00f5"));
         dataVersionMap.put("data/unisim_data.dat", new Pair<>("unisim-data-dat", "a13bffcefb95e410acb4ce02cab2399e"));
-        dataVersionMap.put("data/versal_vdistr_trees.dat", new Pair<>("versal-vdistr-trees-dat", "27d6515bc6a12e0b258b5be1f7095abc"));
+        dataVersionMap.put("data/versal_vdistr_trees.dat", new Pair<>("versal-vdistr-trees-dat", "3f31320ae45277511538d37cc7127309"));
     }
 }
