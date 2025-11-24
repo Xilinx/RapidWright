@@ -28,6 +28,7 @@ import com.xilinx.rapidwright.design.blocks.PBlockRange;
 import com.xilinx.rapidwright.design.xdc.PBlockConstraint;
 import com.xilinx.rapidwright.design.xdc.XDCConstraints;
 import com.xilinx.rapidwright.device.Device;
+
 import tcl.lang.Command;
 import tcl.lang.Interp;
 import tcl.lang.TclException;
@@ -73,6 +74,12 @@ public class ResizePBlockCommand implements Command {
             throw new RuntimeException("pblock name is null");
         }
         PBlockConstraint constraint = Objects.requireNonNull(constraints.getPBlockConstraints().get(pblockName));
-        constraint.getPblock().add(new PBlockRange(dev, toAdd));
+
+        // Handle multiple ranges in the same command
+        String[] ranges = toAdd.split("\\s+");
+        for (String range : ranges) {
+            constraint.getPblock().add(new PBlockRange(dev, range));
+        }
+
     }
 }
