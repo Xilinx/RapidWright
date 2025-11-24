@@ -240,6 +240,7 @@ public class RelocationTools {
             return false;
         }
 
+        DesignTools.makePhysNetNamesConsistent(design);
         DesignTools.createMissingSitePinInsts(design);
 
         for (Net n : design.getNets()) {
