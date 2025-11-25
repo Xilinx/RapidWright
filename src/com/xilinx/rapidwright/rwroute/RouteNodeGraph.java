@@ -1157,8 +1157,7 @@ public class RouteNodeGraph {
                         assert(parentRnode.getIntentCode() != IntentCode.NODE_SLL_OUTPUT);
                         return true;
                     }
-                    // Temporarily only allow NODE_SLL_INPUT to be explored if they are the sink
-                    // TODO: Revisit when SLR crossings are supported
+                    // Otherwise only allow NODE_SLL_INPUT to be explored if it is the sink
                     return childRnode == sinkRnode;
             }
             throw new RuntimeException("ERROR: Unhandled IntentCode: " + childIntentCode);
