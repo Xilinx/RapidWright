@@ -1697,7 +1697,7 @@ public class EDIFNetlist extends EDIFName {
             case VCC:
                 return getPhysicalVccPins();
             default:
-                final EDIFHierNet hierNet = getHierNetFromName(net.getName());
+                final EDIFHierNet hierNet = net.getLogicalHierNet();
                 return getPhysicalNetPinMap().get(hierNet);
         }
     }

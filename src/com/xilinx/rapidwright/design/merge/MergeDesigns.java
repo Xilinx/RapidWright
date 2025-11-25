@@ -102,6 +102,7 @@ public class MergeDesigns {
             Net net0 = design0.getNet(net1.getName());
             if (net0 == null) {
                 design0.addNet(net1);
+                net1.setLogicalHierNet(null);
             } else {
                 merger.mergePhysicalNets(net0, net1);
             }
