@@ -378,7 +378,7 @@ public class TestRWRoute {
         VivadoToolsHelper.assertFullyRouted(design);
     }
 
-    void testSingleConnectionHelper(String partName,
+    Design testSingleConnectionHelper(String partName,
                                     String srcSiteName, String srcPinName,
                                     String dstSiteName, String dstPinName,
                                     long nodesPoppedLimit) {
@@ -400,6 +400,8 @@ public class TestRWRoute {
         Assertions.assertTrue(dstSpi.isRouted());
         long nodesPopped = Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped"));
         Assertions.assertTrue(nodesPopped >= (nodesPoppedLimit - 100) && nodesPopped <= nodesPoppedLimit);
+
+        return design;
     }
 
     @ParameterizedTest
@@ -733,5 +735,31 @@ public class TestRWRoute {
         assertAllSourcesRoutedFlagSet(design);
         assertAllPinsRouted(design);
         VivadoToolsHelper.assertFullyRouted(design);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            // Check that no routethru-s are used when terminating at the LAG pin to reach the FF inside the slice
+            "SLICE_X95Y621,SLICE_X93Y546,LAG_N,3,false",
+            "SLICE_X95Y621,SLICE_X92Y546,LAG_N,3, false",
+
+            // Connecting to a non-LAG pin requires routethru
+            "SLICE_X95Y621,SLICE_X93Y456,FX,700,true",
+            "SLICE_X95Y621,SLICE_X92Y456,EX,500,true"
+    })
+    public void testRWRouteVersalSLRCrossingStraightIntoFlop(String srcSiteName, String dstSiteName, String dstPinName, int nodesPoppedLimit, boolean expectRoutethru) {
+        Design design = testSingleConnectionHelper("xcv80",
+                srcSiteName, "CQ",
+                dstSiteName, dstPinName,
+                nodesPoppedLimit);
+        Net net = design.getNet("net");
+        if (!expectRoutethru) {
+            Assertions.assertEquals(6, net.getPIPs().size());
+        }
+        boolean routethruFound = false;
+        for (PIP pip : net.getPIPs()) {
+            routethruFound |= pip.isRouteThru();
+        }
+        Assertions.assertEquals(expectRoutethru, routethruFound);
     }
 }
