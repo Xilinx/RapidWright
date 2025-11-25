@@ -504,7 +504,7 @@ public class SchematicScene extends QGraphicsScene {
                         EDIFPortInst portInst = topPort.isBus() ? topPort.getInternalPortInstFromIndex(i)
                                 : topPort.getInternalPortInst();
                         if (portInst == null) {
-                            portInst = new EDIFPortInst(topPort, null, i);
+                            portInst = new EDIFPortInst(topPort, null, topPort.isBus() ? i : -1);
                         }
                         hierPortInst = new EDIFHierPortInst(cellInst, portInst);
                     }
