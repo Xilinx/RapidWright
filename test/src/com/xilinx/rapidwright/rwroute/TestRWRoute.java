@@ -32,9 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import com.xilinx.rapidwright.design.tools.LUTTools;
-import com.xilinx.rapidwright.eco.ECOTools;
-import com.xilinx.rapidwright.util.VivadoToolsHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -51,12 +48,17 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.eco.ECOTools;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.support.LargeTest;
@@ -64,6 +66,7 @@ import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
 import com.xilinx.rapidwright.util.VivadoTools;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 public class TestRWRoute {
     private static void assertAllPinsRouted(Net net) {
@@ -375,7 +378,7 @@ public class TestRWRoute {
         VivadoToolsHelper.assertFullyRouted(design);
     }
 
-    void testSingleConnectionHelper(String partName,
+    Design testSingleConnectionHelper(String partName,
                                     String srcSiteName, String srcPinName,
                                     String dstSiteName, String dstPinName,
                                     long nodesPoppedLimit) {
@@ -397,52 +400,69 @@ public class TestRWRoute {
         Assertions.assertTrue(dstSpi.isRouted());
         long nodesPopped = Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped"));
         Assertions.assertTrue(nodesPopped >= (nodesPoppedLimit - 100) && nodesPopped <= nodesPoppedLimit);
+
+        return design;
     }
 
     @ParameterizedTest
     @CsvSource({
+            // Versal
+            // One SLR crossing
+            // (Too) close
+            "xcv80,SLICE_X54Y331,SLICE_X54Y332,1000",           // Source adjacent to crossing SLL (east)
+            "xcv80,SLICE_X53Y332,SLICE_X53Y331,900",            // Source adjacent to crossing SLL (west)
+            "xcv80,SLICE_X51Y331,SLICE_X51Y332,400",            // Close to crossing SLL
+            // Perfect
+            "xcv80,SLICE_X54Y331,SLICE_X54Y406,700",            // Source adjacent to crossing SLL (east, north)
+            "xcv80,SLICE_X53Y331,SLICE_X53Y406,200",            // Source adjacent to crossing SLL (west, north)
+            "xcv80,SLICE_X54Y406,SLICE_X54Y331,600",            // Sink adjacent to crossing SLL (east, south)
+            "xcv80,SLICE_X53Y406,SLICE_X53Y331,100",            // Sink adjacent to crossing SLL (west, south)
+            "xcv80,SLICE_X51Y331,SLICE_X51Y406,400",            // Source close to crossing SLL
+            "xcv80,SLICE_X0Y331,SLICE_X49Y406,2700",            // Source far from crossing SLL
+
+            // US+
             // One SLR crossing
             // (Too) Close
-            "SLICE_X9Y299,SLICE_X9Y300,100",    // On Laguna column
-            "SLICE_X9Y300,SLICE_X9Y299,200",
-            "SLICE_X0Y299,SLICE_X0Y300,200",    // Far from Laguna column
-            "SLICE_X0Y300,SLICE_X0Y299,200",
-            "SLICE_X54Y299,SLICE_X56Y300,200",  // Slight closer to one Laguna column that is further from sink
-            "SLICE_X54Y300,SLICE_X56Y299,200",
-            "SLICE_X50Y299,SLICE_X65Y300,200",
-            "SLICE_X50Y300,SLICE_X65Y299,300",
-            "SLICE_X55Y299,SLICE_X55Y300,200",  // Equidistant from two Laguna columns
-            "SLICE_X55Y300,SLICE_X55Y299,200",
+            Device.AWS_F1 + ",SLICE_X9Y299,SLICE_X9Y300,100",    // On Laguna column
+            Device.AWS_F1 + ",SLICE_X9Y300,SLICE_X9Y299,200",
+            Device.AWS_F1 + ",SLICE_X0Y299,SLICE_X0Y300,200",    // Far from Laguna column
+            Device.AWS_F1 + ",SLICE_X0Y300,SLICE_X0Y299,200",
+            Device.AWS_F1 + ",SLICE_X54Y299,SLICE_X56Y300,200",  // Slight closer to one Laguna column that is further from sink
+            Device.AWS_F1 + ",SLICE_X54Y300,SLICE_X56Y299,200",
+            Device.AWS_F1 + ",SLICE_X50Y299,SLICE_X65Y300,200",
+            Device.AWS_F1 + ",SLICE_X50Y300,SLICE_X65Y299,300",
+            Device.AWS_F1 + ",SLICE_X55Y299,SLICE_X55Y300,200",  // Equidistant from two Laguna columns
+            Device.AWS_F1 + ",SLICE_X55Y300,SLICE_X55Y299,200",
             // Perfect
-            "SLICE_X9Y241,SLICE_X9Y300,200",
-            "SLICE_X9Y300,SLICE_X9Y241,200",
-            "SLICE_X9Y358,SLICE_X9Y299,200",
-            "SLICE_X9Y299,SLICE_X9Y358,200",
-            "SLICE_X53Y241,SLICE_X69Y300,500",
-            "SLICE_X53Y358,SLICE_X69Y299,500",
+            Device.AWS_F1 + ",SLICE_X9Y241,SLICE_X9Y300,200",
+            Device.AWS_F1 + ",SLICE_X9Y300,SLICE_X9Y241,200",
+            Device.AWS_F1 + ",SLICE_X9Y358,SLICE_X9Y299,200",
+            Device.AWS_F1 + ",SLICE_X9Y299,SLICE_X9Y358,200",
+            Device.AWS_F1 + ",SLICE_X53Y241,SLICE_X69Y300,500",
+            Device.AWS_F1 + ",SLICE_X53Y358,SLICE_X69Y299,500",
             // Far
-            "SLICE_X9Y240,SLICE_X9Y359,200",    // On Laguna
-            "SLICE_X9Y359,SLICE_X9Y240,200",
-            "SLICE_X162Y240,SLICE_X162Y430,100",
+            Device.AWS_F1 + ",SLICE_X9Y240,SLICE_X9Y359,200",    // On Laguna
+            Device.AWS_F1 + ",SLICE_X9Y359,SLICE_X9Y240,200",
+            Device.AWS_F1 + ",SLICE_X162Y240,SLICE_X162Y430,100",
 
-            "SLICE_X162Y430,SLICE_X162Y240,200",
-            "SLICE_X0Y240,SLICE_X12Y430,300",   // Far from Laguna
-            "SLICE_X0Y430,SLICE_X12Y240,300",
+            Device.AWS_F1 + ",SLICE_X162Y430,SLICE_X162Y240,200",
+            Device.AWS_F1 + ",SLICE_X0Y240,SLICE_X12Y430,300",   // Far from Laguna
+            Device.AWS_F1 + ",SLICE_X0Y430,SLICE_X12Y240,300",
 
             // Two SLR crossings
-            "SLICE_X162Y299,SLICE_X162Y599,100",
-            "SLICE_X162Y599,SLICE_X162Y299,300",
+            Device.AWS_F1 + ",SLICE_X162Y299,SLICE_X162Y599,100",
+            Device.AWS_F1 + ",SLICE_X162Y599,SLICE_X162Y299,300",
 
             // Three SLR crossings
-            "SLICE_X79Y0,SLICE_X79Y899,200",    // Straight up: on Laguna column (opposite side of Laguna)
-            "SLICE_X78Y60,SLICE_X78Y839,400",   // Straight up: on Laguna column (same side as Laguna)
-            "SLICE_X0Y0,SLICE_X0Y899,200",      // Straight up: far from Laguna column
-            "SLICE_X168Y0,SLICE_X168Y899,300",  // Straight up: far from Laguna column
-            "SLICE_X9Y0,SLICE_X162Y899,300",    // Up and right
-            "SLICE_X168Y162,SLICE_X9Y899,400",  // Up and left
+            Device.AWS_F1 + ",SLICE_X79Y0,SLICE_X79Y899,200",    // Straight up: on Laguna column (opposite side of Laguna)
+            Device.AWS_F1 + ",SLICE_X78Y60,SLICE_X78Y839,400",   // Straight up: on Laguna column (same side as Laguna)
+            Device.AWS_F1 + ",SLICE_X0Y0,SLICE_X0Y899,200",      // Straight up: far from Laguna column
+            Device.AWS_F1 + ",SLICE_X168Y0,SLICE_X168Y899,300",  // Straight up: far from Laguna column
+            Device.AWS_F1 + ",SLICE_X9Y0,SLICE_X162Y899,300",    // Up and right
+            Device.AWS_F1 + ",SLICE_X168Y162,SLICE_X9Y899,400",  // Up and left
     })
-    public void testSLRCrossingNonTimingDriven(String srcSiteName, String dstSiteName, long nodesPoppedLimit) {
-        testSingleConnectionHelper(Device.AWS_F1, srcSiteName, "AQ", dstSiteName, "A1", nodesPoppedLimit);
+    public void testSLRCrossingNonTimingDriven(String deviceName, String srcSiteName, String dstSiteName, long nodesPoppedLimit) {
+        testSingleConnectionHelper(deviceName, srcSiteName, "AQ", dstSiteName, "A1", nodesPoppedLimit);
     }
 
     @ParameterizedTest
@@ -613,4 +633,133 @@ public class TestRWRoute {
         VivadoToolsHelper.assertFullyRouted(test_route);
     }
 
+    @Test
+    public void testRWRouteSubstituteBlackBoxFlow(@TempDir Path dir) {
+        // Load an example design, make sure RWRoute can route it
+        Path dcp = RapidWrightDCP.getPath("optical-flow.dcp");
+        Design design = Design.readCheckpoint(dcp);
+        RWRoute.routeDesignFullNonTimingDriven(design);
+        // VivadoToolsHelper.assertFullyRouted(design);
+        
+        // Pick a cell to blackbox
+        String instToBlackBox = "bd_0_i/hls_inst/inst/Loop_FRAMES_CP_OUTER_U0";
+        EDIFHierCellInst inst = design.getNetlist().getHierCellInstFromName(instToBlackBox);
+        
+        // Create example external library, store the guts of this netlist in external lib
+        String cellType = "bd_0_hls_inst_0_Loop_FRAMES_CP_OUTER";
+        EDIFNetlist external = EDIFTools.createNewNetlist(inst.getInst());
+        Path externalEDIF = dir.resolve(cellType + ".edn");
+        external.exportEDIF(externalEDIF);
+        
+        inst.getCellType().makePrimitive(); // makeBlackBox
+        
+        // Write out top EDIF that now has a black boxed cell
+        Path opticalFlowTopEDIF = dir.resolve("optical-flow.edf");
+        design.getNetlist().collapseMacroUnisims(design.getSeries());
+        design.getNetlist().exportEDIF(opticalFlowTopEDIF);
+        
+        // Re-load DCP with black boxed netlist
+        Design designWithBlackBox = Design.readCheckpoint(dcp, opticalFlowTopEDIF);
+
+        // Load external lib, set it as the netlist's external library
+        EDIFNetlist externalLib = EDIFTools.readEdifFile(externalEDIF);
+        EDIFCell cell = designWithBlackBox.getNetlist().getCellInstFromHierName(instToBlackBox).getCellType();
+        Assertions.assertTrue(cell.isLeafCellOrBlackBox() && !cell.isPrimitive());
+        designWithBlackBox.getNetlist().setExternalLibrary(externalLib.getLibrary("work"));
+        cell = designWithBlackBox.getNetlist().getCellInstFromHierName(instToBlackBox).getCellType();
+        Assertions.assertFalse(cell.isLeafCellOrBlackBox());
+        
+        // Run RWRoute
+        RWRoute.routeDesignFullNonTimingDriven(designWithBlackBox);
+
+        // Sanity check on routing
+        for (Net net : design.getNets()) {
+            Net other = designWithBlackBox.getNet(net.getName());
+            Assertions.assertNotNull(other);
+            Assertions.assertEquals(net.getPins().size(), other.getPins().size());
+            Assertions.assertEquals(net.hasPIPs(), other.hasPIPs());
+        }
+
+        // Return the netlist back to its original state for Vivado to read it correctly
+        designWithBlackBox.getNetlist().blackBoxExternalCells();
+        designWithBlackBox.getNetlist().setExternalLibrary(null);
+        EDIFCell guts = externalLib.getCell(cellType);
+        EDIFHierCellInst instToRestore = designWithBlackBox.getNetlist()
+                .getHierCellInstFromName(instToBlackBox);
+        designWithBlackBox.getNetlist().getWorkLibrary().removeCell(instToRestore.getCellType());
+        designWithBlackBox.getNetlist().copyCellAndSubCells(guts);
+        guts = designWithBlackBox.getNetlist().getWorkLibrary().getCell(cellType);
+        instToRestore.getInst().setCellType(guts);
+
+        VivadoToolsHelper.assertFullyRouted(designWithBlackBox);
+    }
+
+    @Test
+    public void testRWRouteSubstituteNetlist(@TempDir Path dir) {
+        if (FileTools.isVivadoOnPath() && FileTools.isVivadoAtLeastVersion(2024, 1)) {
+            Path dcp = RapidWrightDCP.getPath("multiply_ip.dcp");
+            Path outputLog = dir.resolve("output.log");
+            Path tclScript = dir.resolve("run.tcl");
+            Path subNetlist = dir.resolve("sub.edf");
+
+            List<String> tclCmds = new ArrayList<>();
+            tclCmds.add("open_checkpoint " + dcp.toString());
+            tclCmds.add("source " + FileTools.getRapidWrightPath() + "/tcl/rapidwright.tcl");
+            tclCmds.add("set cell_to_write [get_cells [lsort -unique [get_cells [get_property PARENT "
+                    + "[get_cells -hierarchical -filter {is_du_within_envelope==1}]]]] "
+                    + "-filter {is_du_within_envelope!=1}]");
+            tclCmds.add("write_cell_to_edif $cell_to_write " + subNetlist.toString());
+            FileTools.writeLinesToTextFile(tclCmds, tclScript.toString());
+            VivadoTools.runTcl(outputLog, tclScript, true);
+
+            Design d = Design.readCheckpoint(dcp);
+            EDIFNetlist externalLib = EDIFTools.readEdifFile(subNetlist);
+            d.getNetlist().setExternalLibrary(externalLib.getHDIPrimitivesLibrary());
+
+            RWRoute.routeDesignFullNonTimingDriven(d);
+
+            d.getNetlist().blackBoxExternalCells();
+            d.getNetlist().setExternalLibrary(null);
+
+            VivadoToolsHelper.assertFullyRouted(d);
+
+        }
+    }
+
+    @Test
+    public void testRWRouteVersalSLRCrossing() {
+        Path dcp = RapidWrightDCP.getPath("versal_slr_crossing.dcp");
+
+        Design design = Design.readCheckpoint(dcp);
+        RWRoute.routeDesignFullNonTimingDriven(design);
+        assertAllSourcesRoutedFlagSet(design);
+        assertAllPinsRouted(design);
+        VivadoToolsHelper.assertFullyRouted(design);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            // Check that no routethru-s are used when terminating at the LAG pin to reach the FF inside the slice
+            "SLICE_X95Y621,SLICE_X93Y546,LAG_N,3,false",
+            "SLICE_X95Y621,SLICE_X92Y546,LAG_N,3, false",
+
+            // Connecting to a non-LAG pin requires routethru
+            "SLICE_X95Y621,SLICE_X93Y456,FX,700,true",
+            "SLICE_X95Y621,SLICE_X92Y456,EX,500,true"
+    })
+    public void testRWRouteVersalSLRCrossingStraightIntoFlop(String srcSiteName, String dstSiteName, String dstPinName, int nodesPoppedLimit, boolean expectRoutethru) {
+        Design design = testSingleConnectionHelper("xcv80",
+                srcSiteName, "CQ",
+                dstSiteName, dstPinName,
+                nodesPoppedLimit);
+        Net net = design.getNet("net");
+        if (!expectRoutethru) {
+            Assertions.assertEquals(6, net.getPIPs().size());
+        }
+        boolean routethruFound = false;
+        for (PIP pip : net.getPIPs()) {
+            routethruFound |= pip.isRouteThru();
+        }
+        Assertions.assertEquals(expectRoutethru, routethruFound);
+    }
 }

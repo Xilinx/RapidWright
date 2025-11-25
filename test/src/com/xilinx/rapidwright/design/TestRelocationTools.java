@@ -40,6 +40,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -73,6 +74,7 @@ public class TestRelocationTools {
             }
         }
 
+        EDIFNetlist netlist1 = design1.getNetlist();
         for (Pair<ModuleInst,Site> e : newSite) {
             ModuleInst mi = e.getFirst();
             Site ds = e.getSecond();
@@ -94,10 +96,17 @@ public class TestRelocationTools {
             }
 
             for (Net n2 : mi.getNets()) {
-                Net n1 = design1.getNet(n2.getName());
-                if (n1 == null && n2.getName().startsWith(mi.getName() + EDIFTools.EDIF_HIER_SEP)) {
-                    // Retry without ModuleInst hierarchy in case it was flattened
-                    n1 = design1.getNet(n2.getName().substring(mi.getName().length() + 1));
+                boolean n2IsSpecial = n2.isStaticNet() || n2.isUsedNet();
+                Net n1;
+                if (n2IsSpecial) {
+                    n1 = design1.getNet(n2.getName());
+                } else {
+                    String n1Name = netlist1.getParentNetName(n2.getName());
+                    if (n1Name == null) {
+                        // Retry without ModuleInst hierarchy in case it was flattened
+                        n1Name = netlist1.getParentNetName(n2.getName().substring(mi.getName().length() + 1));
+                    }
+                    n1 = design1.getNet(n1Name);
                 }
                 Assertions.assertNotNull(n1);
 
@@ -108,6 +117,10 @@ public class TestRelocationTools {
                 }
 
                 Set<PIP> p1 = new HashSet<>(n1.getPIPs());
+                if (!n2IsSpecial) {
+                    Design design2 = n2.getDesign();
+                    n2 = design2.getNet(design2.getNetlist().getParentNetName(n2.getName()));
+                }
                 Set<PIP> p2 = new HashSet<>(n2.getPIPs());
                 if (!n1.isStaticNet()) {
                     Assertions.assertEquals(p1, p2);

@@ -27,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Sat Jun 07 22:31:12 MDT 2025
+ * Generated on: Tue Nov 11 17:13:57 MST 2025
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  *
  * Enumeration of SiteTypeEnum type for all valid devices within Vivado.
@@ -182,6 +182,8 @@ public enum SiteTypeEnum {
     GCLK_TEST_BUFE3,
     GCLK_TEST_RING,
     GLOBALSIG,
+    GTF_CHANNEL,
+    GTF_COMMON,
     GTHE2_CHANNEL,
     GTHE2_COMMON,
     GTHE3_CHANNEL,

@@ -88,10 +88,11 @@ public class RouteNodeGraph {
 
     private long createRnodeTime;
 
-    public static final short SUPER_LONG_LINE_LENGTH_IN_TILES = 60;
+    public final short SUPER_LONG_LINE_LENGTH_IN_TILES;
 
-    /** Array mapping an INT tile's Y coordinate, to its SLR index */
+    /** Array mapping an INT tile's Y coordinate to its SLR index */
     public final int[] intYToSLRIndex;
+    /** Array mapping an INT tile's X coordinate to the X of the next/previous Laguna column (UltraScale/UltraScale+ only) */
     public final int[] nextLagunaColumn;
     public final int[] prevLagunaColumn;
 
@@ -126,7 +127,8 @@ public class RouteNodeGraph {
     /** Flag for whether design targets the Versal series */
     protected final boolean isVersal;
 
-    protected final Map<TileTypeEnum, Integer> baseWireCounts;
+    /** Map of the TileTypeEnum to the highest base wire index */
+    protected final Map<TileTypeEnum, Integer> highestBaseWireIndex;
 
     protected final static int MAX_OCCUPANCY = 256;
     protected final float[] presentCongestionCosts;
@@ -152,7 +154,7 @@ public class RouteNodeGraph {
         preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
         createRnodeTime = 0;
-        baseWireCounts = new ConcurrentHashMap<>();
+        highestBaseWireIndex = new ConcurrentHashMap<>();
 
         Device device = design.getDevice();
         intYToSLRIndex = new int[device.getRows()];
@@ -190,6 +192,8 @@ public class RouteNodeGraph {
             ultraScalesLocalWires.put(tile.getTileTypeEnum(), localWires);
 
             eastWestPattern = Pattern.compile("(((BOUNCE|BYPASS|IMUX|INODE(_[12])?)_(?<eastwest>[EW]))|INT_NODE_IMUX_(?<inode>\\d+)_).*");
+
+            SUPER_LONG_LINE_LENGTH_IN_TILES = 60;
         } else {
             assert(isVersal);
 
@@ -218,6 +222,8 @@ public class RouteNodeGraph {
             ultraScalesLocalWires = null;
 
             eastWestPattern = Pattern.compile("(((BOUNCE|IMUX_B|[BC]NODE_OUTS)_(?<eastwest>[EW]))|INT_NODE_IMUX_ATOM_(?<inode>\\d+)_).*");
+
+            SUPER_LONG_LINE_LENGTH_IN_TILES = 75;
         }
 
         for (Tile intTile : intTilesToExamine) {
@@ -551,15 +557,21 @@ public class RouteNodeGraph {
     }
 
     /*
-     * Return the maximum base wire index across all Nodes in this tile
+     * Return the highest base wire index across all Nodes in this tile
      */
-    protected int getBaseWireCount(Tile tile, int startWireIndex) {
-        return baseWireCounts.computeIfAbsent(tile.getTileTypeEnum(), (e) -> {
+    protected int getHighestBaseWireIndex(Tile tile, int startWireIndex) {
+        return highestBaseWireIndex.computeIfAbsent(tile.getTileTypeEnum(), (e) -> {
+            final boolean isSLLType = e == TileTypeEnum.SLL; // Versal only
             // Check all wires in tile to find the index of the last base wire
             int lastBaseWire = startWireIndex;
             for (int i = lastBaseWire + 1; i < tile.getWireCount(); i++) {
                 Node node = Node.getNode(tile, i);
-                if (node != null && node.getTile() == tile && node.getWireIndex() == i) {
+                if (node == null) {
+                    continue;
+                }
+                if ((node.getTile() == tile && node.getWireIndex() == i) ||
+                        // Count Versal SLLs even if they're not based in this tile, since they are bidir
+                        (isSLLType && node.getTile().getTileTypeEnum() == e && node.getIntentCode() == IntentCode.NODE_SLL_DATA)) {
                     lastBaseWire = i;
                 }
             }
@@ -581,7 +593,7 @@ public class RouteNodeGraph {
         int tileAddress = tile.getUniqueAddress();
         Net[] nets = preservedMap.get(tileAddress);
         if (nets == null) {
-            int baseWireCount = getBaseWireCount(tile, wireIndex);
+            int baseWireCount = getHighestBaseWireIndex(tile, wireIndex);
             nets = new Net[baseWireCount];
             if (!preservedMap.compareAndSet(tileAddress, null, nets)) {
                 // Another thread must have beat us to a compareAndSet, use that result
@@ -722,6 +734,18 @@ public class RouteNodeGraph {
         }
 
         if (isExcludedTile(child)) {
+            if (isVersal) {
+                IntentCode parentIc = parent.getIntentCode();
+                if (parentIc == IntentCode.NODE_SLL_OUTPUT) {
+                    // Allow NODE_SLL_OUTPUT -> CLE/*LAG*_PIN
+                    return false;
+                }
+                if (parentIc == IntentCode.NODE_CLE_OUTPUT) {
+                    // Allow NODE_CLE_OUTPUT -> NODE_CLE_OUTPUT (e.g. [A-H]Q_PIN -> [A-H]Q)
+                    assert(child.getIntentCode() == IntentCode.NODE_CLE_OUTPUT);
+                    return false;
+                }
+            }
             if (!allowRoutethru(parent, child)) {
                 return true;
             }
@@ -737,6 +761,11 @@ public class RouteNodeGraph {
             if ((!lutRoutethru && ic == IntentCode.NODE_IMUX) || ic == IntentCode.NODE_CLE_CTRL || ic == IntentCode.NODE_INTF_CTRL) {
                 // Disallow these site pin projections if they aren't already in the routing graph (as a potential sink)
                 return childRnode == null;
+            }
+
+            if (ic == IntentCode.NODE_SLL_INPUT && parent.getIntentCode() == IntentCode.NODE_SLL_OUTPUT) {
+                // Disallow NODE_SLL_OUTPUT -> NODE_SLL_INPUT arcs (why are you able to come off an SLL just to go back onto one?)
+                return true;
             }
         } else {
             assert(design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus);
@@ -889,7 +918,7 @@ public class RouteNodeGraph {
         int tileAddress = tile.getUniqueAddress();
         RouteNode[] rnodes = nodesMap[tileAddress];
         if (rnodes == null) {
-            int baseWireCount = getBaseWireCount(tile, wireIndex);
+            int baseWireCount = getHighestBaseWireIndex(tile, wireIndex);
             rnodes = new RouteNode[baseWireCount];
             nodesMap[tileAddress] = rnodes;
         }
@@ -937,7 +966,8 @@ public class RouteNodeGraph {
                                 return false;
                             }
                         } else {
-                            assert(lutRoutethru);
+                            assert(lutRoutethru ||
+                                    isVersal && connection.isCrossSLR() && isVersalLagOutRoutethru(parentRnode, childRnode));
                             assert(Utils.isCLB(childTileType));
                             // IMUX_[EW]\\d+ -> CLE_CLE_L_SITE_0_[A-H]_O
                             assert(childRnode.getIntentCode() == IntentCode.NODE_CLE_OUTPUT);
@@ -958,10 +988,12 @@ public class RouteNodeGraph {
 
         TileTypeEnum childTileType = childRnode.getTile().getTileTypeEnum();
         assert(childTileType == TileTypeEnum.INT ||
-               isVersal && EnumSet.of(TileTypeEnum.INTF_LOCF_TR_TILE, TileTypeEnum.INTF_LOCF_BR_TILE, TileTypeEnum.INTF_ROCF_TR_TILE, TileTypeEnum.INTF_ROCF_BR_TILE,
-                                      TileTypeEnum.INTF_LOCF_TL_TILE, TileTypeEnum.INTF_LOCF_BL_TILE, TileTypeEnum.INTF_ROCF_TL_TILE, TileTypeEnum.INTF_ROCF_BL_TILE,
+                (isVersal && EnumSet.of(TileTypeEnum.INTF_LOCF_TR_TILE, TileTypeEnum.INTF_LOCF_BR_TILE, TileTypeEnum.INTF_ROCF_TR_TILE, TileTypeEnum.INTF_ROCF_BR_TILE,
+                                        TileTypeEnum.INTF_LOCF_TL_TILE, TileTypeEnum.INTF_LOCF_BL_TILE, TileTypeEnum.INTF_ROCF_TL_TILE, TileTypeEnum.INTF_ROCF_BL_TILE,
                                       TileTypeEnum.CLE_BC_CORE, TileTypeEnum.SLL)
-                       .contains(childTileType));
+                       .contains(childTileType)) ||
+                (isVersal && parentRnode.getIntentCode() == IntentCode.NODE_SLL_OUTPUT && childRnode.getIntentCode() == IntentCode.NODE_PINFEED && Utils.isCLB(childTileType))
+        );
 
         if (lutRoutethru && !type.leadsToLaguna()) {
             // (a) considering LUT routethrus (that do not lead to a Laguna)
@@ -1071,24 +1103,48 @@ public class RouteNodeGraph {
             IntentCode childIntentCode = childRnode.getIntentCode();
             switch (childIntentCode) {
                 case NODE_INODE:
+                    if (connection.isCrossSLR() &&
+                            childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
+                        // Allow INODEs needed for PINBOUNCE -> BNODE -> NODE_SLL_INPUT
+                        // TODO: Only allow those that lead to a SLR crossing
+                        return true;
+                    }
                     // Block access to all INODEs outside the sink tile, since NODE_INODE -> NODE_IMUX -> NODE_PINFEED (or NODE_INODE -> NODE_PINBOUNCE)
                     assert(childTile != sinkTile);
                     return false;
                 case NODE_CLE_BNODE:
+                    if (connection.isCrossSLR() &&
+                            childTile.getTileTypeEnum() == TileTypeEnum.SLL &&
+                            childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
+                        // Allow CLE BNODEs since these are used to reach NODE_SLL_INPUT nodes
+                        // TODO: Only allow those that lead to a SLR crossing
+                        return true;
+                    }
                 case NODE_INTF_BNODE:
                 case NODE_CLE_CNODE:
                 case NODE_INTF_CNODE:
+                    if (childTile.getTileYCoordinate() != sinkTile.getTileYCoordinate() ||
+                        childRnode.getEndTileXCoordinate() != sinkTile.getTileXCoordinate()) {
+                        assert(parentRnode.getIntentCode() != IntentCode.NODE_INODE);
+                        return false;
+                    }
                     // Only allow [BC]NODEs that reach into the sink tile
-                    return childTile.getTileYCoordinate() == sinkTile.getTileYCoordinate() &&
-                           childRnode.getEndTileXCoordinate() == sinkTile.getTileXCoordinate();
+                    return true;
                 case NODE_PINBOUNCE:
-                    // BOUNCEs are only accessible through INODEs, so transitively this intent code is unreachable
-                    break;
+                    // PINBOUNCEs are only accessible through an INODE, so arriving here means that this must be a
+                    // Versal inter-SLR connection
+                    assert(connection.isCrossSLR() &&
+                            childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this));
+                    return true;
                 case NODE_IMUX:
                     // IMUXes that are not our target EXCLUSIVE_SINK will have been isExcluded() from the graph unless
                     // LUT routethrus are enabled (which would have already returned true above)
                     break;
                 case NODE_PINFEED:
+                    if (connection.isCrossSLR()) {
+                        // Allow NODE_SLL_OUTPUT -> NODE_PINFEED
+                        return parentRnode.getIntentCode() == IntentCode.NODE_SLL_OUTPUT;
+                    }
                     // Expected to be projected away
                     break;
                 case NODE_CLE_CTRL:
@@ -1096,8 +1152,12 @@ public class RouteNodeGraph {
                     // CTRL pins that are not our target EXCLUSIVE_SINK will have been isExcluded() from the graph
                     break;
                 case NODE_SLL_INPUT:
-                    // Temporarily only allow NODE_SLL_INPUT to be explored if they are the sink
-                    // TODO: Revisit when SLR crossings are supported
+                    if (connection.isCrossSLR() &&
+                            childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
+                        assert(parentRnode.getIntentCode() != IntentCode.NODE_SLL_OUTPUT);
+                        return true;
+                    }
+                    // Otherwise only allow NODE_SLL_INPUT to be explored if it is the sink
                     return childRnode == sinkRnode;
             }
             throw new RuntimeException("ERROR: Unhandled IntentCode: " + childIntentCode);
@@ -1108,18 +1168,30 @@ public class RouteNodeGraph {
                Math.abs(childRnode.getEndTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1;
     }
 
-    protected boolean allowRoutethru(Node head, Node tail) {
+    protected boolean allowRoutethru(RouteNode head, Node tail) {
+        final boolean isCLB = Utils.isCLB(tail.getTile().getTileTypeEnum());
+
+        if (isVersal) {
+            if (tail.getIntentCode() == IntentCode.NODE_CLE_OUTPUT &&
+                    head.getIntentCode() == IntentCode.NODE_PINFEED &&
+                    head.getPrev().getIntentCode() == IntentCode.NODE_SLL_OUTPUT) {
+                // Ths sequence NODE_SLL_OUTPUT -> NODE_PINFEED -> NODE_CLE_OUTPUT must be a slice routethru the Laguna pin
+                assert(isVersalLagOutRoutethru(head, tail));
+                // Allow CLE/*LAG*_PIN -> CLE/*[A-H]Q2?_PIN routethru
+                return true;
+            }
+        }
+
         if (!lutRoutethru) {
             return false;
         }
 
-        if (!Utils.isCLB(tail.getTile().getTileTypeEnum())) {
+        if (!isCLB) {
             return false;
         }
 
         if (tail.getIntentCode() == IntentCode.NODE_PINFEED) {
             assert(isVersal);
-            assert(!lutRoutethru);
             assert(head.getIntentCode() == IntentCode.NODE_IMUX ||
                    head.getIntentCode() == IntentCode.NODE_PINBOUNCE);
             return false;
@@ -1152,5 +1224,20 @@ public class RouteNodeGraph {
 
     public float getPresentCongestionCost(int occupancy) {
         return presentCongestionCosts[occupancy];
+    }
+
+    /**
+     * Determine if the given nodes represent a SLICE routethru from an input site pin dedicated for SLLs
+     * to the [A-H]Q or [A-H]Q2 output.
+     * @param parent Start node of PIP
+     * @param child End node of PIP
+     * @return True if routethru
+     */
+    public boolean isVersalLagOutRoutethru(Node parent, Node child) {
+        assert(isVersal);
+        return parent.getIntentCode() == IntentCode.NODE_PINFEED &&
+                child.getIntentCode() == IntentCode.NODE_CLE_OUTPUT &&
+                parent.getWireName().matches("CLE_SLICE[LM]_TOP_[01]_LAG_([NS]|[EW][12])_PIN") &&
+                child.getWireName().matches("CLE_SLICE[LM]_TOP_[01]_[A-H]Q2?_PIN");
     }
 }

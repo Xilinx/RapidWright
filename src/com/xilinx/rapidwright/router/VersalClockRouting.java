@@ -22,8 +22,10 @@
 
 package com.xilinx.rapidwright.router;
 
+import java.io.InputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -51,6 +53,8 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.rwroute.NodeStatus;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.rwroute.RouterHelper.NodeWithPrev;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
 
 /**
@@ -64,6 +68,8 @@ public class VersalClockRouting {
     private static final EnumSet<IntentCode> hRouteTypes;
     private static final EnumSet<IntentCode> vRouteTypes;
     private static final EnumSet<IntentCode> allRouteTypes;
+    
+    private static Map<String, Map<Integer, VersalClockTree>> vdistrTrees;
     
     static {
         hRouteTypes = EnumSet.of(
@@ -262,11 +268,10 @@ public class VersalClockRouting {
                 IntentCode.NODE_GLOBAL_VDISTR_SHARED,
                 IntentCode.NODE_GLOBAL_GCLK);
 
-        Set<NodeWithPrevAndCost> startingPoints = new HashSet<>();
         // The VROUTE node is the precursor to the clock root, technically the first
         // VDISTR node is the center point. If we have more than one VROUTE->VDISTR
         // transition we end up with multiple clock roots
-        startingPoints.add(new NodeWithPrevAndCost(vroute));
+        NodeWithPrevAndCost clockRootNode = new NodeWithPrevAndCost(vroute);
 
         // Identify top and bottom clock region spine targets
         int minY = Integer.MAX_VALUE;
@@ -282,46 +287,55 @@ public class VersalClockRouting {
             verticalSpineCRs.add(device.getClockRegion(i, x));
         }
 
-        nextClockRegion: for (ClockRegion cr : verticalSpineCRs) {
+        VersalClockTree clkTree = getVersalClockTree(device, minY, maxY);
+        assert (clkTree != null);
+        if (clkTree == null) {
+            System.err.println("ERROR: No clock tree found for " + device + " Y" + minY + "-Y" + maxY
+                    + " while routing clock " + clk + ", skew will be suboptimal.");
+        }
+
+        for (ClockRegion cr : verticalSpineCRs) {
             q.clear();
             visited.clear();
-            q.addAll(startingPoints);
-            Tile crApproxCenterTile = cr.getApproximateCenter();
-            while (!q.isEmpty()) {
-                NodeWithPrevAndCost curr = q.poll();
-                if (getNodeStatus.apply(curr) != NodeStatus.AVAILABLE) {
-                    continue;
-                }
-                IntentCode c = curr.getIntentCode();
-                ClockRegion currCR = curr.getTile().getClockRegion();
-                if (currCR != null && cr.getRow() == currCR.getRow() && c == IntentCode.NODE_GLOBAL_VDISTR) {
-                    // Only consider base wires
-                    if (getNodeStatus.apply(curr) == NodeStatus.INUSE) {
-                        startingPoints.add(curr);
-                    } else {
-                        List<Node> path = curr.getPrevPath();
+            q.add(clockRootNode);
 
-                        for (Node node : path) {
-                            startingPoints.add(new NodeWithPrevAndCost(node));
+            List<Pair<IntentCode, ClockRegion>> distrPath = getVDistrPath(clkTree, cr);
+            nextDistrLevel: for (Pair<IntentCode, ClockRegion> target : distrPath) {
+                IntentCode targetIC = target.getFirst();
+                ClockRegion targetCR = target.getSecond();
+                Tile crApproxCenterTile = targetCR.getApproximateCenter();
+                
+                while (!q.isEmpty()) {
+                    NodeWithPrevAndCost curr = q.poll();
+                    if (getNodeStatus.apply(curr) != NodeStatus.AVAILABLE) {
+                        continue;
+                    }
+                    IntentCode currIC = curr.getIntentCode();
+                    ClockRegion currCR = curr.getTile().getClockRegion();
+                    if (currCR != null && targetCR == currCR && currIC == targetIC) {
+                        q.clear();
+                        visited.clear();
+                        q.add(curr);
+                        allPIPs.addAll(RouterHelper.getPIPsFromNodes(curr.getPrevPath()));
+                        if (targetIC == IntentCode.NODE_GLOBAL_VDISTR) {
+                            crToVdist.put(cr, curr);
                         }
-                        allPIPs.addAll(RouterHelper.getPIPsFromNodes(path));
+                        continue nextDistrLevel;
                     }
-                    crToVdist.put(cr, curr);
-                    continue nextClockRegion;
+    
+                    for (Node downhill : curr.getAllDownhillNodes()) {
+                        if (!allowedIntentCodes.contains(downhill.getIntentCode())) {
+                            continue;
+                        }
+                        if (!visited.add(downhill)) {
+                            continue;
+                        }
+                        int cost = downhill.getTile().getManhattanDistance(crApproxCenterTile) + (curr.depth * 100);
+                        q.add(new NodeWithPrevAndCost(downhill, curr, cost));
+                    }
                 }
-
-                for (Node downhill : curr.getAllDownhillNodes()) {
-                    if (!allowedIntentCodes.contains(downhill.getIntentCode())) {
-                        continue;
-                    }
-                    if (!visited.add(downhill)) {
-                        continue;
-                    }
-                    int cost = downhill.getTile().getManhattanDistance(crApproxCenterTile) + curr.depth;
-                    q.add(new NodeWithPrevAndCost(downhill, curr, cost));
-                }
+                throw new RuntimeException("ERROR: Couldn't route to distribution line in clock region " + cr);
             }
-            throw new RuntimeException("ERROR: Couldn't route to distribution line in clock region " + cr);
         }
         clk.getPIPs().addAll(allPIPs);
 
@@ -341,6 +355,12 @@ public class VersalClockRouting {
         }
 
         return crToVdist;
+    }
+
+    private static List<Pair<IntentCode, ClockRegion>> getVDistrPath(VersalClockTree clkTree,
+            ClockRegion target) {
+        return clkTree == null ? Arrays.asList(new Pair<>(IntentCode.NODE_GLOBAL_VDISTR, target))
+                : clkTree.getClockRegionVDistrPath(target);
     }
 
     /**
@@ -409,7 +429,8 @@ public class VersalClockRouting {
      * @param distLines A map of target clock regions and their respective horizontal distribution lines
      * @param lcbTargets The target LCB nodes to route the clock
      */
-    public static void routeDistributionToLCBs(Net clk, Map<ClockRegion, Node> distLines, Set<Node> lcbTargets, Function<Node, NodeStatus> getNodeStatus) {
+    public static void routeDistributionToLCBs(Net clk, Map<ClockRegion, Node> distLines,
+            Map<Node, List<SitePinInst>> lcbTargets, Function<Node, NodeStatus> getNodeStatus) {
         Map<ClockRegion, Set<NodeWithPrevAndCost>> startingPoints = getStartingPoints(distLines);
         routeToLCBs(clk, startingPoints, lcbTargets, getNodeStatus);
     }
@@ -425,12 +446,14 @@ public class VersalClockRouting {
         return startingPoints;
     }
 
-    public static void routeToLCBs(Net clk, Map<ClockRegion, Set<NodeWithPrevAndCost>> startingPoints, Set<Node> lcbTargets, Function<Node, NodeStatus> getNodeStatus) {
+    public static void routeToLCBs(Net clk, Map<ClockRegion, Set<NodeWithPrevAndCost>> startingPoints,
+            Map<Node, List<SitePinInst>> lcbTargets, Function<Node, NodeStatus> getNodeStatus) {
         Queue<NodeWithPrevAndCost> q = new PriorityQueue<>();
         Set<PIP> allPIPs = new HashSet<>();
         Set<Node> visited = new HashSet<>();
 
-        nextLCB: for (Node lcb : lcbTargets) {
+        nextLCB: for (Entry<Node, List<SitePinInst>> e : lcbTargets.entrySet()) {
+            Node lcb = e.getKey();
             q.clear();
             visited.clear();
             Tile lcbTile = lcb.getTile();
@@ -453,6 +476,10 @@ public class VersalClockRouting {
                     Set<NodeWithPrevAndCost> s = startingPoints.get(currCR);
                     for (Node n : path) {
                         s.add(new NodeWithPrevAndCost(n));
+                    }
+
+                    for (SitePinInst sink : e.getValue()) {
+                        sink.setRouted(true);
                     }
 
                     continue nextLCB;
@@ -648,5 +675,46 @@ public class VersalClockRouting {
             }
         }
         clk.getPIPs().addAll(allPIPs);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static Map<String, Map<Integer, VersalClockTree>> readVersalVDistrTrees() {
+        InputStream is = FileTools.getRapidWrightResourceInputStream(FileTools.VERSAL_VDISTR_TREES_FILE_NAME);
+        return (Map<String, Map<Integer, VersalClockTree>>) FileTools.readObjectFromKryoFile(is);
+    }
+
+    public static void writeVersalVDistrTreesFile() {
+        String fileName = FileTools.getRapidWrightResourceFileName(FileTools.VERSAL_VDISTR_TREES_FILE_NAME);
+        if (vdistrTrees == null) {
+            throw new RuntimeException("ERROR: Cannot write file '" + fileName + "', source map is null.");
+        }
+        FileTools.writeObjectToKryoFile(fileName, vdistrTrees);
+    }
+
+    public static VersalClockTree getVersalClockTree(Device device, int minY, int maxY) {
+        Map<Integer, VersalClockTree> map = getDeviceVDistrTrees(device.getName());
+        return map == null ? null : map.get(VersalClockTree.getMinMaxYRangeKey(minY, maxY));
+    }
+
+    private static Map<Integer, VersalClockTree> getDeviceVDistrTrees(String deviceName) {
+        if (vdistrTrees == null) {
+            vdistrTrees = readVersalVDistrTrees();
+        }
+        return vdistrTrees.get(deviceName);
+    }
+
+    /**
+     * Given a range of occupied clock region Y coordinates, get the preferred clock
+     * root Y coordinate.
+     * 
+     * @param device The current device to target.
+     * @param minY   The smallest Y coordinate of the clock region range.
+     * @param maxY   The largest Y coordinate of the clock region range.
+     * @return The preferred clock region Y coordinate for the given range or null
+     *         if none could be found.
+     */
+    public static Integer getPreferredClockRootYCoord(Device device, int minY, int maxY) {
+        VersalClockTree clkTree = getVersalClockTree(device, minY, maxY);
+        return clkTree == null ? null : clkTree.getPreferredClockRootYCoord();
     }
 }
