@@ -531,7 +531,8 @@ public class NetTools {
      * @param d The design to unroute nets from.
      * @param pBlock The bounding box for the placed and routed design.
      */
-    public static void unrouteTopLevelNetsThatLeavePBlock(Design d, PBlock pBlock) {
+    public static List<Net> unrouteTopLevelNetsThatLeavePBlock(Design d, PBlock pBlock) {
+        List<Net> unroutedNets = new ArrayList<>();
         for (EDIFPort p : d.getNetlist().getTopCell().getPorts()) {
             for (int i : p.getBitBlastedIndices()) {
                 EDIFPortInst portInst = p.getInternalPortInstFromIndex(i);
@@ -551,8 +552,10 @@ public class NetTools {
                 }
                 if (leavesPBlock) {
                     net.unroute();
+                    unroutedNets.add(net);
                 }
             }
         }
+        return unroutedNets;
     }
 }
