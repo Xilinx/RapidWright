@@ -92,7 +92,7 @@ public class RouteNodeGraph {
 
     /** Array mapping an INT tile's Y coordinate to its SLR index */
     public final int[] intYToSLRIndex;
-    /** Array mapping an INT tile's X coordinate to the X of the next/previous Laguna column */
+    /** Array mapping an INT tile's X coordinate to the X of the next/previous Laguna column (UltraScale/UltraScale+ only) */
     public final int[] nextLagunaColumn;
     public final int[] prevLagunaColumn;
 
@@ -1131,8 +1131,9 @@ public class RouteNodeGraph {
                     // Only allow [BC]NODEs that reach into the sink tile
                     return true;
                 case NODE_PINBOUNCE:
-                    // PINBOUNCEs are only accessible through an INODE, so arriving here means that this must be an inter-SLR connection
-                    assert(connection.isCrossSLR() &&
+                    // PINBOUNCEs are only accessible through an INODE, so arriving here means that this must be a
+                    // Versal inter-SLR connection
+                    assert(isVersal && connection.isCrossSLR() &&
                             childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this));
                     return true;
                 case NODE_IMUX:
@@ -1225,6 +1226,13 @@ public class RouteNodeGraph {
         return presentCongestionCosts[occupancy];
     }
 
+    /**
+     * Determine if the given nodes represent a SLICE routethru from an input site pin dedicated for SLLs
+     * to the [A-H]Q or [A-H]Q2 output.
+     * @param parent Start node of PIP
+     * @param child End node of PIP
+     * @return True if routethru
+     */
     public boolean isVersalLagOutRoutethru(Node parent, Node child) {
         assert(isVersal);
         return parent.getIntentCode() == IntentCode.NODE_PINFEED &&

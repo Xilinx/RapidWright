@@ -32,7 +32,6 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.Pair;
@@ -114,8 +113,7 @@ public class Connection implements Comparable<Connection>{
      * and for cross SLR connections the location of Laguna columns.
      * @param boundingBoxExtensionX To indicate the extension on top of the minimum bounding box in the horizontal direction.
      * @param boundingBoxExtensionY To indicate the extension on top of the minimum bounding box in the vertical direction.
-     * @param nextLagunaColumn Array mapping arbitrary tile columns to the next Laguna column
-     * @param prevLagunaColumn Array mapping arbitrary tile columns to the previous Laguna column
+     * @param routingGraph A RouteNodeGraph object for additional context.
      */
     public void computeConnectionBoundingBox(short boundingBoxExtensionX, short boundingBoxExtensionY,
                                              RouteNodeGraph routingGraph) {
@@ -127,10 +125,11 @@ public class Connection implements Comparable<Connection>{
         yMax = maxOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
         yMin = minOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
 
-        if (isCrossSLR()
-                && !routingGraph.isVersal) { // FIXME: Update this for Versal
-            // For SLR-crossing connections, ensure the bounding box width contains at least one Laguna column
-            // before bounding box extension
+        if (isCrossSLR() && !routingGraph.isVersal) {
+            // For SLR-crossing connections on UltraScale/UltraScale+, ensure the bounding box width contains at least
+            // one Laguna column before bounding box extension
+            // On Versal where Laguna columns do not exist and SLLs can be accessed in a distributed fashion,
+            // this optimization is not performed.
             int nextLaguna = routingGraph.nextLagunaColumn[xMin];
             int prevLaguna = routingGraph.prevLagunaColumn[xMax];
             if (nextLaguna != Integer.MAX_VALUE) {
