@@ -1169,13 +1169,14 @@ public class RouteNodeGraph {
                Math.abs(childRnode.getEndTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1;
     }
 
-    protected boolean allowRoutethru(Node head, Node tail) {
+    protected boolean allowRoutethru(RouteNode head, Node tail) {
         final boolean isCLB = Utils.isCLB(tail.getTile().getTileTypeEnum());
 
         if (isVersal) {
-            if (tail.getIntentCode() == IntentCode.NODE_CLE_OUTPUT && head.getIntentCode() == IntentCode.NODE_PINFEED &&
-                    // TODO: Speedup
-                    head.getWireName().matches("CLE_SLICE[LM]_TOP_[01]_LAG_([NS]|[EW][12])_PIN")) {
+            if (tail.getIntentCode() == IntentCode.NODE_CLE_OUTPUT &&
+                    head.getIntentCode() == IntentCode.NODE_PINFEED &&
+                    head.getPrev().getIntentCode() == IntentCode.NODE_SLL_OUTPUT) {
+                // Ths sequence NODE_SLL_OUTPUT -> NODE_PINFEED -> NODE_CLE_OUTPUT must be a slice routethru the Laguna pin
                 assert(isVersalLagOutRoutethru(head, tail));
                 // Allow CLE/*LAG*_PIN -> CLE/*[A-H]Q2?_PIN routethru
                 return true;
