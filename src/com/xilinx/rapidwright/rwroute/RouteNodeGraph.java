@@ -1133,7 +1133,7 @@ public class RouteNodeGraph {
                 case NODE_PINBOUNCE:
                     // PINBOUNCEs are only accessible through an INODE, so arriving here means that this must be a
                     // Versal inter-SLR connection
-                    assert(isVersal && connection.isCrossSLR() &&
+                    assert(connection.isCrossSLR() &&
                             childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this));
                     return true;
                 case NODE_IMUX:
