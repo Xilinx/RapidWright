@@ -129,7 +129,7 @@ public class Connection implements Comparable<Connection>{
             // For SLR-crossing connections on UltraScale/UltraScale+, ensure the bounding box width contains at least
             // one Laguna column before bounding box extension
             // On Versal where Laguna columns do not exist and SLLs can be accessed in a distributed fashion,
-            // this optimization is not performed.
+            // this optimization is not currently performed.
             int nextLaguna = routingGraph.nextLagunaColumn[xMin];
             int prevLaguna = routingGraph.prevLagunaColumn[xMax];
             if (nextLaguna != Integer.MAX_VALUE) {

@@ -2108,9 +2108,11 @@ public class RWRoute {
                     }
                 }
 
-                if (!routingGraph.isVersal) { // FIXME: Update this for Versal
-                    // Account for any detours that must be taken to get to the closest Laguna column
-                    // and from there onto the sink
+                if (!routingGraph.isVersal) {
+                    // For UltraScale/UltraScale+, account for any detours that must be taken
+                    // to get to the closest Laguna column and from there onto the sink.
+                    // This optimization is not currently performed on Versal due to the
+                    // distributed nature of its SLLs.
                     int nextLagunaColumn = routingGraph.nextLagunaColumn[childX];
                     int prevLagunaColumn = routingGraph.prevLagunaColumn[childX];
                     if (nextLagunaColumn == prevLagunaColumn) {
