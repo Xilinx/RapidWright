@@ -268,7 +268,7 @@ public class TestNetTools {
     }
 
     @Test
-    public void testUnrouteTopLevelNetsThatLeavePBlock(@TempDir Path tempDir) {
+    public void testUnrouteTopLevelNetsThatLeavePBlock() {
         Design design = new Design("pblock_unroute_test", "xcv80-lsva4737-2MHP-e-S");
         design.setDesignOutOfContext(true);
         design.setAutoIOBuffers(false);

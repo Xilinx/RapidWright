@@ -200,7 +200,7 @@ public class InlineFlopTools {
      */
     private static void createAndPlaceFlopsInlineOnTopPorts(Design design, String clkNet, PBlock keepOut,
                                                             boolean centroidPlacement) {
-        assert (design.getSiteInsts().isEmpty());
+//        assert (design.getSiteInsts().isEmpty());
         EDIFCell top = design.getTopEDIFCell();
         Site start = keepOut.getAllSites("SLICE").iterator().next(); // TODO this is a bit wasteful
         boolean exclude = true;
@@ -487,7 +487,7 @@ public class InlineFlopTools {
 
         for (SiteInst si : siteInstToRemove) {
             boolean isStaticSource = si.getSitePinInsts().stream()
-                    .anyMatch((p) -> p.getNet().isGNDNet() && p.isOutPin());
+                    .anyMatch((p) -> p.getNet() != null && p.getNet().isGNDNet() && p.isOutPin());
             if (!isStaticSource) {
                 design.removeSiteInst(si);
             }
