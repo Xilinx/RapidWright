@@ -363,8 +363,8 @@ public class InlineFlopTools {
         return null;
     }
 
-    private static Cell createAndPlaceFlopInlineOnTopPortInst(Design design, EDIFPortInst portInst, Pair<Site, BEL> loc,
-                                                              EDIFHierNet clk) {
+    public static Cell createAndPlaceFlopInlineOnTopPortInst(Design design, EDIFPortInst portInst, Pair<Site, BEL> loc,
+                                                             EDIFHierNet clk) {
         String name = portInst.getFullName() + INLINE_SUFFIX;
         Cell flop = design.createAndPlaceCell(design.getTopEDIFCell(), name, Unisim.FDRE, loc.getFirst(),
                 loc.getSecond());
@@ -403,46 +403,16 @@ public class InlineFlopTools {
      * @param design The current design from which to remove the flops
      */
     public static void removeInlineFlops(Design design) {
-        Map<Net, Set<SitePinInst>> pinsToRemove = new HashMap<>();
         List<SiteInst> siteInstToRemove = new ArrayList<>();
         List<EDIFCellInst> cellsToRemove = new ArrayList<>();
-        Net vcc = design.getVccNet();
-        Set<SitePinInst> vccPins = new HashSet<>();
-        pinsToRemove.put(vcc, vccPins);
-        String[] versalStaticPins = new String[]{"CKEN1", "CKEN2", "CKEN3", "CKEN4", "RST"};
-        String[] ultrascaleStaticPins = new String[]{"CKEN1", "CKEN2", "CKEN3", "CKEN4", "SRST1", "SRST2"};
-        String[] series7StaticPins = new String[]{"CE", "SR"};
-        if (design.getSeries() != Series.Versal && design.getSeries() != Series.UltraScale
-                && design.getSeries() != Series.UltraScalePlus && design.getSeries() != Series.Series7) {
-            throw new RuntimeException("Unsupported device series for removing inline flops");
-        }
-        String[] staticPins = design.getSeries() == Series.Versal ? versalStaticPins :
-                              design.getSeries() == Series.UltraScalePlus
-                              || design.getSeries() == Series.UltraScale ? ultrascaleStaticPins : series7StaticPins;
         for (EDIFCellInst inst : design.getTopEDIFCell().getCellInsts()) {
             if (inst.getName().endsWith(INLINE_SUFFIX)) {
                 Cell flop = design.getCell(inst.getName());
                 SiteInst si = flop.getSiteInst();
-                // Assume we only placed one flop per SiteInst
                 siteInstToRemove.add(si);
-                for (SitePinInst pin : si.getSitePinInsts()) {
-                    if (pin.getNet().isGNDNet()) {
-                        continue;
-                    }
-                    pinsToRemove.computeIfAbsent(pin.getNet(), p -> new HashSet<>()).add(pin);
-                }
-                for (String staticPin : staticPins) {
-                    if (si.getSitePinInst(staticPin) == null) {
-                        vccPins.add(vcc.createPin(staticPin, si));
-                    }
-                }
-
                 cellsToRemove.add(inst);
             }
         }
-
-
-        DesignTools.batchRemoveSitePins(pinsToRemove, true);
 
         String[] ctrlPins = new String[]{"C", "R", "CE"};
         EDIFCell top = design.getTopEDIFCell();
