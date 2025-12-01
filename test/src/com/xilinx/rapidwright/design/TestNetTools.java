@@ -21,18 +21,26 @@
  */
 package com.xilinx.rapidwright.design;
 
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFPort;
+import com.xilinx.rapidwright.util.CodeGenerator;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -42,15 +50,15 @@ public class TestNetTools {
     /**
      * Tests the method NetTools.isGlobalClock(Net net).
      * For each DCP file, Vivado uses the Tcl command
-     *      get_nets -hier -parent_net -filter { TYPE == "GLOBAL_CLOCK" } 
-     * to retrieve all nets of type GLOBAL_CLOCK. 
+     *      get_nets -hier -parent_net -filter { TYPE == "GLOBAL_CLOCK" }
+     * to retrieve all nets of type GLOBAL_CLOCK.
      * The method NetTools.isGlobalClock(Net net) returns true for these nets and false for others.
-     * 
+     *
      * All Versal/Ultrascale+/Series-7 designs under the RapidWrightDCP path are available to be checked, except for the following:
      *      picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp    The source cell bufgce_inst of this design is not placed yet.
      *      picoblaze_ooc_X10Y235_unreadable_edif.dcp       This design would call vivado to generate an readable EDIF file.
-     * 
-     * @param pathAndlobalClockNames Use ' ' as the delimiter to split this string, where the first element is the path to the DCP file, 
+     *
+     * @param pathAndlobalClockNames Use ' ' as the delimiter to split this string, where the first element is the path to the DCP file,
      *                               and the remaining elements are the names of the global clock nets reported by Vivado.
      */
     @ParameterizedTest
@@ -73,7 +81,7 @@ public class TestNetTools {
             "picoblaze_partial.dcp clk",
             // "reduce_or_routed_7overlaps.dcp",
             // "testCopyImplementation.dcp",
-            
+
             // UltraScale
             // "microblazeAndILA_3pblocks.dcp base_mb_i/clk_wiz_1/inst/clk_out1 base_mb_i/clk_wiz_1/inst/clkfbout_buf_base_mb_clk_wiz_1_0 base_mb_i/mdm_1/U0/No_Dbg_Reg_Access.BUFG_DRCK/Dbg_Clk_31 dbg_hub/inst/BSCANID.u_xsdbm_id/itck_i",
             "microblazeAndILA_3pblocks_2024.1.dcp base_mb_i/clk_wiz_1/inst/clk_out1 base_mb_i/clk_wiz_1/inst/clkfbout_buf_base_mb_clk_wiz_1_0 base_mb_i/mdm_1/U0/No_Dbg_Reg_Access.BUFG_DRCK/Dbg_Clk_31 dbg_hub/inst/BSCANID.u_xsdbm_id/itck_i",
@@ -257,5 +265,63 @@ public class TestNetTools {
         Assertions.assertTrue(clkNet.hasPIPs());
         ClockRegion clockRoot = NetTools.findClockRootVRoute(clkNet).getTile().getClockRegion();
         Assertions.assertEquals(clockRoot, design.getDevice().getClockRegion(1, 1));
+    }
+
+    @Test
+    public void testUnrouteTopLevelNetsThatLeavePBlock() {
+        Design design = new Design("pblock_unroute_test", "xcv80-lsva4737-2MHP-e-S");
+        design.setDesignOutOfContext(true);
+        design.setAutoIOBuffers(false);
+        EDIFCell topCell = design.getNetlist().getTopCell();
+        EDIFPort clkPort = topCell.createPort("clk", EDIFDirection.INPUT, 1);
+        EDIFNet clkNet = topCell.createNet("clk");
+        clkNet.createPortInst(clkPort);
+        String[] pips = {"CLE_E_CORE_X31Y804/CLE_E_CORE.CLE_SLICEL_TOP_0_AQ_PIN->>CLE_SLICEL_TOP_0_AQ",
+                "INT_X31Y804/INT.LOGIC_OUTS_W1->INT_NODE_SDQ_ATOM_16_INT_OUT1",
+                "INT_X31Y804/INT.INT_NODE_SDQ_ATOM_16_INT_OUT1->>OUT_NN2_W_BEG0",
+                "INT_X31Y806/INT.IN_NN2_W_END0->INT_NODE_SDQ_ATOM_59_INT_OUT0",
+                "INT_X31Y806/INT.INT_NODE_SDQ_ATOM_59_INT_OUT0->>OUT_WW2_W_BEG0",
+                "INT_X30Y806/INT.IN_WW2_W_END0->INT_NODE_SDQ_ATOM_123_INT_OUT1",
+                "INT_X30Y806/INT.INT_NODE_SDQ_ATOM_123_INT_OUT1->>OUT_NN1_W_BEG2",
+                "INT_X30Y807/INT.IN_NN1_W_END2->INT_NODE_SDQ_ATOM_62_INT_OUT0",
+                "INT_X30Y807/INT.INT_NODE_SDQ_ATOM_62_INT_OUT0->>INT_SDQ_RED_ATOM_24_INT_OUT0",
+                "INT_X30Y807/INT.INT_SDQ_RED_ATOM_24_INT_OUT0->INT_NODE_IMUX_ATOM_65_INT_OUT0",
+                "INT_X30Y807/INT.INT_NODE_IMUX_ATOM_65_INT_OUT0->>BOUNCE_E0",
+                "CLE_W_CORE_X30Y807/CLE_W_CORE.CLE_SLICEL_TOP_0_AX->>CLE_SLICEL_TOP_0_AX_PIN",
+                "INT_X31Y806/INT.INT_NODE_SDQ_ATOM_59_INT_OUT0->>INT_SDQ_RED_ATOM_16_INT_OUT0",
+                "INT_X31Y806/INT.INT_SDQ_RED_ATOM_16_INT_OUT0->INT_NODE_SDQ_ATOM_11_INT_OUT1",
+                "INT_X31Y806/INT.INT_NODE_SDQ_ATOM_11_INT_OUT1->>OUT_EE1_E_BEG2",
+                "INT_X32Y806/INT.IN_EE1_E_END2->INT_NODE_IMUX_ATOM_97_INT_OUT0",
+                "INT_X32Y806/INT.INT_NODE_IMUX_ATOM_97_INT_OUT0->>BOUNCE_W0",
+                "CLE_E_CORE_X32Y806/CLE_E_CORE.CLE_SLICEL_TOP_0_AX->>CLE_SLICEL_TOP_0_AX_PIN"};
+
+
+        Net net = CodeGenerator.createTestNet(design, "test_net", pips);
+        EDIFHierNet logicalClkNet = new EDIFHierNet(design.getNetlist().getTopHierCellInst(), clkPort.getInternalNet());
+        Net clk = design.createNet(logicalClkNet);
+        Cell flop0 = design.createAndPlaceCell(design.getTopEDIFCell(), "flop0",
+                Unisim.FDRE, "SLICE_X98Y800/AFF");
+        net.connect(flop0, "Q");
+        design.getGndNet().connect(flop0, "R");
+        design.getVccNet().connect(flop0, "CE");
+        clk.connect(flop0, "C");
+
+        Cell flop1 = design.createAndPlaceCell(design.getTopEDIFCell(), "flop1",
+                Unisim.FDRE, "SLICE_X96Y803/AFF");
+        net.connect(flop1, "D");
+        design.getGndNet().connect(flop1, "R");
+        design.getVccNet().connect(flop1, "CE");
+        clk.connect(flop1, "C");
+
+        EDIFPort outPort = topCell.createPort("out", EDIFDirection.OUTPUT, 1);
+        EDIFNet testNet = design.getNetlist().getHierNetFromName("test_net").getNet();
+        testNet.createPortInst(outPort);
+        PBlock pblock = new PBlock(design.getDevice(), "IRI_QUAD_X58Y3212:IRI_QUAD_X59Y3275 " +
+                "DSP_X0Y398:DSP_X1Y405 " + "DSP58_CPLX_X0Y398:DSP58_CPLX_X0Y405 " + "SLICE_X92Y796:SLICE_X99Y811");
+
+        List<Net> unroutedNets = NetTools.unrouteTopLevelNetsThatLeavePBlock(design, pblock);
+        Assertions.assertEquals(1, unroutedNets.size());
+        Assertions.assertEquals("test_net", unroutedNets.get(0).getName());
+        Assertions.assertEquals(0, net.getPIPs().size());
     }
 }
