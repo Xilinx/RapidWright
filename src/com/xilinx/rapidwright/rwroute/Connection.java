@@ -32,7 +32,6 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.Pair;
@@ -114,11 +113,10 @@ public class Connection implements Comparable<Connection>{
      * and for cross SLR connections the location of Laguna columns.
      * @param boundingBoxExtensionX To indicate the extension on top of the minimum bounding box in the horizontal direction.
      * @param boundingBoxExtensionY To indicate the extension on top of the minimum bounding box in the vertical direction.
-     * @param nextLagunaColumn Array mapping arbitrary tile columns to the next Laguna column
-     * @param prevLagunaColumn Array mapping arbitrary tile columns to the previous Laguna column
+     * @param routingGraph A RouteNodeGraph object for additional context.
      */
     public void computeConnectionBoundingBox(short boundingBoxExtensionX, short boundingBoxExtensionY,
-                                             int[] nextLagunaColumn, int[] prevLagunaColumn) {
+                                             RouteNodeGraph routingGraph) {
         short xMin, xMax, yMin, yMax;
         short xNetCenter = (short) Math.ceil(netWrapper.getXCenter());
         short yNetCenter = (short) Math.ceil(netWrapper.getYCenter());
@@ -127,11 +125,13 @@ public class Connection implements Comparable<Connection>{
         yMax = maxOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
         yMin = minOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
 
-        if (isCrossSLR()) {
-            // For SLR-crossing connections, ensure the bounding box width contains at least one Laguna column
-            // before bounding box extension
-            int nextLaguna = nextLagunaColumn[xMin];
-            int prevLaguna = prevLagunaColumn[xMax];
+        if (isCrossSLR() && !routingGraph.isVersal) {
+            // For SLR-crossing connections on UltraScale/UltraScale+, ensure the bounding box width contains at least
+            // one Laguna column before bounding box extension
+            // On Versal where Laguna columns do not exist and SLLs can be accessed in a distributed fashion,
+            // this optimization is not currently performed.
+            int nextLaguna = routingGraph.nextLagunaColumn[xMin];
+            int prevLaguna = routingGraph.prevLagunaColumn[xMax];
             if (nextLaguna != Integer.MAX_VALUE) {
                 xMax = (short) Math.max(xMax, nextLaguna);
             }
@@ -148,16 +148,16 @@ public class Connection implements Comparable<Connection>{
         if (isCrossSLR()) {
             // Equivalently, ensure that cross-SLR connections are at least as high as a SLL;
             // if necessary, expand the sink side of the bounding box
-            short heightMinusSLL = (short) ((yMaxBB - yMinBB - 1) - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
+            short heightMinusSLL = (short) ((yMaxBB - yMinBB - 1) - routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
             if (heightMinusSLL < 0) {
                 if (sourceRnode.getEndTileYCoordinate() <= sinkRnode.getEndTileYCoordinate()) {
                     // Upwards
-                    short newYMaxBB = (short) (yMin + RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES + 1);
+                    short newYMaxBB = (short) (yMin + routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES + 1);
                     assert(newYMaxBB > yMaxBB);
                     yMaxBB = newYMaxBB;
                 } else {
                     // Downwards
-                    short newYMinBB = (short) (yMax - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - 1);
+                    short newYMinBB = (short) (yMax - routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - 1);
                     assert(newYMinBB < yMinBB);
                     yMinBB = newYMinBB;
                 }
@@ -282,10 +282,6 @@ public class Connection implements Comparable<Connection>{
 
         assert(sourceRnode != null);
         if (!sourceRnode.getTile().getSLR().equals(sinkRnode.getTile().getSLR())) {
-            if (source.getSiteInst().getDesign().getSeries() == Series.Versal) {
-                throw new RuntimeException("ERROR: Cross-SLR connections not yet supported on Versal.");
-            }
-
             if (sourceRnode.getTile().getTileYCoordinate() < sinkRnode.getTile().getTileYCoordinate()) {
                 crossSLRnorth = true;
                 assert(!crossSLRsouth);

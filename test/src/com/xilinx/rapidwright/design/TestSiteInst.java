@@ -518,4 +518,25 @@ public class TestSiteInst {
         n.addPin(spi);
         Assertions.assertTrue(spi.getSiteInst().removePin(spi));
     }
+
+    @Test
+    public void testAddPinDuplicate() {
+        Design design = new Design("top", Device.AWS_F1);
+        SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X0Y0"));
+
+        String pinName = "H_O";
+        boolean isOutPin = true;
+        SitePinInst spi = new SitePinInst(pinName, si);
+        Assertions.assertNotNull(spi);
+
+        Assertions.assertThrows(RuntimeException.class, () -> new SitePinInst(pinName, si));
+        Assertions.assertThrows(RuntimeException.class, () -> {
+            SitePinInst spi2 = new SitePinInst(isOutPin, pinName, null);
+            spi2.setSiteInst(si);
+        });
+        Assertions.assertThrows(RuntimeException.class, () -> {
+            SitePinInst spi2 = new SitePinInst(isOutPin, pinName, null);
+            si.addPin(spi2);
+        });
+    }
 }

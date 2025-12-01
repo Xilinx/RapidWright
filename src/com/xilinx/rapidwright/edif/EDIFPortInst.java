@@ -126,6 +126,10 @@ public class EDIFPortInst implements Comparable<EDIFPortInst> {
             throw new RuntimeException("ERROR: Use a different constructor, "
                     + "need index for bussed port " + port.getName());
         }
+        if (index != -1 && !port.isBus()) {
+            throw new RuntimeException("ERROR: Use a different constructor, " + "port "
+                    + port.getName() + " is not a bus, cannot index into a single bit signal.");
+        }
         if (cellInst != null) {
             if (!port.equals(cellInst.getPort(port.getBusName(true)))) {
                 // check for name collision

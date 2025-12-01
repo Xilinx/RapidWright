@@ -27,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Sat Jun 07 22:31:12 MDT 2025
+ * Generated on: Tue Nov 11 17:13:57 MST 2025
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  *
  * Enumeration of TileTypeEnum type for all valid devices within Vivado.
@@ -689,6 +689,14 @@ public enum TileTypeEnum {
     FSR_VDU_OCTAL_GT_TILE,
     FSR_XRAM_GTYP_OCTAL_GT_TILE,
     FSR_XRAM_GTYP_OCTAL_GT_TILE_MY,
+    GTFY_GTY_RIGHT_RBRK_FT,
+    GTFY_QUAD_LEFT_FT,
+    GTFY_QUAD_LEFT_RBRK_FT,
+    GTFY_QUAD_LEFT_TERM_B_FT,
+    GTFY_QUAD_LEFT_TERM_T_FT,
+    GTFY_QUAD_RIGHT_FT,
+    GTFY_QUAD_RIGHT_RBRK_FT,
+    GTFY_QUAD_RIGHT_TERM_T_FT,
     GTH_CHANNEL_0,
     GTH_CHANNEL_1,
     GTH_CHANNEL_2,

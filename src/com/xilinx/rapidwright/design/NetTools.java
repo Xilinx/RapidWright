@@ -45,6 +45,7 @@ public class NetTools {
     public static final String WHITE_SPACE = "   ";
 
     private static Set<SiteTypeEnum> clkSrcSiteTypeEnums = EnumSet.noneOf(SiteTypeEnum.class);
+
     static {
         clkSrcSiteTypeEnums.add(SiteTypeEnum.BUFGCE);       // All supported series
         clkSrcSiteTypeEnums.add(SiteTypeEnum.BUFGCTRL);     // All supported series
@@ -59,17 +60,19 @@ public class NetTools {
     public static boolean isGlobalClock(Net net) {
         SitePinInst srcSpi = net.getSource();
         if (srcSpi == null)
-            return false;        
-        
+            return false;
+
         return clkSrcSiteTypeEnums.contains(srcSpi.getSiteTypeEnum());
     }
 
     public static class NodeTree extends Node {
         private static final long serialVersionUID = 8522818939039826954L;
         public List<NodeTree> fanouts = Collections.emptyList();
+
         public NodeTree(Node node) {
             super(node);
         }
+
         public boolean multiplyDriven = false;
 
         public void addFanout(NodeTree node) {
@@ -136,6 +139,7 @@ public class NetTools {
 
         /**
          * Returns a string representation of this NodeTree using tree characters (├─, └─).
+         *
          * @return String representation with tree characters.
          */
         public String toTreeString() {
@@ -146,9 +150,9 @@ public class NetTools {
 
         /**
          * Returns a string representation of this NodeTree using tree characters (├─, └─).
-         * 
-         * @param customToString Allows a custom toString() method to be applied to the Node when 
-         *        generating the String.
+         *
+         * @param customToString Allows a custom toString() method to be applied to the Node when
+         *                       generating the String.
          * @return String representation with tree characters.
          */
         public String toTreeString(Function<Node, String> customToString) {
@@ -157,8 +161,8 @@ public class NetTools {
             return sb.toString();
         }
 
-        private void buildTreeString(StringBuilder sb, String prefix, String childPrefix, 
-                Set<NetTools.NodeTree> visited, Function<Node, String> customToString) { 
+        private void buildTreeString(StringBuilder sb, String prefix, String childPrefix,
+                                     Set<NetTools.NodeTree> visited, Function<Node, String> customToString) {
             sb.append(prefix);
             sb.append(customToString.apply(this));
             if (multiplyDriven && !visited.add(this)) {
@@ -181,19 +185,21 @@ public class NetTools {
      * Note that this method only discovers subtrees that start at an output SitePinInst or a node tied to VCC/GND
      * (i.e. gaps and islands will be ignored).
      * Nodes that are multiply-driven (indicative of routing loops) will have their NodeTree.multiplyDriven flag set.
+     *
      * @param net Net to analyze.
      * @return A list of NodeTree objects, corresponding to the root of each subtree.
      */
     public static List<NodeTree> getNodeTrees(Net net) {
         return getNodeTrees(net, n -> false);
     }
-    
+
     /**
      * Compute the node routing tree of the given Net by examining its PIPs.
      * Note that this method only discovers subtrees that start at an output SitePinInst or a node tied to VCC/GND
      * (i.e. gaps and islands will be ignored).
      * Nodes that are multiply-driven (indicative of routing loops) will have their NodeTree.multiplyDriven flag set.
-     * @param net Net to analyze.
+     *
+     * @param net    Net to analyze.
      * @param filter A function that when is applied to a node, if it returns true will be excluded from the tree.
      * @return A list of NodeTree objects, corresponding to the root of each subtree.
      */
@@ -209,10 +215,10 @@ public class NetTools {
             if (filter.apply(start)) continue;
             Node end = pip.getEndNode();
             if (filter.apply(end)) continue;
-            
+
             boolean isReversed = pip.isReversed();
             NodeTree startNode = nodeMap.computeIfAbsent(isReversed ? end : start, NodeTree::new);
-            NodeTree endNode = nodeMap.compute(isReversed ? start : end, (k,v) -> {
+            NodeTree endNode = nodeMap.compute(isReversed ? start : end, (k, v) -> {
                 if (v == null) {
                     v = new NodeTree(k);
                 } else {
@@ -224,7 +230,7 @@ public class NetTools {
             startNode.addFanout(endNode);
             if (!pip.isBidirectional()) {
                 if ((net.getType() == NetType.GND && startNode.isTiedToGnd()) ||
-                    (net.getType() == NetType.VCC && startNode.isTiedToVcc())) {
+                        (net.getType() == NetType.VCC && startNode.isTiedToVcc())) {
                     subtrees.add(startNode);
                 }
             }
@@ -241,15 +247,15 @@ public class NetTools {
 
         return subtrees;
     }
-    
+
     /**
      * Checks if the provided net drives a clock site pin input.
-     * 
+     *
      * @param net The net to examine.
      * @return True if the net has a site pin clock input, false otherwise.
      */
     public static boolean hasClockSinks(Net net) {
-        for (SitePinInst sink : net.getPins()) { 
+        for (SitePinInst sink : net.getPins()) {
             if (sink.isOutPin()) continue;
             if (sink.getName().contains("CLK")) return true;
         }
@@ -305,18 +311,18 @@ public class NetTools {
     /**
      * Returns a string representation of the net's routing tree using tree
      * characters (├─, └─).
-     * 
+     *
      * @param net The net to generate the tree of nodes from.
      * @return String representation of the net's routing tree with tree characters.
      */
-    public static String getNetTreeString(Net net) { 
+    public static String getNetTreeString(Net net) {
         return getNetTreeString(net, n -> false);
     }
 
     /**
      * Returns a string representation of the net's routing tree using tree
      * characters (├─, └─).
-     * 
+     *
      * @param net    The net to generate the tree of nodes from.
      * @param filter A function that when returns true for a node, the node should
      *               be excluded.
@@ -329,7 +335,7 @@ public class NetTools {
     /**
      * Returns a string representation of the net's routing tree using tree
      * characters (├─, └─).
-     * 
+     *
      * @param net            The net to generate the tree of nodes from.
      * @param filter         A function that when returns true for a node, the node
      *                       should be excluded.
@@ -338,7 +344,7 @@ public class NetTools {
      * @return String representation of the net's routing tree with tree characters.
      */
     public static String getNetTreeString(Net net, Function<Node, Boolean> filter,
-            Function<Node, String> customToString) {
+                                          Function<Node, String> customToString) {
         List<NodeTree> subtrees = getNodeTrees(net, filter);
         if (subtrees.isEmpty()) {
             return "";
@@ -356,17 +362,159 @@ public class NetTools {
     /**
      * Generates the clock tree up to the horizontal distribution nodes of the
      * provided clock net up to the NODE_PINFEED nodes.
-     * 
+     *
      * @param net The clock net
      * @return A string tree representation from the source of the clock out to all
-     *         horizontal distribution nodes.
+     * horizontal distribution nodes.
      */
     public static String getClockTreeSpine(Net net) {
-        Function<Node,String> customToString = 
-                n -> n.getTileName() + "/" + n.getWireName() 
-                + " (" + n.getIntentCode() + ") CR="
+        Function<Node, String> customToString =
+                n -> n.getTileName() + "/" + n.getWireName()
+                        + " (" + n.getIntentCode() + ") CR="
                         + n.getTile().getClockRegion();
         Function<Node, Boolean> excludeFilter = n -> n.getIntentCode() == IntentCode.NODE_PINFEED;
         return getNetTreeString(net, excludeFilter, customToString);
+    }
+
+    /**
+     * Gets a string representation of the vertical clock routing spine for the given net.
+     * This method is similar to getClockTreeSpine but only includes vertical distribution nodes.
+     * Only the clock root VROUTE node is included; all other VROUTE nodes are filtered out.
+     *
+     * @param net The net to analyze
+     * @return A string tree representation showing only vertical clock routing nodes
+     */
+    public static String getVerticalClockTreeSpine(Net net) {
+        Function<Node, String> customToString =
+                n -> n.getIntentCode() + " CR=" + n.getTile().getClockRegion();
+
+        // Build the full tree without filtering (except PINFEED)
+        Function<Node, Boolean> minimalFilter = n -> n.getIntentCode() == IntentCode.NODE_PINFEED;
+        List<NodeTree> subtrees = getNodeTrees(net, minimalFilter);
+
+        if (subtrees.isEmpty()) {
+            return "";
+        }
+
+        // Find the clock root VROUTE node
+        Node clockRoot = findClockRootVRoute(net);
+
+        // Define the set of nodes we want to display
+        Set<IntentCode> displayIntentCodes = EnumSet.of(
+                IntentCode.NODE_GLOBAL_VDISTR_SHARED,
+                IntentCode.NODE_GLOBAL_VROUTE,
+                IntentCode.NODE_GLOBAL_VDISTR_LVL1,
+                IntentCode.NODE_GLOBAL_VDISTR,
+                IntentCode.NODE_GLOBAL_VDISTR_LVL2,
+                IntentCode.NODE_GLOBAL_VDISTR_LVL21,
+                IntentCode.NODE_GLOBAL_VDISTR_LVL3
+        );
+
+        if (subtrees.size() > 1) {
+            throw new RuntimeException("Clock route might have multiple clock roots");
+        }
+
+        Function<Node, Boolean> includeFilter = n -> {
+            IntentCode intentCode = n.getIntentCode();
+            if (displayIntentCodes.contains(intentCode)) {
+                if (intentCode == IntentCode.NODE_GLOBAL_VROUTE) {
+                    return n.equals(clockRoot);
+                }
+                return true;
+            }
+            return false;
+        };
+
+        StringBuilder sb = new StringBuilder();
+        NodeTree subtree = subtrees.get(0);
+        NodeTree filteredSubtree = buildFilteredTree(subtree, includeFilter);
+        sb.append(filteredSubtree.toTreeString(customToString));
+        return sb.toString();
+    }
+
+    /**
+     * Builds a tree that only includes the nodes that pass the filter while maintaining connectivity.
+     */
+    private static NodeTree buildFilteredTree(NodeTree nodeTree, Function<Node, Boolean> includeFilter) {
+        class WorkItem {
+            final NodeTree original;
+            final NodeTree parentInFilteredTree;
+
+            WorkItem(NodeTree original, NodeTree parentInFilteredTree) {
+                this.original = original;
+                this.parentInFilteredTree = parentInFilteredTree;
+            }
+        }
+
+        NodeTree filteredRoot = nodeTree;
+
+        while (!includeFilter.apply(filteredRoot)) {
+            if (filteredRoot.fanouts.size() != 1) {
+                throw new RuntimeException("Failed to find clock root");
+            }
+            filteredRoot = filteredRoot.fanouts.get(0);
+        }
+
+        List<WorkItem> worklist = new ArrayList<>();
+        NodeTree filteredNodeTree = new NodeTree(filteredRoot);
+
+        for (NodeTree fanout : filteredRoot.fanouts) {
+            worklist.add(new WorkItem(fanout, filteredNodeTree));
+        }
+
+        // Process worklist for the normal case (root passed filter)
+        while (!worklist.isEmpty()) {
+            WorkItem item = worklist.remove(0);
+            NodeTree curr = item.original;
+            NodeTree filteredParent = item.parentInFilteredTree;
+
+            if (includeFilter.apply(curr)) {
+                NodeTree filteredNode = new NodeTree(curr);
+                filteredNode.multiplyDriven = curr.multiplyDriven;
+                filteredParent.addFanout(filteredNode);
+
+                for (NodeTree fanout : curr.fanouts) {
+                    worklist.add(new WorkItem(fanout, filteredNode));
+                }
+            } else {
+                for (NodeTree fanout : curr.fanouts) {
+                    worklist.add(new WorkItem(fanout, filteredParent));
+                }
+            }
+        }
+
+        return filteredNodeTree;
+    }
+
+    /**
+     * Finds the clock root VROUTE node.
+     * The clock root is the deepest (furthest from source) NODE_GLOBAL_VROUTE node in the tree.
+     *
+     * @param net The net to analyze
+     * @return The clock root VROUTE node, or null if none found
+     */
+    public static Node findClockRootVRoute(Net net) {
+        List<NodeTree> subtrees = getNodeTrees(net);
+
+        if (subtrees.size() > 1) {
+            throw new RuntimeException("Clock route potentially has multiple clock roots");
+        }
+
+        // Find the last GLOBAL_VROUTE node before transitioning VDISTR nodes
+        NodeTree curr = subtrees.get(0);
+        NodeTree deepestVRoute = null;
+
+        while (curr.fanouts.size() == 1) {
+            if (curr.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE) {
+                deepestVRoute = curr;
+            }
+            curr = curr.fanouts.get(0);
+        }
+
+        if (curr.getIntentCode() == IntentCode.NODE_GLOBAL_VROUTE) {
+            deepestVRoute = curr;
+        }
+
+        return deepestVRoute;
     }
 }
