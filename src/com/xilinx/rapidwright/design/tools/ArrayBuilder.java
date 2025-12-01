@@ -72,12 +72,14 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.edif.EDIFValueType;
+import com.xilinx.rapidwright.rwroute.PartialCUFR;
 import com.xilinx.rapidwright.rwroute.PartialRouter;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
@@ -120,7 +122,8 @@ public class ArrayBuilder {
     private static final List<String> PLACEMENT_GRID_OPTS = Collections.singletonList("write-placement-grid");
     private static final List<String> OUT_OF_CONTEXT_OPTS = Collections.singletonList("out-of-context");
     private static final List<String> UNROUTE_STATIC_NETS_OPTS = Collections.singletonList("unroute-static-nets");
-    private static final List<String> ROUTE_CLOCK_OPTS = Collections.singletonList("route-clk");
+    private static final List<String> ROUTE_CLOCK_OPTS = Collections.singletonList("route-clock-only");
+    private static final List<String> ROUTE_DESIGN_OPTS = Collections.singletonList("route");
 
     private Design design;
 
@@ -158,6 +161,8 @@ public class ArrayBuilder {
 
     private boolean routeClock;
 
+    private boolean routeDesign;
+
     public static final double DEFAULT_CLK_PERIOD_TARGET = 2.0;
 
     private OptionParser createOptionParser() {
@@ -185,6 +190,7 @@ public class ArrayBuilder {
                 acceptsAll(OUT_OF_CONTEXT_OPTS, "Specifies that the array will be compiled out of context");
                 acceptsAll(UNROUTE_STATIC_NETS_OPTS, "Unroute static (GND/VCC) nets to potentially help with routability");
                 acceptsAll(ROUTE_CLOCK_OPTS, "Route clock using RWRoute");
+                acceptsAll(ROUTE_DESIGN_OPTS, "Route the built array using RWRoute");
                 acceptsAll(HELP_OPTS, "Print this help message").forHelp();
             }
         };
@@ -350,14 +356,23 @@ public class ArrayBuilder {
         this.routeClock = routeClock;
     }
 
+    public boolean isRouteDesign() {
+        return routeDesign;
+    }
+
+    public void setRouteDesign(boolean routeDesign) {
+        this.routeDesign = routeDesign;
+    }
+
     private void initializeArrayBuilder(OptionSet options) {
-        Path inputFile = null;
+        Path inputFile;
 
         setSkipImpl(options.has(SKIP_IMPL_OPTS.get(0)));
         setOutOfContext(options.has(OUT_OF_CONTEXT_OPTS.get(0)));
         setExactPlacement(options.has(EXACT_PLACEMENT_OPTS.get(0)));
         setUnrouteStaticNets(options.has(UNROUTE_STATIC_NETS_OPTS.get(0)));
         setRouteClock(options.has(ROUTE_CLOCK_OPTS.get(0)));
+        setRouteDesign(options.has(ROUTE_DESIGN_OPTS.get(0)));
 
         if (options.has(KERNEL_DESIGN_OPTS.get(0))) {
             inputFile = Paths.get((String) options.valueOf(KERNEL_DESIGN_OPTS.get(0)));
@@ -952,15 +967,22 @@ public class ArrayBuilder {
             InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsNearPins(array, ab.getTopClockName(), pBlock);
         }
 
-        if (ab.isRouteClock()) {
+        if (ab.isRouteClock() && !ab.isRouteDesign()) {
             t.stop().start("Route clock");
             Net clockNet = array.getNet(ab.getTopClockName());
-            DesignTools.makePhysNetNamesConsistent(array);
+            DesignTools.makePhysNetNameConsistent(array, clockNet);
             DesignTools.createPossiblePinsToStaticNets(array);
             DesignTools.createMissingSitePinInsts(array, clockNet);
             List<SitePinInst> pinsToRoute = clockNet.getPins();
 
             PartialRouter.routeDesignPartialNonTimingDriven(array, pinsToRoute);
+        } else if (ab.isRouteDesign()) {
+            t.stop().start("Route design");
+            PartialCUFR.routeDesignWithUserDefinedArguments(array, new String[]{
+                    "--fixBoundingBox",
+                    "--useUTurnNodes",
+                    "--nonTimingDriven",
+            });
         }
 
         t.stop().start("Write DCP");
