@@ -28,6 +28,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.blocks.PBlock;
+import com.xilinx.rapidwright.design.xdc.ConstraintTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.SLR;
 import com.xilinx.rapidwright.device.Site;
@@ -35,16 +36,18 @@ import com.xilinx.rapidwright.eco.ECOPlacementHelper;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
-import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.Pair;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 
 public class TestInlineFlopTools {
@@ -85,6 +88,7 @@ public class TestInlineFlopTools {
             si.routeSite();
         }
     }
+
     @ParameterizedTest
     @CsvSource({
             "xcv80-lsva4737-2MHP-e-S,SLICE_X96Y803/AFF,AFF,IRI_QUAD_X58Y3212:IRI_QUAD_X59Y3275 DSP_X0Y398:DSP_X1Y405 DSP58_CPLX_X0Y398:DSP58_CPLX_X0Y405 SLICE_X92Y796:SLICE_X99Y811",
@@ -128,7 +132,7 @@ public class TestInlineFlopTools {
             "xc7a200tsbg484-1,SLICE_X60Y124/AFF,DFF,RAMB36_X3Y22:RAMB36_X3Y27 RAMB18_X3Y44:RAMB18_X3Y55 DSP48_X2Y44:DSP48_X3Y55 SLICE_X46Y110:SLICE_X67Y139",
             "xc7a200tsbg484-1,SLICE_X60Y124/AFF,D5FF,RAMB36_X3Y22:RAMB36_X3Y27 RAMB18_X3Y44:RAMB18_X3Y55 DSP48_X2Y44:DSP48_X3Y55 SLICE_X46Y110:SLICE_X67Y139",
     })
-//    @Test
+
     public void testRemoveInlineFlops(String partName, String ffBel, String harnessBel, String pblockRange) {
         Design design = new Design("inline_flops", partName);
         design.setDesignOutOfContext(true);
@@ -136,24 +140,21 @@ public class TestInlineFlopTools {
         EDIFCell topCell = design.getNetlist().getTopCell();
         // Create clock port and net
         EDIFPort clkPort = topCell.createPort("clk", EDIFDirection.INPUT, 1);
-        EDIFNet clkNet = topCell.createNet("clk");
-        clkNet.createPortInst(clkPort);
-        EDIFHierNet logicalClkNet = new EDIFHierNet(design.getNetlist().getTopHierCellInst(), clkPort.getInternalNet());
-        Net clk = design.createNet(logicalClkNet);
+        Net clk = design.createNet("clk");
+        EDIFHierNet logicalClkNet = clk.getLogicalHierNet();
+        logicalClkNet.getNet().createPortInst(clkPort);
 
         // Create in port and net
         EDIFPort inPort = topCell.createPort("in", EDIFDirection.INPUT, 1);
-        EDIFNet logicalInNet = topCell.createNet("in");
-        logicalInNet.createPortInst(inPort);
-        EDIFHierNet hierInNet = new EDIFHierNet(design.getNetlist().getTopHierCellInst(), inPort.getInternalNet());
-        Net inNet = design.createNet(hierInNet);
+        Net inNet = design.createNet("in");
+        EDIFHierNet logicalInNet = inNet.getLogicalHierNet();
+        logicalInNet.getNet().createPortInst(inPort);
 
         // Create out port and net
         EDIFPort outPort = topCell.createPort("out", EDIFDirection.OUTPUT, 1);
-        EDIFNet logicalOutNet = topCell.createNet("out");
-        logicalOutNet.createPortInst(outPort);
-        EDIFHierNet hierOutNet = new EDIFHierNet(design.getNetlist().getTopHierCellInst(), outPort.getInternalNet());
-        Net outNet = design.createNet(hierOutNet);
+        Net outNet = design.createNet("out");
+        EDIFHierNet logicalOutNet = outNet.getLogicalHierNet();
+        logicalOutNet.getNet().createPortInst(outPort);
 
         Cell flop0 = design.createAndPlaceCell(design.getTopEDIFCell(), "flop0",
                 Unisim.FDRE, ffBel);
@@ -172,5 +173,42 @@ public class TestInlineFlopTools {
             Assertions.assertFalse(c.getName().endsWith(InlineFlopTools.INLINE_SUFFIX));
         }
         Assertions.assertEquals(1, design.getVccNet().getSinkPins().size());
+    }
+
+    @Test
+    public void testArbitraryInlineFlopPlacement() {
+        Design design = RapidWrightDCP.loadDCP("PicoBlazeArray/pblock0.dcp");
+        Map<String, PBlock> pblocks = ConstraintTools.getPBlocksFromXDC(design);
+        PBlock pblock = pblocks.get("pe_pblock_1");
+        design.unrouteDesign();
+        design.unplaceDesign();
+        InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsArbitrarily(design, "clk", pblock);
+        int count = 0;
+        for (Cell c : design.getCells()) {
+            if (c.isPlaced()) {
+                count++;
+                Assertions.assertTrue(c.getName().contains(InlineFlopTools.INLINE_SUFFIX));
+                Assertions.assertFalse(c.getName().contains("clk"));
+            }
+        }
+        Assertions.assertEquals(65, count);
+    }
+
+    @Test
+    public void testCentroidInlineFlopPlacement() {
+        Design design = RapidWrightDCP.loadDCP("PicoBlazeArray/pblock0.dcp");
+        Map<String, PBlock> pblocks = ConstraintTools.getPBlocksFromXDC(design);
+        PBlock pblock = pblocks.get("pe_pblock_1");
+        InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsNearPins(design, "clk", pblock);
+        int count = 0;
+        for (Cell c : design.getCells()) {
+            if (c.isPlaced()) {
+                if (c.getName().contains(InlineFlopTools.INLINE_SUFFIX)) {
+                    count++;
+                    Assertions.assertFalse(c.getName().contains("clk"));
+                }
+            }
+        }
+        Assertions.assertEquals(65, count);
     }
 }

@@ -22,7 +22,14 @@
 
 package com.xilinx.rapidwright.design.tools;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.Map.Entry;
 
@@ -74,7 +81,7 @@ public class InlineFlopTools {
      * immediately following this modification.
      *
      * @param design  The design to modify
-     * @param clkNet  Name of the clock net to use on which to add the flops
+     * @param clkNet  Name of the clock net to use for the flops
      * @param keepOut The pblock used to contain the kernel and the added flops will
      *                not be placed inside this area.
      */
@@ -91,7 +98,7 @@ public class InlineFlopTools {
      * placed and potentially partially routed.
      *
      * @param design  The design to modify
-     * @param clkNet  Name of the clock net to use on which to add the flops
+     * @param clkNet  Name of the clock net to use for the flops
      * @param keepOut The pblock used to contain the kernel and the added flops will
      *                not be placed inside this area.
      */
@@ -141,7 +148,7 @@ public class InlineFlopTools {
      * placed/relocated in context.
      *
      * @param design      The design to modify
-     * @param clkNet      Name of the clock net to use on which to add the flops
+     * @param clkNet      Name of the clock net to use for the flops
      * @param keepOut     The pblock used to contain the kernel and the added flops will
      *                    not be placed inside this area.
      * @param portSideMap Map from ports to side of the pblock the flop should be placed on
@@ -192,7 +199,7 @@ public class InlineFlopTools {
      * placed/relocated in context.
      *
      * @param design            The design to modify
-     * @param clkNet            Name of the clock net to use on which to add the flops
+     * @param clkNet            Name of the clock net to use for the flops
      * @param keepOut           The pblock used to contain the kernel and the added flops will
      *                          not be placed inside this area.
      * @param centroidPlacement Places flip-flops based on the centroid of the top-level net pins. Should only be
@@ -200,7 +207,6 @@ public class InlineFlopTools {
      */
     private static void createAndPlaceFlopsInlineOnTopPorts(Design design, String clkNet, PBlock keepOut,
                                                             boolean centroidPlacement) {
-//        assert (design.getSiteInsts().isEmpty());
         EDIFCell top = design.getTopEDIFCell();
         Site start = keepOut.getAllSites("SLICE").iterator().next(); // TODO this is a bit wasteful
         boolean exclude = true;
@@ -363,6 +369,17 @@ public class InlineFlopTools {
         return null;
     }
 
+    /**
+     * Add flip-flop inline on the specified top-level port of an out-of-context design.
+     * This is useful for out-of-context kernels so that after the flop has been
+     * placed, the router is forced to route connections of the port to the flop.
+     * This can help alleviate congestion when the kernels are placed/relocated in context.
+     *
+     * @param design            The design to modify
+     * @param portInst          The port to place an inline flip-flop on
+     * @param loc               A pair of the site and BEL to place the flip-flop at
+     * @param clk               The clock net to use for the inline flip-flop
+     */
     public static Cell createAndPlaceFlopInlineOnTopPortInst(Design design, EDIFPortInst portInst, Pair<Site, BEL> loc,
                                                              EDIFHierNet clk) {
         String name = portInst.getFullName() + INLINE_SUFFIX;
@@ -409,16 +426,7 @@ public class InlineFlopTools {
         Net vcc = design.getVccNet();
         Set<SitePinInst> vccPins = new HashSet<>();
         pinsToRemove.put(vcc, vccPins);
-        String[] versalStaticPins = new String[]{"CKEN1", "CKEN2", "CKEN3", "CKEN4", "RST"};
-        String[] ultrascaleStaticPins = new String[]{"CKEN1", "CKEN2", "CKEN3", "CKEN4", "SRST1", "SRST2"};
-        String[] series7StaticPins = new String[]{"CE", "SR"};
-        if (design.getSeries() != Series.Versal && design.getSeries() != Series.UltraScale
-                && design.getSeries() != Series.UltraScalePlus && design.getSeries() != Series.Series7) {
-            throw new RuntimeException("Unsupported device series for removing inline flops");
-        }
-        String[] staticPins = design.getSeries() == Series.Versal ? versalStaticPins :
-                              design.getSeries() == Series.UltraScalePlus
-                              || design.getSeries() == Series.UltraScale ? ultrascaleStaticPins : series7StaticPins;
+        String[] staticPins = getStaticPins(design);
         for (EDIFCellInst inst : design.getTopEDIFCell().getCellInsts()) {
             if (inst.getName().endsWith(INLINE_SUFFIX)) {
                 Cell flop = design.getCell(inst.getName());
@@ -492,6 +500,19 @@ public class InlineFlopTools {
                 design.removeSiteInst(si);
             }
         }
+    }
+
+    private static String[] getStaticPins(Design design) {
+        String[] versalStaticPins = new String[]{"CKEN1", "CKEN2", "CKEN3", "CKEN4", "RST"};
+        String[] ultrascaleStaticPins = new String[]{"CKEN1", "CKEN2", "CKEN3", "CKEN4", "SRST1", "SRST2"};
+        String[] series7StaticPins = new String[]{"CE", "SR"};
+        if (design.getSeries() != Series.Versal && design.getSeries() != Series.UltraScale
+                && design.getSeries() != Series.UltraScalePlus && design.getSeries() != Series.Series7) {
+            throw new RuntimeException("Unsupported device series for removing inline flops");
+        }
+        return design.getSeries() == Series.Versal ? versalStaticPins :
+                              design.getSeries() == Series.UltraScalePlus
+                              || design.getSeries() == Series.UltraScale ? ultrascaleStaticPins : series7StaticPins;
     }
 
     /**
