@@ -58,7 +58,7 @@ public class TestNetTools {
      *      picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp    The source cell bufgce_inst of this design is not placed yet.
      *      picoblaze_ooc_X10Y235_unreadable_edif.dcp       This design would call vivado to generate an readable EDIF file.
      *
-     * @param pathAndlobalClockNames Use ' ' as the delimiter to split this string, where the first element is the path to the DCP file,
+     * @param pathAndGlobalClockNames Use ' ' as the delimiter to split this string, where the first element is the path to the DCP file,
      *                               and the remaining elements are the names of the global clock nets reported by Vivado.
      */
     @ParameterizedTest
@@ -101,8 +101,8 @@ public class TestNetTools {
             // "routethru_luts.dcp",
             // "routethru_pip.dcp",
     })
-    public void testisGlobalClock(String pathAndlobalClockNames) {
-        String[] tmpList = pathAndlobalClockNames.split(" ");
+    public void testisGlobalClock(String pathAndGlobalClockNames) {
+        String[] tmpList = pathAndGlobalClockNames.split(" ");
         String path = tmpList[0];
         HashSet<String> globalClockNamesFromVivado = new HashSet<>();
         for (int i = 1; i < tmpList.length; i++) {
