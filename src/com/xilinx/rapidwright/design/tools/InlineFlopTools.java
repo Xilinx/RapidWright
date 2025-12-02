@@ -502,17 +502,21 @@ public class InlineFlopTools {
         }
     }
 
+    private static final Map<Series,String[]> staticPinsMap;
+    static {
+        staticPinsMap = new HashMap<>();
+        staticPinsMap.put(Series.Series7, new String[]{"CE", "SR"});
+        staticPinsMap.put(Series.UltraScale, new String[]{"CKEN1", "CKEN2", "CKEN3", "CKEN4", "SRST1", "SRST2"});
+        staticPinsMap.put(Series.UltraScalePlus, staticPinsMap.get(Series.UltraScale));
+        staticPinsMap.put(Series.Versal, new String[]{"CKEN1", "CKEN2", "CKEN3", "CKEN4", "RST"});
+    }
+
     private static String[] getStaticPins(Design design) {
-        String[] versalStaticPins = new String[]{"CKEN1", "CKEN2", "CKEN3", "CKEN4", "RST"};
-        String[] ultrascaleStaticPins = new String[]{"CKEN1", "CKEN2", "CKEN3", "CKEN4", "SRST1", "SRST2"};
-        String[] series7StaticPins = new String[]{"CE", "SR"};
-        if (design.getSeries() != Series.Versal && design.getSeries() != Series.UltraScale
-                && design.getSeries() != Series.UltraScalePlus && design.getSeries() != Series.Series7) {
+        String[] staticPins = staticPinsMap.get(design.getSeries());
+        if (staticPins == null) {
             throw new RuntimeException("Unsupported device series for removing inline flops");
         }
-        return design.getSeries() == Series.Versal ? versalStaticPins :
-                              design.getSeries() == Series.UltraScalePlus
-                              || design.getSeries() == Series.UltraScale ? ultrascaleStaticPins : series7StaticPins;
+        return staticPins;
     }
 
     /**
