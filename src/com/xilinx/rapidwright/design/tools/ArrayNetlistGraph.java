@@ -32,9 +32,12 @@ import com.google.ortools.sat.LinearExpr;
 import com.google.ortools.sat.LinearExprBuilder;
 import com.google.ortools.sat.Literal;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.blocks.PBlockSide;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.util.Pair;
+import jnr.ffi.annotations.In;
 import org.jgrapht.Graph;
 import org.jgrapht.GraphPath;
 import org.jgrapht.alg.cycle.CycleDetector;
@@ -45,7 +48,6 @@ import org.jgrapht.traverse.TopologicalOrderIterator;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -54,13 +56,50 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 public class ArrayNetlistGraph {
-    Graph<String, DefaultEdge> graph;
+    private static class NetlistEdge extends DefaultEdge {
+        private final PBlockSide direction;
+
+        NetlistEdge(PBlockSide direction) {
+            this.direction = direction;
+        }
+
+        public boolean noDirectionSpecified() {
+            return direction == null;
+        }
+
+        public boolean isRight() {
+            return direction == PBlockSide.RIGHT;
+        }
+
+        public boolean isLeft() {
+            return direction == PBlockSide.LEFT;
+        }
+
+        public boolean isBelow() {
+            return direction == PBlockSide.BOTTOM;
+        }
+
+        public boolean isAbove() {
+            return direction == PBlockSide.TOP;
+        }
+
+        @Override
+        public String toString() {
+            return "(" + getSource() + " : " + getTarget() + ", " + this.direction + ")";
+        }
+    }
+    private Graph<String, NetlistEdge> graph;
+    private Map<Pair<String, String>, Boolean> directionMap;
 
     public ArrayNetlistGraph() {
-        graph = new DefaultDirectedGraph<>(DefaultEdge.class);
+        graph = new DefaultDirectedGraph<>(NetlistEdge.class);
     }
 
     public ArrayNetlistGraph(Design array, List<String> modules) {
+        this(array, modules, null);
+    }
+
+    public ArrayNetlistGraph(Design array, List<String> modules, Map<EDIFPort, PBlockSide> sideMap) {
         this();
         EDIFHierCellInst top = array.getNetlist().getTopHierCellInst();
         for (String module : modules) {
@@ -75,8 +114,11 @@ public class ArrayNetlistGraph {
                         if (!netPortInst.equals(portInst) && netPortInst.getCellType() != null) {
                             EDIFHierCellInst destCellInst = netPortInst.getFullHierarchicalInst();
                             if (destCellInst != null && containsNode(destCellInst.getFullHierarchicalInstName())) {
+                                PBlockSide pBlockSide = sideMap.get(portInst.getPortInst().getPort());
+
                                 addEdge(cellInst.getFullHierarchicalInstName(),
-                                        destCellInst.getFullHierarchicalInstName());
+                                        destCellInst.getFullHierarchicalInstName(),
+                                        pBlockSide);
                             }
                         }
                     }
@@ -93,12 +135,12 @@ public class ArrayNetlistGraph {
         return graph.containsVertex(name);
     }
 
-    public void addEdge(String from, String to) {
-        graph.addEdge(from, to);
+    public void addEdge(String from, String to, PBlockSide direction) {
+        graph.addEdge(from, to, new NetlistEdge(direction));
     }
 
     public boolean isAcyclic() {
-        CycleDetector<String, DefaultEdge> cycleDetector = new CycleDetector<>(graph);
+        CycleDetector<String, NetlistEdge> cycleDetector = new CycleDetector<>(graph);
         return !cycleDetector.detectCycles();
     }
 
@@ -111,32 +153,41 @@ public class ArrayNetlistGraph {
         Map<String, Pair<Integer, Integer>> reversePlacementMap = new HashMap<>();
         Map<String, Integer> candidateMap = new HashMap<>();
         Iterator<String> iterator = getTopologicalOrderIterator();
-        DijkstraShortestPath<String, DefaultEdge> dsp = new DijkstraShortestPath<>(graph);
+        DijkstraShortestPath<String, NetlistEdge> dsp = new DijkstraShortestPath<>(graph);
         String topLeftNode = iterator.next();
         placementMap.put(new Pair<>(0, 0), topLeftNode);
         reversePlacementMap.put(topLeftNode, new Pair<>(0, 0));
-        for (DefaultEdge edge : graph.outgoingEdgesOf(topLeftNode)) {
+        for (NetlistEdge edge : graph.outgoingEdgesOf(topLeftNode)) {
             String node = graph.getEdgeTarget(edge);
             candidateMap.put(node, 1);
         }
-        // TODO: Generalize
-        String extraConstraintNode = "u_systolic_array/x[1].y[0].u_tile";
-        candidateMap.remove(extraConstraintNode);
-        placementMap.put(new Pair<>(1, 0), extraConstraintNode);
-        reversePlacementMap.put(extraConstraintNode, new Pair<>(1, 0));
-        for (DefaultEdge edge : graph.outgoingEdgesOf(extraConstraintNode)) {
-            String targetNode = graph.getEdgeTarget(edge);
-            int count = candidateMap.computeIfAbsent(targetNode, (n) -> 0);
-            candidateMap.put(targetNode, count + 1);
+
+        NetlistEdge extraConstraintEdge = graph.outgoingEdgesOf(topLeftNode).iterator().next();
+        if (extraConstraintEdge.isRight() || extraConstraintEdge.isBelow()) {
+            // Add additional constraint based on the sideMap
+            String extraConstraintNode = graph.getEdgeTarget(extraConstraintEdge);
+            candidateMap.remove(extraConstraintNode);
+            Pair<Integer, Integer> extraConstraintPlacement;
+            if (extraConstraintEdge.isRight()) {
+                extraConstraintPlacement = new Pair<>(1, 0);
+            } else {
+                extraConstraintPlacement = new Pair<>(0, 1);
+            }
+            placementMap.put(extraConstraintPlacement, extraConstraintNode);
+            reversePlacementMap.put(extraConstraintNode, extraConstraintPlacement);
+            for (NetlistEdge edge : graph.outgoingEdgesOf(extraConstraintNode)) {
+                String targetNode = graph.getEdgeTarget(edge);
+                int count = candidateMap.computeIfAbsent(targetNode, (n) -> 0);
+                candidateMap.put(targetNode, count + 1);
+            }
         }
-        // END TODO
         while (!candidateMap.isEmpty()) {
             List<String> sortedCandidates = candidateMap.entrySet().stream()
                     .sorted((e1, e2) -> {
                       if (e1.getValue() == e2.getValue()) {
                           // Tie-break of shorted path distance
-                          GraphPath<String, DefaultEdge> shortestPathE1 = dsp.getPath(topLeftNode, e1.getKey());
-                          GraphPath<String, DefaultEdge> shortestPathE2 = dsp.getPath(topLeftNode, e2.getKey());
+                          GraphPath<String, NetlistEdge> shortestPathE1 = dsp.getPath(topLeftNode, e1.getKey());
+                          GraphPath<String, NetlistEdge> shortestPathE2 = dsp.getPath(topLeftNode, e2.getKey());
                           return shortestPathE1.getLength() - shortestPathE2.getLength();
                       }
                       return e2.getValue().compareTo(e1.getValue());
@@ -144,14 +195,14 @@ public class ArrayNetlistGraph {
                     .map(Map.Entry::getKey).collect(Collectors.toList());
             String node = sortedCandidates.get(0);
             candidateMap.remove(node);
-            for (DefaultEdge edge : graph.outgoingEdgesOf(node)) {
+            for (NetlistEdge edge : graph.outgoingEdgesOf(node)) {
                 String targetNode = graph.getEdgeTarget(edge);
                 int count = candidateMap.computeIfAbsent(targetNode, (n) -> 0);
                 candidateMap.put(targetNode, count + 1);
             }
-            Set<DefaultEdge> inEdges = graph.incomingEdgesOf(node);
+            Set<NetlistEdge> inEdges = graph.incomingEdgesOf(node);
             List<String> inNeighbors = new ArrayList<>();
-            for (DefaultEdge e : inEdges) {
+            for (NetlistEdge e : inEdges) {
                 inNeighbors.add(graph.getEdgeSource(e));
             }
             if (inNeighbors.size() > 3) {
@@ -270,9 +321,9 @@ public class ArrayNetlistGraph {
         List<IntVar> xDistVars = new ArrayList<>();
         List<IntVar> yDistVars = new ArrayList<>();
         for (String v : graph.vertexSet()) {
-            Set<DefaultEdge> outEdges = graph.outgoingEdgesOf(v);
+            Set<NetlistEdge> outEdges = graph.outgoingEdgesOf(v);
             int sourceNum = nameToNumMap.get(v);
-            for (DefaultEdge e : outEdges) {
+            for (NetlistEdge e : outEdges) {
                 String edgeTarget = graph.getEdgeTarget(e);
                 int targetNum = nameToNumMap.get(edgeTarget);
 
@@ -314,8 +365,8 @@ public class ArrayNetlistGraph {
                 LinearExprBuilder xDistPlusYDist = LinearExpr.newBuilder();
                 xDistPlusYDist.addSum(new IntVar[]{xDistVar, yDistVar});
                 model.addLessOrEqual(xDistPlusYDist, 1);
-//                model.addLessOrEqual(xDistVar, 3);
-//                model.addLessOrEqual(yDistVar, 3);
+                model.addLessOrEqual(xDistVar, 3);
+                model.addLessOrEqual(yDistVar, 3);
             }
         }
 
@@ -323,6 +374,18 @@ public class ArrayNetlistGraph {
         String anchor = getTopologicalOrderIterator().next();
         int anchorNum = nameToNumMap.get(anchor);
         model.addAssumption(placements[anchorNum][0][0]);
+
+        NetlistEdge extraConstraintEdge = graph.outgoingEdgesOf(anchor).iterator().next();
+        if (extraConstraintEdge.isRight() || extraConstraintEdge.isBelow()) {
+            // Add additional constraint based on the sideMap
+            String extraConstraintNode = graph.getEdgeTarget(extraConstraintEdge);
+            int extraConstraintNum = nameToNumMap.get(extraConstraintNode);
+            if (extraConstraintEdge.isRight()) {
+                model.addAssumption(placements[extraConstraintNum][1][0]);
+            } else {
+                model.addAssumption(placements[extraConstraintNum][0][1]);
+            }
+        }
 
         IntVar maxXDistVar = model.newIntVar(0, width, "max_x_dist");
         for (IntVar xDistVar : xDistVars) {
@@ -337,18 +400,7 @@ public class ArrayNetlistGraph {
         obj.add(maxYDistVar);
         model.minimize(obj);
 
-        // Add objective to minimize manhattan distance
-//        LinearExprBuilder obj = LinearExpr.newBuilder();
-//        for (IntVar xDistVar : xDistVars) {
-//            obj.addTerm(xDistVar, 1);
-//        }
-//        for (IntVar yDistVar : yDistVars) {
-//            obj.add(yDistVar);
-//        }
-//        model.minimize(obj);
-
         CpSolver solver = new CpSolver();
-//        solver.getParameters().setMaxTimeInSeconds(10.0);
         CpSolverStatus status = solver.solve(model);
 
         if (status == CpSolverStatus.FEASIBLE || status == CpSolverStatus.OPTIMAL) {

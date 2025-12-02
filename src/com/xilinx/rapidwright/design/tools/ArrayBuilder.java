@@ -59,6 +59,7 @@ import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockGenerator;
 import com.xilinx.rapidwright.design.blocks.PBlockRange;
+import com.xilinx.rapidwright.design.blocks.PBlockSide;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
@@ -124,6 +125,7 @@ public class ArrayBuilder {
     private static final List<String> UNROUTE_STATIC_NETS_OPTS = Collections.singletonList("unroute-static-nets");
     private static final List<String> ROUTE_CLOCK_OPTS = Collections.singletonList("route-clock-only");
     private static final List<String> ROUTE_DESIGN_OPTS = Collections.singletonList("route");
+    private static final List<String> SIDE_MAP_OPTS = Collections.singletonList("kernel-side-map");
 
     private Design design;
 
@@ -163,6 +165,8 @@ public class ArrayBuilder {
 
     private boolean routeDesign;
 
+    private String sideMapFile;
+
     public static final double DEFAULT_CLK_PERIOD_TARGET = 2.0;
 
     private OptionParser createOptionParser() {
@@ -191,6 +195,8 @@ public class ArrayBuilder {
                 acceptsAll(UNROUTE_STATIC_NETS_OPTS, "Unroute static (GND/VCC) nets to potentially help with routability");
                 acceptsAll(ROUTE_CLOCK_OPTS, "Route clock using RWRoute");
                 acceptsAll(ROUTE_DESIGN_OPTS, "Route the built array using RWRoute");
+                acceptsAll(SIDE_MAP_OPTS, "Provide a text file specifying which side of the pblock each " +
+                        "top-level port routes to. Used to place array optimally for routability.").withRequiredArg();
                 acceptsAll(HELP_OPTS, "Print this help message").forHelp();
             }
         };
@@ -364,6 +370,14 @@ public class ArrayBuilder {
         this.routeDesign = routeDesign;
     }
 
+    public String getSideMapFile() {
+        return sideMapFile;
+    }
+
+    public void setSideMapFile(String sideMapFile) {
+        this.sideMapFile = sideMapFile;
+    }
+
     private void initializeArrayBuilder(OptionSet options) {
         Path inputFile;
 
@@ -373,6 +387,7 @@ public class ArrayBuilder {
         setUnrouteStaticNets(options.has(UNROUTE_STATIC_NETS_OPTS.get(0)));
         setRouteClock(options.has(ROUTE_CLOCK_OPTS.get(0)));
         setRouteDesign(options.has(ROUTE_DESIGN_OPTS.get(0)));
+        setSideMapFile((String) options.valueOf(SIDE_MAP_OPTS.get(0)));
 
         if (options.has(KERNEL_DESIGN_OPTS.get(0))) {
             inputFile = Paths.get((String) options.valueOf(KERNEL_DESIGN_OPTS.get(0)));
@@ -747,16 +762,13 @@ public class ArrayBuilder {
                 throw new RuntimeException("Failed to find module instances in top design that match kernel interface");
             }
             ab.setInstCountLimit(modInstNames.size());
-            ab.setCondensedGraph(new ArrayNetlistGraph(array, modInstNames));
+            Map<EDIFPort, PBlockSide> sideMap = null;
+            if (ab.getSideMapFile() != null) {
+                sideMap = InlineFlopTools.parseSideMap(ab.getKernelDesign().getNetlist(), ab.getSideMapFile());
+            }
+            ab.setCondensedGraph(new ArrayNetlistGraph(array, modInstNames, sideMap));
             Map<Pair<Integer, Integer>, String> idealPlacement =
                     ab.getCondensedGraph().getGreedyPlacementGrid();
-//            Map<Integer, Integer> foldingMap = new HashMap<>();
-//            foldingMap.put(17, 21);
-//            foldingMap.put(18, 20);
-//            foldingMap.put(20, 18);
-//            foldingMap.put(21, 17);
-//            idealPlacement = foldIdealPlacement(idealPlacement, foldingMap);
-//                    ab.getCondensedGraph().getOptimalPlacementGrid(ab.getInstCountLimit(), ab.getInstCountLimit());
             idealPlacementList = idealPlacement.entrySet().stream()
                     .map((e) -> new Pair<>(e.getKey(), e.getValue()))
                     .sorted((p1, p2) -> {
@@ -858,7 +870,7 @@ public class ArrayBuilder {
                 if (ab.isExactPlacement() || (noOverlap && !boundingBoxStraddlesClockRegion(newBoundingBox))) {
                     if (curr.place(anchor, true, false)) {
                         if (ab.isExactPlacement() && (straddlesClockRegion(curr)
-                            || !NetTools.getNetsWithOverlappingNodes(array).isEmpty())
+                                || !NetTools.getNetsWithOverlappingNodes(array).isEmpty())
                         ) {
                             curr.unplace();
                         } else {
