@@ -36,7 +36,6 @@ import com.xilinx.rapidwright.eco.ECOPlacementHelper;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
-import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
@@ -48,7 +47,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -134,6 +132,7 @@ public class TestInlineFlopTools {
             "xc7a200tsbg484-1,SLICE_X60Y124/AFF,DFF,RAMB36_X3Y22:RAMB36_X3Y27 RAMB18_X3Y44:RAMB18_X3Y55 DSP48_X2Y44:DSP48_X3Y55 SLICE_X46Y110:SLICE_X67Y139",
             "xc7a200tsbg484-1,SLICE_X60Y124/AFF,D5FF,RAMB36_X3Y22:RAMB36_X3Y27 RAMB18_X3Y44:RAMB18_X3Y55 DSP48_X2Y44:DSP48_X3Y55 SLICE_X46Y110:SLICE_X67Y139",
     })
+
     public void testRemoveInlineFlops(String partName, String ffBel, String harnessBel, String pblockRange) {
         Design design = new Design("inline_flops", partName);
         design.setDesignOutOfContext(true);
@@ -212,5 +211,4 @@ public class TestInlineFlopTools {
         }
         Assertions.assertEquals(65, count);
     }
-
 }
