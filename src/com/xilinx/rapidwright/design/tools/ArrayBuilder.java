@@ -102,113 +102,33 @@ import static com.xilinx.rapidwright.util.Utils.isSLICE;
  */
 public class ArrayBuilder {
 
-    private static final List<String> KERNEL_DESIGN_OPTS = Arrays.asList("i", "input");
-    private static final List<String> OUTPUT_DESIGN_OPTS = Arrays.asList("o", "output");
-    private static final List<String> INPUT_EDIF_OPTS = Arrays.asList("e", "edif");
-    private static final List<String> UTILIZATION_OPTS = Arrays.asList("u", "utilization");
-    private static final List<String> SHAPES_OPTS = Arrays.asList("s", "shapes");
-    private static final List<String> PART_OPTS = Arrays.asList("p", "part");
-    private static final List<String> PBLOCK_OPTS = Arrays.asList("b", "pblock");
-    private static final List<String> HELP_OPTS = Arrays.asList("?", "h", "help");
-    private static final List<String> TARGET_CLK_PERIOD_OPTS = Arrays.asList("c", "clk-period");
-    private static final List<String> KERNEL_CLK_NAME_OPTS = Arrays.asList("n", "kernel-clk-name");
-    private static final List<String> TOP_CLK_NAME_OPTS = Arrays.asList("m", "top-clk-name");
-    private static final List<String> REUSE_RESULTS_OPTS = Arrays.asList("r", "reuse");
-    private static final List<String> SKIP_IMPL_OPTS = Arrays.asList("k", "skip-impl");
-    private static final List<String> LIMIT_INSTS_OPTS = Arrays.asList("l", "limit-inst-count");
-    private static final List<String> TOP_LEVEL_DESIGN_OPTS = Arrays.asList("t", "top-design");
-    private static final List<String> EXACT_PLACEMENT_OPTS = Collections.singletonList("exact-placement");
-    private static final List<String> WRITE_PLACEMENT_OPTS = Collections.singletonList("write-placement");
-    private static final List<String> PLACEMENT_FILE_OPTS = Collections.singletonList("read-placement");
-    private static final List<String> PLACEMENT_GRID_OPTS = Collections.singletonList("write-placement-grid");
-    private static final List<String> OUT_OF_CONTEXT_OPTS = Collections.singletonList("out-of-context");
-    private static final List<String> UNROUTE_STATIC_NETS_OPTS = Collections.singletonList("unroute-static-nets");
-    private static final List<String> ROUTE_CLOCK_OPTS = Collections.singletonList("route-clock-only");
-    private static final List<String> ROUTE_DESIGN_OPTS = Collections.singletonList("route");
-    private static final List<String> SIDE_MAP_OPTS = Collections.singletonList("kernel-side-map");
-
-    private Design design;
+    private Design kernelDesign;
 
     private Design topDesign;
 
+    private String kernelClockName;
+
+    private String topClockName;
+
     private List<PBlock> pblocks;
-
-    private double clkPeriod;
-
-    private String kernelClkName;
-
-    private String topClkName;
-
-    private boolean skipImpl;
-
-    private String outputName;
 
     private CodePerfTracker t;
 
-    private int instCountLimit = Integer.MAX_VALUE;
-
-    private String outputPlacementFileName;
-
-    private String inputPlacementFileName;
-
-    private String outputPlacementLocsFileName;
-
-    private boolean outOfContext;
-
     private ArrayNetlistGraph condensedGraph;
 
-    private boolean exactPlacement;
+    private Map<ModuleInst, Site> newPlacementMap;
 
-    private boolean unrouteStaticNets;
+    private List<Module> modules;
 
-    private boolean routeClock;
+    private final ArrayBuilderConfig config;
 
-    private boolean routeDesign;
-
-    private String sideMapFile;
-
-    public static final double DEFAULT_CLK_PERIOD_TARGET = 2.0;
-
-    private OptionParser createOptionParser() {
-
-        OptionParser p = new OptionParser() {
-            {
-                acceptsAll(KERNEL_DESIGN_OPTS, "Input Kernel Design (*.dcp or *.edf)").withRequiredArg();
-                acceptsAll(OUTPUT_DESIGN_OPTS, "Output Array Design (default is 'array.dcp')").withRequiredArg();
-                acceptsAll(PBLOCK_OPTS, "PBlock Constraint(s), separated with ';'").withRequiredArg();
-                acceptsAll(INPUT_EDIF_OPTS, "Companion EDIF for DCP  (*.edf)").withRequiredArg();
-                acceptsAll(UTILIZATION_OPTS, "Vivado Generated Utilization Report").withRequiredArg();
-                acceptsAll(SHAPES_OPTS, "Vivado Generated Shapes").withRequiredArg();
-                acceptsAll(PART_OPTS, "Target AMD Part").withRequiredArg();
-                acceptsAll(TARGET_CLK_PERIOD_OPTS, "Target Clock Period (ns)").withRequiredArg();
-                acceptsAll(KERNEL_CLK_NAME_OPTS, "Kernel Clock Name").withRequiredArg();
-                acceptsAll(TOP_CLK_NAME_OPTS, "Top Clock Name").withRequiredArg();
-                acceptsAll(REUSE_RESULTS_OPTS, "Reuse Previous Implementation Results");
-                acceptsAll(SKIP_IMPL_OPTS, "Skip Implementation of the Kernel");
-                acceptsAll(LIMIT_INSTS_OPTS, "Limit number of instance copies").withRequiredArg();
-                acceptsAll(WRITE_PLACEMENT_OPTS, "Write the chosen placement to the specified file").withRequiredArg();
-                acceptsAll(PLACEMENT_FILE_OPTS, "Use placement specified in file").withRequiredArg();
-                acceptsAll(PLACEMENT_GRID_OPTS, "Write grid of possible placement locations to specified file").withRequiredArg();
-                acceptsAll(TOP_LEVEL_DESIGN_OPTS, "Top level design with blackboxes/kernel insts").withRequiredArg();
-                acceptsAll(EXACT_PLACEMENT_OPTS, "Use exact module overlap calculation instead of the faster bounding-box method");
-                acceptsAll(OUT_OF_CONTEXT_OPTS, "Specifies that the array will be compiled out of context");
-                acceptsAll(UNROUTE_STATIC_NETS_OPTS, "Unroute static (GND/VCC) nets to potentially help with routability");
-                acceptsAll(ROUTE_CLOCK_OPTS, "Route clock using RWRoute");
-                acceptsAll(ROUTE_DESIGN_OPTS, "Route the built array using RWRoute");
-                acceptsAll(SIDE_MAP_OPTS, "Provide a text file specifying which side of the pblock each " +
-                        "top-level port routes to. Used to place array optimally for routability.").withRequiredArg();
-                acceptsAll(HELP_OPTS, "Print this help message").forHelp();
-            }
-        };
-
-        return p;
+    public ArrayBuilder(ArrayBuilderConfig config) {
+        newPlacementMap = new HashMap<>();
+        this.config = config;
     }
 
-    public ArrayBuilder() {
-
-    }
-
-    public ArrayBuilder(CodePerfTracker t) {
+    public ArrayBuilder(ArrayBuilderConfig config, CodePerfTracker t) {
+        this(config);
         this.t = t;
     }
 
@@ -226,12 +146,21 @@ public class ArrayBuilder {
         return getKernelDesign().getDevice();
     }
 
-    public void setKernelDesign(Design design) {
-        this.design = design;
-    }
+
+//    public String getReuseWorkDir() {
+//        return reuseWorkDir;
+//    }
+//
+//    public void setReuseWorkDir(String reuseWorkDir) {
+//        this.reuseWorkDir = reuseWorkDir;
+//    }
 
     public Design getKernelDesign() {
-        return design;
+        return kernelDesign;
+    }
+
+    public void setKernelDesign(Design kernelDesign) {
+        this.kernelDesign = kernelDesign;
     }
 
     public Design getTopDesign() {
@@ -242,92 +171,20 @@ public class ArrayBuilder {
         this.topDesign = topDesign;
     }
 
+    public String getKernelClockName() {
+        return kernelClockName;
+    }
+
+    public String getTopClockName() {
+        return topClockName;
+    }
+
     public void setPBlocks(List<PBlock> pblocks) {
         this.pblocks = pblocks;
     }
 
     public List<PBlock> getPBlocks() {
         return pblocks == null ? Collections.emptyList() : pblocks;
-    }
-
-    public void setClockPeriod(double clkPeriod) {
-        this.clkPeriod = clkPeriod;
-    }
-
-    public double getClockPeriod() {
-        return clkPeriod;
-    }
-
-    public void setKernelClockName(String clkName) {
-        this.kernelClkName = clkName;
-    }
-
-    public String getKernelClockName() {
-        return kernelClkName;
-    }
-
-    public void setTopClockName(String clkName) {
-        this.topClkName = clkName;
-    }
-
-    public String getTopClockName() {
-        return topClkName;
-    }
-
-    public boolean isSkipImpl() {
-        return skipImpl;
-    }
-
-    public void setSkipImpl(boolean skipImpl) {
-        this.skipImpl = skipImpl;
-    }
-
-    public String getOutputName() {
-        return outputName;
-    }
-
-    public void setOutputName(String outputName) {
-        this.outputName = outputName;
-    }
-
-    public int getInstCountLimit() {
-        return instCountLimit;
-    }
-
-    public void setInstCountLimit(int instCountLimit) {
-        this.instCountLimit = instCountLimit;
-    }
-
-    public String getOutputPlacementFileName() {
-        return outputPlacementFileName;
-    }
-
-    public void setOutputPlacementFileName(String outputPlacementFileName) {
-        this.outputPlacementFileName = outputPlacementFileName;
-    }
-
-    public String getInputPlacementFileName() {
-        return inputPlacementFileName;
-    }
-
-    public void setInputPlacementFileName(String inputPlacementFileName) {
-        this.inputPlacementFileName = inputPlacementFileName;
-    }
-
-    public String getOutputPlacementLocsFileName() {
-        return outputPlacementLocsFileName;
-    }
-
-    public void setOutputPlacementLocsFileName(String outputPlacementLocsFileName) {
-        this.outputPlacementLocsFileName = outputPlacementLocsFileName;
-    }
-
-    public boolean isOutOfContext() {
-        return outOfContext;
-    }
-
-    public void setOutOfContext(boolean outOfContext) {
-        this.outOfContext = outOfContext;
     }
 
     public ArrayNetlistGraph getCondensedGraph() {
@@ -338,111 +195,35 @@ public class ArrayBuilder {
         this.condensedGraph = condensedGraph;
     }
 
-    public boolean isExactPlacement() {
-        return exactPlacement;
+    private Map<ModuleInst, Site> getNewPlacementMap() {
+        return newPlacementMap;
     }
 
-    public void setExactPlacement(boolean exactPlacement) {
-        this.exactPlacement = exactPlacement;
-    }
+    private void initializeArrayBuilder() {
+        assert (config.getKernelDesign() != null);
 
-    public boolean unrouteStaticNets() {
-        return unrouteStaticNets;
-    }
+        kernelDesign = config.getKernelDesign();
+        topDesign = config.getTopDesign();
 
-    public void setUnrouteStaticNets(boolean unrouteStaticNets) {
-        this.unrouteStaticNets = unrouteStaticNets;
-    }
-
-    public boolean isRouteClock() {
-        return routeClock;
-    }
-
-    public void setRouteClock(boolean routeClock) {
-        this.routeClock = routeClock;
-    }
-
-    public boolean isRouteDesign() {
-        return routeDesign;
-    }
-
-    public void setRouteDesign(boolean routeDesign) {
-        this.routeDesign = routeDesign;
-    }
-
-    public String getSideMapFile() {
-        return sideMapFile;
-    }
-
-    public void setSideMapFile(String sideMapFile) {
-        this.sideMapFile = sideMapFile;
-    }
-
-    private void initializeArrayBuilder(OptionSet options) {
-        Path inputFile;
-
-        setSkipImpl(options.has(SKIP_IMPL_OPTS.get(0)));
-        setOutOfContext(options.has(OUT_OF_CONTEXT_OPTS.get(0)));
-        setExactPlacement(options.has(EXACT_PLACEMENT_OPTS.get(0)));
-        setUnrouteStaticNets(options.has(UNROUTE_STATIC_NETS_OPTS.get(0)));
-        setRouteClock(options.has(ROUTE_CLOCK_OPTS.get(0)));
-        setRouteDesign(options.has(ROUTE_DESIGN_OPTS.get(0)));
-        setSideMapFile((String) options.valueOf(SIDE_MAP_OPTS.get(0)));
-
-        if (options.has(KERNEL_DESIGN_OPTS.get(0))) {
-            inputFile = Paths.get((String) options.valueOf(KERNEL_DESIGN_OPTS.get(0)));
-            if (inputFile.toString().endsWith(".dcp")) {
-                if (options.has(INPUT_EDIF_OPTS.get(0))) {
-                    Path companionEDIF = Paths.get((String) options.valueOf(INPUT_EDIF_OPTS.get(0)));
-                    setKernelDesign(Design.readCheckpoint(inputFile, companionEDIF, CodePerfTracker.SILENT));
-                } else {
-                    setKernelDesign(Design.readCheckpoint(inputFile));
-                    EDIFTools.removeVivadoBusPreventionAnnotations(getKernelDesign().getNetlist());
-                    if (!design.getNetlist().getEncryptedCells().isEmpty()) {
-                        System.out.println("Design has encrypted cells");
-                    } else {
-                        System.out.println("Design does not have encrypted cells");
-                    }
-                }
-
-            } else if (inputFile.toString().endsWith(".edf")) {
-                EDIFNetlist netlist = EDIFTools.readEdifFile(inputFile);
-                if (options.has(PART_OPTS.get(0))) {
-                    Part part = PartNameTools.getPart((String) options.valueOf(PART_OPTS.get(0)));
-                    EDIFTools.ensureCorrectPartInEDIF(netlist, part.toString());
-                }
-                setKernelDesign(new Design(netlist));
-            }
-        } else {
-            throw new RuntimeException("No input design found. "
-                    + "Please specify an input kernel (*.dcp or *.edf) using options "
-                    + KERNEL_DESIGN_OPTS);
-        }
-        assert (getKernelDesign() != null);
-
-        if (options.has(PBLOCK_OPTS.get(0))) {
-            String pblockString = (String) options.valueOf(PBLOCK_OPTS.get(0));
-            String[] pblockStrings = pblockString.split(";");
+        if (config.getPBlockStrings() != null) {
             List<PBlock> pblocks = new ArrayList<PBlock>();
-            for (String str : pblockStrings) {
+            for (String str : config.getPBlockStrings()) {
                 pblocks.add(new PBlock(getDevice(), str));
             }
             setPBlocks(pblocks);
-        } else if (!skipImpl) {
+        } else if (!config.isSkipImpl()) {
             PBlockGenerator pb = new PBlockGenerator();
-            Path utilReport = null;
-            Path shapesReport = null;
-            if (options.has(UTILIZATION_OPTS.get(0)) && options.has(SHAPES_OPTS.get(0))) {
-                utilReport = Paths.get((String) options.valueOf(UTILIZATION_OPTS.get(0)));
-                shapesReport = Paths.get((String) options.valueOf(SHAPES_OPTS.get(0)));
+            Path utilReport;
+            Path shapesReport;
+            if (config.getUtilReport() != null && config.getShapesReport() != null) {
+                utilReport = Paths.get(config.getUtilReport());
+                shapesReport = Paths.get(config.getShapesReport());
             } else {
                 utilReport = Paths.get("utilization.report");
                 shapesReport = Paths.get("shapes.report");
-                if (!inputFile.toString().endsWith(".dcp")) {
-                    throw new RuntimeException(
-                            "TODO - Implement support for util/shapes file " + "generation with EDIF input file.");
-                }
-                VivadoTools.getUtilizationAndShapesReport(inputFile, utilReport, shapesReport);
+                Path kernelDesign = Paths.get("kernelDesign.dcp");
+                config.getKernelDesign().writeCheckpoint(kernelDesign);
+                VivadoTools.getUtilizationAndShapesReport(kernelDesign, utilReport, shapesReport);
             }
 
             List<String> pblocks = pb.generatePBlockFromReport(utilReport.toString(), shapesReport.toString());
@@ -461,51 +242,20 @@ public class ArrayBuilder {
             System.out.println("[INFO] PBlocks Set [" + i + "]: " + getPBlocks().get(i));
         }
 
-        if (options.has(TARGET_CLK_PERIOD_OPTS.get(0))) {
-            setClockPeriod(Double.parseDouble((String) options.valueOf(TARGET_CLK_PERIOD_OPTS.get(0))));
+        if (config.getTopDesign() != null) {
+            EDIFTools.removeVivadoBusPreventionAnnotations(config.getTopDesign().getNetlist());
+        }
+
+        if (config.getKernelClockName() != null) {
+            kernelClockName = config.getKernelClockName();
         } else {
-            setClockPeriod(DEFAULT_CLK_PERIOD_TARGET);
-            System.out.println("[INFO] No clock period set, defaulting to: " + getClockPeriod() + "ns");
+            kernelClockName = ClockTools.getClockFromDesign(config.getKernelDesign()).toString();
         }
 
-        if (options.has(KERNEL_CLK_NAME_OPTS.get(0))) {
-            setKernelClockName(((String) options.valueOf(KERNEL_CLK_NAME_OPTS.get(0))));
-        } else {
-            setKernelClockName(ClockTools.getClockFromDesign(getKernelDesign()).toString());
-        }
-
-        if (options.has(OUTPUT_DESIGN_OPTS.get(0))) {
-            setOutputName((String) options.valueOf(OUTPUT_DESIGN_OPTS.get(0)));
-        } else {
-            setOutputName("array.dcp");
-        }
-
-        if (options.has(LIMIT_INSTS_OPTS.get(0))) {
-            setInstCountLimit(Integer.parseInt((String) options.valueOf(LIMIT_INSTS_OPTS.get(0))));
-        }
-
-        if (options.has(TOP_LEVEL_DESIGN_OPTS.get(0))) {
-            Design d = Design.readCheckpoint((String) options.valueOf(TOP_LEVEL_DESIGN_OPTS.get(0)));
-            setTopDesign(d);
-            EDIFTools.removeVivadoBusPreventionAnnotations(getTopDesign().getNetlist());
-        }
-
-        if (options.has(TOP_CLK_NAME_OPTS.get(0))) {
-            setTopClockName(((String) options.valueOf(TOP_CLK_NAME_OPTS.get(0))));
-        } else if (options.has(TOP_LEVEL_DESIGN_OPTS.get(0))) {
-            setTopClockName(ClockTools.getClockFromDesign(getTopDesign()).toString());
-        }
-
-        if (options.has(WRITE_PLACEMENT_OPTS.get(0))) {
-            setOutputPlacementFileName((String) options.valueOf(WRITE_PLACEMENT_OPTS.get(0)));
-        }
-
-        if (options.has(PLACEMENT_FILE_OPTS.get(0))) {
-            setInputPlacementFileName((String) options.valueOf(PLACEMENT_FILE_OPTS.get(0)));
-        }
-
-        if (options.has(PLACEMENT_GRID_OPTS.get(0))) {
-            setOutputPlacementLocsFileName((String) options.valueOf(PLACEMENT_GRID_OPTS.get(0)));
+        if (config.getTopClockName() != null) {
+            topClockName = config.getTopClockName();
+        } else if (config.getTopDesign() != null) {
+            topClockName = ClockTools.getClockFromDesign(config.getTopDesign()).toString();
         }
     }
 
@@ -646,72 +396,56 @@ public class ArrayBuilder {
         return placementGrid;
     }
 
-    public static void main(String[] args) {
-        CodePerfTracker t = new CodePerfTracker(ArrayBuilder.class.getName());
-        t.start("Init");
-        ArrayBuilder ab = new ArrayBuilder(t);
-        OptionParser p = ab.createOptionParser();
-        OptionSet options = p.parse(args);
+    private List<Module> implementKernel(Path workDir) {
+        t.stop().start("Implement Kernel");
+        FileTools.makeDirs(workDir.toString());
+        System.out.println("[INFO] Created work directory: " + workDir.toString());
 
-        if (options.has(HELP_OPTS.get(0))) {
-            printHelp(p);
-            return;
+        // Initialize PerformanceExplorer
+        PerformanceExplorer pe = new PerformanceExplorer(getKernelDesign(), workDir.toString(),
+                kernelClockName, config.getClockPeriod());
+
+        // Set PBlocks
+        Map<PBlock, String> pblocks = new HashMap<>();
+        for (PBlock pb : getPBlocks()) {
+            pblocks.put(pb, null);
         }
-
-        // Load design and options
-        ab.initializeArrayBuilder(options);
-
-        // Create a working directory for PerformanceExplorer
-        Path workDir = Paths.get("ArrayBuilder-" + FileTools.getTimeStamp().replace(" ", "-"));
-        boolean reuseResults = false;
-        if (options.has(REUSE_RESULTS_OPTS.get(0))) {
-            workDir = Paths.get((String) options.valueOf(REUSE_RESULTS_OPTS.get(0)));
-            reuseResults = true;
-        }
+        pe.setPBlocks(pblocks);
+        pe.setAddEDIFAndMetadata(true);
+        pe.setReusePreviousResults(getReuseWorkDir() != null);
+        pe.explorePerformance();
 
         List<Module> modules = new ArrayList<>();
-        if (!ab.isSkipImpl()) {
-            t.stop().start("Implement Kernel");
-            FileTools.makeDirs(workDir.toString());
-            System.out.println("[INFO] Created work directory: " + workDir.toString());
-
-            // Initialize PerformanceExplorer
-            PerformanceExplorer pe = new PerformanceExplorer(ab.getKernelDesign(), workDir.toString(),
-                    ab.getKernelClockName(), ab.getClockPeriod());
-
-            // Set PBlocks
-            Map<PBlock, String> pblocks = new HashMap<>();
-            for (PBlock pb : ab.getPBlocks()) {
-                pblocks.put(pb, null);
+        List<Pair<Path, Float>> results = pe.getBestResultsPerPBlock();
+        for (int i = 0; i < results.size(); i++) {
+            Pair<Path, Float> result = results.get(i);
+            Path dcpPath = result.getFirst().resolve("routed.dcp");
+            if (Files.exists(dcpPath)) {
+                System.out.println("Reading... " + dcpPath);
+                Design d = Design.readCheckpoint(dcpPath);
+                d.setName(d.getName() + "_" + i);
+                Module m = new Module(d, config.unrouteStaticNets());
+                modules.add(m);
+                m.setPBlock(pe.getPBlock(i));
+                m.calculateAllValidPlacements(d.getDevice());
+            } else {
+                System.err.println("Missing DCP Result: " + dcpPath);
             }
-            pe.setPBlocks(pblocks);
-            pe.setAddEDIFAndMetadata(true);
-            pe.setReusePreviousResults(reuseResults);
-            pe.explorePerformance();
+            System.out.println(result.getFirst() + " " + result.getSecond());
+        }
+        return modules;
+    }
 
-            List<Pair<Path, Float>> results = pe.getBestResultsPerPBlock();
-            for (int i = 0; i < results.size(); i++) {
-                Pair<Path, Float> result = results.get(i);
-                Path dcpPath = result.getFirst().resolve("routed.dcp");
-                if (Files.exists(dcpPath)) {
-                    System.out.println("Reading... " + dcpPath);
-                    Design d = Design.readCheckpoint(dcpPath);
-                    d.setName(d.getName() + "_" + i);
-                    Module m = new Module(d, ab.unrouteStaticNets());
-                    modules.add(m);
-                    m.setPBlock(pe.getPBlock(i));
-                    m.calculateAllValidPlacements(d.getDevice());
-                } else {
-                    System.err.println("Missing DCP Result: " + dcpPath);
-                }
-                System.out.println(result.getFirst() + " " + result.getSecond());
-            }
+    public Design placeArray(Path workDir) {
+        List<Module> modules = new ArrayList<>();
+        if (!config.isSkipImpl()) {
+            modules = implementKernel(workDir);
         } else /* skipImpl==true */ {
             // Just use the design we loaded and replicate it
             t.stop().start("Calculate Valid Placements");
-            removeBUFGs(ab.getKernelDesign());
-            if (ab.unrouteStaticNets()) {
-                Net gndNet = ab.getKernelDesign().getNet(Net.GND_NET);
+            removeBUFGs(config.getKernelDesign());
+            if (config.unrouteStaticNets()) {
+                Net gndNet = config.getKernelDesign().getNet(Net.GND_NET);
                 if (gndNet != null) {
                     gndNet.unroute();
                     List<SitePinInst> staticSourcePins = new ArrayList<>();
@@ -731,19 +465,19 @@ public class ArrayBuilder {
                         siteInst.unPlace();
                     }
                 }
-                Net vccNet = ab.getKernelDesign().getNet(Net.VCC_NET);
+                Net vccNet = getKernelDesign().getNet(Net.VCC_NET);
                 if (vccNet != null) {
                     vccNet.unroute();
                 }
             }
-            Module m = new Module(ab.getKernelDesign(), ab.unrouteStaticNets());
-            m.getNet(ab.getKernelClockName()).unroute();
+            Module m = new Module(getKernelDesign(), config.unrouteStaticNets());
+            m.getNet(getKernelClockName()).unroute();
 
-            if (ab.getInputPlacementFileName() == null) {
-                m.calculateAllValidPlacements(ab.getDevice());
+            if (getInputPlacementFileName() == null) {
+                m.calculateAllValidPlacements(getDevice());
             }
-            if (!ab.getPBlocks().isEmpty()) {
-                m.setPBlock(ab.getPBlocks().get(0));
+            if (!getPBlocks().isEmpty()) {
+                m.setPBlock(getPBlocks().get(0));
             }
             modules.add(m);
         }
@@ -751,24 +485,24 @@ public class ArrayBuilder {
         Design array = null;
         List<String> modInstNames = null;
         List<Pair<Pair<Integer, Integer>, String>> idealPlacementList = null;
-        if (ab.getTopDesign() == null) {
-            array = new Design("array", ab.getKernelDesign().getPartName());
+        if (getTopDesign() == null) {
+            array = new Design("array", getKernelDesign().getPartName());
         } else {
-            array = ab.getTopDesign();
+            array = getTopDesign();
             t.stop().start("Calculate ideal array placement");
             // Find instances in existing design
             modInstNames = getMatchingModuleInstanceNames(modules.get(0), array);
             if (modInstNames.isEmpty()) {
                 throw new RuntimeException("Failed to find module instances in top design that match kernel interface");
             }
-            ab.setInstCountLimit(modInstNames.size());
+            setInstCountLimit(modInstNames.size());
             Map<EDIFPort, PBlockSide> sideMap = null;
-            if (ab.getSideMapFile() != null) {
-                sideMap = InlineFlopTools.parseSideMap(ab.getKernelDesign().getNetlist(), ab.getSideMapFile());
+            if (getSideMapFile() != null) {
+                sideMap = InlineFlopTools.parseSideMap(getKernelDesign().getNetlist(), getSideMapFile());
             }
-            ab.setCondensedGraph(new ArrayNetlistGraph(array, modInstNames, sideMap));
+            setCondensedGraph(new ArrayNetlistGraph(array, modInstNames, sideMap));
             Map<Pair<Integer, Integer>, String> idealPlacement =
-                    ab.getCondensedGraph().getGreedyPlacementGrid();
+                    getCondensedGraph().getGreedyPlacementGrid();
             idealPlacementList = idealPlacement.entrySet().stream()
                     .map((e) -> new Pair<>(e.getKey(), e.getValue()))
                     .sorted((p1, p2) -> {
@@ -784,8 +518,8 @@ public class ArrayBuilder {
         }
 
         t.stop().start("Place Instances");
-        if (ab.getOutputPlacementLocsFileName() != null) {
-            writePlacementLocsToFile(modules, ab.getOutputPlacementLocsFileName());
+        if (getOutputPlacementLocsFileName() != null) {
+            writePlacementLocsToFile(modules, getOutputPlacementLocsFileName());
         }
 
         // Add encrypted cells from modules to array
@@ -799,9 +533,9 @@ public class ArrayBuilder {
         }
 
         int placed = 0;
-        Map<ModuleInst, Site> newPlacementMap = new HashMap<>();
-        if (ab.getInputPlacementFileName() != null) {
-            Map<String, String> placementMap = readPlacementFromFile(ab.inputPlacementFileName);
+
+        if (getInputPlacementFileName() != null) {
+            Map<String, String> placementMap = readPlacementFromFile(inputPlacementFileName);
             System.out.println("Placing from specified file");
             for (Map.Entry<String, String> entry : placementMap.entrySet()) {
                 String instName = entry.getKey();
@@ -845,7 +579,7 @@ public class ArrayBuilder {
             int gridY = 5;
             int lastYCoordinate = 0;
             boolean searchDown = true;
-            while (placed < ab.getInstCountLimit()) {
+            while (placed < getInstCountLimit()) {
                 if (curr == null) {
                     String instName = modInstNames == null ? ("inst_" + i) : idealPlacementList.get(i).getSecond();
                     int yCoordinate = idealPlacementList.get(i).getFirst().getSecond();
@@ -867,9 +601,9 @@ public class ArrayBuilder {
                 RelocatableTileRectangle newBoundingBox =
                         boundingBox.getCorresponding(anchor.getTile(), module.getAnchor().getTile());
                 boolean noOverlap = boundingBoxes.stream().noneMatch((b) -> b.overlaps(newBoundingBox));
-                if (ab.isExactPlacement() || (noOverlap && !boundingBoxStraddlesClockRegion(newBoundingBox))) {
+                if (isExactPlacement() || (noOverlap && !boundingBoxStraddlesClockRegion(newBoundingBox))) {
                     if (curr.place(anchor, true, false)) {
-                        if (ab.isExactPlacement() && (straddlesClockRegion(curr)
+                        if (isExactPlacement() && (straddlesClockRegion(curr)
                                 || !NetTools.getNetsWithOverlappingNodes(array).isEmpty())
                         ) {
                             curr.unplace();
@@ -891,9 +625,33 @@ public class ArrayBuilder {
                 }
             }
         }
+        return array;
+    }
+
+    public static void main(String[] args) {
+        CodePerfTracker t = new CodePerfTracker(ArrayBuilder.class.getName());
+        t.start("Init");
+
+        if (ArrayBuilderConfig.hasHelpArg(args)) {
+            ArrayBuilderConfig.printHelp();
+            return;
+        }
+
+        // Load design and options
+        ArrayBuilderConfig config = new ArrayBuilderConfig(args);
+        ArrayBuilder ab = new ArrayBuilder(config, t);
+        ab.initializeArrayBuilder(options);
+
+        // Create a working directory for PerformanceExplorer
+        Path workDir = Paths.get("ArrayBuilder-" + FileTools.getTimeStamp().replace(" ", "-"));
+        ab.setReuseWorkDir((String) options.valueOf(REUSE_RESULTS_OPTS.get(0)));
+        workDir = ab.getReuseWorkDir() == null ? workDir : Paths.get(ab.getReuseWorkDir());
+
+        // Place the array
+        Design array = ab.placeArray(workDir);
 
         if (ab.getOutputPlacementFileName() != null) {
-            writePlacementToFile(newPlacementMap, ab.outputPlacementFileName);
+            writePlacementToFile(ab.getNewPlacementMap(), ab.outputPlacementFileName);
         }
 
         List<Net> unrouted = NetTools.unrouteNetsWithOverlappingNodes(array);
