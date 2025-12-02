@@ -114,7 +114,7 @@ public class ArrayNetlistGraph {
                         if (!netPortInst.equals(portInst) && netPortInst.getCellType() != null) {
                             EDIFHierCellInst destCellInst = netPortInst.getFullHierarchicalInst();
                             if (destCellInst != null && containsNode(destCellInst.getFullHierarchicalInstName())) {
-                                PBlockSide pBlockSide = sideMap.get(portInst.getPortInst().getPort());
+                                PBlockSide pBlockSide = sideMap == null ? null : sideMap.get(portInst.getPortInst().getPort());
 
                                 addEdge(cellInst.getFullHierarchicalInstName(),
                                         destCellInst.getFullHierarchicalInstName(),
