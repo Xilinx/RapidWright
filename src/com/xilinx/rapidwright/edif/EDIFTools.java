@@ -424,10 +424,10 @@ public class EDIFTools {
     }
 
     /**
-     * Determines if the char[] ends with the pattern [#:#] where # are positive bus
-     * values (e.g., [7:0]) and then returns the length of the string without the
-     * bus suffix (if it exists). If the name does not end with the bus pattern, it
-     * returns the original length of the char[].
+     * Determines if the char[] ends with the pattern [#:#] where # are integer bus
+     * values (e.g., [7:0] or [0:-1]) and then returns the length of the string
+     * without the bus suffix (if it exists). If the name does not end with the bus
+     * pattern, it returns the original length of the char[].
      * 
      * @param name
      * @param keepOpenBracket In the case of a bussed name, this will return the
@@ -439,11 +439,11 @@ public class EDIFTools {
         int len = name.length;
         int i = len-1;
         if (name[i--] != ']') return len;
-        while (Character.isDigit(name[i])) {
+        while (Character.isDigit(name[i]) || name[i] == '-') {
             i--;
         }
         if (name[i--] != ':') return len;
-        while (Character.isDigit(name[i])) {
+        while (Character.isDigit(name[i]) || name[i] == '-') {
             i--;
         }
         if (name[i] != '[') return len;
@@ -475,7 +475,7 @@ public class EDIFTools {
             }
         }
         if (colonIdx == -1 || leftBracket == -1) {
-            throw new RuntimeException("ERROR: Interpreting port " + name + ", couldn't identify indicies.");
+            throw new RuntimeException("ERROR: Interpreting port " + name + ", couldn't identify indices.");
         }
 
         int left = Integer.parseInt(name.substring(leftBracket+1, colonIdx));
@@ -1736,7 +1736,7 @@ public class EDIFTools {
         for (EDIFPort topPort : netlist.getTopCell().getPorts()) {
             EDIFPort flatPort = flatTop.createPort(topPort);
             if (flatPort.isBus()) {
-                int[] indicies = flatPort.getBitBlastedIndicies();
+                int[] indices = flatPort.getBitBlastedIndices();
                 int i = 0;
                 for (EDIFNet net : topPort.getInternalNets()) {
                     if (net == null) continue;
@@ -1744,7 +1744,7 @@ public class EDIFTools {
                     if (flatNet == null) {
                         flatNet = flatTop.createNet(net.getName());
                     }
-                    flatNet.createPortInst(flatPort, indicies[i++]);
+                    flatNet.createPortInst(flatPort, indices[i++]);
                 }
             } else {
                 EDIFNet net = topPort.getInternalNet();

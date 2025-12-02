@@ -378,10 +378,6 @@ public class PolynomialGenerator {
 
         buildOperatorTree(p, d, results);
 
-        // This is redundant if the design will be routed later, but is necessary
-        // for correct visualization in the Hand Placer tool
-        RWRoute.preprocess(d);
-
         releaseOperators();
 
         d.addXDCConstraint(ConstraintGroup.LATE, "create_clock -name "+CLK_NAME+" -period 1.291 [get_ports "+CLK_NAME+"]");
@@ -389,6 +385,11 @@ public class PolynomialGenerator {
 
         if (invokeHandPlacer) {
             t.stop().start("Hand Placer");
+            // These are redundant if the design will be routed later, but is necessary
+            // for correct visualization in the Hand Placer tool
+            d.flattenDesign();
+            RWRoute.preprocess(d);
+
             HandPlacer.openDesign(d);
         }
 

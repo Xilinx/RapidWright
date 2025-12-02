@@ -41,7 +41,7 @@ import com.xilinx.rapidwright.support.RapidWrightDCP;
 public class TestNetTools {
     /**
      * Tests the method NetTools.isGlobalClock(Net net).
-     * For each DCP file, Vivado uses the TCL command 
+     * For each DCP file, Vivado uses the Tcl command
      *      get_nets -hier -parent_net -filter { TYPE == "GLOBAL_CLOCK" } 
      * to retrieve all nets of type GLOBAL_CLOCK. 
      * The method NetTools.isGlobalClock(Net net) returns true for these nets and false for others.

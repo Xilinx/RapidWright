@@ -33,15 +33,21 @@ import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PblockProperty;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public class TestConstraintTools {
 
-    @Test
-    public void testGetPBlockFromXDCConstraints() {
+    @ParameterizedTest
+    @EnumSource(TestXDCParser.RoundtripMode.class)
+    public void testGetPBlockFromXDCConstraints(TestXDCParser.RoundtripMode roundtripMode) {
         Design d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
         d.getXDCConstraints(ConstraintGroup.LATE).add("set_property " + PblockProperty.IS_SOFT + " 1 [get_pblocks pblock_dbg_hub]");
         d.getXDCConstraints(ConstraintGroup.LATE).add("set_property " + PblockProperty.EXCLUDE_PLACEMENT + " 1 [get_pblocks pblock_u_ila_0]");
-        Map<String, PBlock> pblockMap = ConstraintTools.getPBlockFromXDCConstraints(d);
+        roundtripMode.doRoundtrip(d);
+
+        Map<String, PBlock> pblockMap = ConstraintTools.getPBlocksFromXDC(d);
         Assertions.assertEquals(3, pblockMap.size());
         Assertions.assertTrue(pblockMap.containsKey("pblock_dbg_hub"));
         Assertions.assertTrue(pblockMap.containsKey("pblock_base_mb_i"));
@@ -50,7 +56,6 @@ public class TestConstraintTools {
         // Check for the property and cooresponding TclConstraints
         String TclConstraints;
         PBlock dbgHub = pblockMap.get("pblock_dbg_hub");
-        dbgHub.setName("pblock_dbg_hub");
         Assertions.assertTrue(dbgHub.containRouting());
         Assertions.assertTrue(dbgHub.isSoft());
         Assertions.assertFalse(dbgHub.excludePlacement());
@@ -62,7 +67,6 @@ public class TestConstraintTools {
         );
 
         PBlock baseMb = pblockMap.get("pblock_base_mb_i");
-        baseMb.setName("pblock_base_mb_i");
         Assertions.assertTrue(baseMb.containRouting());
         Assertions.assertFalse(baseMb.isSoft());
         Assertions.assertFalse(baseMb.excludePlacement());
@@ -74,7 +78,6 @@ public class TestConstraintTools {
         );
 
         PBlock uila0 = pblockMap.get("pblock_u_ila_0");
-        uila0.setName("pblock_u_ila_0");
         Assertions.assertTrue(uila0.containRouting());
         Assertions.assertFalse(uila0.isSoft());
         Assertions.assertTrue(uila0.excludePlacement());
