@@ -763,32 +763,6 @@ public class ArrayBuilder {
         routeArray();
     }
 
-    public static void main(String[] args) {
-        CodePerfTracker t = new CodePerfTracker(ArrayBuilder.class.getName());
-        t.start("Init");
-
-        if (ArrayBuilderConfig.hasHelpArg(args)) {
-            ArrayBuilderConfig.printHelp();
-            return;
-        }
-
-        // Create config
-        ArrayBuilderConfig config = new ArrayBuilderConfig(args);
-        if (!config.isReuseResults()) {
-            config.setWorkDir("ArrayBuilder-" + FileTools.getTimeStamp().replace(" ", "-"));
-        }
-
-        // Create array builder with config
-        ArrayBuilder ab = new ArrayBuilder(config, t);
-        ab.initializeArrayBuilder();
-
-        ab.createArray();
-
-        t.stop().start("Write DCP");
-        ab.getArray().writeCheckpoint(ArrayBuilderConfig.getOutputName(args));
-        t.stop().printSummary();
-    }
-
     private static Map<Pair<Integer, Integer>, String> foldIdealPlacement(Map<Pair<Integer, Integer>, String> placement,
                                                                           Map<Integer, Integer> newRowMap) {
         if (newRowMap.isEmpty()) {
@@ -907,5 +881,31 @@ public class ArrayBuilder {
             }
         }
         return center.getRow();
+    }
+
+    public static void main(String[] args) {
+        CodePerfTracker t = new CodePerfTracker(ArrayBuilder.class.getName());
+        t.start("Init");
+
+        if (ArrayBuilderConfig.hasHelpArg(args)) {
+            ArrayBuilderConfig.printHelp();
+            return;
+        }
+
+        // Create config
+        ArrayBuilderConfig config = new ArrayBuilderConfig(args);
+        if (!config.isReuseResults()) {
+            config.setWorkDir("ArrayBuilder-" + FileTools.getTimeStamp().replace(" ", "-"));
+        }
+
+        // Create array builder with config
+        ArrayBuilder ab = new ArrayBuilder(config, t);
+        ab.initializeArrayBuilder();
+
+        ab.createArray();
+
+        t.stop().start("Write DCP");
+        ab.getArray().writeCheckpoint(ArrayBuilderConfig.getOutputName(args));
+        t.stop().printSummary();
     }
 }
