@@ -29,6 +29,7 @@ import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -54,8 +55,6 @@ public class ArrayBuilderConfig {
 
     private boolean skipImpl;
 
-    private String outputName;
-
     private int instCountLimit;
 
     private String outputPlacementFileName;
@@ -76,7 +75,9 @@ public class ArrayBuilderConfig {
 
     private String sideMapFile;
 
-    private String reuseWorkDir;
+    private String workDir;
+
+    private boolean reuseResults;
 
     private Part part;
 
@@ -114,9 +115,17 @@ public class ArrayBuilderConfig {
     private static final List<String> SIDE_MAP_OPTS = Collections.singletonList("kernel-side-map");
 
     private ArrayBuilderConfig() {
-        setOutputName("array.dcp");
-        setPBlockStrings(null);
+        clkPeriod = DEFAULT_CLK_PERIOD_TARGET;
+        skipImpl = true;
         instCountLimit = Integer.MAX_VALUE;
+        outOfContext = true;
+        exactPlacement = false;
+        unrouteStaticNets = false;
+        routeClock = true;
+        routeDesign = false;
+        reuseResults = false;
+        pblockStrings = null;
+        workDir = "ArrayBuilder-" + FileTools.getTimeStamp().replace(" ", "-");
     }
 
     public ArrayBuilderConfig(Design kernelDesign, Design topDesign) {
@@ -220,15 +229,16 @@ public class ArrayBuilderConfig {
             setKernelDesign(new Design(netlist));
         }
 
+        if (options.has(TOP_LEVEL_DESIGN_OPTS.get(0))) {
+            Design d = Design.readCheckpoint((String) options.valueOf(TOP_LEVEL_DESIGN_OPTS.get(0)));
+            setTopDesign(d);
+        }
+
         if (options.has(TARGET_CLK_PERIOD_OPTS.get(0))) {
             setClockPeriod(Double.parseDouble((String) options.valueOf(TARGET_CLK_PERIOD_OPTS.get(0))));
         } else {
             setClockPeriod(DEFAULT_CLK_PERIOD_TARGET);
             System.out.println("[INFO] No clock period set, defaulting to: " + getClockPeriod() + "ns");
-        }
-
-        if (options.has(OUTPUT_DESIGN_OPTS.get(0))) {
-            setOutputName((String) options.valueOf(OUTPUT_DESIGN_OPTS.get(0)));
         }
 
         if (options.has(LIMIT_INSTS_OPTS.get(0))) {
@@ -264,6 +274,10 @@ public class ArrayBuilderConfig {
         if (options.has(TOP_CLK_NAME_OPTS.get(0))) {
             setTopClockName(((String) options.valueOf(TOP_CLK_NAME_OPTS.get(0))));
         }
+
+        if (options.has(REUSE_RESULTS_OPTS.get(0))) {
+            setWorkDir((String) options.valueOf(REUSE_RESULTS_OPTS.get(0)));
+        }
     }
 
     public static boolean hasHelpArg(String[] arguments) {
@@ -271,6 +285,17 @@ public class ArrayBuilderConfig {
         OptionSet options = p.parse(arguments);
         return options.has(HELP_OPTS.get(0));
     }
+
+    public static String getOutputName(String[] args) {
+        OptionParser p = createOptionParser();
+        OptionSet options = p.parse(args);
+        if (options.has(OUTPUT_DESIGN_OPTS.get(0))) {
+            return (String) options.valueOf(OUTPUT_DESIGN_OPTS.get(0));
+        }
+
+        return "array.dcp";
+    }
+
 
     public void setKernelDesign(Design kernelDesign) {
         this.kernelDesign = kernelDesign;
@@ -318,14 +343,6 @@ public class ArrayBuilderConfig {
 
     public void setSkipImpl(boolean skipImpl) {
         this.skipImpl = skipImpl;
-    }
-
-    public String getOutputName() {
-        return outputName;
-    }
-
-    public void setOutputName(String outputName) {
-        this.outputName = outputName;
     }
 
     public int getInstCountLimit() {
@@ -376,7 +393,7 @@ public class ArrayBuilderConfig {
         this.exactPlacement = exactPlacement;
     }
 
-    public boolean unrouteStaticNets() {
+    public boolean shouldUnrouteStaticNets() {
         return unrouteStaticNets;
     }
 
@@ -438,5 +455,21 @@ public class ArrayBuilderConfig {
 
     public void setShapesReport(String shapesReport) {
         this.shapesReport = shapesReport;
+    }
+
+    public String getWorkDir() {
+        return workDir;
+    }
+
+    public void setWorkDir(String workDir) {
+        this.workDir = workDir;
+    }
+
+    public boolean isReuseResults() {
+        return reuseResults;
+    }
+
+    public void setReuseResults(boolean reuseResults) {
+        this.reuseResults = reuseResults;
     }
 }

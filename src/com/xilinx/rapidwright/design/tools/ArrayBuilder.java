@@ -28,7 +28,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -63,8 +62,6 @@ import com.xilinx.rapidwright.design.blocks.PBlockSide;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.Part;
-import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
@@ -73,9 +70,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
-import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
-import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
@@ -90,7 +85,6 @@ import com.xilinx.rapidwright.util.PerformanceExplorer;
 import com.xilinx.rapidwright.util.VivadoTools;
 
 import joptsimple.OptionParser;
-import joptsimple.OptionSet;
 
 import static com.xilinx.rapidwright.util.Utils.isBRAM;
 import static com.xilinx.rapidwright.util.Utils.isDSP;
@@ -105,6 +99,8 @@ public class ArrayBuilder {
     private Design kernelDesign;
 
     private Design topDesign;
+
+    private Design array;
 
     private String kernelClockName;
 
@@ -146,29 +142,16 @@ public class ArrayBuilder {
         return getKernelDesign().getDevice();
     }
 
-
-//    public String getReuseWorkDir() {
-//        return reuseWorkDir;
-//    }
-//
-//    public void setReuseWorkDir(String reuseWorkDir) {
-//        this.reuseWorkDir = reuseWorkDir;
-//    }
-
     public Design getKernelDesign() {
         return kernelDesign;
-    }
-
-    public void setKernelDesign(Design kernelDesign) {
-        this.kernelDesign = kernelDesign;
     }
 
     public Design getTopDesign() {
         return topDesign;
     }
 
-    public void setTopDesign(Design topDesign) {
-        this.topDesign = topDesign;
+    public Design getArray() {
+        return array;
     }
 
     public String getKernelClockName() {
@@ -412,7 +395,7 @@ public class ArrayBuilder {
         }
         pe.setPBlocks(pblocks);
         pe.setAddEDIFAndMetadata(true);
-        pe.setReusePreviousResults(getReuseWorkDir() != null);
+        pe.setReusePreviousResults(config.isReuseResults());
         pe.explorePerformance();
 
         List<Module> modules = new ArrayList<>();
@@ -424,7 +407,7 @@ public class ArrayBuilder {
                 System.out.println("Reading... " + dcpPath);
                 Design d = Design.readCheckpoint(dcpPath);
                 d.setName(d.getName() + "_" + i);
-                Module m = new Module(d, config.unrouteStaticNets());
+                Module m = new Module(d, config.shouldUnrouteStaticNets());
                 modules.add(m);
                 m.setPBlock(pe.getPBlock(i));
                 m.calculateAllValidPlacements(d.getDevice());
@@ -436,7 +419,8 @@ public class ArrayBuilder {
         return modules;
     }
 
-    public Design placeArray(Path workDir) {
+    private void placeArray() {
+        Path workDir = Paths.get(config.getWorkDir());
         List<Module> modules = new ArrayList<>();
         if (!config.isSkipImpl()) {
             modules = implementKernel(workDir);
@@ -444,7 +428,7 @@ public class ArrayBuilder {
             // Just use the design we loaded and replicate it
             t.stop().start("Calculate Valid Placements");
             removeBUFGs(config.getKernelDesign());
-            if (config.unrouteStaticNets()) {
+            if (config.shouldUnrouteStaticNets()) {
                 Net gndNet = config.getKernelDesign().getNet(Net.GND_NET);
                 if (gndNet != null) {
                     gndNet.unroute();
@@ -470,10 +454,10 @@ public class ArrayBuilder {
                     vccNet.unroute();
                 }
             }
-            Module m = new Module(getKernelDesign(), config.unrouteStaticNets());
+            Module m = new Module(getKernelDesign(), config.shouldUnrouteStaticNets());
             m.getNet(getKernelClockName()).unroute();
 
-            if (getInputPlacementFileName() == null) {
+            if (config.getInputPlacementFileName() == null) {
                 m.calculateAllValidPlacements(getDevice());
             }
             if (!getPBlocks().isEmpty()) {
@@ -482,7 +466,6 @@ public class ArrayBuilder {
             modules.add(m);
         }
 
-        Design array = null;
         List<String> modInstNames = null;
         List<Pair<Pair<Integer, Integer>, String>> idealPlacementList = null;
         if (getTopDesign() == null) {
@@ -495,10 +478,10 @@ public class ArrayBuilder {
             if (modInstNames.isEmpty()) {
                 throw new RuntimeException("Failed to find module instances in top design that match kernel interface");
             }
-            setInstCountLimit(modInstNames.size());
+            config.setInstCountLimit(modInstNames.size());
             Map<EDIFPort, PBlockSide> sideMap = null;
-            if (getSideMapFile() != null) {
-                sideMap = InlineFlopTools.parseSideMap(getKernelDesign().getNetlist(), getSideMapFile());
+            if (config.getSideMapFile() != null) {
+                sideMap = InlineFlopTools.parseSideMap(getKernelDesign().getNetlist(), config.getSideMapFile());
             }
             setCondensedGraph(new ArrayNetlistGraph(array, modInstNames, sideMap));
             Map<Pair<Integer, Integer>, String> idealPlacement =
@@ -518,8 +501,8 @@ public class ArrayBuilder {
         }
 
         t.stop().start("Place Instances");
-        if (getOutputPlacementLocsFileName() != null) {
-            writePlacementLocsToFile(modules, getOutputPlacementLocsFileName());
+        if (config.getOutputPlacementLocsFileName() != null) {
+            writePlacementLocsToFile(modules, config.getOutputPlacementLocsFileName());
         }
 
         // Add encrypted cells from modules to array
@@ -534,8 +517,8 @@ public class ArrayBuilder {
 
         int placed = 0;
 
-        if (getInputPlacementFileName() != null) {
-            Map<String, String> placementMap = readPlacementFromFile(inputPlacementFileName);
+        if (config.getInputPlacementFileName() != null) {
+            Map<String, String> placementMap = readPlacementFromFile(config.getInputPlacementFileName());
             System.out.println("Placing from specified file");
             for (Map.Entry<String, String> entry : placementMap.entrySet()) {
                 String instName = entry.getKey();
@@ -579,7 +562,7 @@ public class ArrayBuilder {
             int gridY = 5;
             int lastYCoordinate = 0;
             boolean searchDown = true;
-            while (placed < getInstCountLimit()) {
+            while (placed < config.getInstCountLimit()) {
                 if (curr == null) {
                     String instName = modInstNames == null ? ("inst_" + i) : idealPlacementList.get(i).getSecond();
                     int yCoordinate = idealPlacementList.get(i).getFirst().getSecond();
@@ -601,9 +584,9 @@ public class ArrayBuilder {
                 RelocatableTileRectangle newBoundingBox =
                         boundingBox.getCorresponding(anchor.getTile(), module.getAnchor().getTile());
                 boolean noOverlap = boundingBoxes.stream().noneMatch((b) -> b.overlaps(newBoundingBox));
-                if (isExactPlacement() || (noOverlap && !boundingBoxStraddlesClockRegion(newBoundingBox))) {
+                if (config.isExactPlacement() || (noOverlap && !boundingBoxStraddlesClockRegion(newBoundingBox))) {
                     if (curr.place(anchor, true, false)) {
-                        if (isExactPlacement() && (straddlesClockRegion(curr)
+                        if (config.isExactPlacement() && (straddlesClockRegion(curr)
                                 || !NetTools.getNetsWithOverlappingNodes(array).isEmpty())
                         ) {
                             curr.unplace();
@@ -625,7 +608,136 @@ public class ArrayBuilder {
                 }
             }
         }
-        return array;
+
+        if (config.getOutputPlacementFileName() != null) {
+            writePlacementToFile(getNewPlacementMap(), config.getOutputPlacementFileName());
+        }
+    }
+
+    private void finalizeStandaloneArray() {
+        if (config.getTopDesign() != null) {
+            throw new RuntimeException("Cannot call finalizeStandaloneArray on an array with a top level design");
+        }
+        EDIFCell top = array.getTopEDIFCell();
+        EDIFHierNet clkNet = array.getNetlist().getHierNetFromName(getKernelClockName());
+        if (clkNet == null) {
+            // Create BUFG and clock net, then connect to all instances
+            Cell bufg = createBUFGCE(array, top, "bufg", array.getDevice().getSite("BUFGCE_X2Y0"));
+            Net clk = array.createNet(getKernelClockName());
+            clk.connect(bufg, "O");
+            Net clkIn = array.createNet(getKernelClockName() + "_in");
+            clkIn.connect(bufg, "I");
+            EDIFPort clkInPort = top.createPort(getKernelClockName(), EDIFDirection.INPUT, 1);
+            clkIn.getLogicalNet().createPortInst(clkInPort);
+            EDIFNet logClkNet = clk.getLogicalNet();
+            for (EDIFCellInst inst : top.getCellInsts()) {
+                EDIFPort port = inst.getPort(getKernelClockName());
+                if (port != null) {
+                    logClkNet.createPortInst(port, inst);
+                }
+            }
+        }
+
+        // Port up unconnected inputs
+        for (EDIFPort topPort : modules.get(0).getNetlist().getTopCell().getPorts()) {
+            if (topPort.isInput()) {
+                if (top.getPort(topPort.getName()) == null) {
+                    EDIFPort port = top.createPort(topPort);
+                    if (port.isBus()) {
+                        for (int j = 0; j < port.getWidth(); j++) {
+                            EDIFNet net = top.createNet(port.getPortInstNameFromPort(j));
+                            net.createPortInst(port, j);
+                            for (ModuleInst mi : array.getModuleInsts()) {
+                                net.createPortInst(port, j, mi.getCellInst());
+                            }
+                        }
+                    } else {
+                        EDIFNet net = top.createNet(port.getName());
+                        net.createPortInst(port);
+                        for (ModuleInst mi : array.getModuleInsts()) {
+                            net.createPortInst(port, mi.getCellInst());
+                        }
+                    }
+                }
+            }
+        }
+
+        PerformanceExplorer.updateClockPeriodConstraint(array, getKernelClockName(), config.getClockPeriod());
+        array.setDesignOutOfContext(true);
+        array.setAutoIOBuffers(false);
+    }
+
+    private static void unrouteStaticNets(Design design) {
+        Net gndNet = design.getNet(Net.GND_NET);
+        if (gndNet != null) {
+            gndNet.unroute();
+        }
+        Net vccNet = design.getNet(Net.VCC_NET);
+        if (vccNet != null) {
+            vccNet.unroute();
+        }
+    }
+
+    private static void createFlopHarnessForArray(Design array, String topClockName) {
+        // Automatically find bounding PBlock based on used Slices, DSPs, and BRAMs
+        Set<Site> usedSites = new HashSet<>();
+        for (SiteInst siteInst : array.getSiteInsts()) {
+            if (siteInst.getName().contains("STATIC_SOURCE_SLICE")) {
+                continue;
+            }
+            if (isSLICE(siteInst) || isBRAM(siteInst) || isDSP(siteInst)) {
+                usedSites.add(siteInst.getSite());
+            }
+        }
+        PBlock pBlock = new PBlock(array.getDevice(), usedSites);
+        InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsNearPins(array, topClockName, pBlock);
+    }
+
+    private void routeArray() {
+        if (config.isRouteClock() && !config.isRouteDesign()) {
+            t.stop().start("Route clock");
+            Net clockNet = array.getNet(config.getTopClockName());
+            DesignTools.makePhysNetNameConsistent(array, clockNet);
+            DesignTools.createPossiblePinsToStaticNets(array);
+            DesignTools.createMissingSitePinInsts(array, clockNet);
+            List<SitePinInst> pinsToRoute = clockNet.getPins();
+
+            PartialRouter.routeDesignPartialNonTimingDriven(array, pinsToRoute);
+        } else if (config.isRouteDesign()) {
+            t.stop().start("Route design");
+            PartialCUFR.routeDesignWithUserDefinedArguments(array, new String[]{
+                    "--fixBoundingBox",
+                    "--useUTurnNodes",
+                    "--nonTimingDriven",
+            });
+        }
+    }
+
+    public void createArray() {
+        // Place the array
+        placeArray();
+
+        // Unroute conflicting nets
+        List<Net> unrouted = NetTools.unrouteNetsWithOverlappingNodes(getArray());
+        if (!unrouted.isEmpty()) {
+            System.out.println("Found " + unrouted.size() + " overlapping nets, that were unrouted.");
+        }
+
+        if (config.isSkipImpl() && config.getTopDesign() == null) {
+            finalizeStandaloneArray();
+        }
+
+        if (config.shouldUnrouteStaticNets()) {
+            unrouteStaticNets(array);
+        }
+        array.getNetlist().consolidateAllToWorkLibrary();
+        array.flattenDesign();
+
+        if (config.isOutOfContext()) {
+            createFlopHarnessForArray(array, getTopClockName());
+        }
+
+        routeArray();
     }
 
     public static void main(String[] args) {
@@ -637,126 +749,20 @@ public class ArrayBuilder {
             return;
         }
 
-        // Load design and options
+        // Create config
         ArrayBuilderConfig config = new ArrayBuilderConfig(args);
+        if (!config.isReuseResults()) {
+            config.setWorkDir("ArrayBuilder-" + FileTools.getTimeStamp().replace(" ", "-"));
+        }
+
+        // Create array builder with config
         ArrayBuilder ab = new ArrayBuilder(config, t);
-        ab.initializeArrayBuilder(options);
+        ab.initializeArrayBuilder();
 
-        // Create a working directory for PerformanceExplorer
-        Path workDir = Paths.get("ArrayBuilder-" + FileTools.getTimeStamp().replace(" ", "-"));
-        ab.setReuseWorkDir((String) options.valueOf(REUSE_RESULTS_OPTS.get(0)));
-        workDir = ab.getReuseWorkDir() == null ? workDir : Paths.get(ab.getReuseWorkDir());
-
-        // Place the array
-        Design array = ab.placeArray(workDir);
-
-        if (ab.getOutputPlacementFileName() != null) {
-            writePlacementToFile(ab.getNewPlacementMap(), ab.outputPlacementFileName);
-        }
-
-        List<Net> unrouted = NetTools.unrouteNetsWithOverlappingNodes(array);
-        if (!unrouted.isEmpty()) {
-            System.out.println("Found " + unrouted.size() + " overlapping nets, that were unrouted.");
-        }
-
-        if (ab.isSkipImpl() && ab.getTopDesign() == null) {
-            EDIFCell top = array.getTopEDIFCell();
-            EDIFHierNet clkNet = array.getNetlist().getHierNetFromName(ab.getKernelClockName());
-            if (clkNet == null) {
-                // Create BUFG and clock net, then connect to all instances
-                Cell bufg = createBUFGCE(array, top, "bufg", array.getDevice().getSite("BUFGCE_X2Y0"));
-                Net clk = array.createNet(ab.getKernelClockName());
-                clk.connect(bufg, "O");
-                Net clkIn = array.createNet(ab.getKernelClockName() + "_in");
-                clkIn.connect(bufg, "I");
-                EDIFPort clkInPort = top.createPort(ab.getKernelClockName(), EDIFDirection.INPUT, 1);
-                clkIn.getLogicalNet().createPortInst(clkInPort);
-                EDIFNet logClkNet = clk.getLogicalNet();
-                for (EDIFCellInst inst : top.getCellInsts()) {
-                    EDIFPort port = inst.getPort(ab.getKernelClockName());
-                    if (port != null) {
-                        logClkNet.createPortInst(port, inst);
-                    }
-                }
-            }
-
-            // Port up unconnected inputs
-            for (EDIFPort topPort : modules.get(0).getNetlist().getTopCell().getPorts()) {
-                if (topPort.isInput()) {
-                    if (top.getPort(topPort.getName()) == null) {
-                        EDIFPort port = top.createPort(topPort);
-                        if (port.isBus()) {
-                            for (int j = 0; j < port.getWidth(); j++) {
-                                EDIFNet net = top.createNet(port.getPortInstNameFromPort(j));
-                                net.createPortInst(port, j);
-                                for (ModuleInst mi : array.getModuleInsts()) {
-                                    net.createPortInst(port, j, mi.getCellInst());
-                                }
-                            }
-                        } else {
-                            EDIFNet net = top.createNet(port.getName());
-                            net.createPortInst(port);
-                            for (ModuleInst mi : array.getModuleInsts()) {
-                                net.createPortInst(port, mi.getCellInst());
-                            }
-                        }
-                    }
-                }
-            }
-
-            PerformanceExplorer.updateClockPeriodConstraint(array, ab.getKernelClockName(), ab.getClockPeriod());
-            array.setDesignOutOfContext(true);
-            array.setAutoIOBuffers(false);
-        }
-
-        if (ab.unrouteStaticNets()) {
-            Net gndNet = array.getNet(Net.GND_NET);
-            if (gndNet != null) {
-                gndNet.unroute();
-            }
-            Net vccNet = array.getNet(Net.VCC_NET);
-            if (vccNet != null) {
-                vccNet.unroute();
-            }
-        }
-        array.getNetlist().consolidateAllToWorkLibrary();
-        array.flattenDesign();
-
-        if (ab.isOutOfContext()) {
-            // Automatically find bounding PBlock based on used Slices, DSPs, and BRAMs
-            Set<Site> usedSites = new HashSet<>();
-            for (SiteInst siteInst : array.getSiteInsts()) {
-                if (siteInst.getName().contains("STATIC_SOURCE_SLICE")) {
-                    continue;
-                }
-                if (isSLICE(siteInst) || isBRAM(siteInst) || isDSP(siteInst)) {
-                    usedSites.add(siteInst.getSite());
-                }
-            }
-            PBlock pBlock = new PBlock(array.getDevice(), usedSites);
-            InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsNearPins(array, ab.getTopClockName(), pBlock);
-        }
-
-        if (ab.isRouteClock() && !ab.isRouteDesign()) {
-            t.stop().start("Route clock");
-            Net clockNet = array.getNet(ab.getTopClockName());
-            DesignTools.makePhysNetNameConsistent(array, clockNet);
-            DesignTools.createPossiblePinsToStaticNets(array);
-            DesignTools.createMissingSitePinInsts(array, clockNet);
-            List<SitePinInst> pinsToRoute = clockNet.getPins();
-
-            PartialRouter.routeDesignPartialNonTimingDriven(array, pinsToRoute);
-        } else if (ab.isRouteDesign()) {
-            t.stop().start("Route design");
-            PartialCUFR.routeDesignWithUserDefinedArguments(array, new String[]{
-                    "--fixBoundingBox",
-                    "--useUTurnNodes",
-                    "--nonTimingDriven",
-            });
-        }
+        ab.createArray();
 
         t.stop().start("Write DCP");
-        array.writeCheckpoint(ab.getOutputName());
+        ab.getArray().writeCheckpoint(ArrayBuilderConfig.getOutputName(args));
         t.stop().printSummary();
     }
 
