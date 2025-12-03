@@ -123,6 +123,7 @@ public class ArrayBuilder {
     public ArrayBuilder(ArrayBuilderConfig config) {
         newPlacementMap = new HashMap<>();
         modInstNames = new ArrayList<>();
+        modules = new ArrayList<>();
         this.config = config;
     }
 
@@ -456,7 +457,6 @@ public class ArrayBuilder {
 
     private List<Pair<Pair<Integer, Integer>, String>> prepareArrayForPlacement() {
         Path workDir = Paths.get(config.getWorkDir());
-        List<Module> modules = new ArrayList<>();
         if (!config.isSkipImpl()) {
             modules = implementKernel(workDir);
         } else /* skipImpl==true */ {
