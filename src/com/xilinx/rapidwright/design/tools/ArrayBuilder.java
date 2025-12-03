@@ -116,10 +116,13 @@ public class ArrayBuilder {
 
     private List<Module> modules;
 
+    private List<String> modInstNames;
+
     private final ArrayBuilderConfig config;
 
     public ArrayBuilder(ArrayBuilderConfig config) {
         newPlacementMap = new HashMap<>();
+        modInstNames = new ArrayList<>();
         this.config = config;
     }
 
@@ -321,6 +324,9 @@ public class ArrayBuilder {
     }
 
     public static Map<String, String> readPlacementFromFile(String fileName) {
+        if (fileName == null) {
+            throw new RuntimeException("Trying to read placement file without providing a file path");
+        }
         Map<String, String> placementMap = new HashMap<>();
         List<String> lines = FileTools.getLinesFromTextFile(fileName);
 
@@ -419,7 +425,36 @@ public class ArrayBuilder {
         return modules;
     }
 
-    private void placeArray() {
+    private List<Pair<Pair<Integer, Integer>, String>> calculateIdealArrayPlacement() {
+        t.stop().start("Calculate ideal array placement");
+        // Find instances in existing design
+        modInstNames = getMatchingModuleInstanceNames(modules.get(0), array);
+        if (modInstNames.isEmpty()) {
+            throw new RuntimeException("Failed to find module instances in top design that match kernel interface");
+        }
+        config.setInstCountLimit(modInstNames.size());
+        Map<EDIFPort, PBlockSide> sideMap = null;
+        if (config.getSideMapFile() != null) {
+            sideMap = InlineFlopTools.parseSideMap(getKernelDesign().getNetlist(), config.getSideMapFile());
+        }
+        setCondensedGraph(new ArrayNetlistGraph(array, modInstNames, sideMap));
+        Map<Pair<Integer, Integer>, String> idealPlacement =
+                getCondensedGraph().getGreedyPlacementGrid();
+        return idealPlacement.entrySet().stream()
+                .map((e) -> new Pair<>(e.getKey(), e.getValue()))
+                .sorted((p1, p2) -> {
+                    Pair<Integer, Integer> pa = p1.getFirst();
+                    Pair<Integer, Integer> pb = p2.getFirst();
+                    if (!Objects.equals(pa.getSecond(), pb.getSecond())) {
+                        return pa.getSecond().compareTo(pb.getSecond());
+                    }
+
+                    return pa.getFirst().compareTo(pb.getFirst());
+                })
+                .collect(Collectors.toList());
+    }
+
+    private List<Pair<Pair<Integer, Integer>, String>> prepareArrayForPlacement() {
         Path workDir = Paths.get(config.getWorkDir());
         List<Module> modules = new ArrayList<>();
         if (!config.isSkipImpl()) {
@@ -466,39 +501,114 @@ public class ArrayBuilder {
             modules.add(m);
         }
 
-        List<String> modInstNames = null;
         List<Pair<Pair<Integer, Integer>, String>> idealPlacementList = null;
         if (getTopDesign() == null) {
             array = new Design("array", getKernelDesign().getPartName());
         } else {
             array = getTopDesign();
-            t.stop().start("Calculate ideal array placement");
-            // Find instances in existing design
-            modInstNames = getMatchingModuleInstanceNames(modules.get(0), array);
-            if (modInstNames.isEmpty()) {
-                throw new RuntimeException("Failed to find module instances in top design that match kernel interface");
-            }
-            config.setInstCountLimit(modInstNames.size());
-            Map<EDIFPort, PBlockSide> sideMap = null;
-            if (config.getSideMapFile() != null) {
-                sideMap = InlineFlopTools.parseSideMap(getKernelDesign().getNetlist(), config.getSideMapFile());
-            }
-            setCondensedGraph(new ArrayNetlistGraph(array, modInstNames, sideMap));
-            Map<Pair<Integer, Integer>, String> idealPlacement =
-                    getCondensedGraph().getGreedyPlacementGrid();
-            idealPlacementList = idealPlacement.entrySet().stream()
-                    .map((e) -> new Pair<>(e.getKey(), e.getValue()))
-                    .sorted((p1, p2) -> {
-                        Pair<Integer, Integer> pa = p1.getFirst();
-                        Pair<Integer, Integer> pb = p2.getFirst();
-                        if (!Objects.equals(pa.getSecond(), pb.getSecond())) {
-                            return pa.getSecond().compareTo(pb.getSecond());
-                        }
-
-                        return pa.getFirst().compareTo(pb.getFirst());
-                    })
-                    .collect(Collectors.toList());
+            idealPlacementList = calculateIdealArrayPlacement();
         }
+        return idealPlacementList;
+    }
+
+    private void placeInstancesWithManualPlacementFile() {
+        Map<String, String> placementMap = readPlacementFromFile(config.getInputPlacementFileName());
+        System.out.println("Placing from specified file");
+        int placed = 0;
+        for (Map.Entry<String, String> entry : placementMap.entrySet()) {
+            String instName = entry.getKey();
+            String anchorName = entry.getValue();
+            EDIFHierCellInst hierInst = array.getNetlist().getHierCellInstFromName(instName);
+            if (hierInst == null) {
+                throw new RuntimeException("Instance name " + instName + " is invalid");
+            }
+            if (modules.size() > 1) {
+                throw new RuntimeException("Manual placement does not work with automated implementation");
+            }
+            Module module = modules.get(0);
+            ModuleInst curr = array.createModuleInst(instName, module);
+
+            Site anchor = array.getDevice().getSite(anchorName);
+
+            boolean wasPlaced = curr.place(anchor, true, false);
+            if (!wasPlaced) {
+                throw new RuntimeException("Unable to place cell " + instName + " at site " + anchor);
+            }
+
+            if (straddlesClockRegion(curr)) {
+                curr.unplace();
+                throw new RuntimeException("Chosen site anchor " + anchor + " straddles multiple clock regions");
+            }
+
+            newPlacementMap.put(curr, anchor);
+            placed++;
+            System.out.println("  ** PLACED: " + placed + " " + anchor + " " + curr.getName());
+        }
+    }
+
+    private void placeModuleInstancesAutomatically(List<Pair<Pair<Integer, Integer>, String>> idealPlacementList) {
+        int placed = 0;
+        ModuleInst curr = null;
+        int i = 0;
+
+        // TODO: Figure out how to handle placement for multiple modules
+        Module module = modules.get(0);
+        RelocatableTileRectangle boundingBox = module.getBoundingBox();
+        List<RelocatableTileRectangle> boundingBoxes = new ArrayList<>();
+        List<List<Site>> validPlacementGrid = getValidPlacementGrid(module);
+        int gridX = 0;
+        int gridY = 5;
+        int lastYCoordinate = 0;
+        boolean searchDown = true;
+        while (placed < config.getInstCountLimit()) {
+            if (curr == null) {
+                String instName = modInstNames == null ? ("inst_" + i) : idealPlacementList.get(i).getSecond();
+                int yCoordinate = idealPlacementList.get(i).getFirst().getSecond();
+                if (yCoordinate > lastYCoordinate) {
+                    gridX = 0;
+                    searchDown = true;
+                }
+                lastYCoordinate = yCoordinate;
+                curr = array.createModuleInst(instName, module);
+                i++;
+            }
+            if (gridY >= validPlacementGrid.size()) {
+                throw new RuntimeException("Optimal placement is too tall for device");
+            }
+            if (gridX >= validPlacementGrid.get(gridY).size()) {
+                throw new RuntimeException("Optimal placement is too wide for device");
+            }
+            Site anchor = validPlacementGrid.get(gridY).get(gridX);
+            RelocatableTileRectangle newBoundingBox =
+                    boundingBox.getCorresponding(anchor.getTile(), module.getAnchor().getTile());
+            boolean noOverlap = boundingBoxes.stream().noneMatch((b) -> b.overlaps(newBoundingBox));
+            if (config.isExactPlacement() || (noOverlap && !boundingBoxStraddlesClockRegion(newBoundingBox))) {
+                if (curr.place(anchor, true, false)) {
+                    if (config.isExactPlacement() && (straddlesClockRegion(curr)
+                            || !NetTools.getNetsWithOverlappingNodes(array).isEmpty())
+                    ) {
+                        curr.unplace();
+                    } else {
+                        boundingBoxes.add(newBoundingBox);
+                        placed++;
+                        newPlacementMap.put(curr, anchor);
+                        System.out.println("  ** PLACED: " + placed + " " + anchor + " " + curr.getName()
+                                + " " + curr.getAnchor().getTile().getSLR());
+                        curr = null;
+                        searchDown = false;
+                    }
+                }
+            }
+            if (!searchDown) {
+                gridX++;
+            } else {
+                gridY++;
+            }
+        }
+    }
+
+    private void placeArray() {
+        List<Pair<Pair<Integer, Integer>, String>> idealPlacementList = prepareArrayForPlacement();
 
         t.stop().start("Place Instances");
         if (config.getOutputPlacementLocsFileName() != null) {
@@ -515,98 +625,10 @@ public class ArrayBuilder {
             }
         }
 
-        int placed = 0;
-
         if (config.getInputPlacementFileName() != null) {
-            Map<String, String> placementMap = readPlacementFromFile(config.getInputPlacementFileName());
-            System.out.println("Placing from specified file");
-            for (Map.Entry<String, String> entry : placementMap.entrySet()) {
-                String instName = entry.getKey();
-                String anchorName = entry.getValue();
-                EDIFHierCellInst hierInst = array.getNetlist().getHierCellInstFromName(instName);
-                if (hierInst == null) {
-                    throw new RuntimeException("Instance name " + instName + " is invalid");
-                }
-                if (modules.size() > 1) {
-                    throw new RuntimeException("Manual placement does not work with automated implementation");
-                }
-                Module module = modules.get(0);
-                ModuleInst curr = array.createModuleInst(instName, module);
-
-                Site anchor = array.getDevice().getSite(anchorName);
-
-                boolean wasPlaced = curr.place(anchor, true, false);
-                if (!wasPlaced) {
-                    throw new RuntimeException("Unable to place cell " + instName + " at site " + anchor);
-                }
-
-                if (straddlesClockRegion(curr)) {
-                    curr.unplace();
-                    throw new RuntimeException("Chosen site anchor " + anchor + " straddles multiple clock regions");
-                }
-
-                newPlacementMap.put(curr, anchor);
-                placed++;
-                System.out.println("  ** PLACED: " + placed + " " + anchor + " " + curr.getName());
-            }
+            placeInstancesWithManualPlacementFile();
         } else {
-            ModuleInst curr = null;
-            int i = 0;
-
-            // TODO: Figure out how to handle placement for multiple modules
-            Module module = modules.get(0);
-            RelocatableTileRectangle boundingBox = module.getBoundingBox();
-            List<RelocatableTileRectangle> boundingBoxes = new ArrayList<>();
-            List<List<Site>> validPlacementGrid = getValidPlacementGrid(module);
-            int gridX = 0;
-            int gridY = 5;
-            int lastYCoordinate = 0;
-            boolean searchDown = true;
-            while (placed < config.getInstCountLimit()) {
-                if (curr == null) {
-                    String instName = modInstNames == null ? ("inst_" + i) : idealPlacementList.get(i).getSecond();
-                    int yCoordinate = idealPlacementList.get(i).getFirst().getSecond();
-                    if (yCoordinate > lastYCoordinate) {
-                        gridX = 0;
-                        searchDown = true;
-                    }
-                    lastYCoordinate = yCoordinate;
-                    curr = array.createModuleInst(instName, module);
-                    i++;
-                }
-                if (gridY >= validPlacementGrid.size()) {
-                    throw new RuntimeException("Optimal placement is too tall for device");
-                }
-                if (gridX >= validPlacementGrid.get(gridY).size()) {
-                    throw new RuntimeException("Optimal placement is too wide for device");
-                }
-                Site anchor = validPlacementGrid.get(gridY).get(gridX);
-                RelocatableTileRectangle newBoundingBox =
-                        boundingBox.getCorresponding(anchor.getTile(), module.getAnchor().getTile());
-                boolean noOverlap = boundingBoxes.stream().noneMatch((b) -> b.overlaps(newBoundingBox));
-                if (config.isExactPlacement() || (noOverlap && !boundingBoxStraddlesClockRegion(newBoundingBox))) {
-                    if (curr.place(anchor, true, false)) {
-                        if (config.isExactPlacement() && (straddlesClockRegion(curr)
-                                || !NetTools.getNetsWithOverlappingNodes(array).isEmpty())
-                        ) {
-                            curr.unplace();
-                        } else {
-                            boundingBoxes.add(newBoundingBox);
-                            placed++;
-                            newPlacementMap.put(curr, anchor);
-                            System.out.println("  ** PLACED: " + placed + " " + anchor + " " + curr.getName()
-                                    + " " + curr.getAnchor().getTile().getSLR());
-                            curr = null;
-                            searchDown = false;
-                        }
-                    }
-                }
-                if (!searchDown) {
-                    gridX++;
-                } else {
-                    gridY++;
-                }
-            }
+            placeModuleInstancesAutomatically(idealPlacementList);
         }
 
         if (config.getOutputPlacementFileName() != null) {
