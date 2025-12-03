@@ -678,7 +678,8 @@ public class ArrayBuilder {
         }
     }
 
-    private static void createFlopHarnessForArray(Design array, String topClockName) {
+    private void createFlopHarnessForArray() {
+        t.stop().start("Create flop harness");
         // Automatically find bounding PBlock based on used Slices, DSPs, and BRAMs
         Set<Site> usedSites = new HashSet<>();
         for (SiteInst siteInst : array.getSiteInsts()) {
@@ -690,7 +691,7 @@ public class ArrayBuilder {
             }
         }
         PBlock pBlock = new PBlock(array.getDevice(), usedSites);
-        InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsNearPins(array, topClockName, pBlock);
+        InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsNearPins(array, getTopClockName(), pBlock);
     }
 
     private void routeArray() {
@@ -734,7 +735,7 @@ public class ArrayBuilder {
         array.flattenDesign();
 
         if (config.isOutOfContext()) {
-            createFlopHarnessForArray(array, getTopClockName());
+            createFlopHarnessForArray();
         }
 
         routeArray();
