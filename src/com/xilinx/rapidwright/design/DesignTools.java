@@ -3426,6 +3426,64 @@ public class DesignTools {
         ParallelismTools.join(futures);
     }
 
+    /**
+     * Make a single physical Net's name consistent with its logical (EDIF) netlist.
+     * @param design Design containing the net
+     * @param net The physical Net to make consistent
+     * @return The parent physical Net or null if already consistent
+     */
+    public static Net makePhysNetNameConsistent(Design design, Net net) {
+        if (net.isStaticNet()) {
+            Net staticNet = design.getStaticNet(net.getType());
+            if (staticNet != net) {
+                design.movePinsToNewNetDeleteOldNet(net, staticNet, true);
+                return staticNet;
+            }
+            return null;
+        }
+
+        EDIFHierNet hierNet = net.getLogicalHierNet();
+        if (hierNet == null) {
+            return null; // Likely an encrypted cell
+        }
+
+        Map<EDIFHierNet, EDIFHierNet> netParentMap = design.getNetlist().getParentNetMap();
+        EDIFHierNet parentHierNet = netParentMap.get(hierNet);
+        if (parentHierNet == null) {
+            return null;
+        }
+
+        // Check for static net aliases
+        EDIFNet srcNetAlias = parentHierNet.getNet();
+        if (srcNetAlias.isGND()) {
+            Net gndNet = design.getGndNet();
+            design.movePinsToNewNetDeleteOldNet(net, gndNet, true);
+            return gndNet;
+        } else if (srcNetAlias.isVCC()) {
+            Net vccNet = design.getVccNet();
+            design.movePinsToNewNetDeleteOldNet(net, vccNet, true);
+            return vccNet;
+        }
+
+        if (!hierNet.equals(parentHierNet)) {
+            String parentNetName = parentHierNet.getHierarchicalNetName();
+            Net parentPhysNet = design.getNet(parentNetName);
+
+            if (parentPhysNet == null) {
+                // No existing parent net - just rename this one
+                if (!net.rename(parentNetName)) {
+                    System.out.println("WARNING: Failed to change physical net name " + net.getName());
+                }
+            } else {
+                // Parent net exists - merge into it
+                design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
+                return parentPhysNet;
+            }
+        }
+
+        return null;
+    }
+
     public static void createPossiblePinsToStaticNets(Design design) {
         createA1A6ToStaticNets(design);
         createCeClkOfRoutethruFFToVCC(design);

@@ -37,24 +37,29 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.ClockTools;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.design.RelocatableTileRectangle;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockGenerator;
 import com.xilinx.rapidwright.design.blocks.PBlockRange;
+import com.xilinx.rapidwright.design.blocks.PBlockSide;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
@@ -62,7 +67,6 @@ import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -75,6 +79,8 @@ import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.edif.EDIFValueType;
+import com.xilinx.rapidwright.rwroute.PartialCUFR;
+import com.xilinx.rapidwright.rwroute.PartialRouter;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
@@ -110,10 +116,15 @@ public class ArrayBuilder {
     private static final List<String> SKIP_IMPL_OPTS = Arrays.asList("k", "skip-impl");
     private static final List<String> LIMIT_INSTS_OPTS = Arrays.asList("l", "limit-inst-count");
     private static final List<String> TOP_LEVEL_DESIGN_OPTS = Arrays.asList("t", "top-design");
+    private static final List<String> EXACT_PLACEMENT_OPTS = Collections.singletonList("exact-placement");
     private static final List<String> WRITE_PLACEMENT_OPTS = Collections.singletonList("write-placement");
     private static final List<String> PLACEMENT_FILE_OPTS = Collections.singletonList("read-placement");
     private static final List<String> PLACEMENT_GRID_OPTS = Collections.singletonList("write-placement-grid");
     private static final List<String> OUT_OF_CONTEXT_OPTS = Collections.singletonList("out-of-context");
+    private static final List<String> UNROUTE_STATIC_NETS_OPTS = Collections.singletonList("unroute-static-nets");
+    private static final List<String> ROUTE_CLOCK_OPTS = Collections.singletonList("route-clock-only");
+    private static final List<String> ROUTE_DESIGN_OPTS = Collections.singletonList("route");
+    private static final List<String> SIDE_MAP_OPTS = Collections.singletonList("kernel-side-map");
 
     private Design design;
 
@@ -143,6 +154,18 @@ public class ArrayBuilder {
 
     private boolean outOfContext;
 
+    private ArrayNetlistGraph condensedGraph;
+
+    private boolean exactPlacement;
+
+    private boolean unrouteStaticNets;
+
+    private boolean routeClock;
+
+    private boolean routeDesign;
+
+    private String sideMapFile;
+
     public static final double DEFAULT_CLK_PERIOD_TARGET = 2.0;
 
     private OptionParser createOptionParser() {
@@ -166,7 +189,13 @@ public class ArrayBuilder {
                 acceptsAll(PLACEMENT_FILE_OPTS, "Use placement specified in file").withRequiredArg();
                 acceptsAll(PLACEMENT_GRID_OPTS, "Write grid of possible placement locations to specified file").withRequiredArg();
                 acceptsAll(TOP_LEVEL_DESIGN_OPTS, "Top level design with blackboxes/kernel insts").withRequiredArg();
+                acceptsAll(EXACT_PLACEMENT_OPTS, "Use exact module overlap calculation instead of the faster bounding-box method");
                 acceptsAll(OUT_OF_CONTEXT_OPTS, "Specifies that the array will be compiled out of context");
+                acceptsAll(UNROUTE_STATIC_NETS_OPTS, "Unroute static (GND/VCC) nets to potentially help with routability");
+                acceptsAll(ROUTE_CLOCK_OPTS, "Route clock using RWRoute");
+                acceptsAll(ROUTE_DESIGN_OPTS, "Route the built array using RWRoute");
+                acceptsAll(SIDE_MAP_OPTS, "Provide a text file specifying which side of the pblock each " +
+                        "top-level port routes to. Used to place array optimally for routability.").withRequiredArg();
                 acceptsAll(HELP_OPTS, "Print this help message").forHelp();
             }
         };
@@ -292,7 +321,7 @@ public class ArrayBuilder {
         this.outputPlacementLocsFileName = outputPlacementLocsFileName;
     }
 
-    public boolean getOutOfContext() {
+    public boolean isOutOfContext() {
         return outOfContext;
     }
 
@@ -300,11 +329,64 @@ public class ArrayBuilder {
         this.outOfContext = outOfContext;
     }
 
+    public ArrayNetlistGraph getCondensedGraph() {
+        return condensedGraph;
+    }
+
+    public void setCondensedGraph(ArrayNetlistGraph condensedGraph) {
+        this.condensedGraph = condensedGraph;
+    }
+
+    public boolean isExactPlacement() {
+        return exactPlacement;
+    }
+
+    public void setExactPlacement(boolean exactPlacement) {
+        this.exactPlacement = exactPlacement;
+    }
+
+    public boolean unrouteStaticNets() {
+        return unrouteStaticNets;
+    }
+
+    public void setUnrouteStaticNets(boolean unrouteStaticNets) {
+        this.unrouteStaticNets = unrouteStaticNets;
+    }
+
+    public boolean isRouteClock() {
+        return routeClock;
+    }
+
+    public void setRouteClock(boolean routeClock) {
+        this.routeClock = routeClock;
+    }
+
+    public boolean isRouteDesign() {
+        return routeDesign;
+    }
+
+    public void setRouteDesign(boolean routeDesign) {
+        this.routeDesign = routeDesign;
+    }
+
+    public String getSideMapFile() {
+        return sideMapFile;
+    }
+
+    public void setSideMapFile(String sideMapFile) {
+        this.sideMapFile = sideMapFile;
+    }
+
     private void initializeArrayBuilder(OptionSet options) {
-        Path inputFile = null;
+        Path inputFile;
 
         setSkipImpl(options.has(SKIP_IMPL_OPTS.get(0)));
         setOutOfContext(options.has(OUT_OF_CONTEXT_OPTS.get(0)));
+        setExactPlacement(options.has(EXACT_PLACEMENT_OPTS.get(0)));
+        setUnrouteStaticNets(options.has(UNROUTE_STATIC_NETS_OPTS.get(0)));
+        setRouteClock(options.has(ROUTE_CLOCK_OPTS.get(0)));
+        setRouteDesign(options.has(ROUTE_DESIGN_OPTS.get(0)));
+        setSideMapFile((String) options.valueOf(SIDE_MAP_OPTS.get(0)));
 
         if (options.has(KERNEL_DESIGN_OPTS.get(0))) {
             inputFile = Paths.get((String) options.valueOf(KERNEL_DESIGN_OPTS.get(0)));
@@ -314,6 +396,7 @@ public class ArrayBuilder {
                     setKernelDesign(Design.readCheckpoint(inputFile, companionEDIF, CodePerfTracker.SILENT));
                 } else {
                     setKernelDesign(Design.readCheckpoint(inputFile));
+                    EDIFTools.removeVivadoBusPreventionAnnotations(getKernelDesign().getNetlist());
                     if (!design.getNetlist().getEncryptedCells().isEmpty()) {
                         System.out.println("Design has encrypted cells");
                     } else {
@@ -403,6 +486,7 @@ public class ArrayBuilder {
         if (options.has(TOP_LEVEL_DESIGN_OPTS.get(0))) {
             Design d = Design.readCheckpoint((String) options.valueOf(TOP_LEVEL_DESIGN_OPTS.get(0)));
             setTopDesign(d);
+            EDIFTools.removeVivadoBusPreventionAnnotations(getTopDesign().getNetlist());
         }
 
         if (options.has(TOP_CLK_NAME_OPTS.get(0))) {
@@ -529,12 +613,36 @@ public class ArrayBuilder {
         };
         for (Module module : modules) {
             lines.add(module.getName() + ":");
-            List<Site> validPlacements = module.getAllValidPlacements().stream().sorted(comparator).collect(Collectors.toList());
+            List<Site> validPlacements = module.getAllValidPlacements().stream().sorted(comparator)
+                    .collect(Collectors.toList());
             for (Site anchor : validPlacements) {
                 lines.add(anchor.getName());
             }
         }
         FileTools.writeLinesToTextFile(lines, fileName);
+    }
+
+    public static List<List<Site>> getValidPlacementGrid(Module module) {
+        List<List<Site>> placementGrid = new ArrayList<>();
+        // Sort by descending Y coordinate, then ascending X coordinate
+        List<Site> sortedValidPlacements = module.getAllValidPlacements().stream().sorted((s1, s2) -> {
+            if (s1.getInstanceY() == s2.getInstanceY()) {
+                return s1.getInstanceX() - s2.getInstanceX();
+            }
+            return s2.getInstanceY() - s1.getInstanceY();
+        }).collect(Collectors.toList());
+        int currentYCoordinate = sortedValidPlacements.get(0).getInstanceY();
+        int i = 0;
+        placementGrid.add(new ArrayList<>());
+        for (Site anchor : sortedValidPlacements) {
+            if (anchor.getInstanceY() < currentYCoordinate) {
+                i++;
+                placementGrid.add(new ArrayList<>());
+            }
+            placementGrid.get(i).add(anchor);
+            currentYCoordinate = anchor.getInstanceY();
+        }
+        return placementGrid;
     }
 
     public static void main(String[] args) {
@@ -561,7 +669,6 @@ public class ArrayBuilder {
         }
 
         List<Module> modules = new ArrayList<>();
-        boolean unrouteStaticNets = false;
         if (!ab.isSkipImpl()) {
             t.stop().start("Implement Kernel");
             FileTools.makeDirs(workDir.toString());
@@ -589,7 +696,7 @@ public class ArrayBuilder {
                     System.out.println("Reading... " + dcpPath);
                     Design d = Design.readCheckpoint(dcpPath);
                     d.setName(d.getName() + "_" + i);
-                    Module m = new Module(d, unrouteStaticNets);
+                    Module m = new Module(d, ab.unrouteStaticNets());
                     modules.add(m);
                     m.setPBlock(pe.getPBlock(i));
                     m.calculateAllValidPlacements(d.getDevice());
@@ -602,8 +709,35 @@ public class ArrayBuilder {
             // Just use the design we loaded and replicate it
             t.stop().start("Calculate Valid Placements");
             removeBUFGs(ab.getKernelDesign());
-            Module m = new Module(ab.getKernelDesign(), unrouteStaticNets);
+            if (ab.unrouteStaticNets()) {
+                Net gndNet = ab.getKernelDesign().getNet(Net.GND_NET);
+                if (gndNet != null) {
+                    gndNet.unroute();
+                    List<SitePinInst> staticSourcePins = new ArrayList<>();
+                    Set<SiteInst> staticSourceSites = new HashSet<>();
+                    for (SitePinInst pin : gndNet.getPins()) {
+                        if (pin.isOutPin() && pin.getSiteInst().getName().startsWith(SiteInst.STATIC_SOURCE)) {
+                            staticSourcePins.add(pin);
+                            staticSourceSites.add(pin.getSiteInst());
+                        }
+                    }
+                    for (SitePinInst pin : staticSourcePins) {
+                        gndNet.removePin(pin);
+                        pin.getSiteInst().removePin(pin);
+                    }
+                    for (SiteInst siteInst : staticSourceSites) {
+                        siteInst.setDesign(null);
+                        siteInst.unPlace();
+                    }
+                }
+                Net vccNet = ab.getKernelDesign().getNet(Net.VCC_NET);
+                if (vccNet != null) {
+                    vccNet.unroute();
+                }
+            }
+            Module m = new Module(ab.getKernelDesign(), ab.unrouteStaticNets());
             m.getNet(ab.getKernelClockName()).unroute();
+
             if (ab.getInputPlacementFileName() == null) {
                 m.calculateAllValidPlacements(ab.getDevice());
             }
@@ -612,19 +746,44 @@ public class ArrayBuilder {
             }
             modules.add(m);
         }
-        t.stop().start("Place Instances");
 
         Design array = null;
         List<String> modInstNames = null;
+        // List containing pairs of (x,y) coordinates with the moduleInst name placed at that ideal (x,y) coordinate
+        List<Pair<Pair<Integer, Integer>, String>> idealPlacementList = null;
         if (ab.getTopDesign() == null) {
             array = new Design("array", ab.getKernelDesign().getPartName());
         } else {
             array = ab.getTopDesign();
+            t.stop().start("Calculate ideal array placement");
             // Find instances in existing design
             modInstNames = getMatchingModuleInstanceNames(modules.get(0), array);
+            if (modInstNames.isEmpty()) {
+                throw new RuntimeException("Failed to find module instances in top design that match kernel interface");
+            }
             ab.setInstCountLimit(modInstNames.size());
+            Map<EDIFPort, PBlockSide> sideMap = null;
+            if (ab.getSideMapFile() != null) {
+                sideMap = InlineFlopTools.parseSideMap(ab.getKernelDesign().getNetlist(), ab.getSideMapFile());
+            }
+            ab.setCondensedGraph(new ArrayNetlistGraph(array, modInstNames, sideMap));
+            Map<Pair<Integer, Integer>, String> idealPlacement =
+                    ab.getCondensedGraph().getGreedyPlacementGrid();
+            idealPlacementList = idealPlacement.entrySet().stream()
+                    .map((e) -> new Pair<>(e.getKey(), e.getValue()))
+                    .sorted((p1, p2) -> {
+                        Pair<Integer, Integer> pa = p1.getFirst();
+                        Pair<Integer, Integer> pb = p2.getFirst();
+                        if (!Objects.equals(pa.getSecond(), pb.getSecond())) {
+                            return pa.getSecond().compareTo(pb.getSecond());
+                        }
+
+                        return pa.getFirst().compareTo(pb.getFirst());
+                    })
+                    .collect(Collectors.toList());
         }
 
+        t.stop().start("Place Instances");
         if (ab.getOutputPlacementLocsFileName() != null) {
             writePlacementLocsToFile(modules, ab.getOutputPlacementLocsFileName());
         }
@@ -676,33 +835,59 @@ public class ArrayBuilder {
         } else {
             ModuleInst curr = null;
             int i = 0;
-            outer: for (Module module : modules) {
-                for (Site anchor : module.getAllValidPlacements()) {
-                    if (curr == null) {
-                        String instName = modInstNames == null ? ("inst_" + i) : modInstNames.get(i);
-                        curr = array.createModuleInst(instName, module);
-                        i++;
+
+            // TODO: Figure out how to handle placement for multiple modules
+            Module module = modules.get(0);
+            RelocatableTileRectangle boundingBox = module.getBoundingBox();
+            List<RelocatableTileRectangle> boundingBoxes = new ArrayList<>();
+            List<List<Site>> validPlacementGrid = getValidPlacementGrid(module);
+            int gridX = 0;
+            int gridY = 5;
+            int lastYCoordinate = 0;
+            boolean searchDown = true;
+            while (placed < ab.getInstCountLimit()) {
+                if (curr == null) {
+                    String instName = modInstNames == null ? ("inst_" + i) : idealPlacementList.get(i).getSecond();
+                    int yCoordinate = idealPlacementList.get(i).getFirst().getSecond();
+                    if (yCoordinate > lastYCoordinate) {
+                        gridX = 0;
+                        searchDown = true;
                     }
+                    lastYCoordinate = yCoordinate;
+                    curr = array.createModuleInst(instName, module);
+                    i++;
+                }
+                if (gridY >= validPlacementGrid.size()) {
+                    throw new RuntimeException("Optimal placement is too tall for device");
+                }
+                if (gridX >= validPlacementGrid.get(gridY).size()) {
+                    throw new RuntimeException("Optimal placement is too wide for device");
+                }
+                Site anchor = validPlacementGrid.get(gridY).get(gridX);
+                RelocatableTileRectangle newBoundingBox =
+                        boundingBox.getCorresponding(anchor.getTile(), module.getAnchor().getTile());
+                boolean noOverlap = boundingBoxes.stream().noneMatch((b) -> b.overlaps(newBoundingBox));
+                if (ab.isExactPlacement() || (noOverlap && !boundingBoxStraddlesClockRegion(newBoundingBox))) {
                     if (curr.place(anchor, true, false)) {
-                        if (straddlesClockRegion(curr)) {
+                        if (ab.isExactPlacement() && (straddlesClockRegion(curr)
+                                || !NetTools.getNetsWithOverlappingNodes(array).isEmpty())
+                        ) {
                             curr.unplace();
-                            continue;
-                        }
-
-                        List<Net> overlapping = NetTools.getNetsWithOverlappingNodes(array);
-                        if (!overlapping.isEmpty()) {
-                            curr.unplace();
-                            continue;
-                        }
-
-                        placed++;
-                        newPlacementMap.put(curr, anchor);
-                        System.out.println("  ** PLACED: " + placed + " " + anchor + " " + curr.getName());
-                        curr = null;
-                        if (placed >= ab.getInstCountLimit()) {
-                            break outer;
+                        } else {
+                            boundingBoxes.add(newBoundingBox);
+                            placed++;
+                            newPlacementMap.put(curr, anchor);
+                            System.out.println("  ** PLACED: " + placed + " " + anchor + " " + curr.getName()
+                                    + " " + curr.getAnchor().getTile().getSLR());
+                            curr = null;
+                            searchDown = false;
                         }
                     }
+                }
+                if (!searchDown) {
+                    gridX++;
+                } else {
+                    gridY++;
                 }
             }
         }
@@ -766,16 +951,26 @@ public class ArrayBuilder {
             array.setAutoIOBuffers(false);
         }
 
-        Net gndNet = array.getNet(Net.GND_NET);
-        gndNet.unroute();
-        Net vccNet = array.getNet(Net.VCC_NET);
-        vccNet.unroute();
+        if (ab.unrouteStaticNets()) {
+            Net gndNet = array.getNet(Net.GND_NET);
+            if (gndNet != null) {
+                gndNet.unroute();
+            }
+            Net vccNet = array.getNet(Net.VCC_NET);
+            if (vccNet != null) {
+                vccNet.unroute();
+            }
+        }
         array.getNetlist().consolidateAllToWorkLibrary();
+        array.flattenDesign();
 
-        if (ab.getOutOfContext()) {
+        if (ab.isOutOfContext()) {
             // Automatically find bounding PBlock based on used Slices, DSPs, and BRAMs
             Set<Site> usedSites = new HashSet<>();
             for (SiteInst siteInst : array.getSiteInsts()) {
+                if (siteInst.getName().contains(SiteInst.STATIC_SOURCE)) {
+                    continue;
+                }
                 if (isSLICE(siteInst) || isBRAM(siteInst) || isDSP(siteInst)) {
                     usedSites.add(siteInst.getSite());
                 }
@@ -784,9 +979,70 @@ public class ArrayBuilder {
             InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsNearPins(array, ab.getTopClockName(), pBlock);
         }
 
+        if (ab.isRouteClock() && !ab.isRouteDesign()) {
+            t.stop().start("Route clock");
+            Net clockNet = array.getNet(ab.getTopClockName());
+            DesignTools.makePhysNetNameConsistent(array, clockNet);
+            DesignTools.createPossiblePinsToStaticNets(array);
+            DesignTools.createMissingSitePinInsts(array, clockNet);
+            List<SitePinInst> pinsToRoute = clockNet.getPins();
+
+            PartialRouter.routeDesignPartialNonTimingDriven(array, pinsToRoute);
+        } else if (ab.isRouteDesign()) {
+            t.stop().start("Route design");
+            PartialCUFR.routeDesignWithUserDefinedArguments(array, new String[]{
+                    "--fixBoundingBox",
+                    "--useUTurnNodes",
+                    "--nonTimingDriven",
+            });
+        }
+
         t.stop().start("Write DCP");
         array.writeCheckpoint(ab.getOutputName());
         t.stop().printSummary();
+    }
+
+    private static Map<Pair<Integer, Integer>, String> foldIdealPlacement(Map<Pair<Integer, Integer>, String> placement,
+                                                                          Map<Integer, Integer> newRowMap) {
+        if (newRowMap.isEmpty()) {
+            return placement;
+        }
+        // Map from (x,y) coordinate to the moduleInst name placed at that ideal (x,y) coordinate
+        Map<Pair<Integer, Integer>, String> newPlacement = new HashMap<>(placement);
+
+        // Check if row updates are unique
+        Set<Integer> fromSet = new HashSet<>();
+        Set<Integer> toSet = new HashSet<>();
+        for (Map.Entry<Integer, Integer> rowUpdate : newRowMap.entrySet()) {
+            if (fromSet.contains(rowUpdate.getKey())) {
+                throw new RuntimeException("Non-unique source row when folding placement");
+            }
+            if (toSet.contains(rowUpdate.getValue())) {
+                throw new RuntimeException("Non-unique destination row when folding placement");
+            }
+            fromSet.add(rowUpdate.getKey());
+            toSet.add(rowUpdate.getValue());
+        }
+        if (!fromSet.containsAll(toSet)) {
+            throw new RuntimeException("Ideal placement folding provided with a non one-to-one mapping");
+        }
+
+        for (Map.Entry<Integer, Integer> rowUpdate : newRowMap.entrySet()) {
+            int fromRow = rowUpdate.getKey();
+            int toRow = rowUpdate.getValue();
+            int currColumn = 0;
+            while (placement.containsKey(new Pair<>(currColumn, fromRow))) {
+                String cell = placement.get(new Pair<>(currColumn, fromRow));
+                newPlacement.put(new Pair<>(currColumn, toRow), cell);
+                currColumn++;
+            }
+            // Remove rest of destination row if rows are not equal length
+            while (placement.containsKey(new Pair<>(currColumn, toRow))) {
+                newPlacement.remove(new Pair<>(currColumn, toRow));
+                currColumn++;
+            }
+        }
+        return newPlacement;
     }
 
     public static Cell createBUFGCE(Design design, EDIFCell parent, String name, Site location) {
@@ -812,6 +1068,14 @@ public class ArrayBuilder {
         bufgce.addPinMapping("CE", "CE");
 
         return bufgce;
+    }
+
+    private static boolean boundingBoxStraddlesClockRegion(RelocatableTileRectangle boundingBox) {
+        ClockRegion cr0 = boundingBox.getMaxColumnTile().getClockRegion();
+        ClockRegion cr1 = boundingBox.getMinColumnTile().getClockRegion();
+        ClockRegion cr2 = boundingBox.getMaxRowTile().getClockRegion();
+        ClockRegion cr3 = boundingBox.getMinRowTile().getClockRegion();
+        return !Stream.of(cr0, cr1, cr2, cr3).allMatch(cr0::equals);
     }
 
     private static boolean straddlesClockRegion(ModuleInst mi) {
@@ -842,7 +1106,8 @@ public class ArrayBuilder {
     private static int getRCLKRowIndex(ClockRegion cr) {
         Tile center = cr.getApproximateCenter();
         int searchGridDim = 0;
-        outer: while (!center.getName().startsWith("RCLK_")) {
+        outer:
+        while (!center.getName().startsWith("RCLK_")) {
             searchGridDim++;
             for (int row = -searchGridDim; row < searchGridDim; row++) {
                 for (int col = -searchGridDim; col < searchGridDim; col++) {
