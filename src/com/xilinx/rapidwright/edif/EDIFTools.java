@@ -1783,18 +1783,25 @@ public class EDIFTools {
         }
     }
 
+    /**
+     * Removes vivado bus prevention annotations from top-level ports. Vivado sometimes adds these annotations
+     * to prevent multiple single bit ports with similar names from getting merged into a single bus. The method
+     * used here will only work on the top-level cell as we do not traverse the netlist to ensure the new names
+     * are consistent.
+     *
+     * @param netlist  The netlist to remove bus prevention annotations from.
+     *
+     */
     public static void removeVivadoBusPreventionAnnotations(EDIFNetlist netlist) {
         EDIFCell top = netlist.getTopCell();
-        for (EDIFCell cell : netlist.getLibrary(top.getLibrary().getName()).getCells()) {
-            List<String> portsToRename = new ArrayList<>();
-            for (EDIFPort p : cell.getPorts()) {
-                if (p.getName().startsWith(VIVADO_PRESERVE_PORT_INTERFACE)) {
-                    portsToRename.add(p.getName());
-                }
+        List<String> portsToRename = new ArrayList<>();
+        for (EDIFPort p : top.getPorts()) {
+            if (p.getName().startsWith(VIVADO_PRESERVE_PORT_INTERFACE)) {
+                portsToRename.add(p.getName());
             }
-            for (String p : portsToRename) {
-                cell.renamePort(p, p.substring(VIVADO_PRESERVE_PORT_INTERFACE.length()));
-            }
+        }
+        for (String p : portsToRename) {
+            top.renamePort(p, p.substring(VIVADO_PRESERVE_PORT_INTERFACE.length()));
         }
     }
 }
