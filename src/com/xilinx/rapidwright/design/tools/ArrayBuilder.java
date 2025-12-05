@@ -73,7 +73,6 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
-import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -750,6 +749,7 @@ public class ArrayBuilder {
 
         Design array = null;
         List<String> modInstNames = null;
+        // List containing pairs of (x,y) coordinates with the moduleInst name placed at that ideal (x,y) coordinate
         List<Pair<Pair<Integer, Integer>, String>> idealPlacementList = null;
         if (ab.getTopDesign() == null) {
             array = new Design("array", ab.getKernelDesign().getPartName());
@@ -968,7 +968,7 @@ public class ArrayBuilder {
             // Automatically find bounding PBlock based on used Slices, DSPs, and BRAMs
             Set<Site> usedSites = new HashSet<>();
             for (SiteInst siteInst : array.getSiteInsts()) {
-                if (siteInst.getName().contains("STATIC_SOURCE_SLICE")) {
+                if (siteInst.getName().contains(SiteInst.STATIC_SOURCE)) {
                     continue;
                 }
                 if (isSLICE(siteInst) || isBRAM(siteInst) || isDSP(siteInst)) {
@@ -1007,6 +1007,7 @@ public class ArrayBuilder {
         if (newRowMap.isEmpty()) {
             return placement;
         }
+        // Map from (x,y) coordinate to the moduleInst name placed at that ideal (x,y) coordinate
         Map<Pair<Integer, Integer>, String> newPlacement = new HashMap<>(placement);
 
         // Check if row updates are unique
