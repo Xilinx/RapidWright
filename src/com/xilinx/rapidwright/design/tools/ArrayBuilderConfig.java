@@ -41,6 +41,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * A collection of customizable parameters for a {@link ArrayBuilder} Object.
+ * Modifications of default parameter values can be done by adding corresponding
+ * options with values to the arguments or by calling the applicable setter method.
+ */
 public class ArrayBuilderConfig {
 
     private Design kernelDesign;
