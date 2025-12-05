@@ -35,9 +35,9 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.blocks.PBlockSide;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.util.Pair;
-import jnr.ffi.annotations.In;
 import org.jgrapht.Graph;
 import org.jgrapht.GraphPath;
 import org.jgrapht.alg.cycle.CycleDetector;
@@ -55,7 +55,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * A graph providing an abstract representation of a netlist comprised of blackbox cells.
+ * Used by ArrayBuilder to calculate an ideal placement for a netlist that minimizes distanced between
+ * nearest neighbors.
+ */
 public class ArrayNetlistGraph {
+    /**
+     * Graph edge that contains an orthogonal direction from the provided side map.
+     * Direction is used to pick a placement that improves routability.
+     */
     private static class NetlistEdge extends DefaultEdge {
         private final PBlockSide direction;
 
@@ -101,13 +110,13 @@ public class ArrayNetlistGraph {
 
     public ArrayNetlistGraph(Design array, List<String> modules, Map<EDIFPort, PBlockSide> sideMap) {
         this();
-        EDIFHierCellInst top = array.getNetlist().getTopHierCellInst();
+        EDIFNetlist netlist = array.getNetlist();
         for (String module : modules) {
             addVertex(module);
         }
 
         for (String module : modules) {
-            EDIFHierCellInst cellInst = array.getNetlist().getHierCellInstFromName(module);
+            EDIFHierCellInst cellInst = netlist.getHierCellInstFromName(module);
             for (EDIFHierPortInst portInst : cellInst.getHierPortInsts()) {
                 if (portInst.isOutput()) {
                     for (EDIFHierPortInst netPortInst : portInst.getHierarchicalNet().getPortInsts()) {
