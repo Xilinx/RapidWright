@@ -92,6 +92,7 @@ public class TimingAndWirelengthReport{
             if (net.getType() != NetType.WIRE) continue;
             if (!RouterHelper.isRoutableNetWithSourceSinks(net)) continue;
             if (net.getSource().toString().contains("CLK")) continue;
+            if (net.getSource().toString().contains("BUF")) continue;
             NetWrapper netplus = createNetWrapper(net);
             for (Node node : RouterHelper.getNodesOfNet(net)) {
                 if (RouteNodeGraph.isExcludedTile(node)) {
