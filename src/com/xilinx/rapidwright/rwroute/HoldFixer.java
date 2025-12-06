@@ -210,7 +210,7 @@ public class HoldFixer {
     /**
      * Computes the wirelength and delay for each net and reports the total wirelength and critical path delay.
      */
-    private void computeStatisticsAndReport() {
+    public void computeStatisticsAndReport() {
         nodeTypeUsage = new HashMap<>();
         nodeTypeLength = new HashMap<>();
         wirelength = 0;
@@ -258,7 +258,7 @@ public class HoldFixer {
         }
     }
 
-    private void fixHoldViolations() {
+    public void fixHoldViolations() {
         computeNetsWirelength();
 
         PriorityQueue<Pair<Connection, Long>> minHeap = new PriorityQueue<>(
