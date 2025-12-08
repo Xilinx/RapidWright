@@ -22,10 +22,21 @@
 package com.xilinx.rapidwright.design.blocks;
 
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Tile;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestPBlock {
+    private PBlockRange getIriQuadPBlockRange(PBlock pblock) {
+        PBlockRange iriRange = null;
+        for (PBlockRange pbr : pblock) {
+            if (pbr.getLowerLeftSite().getName().contains("IRI_QUAD")) {
+                iriRange = pbr;
+            }
+        }
+        return iriRange;
+    }
+
     @Test
     public void testVersalPBlockMove() {
         Device device = Device.getDevice("xcv80");
@@ -33,19 +44,28 @@ public class TestPBlock {
                 "DSP58_CPLX_X0Y398:DSP58_CPLX_X0Y405 SLICE_X92Y796:SLICE_X99Y811");
         PBlock newPblock = new PBlock(device, pblock.getAllSites(null));
 
-        PBlockRange iriRange = null;
-        for (PBlockRange pbr : newPblock) {
-            if (pbr.getLowerLeftSite().getName().contains("IRI_QUAD")) {
-                iriRange = pbr;
-            }
-        }
+        PBlockRange iriRange = getIriQuadPBlockRange(newPblock);
         Assertions.assertNotNull(iriRange);
         Assertions.assertEquals("IRI_QUAD_X58Y3212", iriRange.getLowerLeftSite().getName());
 
-        newPblock.movePBlock(0, 220);
+        boolean wasMoved = newPblock.movePBlock(0, 220);
+        Assertions.assertTrue(wasMoved);
         Assertions.assertEquals("CLE_W_CORE_X28Y624", newPblock.getBottomLeftTile().getName());
         Assertions.assertEquals("CLE_E_CORE_X31Y639", newPblock.getTopRightTile().getName());
         Assertions.assertEquals("IRI_QUAD_X58Y2508", iriRange.getLowerLeftSite().getName());
         Assertions.assertEquals("IRI_QUAD_X59Y2571", iriRange.getUpperRightSite().getName());
+
+        newPblock = new PBlock(device, pblock.getAllSites(null));
+        iriRange = getIriQuadPBlockRange(newPblock);
+        wasMoved = newPblock.movePBlock(34, 243);
+        Assertions.assertTrue(wasMoved);
+        Assertions.assertEquals("CLE_W_CORE_X35Y608", newPblock.getBottomLeftTile().getName());
+        Assertions.assertEquals("CLE_E_CORE_X38Y623", newPblock.getTopRightTile().getName());
+        Assertions.assertEquals("IRI_QUAD_X38Y2444", iriRange.getLowerLeftSite().getName());
+        Assertions.assertEquals("IRI_QUAD_X39Y2507", iriRange.getUpperRightSite().getName());
+
+        newPblock = new PBlock(device, pblock.getAllSites(null));
+        wasMoved = newPblock.movePBlock(1, 1);
+        Assertions.assertFalse(wasMoved);
     }
 }

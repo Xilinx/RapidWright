@@ -40,6 +40,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.util.Utils;
 
 /**
  * Represents a collection of one or more pblock ranges that describe a complete pblock
@@ -437,104 +438,38 @@ public class PBlock extends ArrayList<PBlockRange> {
     /**
      * Attempts to move the pblock by an offset of tiles in the x and y directions.
      * @param dx The number of tiles to move the pblock in the x direction.
-     * @param dy The number of tiles to mvoe the pblock in the y direction.
+     * @param dy The number of tiles to move the pblock in the y direction.
      * @return True if the pblock ranges changed, false if no move was made.
      */
     public boolean movePBlock(int dx, int dy) {
         if (dx == 0 && dy == 0) return false;
-        Tile bl = getBottomLeftTile();
-        Tile tr = getTopRightTile();
-        Device d = tr.getDevice();
-        boolean hasMoved = false;
-        if (dx != 0) {
-            if (dx > 0) {
-                // moving to the right, check the columns to the right most tile
-                for (PBlockRange pbr : this) {
-                    int x = 0;
-                    Site right = pbr.getUpperRightSite().getNeighborSite(x, 0);
-                    int siteIndex = right.getSiteIndexInTile();
-                    int target = right.getTile().getColumn() + dx;
-                    while (right.getTile().getColumn() < target || right.getSiteIndexInTile() != siteIndex) {
-                        x++;
-                        right = pbr.getUpperRightSite().getNeighborSite(x, 0);
-                        if (right.getTile().getColumn() <= target || right.getSiteIndexInTile() != siteIndex) {
-                            hasMoved = true;
-                        }
-                    }
-                    if (hasMoved) {
-                        pbr.setUpperRight(right);
-                        Site otherCorner = pbr.getLowerLeftSite().getNeighborSite(x, 0);
-                        pbr.setLowerLeft(otherCorner);
-                    }
-                }
-            } else {
-                // moving to the left, check the columns to the left most tile
-                for (PBlockRange pbr : this) {
-                    int x = 0;
-                    Site left = pbr.getLowerLeftSite().getNeighborSite(x, 0);
-                    int siteIndex = left.getSiteIndexInTile();
-                    int target = left.getTile().getColumn() + dx;
-                    while (left.getTile().getColumn() > target || left.getSiteIndexInTile() != siteIndex) {
-                        x--;
-                        left = pbr.getLowerLeftSite().getNeighborSite(x, 0);
-                        if (left.getTile().getColumn() >= target || left.getSiteIndexInTile() != siteIndex) {
-                            hasMoved = true;
-                        }
-                    }
-                    if (hasMoved) {
-                        pbr.setLowerLeft(left);
-                        Site otherCorner = pbr.getUpperRightSite().getNeighborSite(x, 0);
-                        pbr.setUpperRight(otherCorner);
-                    }
-                }
-
+        List<PBlockRange> pBlockRanges = new ArrayList<>();
+        for (PBlockRange pbr : this) {
+            Tile left = pbr.getBottomLeftTile();
+            int siteIndex = pbr.getLowerLeftSite().getSiteIndexInTile();
+            Tile newLeft = left.getTileNeighbor(dx, -dy);
+            Site leftSite = pbr.getLowerLeftSite();
+            if (newLeft == null || leftSite.getCorrespondingSite(leftSite.getSiteTypeEnum(), newLeft) == null) {
+                return false;
             }
-        }
-        if (dy != 0) {
-            if (dy > 0) {
-                // moving down, check tiles below
-                for (PBlockRange pbr : this) {
-                    int y = 0;
-                    Site left = pbr.getLowerLeftSite().getNeighborSite(0, y);
-                    int siteIndex = left.getSiteIndexInTile();
-                    int target = left.getTile().getRow() + dy;
-                    while (left.getTile().getRow() < target || left.getSiteIndexInTile() != siteIndex) {
-                        y--;
-                        left = pbr.getLowerLeftSite().getNeighborSite(0, y);
-                        if (left.getTile().getRow() <= target || left.getSiteIndexInTile() != siteIndex) {
-                            hasMoved = true;
-                        }
-                    }
-                    if (hasMoved) {
-                        pbr.setLowerLeft(left);
-                        Site otherCorner = pbr.getUpperRightSite().getNeighborSite(0, y);
-                        pbr.setUpperRight(otherCorner);
-                    }
-                }
-            } else {
-                // moving up, check the rows above
-                for (PBlockRange pbr : this) {
-                    int y = 0;
-                    Site right = pbr.getUpperRightSite().getNeighborSite(0, y);
-                    int siteIndex = right.getSiteIndexInTile();
-                    int target = right.getTile().getRow() + dy;
-                    while (right.getTile().getRow() > target || right.getSiteIndexInTile() != siteIndex) {
-                        y++;
-                        right = pbr.getUpperRightSite().getNeighborSite(0, y);
-                        if (right.getTile().getRow() >= target || right.getSiteIndexInTile() != siteIndex) {
-                            hasMoved = true;
-                        }
-                    }
-                    if (hasMoved) {
-                        pbr.setUpperRight(right);
-                        Site otherCorner = pbr.getLowerLeftSite().getNeighborSite(0, y);
-                        pbr.setLowerLeft(otherCorner);
-                    }
-                }
-
+            Site newLeftSite = newLeft.getSites()[siteIndex];
+            Tile right = pbr.getTopRightTile();
+            Tile newRight = right.getTileNeighbor(dx, -dy);
+            Site rightSite = pbr.getUpperRightSite();
+            if (newRight == null || rightSite.getCorrespondingSite(rightSite.getSiteTypeEnum(), newRight) == null) {
+                return false;
             }
+            int upperRightSiteIndex = pbr.getUpperRightSite().getSiteIndexInTile();
+            Site otherCorner = newRight.getSites()[upperRightSiteIndex];
+            pBlockRanges.add(new PBlockRange(newLeftSite, otherCorner));
         }
-        return hasMoved;
+        int i = 0;
+        for (PBlockRange pbr : pBlockRanges) {
+            this.get(i).setLowerLeft(pbr.getLowerLeftSite());
+            this.get(i).setUpperRight(pbr.getUpperRightSite());
+            i++;
+        }
+        return true;
     }
 
     public static void main(String[] args) {
