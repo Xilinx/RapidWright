@@ -33,14 +33,19 @@ public class TestPBlock {
                 "DSP58_CPLX_X0Y398:DSP58_CPLX_X0Y405 SLICE_X92Y796:SLICE_X99Y811");
         PBlock newPblock = new PBlock(device, pblock.getAllSites(null));
 
-        Assertions.assertTrue(pblock.stream().anyMatch((pbr) -> pbr.getLowerLeftSite().getName().contains("IRI_QUAD")));
-
+        PBlockRange iriRange = null;
         for (PBlockRange pbr : newPblock) {
             if (pbr.getLowerLeftSite().getName().contains("IRI_QUAD")) {
-                Assertions.assertEquals("IRI_QUAD_X58Y3212", pbr.getLowerLeftSite().getName());
+                iriRange = pbr;
             }
         }
+        Assertions.assertNotNull(iriRange);
+        Assertions.assertEquals("IRI_QUAD_X58Y3212", iriRange.getLowerLeftSite().getName());
+
         newPblock.movePBlock(0, 220);
-        System.out.println();
+        Assertions.assertEquals("CLE_W_CORE_X28Y624", newPblock.getBottomLeftTile().getName());
+        Assertions.assertEquals("CLE_E_CORE_X31Y639", newPblock.getTopRightTile().getName());
+        Assertions.assertEquals("IRI_QUAD_X58Y2508", iriRange.getLowerLeftSite().getName());
+        Assertions.assertEquals("IRI_QUAD_X59Y2571", iriRange.getUpperRightSite().getName());
     }
 }
