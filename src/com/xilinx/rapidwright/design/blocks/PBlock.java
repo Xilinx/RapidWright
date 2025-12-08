@@ -40,7 +40,6 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
-import com.xilinx.rapidwright.util.Utils;
 
 /**
  * Represents a collection of one or more pblock ranges that describe a complete pblock
