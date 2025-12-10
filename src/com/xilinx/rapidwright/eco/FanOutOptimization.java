@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.eco;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -35,15 +36,14 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
-import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.placer.blockplacer.Point;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
@@ -54,23 +54,49 @@ import com.xilinx.rapidwright.util.Utils;
  */
 public class FanOutOptimization {
 
-    private static Pair<Site, BEL> findValidPlacementOption(Design design, Cell srcFF, Iterator<Site> itr) {
-        SiteInst si = srcFF.getSiteInst();
-        Net clk = si.getNetFromSiteWire(srcFF.getSiteWireNameFromLogicalPin("C"));
-        Net rst = si.getNetFromSiteWire(srcFF.getSiteWireNameFromLogicalPin("R"));
-        Net ce = si.getNetFromSiteWire(srcFF.getSiteWireNameFromLogicalPin("CE"));
+    private static Set<Unisim> supportedCellTypes;
+    public static Map<String, String> ffTypeRstName;
+
+    static {
+        supportedCellTypes = EnumSet.of(Unisim.FDRE, Unisim.FDSE, Unisim.FDCE, Unisim.FDPE,
+                Unisim.LUT1, Unisim.LUT2, Unisim.LUT3, Unisim.LUT4, Unisim.LUT5, Unisim.LUT6);
+        ffTypeRstName = new HashMap<>();
+        ffTypeRstName.put("FDRE", "R");
+        ffTypeRstName.put("FDSE", "S");
+        ffTypeRstName.put("FDCE", "CLR");
+        ffTypeRstName.put("FDPE", "PRE");
+    }
+
+
+    private static Pair<Site, BEL> findValidPlacementOption(Design design, Cell srcCell,
+            Iterator<Site> itr, ECOPlacementHelper ecoHelper, boolean onlyFindEmptySites) {
+        boolean isFF = srcCell.getBEL().isFF();
+
+        SiteInst si = srcCell.getSiteInst();
+        Net clk = null;
+        Net rst = null;
+        Net ce = null;
+        if (isFF) {
+            String rstName = ffTypeRstName.get(srcCell.getType());
+            clk = si.getNetFromSiteWire(srcCell.getSiteWireNameFromLogicalPin("C"));
+            rst = si.getNetFromSiteWire(srcCell.getSiteWireNameFromLogicalPin(rstName));
+            ce = si.getNetFromSiteWire(srcCell.getSiteWireNameFromLogicalPin("CE"));
+        }
+
         while (itr.hasNext()) {
             Site curr = itr.next();
             SiteInst candidate = design.getSiteInstFromSite(curr);
             if (candidate == null) {
                 // Empty site, let's use it
-                return new Pair<Site, BEL>(curr, curr.getBEL("AFF"));
+                return new Pair<Site, BEL>(curr, curr.getBEL(isFF ? "AFF" : "A6LUT"));
+            } else if (onlyFindEmptySites) {
+                continue;
             }
-            // Perhaps it is better to only use empty sites?
-//            BEL bel = h.getUnusedFlop(si, clk, ce, rst);
-//            if (bel != null) {
-//                return new Pair<Site, BEL>(curr, bel);
-//            }
+            BEL bel = isFF ? ecoHelper.getUnusedFlop(candidate, clk, ce, rst)
+                    : ecoHelper.getUnusedLUT(candidate);
+            if (bel != null) {
+                return new Pair<Site, BEL>(curr, bel);
+            }
         }
         return null;
     }
@@ -94,6 +120,24 @@ public class FanOutOptimization {
      * @param splitByCount Desired number to split the fan out.
      */
     public static void cutFanOutOfRoutedNet(Design design, Net net, int splitByCount) {
+        cutFanOutOfRoutedNet(design, net, splitByCount, /* onlyUseEmptySites= */true);
+    }
+
+    /**
+     * Given a fully placed and routed design and a net driven by a flip flop, this
+     * will replicate the flop by splitByCount times and divide the set of sinks on
+     * the net into neighborhood clusters to be re-routed.
+     * 
+     * @param design            The design
+     * @param net               The high fan out net
+     * @param splitByCount      Desired number to split the fan out.
+     * @param onlyUseEmptySites Flag to indicate that any replicated cells only be
+     *                          placed in empty sites. Default is true and leads to
+     *                          more routable scenarios when combined with
+     *                          `route_design -preserve`.
+     */
+    public static void cutFanOutOfRoutedNet(Design design, Net net, int splitByCount,
+            boolean onlyUseEmptySites) {
         EDIFHierNet logicalNet = net.getLogicalHierNet();
         int srcIdx = -1;
         List<EDIFHierPortInst> snks = logicalNet.getLeafHierPortInsts();
@@ -106,37 +150,65 @@ public class FanOutOptimization {
         EDIFHierPortInst src = snks.remove(srcIdx);
         
         // Replicate source flop splitByCount-1 times
-        Cell driverFlop = src.getPhysicalCell(design);
-        SiteInst si = driverFlop.getSiteInst();
-        // TODO - If srcNet is an internally routed net, we need to bring it out of the SLICE
-        Net srcNet = si.getNetFromSiteWire(driverFlop.getSiteWireNameFromLogicalPin("D"));
-        Net highFanoutNet = si.getNetFromSiteWire(driverFlop.getSiteWireNameFromLogicalPin("Q"));
-        Net clk = si.getNetFromSiteWire(driverFlop.getSiteWireNameFromLogicalPin("C"));
-        Net rst = si.getNetFromSiteWire(driverFlop.getSiteWireNameFromLogicalPin("R"));
-        Net ce = si.getNetFromSiteWire(driverFlop.getSiteWireNameFromLogicalPin("CE"));
+        Cell driverCell = src.getPhysicalCell(design);
+        Unisim cellType = Unisim.valueOf(driverCell.getType());
+        if (!supportedCellTypes.contains(cellType)) {
+            throw new RuntimeException("ERROR: Unsupported driver cell type for fan out optimization "
+                    + cellType
+                    + " of cell '" + driverCell.getName() + "'.");
+        }
+
+        SiteInst si = driverCell.getSiteInst();
+
+        boolean isFF = driverCell.getBEL().isFF();
+        Net highFanoutNet = si
+                .getNetFromSiteWire(driverCell.getSiteWireNameFromLogicalPin(isFF ? "Q" : "O"));
+        Net clk = null;
+        Net rst = null;
+        Net ce = null;
+        String rstName = null;
+        Map<String, Net> srcNets = new HashMap<>();
+        if (isFF) {
+            rstName = ffTypeRstName.get(driverCell.getType());
+            srcNets.put("D", si.getNetFromSiteWire(driverCell.getSiteWireNameFromLogicalPin("D")));
+            clk = si.getNetFromSiteWire(driverCell.getSiteWireNameFromLogicalPin("C"));
+            rst = si.getNetFromSiteWire(driverCell.getSiteWireNameFromLogicalPin(rstName));
+            ce = si.getNetFromSiteWire(driverCell.getSiteWireNameFromLogicalPin("CE"));
+        } else {
+            assert(driverCell.getBEL().isLUT());
+            for (EDIFPortInst pi : driverCell.getEDIFCellInst().getPortInsts()) { 
+                if (!pi.isInput()) continue;
+                String logPinName = pi.getName();
+                Net srcNet = si.getNetFromSiteWire(driverCell.getSiteWireNameFromLogicalPin(logPinName));
+                srcNets.put(logPinName, srcNet);
+            }
+        }
 
         Site highFanoutNetCentroid = ECOPlacementHelper.getCentroidOfNet(highFanoutNet, Utils.sliceTypes);
 
-        EDIFCell parent = driverFlop.getParentCell();
-        Unisim ffType = Unisim.valueOf(driverFlop.getType());
+        EDIFCell parent = driverCell.getParentCell();
         List<Cell> sources = new ArrayList<>();
-        sources.add(driverFlop);
+        sources.add(driverCell);
         List<Net> sourceNets = new ArrayList<>();
         sourceNets.add(highFanoutNet);
         Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(highFanoutNetCentroid).iterator();
-
+        ECOPlacementHelper ecoHelper = new ECOPlacementHelper(design, null);
         for (int i = 0; i < splitByCount - 1; i++) {
-            Pair<Site, BEL> loc = findValidPlacementOption(design, driverFlop, siteItr);
-            String copyName = driverFlop.getName() + "_copy" + i;
-            Cell copy = design.createAndPlaceCell(parent, copyName, ffType, loc.getFirst(), loc.getSecond());
-            copy.setPropertiesMap(driverFlop.getEDIFCellInst().createDuplicatePropertiesMap());
-            srcNet.connect(copy, "D");
-            clk.connect(copy, "C");
-            (rst == null ? design.getGndNet() : rst).connect(copy, "R");
-            (ce == null ? design.getVccNet() : ce).connect(copy, "CE");
+            Pair<Site, BEL> loc = findValidPlacementOption(design, driverCell, siteItr, ecoHelper, onlyUseEmptySites);
+            String copyName = driverCell.getName() + "_copy" + i;
+            Cell copy = design.createAndPlaceCell(parent, copyName, cellType, loc.getFirst(), loc.getSecond());
+            copy.setPropertiesMap(driverCell.getEDIFCellInst().createDuplicatePropertiesMap());
+            for (Entry<String, Net> e : srcNets.entrySet()) {
+                e.getValue().connect(copy, e.getKey());
+            }
+            if (isFF) {
+                clk.connect(copy, "C");
+                (rst == null ? design.getGndNet() : rst).connect(copy, rstName);
+                (ce == null ? design.getVccNet() : ce).connect(copy, "CE");
+            }
             sources.add(copy);
             Net newSrc = design.createNet(highFanoutNet.getName() + "_copy" + i);
-            newSrc.connect(copy, "Q");
+            newSrc.connect(copy, isFF ? "Q" : "O");
             sourceNets.add(newSrc);
         }
         

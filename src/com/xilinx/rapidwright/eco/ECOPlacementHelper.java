@@ -56,6 +56,8 @@ import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.placer.blockplacer.Point;
 import com.xilinx.rapidwright.util.Pair;
 
@@ -83,8 +85,10 @@ public class ECOPlacementHelper {
     private final String[] clkSitePinNames;
     /** Alias to {@link DesignTools#belTypeSitePinNameMapping} for current device series */
     private final Map<String, Pair<String, String>> belTypeSitePinNameMapping;
+    /** Alias to {@link DesignTools#ctrlPinFFMapping} for current device series */
+    private final Map<String, List<String>> ctrlPinFFMapping;
 
-    private static final Map<Series, String[]> ULTRASCALE_CLK_SITEPIN = new EnumMap<>(Series.class);
+    private static final Map<Series, String[]> CLK_SITEPINS = new EnumMap<>(Series.class);
     public static final Set<String> ultraScaleFlopNames = new HashSet<>();
     static {
         // NOTE: Only FF BELs are considered, FF2s are not to limit congestion.
@@ -97,8 +101,10 @@ public class ECOPlacementHelper {
         ultraScaleFlopNames.add("GFF");
         ultraScaleFlopNames.add("HFF");
 
-        ULTRASCALE_CLK_SITEPIN.put(Series.UltraScale, new String[]{"CLK_B1", "CLK_B2"});
-        ULTRASCALE_CLK_SITEPIN.put(Series.UltraScalePlus, new String[]{"CLK1", "CLK2"});
+        CLK_SITEPINS.put(Series.Series7, new String[] { "CLK" });
+        CLK_SITEPINS.put(Series.UltraScale, new String[] { "CLK_B1", "CLK_B2" });
+        CLK_SITEPINS.put(Series.UltraScalePlus, new String[] { "CLK1", "CLK2" });
+        CLK_SITEPINS.put(Series.Versal, CLK_SITEPINS.get(Series.Series7));
     }
 
     /**
@@ -134,8 +140,9 @@ public class ECOPlacementHelper {
 
         // Extract the correct set of clock/enable/reset pins according to device series
         Series series = device.getSeries();
-        clkSitePinNames = ULTRASCALE_CLK_SITEPIN.get(series);
+        clkSitePinNames = CLK_SITEPINS.get(series);
         belTypeSitePinNameMapping = DesignTools.belTypeSitePinNameMapping.get(series);
+        ctrlPinFFMapping = DesignTools.ctrlPinFFMapping.get(series);
     }
 
     /**
@@ -199,7 +206,9 @@ public class ECOPlacementHelper {
                 Net existingClk = existingClkSpi != null ? existingClkSpi.getNet() : null;
                 if (existingClk != null && existingClk != clk) {
                     // Allow pre-existing SitePinInsts if they were deferred for removal
-                    if (deferredRemovals != null && !deferredRemovals.getOrDefault(existingClk, Collections.emptySet()).contains(existingClkSpi)) {
+                    if (deferredRemovals == null || (deferredRemovals != null
+                            && !deferredRemovals.getOrDefault(existingClk, Collections.emptySet())
+                                    .contains(existingClkSpi))) {
                         continue;
                     }
                 }
@@ -207,19 +216,12 @@ public class ECOPlacementHelper {
                 // Check that CE and SR are already connected to the
                 // required nets (if null, to VCC and GND respectively)
                 Pair<String, String> p = belTypeSitePinNameMapping.get(belFlop);
-                Net existingCE = siteInst.getNetFromSiteWire(p.getFirst());
-                if (existingCE != null) {
-                    if ((ce == null && existingCE.getType() != NetType.VCC) ||
-                            (ce != null && !ce.equals(existingCE))) {
-                        continue;
-                    }
+                if (!isFFCtrlPinCompatible(ce, siteInst, p.getFirst(), false)) {
+                    continue;
                 }
-                Net existingSR = siteInst.getNetFromSiteWire(p.getSecond());
-                if (existingSR != null) {
-                    if ((rst == null && existingSR.getType() != NetType.GND) ||
-                            (rst != null && !rst.equals(existingSR))) {
-                        continue;
-                    }
+
+                if (!isFFCtrlPinCompatible(rst, siteInst, p.getSecond(), true)) {
+                    continue;
                 }
 
                 // Compatible BEL found! Return.
@@ -236,6 +238,33 @@ public class ECOPlacementHelper {
         return null;
     }
 
+    private boolean isFFCtrlPinCompatible(Net ctrlNet, SiteInst si, String sitePinName, boolean isRst) {
+        Net existingNet = si.getNetFromSiteWire(sitePinName);
+        NetType staticDefault = isRst ? NetType.GND : NetType.VCC;
+        if (existingNet != null) {
+            if ((ctrlNet == null && existingNet.getType() != staticDefault) ||
+                    (ctrlNet != null && !ctrlNet.equals(existingNet))) {
+                return false;
+            }
+        } else {
+            // Vivado doesn't always mark GND/VCC usage, look at other FF BELs
+            for (String ff : ctrlPinFFMapping.get(sitePinName)) {
+                Cell ffCell = si.getCell(ff);
+                if (ffCell != null) {
+                    String ctrlPin = isRst ? FanOutOptimization.ffTypeRstName.get(ffCell.getType()) : "CE";
+                    EDIFHierPortInst portInst = ffCell.getEDIFHierCellInst().getPortInst(ctrlPin);
+                    EDIFHierNet net = portInst.getHierarchicalNet();
+                    if ((net.getNet().isGND() && staticDefault != NetType.GND) ||
+                        (net.getNet().isVCC() && staticDefault != NetType.VCC) || 
+                        (ctrlNet != null && !net.toString().equals(ctrlNet.getName()))) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+    
     /**
      * Given a SiteInst, find an unused LUT BEL that can host a new LUT6 cell.
      *
