@@ -34,11 +34,15 @@ import java.util.Set;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
@@ -136,8 +140,7 @@ public class FanOutOptimization {
      *                          more routable scenarios when combined with
      *                          `route_design -preserve`.
      */
-    public static void cutFanOutOfRoutedNet(Design design, Net net, int splitByCount,
-            boolean onlyUseEmptySites) {
+    public static void cutFanOutOfRoutedNet(Design design, Net net, int splitByCount, boolean onlyUseEmptySites) {
         EDIFHierNet logicalNet = net.getLogicalHierNet();
         int srcIdx = -1;
         List<EDIFHierPortInst> snks = logicalNet.getLeafHierPortInsts();
@@ -184,49 +187,102 @@ public class FanOutOptimization {
             }
         }
 
-        Site highFanoutNetCentroid = ECOPlacementHelper.getCentroidOfNet(highFanoutNet, Utils.sliceTypes);
-
-        EDIFCell parent = driverCell.getParentCell();
-        List<Cell> sources = new ArrayList<>();
-        sources.add(driverCell);
-        List<Net> sourceNets = new ArrayList<>();
-        sourceNets.add(highFanoutNet);
-        Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(highFanoutNetCentroid).iterator();
-        ECOPlacementHelper ecoHelper = new ECOPlacementHelper(design, null);
-        for (int i = 0; i < splitByCount - 1; i++) {
-            Pair<Site, BEL> loc = findValidPlacementOption(design, driverCell, siteItr, ecoHelper, onlyUseEmptySites);
-            String copyName = driverCell.getName() + "_copy" + i;
-            Cell copy = design.createAndPlaceCell(parent, copyName, cellType, loc.getFirst(), loc.getSecond());
-            copy.setPropertiesMap(driverCell.getEDIFCellInst().createDuplicatePropertiesMap());
-            for (Entry<String, Net> e : srcNets.entrySet()) {
-                e.getValue().connect(copy, e.getKey());
-            }
-            if (isFF) {
-                clk.connect(copy, "C");
-                (rst == null ? design.getGndNet() : rst).connect(copy, rstName);
-                (ce == null ? design.getVccNet() : ce).connect(copy, "CE");
-            }
-            sources.add(copy);
-            Net newSrc = design.createNet(highFanoutNet.getName() + "_copy" + i);
-            newSrc.connect(copy, isFF ? "Q" : "O");
-            sourceNets.add(newSrc);
-        }
-        
-        // Distribute high fanout net sinks among copies
+        // Calculate splitByCount clusters from net sinks and path source pins
         Set<Point> points = new HashSet<>();
         Map<Point, List<EDIFHierPortInst>> pinMap = new HashMap<>();
         boolean includeSources = false;
-        List<EDIFHierPortInst> fanoutSinks = highFanoutNet.getLogicalHierNet().getLeafHierPortInsts(includeSources);
-        for (EDIFHierPortInst ehpi : fanoutSinks) {
+        // Add all sinks of high fanout pins
+        List<EDIFHierPortInst> highFanoutSinks = highFanoutNet.getLogicalHierNet()
+                .getLeafHierPortInsts(includeSources);
+        List<EDIFHierPortInst> clusterPins = new ArrayList<>(highFanoutSinks);
+        // Also add source pins of nets driving to-be-replicated cell if we are replicating a LUT
+        if (!isFF) {
+            for (Net srcNet : srcNets.values()) {
+                List<EDIFHierPortInst> srcs = srcNet.getLogicalHierNet().getSourcePortInsts(false);
+                clusterPins.addAll(srcs);
+            }            
+        }
+        for (EDIFHierPortInst ehpi : clusterPins) {
             Point point = createPoint(ehpi.getPhysicalCell(design));
             points.add(point);
             pinMap.computeIfAbsent(point, l -> new ArrayList<>()).add(ehpi);
         }
         Map<Point, List<Point>> clusters = KMeans.kmeansClustering(points, splitByCount, 50);
 
-        // Disconnect all sinks, we'll reconnect them based on cluster below
-        ECOTools.disconnectNet(design, fanoutSinks);
+        EDIFCell parent = driverCell.getParentCell();
+        List<Cell> sources = new ArrayList<>();
+        sources.add(driverCell);
+        List<Net> sourceNets = new ArrayList<>();
+        sourceNets.add(highFanoutNet);
+        ECOPlacementHelper ecoHelper = new ECOPlacementHelper(design, null);
+        int copyIdx=0; 
 
+        // For each cluster of sinks, find a suitable location for a source cell
+        for (Entry<Point, List<Point>> cluster : clusters.entrySet()) {
+            Site centroid = findClosestSLICE(cluster.getKey(), design.getDevice());
+            Iterator<Site> siteItr = ECOPlacementHelper.spiralOutFrom(centroid).iterator();
+            Pair<Site, BEL> loc = findValidPlacementOption(design, driverCell, siteItr, ecoHelper, onlyUseEmptySites);
+            // If this is the original cell, handle it differently
+            if (copyIdx == 0) {
+                // Move the original cell to the new valid location (approx. centroid)
+                Pair<EDIFHierPortInst, Net> srcPinToRouteOutOfSite = isFF ? getFFSameSiteDriver(driverCell) : null;
+//                EDIFHierPortInst srcPinToRouteOutOfSite = null;
+//                if (isFF) {
+//                    BELPin dInput = driverCell.getBEL().getPin("D");
+//                    SitePIP sitePIP = si.getUsedSitePIP(dInput.getSourcePin());
+//                    BELPin sitePIPInput = sitePIP.getInputPin();
+//
+//                    // If we are moving a FF that is driven by a another cell in the same site, we need to
+//                    //    clean up the site routing
+//                    if (!sitePIPInput.getName().equals("BYP")) {
+//                        BELPin srcBELPin = sitePIPInput.getSourcePin();
+//                        Cell srcCell = si.getCell(srcBELPin.getBEL());
+//                        
+//                        srcCell.getEDIFHierCellInst().getPortInst();
+//                        srcPinToRouteOutOfSite = ;
+//                    }
+//                }
+                
+                DesignTools.fullyUnplaceCell(driverCell, null);
+                
+                if (srcPinToRouteOutOfSite != null) {
+                    // Ensure output site pin gets created
+                    EDIFHierPortInst srcPin = srcPinToRouteOutOfSite.getFirst();
+                    Net srcNet = srcPinToRouteOutOfSite.getSecond();
+                    assert (srcPin != null && srcNet != null);
+                    ECOTools.createExitSitePinInst(design, srcPin, srcNet);
+//                    si.routeSite();
+                }
+                design.placeCell(driverCell, loc.getFirst(), loc.getSecond());
+                driverCell.getSiteInst().routeSite();
+            }
+            else {
+                // Create a new copy of the original driver cell and place on valid location
+                String copyName = driverCell.getName() + "_copy" + copyIdx;
+                Cell copy = design.createAndPlaceCell(parent, copyName, cellType, loc.getFirst(),
+                        loc.getSecond());
+                copy.setPropertiesMap(driverCell.getEDIFCellInst().createDuplicatePropertiesMap());
+                for (Entry<String, Net> e : srcNets.entrySet()) {
+                    e.getValue().connect(copy, e.getKey());
+                }
+                if (isFF) {
+                    clk.connect(copy, "C");
+                    (rst == null ? design.getGndNet() : rst).connect(copy, rstName);
+                    (ce == null ? design.getVccNet() : ce).connect(copy, "CE");
+                }
+                sources.add(copy);
+                Net newSrc = design.createNet(highFanoutNet.getName() + "_copy" + copyIdx);
+                newSrc.connect(copy, isFF ? "Q" : "O");
+                sourceNets.add(newSrc);
+            }
+            copyIdx++;
+        }
+
+        // Disconnect all sinks, we'll reconnect them based on cluster below
+        ECOTools.disconnectNet(design, highFanoutSinks);
+
+        // Due to noise in placement legalization of source cell copies, we still assign
+        // clusters to the best candidate driver cell after they have been placed.
         Map<EDIFHierNet, List<EDIFHierPortInst>> netsToConnect = new HashMap<>();
         boolean[] assigned = new boolean[splitByCount];
         for (Entry<Point, List<Point>> e : clusters.entrySet()) {
@@ -249,7 +305,9 @@ public class FanOutOptimization {
             List<EDIFHierPortInst> assignedSinks = new ArrayList<>();
             for (Point point : e.getValue()) {
                 for (EDIFHierPortInst ehpi : pinMap.get(point)) {
-                    assignedSinks.add(ehpi);
+                    if (ehpi.isInput()) {
+                        assignedSinks.add(ehpi);
+                    }
                 }
             }
             netsToConnect.put(newFanoutNet.getLogicalHierNet(), assignedSinks);
@@ -257,7 +315,43 @@ public class FanOutOptimization {
 
         ECOTools.connectNet(design, netsToConnect, null);
     }
+
+    private static Pair<EDIFHierPortInst, Net> getFFSameSiteDriver(Cell ffCell) {
+        EDIFHierPortInst srcPin = null;
+        BELPin input = ffCell.getBEL().getPin("D");
+        SiteInst si = ffCell.getSiteInst();
+        SitePIP sitePIP = ffCell.getSiteInst().getUsedSitePIP(input.getSourcePin());
+
+        if (sitePIP != null) {
+            BELPin sitePIPInput = sitePIP.getInputPin();
+            BELPin srcBELPin = sitePIPInput.getSourcePin();
+            Cell srcCell = si.getCell(srcBELPin.getBEL());
+            if (srcCell != null) {
+                String logPinName = srcCell.getLogicalPinMapping(srcBELPin.getName());
+                if (logPinName != null) {
+                    srcPin = srcCell.getEDIFHierCellInst().getPortInst(logPinName);
+                    Net net = si.getNetFromSiteWire(srcBELPin.getSiteWireName());
+                    return new Pair<>(srcPin, net);
+                }
+
+            }
+        }
+        return null;
+    }
     
+    private static Site findClosestSLICE(Point point, Device device) {
+        Tile tile = device.getTile(point.y, point.x);
+        Iterator<Tile> tileItr = ECOPlacementHelper.spiralOutFrom(tile, null, false).iterator();
+        while (tileItr.hasNext()) {
+            Tile next = tileItr.next();
+            for (Site site : next.getSites()) {
+                if (Utils.isSLICE(site.getSiteTypeEnum()))
+                    return site;
+            }
+        }
+        return null;
+    }
+
     public static void main(String[] args) {
         if (args.length != 4) {
             System.out.println("USAGE: <input.dcp> <high fanout net name> <split net by k> <output>");

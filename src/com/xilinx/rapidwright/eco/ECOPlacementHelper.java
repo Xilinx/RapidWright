@@ -297,6 +297,15 @@ public class ECOPlacementHelper {
         return null;
     }
 
+    public String getFFClkSitePinName(String belName) {
+        int idx = clkSitePinNames.length > 1 ? (belName.charAt(0) > 'D' ? 1 : 0) : 0;
+        return clkSitePinNames[idx];
+    }
+
+    public Pair<String, String> getFFCtrlSitePinNames(String belName) {
+        return belTypeSitePinNameMapping.get(belName);
+    }
+
     public static Site getCentroidOfPoints(Device device, List<Point> points, Set<SiteTypeEnum> targetSiteTypes) {
         if (points.size() == 0) return null;
         Point centroid = KMeans.calculateCentroid(points);
@@ -433,6 +442,79 @@ public class ECOPlacementHelper {
 
                     private boolean insidePblock(Site nextSite) {
                         return pblock == null ? true : pblock.containsTile(nextSite.getTile());
+                    }
+                };
+            }
+        };
+    }
+    
+    /**
+     * Given a home Tile, return an Iterable that yields the neighbouring tiles
+     * encountered when walking outwards in a spiral fashion. 
+     * 
+     * @param tile    Originating Tile.
+     * @param pblock  Also check to ensure the proposed tiles are inside the
+     *                provided pblock.
+     * @param exclude If this flag is true, any sites inside the pblock are
+     *                excluded.
+     * 
+     * @return Iterable<Tile> of neighbouring tiles.
+     */
+    public static Iterable<Tile> spiralOutFrom(Tile tile, PBlock pblock, boolean exclude) {
+        return new Iterable<Tile>() {
+            @NotNull
+            @Override
+            public Iterator<Tile> iterator() {
+                return new Iterator<Tile>() {
+                    // Delta X/Y from home tile
+                    int dx = 0;
+                    int dy = 0;
+                    // Increment X/Y
+                    int ix = -1;
+                    int iy = 0;
+                    int stepsSinceLastTurn = 0;
+                    int stepLimitForNextTurn = 1;
+                    int watchdog = 0;
+
+                    final Tile home = tile;
+                    Tile nextTile = home;
+
+                    @Override
+                    public boolean hasNext() {
+                        return nextTile != null;
+                    }
+
+                    @Override
+                    public Tile next() {
+                        if (nextTile == null) {
+                            throw new NoSuchElementException();
+                        }
+                        Tile retSite = nextTile;
+                        do {
+                            dx += ix;
+                            dy += iy;
+
+                            if (++stepsSinceLastTurn == stepLimitForNextTurn) {
+                                int tmp = ix;
+                                ix = -iy;
+                                iy = tmp;
+
+                                stepsSinceLastTurn = 0;
+                                if (iy == 0) {
+                                    stepLimitForNextTurn++;
+                                }
+                            }
+                            if (++watchdog == 1000000) {
+                                assert(nextTile == null);
+                                break;
+                            }
+                            nextTile = home.getTileNeighbor(dx, dy);
+                        } while (nextTile == null || (exclude ? insidePblock(nextTile) : !insidePblock(nextTile)));
+                        return retSite;
+                    }
+
+                    private boolean insidePblock(Tile nextTile) {
+                        return pblock == null ? true : pblock.containsTile(nextTile);
                     }
                 };
             }
