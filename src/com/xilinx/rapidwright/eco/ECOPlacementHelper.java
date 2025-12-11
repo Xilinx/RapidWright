@@ -253,6 +253,11 @@ public class ECOPlacementHelper {
                 if (ffCell != null) {
                     String ctrlPin = isRst ? FanOutOptimization.ffTypeRstName.get(ffCell.getType()) : "CE";
                     EDIFHierPortInst portInst = ffCell.getEDIFHierCellInst().getPortInst(ctrlPin);
+                    if (portInst == null) {
+                        // If the control signal is not connected yet, let's be pessimistic that it
+                        // won't match later
+                        return false;
+                    }
                     EDIFHierNet net = portInst.getHierarchicalNet();
                     if ((net.getNet().isGND() && staticDefault != NetType.GND) ||
                         (net.getNet().isVCC() && staticDefault != NetType.VCC) || 
