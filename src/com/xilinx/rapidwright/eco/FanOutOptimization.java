@@ -58,6 +58,8 @@ import com.xilinx.rapidwright.util.Utils;
  */
 public class FanOutOptimization {
 
+    public static final String UNIQUE_SUFFIX = "_copy";
+
     private static Set<Unisim> supportedCellTypes;
     public static Map<String, String> ffTypeRstName;
 
@@ -224,41 +226,23 @@ public class FanOutOptimization {
             Pair<Site, BEL> loc = findValidPlacementOption(design, driverCell, siteItr, ecoHelper, onlyUseEmptySites);
             // If this is the original cell, handle it differently
             if (copyIdx == 0) {
-                // Move the original cell to the new valid location (approx. centroid)
                 Pair<EDIFHierPortInst, Net> srcPinToRouteOutOfSite = isFF ? getFFSameSiteDriver(driverCell) : null;
-//                EDIFHierPortInst srcPinToRouteOutOfSite = null;
-//                if (isFF) {
-//                    BELPin dInput = driverCell.getBEL().getPin("D");
-//                    SitePIP sitePIP = si.getUsedSitePIP(dInput.getSourcePin());
-//                    BELPin sitePIPInput = sitePIP.getInputPin();
-//
-//                    // If we are moving a FF that is driven by a another cell in the same site, we need to
-//                    //    clean up the site routing
-//                    if (!sitePIPInput.getName().equals("BYP")) {
-//                        BELPin srcBELPin = sitePIPInput.getSourcePin();
-//                        Cell srcCell = si.getCell(srcBELPin.getBEL());
-//                        
-//                        srcCell.getEDIFHierCellInst().getPortInst();
-//                        srcPinToRouteOutOfSite = ;
-//                    }
-//                }
-                
                 DesignTools.fullyUnplaceCell(driverCell, null);
-                
                 if (srcPinToRouteOutOfSite != null) {
                     // Ensure output site pin gets created
                     EDIFHierPortInst srcPin = srcPinToRouteOutOfSite.getFirst();
                     Net srcNet = srcPinToRouteOutOfSite.getSecond();
                     assert (srcPin != null && srcNet != null);
                     ECOTools.createExitSitePinInst(design, srcPin, srcNet);
-//                    si.routeSite();
                 }
+                // Move the original cell to the new valid location (approx. centroid)
                 design.placeCell(driverCell, loc.getFirst(), loc.getSecond());
                 driverCell.getSiteInst().routeSite();
             }
             else {
                 // Create a new copy of the original driver cell and place on valid location
-                String copyName = driverCell.getName() + "_copy" + copyIdx;
+                String suffix = UNIQUE_SUFFIX + copyIdx;
+                String copyName = driverCell.getName() + suffix;
                 Cell copy = design.createAndPlaceCell(parent, copyName, cellType, loc.getFirst(),
                         loc.getSecond());
                 copy.setPropertiesMap(driverCell.getEDIFCellInst().createDuplicatePropertiesMap());
@@ -271,7 +255,7 @@ public class FanOutOptimization {
                     (ce == null ? design.getVccNet() : ce).connect(copy, "CE");
                 }
                 sources.add(copy);
-                Net newSrc = design.createNet(highFanoutNet.getName() + "_copy" + copyIdx);
+                Net newSrc = design.createNet(highFanoutNet.getName() + suffix);
                 newSrc.connect(copy, isFF ? "Q" : "O");
                 sourceNets.add(newSrc);
             }
