@@ -3796,8 +3796,10 @@ public class DesignTools {
         return flipFlopAndLatchTypesNeedingCeSrToVcc.contains(cellType);
     }
 
-    /** Mapping from device Series to another mapping from FF BEL name to CKEN/SRST site pin name **/
+    /** Mapping from device Series to another mapping from FF BEL name to CKEN/SRST site pin name */
     static public final Map<Series, Map<String, Pair<String, String>>> belTypeSitePinNameMapping;
+    /** Mapping from device Series to ctrl set pins connected FF BEL site names */
+    static public final Map<Series, Map<String, List<String>>> ctrlPinFFMapping;
     static{
         belTypeSitePinNameMapping = new EnumMap<Series, Map<String, Pair<String, String>>>(Series.class);
         Pair<String,String> p;
@@ -3893,6 +3895,17 @@ public class DesignTools {
             versal.put("GFF2", p);
             versal.put("HFF",  p);
             versal.put("HFF2", p);
+        }
+        
+        ctrlPinFFMapping = new HashMap<>();
+        for (Entry<Series, Map<String, Pair<String, String>>> e : belTypeSitePinNameMapping.entrySet()) {
+            Map<String, List<String>> map = new HashMap<>();
+            for (Entry<String, Pair<String, String>> e2 : e.getValue().entrySet()) {
+                for (String pin : new String[] {e2.getValue().getFirst(), e2.getValue().getSecond()}) {
+                    map.computeIfAbsent(pin, l -> new ArrayList<>()).add(e2.getKey());
+                }
+            }
+            ctrlPinFFMapping.put(e.getKey(), map);
         }
     }
 
