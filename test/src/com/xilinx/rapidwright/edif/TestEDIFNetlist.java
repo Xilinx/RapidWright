@@ -438,8 +438,10 @@ class TestEDIFNetlist {
 
         EDIFCell top = origNetlist.getTopCell();
 
-        EDIFCellInst ff = top.createChildCellInst("ff", Design.getPrimitivesLibrary().getCell("FDRE"));
-        origNetlist.getHDIPrimitivesLibrary().addCell(ff.getCellType());
+        EDIFCell fdre = new EDIFCell(Design.getUnisimCell(Unisim.FDRE));
+        EDIFLibrary hdi = origNetlist.getHDIPrimitivesLibrary();
+        hdi.addCell(fdre);
+        EDIFCellInst ff = top.createChildCellInst("ff", fdre);
 
         String portName = "unfortunate_name";
 
@@ -477,8 +479,10 @@ class TestEDIFNetlist {
 
         EDIFCell top = origNetlist.getTopCell();
 
-        EDIFCellInst ff = top.createChildCellInst("ff", Design.getPrimitivesLibrary().getCell("FDRE"));
-        origNetlist.getHDIPrimitivesLibrary().addCell(ff.getCellType());
+        EDIFCell fdre = new EDIFCell(Design.getUnisimCell(Unisim.FDRE));
+        EDIFLibrary hdi = origNetlist.getHDIPrimitivesLibrary();
+        hdi.addCell(fdre);
+        EDIFCellInst ff = top.createChildCellInst("ff", fdre);
 
         String portName = "unfortunate_name";
 
