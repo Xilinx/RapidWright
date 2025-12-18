@@ -161,13 +161,23 @@ public class VivadoTools {
     }
 
     private static Path writeCheckpoint(Design design) {
-        final Path workdir = FileSystems.getDefault()
-                .getPath("vivadoToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
-        File workdirHandle = new File(workdir.toString());
-        workdirHandle.mkdirs();
+        final Path workdir = createTempVivadoToolsWorkDir();
         final Path dcp = workdir.resolve("checkpoint.dcp");
         design.writeCheckpoint(dcp);
         return dcp;
+    }
+
+    /**
+     * Creates a unique, temporary work directory for Vivado interaction.
+     * 
+     * @return
+     */
+    public static Path createTempVivadoToolsWorkDir() {
+        Path workDir = FileSystems.getDefault().getPath("vivadoToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
+        ;
+        File workDirHandle = new File(workDir.toString());
+        workDirHandle.mkdirs();
+        return workDir;
     }
 
     /**
@@ -209,7 +219,6 @@ public class VivadoTools {
                 .getPath("vivadoToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
         File workdirHandle = new File(workdir.toString());
         workdirHandle.mkdirs();
-
         final Path outputLog = workdir.resolve("outputLog.log");
         StringBuilder sb = new StringBuilder();
         sb.append(createTclDCPLoadCommand(dcp, hasEncryptedIP));
@@ -282,15 +291,9 @@ public class VivadoTools {
      * @return ReportRouteStatusResult object.
      */
     public static ReportRouteStatusResult reportRouteStatus(Path dcp, boolean encrypted) {
-        final Path workdir = FileSystems.getDefault()
-                .getPath("vivadoToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
-        File workdirHandle = new File(workdir.toString());
-        workdirHandle.mkdirs();
-
+        final Path workdir = createTempVivadoToolsWorkDir();
         ReportRouteStatusResult rrs = reportRouteStatus(dcp, workdir, encrypted);
-
         FileTools.deleteFolder(workdir.toString());
-
         return rrs;
     }
 
@@ -474,6 +477,31 @@ public class VivadoTools {
         return Float.NaN;
     }
 
+    /**
+     * Creates a utilization report and shapes report for a given synthesized DCP
+     * file.
+     * 
+     * @param design       The input DCP to measure and extract reports from.
+     * @param utilReport   The desired path to a utilization report from Vivado
+     *                     (report_utilization -file <utilReport>).
+     * @param shapesReport The desired shapes report.
+     */
+    public static void getUtilizationAndShapesReport(Path design, Path utilReport, Path shapesReport) {
+        final Path workDir = createTempVivadoToolsWorkDir();
+        final Path outputLog = workDir.resolve("outputLog.log");
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("open_checkpoint " + design.toString() + "\n");
+        sb.append("report_utilization -file " + utilReport.toString() + "\n");
+        sb.append("set_param place.debugShape " + shapesReport.toString() + "\n");
+        sb.append("place_design -directive Quick \n");
+        sb.append("set_param place.debugShape \"\"\n");
+
+        VivadoTools.runTcl(outputLog, sb.toString(), true);
+
+        FileTools.deleteFolder(workDir.toString());
+    }
+  
     /**
      * Open a DCP in Vivado and write a new DCP.
      *

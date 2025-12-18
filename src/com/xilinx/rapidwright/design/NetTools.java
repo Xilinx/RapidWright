@@ -33,10 +33,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
+import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFPort;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
 
 public class NetTools {
     public static final String CONTINUE_ELBOW = "\u251c\u2500 ";
@@ -263,6 +267,52 @@ public class NetTools {
     }
 
     /**
+     * Unroutes routed nets that have one or more overlapping or conflicting nodes
+     * with another route in the design. The choice between which of two or more
+     * nets gets unrouted is arbitrary and nets are unrouted until the set of routed
+     * nets do not overlap.
+     * 
+     * @param design The design to evaluate for conflicting nodes.
+     * @return The list of nets that were unrouted.
+     */
+    public static List<Net> unrouteNetsWithOverlappingNodes(Design design) {
+        List<Net> overlappingNets = getNetsWithOverlappingNodes(design);
+        for (Net net : overlappingNets) {
+            net.unroute();
+        }
+        return overlappingNets;
+    }
+
+    /**
+     * Returns a list of nets with overlapping nodes without unrouting them.
+     *
+     * @param design The design to evaluate for conflicting nodes.
+     * @return The list of nets that overlap.
+     */
+    public static List<Net> getNetsWithOverlappingNodes(Design design) {
+        List<Net> overlappingNets = new ArrayList<>();
+        Map<Node, Net> used = new HashMap<>();
+        for (Net net : design.getNets()) {
+            for (PIP pip : net.getPIPs()) {
+                for (Node node : new Node[] { pip.getStartNode(), pip.getEndNode() }) {
+                    if (node == null)
+                        continue;
+                    Net existing = used.putIfAbsent(node, net);
+                    if (existing != null && existing != net) {
+                        for (PIP oldPip : new ArrayList<>(existing.getPIPs())) {
+                            for (Node oldNode : new Node[] { oldPip.getStartNode(), oldPip.getEndNode() }) {
+                                used.remove(oldNode);
+                            }
+                        }
+                        overlappingNets.add(existing);
+                    }
+                }
+            }
+        }
+        return overlappingNets;
+    }
+
+    /**
      * Returns a string representation of the net's routing tree using tree
      * characters (├─, └─).
      *
@@ -470,5 +520,42 @@ public class NetTools {
         }
 
         return deepestVRoute;
+    }
+
+    /**
+     * Unroute top-level port nets that have PIPs outside the specified PBlock. Vivado can potentially create designs
+     * where the top-level port nets leave the PBlock if the InlineFlopTools flop harness was used and the top-level
+     * port net also has a sink inside the PBlock. Physical net names must be consistent and macro unisims must be
+     * expanded before calling this method.
+     *
+     * @param d The design to unroute nets from.
+     * @param pBlock The bounding box for the placed and routed design.
+     */
+    public static List<Net> unrouteTopLevelNetsThatLeavePBlock(Design d, PBlock pBlock) {
+        List<Net> unroutedNets = new ArrayList<>();
+        for (EDIFPort p : d.getNetlist().getTopCell().getPorts()) {
+            for (int i : p.getBitBlastedIndices()) {
+                EDIFPortInst portInst = p.getInternalPortInstFromIndex(i);
+                if (portInst == null) {
+                    continue;
+                }
+                EDIFHierNet hierNet = new EDIFHierNet(d.getNetlist().getTopHierCellInst(), portInst.getNet());
+                EDIFHierNet parentNet = d.getNetlist().getParentNet(hierNet);
+                Net net = d.getNet(parentNet.getHierarchicalNetName());
+
+                boolean leavesPBlock = false;
+                for (PIP pip : net.getPIPs()) {
+                    if (!pBlock.containsTile(pip.getTile())) {
+                        leavesPBlock = true;
+                        break;
+                    }
+                }
+                if (leavesPBlock) {
+                    net.unroute();
+                    unroutedNets.add(net);
+                }
+            }
+        }
+        return unroutedNets;
     }
 }
