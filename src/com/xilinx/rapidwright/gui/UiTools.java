@@ -25,37 +25,43 @@ package com.xilinx.rapidwright.gui;
 
 import java.io.File;
 
+import com.trolltech.qt.core.QRectF;
+import com.trolltech.qt.core.QSize;
+import com.trolltech.qt.core.QSizeF;
+import com.trolltech.qt.gui.QGraphicsScene;
 import com.trolltech.qt.gui.QPainter;
 import com.trolltech.qt.gui.QPrinter;
 import com.trolltech.qt.svg.QSvgGenerator;
 
 public class UiTools {
+
     private UiTools() {
 
     }
 
-    public static void saveAsSvg(TileScene scene, File file) {
+    public static void saveAsPdf(QGraphicsScene scene, File file) {
+        QRectF sceneRect = scene.sceneRect();
+        QPrinter printer = new QPrinter(QPrinter.PrinterMode.HighResolution);
+        printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat);
+        printer.setOutputFileName(file.toString());
+        // Set custom page size to match scene dimensions for vector output
+        printer.setPaperSize(new QSizeF(sceneRect.width(), sceneRect.height()), QPrinter.Unit.Point);
+        QPainter pdfPainter = new QPainter(printer);
+        scene.render(pdfPainter);
+        pdfPainter.end();
+    }
 
+    public static void saveAsSvg(QGraphicsScene scene, File file) {
+        QRectF sceneRect = scene.sceneRect();
         QSvgGenerator svgGen = new QSvgGenerator();
-
         svgGen.setFileName(file.toString());
-        svgGen.setSize(scene.getSceneSize());
-        svgGen.setViewBox(scene.sceneRect());
-        svgGen.setTitle("RapidWright Scene");
-        svgGen.setDescription(scene.getClass().getSimpleName());
+        svgGen.setSize(new QSize((int) sceneRect.width(), (int) sceneRect.height()));
+        svgGen.setViewBox(sceneRect);
+        svgGen.setTitle("RapidWright Schematic");
+        svgGen.setDescription("Schematic Scene");
 
         QPainter svgPainter = new QPainter(svgGen);
         scene.render(svgPainter);
         svgPainter.end();
-    }
-
-    public static void saveAsPdf(TileScene scene, File file) {
-        QPrinter printer = new QPrinter();
-        printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat);
-        printer.setOutputFileName(file.toString());
-        printer.setPageSize(QPrinter.PageSize.Letter);
-        QPainter pdfPainter = new QPainter(printer);
-        scene.render(pdfPainter);
-        pdfPainter.end();
     }
 }
