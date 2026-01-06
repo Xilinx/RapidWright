@@ -37,8 +37,10 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.SitePIP;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
@@ -49,6 +51,7 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.rwroute.PartialRouter;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
@@ -145,7 +148,6 @@ public class PathReplicator {
      */
     public static void replicatePath(Design src, Design dst, List<String> pathPins) {
         EDIFNetlist netlist = src.getNetlist();
-        
         Set<Cell> cells = new HashSet<>();
         Set<SiteInst> siteInsts = new HashSet<>();
         Map<Net, Set<SitePinInst>> nets = new HashMap<>();
@@ -170,9 +172,14 @@ public class PathReplicator {
                                 SitePinInst clkPin = cell.getSitePinFromLogicalPin(logPinName, null);
                                 nets.computeIfAbsent(clk, s -> new HashSet<>()).add(clkPin);
                                 // Preserve the clock source bufg
-                                for (EDIFHierPortInst srcPortInst : clk.getLogicalHierNet()
-                                        .getLeafHierPortInsts(true, false, false)) {
-                                    cells.add(srcPortInst.getPhysicalCell(src));
+                                List<EDIFHierPortInst> bufgPin = clk.getLogicalHierNet()
+                                        .getLeafHierPortInsts(true, false, false);
+                                assert(bufgPin.size() == 1);
+                                Cell bufg = bufgPin.get(0).getPhysicalCell(src);
+                                cells.add(bufg);
+                                if (bufg.getType().equals("BUFGCE")) {
+                                    SitePinInst ce = bufg.getSitePinFromLogicalPin("CE", null);
+                                    nets.computeIfAbsent(src.getVccNet(), s -> new HashSet<>()).add(ce);
                                 }
                             }
                         }
@@ -184,13 +191,17 @@ public class PathReplicator {
             Net net = ehpi.getRoutedPhysicalNet(src);
             if (net != null && !net.isStaticNet()) {
                 SitePinInst spi = cell.getSitePinFromLogicalPin(ehpi.getPortInst().getName(), null);
-                nets.computeIfAbsent(net, s -> new HashSet<>()).add(spi);
+                Set<SitePinInst> spis = nets.computeIfAbsent(net, s -> new HashSet<>());
+                if (spi != null) {
+                    spis.add(spi);
+                }
             }
         }
         
         // Copy all physical cells
         for (Cell cell : cells) {
-            EDIFHierCellInst hierCell = ensureHierCellInstExists(cell.getEDIFHierCellInst(), dst);
+            EDIFHierCellInst orig = cell.getEDIFHierCellInst();
+            EDIFHierCellInst hierCell = ensureHierCellInstExists(orig, dst);
             Cell dstCell = dst.createCell(hierCell.toString(), hierCell.getInst());
             hierCell.getInst().setPropertiesMap(cell.getEDIFCellInst().createDuplicatePropertiesMap());
             dst.placeCell(dstCell, cell.getSite(), cell.getBEL(), cell.getPhysicalPinMappings());
@@ -201,7 +212,9 @@ public class PathReplicator {
 
         // Ensure all alias parent cells are present in the netlist
         for (Entry<Net, Set<SitePinInst>> e : nets.entrySet()) {
+            if (e.getKey().isStaticNet()) continue;
             for (EDIFHierNet alias : netlist.getNetAliases(e.getKey().getLogicalHierNet())) {
+                // Macros are excluded because they will pull in leaf cells unnecessarily
                 if (!alias.getHierarchicalInst().getCellType().isMacro()) {
                     ensureHierCellInstExists(alias.getHierarchicalInst(), dst);
                 }
@@ -211,21 +224,29 @@ public class PathReplicator {
         // Copy all physical nets
         for (Entry<Net, Set<SitePinInst>> e : nets.entrySet()) {
             Net net = e.getKey();
+
             Set<SitePinInst> pinsToKeep = e.getValue();
             // Copy logical net and aliases
-            EDIFHierNet logHierNet = net.getLogicalHierNet();
-            for (EDIFHierNet alias : netlist.getNetAliases(logHierNet)) {
-                EDIFHierCellInst parent = dstNetlist
-                        .getHierCellInstFromName(alias.getHierarchicalInstName());
-                if (parent != null) {
-                    ensureHierNetExists(alias, dst);
+            Net dstNet = null;
+            if (!net.isStaticNet()) {
+                EDIFHierNet logHierNet = net.getLogicalHierNet();
+                for (EDIFHierNet alias : netlist.getNetAliases(logHierNet)) {
+                    if (dstNetlist.getHierCellInstFromName(alias.getHierarchicalInstName()) != null) {
+                        ensureHierNetExists(alias, dst);
+                    }
                 }
+
+                dstNet = dst.createNet(logHierNet);
+            } else {
+                dstNet = dst.getStaticNet(net.getType());
             }
-            
-            Net dstNet = dst.createNet(logHierNet);
-            
-            for (SitePinInst pin : net.getPins()) {
+
+            for (SitePinInst pin : pinsToKeep) {
                 SiteInst si = pin.getSiteInst();
+                if (si == null) {
+                    continue;
+                }
+
                 // Copy site pins (although they don't exist in DCPs)
                 SiteInst dstSiteInst = dst.getSiteInstFromSiteName(si.getSiteName());
                 if (dstSiteInst == null) {
@@ -233,7 +254,7 @@ public class PathReplicator {
                 }
                 dstNet.createPin(pin.getName(), dstSiteInst);
                 
-                // Copy site routing 
+                // Copy site routing
                 for (String siteWire : pin.getSiteInst().getSiteWiresFromNet(net)) {
                     BELPin[] belPins = dstSiteInst.getSite().getBELPins(siteWire);
                     dstSiteInst.routeIntraSiteNet(dstNet, belPins[0], belPins[0]);
@@ -247,7 +268,7 @@ public class PathReplicator {
                         Cell cell = si.getCell(belPin.getBEL());
                         if (cell != null && cell.isRoutethru() && belPin.isOutput()) {
                             String[] physPinMappings = cell.getPhysicalPinMappings();
-                            for (int i=0; i < physPinMappings.length; i++) {
+                            for (int i = 0; i < physPinMappings.length; i++) {
                                 if (physPinMappings[i] != null) {
                                     BELPin rtInput = cell.getBEL().getPin(i);
                                     if (!dstSiteInst.routeIntraSiteNet(dstNet, rtInput, belPin)) {
@@ -262,7 +283,7 @@ public class PathReplicator {
                                         }
                                         copyCellPinMappings(cell, dstRtCell);
                                     }
-                                    break;                                    
+                                    break;
                                 }
                             }
                         }
@@ -277,6 +298,33 @@ public class PathReplicator {
                     pinsToUnroute.add(pin);
                 }
             }
+            // For static nets, some pins are implicit, we need to filter them as well
+            if (net.isStaticNet()) {
+                for (PIP p : net.getPIPs()) {
+                    Node n = p.getEndNode();
+                    if (n != null) {
+                        SitePin sp = n.getSitePin();
+                        if (sp != null && sp.isInput()) {
+                            SiteInst si = dst.getSiteInstFromSite(sp.getSite());
+                            if (si == null) {
+                                SiteInst origSi = src.getSiteInstFromSite(sp.getSite());
+                                if (origSi != null) {
+                                    SiteInst siDummy = new SiteInst(sp.getSite().getName(),
+                                            origSi.getSiteTypeEnum());
+                                    siDummy.place(sp.getSite());
+                                    SitePinInst spi = new SitePinInst(sp.getPinName(), siDummy);
+                                    // Note: This modifies the source design by adding dummy site pins
+                                    // to the source static net in order to get the desired output from
+                                    // DesignTools.getTrimmablePIPsFromPins().
+                                    net.addPin(spi, false);
+                                    pinsToUnroute.add(spi);
+                                }
+                            }
+                        }
+                    }
+                }                
+            }
+
             // Only keep routing connected to the pins that drive a used site pin
             Set<PIP> pipsToExclude = DesignTools.getTrimmablePIPsFromPins(net, pinsToUnroute);
             for (PIP p : net.getPIPs()) {
@@ -287,6 +335,10 @@ public class PathReplicator {
         }
 
         dst.getNetlist().consolidateAllToWorkLibrary(true);
+
+        // Tie off CE/SR pins
+        DesignTools.createCeSrRstPinsToVCC(dst);
+        PartialRouter.routeDesignPartialNonTimingDriven(dst, null);
     }
 
     public static void main(String[] args) {
