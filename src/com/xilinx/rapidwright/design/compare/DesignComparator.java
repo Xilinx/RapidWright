@@ -21,8 +21,8 @@
  */
 package com.xilinx.rapidwright.design.compare;
 
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -440,10 +440,14 @@ public class DesignComparator {
         
         DesignComparator dc = new DesignComparator();
         int diffs = dc.compareDesigns(design1, design2);
-        try {
-            dc.printDiffReport(args.length == 3 ? new PrintStream(new FileOutputStream(args[2])) : System.out);
-        } catch (FileNotFoundException e) {
-            throw new RuntimeException(e);
+        if (args.length == 3) {
+            try (PrintStream ps = new PrintStream(new FileOutputStream(args[2]))) {
+                dc.printDiffReport(ps);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else {
+            dc.printDiffReport(System.out);
         }
     }
 }
