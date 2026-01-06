@@ -422,6 +422,45 @@ public class TestDesign {
     }
 
     @Test
+    public void testCreateModuleInstHandleRoutethrus(@TempDir Path dir) {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        for (Cell c : d.getCells()) {
+            Assertions.assertFalse(c.isRoutethru());
+        }
+
+        int routeThruCells = 0;
+        for (SiteInst si : d.getSiteInsts()) {
+            for (Cell c : si.getCells()) {
+                if (c.isRoutethru()) {
+                    routeThruCells++;
+                }
+            }
+        }
+        Assertions.assertEquals(1016, routeThruCells);
+
+        Module m = new Module(d);
+
+        Design newDesign = new Design("top", d.getPartName());
+
+        newDesign.createModuleInst("inst", m);
+
+        for (Cell c : newDesign.getCells()) {
+            Assertions.assertFalse(c.isRoutethru());
+        }
+
+        int newDesignRTCells = 0;
+        for (SiteInst si : newDesign.getSiteInsts()) {
+            for (Cell c : si.getCells()) {
+                if (c.isRoutethru()) {
+                    newDesignRTCells++;
+                }
+            }
+        }
+        Assertions.assertEquals(routeThruCells, newDesignRTCells);
+
+    }
+
+    @Test
     public void testCreateModuleInstFromBlackBox(@TempDir Path dir) {
         Design d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks_2024.1.dcp");
         String ilaName = "u_ila_0";
