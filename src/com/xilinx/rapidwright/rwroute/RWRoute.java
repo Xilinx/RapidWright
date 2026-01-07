@@ -1753,6 +1753,181 @@ public class RWRoute {
         targets.clear();
     }
 
+    protected void routeIndirectConnectionBackward(Connection connection) {
+        ConnectionState state = getConnectionState();
+        state.connection = connection;
+        state.sequence = connectionsRouted.incrementAndGet();
+        connectionsRoutedThisIteration.incrementAndGet();
+        state.rnodeCostWeight = 1 - connection.getCriticality();
+        state.shareWeight = (float) (Math.pow(state.rnodeCostWeight, config.getShareExponent()));
+        state.rnodeWLWeight = state.rnodeCostWeight * oneMinusWlWeight;
+        state.estWlWeight = state.rnodeCostWeight * wlWeight;
+        state.dlyWeight = connection.getCriticality() * oneMinusTimingWeight / 100f;
+        state.estDlyWeight = connection.getCriticality() * timingWeight;
+        state.nodesPopped = 0;
+        state.earlyTermination = false;
+
+        PriorityQueue<RouteNode> queue = state.queue;
+        assert(queue.isEmpty());
+
+        prepareRouteConnectionBackward(state);
+
+        RouteNode rnode;
+        while ((rnode = queue.poll()) != null) {
+            state.nodesPopped++;
+            if (rnode.isTarget()) {
+                break;
+            }
+            exploreAndExpandBackward(state, rnode);
+        }
+        nodesPushed.addAndGet(state.nodesPopped + queue.size());
+        nodesPopped.addAndGet(state.nodesPopped);
+
+        if (rnode != null) {
+            queue.clear();
+            finishRouteConnectionBackward(connection, rnode);
+            if (!connection.isRouted()) {
+                List<RouteNode> rnodes = connection.getRnodes();
+                throw new RuntimeException("ERROR: Unable to save routing for connection " + connection + "\n" +
+                                           "       Backtracking terminated at " + rnodes.get(rnodes.size() -1));
+            }
+            if (config.isTimingDriven()) {
+                connection.updateRouteDelay();
+            }
+            assert(connection.isRouted());
+        } else {
+            assert(queue.isEmpty());
+            // Clears previous route of the connection
+            connection.resetRoute();
+            connection.setRouted(false);
+            assert(connection.getRnodes().isEmpty());
+        }
+
+        // Reset the nodes marked as this connection's target(s)
+        List<RouteNode> targets = state.targets;
+        for (RouteNode target : targets) {
+            target.clearTarget();
+        }
+        targets.clear();
+    }
+
+    protected void prepareRouteConnectionBackward(ConnectionState state) {
+        final Connection connection = state.connection;
+
+        // Rips up the connection
+        ripUp(connection);
+        assert(state.queue.isEmpty());
+
+        // Sets the SOURCE rnode of the connection as the target
+        RouteNode sourceRnode = connection.getSourceRnode();
+        sourceRnode.markTarget(state);
+
+        // Adds the SINK rnode to the queue
+        RouteNode sinkRnode = connection.getSinkRnode();
+        float newPartialPathCost = 0;
+        float newTotalPathCost = 0;
+        boolean lookahead = false;
+        push(state, sinkRnode, newPartialPathCost, newTotalPathCost, lookahead);
+    }
+
+    private void exploreAndExpandBackward(ConnectionState state, RouteNode rnode) {
+        // System.out.println("Traversed: " + rnode);
+        final boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(rnode);
+        final Connection connection = state.connection;
+        final int sequence = state.sequence;
+        final PriorityQueue<RouteNode> queue = state.queue;
+        final NetWrapper netWrapper = connection.getNetWrapper();
+
+        for (RouteNode parentRNode : rnode.getParents(routingGraph)) {
+            if (parentRNode.isVisited(sequence)) {
+                continue;
+            }
+
+            Net preservedNet = routingGraph.getPreservedNet(parentRNode);
+            if (preservedNet != null && preservedNet != connection.getNet()) {
+                continue;
+            }
+
+            boolean lookahead = false;
+            if (parentRNode.isTarget()) {
+                state.earlyTermination = true;
+                if (state.earlyTermination) {
+                    assert(!parentRNode.isVisited(sequence));
+                    nodesPushed.addAndGet(queue.size());
+                    queue.clear();
+                }
+            } else {
+                if (!isAccessible(parentRNode, connection)) {
+                    continue;
+                }
+            }
+
+            evaluateCostAndPushBackward(state, rnode, longParent, parentRNode, lookahead);
+            if (state.earlyTermination) {
+                break;
+            }
+        }
+    }
+
+    protected void evaluateCostAndPushBackward(ConnectionState state,
+                                       RouteNode rnode,
+                                       boolean longParent,
+                                       RouteNode parentRNode,
+                                       boolean lookahead) {
+        final Connection connection = state.connection;
+        final int countSourceUses = parentRNode.countConnectionsOfUser(connection.getNetWrapper());
+        final float sharingFactor = 1 + state.shareWeight * countSourceUses;
+        
+        parentRNode.setPrev(rnode);
+
+        float newPartialPathCost = rnode.getUpstreamPathCost();
+        if (parentRNode.getType() != RouteNodeType.EXCLUSIVE_SOURCE) {
+            newPartialPathCost += state.rnodeCostWeight * getNodeCost(parentRNode, connection, countSourceUses, sharingFactor);
+        }
+        newPartialPathCost += state.rnodeWLWeight * parentRNode.getLength() / sharingFactor;
+        
+        if (config.isTimingDriven()) {
+            newPartialPathCost += state.dlyWeight * (parentRNode.getDelay() + DelayEstimatorBase.getExtraDelay(parentRNode, longParent));
+        }
+
+        int parentX = parentRNode.getEndTileXCoordinate();
+        int parentY = parentRNode.getEndTileYCoordinate();
+        
+        RouteNode sourceRnode = connection.getSourceRnode();
+        int sourceX = sourceRnode.getBeginTileXCoordinate();
+        int sourceY = sourceRnode.getBeginTileYCoordinate();
+        
+        int deltaX = Math.abs(parentX - sourceX);
+        int deltaY = Math.abs(parentY - sourceY);
+        
+        float newTotalPathCost = newPartialPathCost + state.estWlWeight * (deltaX + deltaY);
+        
+        push(state, parentRNode, newPartialPathCost, newTotalPathCost, lookahead);
+    }
+
+    protected void finishRouteConnectionBackward(Connection connection, RouteNode rnode) {
+        connection.resetRoute();
+        List<RouteNode> path = new ArrayList<>();
+        do {
+            path.add(rnode);
+        } while ((rnode = rnode.getPrev()) != null);
+        
+        // Reverse to match the standard connection rnodes order (Sink -> Source)
+        Collections.reverse(path);
+        for (RouteNode rn : path) {
+            connection.addRnode(rn);
+        }
+        
+        List<RouteNode> rnodes = connection.getRnodes();
+        RouteNode sourceRnode = rnodes.get(rnodes.size() -1);
+        
+        boolean routed = (sourceRnode == connection.getSourceRnode());
+        connection.setRouted(routed);
+        if (routed) {
+            updateUsersAndPresentCongestionCost(connection);
+        }
+    }
+
     protected void enlargeBoundingBox(Connection connection) {
         if (!config.isEnlargeBoundingBox()) {
             return;

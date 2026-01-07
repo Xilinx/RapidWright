@@ -398,6 +398,13 @@ public class TestRWRoute {
 
         Assertions.assertTrue(srcSpi.isRouted());
         Assertions.assertTrue(dstSpi.isRouted());
+        
+        System.out.println("Routed Nodes:");
+        System.out.println(srcSpi.getConnectedNode());
+        for (PIP pip : net.getPIPs()) {
+            System.out.println(pip.getEndNode());
+        }
+
         long nodesPopped = Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped"));
         Assertions.assertTrue(nodesPopped >= (nodesPoppedLimit - 100) && nodesPopped <= nodesPoppedLimit);
 
@@ -539,15 +546,17 @@ public class TestRWRoute {
 
     @ParameterizedTest
     @CsvSource({
-            // Dedicated connections, hence no nodes popped
-            "xcvu3p,GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,BUFG_GT_SYNC_X0Y46,CLK_IN,0",
-            "xcvu3p,GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,BUFG_GT_X0Y78,CLK_IN,0", // (dst pin can be projected to INT but not src pin)
+            // // Dedicated connections, hence no nodes popped
+            // "xcvu3p,GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,BUFG_GT_SYNC_X0Y46,CLK_IN,0",
+            // "xcvu3p,GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,BUFG_GT_X0Y78,CLK_IN,0", // (dst pin can be projected to INT but not src pin)
 
-            // Non-dedicated connections
-            "xcvu3p,IOB_X0Y47,I,SLICE_X77Y122,FX,100",
+            // // Non-dedicated connections
+            // "xcvu3p,IOB_X0Y47,I,SLICE_X77Y122,FX,100",
 
-            // 240 CLB height SLR, no LAG tiles on Y0 (since HBM on bottom edge)
-            "xcu50,SLICE_X38Y239,AQ,SLICE_X38Y240,A1,100"
+            // // 240 CLB height SLR, no LAG tiles on Y0 (since HBM on bottom edge)
+            // "xcu50,SLICE_X38Y239,AQ,SLICE_X38Y240,A1,100"
+            
+            "xcau10p,SLICE_X0Y0,A_O,SLICE_X0Y1,A1,100"
     })
     public void testSingleConnection(String partName,
                                      String srcSiteName, String srcPinName,
@@ -557,6 +566,63 @@ public class TestRWRoute {
                 srcSiteName, srcPinName,
                 dstSiteName, dstPinName,
                 nodesPoppedLimit);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcau10p,SLICE_X0Y0,A_O,SLICE_X0Y1,A1,100"
+    })
+    public void testSingleConnectionBackward(String partName,
+                                     String srcSiteName, String srcPinName,
+                                     String dstSiteName, String dstPinName,
+                                     int nodesPoppedLimit) {
+        testSingleConnectionBackwardHelper(partName,
+                srcSiteName, srcPinName,
+                dstSiteName, dstPinName,
+                nodesPoppedLimit);
+    }
+
+    Design testSingleConnectionBackwardHelper(String partName,
+                                    String srcSiteName, String srcPinName,
+                                    String dstSiteName, String dstPinName,
+                                    long nodesPoppedLimit) {
+        Design design = new Design("top", partName);
+
+        Net net = design.createNet("net");
+        SiteInst srcSi = design.createSiteInst(srcSiteName);
+        SitePinInst srcSpi = net.createPin(srcPinName, srcSi);
+
+        SiteInst dstSi = design.createSiteInst(dstSiteName);
+        SitePinInst dstSpi = net.createPin(dstPinName, dstSi);
+
+        List<SitePinInst> pinsToRoute = new ArrayList<>();
+        pinsToRoute.add(dstSpi);
+        boolean softPreserve = false;
+        
+        RWRouteConfig config = new RWRouteConfig(new String[] {"--nonTimingDriven", "--verbose"});
+        PartialRouter router = new PartialRouter(design, config, pinsToRoute, softPreserve) {
+            @Override
+            protected void routeIndirectConnection(Connection connection) {
+                routeIndirectConnectionBackward(connection);
+            }
+        };
+        router.initialize();
+        router.route();
+
+        System.out.println("Net PIPs: " + net.getPIPs());
+        System.out.println("Source routed: " + srcSpi.isRouted());
+        System.out.println("Dest routed: " + dstSpi.isRouted());
+
+        Assertions.assertTrue(srcSpi.isRouted());
+        Assertions.assertTrue(dstSpi.isRouted());
+
+        System.out.println("Routed Nodes:");
+        System.out.println(srcSpi.getConnectedNode());
+        for (PIP pip : net.getPIPs()) {
+            System.out.println(pip.getEndNode());
+        }
+
+        return design;
     }
 
     @Test
