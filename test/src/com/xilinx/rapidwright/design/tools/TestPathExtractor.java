@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.design.tools;
 
 import java.nio.file.Path;
 
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -32,24 +33,25 @@ import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.VivadoTools;
 import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
-public class TestPathReplicator {
+public class TestPathExtractor {
 
     @Test
-    public void testPathReplicator(@TempDir Path dir) {
-        if (FileTools.isVivadoOnPath()) {
-            Path dcpPath = RapidWrightDCP.getPath("microblazeAndILA_3pblocks_2024.1.dcp");
-            Path pathTxt = dir.resolve("path.txt");
-            String tclCommand = "open_checkpoint " + dcpPath + ";";
-            tclCommand += "set fp [open " + pathTxt + " \"w\"];";
-            tclCommand += " foreach p [get_pins -of [get_timing_paths -nworst 1 ]] {puts $fp $p};";
-            tclCommand += "close $fp";
-            VivadoTools.runTcl(dir.resolve("out.log"), tclCommand, true);
+    public void testPathExtractor(@TempDir Path dir) {
+        Assumptions.assumeTrue(FileTools.isVivadoOnPath());
 
-            Path outputDCP = dir.resolve("path.dcp");
-            
-            PathReplicator.main(new String[] {dcpPath.toString(), outputDCP.toString(), pathTxt.toString()});
+        Path dcpPath = RapidWrightDCP.getPath("microblazeAndILA_3pblocks_2024.1.dcp");
 
-            VivadoToolsHelper.assertFullyRouted(outputDCP);
-        }
+        Path pathTxt = dir.resolve("path.txt");
+        String tclCommand = "open_checkpoint " + dcpPath + ";";
+        tclCommand += "set fp [open " + pathTxt + " \"w\"];";
+        tclCommand += " foreach p [get_pins -of [get_timing_paths -nworst 1 ]] {puts $fp $p};";
+        tclCommand += "close $fp";
+        VivadoTools.runTcl(dir.resolve("out.log"), tclCommand, true);
+
+        Path outputDCP = dir.resolve("path.dcp");
+        
+        PathExtractor.main(new String[] {dcpPath.toString(), outputDCP.toString(), pathTxt.toString()});
+
+        VivadoToolsHelper.assertFullyRouted(outputDCP);
     }
 }

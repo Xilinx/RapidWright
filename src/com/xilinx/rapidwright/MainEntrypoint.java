@@ -41,7 +41,7 @@ import com.xilinx.rapidwright.design.tools.CopyImplementation;
 import com.xilinx.rapidwright.design.tools.DesignObfuscator;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.design.tools.NetlistClockDetection;
-import com.xilinx.rapidwright.design.tools.PathReplicator;
+import com.xilinx.rapidwright.design.tools.PathExtractor;
 import com.xilinx.rapidwright.design.tools.RegroupInstances;
 import com.xilinx.rapidwright.design.tools.RelocationTools;
 import com.xilinx.rapidwright.device.IntentCode;
@@ -190,7 +190,7 @@ public class MainEntrypoint {
         addFunction("PartialCUFR", PartialCUFR::main);
         addFunction("PartialRouter", PartialRouter::main);
         addFunction("PartialDFXRouter", PartialDFXRouter::main);
-        addFunction("PathReplicator", PathReplicator::main);
+        addFunction("PathReplicator", PathExtractor::main);
         addFunction("PBlockGenDebugger", PBlockGenDebugger::main);
         addFunction("PBlockGenerator", PBlockGenerator::main);
         addFunction("PBlock", PBlock::main);
