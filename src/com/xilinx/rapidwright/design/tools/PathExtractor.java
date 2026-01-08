@@ -136,15 +136,28 @@ public class PathExtractor {
 
     private static void addNetCellPins(Map<Net, Map<Pair<SiteInst,BELPin>, List<BELPin>>> nets, Net net, Cell cell, String logPinName) {
         BELPin belPin = cell.getBEL().getPin(cell.getPhysicalPinMapping(logPinName));
-        SitePinInst spi = cell.getSitePinFromLogicalPin(logPinName, null);
-        if (spi == null) {
+        SiteInst si = cell.getSiteInst();
+
+        // Check for multiple site pin outputs
+        List<SitePinInst> spis = new ArrayList<>();
+        for (String pinName : DesignTools.getAllRoutedSitePinsFromPhysicalPin(cell, net, belPin.getName())) {
+            SitePinInst spiMaybe = si.getSitePinInst(pinName);
+            if (spiMaybe != null) {
+                spis.add(spiMaybe);
+            }
+        }
+
+        if (spis.size() == 0) {
+            // This intra-site net is internal, doesn't have a site pin
             nets.computeIfAbsent(net, m -> new HashMap<>())
-            .computeIfAbsent(new Pair<>(cell.getSiteInst(), belPin), l -> new ArrayList<>()).add(belPin);                        
+                .computeIfAbsent(new Pair<>(si, belPin), l -> new ArrayList<>()).add(belPin);                        
         } else {
-            BELPin src = belPin.isOutput() ? belPin : spi.getBELPin();
-            BELPin snk = belPin.isOutput() ? spi.getBELPin() : belPin;
-            nets.computeIfAbsent(net, m -> new HashMap<>())
-            .computeIfAbsent(new Pair<>(cell.getSiteInst(), src), l -> new ArrayList<>()).add(snk);            
+            for (SitePinInst spi : spis) {
+                BELPin src = belPin.isOutput() ? belPin : spi.getBELPin();
+                BELPin snk = belPin.isOutput() ? spi.getBELPin() : belPin;
+                nets.computeIfAbsent(net, m -> new HashMap<>())
+                    .computeIfAbsent(new Pair<>(si, src), l -> new ArrayList<>()).add(snk);
+            }
         }
     }
     
