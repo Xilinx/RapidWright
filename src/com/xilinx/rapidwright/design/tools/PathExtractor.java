@@ -33,6 +33,7 @@ import java.util.Set;
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
+import com.xilinx.rapidwright.design.IntraSiteNet;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -134,7 +135,8 @@ public class PathExtractor {
         }
     }
 
-    private static void captureIntraSiteNets(Map<Net, Map<Pair<SiteInst,BELPin>, List<BELPin>>> nets, Net net, Cell cell, String logPinName) {
+    private static void captureIntraSiteNets(Map<Net, Map<Pair<SiteInst, BELPin>, IntraSiteNet>> nets,
+            Net net, Cell cell, String logPinName) {
         BELPin belPin = cell.getBEL().getPin(cell.getPhysicalPinMapping(logPinName));
         SiteInst si = cell.getSiteInst();
 
@@ -149,14 +151,16 @@ public class PathExtractor {
 
         if (spis.size() == 0) {
             // This intra-site net is internal, doesn't have a site pin
+            Pair<SiteInst, BELPin> isnKey = new Pair<>(si, belPin);
             nets.computeIfAbsent(net, m -> new HashMap<>())
-                .computeIfAbsent(new Pair<>(si, belPin), l -> new ArrayList<>()).add(belPin);                        
+                .computeIfAbsent(isnKey, i -> new IntraSiteNet(si, net, belPin, belPin)).addSink(belPin);                        
         } else {
             for (SitePinInst spi : spis) {
                 BELPin src = belPin.isOutput() ? belPin : spi.getBELPin();
                 BELPin snk = belPin.isOutput() ? spi.getBELPin() : belPin;
+                Pair<SiteInst, BELPin> isnKey = new Pair<>(si, src);
                 nets.computeIfAbsent(net, m -> new HashMap<>())
-                    .computeIfAbsent(new Pair<>(si, src), l -> new ArrayList<>()).add(snk);
+                    .computeIfAbsent(isnKey, i -> new IntraSiteNet(si, net, src, snk)).addSink(snk);
             }
         }
     }
@@ -176,7 +180,9 @@ public class PathExtractor {
         EDIFNetlist netlist = src.getNetlist();
         Set<Cell> cells = new HashSet<>();
         Set<SiteInst> siteInsts = new HashSet<>();
-        Map<Net, Map<Pair<SiteInst, BELPin>, List<BELPin>>> nets = new HashMap<>();
+        // Map that keeps track of all intrasite nets that need to be preserved and copied
+        // Pair<SiteInst, BELPin> is simply a key for the IntraSiteNet object
+        Map<Net, Map<Pair<SiteInst, BELPin>, IntraSiteNet>> nets = new HashMap<>();
         for (String pinName : pathPins) {
             EDIFHierPortInst ehpi = netlist.getHierPortInstFromName(pinName);
             if (ehpi == null) {
@@ -232,9 +238,10 @@ public class PathExtractor {
         EDIFNetlist dstNetlist = dst.getNetlist();
 
         // Ensure all alias parent cells are present in the netlist
-        for (Entry<Net, Map<Pair<SiteInst, BELPin>, List<BELPin>>> e : nets.entrySet()) {
-            if (e.getKey().isStaticNet()) continue;
-            for (EDIFHierNet alias : netlist.getNetAliases(e.getKey().getLogicalHierNet())) {
+        for (Entry<Net, Map<Pair<SiteInst, BELPin>, IntraSiteNet>> e : nets.entrySet()) {
+            Net net = e.getKey();
+            if (net.isStaticNet()) continue;
+            for (EDIFHierNet alias : netlist.getNetAliases(net.getLogicalHierNet())) {
                 // Macros are excluded because they will pull in leaf cells unnecessarily
                 if (!alias.getHierarchicalInst().getCellType().isMacro()) {
                     ensureHierCellInstExists(alias.getHierarchicalInst(), dst);
@@ -243,9 +250,8 @@ public class PathExtractor {
         }
         
         // Copy all physical nets
-        for (Entry<Net, Map<Pair<SiteInst, BELPin>, List<BELPin>>> e : nets.entrySet()) {
+        for (Entry<Net, Map<Pair<SiteInst, BELPin>, IntraSiteNet>> e : nets.entrySet()) {
             Net net = e.getKey();
-            Map<Pair<SiteInst, BELPin>, List<BELPin>> pinsToRoute = e.getValue();
             Set<SitePinInst> pinsToKeep = new HashSet<>();
 
             // Copy logical net and aliases
@@ -263,20 +269,17 @@ public class PathExtractor {
                 dstNet = dst.getStaticNet(net.getType());
             }
 
-            for (Entry<Pair<SiteInst, BELPin>, List<BELPin>> entry : pinsToRoute.entrySet()) {
-                SiteInst si = entry.getKey().getFirst();
-                if (si == null) {
-                    continue;
-                }
-
+            for (Entry<Pair<SiteInst, BELPin>, IntraSiteNet> e2 : e.getValue().entrySet()) {
+                SiteInst si = e2.getKey().getFirst();
+                BELPin srcBELPin = e2.getKey().getSecond();
+                IntraSiteNet intraSiteNet = e2.getValue();
 
                 // Copy site pins (although they don't exist in DCPs)
                 SiteInst dstSiteInst = dst.getSiteInstFromSiteName(si.getSiteName());
                 if (dstSiteInst == null) {
                     continue;
                 }
-                
-                BELPin srcBELPin = entry.getKey().getSecond();
+
                 if (srcBELPin.isSitePort()) {
                     if (net.isStaticNet()) {
                         dstNet.createPin(srcBELPin.getName(), dstSiteInst);
@@ -285,10 +288,9 @@ public class PathExtractor {
                     }
                 }
 
-                for (BELPin sink : entry.getValue()) {
+                for (BELPin sink : intraSiteNet.getSinks()) {
                     dstSiteInst.routeIntraSiteNet(dstNet, srcBELPin, sink);
                 }
-
             }
 
             if (net.isStaticNet()) {
