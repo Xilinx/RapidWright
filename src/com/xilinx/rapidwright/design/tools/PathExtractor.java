@@ -134,7 +134,7 @@ public class PathExtractor {
         }
     }
 
-    private static void addNetCellPins(Map<Net, Map<Pair<SiteInst,BELPin>, List<BELPin>>> nets, Net net, Cell cell, String logPinName) {
+    private static void captureIntraSiteNets(Map<Net, Map<Pair<SiteInst,BELPin>, List<BELPin>>> nets, Net net, Cell cell, String logPinName) {
         BELPin belPin = cell.getBEL().getPin(cell.getPhysicalPinMapping(logPinName));
         SiteInst si = cell.getSiteInst();
 
@@ -195,7 +195,7 @@ public class PathExtractor {
                         if (belPin.isClock()) {
                             Net clk = cell.getSiteInst().getNetFromSiteWire(belPin.getSiteWireName());
                             if (clk != null) {
-                                addNetCellPins(nets, clk, cell, logPinName);
+                                captureIntraSiteNets(nets, clk, cell, logPinName);
                                 // Preserve the clock source bufg
                                 List<EDIFHierPortInst> bufgPin = clk.getLogicalHierNet()
                                         .getLeafHierPortInsts(true, false, false);
@@ -203,8 +203,8 @@ public class PathExtractor {
                                 Cell bufg = bufgPin.get(0).getPhysicalCell(src);
                                 cells.add(bufg);
                                 if (bufg.getType().equals("BUFGCE")) {
-                                    addNetCellPins(nets, src.getVccNet(), bufg, "CE");
-                                    addNetCellPins(nets, clk, bufg, "O");
+                                    captureIntraSiteNets(nets, src.getVccNet(), bufg, "CE");
+                                    captureIntraSiteNets(nets, clk, bufg, "O");
                                 }
                             }
                         }
@@ -215,7 +215,7 @@ public class PathExtractor {
             
             Net net = ehpi.getRoutedPhysicalNet(src);
             if (net != null && !net.isStaticNet()) {
-                addNetCellPins(nets, net, cell, ehpi.getPortInst().getName());
+                captureIntraSiteNets(nets, net, cell, ehpi.getPortInst().getName());
             }
         }
         
@@ -296,7 +296,7 @@ public class PathExtractor {
                 continue;
             }
 
-            // Copy intersite routing
+            // Copy inter-site routing
             Set<SitePinInst> pinsToUnroute = new HashSet<>();
             for (SitePinInst pin : net.getPins()) {
                 if (!pin.isOutPin() && !pinsToKeep.contains(pin)) {
