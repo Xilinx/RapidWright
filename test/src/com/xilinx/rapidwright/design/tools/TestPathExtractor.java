@@ -30,7 +30,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.VivadoTools;
 import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 public class TestPathExtractor {
@@ -40,13 +39,8 @@ public class TestPathExtractor {
         Assumptions.assumeTrue(FileTools.isVivadoOnPath());
 
         Path dcpPath = RapidWrightDCP.getPath("microblazeAndILA_3pblocks_2024.1.dcp");
-
         Path pathTxt = dir.resolve("path.txt");
-        String tclCommand = "open_checkpoint " + dcpPath + ";";
-        tclCommand += "set fp [open " + pathTxt + " \"w\"];";
-        tclCommand += " foreach p [get_pins -of [get_timing_paths -nworst 1 ]] {puts $fp $p};";
-        tclCommand += "close $fp";
-        VivadoTools.runTcl(dir.resolve("out.log"), tclCommand, true);
+        VivadoToolsHelper.createWorstPathFile(dcpPath, pathTxt);
 
         Path outputDCP = dir.resolve("path.dcp");
         

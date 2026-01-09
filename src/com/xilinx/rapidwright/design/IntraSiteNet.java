@@ -29,10 +29,10 @@ import com.xilinx.rapidwright.device.BELPin;
 
 /**
  * Helper or Accessory class to help capture intra-site nets inside a site. This
- * is primarily to represent a single {@link BELPin}/{@link SitePinInst} source
- * and all the BELPin sinks connected to a placed cell pin. Multiple instances
- * of {@link IntraSiteNet} would be needed if a net drives multiple
- * {@link SitePinInst} inputs.
+ * is primarily to represent a single {@link BELPin} (or the equivalent
+ * {@link SitePinInst}) source and all the BELPin sinks connected to a placed
+ * cell pin. Multiple instances of {@link IntraSiteNet} would be needed if a net
+ * drives multiple {@link SitePinInst} inputs.
  */
 public class IntraSiteNet {
 
