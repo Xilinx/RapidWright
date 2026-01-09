@@ -634,9 +634,6 @@ public class RWRoute {
         int indirect = 0;
         for (SitePinInst sink : sinkPins) {
             Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
-            if (config.isBackwardRouting()) {
-                connection.setBackwardRouting(true);
-            }
             Node sinkINTNode = RouterHelper.projectInputPinToINTNode(sink);
             if (sourceINTNode == null && sinkINTNode != null) {
                 // Sink can be projected to an INT tile, but primary source (e.g. COUT)
@@ -1756,8 +1753,6 @@ public class RWRoute {
         targets.clear();
     }
 
-
-
     protected void enlargeBoundingBox(Connection connection) {
         if (!config.isEnlargeBoundingBox()) {
             return;
@@ -1842,7 +1837,7 @@ public class RWRoute {
      * @return True if backtracking successful.
      */
     protected boolean saveRouting(Connection connection, RouteNode rnode) {
-        if (connection.isBackwardRouting()) {
+        if (config.isBackwardRouting()) {
             if (rnode != connection.getSourceRnode()) {
                  List<RouteNode> prevRouting = connection.getRnodes();
                  if (!connection.isRouted() || prevRouting.isEmpty() || !rnode.isTarget()) {
@@ -1868,7 +1863,7 @@ public class RWRoute {
             path.add(rnode);
         } while ((rnode = rnode.getPrev()) != null);
         
-        if (connection.isBackwardRouting()) {
+        if (config.isBackwardRouting()) {
             Collections.reverse(path);
         }
 
@@ -1895,9 +1890,9 @@ public class RWRoute {
         final PriorityQueue<RouteNode> queue = state.queue;
         final NetWrapper netWrapper = connection.getNetWrapper();
         final RouteNodeType rnodeType = rnode.getType();
-        final boolean rnodeIsLaguna = !connection.isBackwardRouting() && Utils.isLaguna(rnode.getTile().getTileTypeEnum());
+        final boolean rnodeIsLaguna = !config.isBackwardRouting() && Utils.isLaguna(rnode.getTile().getTileTypeEnum());
 
-        RouteNode[] neighbors = connection.isBackwardRouting() ? rnode.getParents(routingGraph) : rnode.getChildren(routingGraph);
+        RouteNode[] neighbors = config.isBackwardRouting() ? rnode.getParents(routingGraph) : rnode.getChildren(routingGraph);
 
         for (RouteNode childRNode : neighbors) {
             if (childRNode.isVisited(sequence)) {
@@ -1945,104 +1940,104 @@ public class RWRoute {
                     continue;
                 }
                 RouteNodeType childType = childRNode.getType();
-                if (!connection.isBackwardRouting()) {
-                switch (childType) {
-                    case LOCAL_EAST_LEADING_TO_NORTHBOUND_LAGUNA:
-                    case LOCAL_EAST_LEADING_TO_SOUTHBOUND_LAGUNA:
-                    case LOCAL_WEST_LEADING_TO_NORTHBOUND_LAGUNA:
-                    case LOCAL_WEST_LEADING_TO_SOUTHBOUND_LAGUNA:
-                        // Lookahead beyond child nodes leading to a Laguna if it won't get overused
-                        lookahead = !childRNode.willOverUse(netWrapper);
-                        // Fall-through
-                    case LOCAL_BOTH:
-                    case LOCAL_EAST:
-                    case LOCAL_WEST:
-                    case LOCAL_RESERVED:
-                        if (!routingGraph.isAccessible(childRNode, rnode, connection)) {
-                            continue;
-                        }
-                        // Verify invariant that east/west wires stay east/west ...
-                        assert(!rnodeType.isEastLocal() || childType.isEastLocal() ||
-                                // ... unless it's an exclusive sink using a LOCAL_RESERVED node
-                                (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH) ||
-                                // ... or unless it's a Versal SLL input
-                                childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT);
-                        assert(!rnodeType.isWestLocal() || childType.isWestLocal() ||
-                                (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH) ||
-                                // ... or unless it's a Versal SLL input
-                                childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT);
-                        break;
-                    case NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
-                    case NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
-                        if (connection.isCrossSLR() && connection.getSinkRnode().getSLRIndex(routingGraph) != childRNode.getSLRIndex(routingGraph) &&
-                                ((connection.isCrossSLRnorth() && childType == RouteNodeType.NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA) ||
-                                 (connection.isCrossSLRsouth() && childType == RouteNodeType.NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA))) {
-                            // Only lookahead beyond child nodes leading to a Laguna if we require an SLR crossing in that direction,
-                            // and it won't get overused
+                if (!config.isBackwardRouting()) {
+                    switch (childType) {
+                        case LOCAL_EAST_LEADING_TO_NORTHBOUND_LAGUNA:
+                        case LOCAL_EAST_LEADING_TO_SOUTHBOUND_LAGUNA:
+                        case LOCAL_WEST_LEADING_TO_NORTHBOUND_LAGUNA:
+                        case LOCAL_WEST_LEADING_TO_SOUTHBOUND_LAGUNA:
+                            // Lookahead beyond child nodes leading to a Laguna if it won't get overused
                             lookahead = !childRNode.willOverUse(netWrapper);
-                        }
-                        // Fall-through
-                    case NON_LOCAL:
-                        // LOCALs cannot connect to NON_LOCALs except
-                        //   (a) IMUX (LOCAL_*_LEADING_TO_*_LAGUNA) -> LAG_MUX_ATOM_\\d+_TXOUT
-                        //   (b) via a LUT routethru: IMUX (LOCAL*) -> CLE_CLE_*_SITE_0_[A-H]_O
-                        assert(!rnodeType.isAnyLocal() || rnodeType.isLocalLeadingToLaguna() ||
-                               (routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED) ||
-                                // Allow CLE/*LAG*_PIN -> CLE/*[A-H]Q2?_PIN
-                                (routingGraph.isVersal && connection.isCrossSLR() &&
-                                       routingGraph.isVersalLagOutRoutethru(rnode, childRNode))
-                        );
+                            // Fall-through
+                        case LOCAL_BOTH:
+                        case LOCAL_EAST:
+                        case LOCAL_WEST:
+                        case LOCAL_RESERVED:
+                            if (!routingGraph.isAccessible(childRNode, rnode, connection)) {
+                                continue;
+                            }
+                            // Verify invariant that east/west wires stay east/west ...
+                            assert(!rnodeType.isEastLocal() || childType.isEastLocal() ||
+                                    // ... unless it's an exclusive sink using a LOCAL_RESERVED node
+                                    (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH) ||
+                                    // ... or unless it's a Versal SLL input
+                                    childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT);
+                            assert(!rnodeType.isWestLocal() || childType.isWestLocal() ||
+                                    (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH) ||
+                                    // ... or unless it's a Versal SLL input
+                                    childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT);
+                            break;
+                        case NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
+                        case NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
+                            if (connection.isCrossSLR() && connection.getSinkRnode().getSLRIndex(routingGraph) != childRNode.getSLRIndex(routingGraph) &&
+                                    ((connection.isCrossSLRnorth() && childType == RouteNodeType.NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA) ||
+                                     (connection.isCrossSLRsouth() && childType == RouteNodeType.NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA))) {
+                                // Only lookahead beyond child nodes leading to a Laguna if we require an SLR crossing in that direction,
+                                // and it won't get overused
+                                lookahead = !childRNode.willOverUse(netWrapper);
+                            }
+                            // Fall-through
+                        case NON_LOCAL:
+                            // LOCALs cannot connect to NON_LOCALs except
+                            //   (a) IMUX (LOCAL_*_LEADING_TO_*_LAGUNA) -> LAG_MUX_ATOM_\\d+_TXOUT
+                            //   (b) via a LUT routethru: IMUX (LOCAL*) -> CLE_CLE_*_SITE_0_[A-H]_O
+                            assert(!rnodeType.isAnyLocal() || rnodeType.isLocalLeadingToLaguna() ||
+                                   (routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED) ||
+                                    // Allow CLE/*LAG*_PIN -> CLE/*[A-H]Q2?_PIN
+                                    (routingGraph.isVersal && connection.isCrossSLR() &&
+                                           routingGraph.isVersalLagOutRoutethru(rnode, childRNode))
+                            );
 
-                        if (!routingGraph.isAccessible(childRNode, rnode, connection)) {
-                            continue;
-                        }
-                        if (!config.isUseUTurnNodes() && childRNode.getDelay() > 10000) {
-                            // To filter out those nodes that are considered to be excluded with the masking resource approach,
-                            // such as U-turn shape nodes near the boundary
-                            continue;
-                        }
+                            if (!routingGraph.isAccessible(childRNode, rnode, connection)) {
+                                continue;
+                            }
+                            if (!config.isUseUTurnNodes() && childRNode.getDelay() > 10000) {
+                                // To filter out those nodes that are considered to be excluded with the masking resource approach,
+                                // such as U-turn shape nodes near the boundary
+                                continue;
+                            }
 
-                        // Lookahead if parent or child is in a Laguna tile
-                        // (e.g. LAG_MUX_ATOM_\\d+_TXOUT -> UBUMP\\d+
-                        //       LAG_LAGUNA_SITE_[0-3]_RXD[0-5] -> RXD\\d+
-                        //       RXD\\d+ -> INT_NODE_SDQ_\\d+_INT_OUT[01]
-                        // )
-                        // NOTE: UBUMP\\d+ wires have RouteNodeType.SUPER_LONG_LINE
-                        lookahead |= (rnodeIsLaguna || Utils.isLaguna(childRNode.getTile().getTileTypeEnum()));
-                        break;
-                    case EXCLUSIVE_SINK_BOTH:
-                    case EXCLUSIVE_SINK_EAST:
-                    case EXCLUSIVE_SINK_WEST:
-                    case EXCLUSIVE_SINK_NON_LOCAL:
-                        assert(childType != RouteNodeType.EXCLUSIVE_SINK_EAST || rnodeType == RouteNodeType.LOCAL_EAST ||
-                                // Must be an INODE that services Laguna but also feedsthrough above/below to a SLICE sink
-                                rnodeType.isLocalLeadingToLaguna());
-                        assert(childType != RouteNodeType.EXCLUSIVE_SINK_WEST || rnodeType == RouteNodeType.LOCAL_WEST ||
-                                // Must be an INODE that services Laguna but also feedsthrough above/below to a SLICE sink
-                                rnodeType.isLocalLeadingToLaguna());
-                        assert(childType != RouteNodeType.EXCLUSIVE_SINK_BOTH || rnodeType == RouteNodeType.LOCAL_BOTH ||
-                               // [BC]NODEs are LOCAL_{EAST,WEST} since they connect to INODEs, but also service CTRL sinks
-                               (routingGraph.isVersal && EnumSet.of(IntentCode.NODE_CLE_BNODE, IntentCode.NODE_CLE_CNODE,
-                                                                    IntentCode.NODE_INTF_BNODE, IntentCode.NODE_INTF_CNODE)
-                                       .contains(rnode.getIntentCode())));
-                        if (!isAccessibleSink(childRNode, connection)) {
-                            continue;
-                        }
-                        assert(childRNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
-                        assert(childRNode.countConnectionsOfUser(netWrapper) > 0);
-                        assert(!childRNode.willOverUse(netWrapper));
-                        break;
-                    case SUPER_LONG_LINE:
-                        assert(connection.isCrossSLR() &&
-                               connection.getSinkRnode().getSLRIndex(routingGraph) != rnode.getSLRIndex(routingGraph));
-                        // Do not lookahead beyond the SLL, since looking-ahead may push many SLLs onto the queue,
-                        // and we want to pick the best (least expensive/congested) one
-                        assert(!lookahead);
-                        break;
-                    default:
-                        throw new RuntimeException("Unexpected rnode type: " + childType);
+                            // Lookahead if parent or child is in a Laguna tile
+                            // (e.g. LAG_MUX_ATOM_\\d+_TXOUT -> UBUMP\\d+
+                            //       LAG_LAGUNA_SITE_[0-3]_RXD[0-5] -> RXD\\d+
+                            //       RXD\\d+ -> INT_NODE_SDQ_\\d+_INT_OUT[01]
+                            // )
+                            // NOTE: UBUMP\\d+ wires have RouteNodeType.SUPER_LONG_LINE
+                            lookahead |= (rnodeIsLaguna || Utils.isLaguna(childRNode.getTile().getTileTypeEnum()));
+                            break;
+                        case EXCLUSIVE_SINK_BOTH:
+                        case EXCLUSIVE_SINK_EAST:
+                        case EXCLUSIVE_SINK_WEST:
+                        case EXCLUSIVE_SINK_NON_LOCAL:
+                            assert(childType != RouteNodeType.EXCLUSIVE_SINK_EAST || rnodeType == RouteNodeType.LOCAL_EAST ||
+                                    // Must be an INODE that services Laguna but also feedsthrough above/below to a SLICE sink
+                                    rnodeType.isLocalLeadingToLaguna());
+                            assert(childType != RouteNodeType.EXCLUSIVE_SINK_WEST || rnodeType == RouteNodeType.LOCAL_WEST ||
+                                    // Must be an INODE that services Laguna but also feedsthrough above/below to a SLICE sink
+                                    rnodeType.isLocalLeadingToLaguna());
+                            assert(childType != RouteNodeType.EXCLUSIVE_SINK_BOTH || rnodeType == RouteNodeType.LOCAL_BOTH ||
+                                   // [BC]NODEs are LOCAL_{EAST,WEST} since they connect to INODEs, but also service CTRL sinks
+                                   (routingGraph.isVersal && EnumSet.of(IntentCode.NODE_CLE_BNODE, IntentCode.NODE_CLE_CNODE,
+                                                                        IntentCode.NODE_INTF_BNODE, IntentCode.NODE_INTF_CNODE)
+                                           .contains(rnode.getIntentCode())));
+                            if (!isAccessibleSink(childRNode, connection)) {
+                                continue;
+                            }
+                            assert(childRNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
+                            assert(childRNode.countConnectionsOfUser(netWrapper) > 0);
+                            assert(!childRNode.willOverUse(netWrapper));
+                            break;
+                        case SUPER_LONG_LINE:
+                            assert(connection.isCrossSLR() &&
+                                   connection.getSinkRnode().getSLRIndex(routingGraph) != rnode.getSLRIndex(routingGraph));
+                            // Do not lookahead beyond the SLL, since looking-ahead may push many SLLs onto the queue,
+                            // and we want to pick the best (least expensive/congested) one
+                            assert(!lookahead);
+                            break;
+                        default:
+                            throw new RuntimeException("Unexpected rnode type: " + childType);
+                    }
                 }
-            }
             }
 
             evaluateCostAndPush(state, rnode, longParent, childRNode, lookahead);
@@ -2104,7 +2099,7 @@ public class RWRoute {
         childRnode.setPrev(rnode);
 
         float newPartialPathCost = rnode.getUpstreamPathCost();
-        if (!connection.isBackwardRouting() || childRnode.getType() != RouteNodeType.EXCLUSIVE_SOURCE) {
+        if (!config.isBackwardRouting() || childRnode.getType() != RouteNodeType.EXCLUSIVE_SOURCE) {
             newPartialPathCost += state.rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor);
         }
         newPartialPathCost += state.rnodeWLWeight * childRnode.getLength() / sharingFactor;
@@ -2114,12 +2109,12 @@ public class RWRoute {
 
         int childX = childRnode.getEndTileXCoordinate();
         int childY = childRnode.getEndTileYCoordinate();
-        RouteNode targetRnode = connection.isBackwardRouting() ? connection.getSourceRnode() : connection.getSinkRnode();
+        RouteNode targetRnode = config.isBackwardRouting() ? connection.getSourceRnode() : connection.getSinkRnode();
         int targetX = targetRnode.getBeginTileXCoordinate();
         int targetY = targetRnode.getBeginTileYCoordinate();
         int deltaX = Math.abs(childX - targetX);
         int deltaY = Math.abs(childY - targetY);
-        if (connection.isCrossSLR() && !connection.isBackwardRouting()) {
+        if (connection.isCrossSLR() && !config.isBackwardRouting()) {
             assert(!childRnode.getType().isLocalLeadingToLaguna() || (
                     (connection.isCrossSLRnorth() && childRnode.getType().leadsToNorthboundLaguna()) ||
                     (connection.isCrossSLRsouth() && childRnode.getType().leadsToSouthboundLaguna()) ||
@@ -2276,7 +2271,7 @@ public class RWRoute {
         assert(state.queue.isEmpty());
 
         RouteNode startNode;
-        if (connection.isBackwardRouting()) {
+        if (config.isBackwardRouting()) {
             // Sets the SOURCE rnode of the connection as the target
             connection.getSourceRnode().markTarget(state);
             startNode = connection.getSinkRnode();
@@ -2291,7 +2286,7 @@ public class RWRoute {
         boolean lookahead = false;
         push(state, startNode, newPartialPathCost, newTotalPathCost, lookahead);
 
-        if (!connection.isBackwardRouting()) {
+        if (!config.isBackwardRouting()) {
             assert(routingGraph.isAllowedTile(connection.getSinkRnode()));
         }
     }
