@@ -58,6 +58,12 @@ public class Connection implements Comparable<Connection>{
      * These connections only need to be routed once after the iterative routing of other connections.
      */
     private boolean direct;
+
+    /**
+     * true to indicate the connection is routed backward (from sink to source)
+     */
+    private boolean backwardRouting = false;
+
     /** The {@link NetWrapper} instance indicating the net a connection belongs to */
     private NetWrapper netWrapper;
     /**
@@ -98,6 +104,14 @@ public class Connection implements Comparable<Connection>{
         netWrapper.addConnection(this);
         crossSLRnorth = false;
         crossSLRsouth = false;
+    }
+
+    public void setBackwardRouting(boolean backwardRouting) {
+        this.backwardRouting = backwardRouting;
+    }
+
+    public boolean isBackwardRouting() {
+        return backwardRouting;
     }
 
     /**

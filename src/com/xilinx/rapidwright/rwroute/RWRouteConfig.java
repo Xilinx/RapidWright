@@ -106,6 +106,9 @@ public class RWRouteConfig {
     private float husActivateThreshold;
     /* PBlock within which RWRoute must stay within */
     private String pblock;
+    
+    /* true to route backward (Sink ->...->Source) */
+    private boolean backwardRouting;
 
     /** Constructs a Configuration Object */
     public RWRouteConfig(String[] arguments) {
@@ -246,6 +249,9 @@ public class RWRouteConfig {
                 break;
             case "--lutRoutethru":
                 setLutRoutethru(true);
+                break;
+            case "--backwardRouting":
+                setBackwardRouting(true);
                 break;
             case "--noInvertGndToVccForLutInputs":
                 setInvertGndToVccForLutInputs(false);
@@ -1080,5 +1086,21 @@ public class RWRouteConfig {
         }
 
         return s.toString();
+    }
+
+    /**
+     * Checks if backward routing is enabled.
+     * @return true if backward routing is enabled, false otherwise.
+     */
+    public boolean isBackwardRouting() {
+        return backwardRouting;
+    }
+
+    /**
+     * Sets the backward routing flag.
+     * @param backwardRouting true to enable backward routing, false otherwise.
+     */
+    public void setBackwardRouting(boolean backwardRouting) {
+        this.backwardRouting = backwardRouting;
     }
 }
