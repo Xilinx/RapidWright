@@ -1858,20 +1858,15 @@ public class RWRoute {
         }
 
         connection.resetRoute();
-        List<RouteNode> path = new ArrayList<>();
         do {
-            path.add(rnode);
+            connection.addRnode(rnode);
         } while ((rnode = rnode.getPrev()) != null);
-        
-        if (config.isBackwardRouting()) {
-            Collections.reverse(path);
-        }
-
-        for (RouteNode rn : path) {
-            connection.addRnode(rn);
-        }
 
         List<RouteNode> rnodes = connection.getRnodes();
+        if (config.isBackwardRouting()) {
+            Collections.reverse(rnodes);
+        }
+
         RouteNode sourceRnode = rnodes.get(rnodes.size() - 1);
         // Only successfully routed if backtracked to this connection's source node
         return sourceRnode == connection.getSourceRnode();
