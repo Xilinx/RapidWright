@@ -153,14 +153,14 @@ public class PathExtractor {
             // This intra-site net is internal, doesn't have a site pin
             Pair<SiteInst, BELPin> isnKey = new Pair<>(si, belPin);
             nets.computeIfAbsent(net, m -> new HashMap<>())
-                .computeIfAbsent(isnKey, i -> new IntraSiteNet(si, net, belPin, belPin)).addSink(belPin);                        
+                .computeIfAbsent(isnKey, i -> new IntraSiteNet(si, net, belPin)).addSink(belPin);                        
         } else {
             for (SitePinInst spi : spis) {
                 BELPin src = belPin.isOutput() ? belPin : spi.getBELPin();
                 BELPin snk = belPin.isOutput() ? spi.getBELPin() : belPin;
                 Pair<SiteInst, BELPin> isnKey = new Pair<>(si, src);
                 nets.computeIfAbsent(net, m -> new HashMap<>())
-                    .computeIfAbsent(isnKey, i -> new IntraSiteNet(si, net, src, snk)).addSink(snk);
+                    .computeIfAbsent(isnKey, i -> new IntraSiteNet(si, net, src)).addSink(snk);
             }
         }
     }

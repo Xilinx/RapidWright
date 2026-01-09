@@ -44,6 +44,12 @@ public class IntraSiteNet {
 
     private Set<BELPin> sinks;
 
+    public IntraSiteNet(SiteInst si, Net net, BELPin src) {
+        this.si = si;
+        this.net = net;
+        this.src = src;
+    }
+
     public IntraSiteNet(SiteInst si, Net net, BELPin src, BELPin snk) {
         this.si = si;
         this.net = net;
