@@ -190,7 +190,7 @@ public class MainEntrypoint {
         addFunction("PartialCUFR", PartialCUFR::main);
         addFunction("PartialRouter", PartialRouter::main);
         addFunction("PartialDFXRouter", PartialDFXRouter::main);
-        addFunction("PathReplicator", PathExtractor::main);
+        addFunction("PathExtractor", PathExtractor::main);
         addFunction("PBlockGenDebugger", PBlockGenDebugger::main);
         addFunction("PBlockGenerator", PBlockGenerator::main);
         addFunction("PBlock", PBlock::main);
