@@ -22,6 +22,8 @@
  */
 package com.xilinx.rapidwright.gui;
 
+import java.io.File;
+
 import com.trolltech.qt.core.QPoint;
 import com.trolltech.qt.core.QPointF;
 import com.trolltech.qt.core.QRectF;
@@ -29,10 +31,13 @@ import com.trolltech.qt.core.Qt;
 import com.trolltech.qt.core.Qt.AspectRatioMode;
 import com.trolltech.qt.core.Qt.CursorShape;
 import com.trolltech.qt.core.Qt.Key;
+import com.trolltech.qt.gui.QAction;
 import com.trolltech.qt.gui.QCursor;
+import com.trolltech.qt.gui.QFileDialog;
 import com.trolltech.qt.gui.QGraphicsScene;
 import com.trolltech.qt.gui.QGraphicsView;
 import com.trolltech.qt.gui.QKeyEvent;
+import com.trolltech.qt.gui.QMenu;
 import com.trolltech.qt.gui.QMouseEvent;
 import com.trolltech.qt.gui.QWheelEvent;
 
@@ -40,6 +45,7 @@ public class SchematicView extends QGraphicsView {
 
     private boolean rightPressed;
     private QPoint lastPan;
+    private static final int PAN_THRESHOLD = 5;
 
     /** The maximum value to which we can zoom out */
     protected static double zoomMin = 0.05;
@@ -68,14 +74,65 @@ public class SchematicView extends QGraphicsView {
 
     /**
      * This method is called when any mouse button is released. In this case, this
-     * will disallow the user to pan.
+     * will disallow the user to pan. If the mouse didn't move significantly, show
+     * a context menu.
      */
     public void mouseReleaseEvent(QMouseEvent event) {
         if (event.button().equals(Qt.MouseButton.RightButton)) {
             rightPressed = false;
             setCursor(new QCursor(CursorShape.ArrowCursor));
+            
+            // Show context menu if the mouse didn't move significantly (not panning)
+            int dx = Math.abs(event.pos().x() - lastPan.x());
+            int dy = Math.abs(event.pos().y() - lastPan.y());
+            if (dx < PAN_THRESHOLD && dy < PAN_THRESHOLD) {
+                showContextMenu(event.globalPos());
+            }
         }
         super.mouseReleaseEvent(event);
+    }
+
+    /**
+     * Shows the context menu with export options.
+     */
+    private void showContextMenu(QPoint globalPos) {
+        QMenu menu = new QMenu(this);
+        
+        QAction exportSvgAction = menu.addAction("Export to SVG...");
+        exportSvgAction.triggered.connect(this, "exportToSvg()");
+        
+        QAction exportPdfAction = menu.addAction("Export to PDF...");
+        exportPdfAction.triggered.connect(this, "exportToPdf()");
+        
+        menu.exec(globalPos);
+    }
+
+    /**
+     * Exports the schematic scene to an SVG file (vector graphics).
+     */
+    public void exportToSvg() {
+        String fileName = QFileDialog.getSaveFileName(this, "Export to SVG", "", 
+                new QFileDialog.Filter("SVG Files (*.svg)"));
+        if (fileName != null && !fileName.isEmpty()) {
+            if (!fileName.toLowerCase().endsWith(".svg")) {
+                fileName += ".svg";
+            }
+            UiTools.saveAsSvg(scene(), new File(fileName));
+        }
+    }
+
+    /**
+     * Exports the schematic scene to a PDF file.
+     */
+    public void exportToPdf() {
+        String fileName = QFileDialog.getSaveFileName(this, "Export to PDF", "", 
+                new QFileDialog.Filter("PDF Files (*.pdf)"));
+        if (fileName != null && !fileName.isEmpty()) {
+            if (!fileName.toLowerCase().endsWith(".pdf")) {
+                fileName += ".pdf";
+            }
+            UiTools.saveAsPdf(scene(), new File(fileName));
+        }
     }
 
     /**
