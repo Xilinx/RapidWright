@@ -64,6 +64,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     private boolean isTarget;
     /** The children (downhill rnodes) of this rnode */
     protected RouteNode[] children;
+    /** The parents (uphill rnodes) of this rnode */
+    protected RouteNode[] parents;
 
     /** Historical congestion cost */
     private float historicalCongestionCost;
@@ -173,6 +175,10 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_LAGUNA_DATA:   // LAG_LAG.UBUMP* super long lines for u-turns at the boundary of the device (US+)
                     case NODE_SLL_INPUT:     // Versal only
                     case NODE_SLL_OUTPUT:    // Versal only
+                    case NODE_GLOBAL_LEAF:
+                    case NODE_INT_INTERFACE:
+                    case NODE_DEDICATED:
+                    case NODE_OPTDELAY:
                     case INTENT_DEFAULT:     // INT.VCC_WIRE
                         assert(length == 0);
                         break;
@@ -524,6 +530,32 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      */
     public void resetChildren() {
         children = null;
+    }
+
+    public RouteNode[] getParents(RouteNodeGraph routingGraph) {
+        if (parents == null) {
+            List<Node> allUphillNodes = getAllUphillNodes();
+            List<RouteNode> parentsList = new ArrayList<>(allUphillNodes.size());
+            for (Node uphill : allUphillNodes) {
+                RouteNode parent = routingGraph.getOrCreate(uphill);
+                if (parent.getType() != RouteNodeType.INACCESSIBLE) {
+                    parentsList.add(parent);
+                }
+            }
+            if (!parentsList.isEmpty()) {
+                parents = parentsList.toArray(EMPTY_ARRAY);
+            } else {
+                parents = EMPTY_ARRAY;
+            }
+        }
+        return parents;
+    }
+
+    /**
+     * Clears the parents of this node so that it can be regenerated.
+     */
+    public void resetParents() {
+        parents = null;
     }
 
     /**

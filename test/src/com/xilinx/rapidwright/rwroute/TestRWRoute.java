@@ -398,6 +398,13 @@ public class TestRWRoute {
 
         Assertions.assertTrue(srcSpi.isRouted());
         Assertions.assertTrue(dstSpi.isRouted());
+        
+        System.out.println("Routed Nodes:");
+        System.out.println(srcSpi.getConnectedNode());
+        for (PIP pip : net.getPIPs()) {
+            System.out.println(pip.getEndNode());
+        }
+
         long nodesPopped = Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped"));
         Assertions.assertTrue(nodesPopped >= (nodesPoppedLimit - 100) && nodesPopped <= nodesPoppedLimit);
 
@@ -462,7 +469,7 @@ public class TestRWRoute {
             Device.AWS_F1 + ",SLICE_X168Y162,SLICE_X9Y899,400",  // Up and left
     })
     public void testSLRCrossingNonTimingDriven(String deviceName, String srcSiteName, String dstSiteName, long nodesPoppedLimit) {
-        testSingleConnectionHelper(deviceName, srcSiteName, "AQ", dstSiteName, "A1", nodesPoppedLimit);
+        testSingleConnectionHelper(deviceName, srcSiteName, "AQ", dstSiteName, "A1", nodesPoppedLimit, false);
     }
 
     @ParameterizedTest
@@ -556,7 +563,62 @@ public class TestRWRoute {
         testSingleConnectionHelper(partName,
                 srcSiteName, srcPinName,
                 dstSiteName, dstPinName,
-                nodesPoppedLimit);
+                nodesPoppedLimit,
+                false);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcau10p,SLICE_X0Y0,A_O,SLICE_X0Y1,A1,400"
+    })
+    public void testSingleConnectionBackward(String partName,
+                                     String srcSiteName, String srcPinName,
+                                     String dstSiteName, String dstPinName,
+                                     int nodesPoppedLimit) {
+        testSingleConnectionHelper(partName,
+                srcSiteName, srcPinName,
+                dstSiteName, dstPinName,
+                nodesPoppedLimit,
+                true);
+    }
+
+    Design testSingleConnectionHelper(String partName,
+                                    String srcSiteName, String srcPinName,
+                                    String dstSiteName, String dstPinName,
+                                    long nodesPoppedLimit,
+                                    boolean backwardRouting) {
+        Design design = new Design("top", partName);
+
+        Net net = design.createNet("net");
+        SiteInst srcSi = design.createSiteInst(srcSiteName);
+        SitePinInst srcSpi = net.createPin(srcPinName, srcSi);
+
+        SiteInst dstSi = design.createSiteInst(dstSiteName);
+        SitePinInst dstSpi = net.createPin(dstPinName, dstSi);
+
+        List<SitePinInst> pinsToRoute = new ArrayList<>();
+        pinsToRoute.add(dstSpi);
+        boolean softPreserve = false;
+        
+        if (backwardRouting) {
+            PartialRouter.routeDesignPartialNonTimingDrivenBackward(design, pinsToRoute, softPreserve);
+        } else {
+            PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute, softPreserve);
+        }
+
+        Assertions.assertTrue(srcSpi.isRouted());
+        Assertions.assertTrue(dstSpi.isRouted());
+        
+        System.out.println("Routed Nodes:");
+        System.out.println(srcSpi.getConnectedNode());
+        for (PIP pip : net.getPIPs()) {
+            System.out.println(pip.getEndNode());
+        }
+
+        long nodesPopped = Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped"));
+        Assertions.assertTrue(nodesPopped >= (nodesPoppedLimit - 100) && nodesPopped <= nodesPoppedLimit);
+
+        return design;
     }
 
     @Test
@@ -751,7 +813,7 @@ public class TestRWRoute {
         Design design = testSingleConnectionHelper("xcv80",
                 srcSiteName, "CQ",
                 dstSiteName, dstPinName,
-                nodesPoppedLimit);
+                nodesPoppedLimit, false);
         Net net = design.getNet("net");
         if (!expectRoutethru) {
             Assertions.assertEquals(6, net.getPIPs().size());
