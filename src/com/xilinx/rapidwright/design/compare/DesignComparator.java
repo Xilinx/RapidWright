@@ -21,6 +21,8 @@
  */
 package com.xilinx.rapidwright.design.compare;
 
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -424,6 +426,28 @@ public class DesignComparator {
                 ps.println("  " + diff.toString());
             }
 
+        }
+    }
+    
+    public static void main(String[] args) {
+        if (args.length < 2 || args.length > 3) {
+            System.out.println("USAGE: <design1.dcp> <design2.dcp> [diff_report.txt]");
+            return;
+        }
+        
+        Design design1 = Design.readCheckpoint(args[0]);
+        Design design2 = Design.readCheckpoint(args[1]);
+        
+        DesignComparator dc = new DesignComparator();
+        int diffs = dc.compareDesigns(design1, design2);
+        if (args.length == 3) {
+            try (PrintStream ps = new PrintStream(new FileOutputStream(args[2]))) {
+                dc.printDiffReport(ps);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else {
+            dc.printDiffReport(System.out);
         }
     }
 }

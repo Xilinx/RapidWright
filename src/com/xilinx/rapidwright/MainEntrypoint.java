@@ -36,6 +36,7 @@ import com.xilinx.rapidwright.design.MetadataParser;
 import com.xilinx.rapidwright.design.blocks.ImplGuide;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockGenerator;
+import com.xilinx.rapidwright.design.compare.DesignComparator;
 import com.xilinx.rapidwright.design.merge.MergeDesigns;
 import com.xilinx.rapidwright.design.tools.CopyImplementation;
 import com.xilinx.rapidwright.design.tools.DesignObfuscator;
@@ -148,6 +149,7 @@ public class MainEntrypoint {
         addFunction("CustomRouting", CustomRouting::main);
         addFunction("DcpToInterchange", DcpToInterchange::main);
         addFunction("DecomposeLUT", DecomposeLUT::main);
+        addFunction("DesignComparator", DesignComparator::main);
         addFunction("DesignImplementationDiff", DesignImplementationDiff::main);
         addFunction("DesignInstrumentor", DesignInstrumentor::main);
         addFunction("DesignObfuscator", DesignObfuscator::main);
