@@ -121,7 +121,7 @@ public class Partitioner {
         Path constraintsFile = null;
         boolean constraintsDebug = false;
         boolean skipDetailedReports = false;
-        
+        boolean optimizeMapping = false;
 
 
 
@@ -158,6 +158,8 @@ public class Partitioner {
                 String val = arg.substring("--skip_detailed_reports=".length()).trim();
                 skipDetailedReports = "1".equals(val) || "true".equalsIgnoreCase(val) ||
                         "yes".equalsIgnoreCase(val);
+            } else if ("--optimized".equals(arg)) {
+                optimizeMapping = true;
             }
         }
         generateEdifNets = !skipDetailedReports;
@@ -317,7 +319,7 @@ public class Partitioner {
         // ============================================================================
         t.start("Write hMETIS File");
         Path hMetisFile = outDir.resolve(inputPath.getFileName().toString() + ".hgr");
-        PartitionTools.writeHMetisFile(hMetisFile, edgesMap, leafInsts, generateEdifNets);
+        PartitionTools.writeHMetisFile(hMetisFile, edgesMap, leafInsts, generateEdifNets, instLutCountMap);
         t.stop();
 
         //free edgesMap memory after .hgr file is written
@@ -647,13 +649,25 @@ public class Partitioner {
                     "per-partitions sum=%d, top-level total=%d%n", sumLuts, totalLUTs);
             }
             try {
-                HierMappingWriter.write(outDir, netlist, partitions, instLutCountMap);
+                HierMappingWriter.write(outDir, netlist, partitions, instLutCountMap, optimizeMapping);
                 System.out.println("Partitioner artifact written: " + 
                     outDir.resolve("cells.txt"));
                 System.out.println("Partitioner artifact written: " + 
                     outDir.resolve("mapping.txt"));
             } catch (RuntimeException ex) {
                 System.err.println("WARNING: failed to write hierarchical mapping artifacts: " + 
+                    ex.getMessage());
+            }
+            
+            // Generate FPGA-level direction-aware IO cut report
+            try {
+                FpgaIoCutAnalyzer.FpgaIoCutResult fpgaIoCutResult = 
+                    FpgaIoCutAnalyzer.analyze(netlist, leafInsts, nameToPartMap);
+                FpgaIoCutAnalyzer.writeReport(outDir, fpgaIoCutResult);
+                System.out.println("Partitioner artifact written: " + 
+                    outDir.resolve("fpga_io_cuts.txt"));
+            } catch (RuntimeException ex) {
+                System.err.println("WARNING: failed to write FPGA IO cut analysis: " + 
                     ex.getMessage());
             }
         } else {
@@ -811,7 +825,7 @@ public class Partitioner {
             System.out.printf("        Total : %10d LUTs\n\n\n", totalLUTs);
 
             try {
-                HierMappingWriter.write(outDir, netlist, partitions, instLutCountMap);
+                HierMappingWriter.write(outDir, netlist, partitions, instLutCountMap, optimizeMapping);
                 System.out.println("Partitioner artifact written: " +
                         outDir.resolve("cells.txt"));
                 System.out.println("Partitioner artifact written: " +
@@ -819,6 +833,26 @@ public class Partitioner {
             } catch (RuntimeException ex) {
                 System.err.println("WARNING: failed to write hierarchical " +
                         "mapping artifacts: " + ex.getMessage());
+            }
+            
+            // Generate FPGA-level direction-aware IO cut report
+            // Build name->partition map for the analyzer
+            java.util.Map<String, Integer> nameToPartMapFull = new java.util.LinkedHashMap<>();
+            for (Map.Entry<Integer, Set<String>> partEntry : partitions.entrySet()) {
+                int partIdx = partEntry.getKey();
+                for (String instName : partEntry.getValue()) {
+                    nameToPartMapFull.put(instName, partIdx);
+                }
+            }
+            try {
+                FpgaIoCutAnalyzer.FpgaIoCutResult fpgaIoCutResult = 
+                    FpgaIoCutAnalyzer.analyze(netlist, leafInsts, nameToPartMapFull);
+                FpgaIoCutAnalyzer.writeReport(outDir, fpgaIoCutResult);
+                System.out.println("Partitioner artifact written: " + 
+                    outDir.resolve("fpga_io_cuts.txt"));
+            } catch (RuntimeException ex) {
+                System.err.println("WARNING: failed to write FPGA IO cut analysis: " + 
+                    ex.getMessage());
             }
         }
 

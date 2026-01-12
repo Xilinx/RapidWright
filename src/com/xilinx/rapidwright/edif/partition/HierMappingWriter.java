@@ -70,6 +70,46 @@ public final class HierMappingWriter {
         Map<String, Node> children = new LinkedHashMap<>();
         Map<String, Integer> counts = new LinkedHashMap<>();
         Map<String, Integer> leafCounts = new LinkedHashMap<>();
+        String assignedPartition;
+    }
+
+    /**
+     * Recursively assigns the majority partition to each node in the trie.
+     * @param node The current node.
+     */
+    private static void assignPartitions(Node node) {
+        for (Node child : node.children.values()) {
+            assignPartitions(child);
+        }
+        node.assignedPartition = chooseHomePartition(node.counts);
+    }
+
+    /**
+     * Emits mapping lines only when the partition assignment changes from the parent.
+     * @param node The current node.
+     * @param parentPartition The partition assigned to the parent node.
+     * @param currentPath The current hierarchical path.
+     * @param out The list to collect mapping lines.
+     */
+    private static void emitOptimizedMappings(Node node, String parentPartition, String currentPath, List<String> out) {
+        // 1. Recurse to children first (Deepest-First)
+        for (Node child : node.children.values()) {
+            String childPath = currentPath.isEmpty() ? child.name : currentPath + "/" + child.name;
+            emitOptimizedMappings(child, node.assignedPartition, childPath, out);
+        }
+
+        // 2. Check for difference
+        boolean isRoot = parentPartition == null;
+        boolean isDifferent = isRoot || (node.assignedPartition != null && !node.assignedPartition.equals(parentPartition));
+
+        if (isDifferent && node.assignedPartition != null) {
+            // Emit line
+            if (!currentPath.isEmpty()) {
+                if (!logicDiscoveryPolicy.pathHasExcludedSegment(currentPath)) {
+                    out.add(currentPath + " " + node.assignedPartition);
+                }
+            }
+        }
     }
 
     /**
@@ -79,18 +119,25 @@ public final class HierMappingWriter {
      * @param partitionDir The directory containing partition files.
      * @param cellsFile The path to the cells.txt file.
      * @param defaultPartitionName The name of the default partition (optional).
+     * @param optimize Whether to use the optimized differential mapping generation.
      * @return A list of mapping lines.
      */
     public static List<String> buildMappingFromPartitionFiles(String partitionDir
             , String cellsFile
-            , String defaultPartitionName) {
+            , String defaultPartitionName
+            , boolean optimize) {
         List<String> partitions = readPartitionNames(Paths.get(cellsFile));
         Map<String, Set<String>> partToPaths = readPartitionInstanceSets(Paths.get(partitionDir),
                 new LinkedHashSet<>(partitions));
         Node root = buildTrie(partToPaths);
         computeCounts(root);
         List<String> out = new ArrayList<>();
-        selectAndEmitMappings(root, "", out, false);
+        if (optimize) {
+            assignPartitions(root);
+            emitOptimizedMappings(root, null, "", out);
+        } else {
+            selectAndEmitMappings(root, "", out, false);
+        }
 
         if (defaultPartitionName != null && !partitions.contains(defaultPartitionName)) {
             PartitionTools.logPartitionerDebug(null,
@@ -133,7 +180,8 @@ public final class HierMappingWriter {
     public static void write(Path outDir
             , EDIFNetlist netlist
             , Map<Integer, Set<String>> partitions
-            , Map<EDIFHierCellInst, Integer> instLutCountMap) {
+            , Map<EDIFHierCellInst, Integer> instLutCountMap
+            , boolean optimize) {
         // ============================================================================
         // STEP 1
         // Ensure cells.txt has fpga_* names for all partitions based on indices;
@@ -186,7 +234,12 @@ public final class HierMappingWriter {
         Node root = buildTrie(partToPaths);
         computeCounts(root);
         List<String> lines = new ArrayList<>();
-        selectAndEmitMappings(root, "", lines, false);
+        if (optimize) {
+            assignPartitions(root);
+            emitOptimizedMappings(root, null, "", lines);
+        } else {
+            selectAndEmitMappings(root, "", lines, false);
+        }
 
         // ============================================================================
         // STEP 4
@@ -217,7 +270,7 @@ public final class HierMappingWriter {
             String fullSourcePath = topName + "/" + path;
             prefixed.add(fullSourcePath + " " + destination);
         }
-        String topHomePartition = chooseHomePartition(root.counts);
+        String topHomePartition = optimize ? root.assignedPartition : chooseHomePartition(root.counts);
         if (topHomePartition != null) {
             prefixed.add(topName + " " + topHomePartition);
         }
@@ -292,20 +345,27 @@ public final class HierMappingWriter {
      *             [defaultPartitionName].
      */
     public static void main(String[] args) {
-        if (args.length < 3 || args.length > 4) {
+        if (args.length < 3 || args.length > 5) {
             PartitionTools.logPartitionerDebug(null,
                     "usage: <partitionDir> <cells.txt> <output_mapping.txt> " +
-                            "[defaultPartitionName]");
+                            "[defaultPartitionName] [--optimized]");
             return;
         }
         String partitionDir = args[0];
         String cellsFile = args[1];
         String outputFile = args[2];
-        String defaultPartitionName = args.length == 4 ? args[3] : null;
+        String defaultPartitionName = (args.length >= 4 && !args[3].startsWith("--")) ? args[3] : null;
+        boolean optimize = false;
+        for (String arg : args) {
+            if ("--optimized".equals(arg)) {
+                optimize = true;
+            }
+        }
 
         List<String> mapping = buildMappingFromPartitionFiles(partitionDir,
                 cellsFile,
-                defaultPartitionName);
+                defaultPartitionName,
+                optimize);
         writeMappingFile(mapping, outputFile);
     }
 

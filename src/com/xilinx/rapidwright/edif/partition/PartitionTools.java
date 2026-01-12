@@ -221,6 +221,22 @@ public class PartitionTools {
     public static void writeHMetisFile(Path filePath, 
             Map<EDIFHierNet, Set<EDIFHierCellInst>> edgesMap, 
             Map<EDIFHierCellInst, Integer> leafInsts, boolean writeEidmap) {
+        writeHMetisFile(filePath, edgesMap, leafInsts, writeEidmap, null);
+    }
+
+    /**
+     * Creates the hMETIS formatted problem file for the partitioner. This follows
+     * conventional hMETIS file format.
+     * @param filePath Path to the output .hgr file
+     * @param edgesMap Map of edges to include
+     * @param leafInsts Map of nodes to include
+     * @param writeEidmap Whether to write edge ID mapping file
+     * @param instLutCountMap Map of instance LUT counts for vertex weights
+     */
+    public static void writeHMetisFile(Path filePath, 
+            Map<EDIFHierNet, Set<EDIFHierCellInst>> edgesMap, 
+            Map<EDIFHierCellInst, Integer> leafInsts, boolean writeEidmap,
+            Map<EDIFHierCellInst, Integer> instLutCountMap) {
         // Derive .eidmap path alongside .hgr (replace .hgr suffix if present)
         Path eidmapPath;
         String base = filePath.toString();
@@ -229,51 +245,77 @@ public class PartitionTools {
         } else {
             eidmapPath = Paths.get(base + ".eidmap");
         }
-        if (writeEidmap) {
-            try (BufferedWriter hgrWriter = new BufferedWriter(new FileWriter(filePath.toFile()));
-                 BufferedWriter eidmapWriter = new BufferedWriter(
-                     new FileWriter(eidmapPath.toFile()))) {
-                // <total edge count> <total node count>
+        
+        boolean useWeights = instLutCountMap != null;
+        
+        try (BufferedWriter hgrWriter = new BufferedWriter(new FileWriter(filePath.toFile()));
+             BufferedWriter eidmapWriter = writeEidmap ? new BufferedWriter(
+                 new FileWriter(eidmapPath.toFile())) : null) {
+            
+            /**
+             * <total edge count> <total node count> [fmt]
+             * 
+             * fmt = 10 is absolutely required in order to produce balanced designs
+             * >10,000,000LUTs. when fmt is omitted, hMETIS standard tells us that each
+             * vertex has a weight of 1. This is problematic with large designs because a 
+             * single vertex could represent hundreds of thousands of LUTs leading to unbalanced
+             * partitions at the scale which routing no longer becomes possible. Changing 
+             * the header to include fmt=10 allows partitioning to factor in vertex weights.
+             */
+            if (useWeights) {
+                hgrWriter.write(edgesMap.size() + " " + leafInsts.size() + " 10\n");
+            } else {
                 hgrWriter.write(edgesMap.size() + " " + leafInsts.size() + "\n");
-                int unnamedCounter = 0; // assign unique ids for unnamed nets
-                for (Entry<EDIFHierNet, Set<EDIFHierCellInst>> entry : edgesMap.entrySet()) {
+            }
+            
+            int unnamedCounter = 0; // assign unique ids for unnamed nets
+            for (Entry<EDIFHierNet, Set<EDIFHierCellInst>> entry : edgesMap.entrySet()) {
+                if (writeEidmap) {
                     // Write net name safely even if key is null
                     // Might be a better way to resolve this?
                     String netName = (entry.getKey() == null) ? 
                         "<unnamed_net_" + (++unnamedCounter) + ">" : entry.getKey().toString();
                     eidmapWriter.write(netName);
                     eidmapWriter.write("\n");
-                    for (EDIFHierCellInst hierInst : entry.getValue()) {
-                        Integer nodeIdx = leafInsts.get(hierInst);
-                        if (nodeIdx == null) {
-                            throw new RuntimeException(
-                                    "ERROR: Inconsistent netlist, cannot export .hgr.");
-                        }
-                        hgrWriter.write(nodeIdx + " ");
-                    }
-                    hgrWriter.write("\n");
                 }
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        } else {
-            try (BufferedWriter hgrWriter = new BufferedWriter(new FileWriter(filePath.toFile()))) {
-                // <total edge count> <total node count>
-                hgrWriter.write(edgesMap.size() + " " + leafInsts.size() + "\n");
-                for (Entry<EDIFHierNet, Set<EDIFHierCellInst>> entry : edgesMap.entrySet()) {
-                    for (EDIFHierCellInst hierInst : entry.getValue()) {
-                        Integer nodeIdx = leafInsts.get(hierInst);
-                        if (nodeIdx == null) {
-                            throw new RuntimeException(
-                                    "ERROR: Inconsistent netlist, cannot export .hgr.");
-                        }
-                        hgrWriter.write(nodeIdx + " ");
+                for (EDIFHierCellInst hierInst : entry.getValue()) {
+                    Integer nodeIdx = leafInsts.get(hierInst);
+                    if (nodeIdx == null) {
+                        throw new RuntimeException(
+                                "ERROR: Inconsistent netlist, cannot export .hgr.");
                     }
-                    hgrWriter.write("\n");
+                    hgrWriter.write(nodeIdx + " ");
                 }
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
+                hgrWriter.write("\n");
             }
+            
+            // Write vertex weights if enabled
+            if (useWeights) {
+                // Create an array to order vertices by index (1-based)
+                EDIFHierCellInst[] orderedInsts = new EDIFHierCellInst[leafInsts.size() + 1];
+                for (Entry<EDIFHierCellInst, Integer> entry : leafInsts.entrySet()) {
+                    orderedInsts[entry.getValue()] = entry.getKey();
+                }
+                
+                for (int i = 1; i <= leafInsts.size(); i++) {
+                    EDIFHierCellInst inst = orderedInsts[i];
+                    Integer weight = null;
+                    if (inst.getCellType().isLeafCellOrBlackBox()) {
+                        weight = logicDiscoveryPolicy.leafLutCount(inst);
+                    } else {
+                        weight = instLutCountMap.get(inst);
+                    }
+                    
+                    // Default to 1 if weight is missing or 0, to ensure non-empty partitions
+                    // unless it's strictly 0 logic. But for partitioning balance, 
+                    // 1 is safer than 0 to avoid degenerate cases.
+                    int w = (weight == null) ? 1 : weight.intValue();
+                    hgrWriter.write(w + "\n");
+                }
+            }
+            
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
