@@ -108,6 +108,7 @@ import com.xilinx.rapidwright.tests.PinMapTester;
 import com.xilinx.rapidwright.tests.ReportDevicePerformance;
 import com.xilinx.rapidwright.util.BrowseDevice;
 import com.xilinx.rapidwright.util.CompareRouteStatusReports;
+import com.xilinx.rapidwright.util.DesignAnalyzer;
 import com.xilinx.rapidwright.util.DesignImplementationDiff;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.JobQueue;
@@ -151,6 +152,7 @@ public class MainEntrypoint {
         addFunction("DecomposeLUT", DecomposeLUT::main);
         addFunction("DesignComparator", DesignComparator::main);
         addFunction("DesignImplementationDiff", DesignImplementationDiff::main);
+        addFunction("DesignAnalyzer", DesignAnalyzer::main);
         addFunction("DesignInstrumentor", DesignInstrumentor::main);
         addFunction("DesignObfuscator", DesignObfuscator::main);
         addFunction("DeviceBrowser", DeviceBrowser::main);
