@@ -326,6 +326,40 @@ public class EDIFCell extends EDIFPropertyObject {
         return port;
     }
 
+    /**
+     * Rename port with name currName to newName.
+     *
+     * @param currName The current name of the port that will be renamed.
+     * @param newName The new name of the port after renaming.
+     */
+    public void renamePort(String currName, String newName) {
+        if (currName.equals(newName)) {
+            return;
+        }
+
+        EDIFPort port = getPortByPortInstName(currName);
+
+        if (port == null) {
+            throw new RuntimeException("Attempting to rename port " + currName
+                    + " that does not exist on cell " + getName());
+        }
+
+        EDIFPort newPort = new EDIFPort(newName, port.getDirection(), port.getWidth());
+        addPort(newPort);
+
+        for (int i : port.getBitBlastedIndices()) {
+            EDIFPortInst portInst = port.getInternalPortInstFromIndex(i);
+            if (portInst == null) {
+                continue;
+            }
+            EDIFNet net = removeInternalPortMapEntry(portInst.getFullName());
+            net.removePortInst(portInst);
+            net.createPortInst(newPort, newPort.isBus() ? i : -1);
+            addInternalPortMapEntry(newPort.getPortInstNameFromPort(i), net);
+        }
+        removePort(port);
+    }
+
     public EDIFCellInst createCellInst(String name, EDIFCell parent) {
         return new EDIFCellInst(name, this, parent);
     }

@@ -22,25 +22,15 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import com.xilinx.rapidwright.design.Cell;
-import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.DesignTools;
-import com.xilinx.rapidwright.design.Net;
-import com.xilinx.rapidwright.design.NetTools;
-import com.xilinx.rapidwright.design.NetType;
-import com.xilinx.rapidwright.design.SiteInst;
-import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.design.Unisim;
-import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.device.SitePin;
-import com.xilinx.rapidwright.router.RouteThruHelper;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.ReportRouteStatusResult;
-import com.xilinx.rapidwright.util.VivadoTools;
-import com.xilinx.rapidwright.util.VivadoToolsHelper;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -50,12 +40,33 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import com.xilinx.rapidwright.design.Cell;
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetTools;
+import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.ClockRegion;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.IntentCode;
+import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.edif.EDIFValueType;
+import com.xilinx.rapidwright.router.RouteThruHelper;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.ReportRouteStatusResult;
+import com.xilinx.rapidwright.util.VivadoTools;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 public class TestGlobalSignalRouting {
     @ParameterizedTest
@@ -87,7 +98,8 @@ public class TestGlobalSignalRouting {
         //        This is a canary assertion that will light up when this gets fixed.
         Assertions.assertEquals(2 /* 3 */, globalNet.getPins().size());
 
-        Executable e = () -> GlobalSignalRouting.symmetricClkRouting(globalNet, design.getDevice(), (n) -> NodeStatus.AVAILABLE);
+        Executable e = () -> GlobalSignalRouting.symmetricClkRouting(globalNet, design.getDevice(),
+                (n) -> NodeStatus.AVAILABLE, null);
         if (erroringSitePinName == null) {
             e.execute();
         } else {
@@ -330,10 +342,13 @@ public class TestGlobalSignalRouting {
         // Simulate the preserve method
         Set<Node> used = new HashSet<>();
 
+        Map<Integer, Set<ClockRegion>> usedRoutingTracks = new HashMap<>();
         for (String netName : Arrays.asList("clk1_IBUF_BUFG", "clk2_IBUF_BUFG", "rst1", "rst2")) {
             Net net = design.getNet(netName);
             Assertions.assertTrue(NetTools.isGlobalClock(net));
-            GlobalSignalRouting.symmetricClkRouting(net, design.getDevice(), (n) -> used.contains(n) ? NodeStatus.UNAVAILABLE : NodeStatus.AVAILABLE);
+            GlobalSignalRouting.symmetricClkRouting(net, design.getDevice(),
+                    (n) -> used.contains(n) ? NodeStatus.UNAVAILABLE : NodeStatus.AVAILABLE,
+                    usedRoutingTracks);
             for (PIP pip: net.getPIPs()) {
                 for (Node node: Arrays.asList(pip.getStartNode(), pip.getEndNode())) {
                     if (node != null) used.add(node);
@@ -352,5 +367,98 @@ public class TestGlobalSignalRouting {
         } else {
             System.err.println("WARNING: vivado not on PATH");
         }
+    }
+
+    private static Cell createBUFGCE(Design design, EDIFCell parent, String name, Site location) {
+        // TODO - An improved version of this method is coming in ArrayBuilder
+        Cell bufgce = design.createAndPlaceCell(parent, name, Unisim.BUFGCE, location, location.getBEL("BUFCE"));
+
+        bufgce.addProperty("CE_TYPE", "ASYNC", EDIFValueType.STRING);
+
+        // Ensure a VCC cell source in the current cell
+        EDIFTools.getStaticNet(NetType.VCC, parent, design.getNetlist());
+
+        bufgce.getSiteInst().addSitePIP("CEINV", "CE_PREINV");
+        bufgce.getSiteInst().addSitePIP("IINV", "I_PREINV");
+
+        BEL ceinv = bufgce.getSite().getBEL("CEINV");
+        bufgce.getSiteInst().routeIntraSiteNet(design.getVccNet(), ceinv.getPin("CE"), ceinv.getPin("CE_PREINV"));
+        design.getVccNet().addPin(new SitePinInst(false, "CE", bufgce.getSiteInst()));
+
+        // Remove CE:VCC entry for CE:CE
+        bufgce.removePinMapping("CE");
+        bufgce.addPinMapping("CE", "CE");
+
+        return bufgce;
+    }
+
+    private Design genTestDesignForVersalClockRouting() { 
+        Design design = new Design("versal_clk", "xcv80-lsva4737-2MHP-e-S");
+        EDIFCell top = design.getTopEDIFCell();
+        
+        Net clk = design.createNet("clk");
+        Net clkIn = design.createNet("clkIn");
+        Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
+        
+        clkIn.getLogicalNet().createPortInst(top.createPort(clkIn.getName(), EDIFDirection.INPUT, 1));
+        Cell bufgce = createBUFGCE(design, top, "bufgceInst", design.getDevice().getSite("BUFGCE_X2Y0"));
+        
+        clkIn.connect(bufgce, "I");
+        clk.connect(bufgce, "O");
+        vcc.connect(bufgce, "CE");
+        
+        int i=0; 
+        for (String loc : new String[] {"SLICE_X98Y8", "SLICE_X86Y96", "SLICE_X86Y236", "SLICE_X86Y284"}) {
+            Cell ff = design.createAndPlaceCell("ff" + i++, Unisim.FDRE, loc + "/AFF");
+            clk.connect(ff, "C");
+            vcc.connect(ff, "CE");
+            gnd.connect(ff, "D");
+            gnd.connect(ff, "R");
+        }
+        
+        design.addXDCConstraint("create_clock -period 10.0 [get_ports clk_in]");
+        design.routeSites();
+        design.setAutoIOBuffers(false);
+        design.setDesignOutOfContext(true);
+        
+        return design;
+    }
+
+    @Test
+    public void testVersalVDistrClockRouting() {
+        Design d = genTestDesignForVersalClockRouting();
+
+        RWRoute.routeDesignFullNonTimingDriven(d);
+
+        // Check for key vertical distribution patterns from template
+        boolean foundVDistrLVL2InX3Y2 = false;
+        boolean foundVDistrLVL1InX3Y3 = false;
+        boolean foundVDistrInX3Y1 = false;
+        boolean foundVDistrInX3Y2 = false;
+        for (PIP p : d.getNet("clk").getPIPs()) {
+            Node n = p.getEndNode();
+            if (n != null) {
+                if (n.getIntentCode() == IntentCode.NODE_GLOBAL_VDISTR_LVL2
+                        && n.getTile().getClockRegion().getName().equals("X3Y2")) {
+                    foundVDistrLVL2InX3Y2 = true;
+                } else if (n.getIntentCode() == IntentCode.NODE_GLOBAL_VDISTR_LVL1
+                        && n.getTile().getClockRegion().getName().equals("X3Y3")) {
+                    foundVDistrLVL1InX3Y3 = true;
+                } else if (n.getIntentCode() == IntentCode.NODE_GLOBAL_VDISTR
+                        && n.getTile().getClockRegion().getName().equals("X3Y1")) {
+                    foundVDistrInX3Y1 = true;
+                } else if (n.getIntentCode() == IntentCode.NODE_GLOBAL_VDISTR
+                        && n.getTile().getClockRegion().getName().equals("X3Y2")) {
+                    foundVDistrInX3Y2 = true;
+                }
+            }
+        }
+        Assertions.assertTrue(foundVDistrLVL2InX3Y2);
+        Assertions.assertTrue(foundVDistrLVL1InX3Y3);
+        Assertions.assertTrue(foundVDistrInX3Y1);
+        Assertions.assertTrue(foundVDistrInX3Y2);
+
+        VivadoToolsHelper.assertFullyRouted(d);
     }
 }

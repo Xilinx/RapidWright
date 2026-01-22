@@ -36,6 +36,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.edif.TestEDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
@@ -159,5 +160,32 @@ public class TestDCPLoad {
 
         Assertions.assertEquals(origDesign.getSiteInsts().size(), design.getSiteInsts().size());
         Assertions.assertEquals(origDesign.getNets().size(), design.getNets().size());
+    }
+
+    @Test
+    public void testReadEncryptedCellsFromTclLoadScript(@TempDir Path dir) {
+        Path dcp = TestEDIFTools.createEncryptedDCPExample(dir, "picoblaze_2022.2.dcp",
+                TestEDIFTools.PICOBLAZE_BB_CELLNAME);
+
+        // We need to supply the .edf directly to avoid using the edif inside the DCP
+        Design d = Design.readCheckpoint(dcp,
+                dcp.resolveSibling(dcp.toString().replace(".dcp", ".edf")));
+
+        Assertions.assertEquals(1, d.getNetlist().getEncryptedCells().size());
+
+        Path newDir = dir.resolve("newDir");
+        FileTools.makeDir(newDir.toString());
+
+        Path dcpCopy = newDir.resolve(dcp.getFileName());
+        d.writeCheckpoint(dcpCopy);
+
+        Path tclLoad = newDir
+                .resolve(dcp.getFileName().toString().replace(".dcp", EDIFTools.LOAD_TCL_SUFFIX));
+        Assertions.assertTrue(Files.exists(tclLoad));
+
+        Design d2 = Design.readCheckpoint(dcpCopy);
+        // Ensure that even though the DCP is in a new location, we read the _load.tcl
+        // script and attach the encrypted cells accordingly
+        Assertions.assertEquals(1, d2.getNetlist().getEncryptedCells().size());
     }
 }

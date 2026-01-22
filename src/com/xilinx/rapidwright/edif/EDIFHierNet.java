@@ -238,12 +238,42 @@ public class EDIFHierNet implements Comparable<EDIFHierNet> {
      * will return an empty list.
      * @param includeSourcePins A flag to include source pins in the result.
      * @param includeSinkPins A flag to include sink pins in the result.
+     * @param includeTopLevelPins A flag to include top-level pins in the result.
+     * @return The list of all leaf cell port instances connected to this hierarchical net and its
+     * aliases.
+     */
+    public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins, boolean includeSinkPins, boolean includeTopLevelPins) {
+        return getLeafHierPortInsts(includeSourcePins, includeSinkPins, includeTopLevelPins, new HashSet<>());
+    }
+
+    /**
+     * Gets all connected leaf port instances (inputs, and/or outputs, but not inouts) on this
+     * hierarchical net and its aliases. Setting includeSourcePins and includeSinkPins to false
+     * will return an empty list.
+     * @param includeSourcePins A flag to include source pins in the result.
+     * @param includeSinkPins A flag to include sink pins in the result.
      * @param visited An initial set of EDIFHierNet-s that have already been visited and will not
      * be visited again. Pre-populating this set can be useful for blocking traversal.
      * @return The list of all leaf cell port instances connected to this hierarchical net and its
      * aliases.
      */
     public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins, boolean includeSinkPins, Set<EDIFHierNet> visited) {
+        return getLeafHierPortInsts(includeSourcePins, includeSinkPins, false, visited);
+    }
+
+    /**
+     * Gets all connected leaf port instances (inputs, and/or outputs, but not inouts) on this
+     * hierarchical net and its aliases. Setting includeSourcePins and includeSinkPins to false
+     * will return an empty list.
+     * @param includeSourcePins A flag to include source pins in the result.
+     * @param includeSinkPins A flag to include sink pins in the result.
+     * @param includeTopLevelPins A flag to include top-level pins in the result.
+     * @param visited An initial set of EDIFHierNet-s that have already been visited and will not
+     * be visited again. Pre-populating this set can be useful for blocking traversal.
+     * @return The list of all leaf cell port instances connected to this hierarchical net and its
+     * aliases.
+     */
+    public List<EDIFHierPortInst> getLeafHierPortInsts(boolean includeSourcePins, boolean includeSinkPins, boolean includeTopLevelPins, Set<EDIFHierNet> visited) {
         if (!includeSourcePins && !includeSinkPins) {
             return Collections.emptyList();
         }
@@ -284,6 +314,9 @@ public class EDIFHierNet implements Comparable<EDIFHierNet> {
                         if (upNet != null) {
                             queue.add(upPort.getHierarchicalNet());
                         }
+                    } else if (includeTopLevelPins && ((includeSinkPins && p.isOutput()) || (includeSourcePins && p.isInput()))) {
+                        // Add top-level hierarchical port insts
+                        leafCellPins.add(p);
                     }
                 } else {
                     // Moving down in hierarchy

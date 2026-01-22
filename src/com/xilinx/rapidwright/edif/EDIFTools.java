@@ -61,6 +61,7 @@ import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.Params;
 
 
 /**
@@ -149,6 +150,14 @@ public class EDIFTools {
     public static final String LOGICAL_GND_NET_NAME = "<const0>";
 
     public static final String LOAD_TCL_SUFFIX = "_load.tcl";
+
+    /**
+     * Vivado uses this string to prevent the grouping of ports of the form
+     * `port[0]`, `port[1]`, etc. into a single bus of port of the form
+     * `port[1:0]`. EDIF ports named `[]port[0]` and `[]port[1]` will be
+     * kept as separate ports.
+     */
+    public static final String VIVADO_PRESERVE_PORT_INTERFACE = "[]";
 
     public static final AtomicInteger UNIQUE_COUNT = new AtomicInteger();
 
@@ -415,10 +424,10 @@ public class EDIFTools {
     }
 
     /**
-     * Determines if the char[] ends with the pattern [#:#] where # are positive bus
-     * values (e.g., [7:0]) and then returns the length of the string without the
-     * bus suffix (if it exists). If the name does not end with the bus pattern, it
-     * returns the original length of the char[].
+     * Determines if the char[] ends with the pattern [#:#] where # are integer bus
+     * values (e.g., [7:0] or [0:-1]) and then returns the length of the string
+     * without the bus suffix (if it exists). If the name does not end with the bus
+     * pattern, it returns the original length of the char[].
      * 
      * @param name
      * @param keepOpenBracket In the case of a bussed name, this will return the
@@ -430,11 +439,11 @@ public class EDIFTools {
         int len = name.length;
         int i = len-1;
         if (name[i--] != ']') return len;
-        while (Character.isDigit(name[i])) {
+        while (Character.isDigit(name[i]) || name[i] == '-') {
             i--;
         }
         if (name[i--] != ':') return len;
-        while (Character.isDigit(name[i])) {
+        while (Character.isDigit(name[i]) || name[i] == '-') {
             i--;
         }
         if (name[i] != '[') return len;
@@ -466,7 +475,7 @@ public class EDIFTools {
             }
         }
         if (colonIdx == -1 || leftBracket == -1) {
-            throw new RuntimeException("ERROR: Interpreting port " + name + ", couldn't identify indicies.");
+            throw new RuntimeException("ERROR: Interpreting port " + name + ", couldn't identify indices.");
         }
 
         int left = Integer.parseInt(name.substring(leftBracket+1, colonIdx));
@@ -1008,6 +1017,18 @@ public class EDIFTools {
         return Collections.emptyList();
     }
 
+    public static List<String> getEDNFilesFromDCPLoadTclScript(Path tclFileName) {
+        List<String> ednFiles = new ArrayList<>();
+        for (String line : FileTools.getLinesFromTextFile(tclFileName.toString())) {
+            if (line.startsWith("read_edif")) {
+                int start = line.indexOf('{');
+                int end = line.lastIndexOf('}');
+                ednFiles.add(line.subSequence(start + 1, end).toString());
+            }
+        }
+        return ednFiles;
+    }
+
     public static Path getEDIFParentDir(Path edifFileName) {
         Path parent = edifFileName == null ? null : edifFileName.getParent();
         return parent == null ? Paths.get(System.getProperty("user.dir")) : parent;
@@ -1076,10 +1097,8 @@ public class EDIFTools {
         try {
             ensureCorrectPartInEDIF(edif, partName);
             edif.exportEDIF(out);
-            if (dcpFileName != null && edif.getEncryptedCells() != null) {
-                if (edif.getEncryptedCells().size() > 0) {
-                    writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
-                }
+            if (dcpFileName != null && edif.hasEncryptedCells()) {
+                writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -1106,6 +1125,23 @@ public class EDIFTools {
     public static void writeTclLoadScriptForPartialEncryptedDesigns(EDIFNetlist edif,
                                                             Path dcpFileName, String partName) {
         ArrayList<String> lines = new ArrayList<String>();
+        if (Params.RW_COPY_EDNS_ON_DCP_WRITE && edif.getEncryptedCells().size() > 0) {
+            Path destDir = dcpFileName.getParent();
+            System.out.println("INFO: Copying *.edn files to: " + destDir);
+            List<String> newLocs = new ArrayList<>();
+            for (String cellName : edif.getEncryptedCells()) {
+                Path src = Paths.get(cellName);
+                String dst = destDir.resolve(src.getFileName()).toString();
+                if (!FileTools.copyFile(src.toString(), dst)) {
+                    System.err.println("WARNING: Failed to copy " + src + " to " + dst);
+                    newLocs.add(src.toString());
+                } else {
+                    newLocs.add(dst);
+                }
+            }
+            edif.setEncryptedCells(newLocs);
+        }
+
         for (String cellName : edif.getEncryptedCells()) {
             if (cellName.endsWith(".edn") || cellName.endsWith(".edf")) {
                 lines.add(EDIFNetlist.READ_EDIF_CMD + " {" + cellName + "}");
@@ -1700,7 +1736,7 @@ public class EDIFTools {
         for (EDIFPort topPort : netlist.getTopCell().getPorts()) {
             EDIFPort flatPort = flatTop.createPort(topPort);
             if (flatPort.isBus()) {
-                int[] indicies = flatPort.getBitBlastedIndicies();
+                int[] indices = flatPort.getBitBlastedIndices();
                 int i = 0;
                 for (EDIFNet net : topPort.getInternalNets()) {
                     if (net == null) continue;
@@ -1708,7 +1744,7 @@ public class EDIFTools {
                     if (flatNet == null) {
                         flatNet = flatTop.createNet(net.getName());
                     }
-                    flatNet.createPortInst(flatPort, indicies[i++]);
+                    flatNet.createPortInst(flatPort, indices[i++]);
                 }
             } else {
                 EDIFNet net = topPort.getInternalNet();
@@ -1726,5 +1762,39 @@ public class EDIFTools {
         flatNetlist.expandMacroUnisims(part.getSeries());
 
         return flatNetlist;
+    }
+
+    /**
+     * Prevents vivado from forming buses out of ports of the form `port[0]`, `port[1]`, etc.
+     *
+     * @param netlist  The netlist to preserve the interface of.
+     *
+     */
+    public static void ensurePreservedInterfaceVivado(EDIFNetlist netlist) {
+        EDIFCell top = netlist.getTopCell();
+        List<String> portsToRename = new ArrayList<>();
+        for (EDIFPort p : top.getPorts()) {
+            if (!p.isBus() && !p.getName().startsWith(VIVADO_PRESERVE_PORT_INTERFACE) && p.getName().endsWith("]")) {
+                portsToRename.add(p.getName());
+            }
+        }
+        for (String p : portsToRename) {
+            top.renamePort(p, VIVADO_PRESERVE_PORT_INTERFACE + p);
+        }
+    }
+
+    public static void removeVivadoBusPreventionAnnotations(EDIFNetlist netlist) {
+        EDIFCell top = netlist.getTopCell();
+        for (EDIFCell cell : netlist.getLibrary(top.getLibrary().getName()).getCells()) {
+            List<String> portsToRename = new ArrayList<>();
+            for (EDIFPort p : cell.getPorts()) {
+                if (p.getName().startsWith(VIVADO_PRESERVE_PORT_INTERFACE)) {
+                    portsToRename.add(p.getName());
+                }
+            }
+            for (String p : portsToRename) {
+                cell.renamePort(p, p.substring(VIVADO_PRESERVE_PORT_INTERFACE.length()));
+            }
+        }
     }
 }

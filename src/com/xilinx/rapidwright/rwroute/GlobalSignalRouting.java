@@ -24,7 +24,12 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -58,11 +63,8 @@ import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 import com.xilinx.rapidwright.router.VersalClockRouting;
+import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
-
-import java.util.ArrayDeque;
-import java.util.Comparator;
-import java.util.EnumSet;
 
 /**
  * A collection of methods for routing global signals, i.e. GLOBAL_CLOCK, VCC and GND.
@@ -186,20 +188,27 @@ public class GlobalSignalRouting {
     }
 
     /**
-     * Routes a clock net by dividing the target clock regions into two groups and routes to the two groups with different centroid nodes.
-     * @param clk The clock to be routed.
-     * @param device The design device.
-     * @param getNodeStatus Lambda for indicating the status of a Node: available, in-use (preserved
-     *                      for same net as we're routing), or unavailable (preserved for other net).
+     * Routes a clock net by dividing the target clock regions into two groups and
+     * routes to the two groups with different centroid nodes.
+     * 
+     * @param clk           The clock to be routed.
+     * @param device        The design device.
+     * @param getNodeStatus Lambda for indicating the status of a Node: available,
+     *                      in-use (preserved for same net as we're routing), or
+     *                      unavailable (preserved for other net).
+     * @param A             map to keep track of which routing tracks have already
+     *                      been used for each clock region.
      */
-    public static void symmetricClkRouting(Net clk, Device device, Function<Node,NodeStatus> getNodeStatus) {
+    public static void symmetricClkRouting(Net clk, Device device,
+            Function<Node, NodeStatus> getNodeStatus,
+            Map<Integer, Set<ClockRegion>> usedRoutingTracks) {
         switch (device.getSeries()) {
             case UltraScale:
             case UltraScalePlus:
                 symmetricClockRoutingUltraScales(clk, device, getNodeStatus);
                 break;
             case Versal:
-                symmetricClockRoutingVersal(clk, device, getNodeStatus);
+                symmetricClockRoutingVersal(clk, device, getNodeStatus, usedRoutingTracks);
                 break;
             default:
                 throw new RuntimeException("ERROR: GlobalSignalRouting.symmetricClkRouting() does not support the " + device.getSeries() + " series.");
@@ -213,7 +222,7 @@ public class GlobalSignalRouting {
         // Clock routing on UltraScale/UltraScale+ devices
         assert(device.getSeries() == Series.UltraScale || device.getSeries() == Series.UltraScalePlus);
 
-        List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
+        Set<ClockRegion> clockRegions = getFabricClockRegionsOfNet(clk).getFirst();
 
         ClockRegion centroid = findCentroid(clk, device);
         List<ClockRegion> upClockRegions = new ArrayList<>();
@@ -248,18 +257,33 @@ public class GlobalSignalRouting {
         UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
     }
 
-    private static void symmetricClockRoutingVersal(Net clk, Device device, Function<Node, NodeStatus> getNodeStatus) {
+    private static void symmetricClockRoutingVersal(Net clk, Device device,
+            Function<Node, NodeStatus> getNodeStatus,
+            Map<Integer, Set<ClockRegion>> usedRoutingTracks) {
         // Clock routing on Versal devices
         assert(device.getSeries() == Series.Versal);
 
-        List<ClockRegion> clockRegions = getClockRegionsOfNet(clk);
+        Pair<Set<ClockRegion>, List<SitePinInst>> usedCRsAndNonLCBPinsTuple = getFabricClockRegionsOfNet(clk);
         SitePinInst source = clk.getSource();
         SiteTypeEnum sourceTypeEnum = source.getSiteTypeEnum();
         // In US/US+ clock routing, we use two VROUTE nodes to reach the clock regions above and below the centroid.
         // However, we can see that Vivado only uses one VROUTE node in the centroid clock region for Versal clock routing,
         // and reach the above and below clock regions by VDISTR nodes.
 
-        ClockRegion centroid;
+        // Identify invalid tracks to use by looking at used tracks and checking for
+        // overlapping clock regions
+        Set<Integer> unavailableTracks = new HashSet<Integer>();
+        if (usedRoutingTracks != null) {
+            for (ClockRegion cr : usedCRsAndNonLCBPinsTuple.getFirst()) {
+                for (Entry<Integer, Set<ClockRegion>> e : usedRoutingTracks.entrySet()) {
+                    if (e.getValue().contains(cr)) {
+                        unavailableTracks.add(e.getKey());
+                    }
+                }
+            }
+        }
+
+        ClockRegion centroid = findCentroid(clk, device);
         Node centroidHRouteNode;
 
         if (sourceTypeEnum == SiteTypeEnum.BUFG_FABRIC) {
@@ -270,7 +294,6 @@ public class GlobalSignalRouting {
             // NODE_GLOBAL_VROUTE (located in the same clock region of the source site)
 
             // Notice that Vivado always uses the above VROUTE node, there is no need to find a centroid clock region to route to.
-            centroid = source.getTile().getClockRegion();
             centroidHRouteNode = source.getConnectedNode();
         } else if (sourceTypeEnum == SiteTypeEnum.BUFGCE) {
             // Assume that these source sites are located in the bottom of the device (Y=0).
@@ -279,45 +302,166 @@ public class GlobalSignalRouting {
             // which is similar to US/US+ clock routing.
             // Notice that we have to quickly reach a NODE_GLOBAL_HROUTE_HSR node, and if we allow the Y coordinate of centroid to be bigger than 1,
             // we may fail to do so. Thus, we need to force the Y-coordinate of centroid to be 1.
-            assert(source.getTile().getTileYCoordinate() == 0);
-            // And, in X-axis, Vivado doesn't go to the real centroid of target clock regions... it just uses a nearby VROUTE.
-            int centroidX = source.getTile().getClockRegion().getColumn();
-            // VROUTE nodes are in the clock region where X is odd.
-            if (centroidX % 2 == 0) centroidX -= 1;
-            if (centroidX <= 0)     centroidX = 1;
-            centroid = device.getClockRegion(1, centroidX);
-
-            Node clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
-            centroidHRouteNode = VersalClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true);
+            Node clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk, getNodeStatus);// first HROUTE
+            Pair<Node, ClockRegion> result = findCentroid(clk, clkRoutingLine, centroid, true,
+                    getNodeStatus, unavailableTracks, usedCRsAndNonLCBPinsTuple.getFirst());
+            centroidHRouteNode = result.getFirst();
+            centroid = result.getSecond();
+        } else if (sourceTypeEnum == SiteTypeEnum.BUFG_PS) {
+            // These source sites are located in the middle of the device. The path from the
+            // output pin to HROUTE matches the following pattern:
+            // NODE_GLOBAL_BUFG (has a suffix "_O_PIN") ->
+            // NODE_GLOBAL_BUFG (the output node with a suffix "_O") ->
+            // NODE_GLOBAL_HROUTE (located in the same clock region)
+            centroidHRouteNode = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk, getNodeStatus);// first HROUTE
         } else {
             throw new RuntimeException("ERROR: Routing clock net with source type " + sourceTypeEnum + " not supported.");
         }
 
-        Node vroute = VersalClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid, false);
+        // If the source and centroid are in the same row, we do not need to traverse vertical routing tracks
+        boolean noVrouteNeeded = centroidHRouteNode.getTile().getClockRegion().getRow() == centroid.getRow();
 
-        Map<ClockRegion, Node> upDownDistLines = VersalClockRouting.routeToHorizontalDistributionLines(clk, vroute, clockRegions, false, getNodeStatus);
+        Pair<Node, ClockRegion> centroidResult = findCentroid(clk, centroidHRouteNode, centroid,
+                noVrouteNeeded, getNodeStatus, unavailableTracks,
+                usedCRsAndNonLCBPinsTuple.getFirst());
+        Node vroute = centroidResult.getFirst();
+        centroid = centroidResult.getSecond();
+        
+        // Attach the CLOCK_ROOT property <CLOCK_REGION>:<NODE>
+        clk.getLogicalNet().addProperty("CLOCK_ROOT", centroid.toString() + ":" + vroute.toString());
+        // We will only support balanced for now
+        clk.getLogicalNet().addProperty("CLOCK_VTREE_TYPE", "balanced");
+
+        Map<ClockRegion, Node> upDownDistLines = VersalClockRouting
+                .routeToHorizontalDistributionLines(clk, vroute, usedCRsAndNonLCBPinsTuple.getFirst(),
+                        false, getNodeStatus);
+
+        // Route non-LCB driven pins (such as driving clocks off chip via an IOB)
+        VersalClockRouting.routeNonLCBPins(clk, usedCRsAndNonLCBPinsTuple.getSecond(), getNodeStatus);
 
         Map<Node, List<SitePinInst>> lcbMappings = VersalClockRouting.routeLCBsToSinks(clk, getNodeStatus);
-        VersalClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
+        VersalClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings, getNodeStatus);
+
+        // Populate used routing track for any other clocks being routed
+        if (usedRoutingTracks != null) {
+            Integer track = VersalClockRouting.getRoutingTrackIndex(vroute);
+            if (track == null) {
+                System.err.println("WARNING: Unable to identify clock track for " + clk);
+            } else {
+                clk.getLogicalNet().addProperty("CLOCK_TRACK", track);
+                Set<ClockRegion> collision = usedRoutingTracks.put(track,
+                        new HashSet<>(usedCRsAndNonLCBPinsTuple.getFirst()));
+                assert (collision == null);
+            }
+        }
     }
 
+    /**
+     * Iteratively attempts to find a viable centroid based on architecture and
+     * availability.
+     * 
+     * @param clk               The clock net being routed
+     * @param start             The start node to search for a centroid
+     * @param origCentroid      This is the pre-calculated centroid based on the
+     *                          placed clock loads.
+     * @param noVrouteNeeded    Pass thru flag for routeToCentroid that doesn't
+     *                          require passing through a VROUTE.
+     * @param getNodeStatus     Function to identify nodes availability for use.
+     * @param unavailableTracks Tracks that are used by other clocks already routed.
+     *                          When chosing a centroid, we also pick a track that
+     *                          will persist for the rest of the clock tree. We need
+     *                          to pre-emptively avoid clock tracks that have
+     *                          already been used in the same clock region foot
+     *                          print of this clock net.
+     * @return
+     */
+    private static Pair<Node, ClockRegion> findCentroid(Net clk, Node start, ClockRegion origCentroid, 
+            boolean noVrouteNeeded, Function<Node, NodeStatus> getNodeStatus, Set<Integer> unavailableTracks,
+            Set<ClockRegion> clockRegions) {
+        Node vroute = null;
+        int currIdx = 0;
+        
+        int minY = Integer.MAX_VALUE;
+        int maxY = 0;
+        for (ClockRegion cr : clockRegions) {
+            minY = Math.min(minY, cr.getInstanceY());
+            maxY = Math.max(maxY, cr.getInstanceY());
+        }
+        Device device = origCentroid.getDevice();
+        // Clock roots on Versal appear to only be possible on odd-numbered columns
+        int clkRootXCoord = origCentroid.getColumn() % 2 == 0 ? origCentroid.getInstanceX() + 1
+                : origCentroid.getInstanceX();
+        Integer preferredYCoord = VersalClockRouting.getPreferredClockRootYCoord(device, minY, maxY);
+        int clkRootYCoord = preferredYCoord == null ? origCentroid.getInstanceY() : preferredYCoord;
+
+        // If the current column doesn't work, try neighboring ones on both sides
+        List<Integer> colOffsets = Arrays.asList(0, -2, 2, -4, 4, -6, 6);
+
+        ClockRegion proposedClkRoot = null;
+        
+        do {
+            proposedClkRoot = device.getClockRegion(clkRootYCoord,
+                    clkRootXCoord + colOffsets.get(currIdx));
+            if (proposedClkRoot != null && proposedClkRoot.getApproximateCenter() != null) {
+                vroute = VersalClockRouting.routeToCentroid(clk, start, proposedClkRoot,
+                        noVrouteNeeded,
+                        getNodeStatus, unavailableTracks);
+            }
+            // If we weren't successful, loop around and try neighbors
+            currIdx++;
+        } while (vroute == null && currIdx < colOffsets.size());
+        if (vroute == null) {
+            throw new RuntimeException("ERROR: Unable to find a centroid CR for clock " + clk);
+        }
+        assert (proposedClkRoot != null);
+        return new Pair<Node, ClockRegion>(vroute, proposedClkRoot);
+    }
+
+    /**
+     * Evaluates all possible centroid column offset indices for a given candidate.
+     * This is used in conjunction with iterative centroid exploration.
+     * 
+     * @param candidateCentroid The pre-selected centroid based on the placed loads
+     *                          on the clock net.
+     * @return The list of column index offsets sorted by lowest absolute value
+     *         (starting with 0).
+     */
+    private static List<Integer> getOtherRowCentroidCandidates(ClockRegion candidateCentroid) {
+        int columns = candidateCentroid.getDevice().getNumOfClockRegionsColumns();
+        int candidateIdx = candidateCentroid.getColumn();
+        List<Integer> rowOffsets = new ArrayList<>();
+        for (int i=0; i < columns; i++) {
+            rowOffsets.add(i - candidateIdx);
+        }
+        Collections.sort(rowOffsets, (a,b) -> Integer.compare(Math.abs(a), Math.abs(b)));
+        return rowOffsets;
+    }
+    
     /**
      * Gets clock regions of a net's sink pins.
      * @param clk The net in question.
      * @return A list of clock regions of the net's sink pins.
      */
-    private static List<ClockRegion> getClockRegionsOfNet(Net clk) {
-        List<ClockRegion> clockRegions = new ArrayList<>();
+    private static Pair<Set<ClockRegion>, List<SitePinInst>> getFabricClockRegionsOfNet(Net clk) {
+        Set<ClockRegion> clockRegions = new HashSet<>();
+        List<SitePinInst> offFabricClkSinks = new ArrayList<>();
         for (SitePinInst pin : clk.getPins()) {
             if (pin.isOutPin()) continue;
             Tile t = pin.getTile();
             ClockRegion cr = t.getClockRegion();
-            if (!clockRegions.contains(cr)) clockRegions.add(cr);
+            if (Utils.isIOB(pin.getSiteInst())) {
+                offFabricClkSinks.add(pin);
+            } else if (Utils.isPS(pin.getSiteInst())) {
+                // PS clock input will be driven by East CR neighbor
+                clockRegions.add(cr.getNeighborClockRegion(0, 1));
+            } else {
+                clockRegions.add(cr);
+            }
         }
-        return clockRegions;
+        return new Pair<>(clockRegions, offFabricClkSinks);
     }
 
-    private static void divideClockRegions(List<ClockRegion> clockRegions, ClockRegion centroid, List<ClockRegion> upClockRegions,
+    private static void divideClockRegions(Set<ClockRegion> clockRegions, ClockRegion centroid, List<ClockRegion> upClockRegions,
             List<ClockRegion> downClockRegions) {
         for (ClockRegion cr : clockRegions) {
             if (cr.getInstanceY() > centroid.getInstanceY()) {
@@ -386,6 +530,19 @@ public class GlobalSignalRouting {
         return lcbMappings;
     }
 
+    private static final int MIN_CR_HEIGHT_FOR_CENTROID_ELIGIBILITY = 40;
+
+    private static boolean centroidEligible(ClockRegion candidate) {
+        // Check if we can use this clock region
+        Tile lowerLeft = candidate.getLowerLeft();
+        Tile upperLeft = candidate.getUpperLeft();
+        int tileHeight = 0;
+        if (lowerLeft != null && upperLeft != null) {
+            tileHeight = Math.abs(lowerLeft.getRow() - upperLeft.getRow());
+        }
+        return tileHeight > MIN_CR_HEIGHT_FOR_CENTROID_ELIGIBILITY;
+    }
+
     /**
      * Finds the centroid clock region of a clock net.
      * @param clk The clock net of a design.
@@ -400,7 +557,18 @@ public class GlobalSignalRouting {
             sitePinInstTilePoints.add(new Point(c.getColumn(),c.getRow()));
         }
         Point center = SmallestEnclosingCircle.getCenterPoint(sitePinInstTilePoints);
-        return device.getClockRegion(center.y, center.x);
+        ClockRegion centroid = device.getClockRegion(center.y, center.x);
+        // Check if we can use this clock region
+        if (!centroidEligible(centroid)) {
+            // Snap to the closest legal clock region
+            if (centroid.getRow() == 0) {
+                centroid = centroid.getNeighborClockRegion(1, 0);
+            } else if (centroid.getRow() == device.getNumOfClockRegionRows() - 1) {
+                centroid = centroid.getNeighborClockRegion(-1, 0);
+            }
+        }
+
+        return centroid;
     }
 
     /**
@@ -415,7 +583,7 @@ public class GlobalSignalRouting {
                                       Design design, RouteThruHelper routeThruHelper) {
         Queue<Node> q = new ArrayDeque<>();
         Set<Node> usedRoutingNodes = new HashSet<>();
-        Map<Node, Node> prevNode = new HashMap<>();
+        Map<Node, Node> nextNode = new HashMap<>();
         List<Node> pathNodes = new ArrayList<>();
         List<SitePin> sitePinsToCreate = new ArrayList<>();
         final Node INVALID_NODE = new Node(null, Integer.MAX_VALUE);
@@ -449,6 +617,7 @@ public class GlobalSignalRouting {
             assertIntentCodeOfPoppedNodesOnVcc.add(IntentCode.NODE_CLE_CTRL);
             assertIntentCodeOfPoppedNodesOnVcc.add(IntentCode.NODE_INTF_CTRL);
             assertIntentCodeOfPoppedNodesOnVcc.add(IntentCode.NODE_IRI);
+            assertIntentCodeOfPoppedNodesOnVcc.add(IntentCode.NODE_OPTDELAY); // e.g. INTF_PSS_TL_TILE_X15Y56/IF_COE_IMUX93 on vp1202
         } else {
             throw new RuntimeException("ERROR: Unsupported series " + series);
         }
@@ -464,6 +633,12 @@ public class GlobalSignalRouting {
                 assert(currNet == sink.getNet());
             }
             assert(!sink.isOutPin());
+            if (isVersal && currNet.isGNDNet() && sink.getSiteTypeEnum() == SiteTypeEnum.XPLL
+                    && sink.getName().equals("PWRDWN")) {
+                // The PWRDWN pin does not need to be routed to GND
+                sink.setRouted(true);
+            }
+
             if (sink.isRouted()) {
                 continue;
             }
@@ -471,6 +646,11 @@ public class GlobalSignalRouting {
             Node node = sink.getConnectedNode();
             if (getNodeState.apply(node) != NodeStatus.INUSE) {
                 throw new RuntimeException("ERROR: Site pin " + sink + " is not available for net " + currNet);
+            } else if (node.getIntentCode() == IntentCode.NODE_DEDICATED) {
+                // Skip dedicated nodes that don't reach the INT tile
+                // e.g. XPIO_NIBBLE_SC_5_X0Y0/XPIO_IOBPAIR_5_IBUF_DISABLE_M_PIN on vp1202
+                assert(isVersal);
+                continue;
             }
             nodeToRouteToSink.put(node, sink);
         }
@@ -482,16 +662,16 @@ public class GlobalSignalRouting {
 
         NetType netType = currNet.getType();
         for (Node node : nodesToRoute) {
-            int watchdog = 10000;
+            int watchdog = 20000;
             SitePinInst sink = nodeToRouteToSink.get(node);
             if (usedRoutingNodes.contains(node)) {
                 sink.setRouted(true);
             } else {
-                assert(prevNode.isEmpty());
+                assert(nextNode.isEmpty());
                 // Use an invalid node as the sink's prev node, as that's what we'll be looking for
                 // during trace-back. This is necessary because `null` cannot be used since `null`
                 // is what Map uses internally to indicate key is not present.
-                prevNode.put(node, INVALID_NODE);
+                nextNode.put(node, INVALID_NODE);
                 assert(q.isEmpty());
                 q.add(node);
                 search: while ((node = q.poll()) != null) {
@@ -577,7 +757,8 @@ public class GlobalSignalRouting {
                                 break;
                         }
 
-                        if (prevNode.putIfAbsent(uphillNode, node) != null) {
+                        if (nextNode.putIfAbsent(uphillNode, node) != null) {
+                            // Uphill node has already been visited
                             continue;
                         }
 
@@ -618,17 +799,18 @@ public class GlobalSignalRouting {
                     }
                     watchdog--;
                     if (watchdog < 0) {
+                        node = null;
                         break;
                     }
                 }
                 if (node == null) {
                     System.err.println("ERROR: Failed to route " + currNet.getName() + " pin " + sink);
                 } else {
-                    // trace back for a complete path
+                    // trace forward for a complete path
                     do {
                         usedRoutingNodes.add(node);
                         pathNodes.add(node);
-                        node = prevNode.get(node);
+                        node = nextNode.get(node);
                     } while (node != INVALID_NODE);
 
                     // Note that the static net router goes backward from sinks to sources,
@@ -642,7 +824,7 @@ public class GlobalSignalRouting {
                 }
                 assert(pathNodes.isEmpty());
                 q.clear();
-                prevNode.clear();
+                nextNode.clear();
             }
         }
 
@@ -677,7 +859,7 @@ public class GlobalSignalRouting {
     }
 
     /**
-     * Determines if the given {@link Node} instance can serve as our sink.
+     * Determines if the given {@link Node} instance can serve as our source.
      * @param node The {@link Node} instance in question.
      * @param type The net type to designate the static source type.
      * @return {@link SitePin} if a valid source is found, null otherwise.
@@ -715,11 +897,9 @@ public class GlobalSignalRouting {
         if (isVersal) {
             sitePinName = wireName.substring(17, wireName.length() - 4);
 
-            // For [A-H]Q only
-            if (si != null && sitePinName.endsWith("Q")) {
+            if (si != null) {
                 char lutLetter = sitePinName.charAt(0);
-                Net o6Net = si.getNetFromSiteWire(lutLetter + "_O");
-                if (o6Net != null && o6Net.getType() != type) {
+                if (si.getCell(lutLetter + "6LUT") != null) {
                     // 6LUT is occupied
                     return null;
                 }

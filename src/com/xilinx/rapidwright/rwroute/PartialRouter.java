@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +40,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
@@ -206,6 +208,7 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected void routeGlobalClkNets() {
+        Map<Integer, Set<ClockRegion>> usedRoutingTracks = new HashMap<>();
         if (clkNets.isEmpty())
             return;
 
@@ -216,7 +219,7 @@ public class PartialRouter extends RWRoute {
             }
 
             if (!clk.hasPIPs()) {
-                super.routeGlobalClkNet(clk);
+                super.routeGlobalClkNet(clk, usedRoutingTracks);
             } else {
                 System.out.println("INFO: Routing " + clkPins.size() + " pins of clock " + clk + " (non timing-driven)");
                 Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(clk, node);
@@ -373,8 +376,6 @@ public class PartialRouter extends RWRoute {
             }
 
             if (net.hasPIPs()) {
-                final boolean isVersal = design.getSeries() == Series.Versal;
-
                 // Create all nodes used by this net and set its previous pointer so that:
                 // (a) the routing for each connection can be recovered by
                 //      finishRouteConnection()
@@ -390,23 +391,9 @@ public class PartialRouter extends RWRoute {
                         continue;
                     }
 
-                    if (isVersal) {
-                        // Skip all PIPs downstream from a NODE_INTF_CTRL (since that is the intent that
-                        // RouterHelper.projectInputPinToINTNode() will terminate at)
-                        // NODE_INTF_CTRL -> NODE_PINFEED -> NODE_IRI -> NODE_IRI -> NODE_PINFEED (site pin)
-
-                        IntentCode startIntent = start.getIntentCode();
-                        if (startIntent == IntentCode.NODE_INTF_CTRL || startIntent == IntentCode.NODE_IRI) {
-                            continue;
-                        }
-
-                        IntentCode endIntent = end.getIntentCode();
-                        if (endIntent == IntentCode.NODE_IRI ||
-                                // Skip NODE_OUTPUT -> NODE_INTF[24] since RouterHelper.projectOutputPinToINTNode()
-                                // terminates at the latter
-                                endIntent == IntentCode.NODE_INTF2 || endIntent == IntentCode.NODE_INTF4) {
-                            continue;
-                        }
+                    // Skip PIPs that would otherwise get projected away
+                    if (isExcludedPip(start, end)) {
+                        continue;
                     }
 
                     RouteNode rstart = routingGraph.getOrCreate(start);
@@ -435,6 +422,30 @@ public class PartialRouter extends RWRoute {
             numPreservedWire++;
             numPreservedRoutableNets++;
         }
+    }
+
+    protected boolean isExcludedPip(Node start, Node end) {
+        if (!routingGraph.isVersal) {
+            return false;
+        }
+
+        // Skip all PIPs downstream from a NODE_INTF_CTRL/NODE_IMUX (since these are the intents that
+        // RouterHelper.projectInputPinToINTNode() will terminate at)
+        // {NODE_INTF_CTRL,NODE_IMUX} -> NODE_PINFEED -> NODE_IRI -> NODE_IRI -> NODE_PINFEED (site pin)
+        IntentCode startIntent = start.getIntentCode();
+        if (startIntent == IntentCode.NODE_INTF_CTRL || startIntent == IntentCode.NODE_IMUX ||
+                startIntent == IntentCode.NODE_IRI) {
+            return true;
+        }
+
+        IntentCode endIntent = end.getIntentCode();
+        if (endIntent == IntentCode.NODE_IRI ||
+                // Skip NODE_OUTPUT -> NODE_INTF[24] since RouterHelper.projectOutputPinToINTNode()
+                // terminates at the latter
+                endIntent == IntentCode.NODE_INTF2 || endIntent == IntentCode.NODE_INTF4) {
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -565,6 +576,11 @@ public class PartialRouter extends RWRoute {
                 if (RouteNodeGraph.isExcludedTile(end))
                     continue;
 
+                // Skip PIPs that would otherwise get projected away
+                if (isExcludedPip(start, end)) {
+                    continue;
+                }
+
                 // Since net already exists, all the nodes it uses must already
                 // have been created
                 RouteNode rend = routingGraph.getNode(end);
@@ -606,6 +622,11 @@ public class PartialRouter extends RWRoute {
                     // Do not unpreserve locked nodes
                     RouteNode rend = routingGraph.getNode(end);
                     assert(rend == null);
+                    continue;
+                }
+
+                // Skip PIPs that would otherwise get projected away
+                if (isExcludedPip(start, end)) {
                     continue;
                 }
 

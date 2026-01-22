@@ -127,6 +127,8 @@ public class FileTools {
     public static final String PART_DB_PATH = DATA_FOLDER_NAME + File.separator + "parts.db";
     /** Location of the cell pins default data file */
     public static final String CELL_PIN_DEFAULTS_FILE_NAME = DATA_FOLDER_NAME + File.separator + "cell_pin_defaults.dat";
+    /** Location of the Versal VDISTR Tree paths for clock routing */
+    public static final String VERSAL_VDISTR_TREES_FILE_NAME = DATA_FOLDER_NAME + File.separator + "versal_vdistr_trees.dat";
     /** Location of cached routethru helper files */
     public static final String ROUTETHRU_FOLDER_NAME = DATA_FOLDER_NAME + File.separator + "routeThrus";
     /** Common instance of the Kryo class for serialization purposes */
@@ -1500,7 +1502,9 @@ public class FileTools {
     }
 
     public static Pair<InputStream,Long> getInputStreamFromZipFile(String zipFileName, String fileEndsWith) {
-        try (ZipFile zip = new ZipFile(zipFileName)) {
+        try {
+            @SuppressWarnings("resource")
+            final ZipFile zip = new ZipFile(zipFileName);
             Enumeration<? extends ZipEntry> entries = zip.entries();
             ZipEntry match = null;
             while (entries.hasMoreElements()) {

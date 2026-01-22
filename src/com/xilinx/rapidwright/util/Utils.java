@@ -73,6 +73,8 @@ public class Utils{
 
     public static Set<SiteTypeEnum> sliceDspBramUramTypes;
 
+    public static Set<SiteTypeEnum> psTypes;
+
     /**
      * Returns a SiteTypeEnum enum based on the given string. If such
      * an enum does not exist, it will return null.
@@ -182,6 +184,10 @@ public class Utils{
         return moduleSiteTypes.contains(type);
     }
 
+    public static boolean isPSSiteType(SiteTypeEnum type) {
+        return psTypes.contains(type);
+    }
+
     public static Set<TileTypeEnum> getIntTileTypes() {
         return interconnects;
     }
@@ -222,6 +228,10 @@ public class Utils{
         return moduleSiteTypes;
     }
 
+    public static Set<SiteTypeEnum> getPSTypes() {
+        return psTypes;
+    }
+
     public static boolean isSLICE(SiteInst s) {
         return sliceTypes.contains(s.getSiteTypeEnum());
     }
@@ -246,11 +256,17 @@ public class Utils{
         return iobTypes.contains(s.getSiteTypeEnum());
     }
 
+    public static boolean isPS(SiteInst s) {
+        return psTypes.contains(s.getSiteTypeEnum());
+    }
+
     public static boolean isIOB(SiteTypeEnum s) {
         return iobTypes.contains(s);
     }
 
-
+    public static boolean isPS(SiteTypeEnum s) {
+        return psTypes.contains(s);
+    }
 
     static{
         clbs = EnumSet.of(
@@ -327,9 +343,10 @@ public class Utils{
             TileTypeEnum.INT_L,
             //TileTypeEnum.INT_L_SLV,
             //TileTypeEnum.INT_L_SLV_FLY,
-            TileTypeEnum.INT_R
+            TileTypeEnum.INT_R,
             //TileTypeEnum.INT_R_SLV,
             //TileTypeEnum.INT_R_SLV_FLY,
+            TileTypeEnum.SLL                // Versal
         );
 
         urams = EnumSet.of(
@@ -435,6 +452,12 @@ public class Utils{
             // SiteTypeEnum.PS7
         );
         moduleSiteTypes.addAll(sliceDspBramUramTypes);
+
+        psTypes = EnumSet.noneOf(SiteTypeEnum.class);
+        psTypes.add(SiteTypeEnum.PS7);
+        psTypes.add(SiteTypeEnum.PS8);
+        psTypes.add(SiteTypeEnum.PS9);
+        psTypes.add(SiteTypeEnum.PS11);
     }
 
 }
