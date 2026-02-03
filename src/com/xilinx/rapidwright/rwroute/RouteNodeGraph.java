@@ -143,10 +143,13 @@ public class RouteNodeGraph {
     /** Flag to enable really comprehensive (but performance-impacting) assertions */
     protected final static boolean enableComprehensiveAssertions = false;
 
+    protected final boolean backwardRouting;
+
     public RouteNodeGraph(Design design, RWRouteConfig config) {
         this.design = design;
         lutRoutethru = config.isLutRoutethru();
         lutPinSwapping = config.isLutPinSwapping();
+        backwardRouting = config.isBackwardRouting();
 
         this.nodesMap = new RouteNode[getTileCount(design)][];
         nodesMapSize = new AtomicInteger();
@@ -1170,6 +1173,11 @@ public class RouteNodeGraph {
 
     protected boolean allowRoutethru(RouteNode head, Node tail) {
         final boolean isCLB = Utils.isCLB(tail.getTile().getTileTypeEnum());
+
+        if (backwardRouting) {
+            // FIXME: Need a better way to identify LUT routethrus than INT -> CLB edge
+            return true;
+        }
 
         if (isVersal) {
             if (tail.getIntentCode() == IntentCode.NODE_CLE_OUTPUT &&

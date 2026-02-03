@@ -660,7 +660,11 @@ public class RWRoute {
                         // its projected-to-INT source node, since it could
                         // be a projection from LAGUNA/RXQ* -> RXD* (node for INT/LOGIC_OUTS_*)
                         assert(sourceINTRnode != null);
-                        routingGraph.preserve(sourceINTNode, net);
+                        if (!config.isBackwardRouting()) {
+                            // Only preserve source node if forward routing, otherwise it will be
+                            // excluded during expansion
+                            routingGraph.preserve(sourceINTNode, net);
+                        }
                         netWrapper.setSourceRnode(sourceINTRnode);
                     }
                     connection.setSourceRnode(sourceINTRnode);
@@ -1827,7 +1831,7 @@ public class RWRoute {
     }
 
     protected boolean isValidSink(Connection connection, RouteNode rnode) {
-        return connection.getSinkRnode() == rnode || connection.getAltSinkRnodes().contains(rnode);
+        return connection.getSinkRnode(config.isBackwardRouting()) == rnode || connection.getAltSinkRnodes().contains(rnode);
     }
 
     /**
@@ -1837,24 +1841,15 @@ public class RWRoute {
      * @return True if backtracking successful.
      */
     protected boolean saveRouting(Connection connection, RouteNode rnode) {
-        if (config.isBackwardRouting()) {
-            if (rnode != connection.getSourceRnode()) {
-                 List<RouteNode> prevRouting = connection.getRnodes();
-                 if (!connection.isRouted() || prevRouting.isEmpty() || !rnode.isTarget()) {
-                     throw new RuntimeException("Unexpected rnode to backtrack from: " + rnode);
-                 }
-                 rnode = prevRouting.get(prevRouting.size() - 1); // Source is last in Sink->Source list
+        if (!isValidSink(connection, rnode)) {
+            assert(!config.isBackwardRouting()); // TODO
+            List<RouteNode> prevRouting = connection.getRnodes();
+            // Check that this is the sink path marked by prepareRouteConnection()
+            if (!connection.isRouted() || prevRouting.isEmpty() || !rnode.isTarget()) {
+                throw new RuntimeException("Unexpected rnode to backtrack from: " + rnode);
             }
-        } else {
-            if (!isValidSink(connection, rnode)) {
-                List<RouteNode> prevRouting = connection.getRnodes();
-                // Check that this is the sink path marked by prepareRouteConnection()
-                if (!connection.isRouted() || prevRouting.isEmpty() || !rnode.isTarget()) {
-                    throw new RuntimeException("Unexpected rnode to backtrack from: " + rnode);
-                }
-                // Backtrack from the sink used on that sink path
-                rnode = prevRouting.get(0);
-            }
+            // Backtrack from the sink used on that sink path
+            rnode = prevRouting.get(0);
         }
 
         connection.resetRoute();
@@ -1887,9 +1882,7 @@ public class RWRoute {
         final RouteNodeType rnodeType = rnode.getType();
         final boolean rnodeIsLaguna = !config.isBackwardRouting() && Utils.isLaguna(rnode.getTile().getTileTypeEnum());
 
-        RouteNode[] neighbors = config.isBackwardRouting() ? rnode.getParents(routingGraph) : rnode.getChildren(routingGraph);
-
-        for (RouteNode childRNode : neighbors) {
+        for (RouteNode childRNode : rnode.getChildren(routingGraph)) {
             if (childRNode.isVisited(sequence)) {
                 // Node must be in queue already
 
@@ -2104,19 +2097,19 @@ public class RWRoute {
 
         int childX = childRnode.getEndTileXCoordinate();
         int childY = childRnode.getEndTileYCoordinate();
-        RouteNode targetRnode = config.isBackwardRouting() ? connection.getSourceRnode() : connection.getSinkRnode();
-        int targetX = targetRnode.getBeginTileXCoordinate();
-        int targetY = targetRnode.getBeginTileYCoordinate();
-        int deltaX = Math.abs(childX - targetX);
-        int deltaY = Math.abs(childY - targetY);
-        if (connection.isCrossSLR() && !config.isBackwardRouting()) {
+        RouteNode sinkRnode = connection.getSinkRnode(config.isBackwardRouting());
+        int sinkX = sinkRnode.getBeginTileXCoordinate();
+        int sinkY = sinkRnode.getBeginTileYCoordinate();
+        int deltaX = Math.abs(childX - sinkX);
+        int deltaY = Math.abs(childY - sinkY);
+        if (connection.isCrossSLR()) {
             assert(!childRnode.getType().isLocalLeadingToLaguna() || (
                     (connection.isCrossSLRnorth() && childRnode.getType().leadsToNorthboundLaguna()) ||
                     (connection.isCrossSLRsouth() && childRnode.getType().leadsToSouthboundLaguna()) ||
                     (deltaX == 0 && deltaY <= 1)
             ));
 
-            int deltaSLR = Math.abs(targetRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
+            int deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
             if (deltaSLR != 0) {
                 // Check for overshooting which occurs when child and sink node are in
                 // adjacent SLRs and less than a SLL wire's length apart in the Y axis.
@@ -2137,7 +2130,7 @@ public class RWRoute {
                     int prevLagunaColumn = routingGraph.prevLagunaColumn[childX];
                     if (nextLagunaColumn == prevLagunaColumn) {
                         // On top of the column
-                        assert(deltaX == Math.abs(targetX - nextLagunaColumn));
+                        assert(deltaX == Math.abs(sinkX - nextLagunaColumn));
                     } else {
                         assert(rnode.getType() != RouteNodeType.SUPER_LONG_LINE);
 
@@ -2150,14 +2143,14 @@ public class RWRoute {
                             deltaXToAndFromNextColumn = Integer.MAX_VALUE;
                         } else {
                             deltaXToNextColumn = Math.abs(nextLagunaColumn - childX);
-                            deltaXToAndFromNextColumn = deltaXToNextColumn + Math.abs(targetX - nextLagunaColumn);
+                            deltaXToAndFromNextColumn = deltaXToNextColumn + Math.abs(sinkX - nextLagunaColumn);
                         }
                         if (prevLagunaColumn == Integer.MIN_VALUE || prevLagunaColumn <= connection.getXMinBB()) {
                             deltaXToPrevColumn = Integer.MAX_VALUE;
                             deltaXToAndFromPrevColumn = Integer.MAX_VALUE;
                         } else {
                             deltaXToPrevColumn = Math.abs(prevLagunaColumn - childX);
-                            deltaXToAndFromPrevColumn = deltaXToPrevColumn + Math.abs(targetX - prevLagunaColumn);
+                            deltaXToAndFromPrevColumn = deltaXToPrevColumn + Math.abs(sinkX - prevLagunaColumn);
                         }
                         if (deltaXToNextColumn == deltaXToPrevColumn) {
                             // Equidistant from both columns, prefer the one closer when considering to/from the sink
@@ -2183,8 +2176,8 @@ public class RWRoute {
             }
         }
 
-        int distanceToTarget = deltaX + deltaY;
-        float newTotalPathCost = newPartialPathCost + state.estWlWeight * distanceToTarget / sharingFactor;
+        int distanceToSink = deltaX + deltaY;
+        float newTotalPathCost = newPartialPathCost + state.estWlWeight * distanceToSink / sharingFactor;
         if (config.isTimingDriven()) {
             newTotalPathCost += state.estDlyWeight * (deltaX * 0.32f + deltaY * 0.16f);
         }
@@ -2265,21 +2258,15 @@ public class RWRoute {
         ripUp(connection);
         assert(state.queue.isEmpty());
 
-        RouteNode startNode;
-        if (config.isBackwardRouting()) {
-            // Sets the SOURCE rnode of the connection as the target
-            connection.getSourceRnode().markTarget(state);
-            startNode = connection.getSinkRnode();
-        } else {
-            // Sets the sink rnode(s) of the connection as the target(s)
-            connection.setAllTargets(state);
-            startNode = connection.getSourceRnode();
-        }
+        // Sets the sink rnode(s) of the connection as the target(s)
+        connection.setAllTargets(state, config.isBackwardRouting());
 
+        // Adds the source rnode to the queue
+        RouteNode sourceRnode = connection.getSourceRnode(config.isBackwardRouting());
         float newPartialPathCost = 0;
         float newTotalPathCost = 0;
         boolean lookahead = false;
-        push(state, startNode, newPartialPathCost, newTotalPathCost, lookahead);
+        push(state, sourceRnode, newPartialPathCost, newTotalPathCost, lookahead);
 
         if (!config.isBackwardRouting()) {
             assert(routingGraph.isAllowedTile(connection.getSinkRnode()));

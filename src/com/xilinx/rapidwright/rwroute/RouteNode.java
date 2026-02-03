@@ -64,8 +64,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     private boolean isTarget;
     /** The children (downhill rnodes) of this rnode */
     protected RouteNode[] children;
-    /** The parents (uphill rnodes) of this rnode */
-    protected RouteNode[] parents;
 
     /** Historical congestion cost */
     private float historicalCongestionCost;
@@ -501,7 +499,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     public RouteNode[] getChildren(RouteNodeGraph routingGraph) {
         if (children == null) {
             long start = RuntimeTracker.now();
-            List<Node> allDownHillNodes = getAllDownhillNodes();
+            List<Node> allDownHillNodes = routingGraph.backwardRouting ? getAllUphillNodes() : getAllDownhillNodes();
             List<RouteNode> childrenList = new ArrayList<>(allDownHillNodes.size());
             for (Node downhill : allDownHillNodes) {
                 if (isExcluded(routingGraph, downhill)) {
@@ -530,32 +528,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      */
     public void resetChildren() {
         children = null;
-    }
-
-    public RouteNode[] getParents(RouteNodeGraph routingGraph) {
-        if (parents == null) {
-            List<Node> allUphillNodes = getAllUphillNodes();
-            List<RouteNode> parentsList = new ArrayList<>(allUphillNodes.size());
-            for (Node uphill : allUphillNodes) {
-                RouteNode parent = routingGraph.getOrCreate(uphill);
-                if (parent.getType() != RouteNodeType.INACCESSIBLE) {
-                    parentsList.add(parent);
-                }
-            }
-            if (!parentsList.isEmpty()) {
-                parents = parentsList.toArray(EMPTY_ARRAY);
-            } else {
-                parents = EMPTY_ARRAY;
-            }
-        }
-        return parents;
-    }
-
-    /**
-     * Clears the parents of this node so that it can be regenerated.
-     */
-    public void resetParents() {
-        parents = null;
     }
 
     /**

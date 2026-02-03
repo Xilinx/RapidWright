@@ -413,12 +413,6 @@ public class TestRWRoute {
         Assertions.assertTrue(srcSpi.isRouted());
         Assertions.assertTrue(dstSpi.isRouted());
 
-        System.out.println("Routed Nodes:");
-        System.out.println(srcSpi.getConnectedNode());
-        for (PIP pip : net.getPIPs()) {
-            System.out.println(pip.getEndNode());
-        }
-
         long nodesPopped = Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped"));
         Assertions.assertTrue(nodesPopped >= (nodesPoppedLimit - 100) && nodesPopped <= nodesPoppedLimit);
 
