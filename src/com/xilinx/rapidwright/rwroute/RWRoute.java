@@ -2268,9 +2268,7 @@ public class RWRoute {
         boolean lookahead = false;
         push(state, sourceRnode, newPartialPathCost, newTotalPathCost, lookahead);
 
-        if (!config.isBackwardRouting()) {
-            assert(routingGraph.isAllowedTile(connection.getSinkRnode()));
-        }
+        assert(routingGraph.isAllowedTile(connection.getSinkRnode(config.isBackwardRouting())));
     }
 
     /**
