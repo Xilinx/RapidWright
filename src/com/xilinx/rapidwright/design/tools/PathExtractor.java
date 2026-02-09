@@ -166,6 +166,59 @@ public class PathExtractor {
     }
     
     /**
+     * Examines a cell and decides if it is part of a macro. If so, it adds all the
+     * sibling leaf cells in the macro to the provided sets.
+     * 
+     * @param design    The current design
+     * @param cell      The cell to check
+     * @param cells     The cells we are preserving in the path
+     * @param siteInsts The site instances we are preserving as part of the path
+     */
+    private static void addOtherMacroSiblingCells(Design design, Cell cell, Set<Cell> cells,
+            Set<SiteInst> siteInsts, Map<Net, Map<Pair<SiteInst, BELPin>, IntraSiteNet>> nets) {
+        // Identify any parent macro cells, pull in siblings
+        EDIFHierCellInst parent = cell.getEDIFHierCellInst().getParent();
+        if (parent.getCellType().isMacro()) {
+            EDIFHierCellInst grandParent = parent.getParent();
+            if (grandParent.getCellType().isMacro()) {
+                _addOtherMacroSiblingCells(design, grandParent, cells, siteInsts, nets);
+            } else {
+                _addOtherMacroSiblingCells(design, parent, cells, siteInsts, nets);
+            }
+        }
+
+    }
+
+    private static void _addOtherMacroSiblingCells(Design design, EDIFHierCellInst parentMacro,
+            Set<Cell> cells, Set<SiteInst> siteInsts, Map<Net, Map<Pair<SiteInst, BELPin>, IntraSiteNet>> nets) {
+        for (EDIFCellInst inst : parentMacro.getCellType().getCellInsts()) {
+            EDIFHierCellInst relative = parentMacro.getChild(inst);
+            if (inst.getCellType().isPrimitive()) {
+                Cell c = design.getCell(relative.getFullHierarchicalInstName());
+                if (c != null) {
+                    cells.add(c);
+                    siteInsts.add(c.getSiteInst());
+                    String[] physPinMappings = c.getPhysicalPinMappings();
+                    for (int i = 0; i < physPinMappings.length; i++) {
+                        String logPinName = physPinMappings[i];
+                        if (logPinName != null) {
+                            BELPin belPin = c.getBEL().getPin(i);
+                            if (belPin.isInput()) {
+                                Net net = c.getSiteInst().getNetFromSiteWire(belPin.getSiteWireName());
+                                if (net.isStaticNet()) {
+                                    captureIntraSiteNets(nets, net, c, logPinName);
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                _addOtherMacroSiblingCells(design, relative, cells, siteInsts, nets);
+            }
+        }
+    }
+
+    /**
      * Extracts a placed and routed path defined by a list of logical pin names into
      * another design. This method will faithfully reproduce logical hierarchy,
      * names, placement and routing of the defined path. It will also reproduce
@@ -177,6 +230,11 @@ public class PathExtractor {
      * @param pathPins The ordered list of pins in the source design to replicate.
      */
     public static void extractPath(Design src, Design dst, List<String> pathPins) {
+        DesignTools.makePhysNetNamesConsistent(src);
+        DesignTools.createMissingSitePinInsts(src);
+
+        Map<Net, Cell> mbufgces = new HashMap<>();
+
         EDIFNetlist netlist = src.getNetlist();
         Set<Cell> cells = new HashSet<>();
         Set<SiteInst> siteInsts = new HashSet<>();
@@ -192,6 +250,7 @@ public class PathExtractor {
             if (cell != null) {
                 cells.add(cell);
                 siteInsts.add(cell.getSiteInst());
+                addOtherMacroSiblingCells(src, cell, cells, siteInsts, nets);
                 String[] physPinMappings = cell.getPhysicalPinMappings();
                 for (int i = 0; i < physPinMappings.length; i++) {
                     String logPinName = physPinMappings[i];
@@ -208,9 +267,14 @@ public class PathExtractor {
                                 assert(bufgPin.size() == 1);
                                 Cell bufg = bufgPin.get(0).getPhysicalCell(src);
                                 cells.add(bufg);
-                                if (bufg.getType().equals("BUFGCE")) {
+                                boolean isMBUFGCE = bufg.getType().equals("MBUFGCE");
+                                if (bufg.getType().contains("BUFGCE")) {
                                     captureIntraSiteNets(nets, src.getVccNet(), bufg, "CE");
-                                    captureIntraSiteNets(nets, clk, bufg, "O");
+                                    captureIntraSiteNets(nets, clk, bufg, isMBUFGCE ? "O1" : "O");
+                                }
+                                if (isMBUFGCE) {
+                                    // Multiple logical clocks map to the same routing
+                                    mbufgces.put(clk, bufg);
                                 }
                             }
                         }
@@ -224,11 +288,17 @@ public class PathExtractor {
                 captureIntraSiteNets(nets, net, cell, ehpi.getPortInst().getName());
             }
         }
-        
+
         // Copy all physical cells
         for (Cell cell : cells) {
             EDIFHierCellInst orig = cell.getEDIFHierCellInst();
             EDIFHierCellInst hierCell = ensureHierCellInstExists(orig, dst);
+            SiteInst siteInst = cell.getSiteInst();
+            // Make sure site inst of the correct type is created
+            if (dst.getSiteInstFromSite(siteInst.getSite()) == null) {
+                dst.createSiteInst(siteInst.getName(), siteInst.getSiteTypeEnum(),
+                        siteInst.getSite());
+            }
             Cell dstCell = dst.createCell(hierCell.toString(), hierCell.getInst());
             hierCell.getInst().setPropertiesMap(cell.getEDIFCellInst().createDuplicatePropertiesMap());
             dst.placeCell(dstCell, cell.getSite(), cell.getBEL(), cell.getPhysicalPinMappings());
@@ -306,8 +376,39 @@ public class PathExtractor {
                 }
             }
 
+            // Correctly trim off MBUFGCE clocks (check all O1-O4 outputs)
+            Cell mbufgce = mbufgces.get(net);
+            Set<PIP> mbufgAliasPipsToExclude = null;
+            if (mbufgce != null) {
+                for (int i = 1; i < 5; i++) {
+                    String belPinName = "O" + i;
+                    String logPinName = mbufgce.getLogicalPinMapping(belPinName);
+                    EDIFHierPortInst portInst = mbufgce.getEDIFHierCellInst().getPortInst(logPinName);
+                    EDIFHierNet clkAlias = portInst == null ? null : portInst.getHierarchicalNet();
+                    Net physClkAlias = clkAlias == null ? null : src.getNet(clkAlias.toString());
+                    if (physClkAlias != null && !mbufgces.containsKey(physClkAlias) && net.hasPIPs()
+                            && !physClkAlias.hasPIPs()) {
+                        // We need to copy over the physical net PIPs to the alias so the trim
+                        // algorithm will work
+                        physClkAlias.getPIPs().addAll(net.getPIPs());
+                        if (mbufgAliasPipsToExclude == null) {
+                            mbufgAliasPipsToExclude = DesignTools.getTrimmablePIPsFromPins(
+                                    physClkAlias, physClkAlias.getSinkPins());
+                        } else {
+                            mbufgAliasPipsToExclude.addAll(DesignTools.getTrimmablePIPsFromPins(
+                                    physClkAlias, physClkAlias.getSinkPins()));
+                        }
+                        // Then we return the net back to its previous state
+                        physClkAlias.unroute();
+                    }
+                }
+            }
+
             // Only keep routing connected to the pins that drive a used site pin
-            Set<PIP> pipsToExclude = DesignTools.getTrimmablePIPsFromPins(net, pinsToUnroute);
+            Set<PIP> pipsToExclude = DesignTools.getTrimmablePIPsFromPins(net, pinsToUnroute, mbufgAliasPipsToExclude);
+            if (mbufgAliasPipsToExclude != null) {
+                pipsToExclude.addAll(mbufgAliasPipsToExclude);
+            }
             for (PIP p : net.getPIPs()) {
                 if (!pipsToExclude.contains(p)) {
                     dstNet.addPIP(new PIP(p));

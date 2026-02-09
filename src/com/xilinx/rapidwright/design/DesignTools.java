@@ -1245,6 +1245,25 @@ public class DesignTools {
      * set of provided pins from the net.
      */
     public static Set<PIP> getTrimmablePIPsFromPins(Net net, Collection<SitePinInst> pins) {
+        return getTrimmablePIPsFromPins(net, pins, null);
+    }
+
+    /**
+     * For the given set of pins, if they were removed, determine which PIPs could
+     * be trimmed as they no longer route to any specific sink. This method only
+     * works for sink pins. See {@link #unrouteSourcePin(SitePinInst)} for handling
+     * source pin unroutes.
+     * 
+     * @param net     The current net
+     * @param pins    The set of pins to remove.
+     * @param exclude Optional set of PIPs that can be excluded from the traversal
+     *                for removal. This is useful if certain parts of the net will
+     *                be removed later.
+     * @return The set of redundant (trimmable) PIPs that cane safely be removed
+     *         when removing the set of provided pins from the net.
+     */
+    public static Set<PIP> getTrimmablePIPsFromPins(Net net, Collection<SitePinInst> pins,
+            Set<PIP> exclude) {
         // Map listing the PIPs that drive a Node
         Map<Node,ArrayList<PIP>> reverseConns = new HashMap<>();
         Map<Node,Integer> fanout = new HashMap<>();
@@ -1253,6 +1272,10 @@ public class DesignTools {
             nodeSinkPins.add(sinkPin.getConnectedNode());
         }
         for (PIP pip : net.getPIPs()) {
+            if (exclude != null && exclude.contains(pip)) {
+                continue;
+            }
+
             Node endNode = pip.isReversed() ? pip.getStartNode() : pip.getEndNode();
             Node startNode = pip.isReversed() ? pip.getEndNode() : pip.getStartNode();
 
@@ -3500,7 +3523,7 @@ public class DesignTools {
             if (!Utils.isSLICE(si)) {
                 continue;
             }
-            for (Cell cell : si.getCells()) {
+            for (Cell cell : new ArrayList<>(si.getCells())) {
                 BEL bel = cell.getBEL();
                 if (bel == null || !bel.isLUT()) {
                     continue;
