@@ -118,6 +118,7 @@ public class PathExtractor {
                     }
                 }
             }
+            dstNet = dstInst.getNet(net.getNet().getName());
         }
         return dstNet;
     }
@@ -205,7 +206,7 @@ public class PathExtractor {
                             BELPin belPin = c.getBEL().getPin(i);
                             if (belPin.isInput()) {
                                 Net net = c.getSiteInst().getNetFromSiteWire(belPin.getSiteWireName());
-                                if (net.isStaticNet()) {
+                                if (net != null &&net.isStaticNet()) {
                                     captureIntraSiteNets(nets, net, c, logPinName);
                                 }
                             }
@@ -244,7 +245,7 @@ public class PathExtractor {
         for (String pinName : pathPins) {
             EDIFHierPortInst ehpi = netlist.getHierPortInstFromName(pinName);
             if (ehpi == null) {
-                throw new RuntimeException("ERROR: Couldn't find pin " + ehpi);
+                throw new RuntimeException("ERROR: Couldn't find pin " + pinName);
             }
             Cell cell = ehpi.getPhysicalCell(src);
             if (cell != null) {
@@ -376,6 +377,10 @@ public class PathExtractor {
                 }
             }
 
+            if (net.getSource() == null) {
+                continue;
+            }
+
             // Correctly trim off MBUFGCE clocks (check all O1-O4 outputs)
             Cell mbufgce = mbufgces.get(net);
             Set<PIP> mbufgAliasPipsToExclude = null;
@@ -421,10 +426,44 @@ public class PathExtractor {
         routeStaticNets(dst);
     }
 
+    public static void connectUndrivenInputsToVCC(Design design) { 
+        Net vcc = design.getVccNet();
+        for (Cell cell : design.getCells()) {
+            SiteInst si = cell.getSiteInst();
+            BEL bel = cell.getBEL();
+            if (bel == null) continue;
+            String[] physPinMappings = cell.getPhysicalPinMappings();
+            for (int i=0; i < physPinMappings.length; i++) {
+                String logPinName = physPinMappings[i];
+                if (logPinName == null) continue;
+                BELPin belPin = bel.getPin(i);
+                if (belPin.isInput()) {
+                    Net net = si.getNetFromSiteWire(belPin.getSiteWireName());
+                    if (net == null || net == vcc) {
+                        String sitePinName = belPin.getConnectedSitePinName();
+                        if (sitePinName == null) {
+                            sitePinName = cell.getCorrespondingSitePinName(logPinName);
+                        } 
+                        if (sitePinName == null) continue;
+
+                        SitePinInst spi = si.getSitePinInst(sitePinName);
+                        if (spi == null) {
+                            spi = vcc.createPin(sitePinName, si);
+                        } else if (spi.getNet() != vcc) {
+                            continue;
+                        }
+                        si.routeIntraSiteNet(vcc, spi.getBELPin(), belPin);
+                    }
+                }
+            }
+        }
+    }
+
     public static void routeStaticNets(Design design) {
         DesignTools.updatePinsIsRouted(design);
         DesignTools.createCeSrRstPinsToVCC(design);
         DesignTools.createA1A6ToStaticNets(design);
+        // connectUndrivenInputsToVCC(design);
 
         List<SitePinInst> pins = new ArrayList<>();
         pins.addAll(design.getVccNet().getSinkPins());
