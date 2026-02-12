@@ -226,11 +226,16 @@ public class PathExtractor {
      * clock nets that drive any cell in the specified path up to the source BUFG.
      * All other inputs of cells in the netlist are currently left unconnected.
      * 
-     * @param src      The design source where the path exists.
-     * @param dst      The destination design where the path should be replicated.
-     * @param pathPins The ordered list of pins in the source design to replicate.
+     * @param src                 The design source where the path exists.
+     * @param dst                 The destination design where the path should be
+     *                            replicated.
+     * @param pathPins            The ordered list of pins in the source design to
+     *                            replicate.
+     * @param inputsPreserveDepth The number of logic levels to preserve for other
+     *                            inputs on critical path cells.
      */
-    public static void extractPath(Design src, Design dst, List<String> pathPins) {
+    public static void extractPath(Design src, Design dst, List<String> pathPins,
+            int inputsPreserveDepth) {
         DesignTools.makePhysNetNamesConsistent(src);
         DesignTools.createMissingSitePinInsts(src);
 
@@ -242,6 +247,11 @@ public class PathExtractor {
         // Map that keeps track of all intrasite nets that need to be preserved and copied
         // Pair<SiteInst, BELPin> is simply a key for the IntraSiteNet object
         Map<Net, Map<Pair<SiteInst, BELPin>, IntraSiteNet>> nets = new HashMap<>();
+
+        Map<Cell, List<BELPin>> otherLogicInputs = new HashMap<>();
+        // Contains the set of input pins that we'll decide later to connect to VCC or existing nets
+        Map<Cell, Set<BELPin>> decideLaterInputs = new HashMap<>();
+
         for (String pinName : pathPins) {
             EDIFHierPortInst ehpi = netlist.getHierPortInstFromName(pinName);
             if (ehpi == null) {
@@ -278,6 +288,8 @@ public class PathExtractor {
                                     mbufgces.put(clk, bufg);
                                 }
                             }
+                        } else if (inputsPreserveDepth > 0 && belPin.isInput()) {
+                            otherLogicInputs.computeIfAbsent(cell, l -> new ArrayList<>()).add(belPin);
                         }
                     }
                 }
@@ -288,6 +300,74 @@ public class PathExtractor {
             if (net != null && !net.isStaticNet()) {
                 captureIntraSiteNets(nets, net, cell, ehpi.getPortInst().getName());
             }
+        }
+        
+        for (int i=0; i < inputsPreserveDepth; i++) {
+            Map<Cell, List<BELPin>> logicInputs = new HashMap<>(otherLogicInputs);
+            otherLogicInputs.clear();
+            boolean isLastInputStage = i == inputsPreserveDepth-1; 
+            for (Entry<Cell, List<BELPin>> e : logicInputs.entrySet()) {
+                Cell c = e.getKey();
+                cells.add(c);
+                if (!isLastInputStage) {
+                    String[] physPinMappings = c.getPhysicalPinMappings();
+                    for (int j = 0; j < physPinMappings.length; j++) {
+                        String logPinName = physPinMappings[j];
+                        if (logPinName != null) {
+                            BELPin belPin = c.getBEL().getPin(j);
+                            if (belPin.isInput()) {
+                                otherLogicInputs.computeIfAbsent(c, l -> new ArrayList<>()).add(belPin);
+                            }
+                        }
+                    }
+                }
+                addOtherMacroSiblingCells(src, c, cells, siteInsts, nets);
+                for (BELPin p : e.getValue()) {
+                    Net net = c.getSiteInst().getNetFromSiteWire(p.getSiteWireName());
+                    if (net != null) {
+                        String logPinName = c.getLogicalPinMapping(p.getName());
+                        captureIntraSiteNets(nets, net, c, logPinName);
+                        SitePinInst srcPin = net.getSource();
+                        if (srcPin != null && !net.isStaticNet()) {
+                            for (EDIFHierPortInst srcPort : net.getLogicalHierNet().getSourcePortInsts(false)) { 
+                                Cell srcCell = src.getCell(srcPort.getFullHierarchicalInstName());
+                                cells.add(srcCell);
+                                captureIntraSiteNets(nets, net, srcCell, srcPort.getPortInst().getName());
+                                if (isLastInputStage) {
+                                    String[] physPinMappings = srcCell.getPhysicalPinMappings();
+                                    for (int j = 0; j < physPinMappings.length; j++) {
+                                        String srcLogPinName = physPinMappings[j];
+                                        if (srcLogPinName != null) {
+                                            BELPin srcBelPin = srcCell.getBEL().getPin(j);
+                                            if (srcBelPin.isInput()) {
+                                                decideLaterInputs.computeIfAbsent(srcCell,
+                                                        s -> new HashSet<>()).add(srcBelPin);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Process all inputs deferred to capture any nets that drove these inputs
+        Net vcc = src.getVccNet();
+        for (Entry<Cell, Set<BELPin>> e : decideLaterInputs.entrySet()) {
+            Cell c = e.getKey();
+            for (BELPin bp : e.getValue()) {
+                Net net = c.getSiteInst().getNetFromSiteWire(bp.getSiteWireName());
+                if (nets.containsKey(net)) {
+                    // We are preserving this net, lets connect to the preserved net
+                    captureIntraSiteNets(nets, net, c, c.getLogicalPinMapping(bp.getName()));
+                } else {
+                    // Let's connect it to VCC
+                    captureIntraSiteNets(nets, vcc, c, c.getLogicalPinMapping(bp.getName()));
+                }
+            }
+
         }
 
         // Copy all physical cells
@@ -426,7 +506,7 @@ public class PathExtractor {
         routeStaticNets(dst);
     }
 
-    public static void connectUndrivenInputsToVCC(Design design) { 
+    private static void connectUndrivenInputsToVCC(Design design) {
         Net vcc = design.getVccNet();
         for (Cell cell : design.getCells()) {
             SiteInst si = cell.getSiteInst();
@@ -472,8 +552,8 @@ public class PathExtractor {
     }
 
     public static void main(String[] args) {
-        if (args.length != 3) {
-            System.out.println("USAGE: <source.dcp> <dest.dcp> <path.txt>");
+        if (args.length != 4) {
+            System.out.println("USAGE: <source.dcp> <dest.dcp> <preserveInputLogicDepth> <path.txt>");
             System.out.println("         path.txt could be generated from Vivado with a Tcl command such as:");
             System.out.println("         'set fp [open path.txt \"w\"]; foreach p [get_pins -of [get_timing_paths -nworst 1 ]] {puts $fp $p}; close $fp'");
             return;
@@ -481,9 +561,9 @@ public class PathExtractor {
 
         Design src = Design.readCheckpoint(args[0]);
         Design dst = new Design(src.getTopEDIFCell().getName(), src.getPartName());
-        List<String> pathPins = FileTools.getLinesFromTextFile(args[2]);
-
-        extractPath(src, dst, pathPins);
+        List<String> pathPins = FileTools.getLinesFromTextFile(args[3]);
+        int preserveInputLogicDepth = Integer.parseInt(args[2]);
+        extractPath(src, dst, pathPins, preserveInputLogicDepth);
 
         dst.writeCheckpoint(args[1]);
     }
