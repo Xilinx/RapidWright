@@ -168,53 +168,74 @@ public class PathExtractor {
     
     /**
      * Examines a cell and decides if it is part of a macro. If so, it adds all the
-     * sibling leaf cells in the macro to the provided sets.
+     * cells and leaf cells in the macro hierarchy to the provided sets. Internal nets are
+     * preserved and unconnected inputs are connected to VCC.
      * 
      * @param design    The current design
      * @param cell      The cell to check
      * @param cells     The cells we are preserving in the path
      * @param siteInsts The site instances we are preserving as part of the path
+     * @param nets      The intra-site nets to preserve
      */
     private static void addOtherMacroSiblingCells(Design design, Cell cell, Set<Cell> cells,
-            Set<SiteInst> siteInsts, Map<Net, Map<Pair<SiteInst, BELPin>, IntraSiteNet>> nets) {
-        // Identify any parent macro cells, pull in siblings
-        EDIFHierCellInst parent = cell.getEDIFHierCellInst().getParent();
-        if (parent.getCellType().isMacro()) {
-            EDIFHierCellInst grandParent = parent.getParent();
-            if (grandParent.getCellType().isMacro()) {
-                _addOtherMacroSiblingCells(design, grandParent, cells, siteInsts, nets);
-            } else {
-                _addOtherMacroSiblingCells(design, parent, cells, siteInsts, nets);
+            Set<SiteInst> siteInsts, Map<Net, Map<Pair<SiteInst, BELPin>, IntraSiteNet>> nets,
+            Set<String> macroInstsToPreserve) {
+        // Find outermost macro ancestor
+        EDIFHierCellInst macroRoot = cell.getEDIFHierCellInst().getParent();
+        if (!macroRoot.getCellType().isMacro()) return;
+        while (macroRoot.getParent() != null && !macroRoot.getParent().isTopLevelInst()
+                && macroRoot.getParent().getCellType().isMacro()) {
+            macroRoot = macroRoot.getParent();
+        }
+        macroInstsToPreserve.add(macroRoot.getFullHierarchicalInstName());
+
+        // Collect all leaf cells in the macro hierarchy
+        List<Cell> macroCells = new ArrayList<>();
+        collectMacroLeafCells(design, macroRoot, cells, siteInsts, macroCells);
+
+        // Iterate twice, first to identify outputs that are internal, second to capture
+        // inputs that should be tied to VCC
+        for (Cell c : macroCells) {
+            String[] logPinNames = c.getPhysicalPinMappings();
+            for (int i = 0; i < logPinNames.length; i++) {
+                if (logPinNames[i] == null) continue;
+                BELPin bp = c.getBEL().getPin(i);
+                if (bp.isInput()) continue;
+                Net net = c.getSiteInst().getNetFromSiteWire(bp.getSiteWireName());
+                if (net == null) continue;
+                captureIntraSiteNets(nets, net, c, logPinNames[i]);
             }
         }
-
+        Net vcc = design.getVccNet();
+        for (Cell c : macroCells) {
+            String[] logPinNames = c.getPhysicalPinMappings();
+            for (int i = 0; i < logPinNames.length; i++) {
+                if (logPinNames[i] == null) continue;
+                BELPin bp = c.getBEL().getPin(i);
+                if (bp.isOutput()) continue;
+                Net net = c.getSiteInst().getNetFromSiteWire(bp.getSiteWireName());
+                if (net == null) continue;
+                if (!net.isStaticNet() && !nets.containsKey(net)) {
+                    net = vcc;
+                }
+                captureIntraSiteNets(nets, net, c, logPinNames[i]);
+            }
+        }
     }
 
-    private static void _addOtherMacroSiblingCells(Design design, EDIFHierCellInst parentMacro,
-            Set<Cell> cells, Set<SiteInst> siteInsts, Map<Net, Map<Pair<SiteInst, BELPin>, IntraSiteNet>> nets) {
-        for (EDIFCellInst inst : parentMacro.getCellType().getCellInsts()) {
-            EDIFHierCellInst relative = parentMacro.getChild(inst);
+    private static void collectMacroLeafCells(Design design, EDIFHierCellInst parent,
+            Set<Cell> cells, Set<SiteInst> siteInsts, List<Cell> macroCells) {
+        for (EDIFCellInst inst : parent.getCellType().getCellInsts()) {
+            EDIFHierCellInst child = parent.getChild(inst);
             if (inst.getCellType().isPrimitive()) {
-                Cell c = design.getCell(relative.getFullHierarchicalInstName());
+                Cell c = design.getCell(child.getFullHierarchicalInstName());
                 if (c != null) {
                     cells.add(c);
                     siteInsts.add(c.getSiteInst());
-                    String[] physPinMappings = c.getPhysicalPinMappings();
-                    for (int i = 0; i < physPinMappings.length; i++) {
-                        String logPinName = physPinMappings[i];
-                        if (logPinName != null) {
-                            BELPin belPin = c.getBEL().getPin(i);
-                            if (belPin.isInput()) {
-                                Net net = c.getSiteInst().getNetFromSiteWire(belPin.getSiteWireName());
-                                if (net != null &&net.isStaticNet()) {
-                                    captureIntraSiteNets(nets, net, c, logPinName);
-                                }
-                            }
-                        }
-                    }
+                    macroCells.add(c);
                 }
             } else {
-                _addOtherMacroSiblingCells(design, relative, cells, siteInsts, nets);
+                collectMacroLeafCells(design, child, cells, siteInsts, macroCells);
             }
         }
     }
@@ -251,6 +272,7 @@ public class PathExtractor {
         Map<Cell, List<BELPin>> otherLogicInputs = new HashMap<>();
         // Contains the set of input pins that we'll decide later to connect to VCC or existing nets
         Map<Cell, Set<BELPin>> decideLaterInputs = new HashMap<>();
+        Set<String> macroInstsToPreserve = new HashSet<>();
 
         for (String pinName : pathPins) {
             EDIFHierPortInst ehpi = netlist.getHierPortInstFromName(pinName);
@@ -261,7 +283,7 @@ public class PathExtractor {
             if (cell != null) {
                 cells.add(cell);
                 siteInsts.add(cell.getSiteInst());
-                addOtherMacroSiblingCells(src, cell, cells, siteInsts, nets);
+                addOtherMacroSiblingCells(src, cell, cells, siteInsts, nets, macroInstsToPreserve);
                 String[] physPinMappings = cell.getPhysicalPinMappings();
                 for (int i = 0; i < physPinMappings.length; i++) {
                     String logPinName = physPinMappings[i];
@@ -321,7 +343,7 @@ public class PathExtractor {
                         }
                     }
                 }
-                addOtherMacroSiblingCells(src, c, cells, siteInsts, nets);
+                addOtherMacroSiblingCells(src, c, cells, siteInsts, nets, macroInstsToPreserve);
                 for (BELPin p : e.getValue()) {
                     Net net = c.getSiteInst().getNetFromSiteWire(p.getSiteWireName());
                     if (net != null) {
@@ -370,6 +392,16 @@ public class PathExtractor {
 
         }
 
+        // Deep copy macro cell types that are being fully preserved on the path
+        EDIFNetlist dstNetlist = dst.getNetlist();
+        Set<EDIFCell> copiedMacroTypes = new HashSet<>();
+        for (String macroInstName : macroInstsToPreserve) {
+            EDIFCell macroType = netlist.getHierCellInstFromName(macroInstName).getCellType();
+            if (copiedMacroTypes.add(macroType)) {
+                dstNetlist.copyCellAndSubCells(macroType);
+            }
+        }
+
         // Copy all physical cells
         for (Cell cell : cells) {
             EDIFHierCellInst orig = cell.getEDIFHierCellInst();
@@ -385,16 +417,16 @@ public class PathExtractor {
             dst.placeCell(dstCell, cell.getSite(), cell.getBEL(), cell.getPhysicalPinMappings());
             copyCellPinMappings(cell, dstCell);
         }
-        
-        EDIFNetlist dstNetlist = dst.getNetlist();
 
         // Ensure all alias parent cells are present in the netlist
         for (Entry<Net, Map<Pair<SiteInst, BELPin>, IntraSiteNet>> e : nets.entrySet()) {
             Net net = e.getKey();
             if (net.isStaticNet()) continue;
             for (EDIFHierNet alias : netlist.getNetAliases(net.getLogicalHierNet())) {
-                // Macros are excluded because they will pull in leaf cells unnecessarily
-                if (!alias.getHierarchicalInst().getCellType().isMacro()) {
+                // Skip macros unless this specific instance is being preserved on the path
+                EDIFHierCellInst aliasInst = alias.getHierarchicalInst();
+                if (!aliasInst.getCellType().isMacro()
+                        || macroInstsToPreserve.contains(aliasInst.getFullHierarchicalInstName())) {
                     ensureHierCellInstExists(alias.getHierarchicalInst(), dst);
                 }
             }
@@ -506,44 +538,10 @@ public class PathExtractor {
         routeStaticNets(dst);
     }
 
-    private static void connectUndrivenInputsToVCC(Design design) {
-        Net vcc = design.getVccNet();
-        for (Cell cell : design.getCells()) {
-            SiteInst si = cell.getSiteInst();
-            BEL bel = cell.getBEL();
-            if (bel == null) continue;
-            String[] physPinMappings = cell.getPhysicalPinMappings();
-            for (int i=0; i < physPinMappings.length; i++) {
-                String logPinName = physPinMappings[i];
-                if (logPinName == null) continue;
-                BELPin belPin = bel.getPin(i);
-                if (belPin.isInput()) {
-                    Net net = si.getNetFromSiteWire(belPin.getSiteWireName());
-                    if (net == null || net == vcc) {
-                        String sitePinName = belPin.getConnectedSitePinName();
-                        if (sitePinName == null) {
-                            sitePinName = cell.getCorrespondingSitePinName(logPinName);
-                        } 
-                        if (sitePinName == null) continue;
-
-                        SitePinInst spi = si.getSitePinInst(sitePinName);
-                        if (spi == null) {
-                            spi = vcc.createPin(sitePinName, si);
-                        } else if (spi.getNet() != vcc) {
-                            continue;
-                        }
-                        si.routeIntraSiteNet(vcc, spi.getBELPin(), belPin);
-                    }
-                }
-            }
-        }
-    }
-
     public static void routeStaticNets(Design design) {
         DesignTools.updatePinsIsRouted(design);
         DesignTools.createCeSrRstPinsToVCC(design);
         DesignTools.createA1A6ToStaticNets(design);
-        // connectUndrivenInputsToVCC(design);
 
         List<SitePinInst> pins = new ArrayList<>();
         pins.addAll(design.getVccNet().getSinkPins());
