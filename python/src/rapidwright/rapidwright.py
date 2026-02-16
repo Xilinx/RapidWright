@@ -22,7 +22,7 @@ import jpype
 import jpype.imports
 from jpype.types import *
 from typing import List, Optional
-import os, urllib.request, platform, shutil, glob
+import os, urllib.request, platform, shutil
 
 version='2025.2.0'
 java_home_var='JAVA_HOME'
