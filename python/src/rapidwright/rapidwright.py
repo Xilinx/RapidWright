@@ -22,15 +22,33 @@ import jpype
 import jpype.imports
 from jpype.types import *
 from typing import List, Optional
-import os, urllib.request, platform
+import os, urllib.request, platform, shutil, glob
 
 version='2025.2.0'
+java_home_var='JAVA_HOME'
 
+def _find_java_home():
+    # Prioritize 'java' on PATH if JAVA_HOME not set
+    java_exec = shutil.which('java')
+    if java_exec:
+        java_real_path = os.path.realpath(java_exec)
+        java_home = os.path.dirname(os.path.dirname(java_real_path))
+        if os.path.isdir(java_home):
+            return java_home        
+    return None
+    
 def start_jvm():
     os_str = 'lin64'
     if platform.system() == 'Windows':
         os_str = 'win64'
     kwargs = {}
+
+    # JPype prioritizes JAVA_HOME over java on PATH, let's set JAVA_HOME if it is not set
+    if not os.environ.get(java_home_var):
+        java_home = _find_java_home()
+        if java_home:
+            os.environ[java_home_var] = java_home
+    
     if not os.environ.get('RAPIDWRIGHT_PATH'):
         dir_path = os.path.dirname(os.path.realpath(__file__))
         file_name = "rapidwright-"+version+"-standalone-"+os_str+".jar"
