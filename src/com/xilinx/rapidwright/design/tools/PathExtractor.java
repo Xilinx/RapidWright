@@ -295,10 +295,7 @@ public class PathExtractor {
                             if (clk != null) {
                                 captureIntraSiteNets(nets, clk, cell, logPinName);
                                 // Preserve the clock source bufg
-                                List<EDIFHierPortInst> bufgPin = clk.getLogicalHierNet()
-                                        .getLeafHierPortInsts(true, false, false);
-                                assert(bufgPin.size() == 1);
-                                Cell bufg = bufgPin.get(0).getPhysicalCell(src);
+                                Cell bufg = clk.getLogicalHierNet().getLeafSourcePortInst().getPhysicalCell(src);
                                 cells.add(bufg);
                                 boolean isMBUFGCE = bufg.getType().equals("MBUFGCE");
                                 if (bufg.getType().contains("BUFGCE")) {

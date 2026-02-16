@@ -2328,7 +2328,7 @@ public class DesignTools {
                         if (hierNet != null) {
                             EDIFHierNet siteWireHierNet = null;
                             assert((siteWireHierNet = siteWireNet.getLogicalHierNet()) == null || siteWireHierNet.equals(netlist.getParentNet(siteWireHierNet)));
-                            assert(hierNet.equals(siteWireHierNet));
+                            assert(hierNet.equals(siteWireHierNet) || (isNetDrivenByMBUFGCE(hierNet) && isNetDrivenByMBUFGCE(siteWireHierNet)));
                         }
                     }
                     SitePinInst newPin;
@@ -2353,6 +2353,11 @@ public class DesignTools {
             }
         }
         return newPins;
+    }
+
+    private static boolean isNetDrivenByMBUFGCE(EDIFHierNet net) {
+        EDIFHierPortInst src = net.getLeafSourcePortInst();
+        return src != null ? src.getCellType().getName().equals("MBUFGCE") : false;
     }
 
     /**
