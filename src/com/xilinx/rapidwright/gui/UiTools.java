@@ -39,29 +39,37 @@ public class UiTools {
 
     }
 
+    private static final double EXPORT_MARGIN = 10.0;
+
+    private static QRectF getExportRect(QGraphicsScene scene) {
+        QRectF rect = scene.itemsBoundingRect();
+        rect.adjust(-EXPORT_MARGIN, -EXPORT_MARGIN, EXPORT_MARGIN, EXPORT_MARGIN);
+        return rect;
+    }
+
     public static void saveAsPdf(QGraphicsScene scene, File file) {
-        QRectF sceneRect = scene.sceneRect();
+        QRectF exportRect = getExportRect(scene);
         QPrinter printer = new QPrinter(QPrinter.PrinterMode.HighResolution);
         printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat);
         printer.setOutputFileName(file.toString());
-        // Set custom page size to match scene dimensions for vector output
-        printer.setPaperSize(new QSizeF(sceneRect.width(), sceneRect.height()), QPrinter.Unit.Point);
+        // Set custom page size to fit the schematic content
+        printer.setPaperSize(new QSizeF(exportRect.width(), exportRect.height()), QPrinter.Unit.Point);
         QPainter pdfPainter = new QPainter(printer);
-        scene.render(pdfPainter);
+        scene.render(pdfPainter, new QRectF(), exportRect);
         pdfPainter.end();
     }
 
     public static void saveAsSvg(QGraphicsScene scene, File file) {
-        QRectF sceneRect = scene.sceneRect();
+        QRectF exportRect = getExportRect(scene);
         QSvgGenerator svgGen = new QSvgGenerator();
         svgGen.setFileName(file.toString());
-        svgGen.setSize(new QSize((int) sceneRect.width(), (int) sceneRect.height()));
-        svgGen.setViewBox(sceneRect);
+        svgGen.setSize(new QSize((int) exportRect.width(), (int) exportRect.height()));
+        svgGen.setViewBox(new QRectF(0, 0, exportRect.width(), exportRect.height()));
         svgGen.setTitle("RapidWright Schematic");
         svgGen.setDescription("Schematic Scene");
 
         QPainter svgPainter = new QPainter(svgGen);
-        scene.render(svgPainter);
+        scene.render(svgPainter, new QRectF(), exportRect);
         svgPainter.end();
     }
 }
