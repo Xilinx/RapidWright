@@ -1245,7 +1245,7 @@ public class DesignTools {
      * set of provided pins from the net.
      */
     public static Set<PIP> getTrimmablePIPsFromPins(Net net, Collection<SitePinInst> pins) {
-        return getTrimmablePIPsFromPins(net, pins, null);
+        return getTrimmablePIPsFromPins(net, pins, false);
     }
 
     /**
@@ -1254,28 +1254,23 @@ public class DesignTools {
      * works for sink pins. See {@link #unrouteSourcePin(SitePinInst)} for handling
      * source pin unroutes.
      * 
-     * @param net     The current net
-     * @param pins    The set of pins to remove.
-     * @param exclude Optional set of PIPs that can be excluded from the traversal
-     *                for removal. This is useful if certain parts of the net will
-     *                be removed later.
+     * @param net             The current net
+     * @param pins            The set of pins to remove.
+     * @param overrideNetPins If pins are attached to a different net, setting this
+     *                        flag will treat them as attached to this net.
      * @return The set of redundant (trimmable) PIPs that cane safely be removed
      *         when removing the set of provided pins from the net.
      */
     public static Set<PIP> getTrimmablePIPsFromPins(Net net, Collection<SitePinInst> pins,
-            Set<PIP> exclude) {
+            boolean overrideNetPins) {
         // Map listing the PIPs that drive a Node
         Map<Node,ArrayList<PIP>> reverseConns = new HashMap<>();
         Map<Node,Integer> fanout = new HashMap<>();
         Set<Node> nodeSinkPins = new HashSet<>();
-        for (SitePinInst sinkPin : net.getSinkPins()) {
+        for (SitePinInst sinkPin : overrideNetPins ? pins : net.getSinkPins()) {
             nodeSinkPins.add(sinkPin.getConnectedNode());
         }
         for (PIP pip : net.getPIPs()) {
-            if (exclude != null && exclude.contains(pip)) {
-                continue;
-            }
-
             Node endNode = pip.isReversed() ? pip.getStartNode() : pip.getEndNode();
             Node startNode = pip.isReversed() ? pip.getEndNode() : pip.getStartNode();
 
@@ -1294,7 +1289,7 @@ public class DesignTools {
 
         for (SitePinInst p : pins) {
             if (p.getSiteInst() == null || p.getSite() == null) continue;
-            if (p.getNet() != net) continue;
+            if (!overrideNetPins && p.getNet() != net) continue;
             Node sink = p.getConnectedNode();
             Integer fanoutCount = fanout.get(sink);
             if (fanoutCount == null) {
