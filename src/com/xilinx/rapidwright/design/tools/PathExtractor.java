@@ -230,6 +230,8 @@ public class PathExtractor {
         }
         if (isMBUFGCE) {
             mbufgces.put(clk, bufg);
+        } else if (bufg.getType().contains("MMCM")) {
+            captureIntraSiteNets(nets, clk, bufg, leafSrc.getPortInst().getName());
         }
     }
 
