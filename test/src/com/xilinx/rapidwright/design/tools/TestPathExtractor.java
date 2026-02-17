@@ -44,7 +44,8 @@ public class TestPathExtractor {
 
         Path outputDCP = dir.resolve("path.dcp");
         
-        PathExtractor.main(new String[] {dcpPath.toString(), outputDCP.toString(), pathTxt.toString()});
+        PathExtractor.main(
+                new String[] { dcpPath.toString(), outputDCP.toString(), "0", pathTxt.toString() });
 
         VivadoToolsHelper.assertFullyRouted(outputDCP);
     }
