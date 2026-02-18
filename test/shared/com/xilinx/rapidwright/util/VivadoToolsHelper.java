@@ -90,4 +90,12 @@ public class VivadoToolsHelper {
             Assertions.assertNotEquals(beforePortCount, afterPortCount);
         }
     }
+
+    public static void createWorstPathFile(Path dcpPath, Path pathTxt) {
+        String tclCommand = "open_checkpoint " + dcpPath + ";";
+        tclCommand += "set fp [open " + pathTxt + " \"w\"];";
+        tclCommand += " foreach p [get_pins -of [get_timing_paths -nworst 1 ]] {puts $fp $p};";
+        tclCommand += "close $fp";
+        VivadoTools.runTcl(pathTxt.getParent().resolve("out.log"), tclCommand, true);
+    }
 }

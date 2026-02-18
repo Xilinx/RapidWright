@@ -122,16 +122,18 @@ public class PolynomialGenerator {
         EDIFCell top = d.getNetlist().getTopCell();
         EDIFPortInst[] inputA = EDIFTools.createPortInsts(inA, EDIFDirection.INPUT, width, mi.getCellInst());
         EDIFPortInst[] inputB = EDIFTools.createPortInsts(inB, EDIFDirection.INPUT, width, mi.getCellInst());
+        int outPortWidth = mi.getCellInst().getCellType().getPort(outResult).getWidth();
         for (int i=0; i < width; i++) {
             int ii = width - 1 - i;
             String netName = RESULT_NAME + "_" + (instanceCount++) + "[" + ii + "]";
             EDIFNet net = top.createNet(netName);
             net.addPortInst(resultPortInsts[i]);
-            net.createPortInst(outResult, i, mi.getCellInst());
+            net.createPortInst(outResult, outPortWidth - width + i, mi.getCellInst());
         }
         if (!isMult) {
+            EDIFNet gnd = EDIFTools.getStaticNet(NetType.GND, top, d.getNetlist());
             EDIFNet vcc = EDIFTools.getStaticNet(NetType.VCC, top, d.getNetlist());
-            vcc.createPortInst("rst", mi.getCellInst());
+            gnd.createPortInst("rst", mi.getCellInst());
             vcc.createPortInst("ce",mi.getCellInst());
         }
 
@@ -200,7 +202,7 @@ public class PolynomialGenerator {
         origin = d.getDevice().getSite("SLICE_X"+(slicex-1)+"Y"+slicey);
         AddSubGenerator.createAddSub(subDesign2, origin, width, true, true, false);
         Module sub2 = new Module(subDesign2);
-        sub.setNetlist(subDesign2.getNetlist());
+        sub2.setNetlist(subDesign2.getNetlist());
         operators.put("-o", sub2);
 
         return operators;
@@ -270,8 +272,9 @@ public class PolynomialGenerator {
 
         top.getNet(CLK_NAME).createPortInst(CLK_NAME, ci);
         if (!type.startsWith("*")) {
+            EDIFNet gnd = EDIFTools.getStaticNet(NetType.GND, top, d.getNetlist());
             EDIFNet vcc = EDIFTools.getStaticNet(NetType.VCC, top, d.getNetlist());
-            vcc.createPortInst("rst", ci);
+            gnd.createPortInst("rst", ci);
             vcc.createPortInst("ce", ci);
         } else {
             EDIFCellInst dsp = mi.getCellInst().getCellType().getCellInst(MULT_NAME);
