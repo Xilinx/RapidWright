@@ -1245,11 +1245,29 @@ public class DesignTools {
      * set of provided pins from the net.
      */
     public static Set<PIP> getTrimmablePIPsFromPins(Net net, Collection<SitePinInst> pins) {
+        return getTrimmablePIPsFromPins(net, pins, false);
+    }
+
+    /**
+     * For the given set of pins, if they were removed, determine which PIPs could
+     * be trimmed as they no longer route to any specific sink. This method only
+     * works for sink pins. See {@link #unrouteSourcePin(SitePinInst)} for handling
+     * source pin unroutes.
+     * 
+     * @param net             The current net
+     * @param pins            The set of pins to remove.
+     * @param overrideNetPins If pins are attached to a different net, setting this
+     *                        flag will treat them as attached to this net.
+     * @return The set of redundant (trimmable) PIPs that cane safely be removed
+     *         when removing the set of provided pins from the net.
+     */
+    public static Set<PIP> getTrimmablePIPsFromPins(Net net, Collection<SitePinInst> pins,
+            boolean overrideNetPins) {
         // Map listing the PIPs that drive a Node
         Map<Node,ArrayList<PIP>> reverseConns = new HashMap<>();
         Map<Node,Integer> fanout = new HashMap<>();
         Set<Node> nodeSinkPins = new HashSet<>();
-        for (SitePinInst sinkPin : net.getSinkPins()) {
+        for (SitePinInst sinkPin : overrideNetPins ? pins : net.getSinkPins()) {
             nodeSinkPins.add(sinkPin.getConnectedNode());
         }
         for (PIP pip : net.getPIPs()) {
@@ -1271,7 +1289,7 @@ public class DesignTools {
 
         for (SitePinInst p : pins) {
             if (p.getSiteInst() == null || p.getSite() == null) continue;
-            if (p.getNet() != net) continue;
+            if (!overrideNetPins && p.getNet() != net) continue;
             Node sink = p.getConnectedNode();
             Integer fanoutCount = fanout.get(sink);
             if (fanoutCount == null) {
@@ -2305,7 +2323,7 @@ public class DesignTools {
                         if (hierNet != null) {
                             EDIFHierNet siteWireHierNet = null;
                             assert((siteWireHierNet = siteWireNet.getLogicalHierNet()) == null || siteWireHierNet.equals(netlist.getParentNet(siteWireHierNet)));
-                            assert(hierNet.equals(siteWireHierNet));
+                            assert(hierNet.equals(siteWireHierNet) || (isNetDrivenByMBUFGCE(hierNet) && isNetDrivenByMBUFGCE(siteWireHierNet)));
                         }
                     }
                     SitePinInst newPin;
@@ -2330,6 +2348,11 @@ public class DesignTools {
             }
         }
         return newPins;
+    }
+
+    private static boolean isNetDrivenByMBUFGCE(EDIFHierNet net) {
+        EDIFHierPortInst src = net.getLeafSourcePortInst();
+        return src != null ? src.getCellType().getName().equals("MBUFGCE") : false;
     }
 
     /**
@@ -3500,7 +3523,7 @@ public class DesignTools {
             if (!Utils.isSLICE(si)) {
                 continue;
             }
-            for (Cell cell : si.getCells()) {
+            for (Cell cell : new ArrayList<>(si.getCells())) {
                 BEL bel = cell.getBEL();
                 if (bel == null || !bel.isLUT()) {
                     continue;
