@@ -1,4 +1,20 @@
-============= RapidWright 2025.1.3-beta released on 2025-12-01 ================
+============= RapidWright 2025.2.1-beta released on 2026-02-18 ================
+Notes:
+  - Fixes Issues with PathExtractor#1350
+  - [Python] Set JAVA_HOME from PATH if not already set (#1351)
+  - Export schematic viewer scene as a PDF or SVG vector graphic. (#1344)
+  - Functional Fixes for PolynomialGenerator (#1349)
+  - [DesignComparator] Add command line entrypoint (#1341)
+  - Path extraction tool (#1345)
+  - [ModuleInst] Test for handling routethrus correctly (#1333)
+  - [FanOutOptimization] Improvements to support LUT replication and more (#1338)
+  - Fix PBlock creation and movement for Versal IRI_QUAD (#1335)
+
+API Additions:
+  - com.xilinx.rapidwright.design.Module "public Collection<Cell> getCells()"
+
+
+============= RapidWright 2025.2.0-beta released on 2025-12-01 ================
 Notes:
   - [RWRoute] Initial Versal SLR crossing support (#1302)
   - [VersalClockRouting] VDISTR tree storage map for Versal (#1311)
