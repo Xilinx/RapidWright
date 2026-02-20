@@ -835,6 +835,37 @@ public class PartialRouter extends RWRoute {
     }
 
     /**
+     * Routes a design in the partial non-timing-driven backward routing mode.
+     * @param design The {@link Design} instance to be routed.
+     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all unrouted pins in the design.
+     * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
+     */
+    public static Design routeDesignPartialNonTimingDrivenBackward(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
+        return routeDesignWithUserDefinedArguments(design, new String[] {
+                "--fixBoundingBox",
+                "--useUTurnNodes",
+                "--nonTimingDriven",
+                "--backwardRouting",
+                "--verbose"},
+                pinsToRoute, softPreserve);
+    }
+
+    /**
+     * Routes a design in the partial timing-driven backward routing mode.
+     * @param design The {@link Design} instance to be routed.
+     * @param pinsToRoute Collection of {@link SitePinInst}-s to be routed. If null, route all unrouted pins in the design.
+     * @param softPreserve Allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
+     */
+    public static Design routeDesignPartialTimingDrivenBackward(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
+        return routeDesignWithUserDefinedArguments(design, new String[] {
+                "--fixBoundingBox",
+                "--useUTurnNodes",
+                "--backwardRouting",
+                "--verbose"},
+                pinsToRoute, softPreserve);
+    }
+
+    /**
      * The main interface of {@link PartialRouter} that reads in a {@link Design} checkpoint,
      * and parses the arguments for the {@link RWRouteConfig} object of the router.
      * Specifically, only unrouted sinks will be tackled; all routed sinks will have their routing preserved

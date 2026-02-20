@@ -382,6 +382,15 @@ public class TestRWRoute {
                                     String srcSiteName, String srcPinName,
                                     String dstSiteName, String dstPinName,
                                     long nodesPoppedLimit) {
+        boolean backwardRouting = false;
+        return testSingleConnectionHelper(partName, srcSiteName, srcPinName, dstSiteName, dstPinName, nodesPoppedLimit, backwardRouting);
+    }
+
+    Design testSingleConnectionHelper(String partName,
+                                      String srcSiteName, String srcPinName,
+                                      String dstSiteName, String dstPinName,
+                                      long nodesPoppedLimit,
+                                      boolean backwardRouting) {
         Design design = new Design("top", partName);
 
         Net net = design.createNet("net");
@@ -394,10 +403,16 @@ public class TestRWRoute {
         List<SitePinInst> pinsToRoute = new ArrayList<>();
         pinsToRoute.add(dstSpi);
         boolean softPreserve = false;
-        PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute, softPreserve);
+
+        if (backwardRouting) {
+            PartialRouter.routeDesignPartialNonTimingDrivenBackward(design, pinsToRoute, softPreserve);
+        } else {
+            PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute, softPreserve);
+        }
 
         Assertions.assertTrue(srcSpi.isRouted());
         Assertions.assertTrue(dstSpi.isRouted());
+
         long nodesPopped = Long.parseLong(System.getProperty("rapidwright.rwroute.nodesPopped"));
         Assertions.assertTrue(nodesPopped >= (nodesPoppedLimit - 100) && nodesPopped <= nodesPoppedLimit);
 
@@ -557,6 +572,21 @@ public class TestRWRoute {
                 srcSiteName, srcPinName,
                 dstSiteName, dstPinName,
                 nodesPoppedLimit);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcau10p,SLICE_X0Y0,A_O,SLICE_X0Y1,A1,400"
+    })
+    public void testSingleConnectionBackward(String partName,
+                                     String srcSiteName, String srcPinName,
+                                     String dstSiteName, String dstPinName,
+                                     int nodesPoppedLimit) {
+        testSingleConnectionHelper(partName,
+                srcSiteName, srcPinName,
+                dstSiteName, dstPinName,
+                nodesPoppedLimit,
+                true);
     }
 
     @Test
