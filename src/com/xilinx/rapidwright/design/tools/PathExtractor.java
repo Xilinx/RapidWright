@@ -50,6 +50,7 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.rwroute.PartialRouter;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
@@ -537,11 +538,25 @@ public class PathExtractor {
 
                 for (BELPin sink : intraSiteNet.getSinks()) {
                     dstSiteInst.routeIntraSiteNet(dstNet, srcBELPin, sink);
+                    if (net.isStaticNet()) {
+                        Cell cell = dstSiteInst.getCell(sink.getBEL());
+                        if (cell != null) {
+                            String logPin = cell.getLogicalPinMapping(sink.getName());
+                            if (logPin != null) {
+                                EDIFCellInst inst = cell.getEDIFCellInst();
+                                if (inst != null && inst.getPortInst(logPin) == null) {
+                                    // If unconnected, make sure we connect the static net logically
+                                    EDIFNet staticNet = EDIFTools.getStaticNet(net.getType(), 
+                                            inst.getParentCell(), dstNetlist);
+                                    staticNet.createPortInst(logPin, inst);
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
             if (net.isStaticNet()) {
-                // GND & VCC don't need to be replicated, so we'll just re-route it later
                 continue;
             }
 
