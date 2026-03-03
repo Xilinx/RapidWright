@@ -20,7 +20,7 @@
  *
  */
 
-package com.xilinx.rapidwright.util;
+package com.xilinx.rapidwright.edif.partition;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -38,6 +38,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.util.MessageGenerator;
 
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -47,7 +48,7 @@ import joptsimple.OptionSet;
  * Supports LUT counting at different hierarchy levels for a given
  * EDIF or DCP input file.
  */
-public final class DesignAnalyzer {
+public final class HierLUTCounter {
 
     private static final String LUTCOUNT_CMD = "LUTCount";
     private static final String INPUT_OPT = "i";
@@ -57,20 +58,20 @@ public final class DesignAnalyzer {
     private static final String DESC_INPUT = "Input EDIF or DCP file";
     private static final String DESC_LEVEL = "Hierarchy depth (0=total, 1=children, etc.)";
 
-    private DesignAnalyzer() {
+    private HierLUTCounter() {
     }
 
     /**
      * Prints help showing available commands.
      */
     private static void printMainHelp() {
-        MessageGenerator.printHeader("DesignAnalyzer");
+        MessageGenerator.printHeader("HierLUTCounter");
         System.out.println("Analyze Vivado DCP or EDIF designs.\n");
-        System.out.println("Usage: rapidwright DesignAnalyzer <command> [options]\n");
+        System.out.println("Usage: rapidwright HierLUTCounter <command> [options]\n");
         System.out.println("Available commands:");
         System.out.println("  " + LUTCOUNT_CMD + "    Count logic LUT usage at different hierarchy levels");
         System.out.println();
-        System.out.println("Use 'rapidwright DesignAnalyzer <command> --help' for command-specific options.");
+        System.out.println("Use 'rapidwright HierLUTCounter <command> --help' for command-specific options.");
     }
 
     /**
