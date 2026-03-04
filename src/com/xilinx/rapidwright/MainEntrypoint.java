@@ -57,7 +57,6 @@ import com.xilinx.rapidwright.edif.EDIFParser;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.edif.compare.EDIFNetlistComparator;
-import com.xilinx.rapidwright.edif.partition.HierLUTCounter;
 import com.xilinx.rapidwright.examples.AddSubGenerator;
 import com.xilinx.rapidwright.examples.CopyMMCMCell;
 import com.xilinx.rapidwright.examples.CountRoutedNets;
@@ -152,7 +151,6 @@ public class MainEntrypoint {
         addFunction("DecomposeLUT", DecomposeLUT::main);
         addFunction("DesignComparator", DesignComparator::main);
         addFunction("DesignImplementationDiff", DesignImplementationDiff::main);
-        addFunction("HierLUTCounter", HierLUTCounter::main);
         addFunction("DesignInstrumentor", DesignInstrumentor::main);
         addFunction("DesignObfuscator", DesignObfuscator::main);
         addFunction("DeviceBrowser", DeviceBrowser::main);
