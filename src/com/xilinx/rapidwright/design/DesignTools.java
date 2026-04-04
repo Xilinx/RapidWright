@@ -1454,8 +1454,10 @@ public class DesignTools {
             String lut6 = bel.getName().replace('5', '6');
             if (siteInst.getCell(lut6) == null) {
                 SitePinInst a6Spi = siteInst.getSitePinInst(lut6.substring(0,2));
-                siteInst.unrouteIntraSiteNet(a6Spi.getBELPin(), siteInst.getBELPin(lut6, "A6"));
-                handlePinRemovals(a6Spi, deferRemovals);
+                if (a6Spi != null) {
+                    siteInst.unrouteIntraSiteNet(a6Spi.getBELPin(), siteInst.getBELPin(lut6, "A6"));
+                    handlePinRemovals(a6Spi, deferRemovals);
+                }
             }
         }
 

@@ -35,7 +35,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import com.xilinx.rapidwright.device.Node;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -47,6 +46,7 @@ import com.xilinx.rapidwright.design.blocks.UtilizationType;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
@@ -1712,5 +1712,25 @@ public class TestDesignTools {
         if (isVersal) {
             Assertions.assertTrue(si.getNetFromSiteWire("FF_CLK_MOD_CLK_OUT").isGNDNet());
         }
+    }
+
+    @Test
+    public void testFullyUnplaceCell() {
+        Design d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
+
+        // Placed on a B5LUT where the B6LUT is unoccupied
+        Cell c = d.getCell("base_mb_i/mdm_1/U0/MDM_Core_I1/JTAG_CONTROL_I/Use_Serial_Unified_Completion.count[2]_i_1");
+        
+        // Manufacturing a scenario where the A6 input pin is not there, seen in another design
+        SiteInst si = c.getSiteInst();
+        SitePinInst spi = si.getSitePinInst("B6");
+        Assertions.assertTrue(spi.getNet().isVCCNet());
+        spi.getNet().removePin(spi, true);
+        si.removePin(spi);
+        
+        DesignTools.fullyUnplaceCell(c, null);
+        
+        Assertions.assertFalse(c.isPlaced());
+        Assertions.assertNull(c.getBEL());
     }
 }
