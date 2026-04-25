@@ -449,11 +449,19 @@ public class GlobalSignalRouting {
             if (pin.isOutPin()) continue;
             Tile t = pin.getTile();
             ClockRegion cr = t.getClockRegion();
-            if (Utils.isIOB(pin.getSiteInst())) {
+            SiteInst si = pin.getSiteInst();
+            if (Utils.isIOB(si)) {
                 offFabricClkSinks.add(pin);
-            } else if (Utils.isPS(pin.getSiteInst())) {
+            } else if (Utils.isPS(si)) {
                 // PS clock input will be driven by East CR neighbor
                 clockRegions.add(cr.getNeighborClockRegion(0, 1));
+            } else if (Utils.isNOC(si)) {
+                // NOC sites might also need to look at neighbors for LCB 
+                clockRegions.add(cr);
+                for (int dx : new int[] {1, -1}) {
+                    ClockRegion neighbor = cr.getNeighborClockRegion(0, dx);
+                    if (neighbor != null) clockRegions.add(neighbor);
+                }
             } else {
                 clockRegions.add(cr);
             }

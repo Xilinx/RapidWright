@@ -75,6 +75,8 @@ public class Utils{
 
     public static Set<SiteTypeEnum> psTypes;
 
+    public static Set<SiteTypeEnum> nocTypes;
+
     /**
      * Returns a SiteTypeEnum enum based on the given string. If such
      * an enum does not exist, it will return null.
@@ -188,6 +190,10 @@ public class Utils{
         return psTypes.contains(type);
     }
 
+    public static boolean isNOCSiteType(SiteTypeEnum type) {
+        return nocTypes.contains(type);
+    }
+
     public static Set<TileTypeEnum> getIntTileTypes() {
         return interconnects;
     }
@@ -232,6 +238,10 @@ public class Utils{
         return psTypes;
     }
 
+    public static Set<SiteTypeEnum> getNOCTypes() {
+        return nocTypes;
+    }
+
     public static boolean isSLICE(SiteInst s) {
         return sliceTypes.contains(s.getSiteTypeEnum());
     }
@@ -266,6 +276,14 @@ public class Utils{
 
     public static boolean isPS(SiteTypeEnum s) {
         return psTypes.contains(s);
+    }
+
+    public static boolean isNOC(SiteInst s) {
+        return nocTypes.contains(s.getSiteTypeEnum());
+    }
+
+    public static boolean isNOC(SiteTypeEnum s) {
+        return nocTypes.contains(s);
     }
 
     static{
@@ -458,6 +476,24 @@ public class Utils{
         psTypes.add(SiteTypeEnum.PS8);
         psTypes.add(SiteTypeEnum.PS9);
         psTypes.add(SiteTypeEnum.PS11);
+
+        nocTypes = EnumSet.of(
+            SiteTypeEnum.NOC_HBM_BLI_SCAN,
+            SiteTypeEnum.NOC_NCRB,
+            SiteTypeEnum.NOC_NCRB_SSIT,
+            SiteTypeEnum.NOC_NIDB,
+            SiteTypeEnum.NOC_NMU128,
+            SiteTypeEnum.NOC_NMU512,
+            SiteTypeEnum.NOC_NMU_HBM2E,
+            SiteTypeEnum.NOC_NPP_RPTR,
+            SiteTypeEnum.NOC_NPS4,
+            SiteTypeEnum.NOC_NPS5555,
+            SiteTypeEnum.NOC_NPS6,
+            SiteTypeEnum.NOC_NPS7575,
+            SiteTypeEnum.NOC_NPS_VNOC,
+            SiteTypeEnum.NOC_NSU128,
+            SiteTypeEnum.NOC_NSU512
+        );
     }
 
 }
