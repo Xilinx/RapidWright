@@ -588,14 +588,14 @@ public class VersalClockRouting {
             }
             NodeWithPrev sink = new NodeWithPrev(p.getConnectedNode());
             ClockRegion cr = p.getTile().getClockRegion();
-            boolean isPSSink = Utils.isPS(p.getSiteInst());
+            boolean crossCRSink = Utils.isPS(p.getSiteInst()) || Utils.isNOC(p.getSiteInst());
             q.clear();
             q.add(sink);
 
             while (!q.isEmpty()) {
                 NodeWithPrev curr = q.poll();
                 for (Node uphill : curr.getAllUphillNodes()) {
-                    if (!isPSSink && !uphill.getTile().getClockRegion().equals(cr)) {
+                    if (!crossCRSink && !uphill.getTile().getClockRegion().equals(cr)) {
                         continue;
                     }
                     IntentCode uphillIntentCode = uphill.getIntentCode();

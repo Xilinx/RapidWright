@@ -426,6 +426,38 @@ public class TestGlobalSignalRouting {
     }
 
     @Test
+    public void testVersalNocClockRouting() {
+        // Test for NOC clock routing compatibility as LCBs might be in neighboring CRs
+        Design design = new Design("versal_noc_clk", "xcv80-lsva4737-2MHP-e-S");
+        EDIFCell top = design.getTopEDIFCell();
+
+        Net clk = design.createNet("clk");
+        Net clkIn = design.createNet("clkIn");
+        Net vcc = design.getVccNet();
+
+        clkIn.getLogicalNet().createPortInst(top.createPort(clkIn.getName(), EDIFDirection.INPUT, 1));
+        Cell bufgce = createBUFGCE(design, top, "bufgceInst", design.getDevice().getSite("BUFGCE_X2Y0"));
+        clkIn.connect(bufgce, "I");
+        clk.connect(bufgce, "O");
+        vcc.connect(bufgce, "CE");
+
+        Site nocSite = design.getDevice().getSite("NOC_NSU512_X3Y18");
+        Cell nsu = design.createAndPlaceCell("nsu", Unisim.NOC_NSU512, nocSite.getName() + "/NSU");
+        clk.connect(nsu, "CLK");
+
+        design.routeSites();
+        design.setAutoIOBuffers(false);
+        design.setDesignOutOfContext(true);
+
+        GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(),
+                (n) -> NodeStatus.AVAILABLE, null);
+
+        SitePinInst nocClkPin = nsu.getSiteInst().getSitePinInst("CLK");
+        Assertions.assertNotNull(nocClkPin, "NOC CLK SitePinInst should exist");
+        Assertions.assertFalse(clk.getPIPs().isEmpty(), "Clock net should have PIPs after routing");
+    }
+
+    @Test
     public void testVersalVDistrClockRouting() {
         Design d = genTestDesignForVersalClockRouting();
 
