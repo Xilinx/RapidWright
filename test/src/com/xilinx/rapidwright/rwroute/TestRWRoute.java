@@ -786,6 +786,11 @@ public class TestRWRoute {
         List<SitePinInst> pinsToRoute = new ArrayList<>();
         pinsToRoute.add(dstSpi);
         PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute);
+
+        // Check that dstSpi does not get routed because its
+        // inner or outer node is preserved for the ground net.
+        // Check also that an assertion doesn't fire, but this test
+        // is not able to verify that an "ERROR" message gets emitted.
         Assertions.assertFalse(dstSpi.isRouted());
         Assertions.assertFalse(net.hasPIPs());
     }
