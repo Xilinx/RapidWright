@@ -108,6 +108,42 @@ public class ECOTools {
     }
 
     /**
+     * When connecting and disconnecting nets from macro cells, we typically have fan out from inputs.  We 
+     * also cannot modify the internals of macros. This method ensures that the specified leafPin has all sibling sinks in 
+     * the pins list and returns the macro port connection. 
+     * @param ehpi The leaf pin inside the macro.
+     * @param pins The set of pins that must contain all other sinks or the disconnectNet() or connectNet() method will fail.
+     * @Param futurePinsToSkip Updated with the set of macro sibling sink pins that can be skipped 
+     * @return The macro level pin.
+     */
+    private static EDIFHierPortInst ensureTopMacroPortInstConsistent(EDIFHierPortInst ehpi, List<EDIFHierPortInst> pins, Set<String> futurePinsToSkip) {
+        assert(ehpi.isInput());
+        assert(ehpi.getParentCell().isMacro());
+        // If the parent is a LUT6_2, this is an error unless the matching sink pin is also in the list
+        String companionLUT = LUTTools.getCompanionLUTName(ehpi.getCellType());
+        EDIFNet net = ehpi.getNet();
+        EDIFHierPortInst companionLUTInput = new EDIFHierPortInst(ehpi.getHierarchicalInst(),
+                net.getPortInst(ehpi.getHierarchicalInst().getChild(companionLUT).getInst(), ehpi.getPortInst().getName()));
+        EDIFHierPortInst companionMatch = null;
+        // TODO Avoid linear search - O(n)
+        for (EDIFHierPortInst otherPin : pins) {
+            if (otherPin == ehpi) continue;
+            if (companionLUTInput.toString().equals(otherPin.toString())) {
+                companionMatch = otherPin;
+                break;
+            }
+        }
+        if (companionMatch == null) {
+            throw new RuntimeException("ERROR: Cannot disconnect the net of a pin inside a macro "
+                + "unless all pins are included in the invocation of disconnectNet().  Please also "
+                + "include the pin '"+ companionLUTInput +"'");
+        }
+        futurePinsToSkip.add(companionLUTInput.toString());
+        // return the macro
+        return new EDIFHierPortInst(ehpi.getHierarchicalInst(), net.getSourcePortInsts(true).get(0)).getPortInParent();
+    }
+    
+    /**
      * Given a list of EDIFHierPortInst objects, disconnect these pins from their current nets.
      * This method modifies the EDIF (logical) netlist as well as the place-and-route (physical)
      * state, and is modelled on Vivado's <TT>disconnect_net -pinlist</TT> command.
@@ -128,7 +164,15 @@ public class ECOTools {
                                      Map<Net, Set<SitePinInst>> deferredRemovals) {
         final boolean unrouteIntraSite = !Params.isParamSet("rapidwright.ecotools.disconnectNet.skipUnrouteIntraSite");
 
+        Set<String> macroSinkPortsToSkip = new HashSet<>();
         for (EDIFHierPortInst ehpi : pins) {
+            if (macroSinkPortsToSkip.contains(ehpi.toString())) {
+                continue;
+            }
+            boolean isInsideMacro = ehpi.getHierarchicalInst().getCellName().equals("LUT6_2"); 
+            if (isInsideMacro && ehpi.isInput()) {
+                ehpi = ensureTopMacroPortInstConsistent(ehpi, pins, macroSinkPortsToSkip);
+            }
             EDIFHierNet ehn = ehpi.getHierarchicalNet();
             List<EDIFHierPortInst> leafPortInsts;
             EDIFHierNet internalEhn = ehpi.getInternalNet();
@@ -211,10 +255,15 @@ public class ECOTools {
                         cell.getSiteInst().unrouteIntraSiteNet(src, snk);
                     }
 
-                    DesignTools.handlePinRemovals(spi, deferredRemovals);
+                    if (spi.getNet() != null) {
+                        DesignTools.handlePinRemovals(spi, deferredRemovals);
+                    }
                 }
             }
 
+            if (isInsideMacro && ehn == null) {
+                continue;
+            }
             EDIFNet en = ehn.getNet();
             // Detach from net, but do not detach from cell instance since
             // typically we would want to connect it to another net
@@ -336,8 +385,19 @@ public class ECOTools {
             EDIFHierNet ehn = e.getKey();
             EDIFNet en = ehn.getNet();
             List<EDIFHierPortInst> portInsts = e.getValue();
+            Set<String> skipFromMacroFanout = new HashSet<>();
 
             for (EDIFHierPortInst ehpi : portInsts) {
+                if (skipFromMacroFanout.contains(ehpi.toString())) {
+                    // Already connected from other macro fan out connection
+                    continue;
+                }
+                if (ehpi.getParentCell().getName().equals("LUT6_2")) {
+                    boolean isInsideMacro = ehpi.getHierarchicalInst().getCellName().equals("LUT6_2"); 
+                    if (isInsideMacro && ehpi.isInput()) {
+                        ehpi = ensureTopMacroPortInstConsistent(ehpi, portInsts, skipFromMacroFanout);
+                    }
+                }
                 if (ehpi.getNet() != null) {
                     throw new RuntimeException("ERROR: Pin " + ehpi + " already connected to net "
                             + ehpi.getHierarchicalNetName()
