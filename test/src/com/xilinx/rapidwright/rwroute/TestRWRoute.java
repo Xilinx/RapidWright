@@ -773,6 +773,8 @@ public class TestRWRoute {
         SitePinInst srcSpi = net.createPin("A_O", si);
         SitePinInst dstSpi = net.createPin("A_I", si);
 
+        // Attach either the inner or outer connected node 
+        // of the dstSpi above to the gnd net
         Net gndNet = design.getGndNet();
         Node preserveNode = dstSpi.getConnectedNode();
         if (!preserveInner) {
