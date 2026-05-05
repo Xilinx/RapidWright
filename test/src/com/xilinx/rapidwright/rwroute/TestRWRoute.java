@@ -762,4 +762,32 @@ public class TestRWRoute {
         }
         Assertions.assertEquals(expectRoutethru, routethruFound);
     }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testPartialRouteEnsureSinkRoutabilityStatic(boolean preserveInner) {
+        Design design = new Design("top", "xcv80");
+
+        Net net = design.createNet("net");
+        SiteInst si = design.createSiteInst("SLICE_X95Y621");
+        SitePinInst srcSpi = net.createPin("A_O", si);
+        SitePinInst dstSpi = net.createPin("A_I", si);
+
+        Net gndNet = design.getGndNet();
+        Node preserveNode = dstSpi.getConnectedNode();
+        if (!preserveInner) {
+            List<Node> uphillNodes = preserveNode.getAllUphillNodes();
+            Assertions.assertEquals(1, uphillNodes.size());
+            preserveNode = uphillNodes.get(0);
+        }
+        List<PIP> uphillPIPs = preserveNode.getAllUphillPIPs();
+        gndNet.addPIP(uphillPIPs.get(0));
+
+        List<SitePinInst> pinsToRoute = new ArrayList<>();
+        pinsToRoute.add(dstSpi);
+        boolean softPreserve = false;
+        PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute, softPreserve);
+        Assertions.assertFalse(dstSpi.isRouted());
+        Assertions.assertFalse(net.hasPIPs());
+    }
 }
