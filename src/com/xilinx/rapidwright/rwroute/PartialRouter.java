@@ -250,6 +250,10 @@ public class PartialRouter extends RWRoute {
             assert(sinkRnode.getType().isAnyExclusiveSink());
             preservedNet = routingGraph.getPreservedNet(sinkRnode);
             if (preservedNet != null && preservedNet != net) {
+                if (preservedNet.isStaticNet()) {
+                    System.err.println("ERROR: Unable to unpreserve " + preservedNet + " to allow " + connection.getSink().getSitePinName() + " to be reached. Expect unrouteable connection.");
+                    continue;
+                }
                 unpreserveNets.add(preservedNet);
             }
         }
