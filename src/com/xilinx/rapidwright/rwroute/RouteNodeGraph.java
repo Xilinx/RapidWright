@@ -611,16 +611,15 @@ public class RouteNodeGraph {
     public void preserve(Net net, List<SitePinInst> pins) {
         boolean isStaticNet = net.isStaticNet();
         for (SitePinInst pin : pins) {
-            Node spiNode = pin.getConnectedNode();
-            if (isVersal) {
+            Node preserveNode = pin.getConnectedNode();
+            if (isVersal && !pin.isOutPin()) {
                 // On Versal, spiNode gives the "*_PIN" node. Preserve the one and only
                 // node uphill of that, which is the "IMUX_*" or "BOUNCE_*"
-                List<Node> uphillNodes = spiNode.getAllUphillNodes();
+                List<Node> uphillNodes = preserveNode.getAllUphillNodes();
                 assert(uphillNodes.size() == 1);
-                preserve(uphillNodes.get(0), net);
-            } else {
-                preserve(spiNode, net);
+                preserveNode = uphillNodes.get(0);
             }
+            preserve(preserveNode, net);
 
             if (isStaticNet && pin.isOutPin()) {
                 // When a LUT output is used as a static source, also preserve the other pin
