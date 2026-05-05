@@ -821,6 +821,9 @@ public class TestRWRoute {
         SiteInst gndSi = design.createSiteInst("SLICE_X95Y621");
         SitePinInst gndSpi = gndNet.createPin("HX", gndSi);
         PartialRouter.routeDesignPartialNonTimingDriven(design, Collections.singletonList(gndSpi));
+
+        // Make sure the ground sink is not routed, since INT_X29Y625/BOUNCE_W2
+        // is now reserved for signalSpi
         Assertions.assertFalse(gndSpi.isRouted());
         Assertions.assertFalse(gndNet.hasPIPs());
     }
