@@ -765,7 +765,7 @@ public class TestRWRoute {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
-    public void testPartialRouteEnsureSinkRoutabilityStatic(boolean preserveInner) {
+    public void testPartialRouterEnsureSinkRoutabilityStatic(boolean preserveInner) {
         Design design = new Design("top", "xcv80");
 
         Net net = design.createNet("net");
@@ -785,9 +785,43 @@ public class TestRWRoute {
 
         List<SitePinInst> pinsToRoute = new ArrayList<>();
         pinsToRoute.add(dstSpi);
-        boolean softPreserve = false;
-        PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute, softPreserve);
+        PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute);
         Assertions.assertFalse(dstSpi.isRouted());
         Assertions.assertFalse(net.hasPIPs());
+    }
+
+    @Test
+    public void testPartialRouterPreservesOuterNode() {
+        Design design = new Design("top", "xcv80");
+
+        // This is the signal sink, the node(s) to which should not be claimed by static routing
+        Net signalNet = design.createNet("net");
+        SiteInst signalSi = design.createSiteInst("SLICE_X94Y621");
+        SitePinInst signalSpi = signalNet.createPin("DX", signalSi);
+
+        Device device = design.getDevice();
+        Net Z_NET = design.createNet(Net.Z_NET);
+
+        // Block these nodes so that there's only one path
+        // Z_NET.addPIP(device.getNode("INT_X29Y625/INT_NODE_IMUX_ATOM_119_INT_OUT1").getAllUphillPIPs().get(0)); // Force signal through this node
+        Z_NET.addPIP(device.getNode("INT_X29Y625/INT_NODE_IMUX_ATOM_122_INT_OUT0").getAllUphillPIPs().get(0));
+        Z_NET.addPIP(device.getNode("INT_X29Y625/INT_NODE_IMUX_ATOM_125_INT_OUT0").getAllUphillPIPs().get(0));
+        Z_NET.addPIP(device.getNode("INT_X29Y625/INT_NODE_IMUX_ATOM_53_INT_OUT1").getAllUphillPIPs().get(0));
+        Z_NET.addPIP(device.getNode("INT_X29Y625/INT_NODE_IMUX_ATOM_57_INT_OUT1").getAllUphillPIPs().get(0));
+        Z_NET.addPIP(device.getNode("INT_X29Y625/INT_NODE_IMUX_ATOM_60_INT_OUT0").getAllUphillPIPs().get(0));
+
+        Z_NET.addPIP(device.getNode("SLL_X29Y625/BNODE_OUTS_E0").getAllUphillPIPs().get(0));
+        // Z_NET.addPIP(device.getNode("INT_X29Y625/BOUNCE_W2").getAllUphillPIPs().get(0)); // Force signal through this node (which is signalSpi)
+        Z_NET.addPIP(device.getNode("INT_X28Y625/OUT_EE1_E_BEG12").getAllUphillPIPs().get(0));
+        Z_NET.addPIP(device.getNode("INT_X29Y626/OUT_SS4_W_BEG6").getAllUphillPIPs().get(0));
+        Z_NET.addPIP(device.getNode("INT_X29Y626/OUT_SS1_W_BEG12").getAllUphillPIPs().get(0));
+        Z_NET.addPIP(device.getNode("INT_X30Y625/OUT_WW2_W_BEG6").getAllUphillPIPs().get(0));
+
+        Net gndNet = design.getGndNet();
+        SiteInst gndSi = design.createSiteInst("SLICE_X95Y621");
+        SitePinInst gndSpi = gndNet.createPin("HX", gndSi);
+        PartialRouter.routeDesignPartialNonTimingDriven(design, Collections.singletonList(gndSpi));
+        Assertions.assertFalse(gndSpi.isRouted());
+        Assertions.assertFalse(gndNet.hasPIPs());
     }
 }
