@@ -822,7 +822,7 @@ public class ArrayBuilder {
         bufgce.addProperty("CE_TYPE", "ASYNC", EDIFValueType.STRING);
 
         // Ensure a VCC cell source in the current cell
-        EDIFTools.getStaticNet(NetType.VCC, parent, design.getNetlist());
+        EDIFNet vcc = EDIFTools.getStaticNet(NetType.VCC, parent, design.getNetlist());
 
         bufgce.getSiteInst().addSitePIP("CEINV", "CE_PREINV");
         bufgce.getSiteInst().addSitePIP("IINV", "I_PREINV");
@@ -831,6 +831,7 @@ public class ArrayBuilder {
             BEL ceinv = bufgce.getSite().getBEL("CEINV");
             bufgce.getSiteInst().routeIntraSiteNet(design.getVccNet(), ceinv.getPin("CE"), ceinv.getPin("CE_PREINV"));
             design.getVccNet().addPin(new SitePinInst(false, "CE", bufgce.getSiteInst()));
+            vcc.createPortInst("CE", bufgce);
         } else if (design.getSeries() == Series.UltraScalePlus) {
             // TODO
         }
