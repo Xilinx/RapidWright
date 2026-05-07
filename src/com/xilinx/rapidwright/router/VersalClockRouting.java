@@ -583,7 +583,7 @@ public class VersalClockRouting {
         RouteThruHelper routeThruHelper = new RouteThruHelper(clk.getDesign().getDevice());
 
         nextPin: for (SitePinInst p: clk.getPins()) {
-            if (p.isOutPin() || p.isRouted()) {
+            if (p.isOutPin() || p.isRouted() || Utils.isIOB(p.getSiteInst())) {
                 continue;
             }
             NodeWithPrev sink = new NodeWithPrev(p.getConnectedNode());
