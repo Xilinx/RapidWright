@@ -143,16 +143,15 @@ public class MultGenerator extends ArithmeticGenerator {
         String[] gndPins = new String[]{
                 "CEA1","CEAD","CEALUMODE","CEB1","CEC",
                 "CECARRYIN","CECTRL","CED","CEINMODE",
+                "CARRYIN", "RSTA", "RSTALLCARRYIN", "RSTALUMODE", "RSTB", "RSTC", "RSTCTRL", "RSTD", "RSTINMODE",
+                "RSTM", "RSTP",
         };
-        String[] vccPins = new String[]{"CARRYIN","CEA2","CEB2","CEM","CEP","RSTA",
-                "RSTALLCARRYIN","RSTALUMODE","RSTB","RSTC","RSTCTRL","RSTD",
-                "RSTINMODE","RSTM","RSTP"};
+
+        String[] vccPins = new String[] { "CEA2", "CEB2", "CEM", "CEP" };
         String[] gndBusses = new String[]{
-                "A","B","CARRYINSEL","C","D"
+                "A", "B", "CARRYINSEL", "C", "D", "ALUMODE", "INMODE"
         };
-        String[] vccBusses = new String[]{
-                "ALUMODE","INMODE","OPMODE"
-        };
+        String[] vccBusses = new String[] {};
 
         // Setup GND/VCC inputs
         EDIFNet gnd = EDIFTools.getStaticNet(NetType.GND, top, d.getNetlist());
@@ -184,6 +183,16 @@ public class MultGenerator extends ArithmeticGenerator {
                     physNet.createPin(bus + (isAorB ? i + width : i), si);
                 }
             }
+        }
+
+        // Connect OPMODE based on OPMODE_VALUE
+        EDIFPort opmode = inst.getCellType().getPort("OPMODE");
+        for (int i = 0; i < opmode.getWidth(); i++) {
+            char c = OPMODE_VALUE.charAt(OPMODE_VALUE.length() - 1 - i);
+            EDIFNet staticSrc = c == '1' ? vcc : gnd;
+            Net physNet = c == '1' ? logic1 : logic0;
+            staticSrc.createPortInst(opmode, opmode.getWidth() - 1 - i, inst);
+            physNet.createPin("OPMODE" + i, si);
         }
 
         // Connect logical outside connections/ports
@@ -249,7 +258,7 @@ public class MultGenerator extends ArithmeticGenerator {
             } else if (element.startsWith("OPMODE")) {
                 int idx = element.charAt(6) - 48;
                 char c = OPMODE_VALUE.charAt(OPMODE_VALUE.length()-idx-1);
-                net = c == 1 ? logic1 : logic0;
+                net = c == '1' ? logic1 : logic0;
             } else {
                 net = logic0;
             }

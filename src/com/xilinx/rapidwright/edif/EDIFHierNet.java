@@ -331,6 +331,18 @@ public class EDIFHierNet implements Comparable<EDIFHierNet> {
         return leafCellPins;
     }
 
+    /**
+     * Gets the first leaf cell source port inst for this net, or null if none could
+     * be found. If there are multiple sources, this method will return the first
+     * arbitrarily chosen source encountered.
+     * 
+     * @return First source port instance for this net, or null if none exists.
+     */
+    public EDIFHierPortInst getLeafSourcePortInst() {
+        List<EDIFHierPortInst> portInsts = getLeafHierPortInsts(true, false, false);
+        return portInsts.size() > 0 ? portInsts.get(0) : null;
+    }
+
     @Override
     public int compareTo(EDIFHierNet o) {
         return this.toString().compareTo(o.toString());

@@ -59,6 +59,7 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.router.Router;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
@@ -422,6 +423,45 @@ public class TestDesign {
     }
 
     @Test
+    public void testCreateModuleInstHandleRoutethrus(@TempDir Path dir) {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        for (Cell c : d.getCells()) {
+            Assertions.assertFalse(c.isRoutethru());
+        }
+
+        int routeThruCells = 0;
+        for (SiteInst si : d.getSiteInsts()) {
+            for (Cell c : si.getCells()) {
+                if (c.isRoutethru()) {
+                    routeThruCells++;
+                }
+            }
+        }
+        Assertions.assertEquals(1016, routeThruCells);
+
+        Module m = new Module(d);
+
+        Design newDesign = new Design("top", d.getPartName());
+
+        newDesign.createModuleInst("inst", m);
+
+        for (Cell c : newDesign.getCells()) {
+            Assertions.assertFalse(c.isRoutethru());
+        }
+
+        int newDesignRTCells = 0;
+        for (SiteInst si : newDesign.getSiteInsts()) {
+            for (Cell c : si.getCells()) {
+                if (c.isRoutethru()) {
+                    newDesignRTCells++;
+                }
+            }
+        }
+        Assertions.assertEquals(routeThruCells, newDesignRTCells);
+
+    }
+
+    @Test
     public void testCreateModuleInstFromBlackBox(@TempDir Path dir) {
         Design d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks_2024.1.dcp");
         String ilaName = "u_ila_0";
@@ -485,6 +525,41 @@ public class TestDesign {
         }
     }
 
+    @ParameterizedTest
+    @CsvSource({ 
+        "xc7z020clg400-1,SLICE_X100Y100/A6LUT,D19,D20,R14,LVCMOS33", 
+        "xcku040-ffva1156-2-e,SLICE_X32Y46/A6LUT,AE10,AF9,AP8,LVCMOS18",
+        "xcau15p-ffvb676-2-e,SLICE_X1Y1/A6LUT,U26,R21,R20,LVCMOS12",  
+        })
+    public void testCreateAndPlaceIOB(String partName, String lutLoc, String b0, String b1, String led, String ioStandard) { 
+        Design d = new Design("HelloWorld", partName);
+
+        // Create all the design elements (LUT2, and 3 IOs)
+        Cell and2 = d.createAndPlaceCell("and2", Unisim.AND2, lutLoc);
+        Cell button0 = d.createAndPlaceIOB("button0", PinType.IN, b0, ioStandard);
+        Cell button1 = d.createAndPlaceIOB("button1", PinType.IN, b1, ioStandard);
+        Cell led0 = d.createAndPlaceIOB("led0", PinType.OUT, led, ioStandard);
+
+        // Connect Button 0 to the LUT2 input I0
+        Net net0 = d.createNet("button0_IBUF");
+        net0.connect(button0, "O");
+        net0.connect(and2, "I0");
+
+        // Connect Button 1 to the LUT2 input I1
+        Net net1 = d.createNet("button1_IBUF");
+        net1.connect(button1, "O");
+        net1.connect(and2, "I1");
+
+        // Connect the LUT2 (AND2) to the LED IO
+        Net net2 = d.createNet("and2");
+        net2.connect(and2, "O");
+        net2.connect(led0, "I");
+        
+        new Router(d).routeDesign();
+
+        VivadoToolsHelper.assertFullyRouted(d);
+    }
+    
     @ParameterizedTest
     @CsvSource({ 
         "xcvu3p-ffvc1517-1-i,N28", 
