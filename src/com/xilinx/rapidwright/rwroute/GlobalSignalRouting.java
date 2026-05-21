@@ -264,6 +264,14 @@ public class GlobalSignalRouting {
         assert(device.getSeries() == Series.Versal);
 
         Pair<Set<ClockRegion>, List<SitePinInst>> usedCRsAndNonLCBPinsTuple = getFabricClockRegionsOfNet(clk);
+        // NOC and PS clock pins can be driven by LCBs in neighboring clock regions.
+        // Use the actual selected LCBs as distribution targets instead of a superset
+        // of possible neighboring regions.
+        Map<Node, List<SitePinInst>> lcbMappings = VersalClockRouting.routeLCBsToSinks(clk, getNodeStatus);
+        Set<ClockRegion> usedClockRegions = getClockRegionsOfNodes(lcbMappings.keySet());
+        if (usedClockRegions.isEmpty()) {
+            usedClockRegions = usedCRsAndNonLCBPinsTuple.getFirst();
+        }
         SitePinInst source = clk.getSource();
         SiteTypeEnum sourceTypeEnum = source.getSiteTypeEnum();
         // In US/US+ clock routing, we use two VROUTE nodes to reach the clock regions above and below the centroid.
@@ -274,7 +282,7 @@ public class GlobalSignalRouting {
         // overlapping clock regions
         Set<Integer> unavailableTracks = new HashSet<Integer>();
         if (usedRoutingTracks != null) {
-            for (ClockRegion cr : usedCRsAndNonLCBPinsTuple.getFirst()) {
+            for (ClockRegion cr : usedClockRegions) {
                 for (Entry<Integer, Set<ClockRegion>> e : usedRoutingTracks.entrySet()) {
                     if (e.getValue().contains(cr)) {
                         unavailableTracks.add(e.getKey());
@@ -304,7 +312,7 @@ public class GlobalSignalRouting {
             // we may fail to do so. Thus, we need to force the Y-coordinate of centroid to be 1.
             Node clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk, getNodeStatus);// first HROUTE
             Pair<Node, ClockRegion> result = findCentroid(clk, clkRoutingLine, centroid, true,
-                    getNodeStatus, unavailableTracks, usedCRsAndNonLCBPinsTuple.getFirst());
+                    getNodeStatus, unavailableTracks, usedClockRegions);
             centroidHRouteNode = result.getFirst();
             centroid = result.getSecond();
         } else if (sourceTypeEnum == SiteTypeEnum.BUFG_PS) {
@@ -323,7 +331,7 @@ public class GlobalSignalRouting {
 
         Pair<Node, ClockRegion> centroidResult = findCentroid(clk, centroidHRouteNode, centroid,
                 noVrouteNeeded, getNodeStatus, unavailableTracks,
-                usedCRsAndNonLCBPinsTuple.getFirst());
+                usedClockRegions);
         Node vroute = centroidResult.getFirst();
         centroid = centroidResult.getSecond();
         
@@ -333,13 +341,12 @@ public class GlobalSignalRouting {
         clk.getLogicalNet().addProperty("CLOCK_VTREE_TYPE", "balanced");
 
         Map<ClockRegion, Node> upDownDistLines = VersalClockRouting
-                .routeToHorizontalDistributionLines(clk, vroute, usedCRsAndNonLCBPinsTuple.getFirst(),
+                .routeToHorizontalDistributionLines(clk, vroute, usedClockRegions,
                         false, getNodeStatus);
 
         // Route non-LCB driven pins (such as driving clocks off chip via an IOB)
         VersalClockRouting.routeNonLCBPins(clk, usedCRsAndNonLCBPinsTuple.getSecond(), getNodeStatus);
 
-        Map<Node, List<SitePinInst>> lcbMappings = VersalClockRouting.routeLCBsToSinks(clk, getNodeStatus);
         VersalClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings, getNodeStatus);
 
         // Populate used routing track for any other clocks being routed
@@ -350,7 +357,7 @@ public class GlobalSignalRouting {
             } else {
                 clk.getLogicalNet().addProperty("CLOCK_TRACK", track);
                 Set<ClockRegion> collision = usedRoutingTracks.put(track,
-                        new HashSet<>(usedCRsAndNonLCBPinsTuple.getFirst()));
+                        new HashSet<>(usedClockRegions));
                 assert (collision == null);
             }
         }
@@ -415,6 +422,14 @@ public class GlobalSignalRouting {
         }
         assert (proposedClkRoot != null);
         return new Pair<Node, ClockRegion>(vroute, proposedClkRoot);
+    }
+
+    private static Set<ClockRegion> getClockRegionsOfNodes(Set<Node> nodes) {
+        Set<ClockRegion> clockRegions = new HashSet<>();
+        for (Node node : nodes) {
+            clockRegions.add(node.getTile().getClockRegion());
+        }
+        return clockRegions;
     }
 
     /**
