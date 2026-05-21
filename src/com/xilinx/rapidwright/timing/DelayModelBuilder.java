@@ -30,6 +30,10 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import com.xilinx.rapidwright.util.FileTools;
 
 /**
  * Build a delay model.
@@ -53,42 +57,36 @@ class DelayModelBuilder {
      */
     private static String[]   valid_source = {"text"};
 
-    private static DelayModel aModel       = null;
+    private static final Map<String, DelayModel> models = new ConcurrentHashMap<>();
 
     /**
-     * Prepare the appropriate input file for {@link #getDelayModel(String, String, String)}
+     * Returns the cached DelayModel for a series, constructing it on first access.
+     * When no intrasite_delay_terms.txt ships for the series (e.g., Versal), a
+     * topology-only NullDelayModel is returned so TimingGraph can still build a
+     * structural graph.
      */
     public static DelayModel getDelayModel(String series) {
-        String fileName = TimingModel.TIMING_DATA_DIR + File.separator +series+
-                File.separator + "intrasite_delay_terms.txt";
-        return getDelayModel("small", "text", fileName);
-    }
-
-    /**
-     * The method that decides to build a new model or to return the existing one.
-     * Please see the method newDelayModel for parameters' description.
-     */
-    private static DelayModel getDelayModel(String mode, String source, String fileName) {
-        if (aModel == null) {
-            synchronized (DelayModelBuilder.class) {
-                if (aModel == null) {
-                    newDelayModel(mode, source, fileName);
-                }
+        return models.computeIfAbsent(series, s -> {
+            String fileName = TimingModel.TIMING_DATA_DIR + File.separator + s
+                    + File.separator + "intrasite_delay_terms.txt";
+            File f = new File(FileTools.getRapidWrightPath() + File.separator + fileName);
+            if (!f.exists()) {
+                return NullDelayModel.INSTANCE;
             }
-        }
-        return aModel;
+            return newDelayModel("small", "text", fileName);
+        });
     }
 
     /**
-     * The method to build DelayModel and DelayModelSource according to the given parameters.
+     * Build a DelayModel and DelayModelSource according to the given parameters.
      * @param mode      The type of delay model. It defines how data are stored which will affect
      * the memory requirement and how fast the lookup is. Currently, the only valid entry is "small".
      * @param source    The source of delay model. Currently, the only valid entry is "text".
      * @param fileName  The text file describing the delay model.
-     * @throws IllegalArgumentException  This method throw IllegalArgumentException if the fileName
+     * @throws IllegalArgumentException  This method throws IllegalArgumentException if the fileName
      *  does not exist.
      */
-    private static void newDelayModel(String mode, String source, String fileName) {
+    private static DelayModel newDelayModel(String mode, String source, String fileName) {
         DelayModelSource src;
         if (source.equalsIgnoreCase(valid_source[0])) {
             src = new DelayModelSourceFromText(fileName);
@@ -97,7 +95,7 @@ class DelayModelBuilder {
         }
 
         if (mode.equalsIgnoreCase(valid_mode[0])) {
-            aModel = new SmallDelayModel(src);
+            return new SmallDelayModel(src);
         } else {
             throw new IllegalArgumentException("DelayModelBuilder: Unknown mode to newDelayModel.");
         }

@@ -1767,7 +1767,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                             param2,
                             param3);
                 if (returnValue == null) {
-                    continue;
+                    // Unknown intra-site delay (e.g., Versal site type not in the
+                    // UltraScale+ model). Keep the edge so the structural graph
+                    // is preserved; delay will be 0 and can be overlaid later.
+                    returnValue = 0;
                 }
                 tmpNetDelay = (float) returnValue;
                 

@@ -172,6 +172,22 @@ public class TimingModel {
     private Tile[] goodRowTypes;
     private Device device;
 
+    /**
+     * When true, the model was built for a series that has no shipped delay data
+     * (e.g., Versal). The graph structure can still be built, but all computed
+     * delays are 0. Callers are expected to overlay Vivado-reported delays via
+     * TimingEdge.set*Delay(...) if accurate timing is required.
+     */
+    private boolean topologyOnly = false;
+
+    /**
+     * @return Whether this model is in topology-only mode (no usable delay data
+     * was found for the device's series; calcDelay() returns 0).
+     */
+    public boolean isTopologyOnly() {
+        return topologyOnly;
+    }
+
     public HashMap<String, List<TimingGroup>> forDebugTimingGroupByPorts;
 
     private static final HashSet<String> ultraScaleFlopNames;
@@ -240,10 +256,24 @@ public class TimingModel {
         String series = device.getSeries().name().toLowerCase();
         String fileName = TimingModel.TIMING_DATA_DIR + File.separator + series +
                 File.separator + "intersite_delay_terms.txt";
-        if (!readDelayTerms(fileName)) {
-            throw new RuntimeException("Error reading file:" + fileName);
+        File dataFile = new File(FileTools.getRapidWrightPath() + File.separator + fileName);
+        if (dataFile.exists()) {
+            if (!readDelayTerms(fileName)) {
+                throw new RuntimeException("Error reading file:" + fileName);
+            }
+        } else {
+            // No intersite delay data for this series (e.g., Versal): fall back to
+            // topology-only mode. Default coefficients remain in place; calcDelay()
+            // will short-circuit to 0.
+            topologyOnly = true;
         }
         intrasiteAndLogicDelayModel = DelayModelBuilder.getDelayModel(series);
+
+        if (topologyOnly) {
+            // Skip the UltraScale+-specific tile-row scan and distance table build.
+            // Structural graph construction in TimingGraph does not need them.
+            return;
+        }
 
         // create a good row for netDelay model, in terms of capturing resource types within a row
         Tile[][] tiles = device.getTiles();
@@ -309,6 +339,13 @@ public class TimingModel {
      */
     public float calcDelay(SitePinInst startPinInst, SitePinInst endPinInst, BELPin sourceBELPin,
                            BELPin sinkBELPin, Net net) {
+        if (topologyOnly) {
+            // Skip PIP/intent-code traversal that assumes UltraScale+ semantics.
+            // The TimingEdge will still be created with correct source/sink and
+            // physical net annotations; the delay value is just 0.
+            intrasiteDelay = 0f;
+            return 0f;
+        }
         ArrayList<IntentCode> intentCodes = new ArrayList<>();
         HashMap<PIPType, Integer> pipTypes = new LinkedHashMap<>();
 
@@ -496,8 +533,13 @@ public class TimingModel {
 
         // Compute before reading from file to allow overriding.
         Tile tile = findReferenceTile();
-        START_TILE_COL = tile.getColumn();
-        START_TILE_ROW = tile.getRow();
+        if (tile != null) {
+            START_TILE_COL = tile.getColumn();
+            START_TILE_ROW = tile.getRow();
+        }
+        // If null (e.g., Versal: no UltraScale+ CLB-flanked INT tile), keep
+        // the default START_TILE_ROW/COL. Values overridden via the file below
+        // still take precedence.
 
         boolean result = true;
         try (BufferedReader br = new BufferedReader(new FileReader(FileTools.getRapidWrightPath() + File.separator + filename))) {
