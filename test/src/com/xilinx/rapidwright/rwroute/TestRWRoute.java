@@ -762,4 +762,76 @@ public class TestRWRoute {
         }
         Assertions.assertEquals(expectRoutethru, routethruFound);
     }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testPartialRouterEnsureSinkRoutabilityStatic(boolean preserveInner) {
+        Design design = new Design("top", "xcv80");
+
+        Net net = design.createNet("net");
+        SiteInst si = design.createSiteInst("SLICE_X95Y621");
+        SitePinInst srcSpi = net.createPin("A_O", si);
+        SitePinInst dstSpi = net.createPin("A_I", si);
+
+        // Attach either the inner or outer connected node 
+        // of the dstSpi above to the gnd net
+        Net gndNet = design.getGndNet();
+        Node preserveNode = dstSpi.getConnectedNode();
+        if (!preserveInner) {
+            List<Node> uphillNodes = preserveNode.getAllUphillNodes();
+            Assertions.assertEquals(1, uphillNodes.size());
+            preserveNode = uphillNodes.get(0);
+        }
+        List<PIP> uphillPIPs = preserveNode.getAllUphillPIPs();
+        gndNet.addPIP(uphillPIPs.get(0));
+
+        List<SitePinInst> pinsToRoute = new ArrayList<>();
+        pinsToRoute.add(dstSpi);
+        PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute);
+
+        // Check that dstSpi does not get routed because its
+        // inner or outer node is preserved for the ground net.
+        // Check also that an assertion doesn't fire, but this test
+        // is not able to verify that an "ERROR" message gets emitted.
+        Assertions.assertFalse(dstSpi.isRouted());
+        Assertions.assertFalse(net.hasPIPs());
+    }
+
+    @Test
+    public void testPartialRouterPreservesOuterNode() {
+        Design design = new Design("top", "xcv80");
+
+        // This is the signal sink, the node(s) to which should not be claimed by static routing
+        Net signalNet = design.createNet("net");
+        SiteInst signalSi = design.createSiteInst("SLICE_X94Y621");
+        SitePinInst signalSpi = signalNet.createPin("DX", signalSi);
+
+        Device device = design.getDevice();
+        Net Z_NET = design.createNet(Net.Z_NET);
+
+        // Block these nodes so that there's only one path
+        // Z_NET.addPIP(device.getNode("INT_X29Y625/INT_NODE_IMUX_ATOM_119_INT_OUT1").getAllUphillPIPs().get(0)); // Force signal through this node
+        Z_NET.addPIP(device.getNode("INT_X29Y625/INT_NODE_IMUX_ATOM_122_INT_OUT0").getAllUphillPIPs().get(0));
+        Z_NET.addPIP(device.getNode("INT_X29Y625/INT_NODE_IMUX_ATOM_125_INT_OUT0").getAllUphillPIPs().get(0));
+        Z_NET.addPIP(device.getNode("INT_X29Y625/INT_NODE_IMUX_ATOM_53_INT_OUT1").getAllUphillPIPs().get(0));
+        Z_NET.addPIP(device.getNode("INT_X29Y625/INT_NODE_IMUX_ATOM_57_INT_OUT1").getAllUphillPIPs().get(0));
+        Z_NET.addPIP(device.getNode("INT_X29Y625/INT_NODE_IMUX_ATOM_60_INT_OUT0").getAllUphillPIPs().get(0));
+
+        Z_NET.addPIP(device.getNode("SLL_X29Y625/BNODE_OUTS_E0").getAllUphillPIPs().get(0));
+        // Z_NET.addPIP(device.getNode("INT_X29Y625/BOUNCE_W2").getAllUphillPIPs().get(0)); // Force signal through this node (which is signalSpi)
+        Z_NET.addPIP(device.getNode("INT_X28Y625/OUT_EE1_E_BEG12").getAllUphillPIPs().get(0));
+        Z_NET.addPIP(device.getNode("INT_X29Y626/OUT_SS4_W_BEG6").getAllUphillPIPs().get(0));
+        Z_NET.addPIP(device.getNode("INT_X29Y626/OUT_SS1_W_BEG12").getAllUphillPIPs().get(0));
+        Z_NET.addPIP(device.getNode("INT_X30Y625/OUT_WW2_W_BEG6").getAllUphillPIPs().get(0));
+
+        Net gndNet = design.getGndNet();
+        SiteInst gndSi = design.createSiteInst("SLICE_X95Y621");
+        SitePinInst gndSpi = gndNet.createPin("HX", gndSi);
+        PartialRouter.routeDesignPartialNonTimingDriven(design, Collections.singletonList(gndSpi));
+
+        // Make sure the ground sink is not routed, since INT_X29Y625/BOUNCE_W2
+        // is now reserved for signalSpi
+        Assertions.assertFalse(gndSpi.isRouted());
+        Assertions.assertFalse(gndNet.hasPIPs());
+    }
 }
