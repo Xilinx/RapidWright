@@ -41,6 +41,14 @@ public class Params {
     public static String RW_COPY_EDNS_ON_DCP_WRITE_NAME = "RW_COPY_EDNS_ON_DCP_WRITE";
 
     /**
+     * Directory where RapidWright should temporarily extract readable EDIF files
+     * embedded inside DCPs before parsing. This can be set either as an environment
+     * variable or JVM system property. If unset, RapidWright will try the DCP's
+     * directory first and then the JVM temp directory.
+     */
+    public static String RW_DCP_EDIF_TEMP_DIR_NAME = "RW_DCP_EDIF_TEMP_DIR";
+
+    /**
      * Flag to have RapidWright decompress gzipped EDIF files to disk prior to
      * parsing. This is a tradeoff where pre-decompression improves runtime over the
      * default method which is to decompress in memory. The disadvantage is that
@@ -77,6 +85,12 @@ public class Params {
      * to the same directory where the DCP is being written to.
      */
     public static boolean RW_COPY_EDNS_ON_DCP_WRITE = isParamSet(RW_COPY_EDNS_ON_DCP_WRITE_NAME);
+
+    /**
+     * Directory where RapidWright should temporarily extract readable EDIF files
+     * embedded inside DCPs before parsing, or null if unset.
+     */
+    public static String RW_DCP_EDIF_TEMP_DIR = getParamValue(RW_DCP_EDIF_TEMP_DIR_NAME);
 
     /**
      * Checks if the named RapidWright parameter is set via an environment variable
