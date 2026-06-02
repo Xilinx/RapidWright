@@ -1756,20 +1756,27 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             if (haveIntrasiteNet) {//LUT driving a FF is here
                 String param2 = srcCell.getBELName()+"/"+ source.getName();
                 String param3 = null;
-                if (sink_belpins.get(D) == null) {
-                    param3 =  dstCell.getBELName() +"/" + stringSinks.get(D).getName();
-                } else {
-                    param3 =  dstCell.getBELName() +"/" +sink_belpins.get(D).getName();
+                // Prefer the BEL pin; fall back to the SitePinInst name; if
+                // neither resolved (some Versal sinks have neither a physical
+                // pin mapping nor a SitePinInst), leave param3 null so we skip
+                // the lookup and use 0 as the delay -- the edge is still added.
+                if (sink_belpins.get(D) != null) {
+                    param3 = dstCell.getBELName() + "/" + sink_belpins.get(D).getName();
+                } else if (stringSinks.get(D) != null) {
+                    param3 = dstCell.getBELName() + "/" + stringSinks.get(D).getName();
                 }
                 float tmpNetDelay;
-                Short returnValue = intrasiteAndLogicDelayModel.getIntraSiteDelay(
-                            si.getSiteTypeEnum(),
-                            param2,
-                            param3);
+                Short returnValue = (param3 == null)
+                        ? null
+                        : intrasiteAndLogicDelayModel.getIntraSiteDelay(
+                                si.getSiteTypeEnum(),
+                                param2,
+                                param3);
                 if (returnValue == null) {
                     // Unknown intra-site delay (e.g., Versal site type not in the
-                    // UltraScale+ model). Keep the edge so the structural graph
-                    // is preserved; delay will be 0 and can be overlaid later.
+                    // UltraScale+ model, or unresolvable sink pin). Keep the
+                    // edge so the structural graph is preserved; delay will be 0
+                    // and can be overlaid later.
                     returnValue = 0;
                 }
                 tmpNetDelay = (float) returnValue;
@@ -1786,11 +1793,23 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 if (local_spi_source == null || spi_sink == null) {
                     if (local_spi_source == null && spi_sink == null) {//source and sink are null
                         String param2 = srcCell.getBELName()+"/"+ source.getName();
-                        String param3 =  dstCell.getBELName() +"/" +sink_belpins.get(D).getName();
-                        float tmpNetDelay = intrasiteAndLogicDelayModel.getIntraSiteDelay(
-                                si.getSiteTypeEnum(),
-                                param2,
-                                param3);
+                        // Same fallback as the haveIntrasiteNet branch: prefer
+                        // the BEL pin name, then the SitePinInst name; if
+                        // neither resolved, treat the delay as 0 and keep the
+                        // edge for topology.
+                        String param3 = null;
+                        if (sink_belpins.get(D) != null) {
+                            param3 = dstCell.getBELName() + "/" + sink_belpins.get(D).getName();
+                        } else if (stringSinks.get(D) != null) {
+                            param3 = dstCell.getBELName() + "/" + stringSinks.get(D).getName();
+                        }
+                        Short rv = (param3 == null)
+                                ? null
+                                : intrasiteAndLogicDelayModel.getIntraSiteDelay(
+                                        si.getSiteTypeEnum(),
+                                        param2,
+                                        param3);
+                        float tmpNetDelay = (rv == null) ? 0f : (float) rv;
                         netDelay = tmpNetDelay;
                         intraSiteDelay = tmpNetDelay;
                         forceUpdateEdge = true;
