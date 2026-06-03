@@ -38,6 +38,7 @@ import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockGenerator;
 import com.xilinx.rapidwright.design.compare.DesignComparator;
 import com.xilinx.rapidwright.design.merge.MergeDesigns;
+import com.xilinx.rapidwright.design.tools.ArrayBuilder;
 import com.xilinx.rapidwright.design.tools.CopyImplementation;
 import com.xilinx.rapidwright.design.tools.DesignObfuscator;
 import com.xilinx.rapidwright.design.tools.LUTTools;
@@ -136,6 +137,7 @@ public class MainEntrypoint {
 
     static {
         addFunction("AddSubGenerator", AddSubGenerator::main);
+        addFunction("ArrayBuilder", ArrayBuilder::main);
         addFunction("BlockCreator", BlockCreator::main);
         addFunction("BlockStitcher", BlockStitcher::main);
         addFunction("BlockUpdater", BlockUpdater::main);

@@ -315,7 +315,7 @@ public class ECOPlacementHelper {
         if (points.size() == 0) return null;
         Point centroid = KMeans.calculateCentroid(points);
         Tile centroidTile = device.getTile(centroid.y, centroid.x);
-    
+
         // We need to snap to the closest site with the site type of interest from the
         // centroid tile
         Site closest = null;
@@ -348,7 +348,7 @@ public class ECOPlacementHelper {
         for (SitePinInst i : net.getPins()) {
             points.add(new Point(i.getTile().getColumn(), i.getTile().getRow()));
         }
-        return ECOPlacementHelper.getCentroidOfPoints(net.getSource().getTile().getDevice(), points, targetSiteTypes);
+        return ECOPlacementHelper.getCentroidOfPoints(net.getDesign().getDevice(), points, targetSiteTypes);
     }
 
     /**
