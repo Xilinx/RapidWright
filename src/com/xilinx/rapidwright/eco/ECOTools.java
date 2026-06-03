@@ -53,6 +53,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -108,41 +109,75 @@ public class ECOTools {
     }
 
     /**
-     * When connecting and disconnecting nets from macro cells, we typically have fan out from inputs.  We 
-     * also cannot modify the internals of macros. This method ensures that the specified leafPin has all sibling sinks in 
-     * the pins list and returns the macro port connection. 
-     * @param ehpi The leaf pin inside the macro.
-     * @param pins The set of pins that must contain all other sinks or the disconnectNet() or connectNet() method will fail.
-     * @Param futurePinsToSkip Updated with the set of macro sibling sink pins that can be skipped 
-     * @return The macro level pin.
+     * The internal netlist of a macro primitive (e.g. LUT6_2, DSP48E2, RAM32M, IOBUFDS) is immutable,
+     * so {@link #disconnectNet(Design, List, Map)}/{@link #connectNet(Design, Map, Map)} cannot operate
+     * on a leaf pin located inside a macro directly; instead the operation must be lifted to the macro's
+     * external port. A macro port may fan out to (or in from) multiple internal leaf pins, and lifting
+     * affects all of them, so every such sibling pin must be present in {@code pinSet} or a
+     * RuntimeException is thrown naming the ones that are missing. Siblings (other than {@code ehpi})
+     * are added to {@code skip} so the caller does not process them again.
+     *
+     * If {@code ehpi} is not inside a macro it is returned unchanged. Nested macros (e.g.
+     * IOBUFDS &rarr; OBUFTDS) are handled by lifting repeatedly until the parent cell is no longer a
+     * macro. Returns null if a lifted macro port is not connected to a net in its parent.
+     *
+     * @param ehpi A (potential) leaf pin inside a macro.
+     * @param macros The macro primitive library for the design's series (may be null).
+     * @param pinSet All pins included in this invocation, used to validate sibling completeness.
+     * @param skip Updated with the macro sibling pins that can be skipped by the caller.
+     * @return The macro-level (external) port to operate on, the original pin if not inside a macro,
+     *         or null if a lifted macro port has no net in its parent.
      */
-    private static EDIFHierPortInst ensureTopMacroPortInstConsistent(EDIFHierPortInst ehpi, List<EDIFHierPortInst> pins, Set<String> futurePinsToSkip) {
-        assert(ehpi.isInput());
-        assert(ehpi.getParentCell().isMacro());
-        // If the parent is a LUT6_2, this is an error unless the matching sink pin is also in the list
-        String companionLUT = LUTTools.getCompanionLUTName(ehpi.getCellType());
-        EDIFNet net = ehpi.getNet();
-        EDIFHierPortInst companionLUTInput = new EDIFHierPortInst(ehpi.getHierarchicalInst(),
-                net.getPortInst(ehpi.getHierarchicalInst().getChild(companionLUT).getInst(), ehpi.getPortInst().getName()));
-        EDIFHierPortInst companionMatch = null;
-        // TODO Avoid linear search - O(n)
-        for (EDIFHierPortInst otherPin : pins) {
-            if (otherPin == ehpi) continue;
-            if (companionLUTInput.toString().equals(otherPin.toString())) {
-                companionMatch = otherPin;
-                break;
+    private static EDIFHierPortInst liftMacroLeafPin(EDIFHierPortInst ehpi, EDIFLibrary macros,
+                                                     Set<EDIFHierPortInst> pinSet, Set<EDIFHierPortInst> skip) {
+        if (macros == null) {
+            return ehpi;
+        }
+        while (ehpi != null && macros.containsCell(ehpi.getParentCell())) {
+            EDIFHierCellInst macroInst = ehpi.getHierarchicalInst();   // the macro instance
+            EDIFNet internalNet = ehpi.getNet();                       // net inside the macro
+            // An input pin is a sink of the internal net and shares it with sibling sinks (the macro
+            // port's fan-out); an output pin is the unique source and has no required siblings.
+            boolean sink = ehpi.isInput();
+
+            EDIFPortInst macroPortInst = null;
+            List<EDIFHierPortInst> missing = null;
+            for (EDIFPortInst pi : internalNet.getPortInsts()) {
+                if (pi.isTopLevelPort()) {
+                    macroPortInst = pi;                                // the macro's external port
+                    continue;
+                }
+                if (!sink || !pi.isInput()) {
+                    continue;
+                }
+                EDIFHierPortInst sibling = new EDIFHierPortInst(macroInst, pi);
+                if (sibling.equals(ehpi)) {
+                    continue;
+                }
+                if (pinSet.contains(sibling)) {
+                    skip.add(sibling);
+                } else {
+                    if (missing == null) {
+                        missing = new ArrayList<>();
+                    }
+                    missing.add(sibling);
+                }
             }
+            if (macroPortInst == null) {
+                throw new RuntimeException("ERROR: Cannot modify pin '" + ehpi + "': net '"
+                    + internalNet.getName() + "' is internal to macro '"
+                    + macroInst.getCellType().getName() + "' and is not exposed on a macro port.");
+            }
+            if (missing != null) {
+                throw new RuntimeException("ERROR: Cannot modify the net of pin '" + ehpi
+                    + "' inside macro '" + macroInst.getCellType().getName() + "' unless all sibling "
+                    + "macro pins are included in the same invocation. Please also include: " + missing);
+            }
+            ehpi = new EDIFHierPortInst(macroInst, macroPortInst).getPortInParent();
         }
-        if (companionMatch == null) {
-            throw new RuntimeException("ERROR: Cannot disconnect the net of a pin inside a macro "
-                + "unless all pins are included in the invocation of disconnectNet().  Please also "
-                + "include the pin '"+ companionLUTInput +"'");
-        }
-        futurePinsToSkip.add(companionLUTInput.toString());
-        // return the macro
-        return new EDIFHierPortInst(ehpi.getHierarchicalInst(), net.getSourcePortInsts(true).get(0)).getPortInParent();
+        return ehpi;
     }
-    
+
     /**
      * Given a list of EDIFHierPortInst objects, disconnect these pins from their current nets.
      * This method modifies the EDIF (logical) netlist as well as the place-and-route (physical)
@@ -164,14 +199,19 @@ public class ECOTools {
                                      Map<Net, Set<SitePinInst>> deferredRemovals) {
         final boolean unrouteIntraSite = !Params.isParamSet("rapidwright.ecotools.disconnectNet.skipUnrouteIntraSite");
 
-        Set<String> macroSinkPortsToSkip = new HashSet<>();
+        final EDIFLibrary macros = Design.getMacroPrimitives(design.getSeries());
+        Set<EDIFHierPortInst> pinSet = new HashSet<>(pins);
+        Set<EDIFHierPortInst> macroPinsToSkip = new HashSet<>();
         for (EDIFHierPortInst ehpi : pins) {
-            if (macroSinkPortsToSkip.contains(ehpi.toString())) {
+            if (macroPinsToSkip.contains(ehpi)) {
                 continue;
             }
-            boolean isInsideMacro = ehpi.getHierarchicalInst().getCellName().equals("LUT6_2"); 
-            if (isInsideMacro && ehpi.isInput()) {
-                ehpi = ensureTopMacroPortInstConsistent(ehpi, pins, macroSinkPortsToSkip);
+            EDIFHierPortInst lifted = liftMacroLeafPin(ehpi, macros, pinSet, macroPinsToSkip);
+            boolean isInsideMacro = (lifted != ehpi);
+            ehpi = lifted;
+            if (ehpi == null) {
+                // Lifted macro port has no net in its parent; nothing to disconnect
+                continue;
             }
             EDIFHierNet ehn = ehpi.getHierarchicalNet();
             List<EDIFHierPortInst> leafPortInsts;
@@ -381,22 +421,22 @@ public class ECOTools {
         }
 
         // Modify the logical netlist
+        final EDIFLibrary macros = Design.getMacroPrimitives(design.getSeries());
         for (Map.Entry<EDIFHierNet,List<EDIFHierPortInst>> e : netToPortInsts.entrySet()) {
             EDIFHierNet ehn = e.getKey();
             EDIFNet en = ehn.getNet();
             List<EDIFHierPortInst> portInsts = e.getValue();
-            Set<String> skipFromMacroFanout = new HashSet<>();
+            Set<EDIFHierPortInst> pinSet = new HashSet<>(portInsts);
+            Set<EDIFHierPortInst> skipFromMacroFanout = new HashSet<>();
 
             for (EDIFHierPortInst ehpi : portInsts) {
-                if (skipFromMacroFanout.contains(ehpi.toString())) {
+                if (skipFromMacroFanout.contains(ehpi)) {
                     // Already connected from other macro fan out connection
                     continue;
                 }
-                if (ehpi.getParentCell().getName().equals("LUT6_2")) {
-                    boolean isInsideMacro = ehpi.getHierarchicalInst().getCellName().equals("LUT6_2"); 
-                    if (isInsideMacro && ehpi.isInput()) {
-                        ehpi = ensureTopMacroPortInstConsistent(ehpi, portInsts, skipFromMacroFanout);
-                    }
+                ehpi = liftMacroLeafPin(ehpi, macros, pinSet, skipFromMacroFanout);
+                if (ehpi == null) {
+                    continue;
                 }
                 if (ehpi.getNet() != null) {
                     throw new RuntimeException("ERROR: Pin " + ehpi + " already connected to net "
