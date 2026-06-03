@@ -121,6 +121,15 @@ public class LUTTools {
     }
 
     /**
+     * Gets the companion netlist cell type.  For example, a LUT5 will return a LUT6 and vice versa.
+     * @param cell The netlist cell type.
+     * @return The companion cell type 
+     */
+    public static String getCompanionLUTName(EDIFCell cell) {
+        return cell.getName().equals("LUT5") ? "LUT6" : (cell.getName().equals("LUT6") ? "LUT5" : null);
+    }
+
+    /**
      * From a placed LUT cell, get the companion LUT BEL location. For example, a
      * cell placed on A5LUT would return the A6LUT and vice versa.
      * 
