@@ -34,6 +34,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.BiConsumer;
@@ -126,6 +127,9 @@ public class RouteNodeGraph {
     /** Flag for whether design targets the Versal series */
     protected final boolean isVersal;
 
+    /** Map of the TileTypeEnum to the highest base wire index */
+    protected final Map<TileTypeEnum, Integer> highestBaseWireIndex;
+
     protected final static int MAX_OCCUPANCY = 256;
     protected final float[] presentCongestionCosts;
 
@@ -150,6 +154,7 @@ public class RouteNodeGraph {
         preservedMapSize = new AtomicInteger();
         asyncPreserveOutstanding = new CountUpDownLatch();
         createRnodeTime = 0;
+        highestBaseWireIndex = new ConcurrentHashMap<>();
 
         Device device = design.getDevice();
         intYToSLRIndex = new int[device.getRows()];
@@ -551,6 +556,29 @@ public class RouteNodeGraph {
     public void initialize() {
     }
 
+    /*
+     * Return the highest base wire index across all Nodes in this tile
+     */
+    protected int getHighestBaseWireIndex(Tile tile, int startWireIndex) {
+        return highestBaseWireIndex.computeIfAbsent(tile.getTileTypeEnum(), (e) -> {
+            final boolean isSLLType = e == TileTypeEnum.SLL; // Versal only
+            // Check all wires in tile to find the index of the last base wire
+            int lastBaseWire = startWireIndex;
+            for (int i = lastBaseWire + 1; i < tile.getWireCount(); i++) {
+                Node node = Node.getNode(tile, i);
+                if (node == null) {
+                    continue;
+                }
+                if ((node.getTile() == tile && node.getWireIndex() == i) ||
+                        // Count Versal SLLs even if they're not based in this tile, since they are bidir
+                        (isSLLType && node.getTile().getTileTypeEnum() == e && node.getIntentCode() == IntentCode.NODE_SLL_DATA)) {
+                    lastBaseWire = i;
+                }
+            }
+            return lastBaseWire + 1;
+        });
+    }
+
     protected Net preserve(Node node, Net net) {
         Net oldNet = preserve(node.getTile(), node.getWireIndex(), net);
         if (oldNet == null) {
@@ -561,38 +589,23 @@ public class RouteNodeGraph {
 
     private Net preserve(Tile tile, int wireIndex, Net net) {
         // Assumes that tile/wireIndex describes the base wire on the node
+        // No need to synchronize access to 'nets' since collisions are not expected
         int tileAddress = tile.getUniqueAddress();
-        while (true) {
-            Net[] nets = preservedMap.get(tileAddress);
-            if (nets == null) {
-                Net[] newNets = new Net[wireIndex + 1];
-                if (preservedMap.compareAndSet(tileAddress, null, newNets)) {
-                    nets = newNets;
-                } else {
-                    continue;
-                }
-            }
-
-            synchronized (nets) {
-                if (preservedMap.get(tileAddress) != nets) {
-                    continue;
-                }
-                if (wireIndex >= nets.length) {
-                    Net[] newNets = Arrays.copyOf(nets, wireIndex + 1);
-                    if (preservedMap.compareAndSet(tileAddress, nets, newNets)) {
-                        continue;
-                    } else {
-                        continue;
-                    }
-                }
-                Net oldNet = nets[wireIndex];
-                // Do not clobber the old value
-                if (oldNet == null) {
-                    nets[wireIndex] = net;
-                }
-                return oldNet;
+        Net[] nets = preservedMap.get(tileAddress);
+        if (nets == null) {
+            int baseWireCount = getHighestBaseWireIndex(tile, wireIndex);
+            nets = new Net[baseWireCount];
+            if (!preservedMap.compareAndSet(tileAddress, null, nets)) {
+                // Another thread must have beat us to a compareAndSet, use that result
+                nets = preservedMap.get(tileAddress);
             }
         }
+        Net oldNet = nets[wireIndex];
+        // Do not clobber the old value
+        if (oldNet == null) {
+            nets[wireIndex] = net;
+        }
+        return oldNet;
     }
 
     public void preserve(Net net, List<SitePinInst> pins) {
@@ -680,30 +693,18 @@ public class RouteNodeGraph {
 
     private boolean unpreserve(Tile tile, int wireIndex) {
         // Assumes that tile/wireIndex describes the base wire on its node
-        int tileAddress = tile.getUniqueAddress();
-        while (true) {
-            Net[] nets = preservedMap.get(tileAddress);
-            if (nets == null || wireIndex >= nets.length) {
-                return false;
-            }
-            synchronized (nets) {
-                if (preservedMap.get(tileAddress) != nets) {
-                    continue;
-                }
-                if (nets[wireIndex] == null) {
-                    return false;
-                }
-                nets[wireIndex] = null;
-                return true;
-            }
-        }
+        Net[] nets = preservedMap.get(tile.getUniqueAddress());
+        if (nets == null || nets[wireIndex] == null)
+            return false;
+        nets[wireIndex] = null;
+        return true;
     }
 
     public boolean isPreserved(Node node) {
         Tile tile = node.getTile();
         int wireIndex = node.getWireIndex();
         Net[] nets = preservedMap.get(tile.getUniqueAddress());
-        return nets != null && wireIndex < nets.length && nets[wireIndex] != null;
+        return nets != null && nets[wireIndex] != null;
     }
 
     private static final Set<TileTypeEnum> allowedTileEnums;
@@ -828,7 +829,7 @@ public class RouteNodeGraph {
     private Net getPreservedNet(Tile tile, int wireIndex) {
         // Assumes that tile/wireIndex describes the base wire on its node
         Net[] nets = preservedMap.get(tile.getUniqueAddress());
-        return nets != null && wireIndex < nets.length ? nets[wireIndex] : null;
+        return nets != null ? nets[wireIndex] : null;
     }
 
     public RouteNode getNode(Node node) {
@@ -840,7 +841,7 @@ public class RouteNodeGraph {
     private RouteNode getNode(Tile tile, int wireIndex) {
         // Assumes that tile/wireIndex describes the base wire on its node
         RouteNode[] rnodes = nodesMap[tile.getUniqueAddress()];
-        return rnodes != null && wireIndex < rnodes.length ? rnodes[wireIndex] : null;
+        return rnodes != null ? rnodes[wireIndex] : null;
     }
 
     public Iterable<RouteNode> getRnodes() {
@@ -924,8 +925,9 @@ public class RouteNodeGraph {
         int wireIndex = node.getWireIndex();
         int tileAddress = tile.getUniqueAddress();
         RouteNode[] rnodes = nodesMap[tileAddress];
-        if (rnodes == null || wireIndex >= rnodes.length) {
-            rnodes = rnodes == null ? new RouteNode[wireIndex + 1] : Arrays.copyOf(rnodes, wireIndex + 1);
+        if (rnodes == null) {
+            int baseWireCount = getHighestBaseWireIndex(tile, wireIndex);
+            rnodes = new RouteNode[baseWireCount];
             nodesMap[tileAddress] = rnodes;
         }
         RouteNode rnode = rnodes[wireIndex];
