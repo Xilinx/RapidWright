@@ -561,27 +561,38 @@ public class RouteNodeGraph {
 
     private Net preserve(Tile tile, int wireIndex, Net net) {
         // Assumes that tile/wireIndex describes the base wire on the node
-        // No need to synchronize access to 'nets' since collisions are not expected
         int tileAddress = tile.getUniqueAddress();
-        Net[] nets;
         while (true) {
-            nets = preservedMap.get(tileAddress);
-            if (nets != null && wireIndex < nets.length) {
-                break;
+            Net[] nets = preservedMap.get(tileAddress);
+            if (nets == null) {
+                Net[] newNets = new Net[wireIndex + 1];
+                if (preservedMap.compareAndSet(tileAddress, null, newNets)) {
+                    nets = newNets;
+                } else {
+                    continue;
+                }
             }
 
-            Net[] newNets = nets == null ? new Net[wireIndex + 1] : Arrays.copyOf(nets, wireIndex + 1);
-            if (preservedMap.compareAndSet(tileAddress, nets, newNets)) {
-                nets = newNets;
-                break;
+            synchronized (nets) {
+                if (preservedMap.get(tileAddress) != nets) {
+                    continue;
+                }
+                if (wireIndex >= nets.length) {
+                    Net[] newNets = Arrays.copyOf(nets, wireIndex + 1);
+                    if (preservedMap.compareAndSet(tileAddress, nets, newNets)) {
+                        continue;
+                    } else {
+                        continue;
+                    }
+                }
+                Net oldNet = nets[wireIndex];
+                // Do not clobber the old value
+                if (oldNet == null) {
+                    nets[wireIndex] = net;
+                }
+                return oldNet;
             }
         }
-        Net oldNet = nets[wireIndex];
-        // Do not clobber the old value
-        if (oldNet == null) {
-            nets[wireIndex] = net;
-        }
-        return oldNet;
     }
 
     public void preserve(Net net, List<SitePinInst> pins) {
@@ -669,11 +680,23 @@ public class RouteNodeGraph {
 
     private boolean unpreserve(Tile tile, int wireIndex) {
         // Assumes that tile/wireIndex describes the base wire on its node
-        Net[] nets = preservedMap.get(tile.getUniqueAddress());
-        if (nets == null || wireIndex >= nets.length || nets[wireIndex] == null)
-            return false;
-        nets[wireIndex] = null;
-        return true;
+        int tileAddress = tile.getUniqueAddress();
+        while (true) {
+            Net[] nets = preservedMap.get(tileAddress);
+            if (nets == null || wireIndex >= nets.length) {
+                return false;
+            }
+            synchronized (nets) {
+                if (preservedMap.get(tileAddress) != nets) {
+                    continue;
+                }
+                if (nets[wireIndex] == null) {
+                    return false;
+                }
+                nets[wireIndex] = null;
+                return true;
+            }
+        }
     }
 
     public boolean isPreserved(Node node) {
