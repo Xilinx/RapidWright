@@ -68,8 +68,8 @@ import joptsimple.OptionSet;
 public class PBlockGenerator {
     public static final int LUTS_PER_CLE = 8;
     public static final int FF_PER_CLE = 16;
-    public static final float CLES_PER_BRAM = 5;
-    public static final float CLES_PER_DSP = 2.5f;
+    public static float CLES_PER_BRAM = 5;
+    public static float CLES_PER_DSP = 2.5f;
     public static int RAMLUTS_PER_CLE = 8;
     public static int CARRY_PER_CLE = 1;
     public static int SLICES_PER_TILE = 1;
@@ -106,6 +106,7 @@ public class PBlockGenerator {
     int carryCount = 0;
     int bram18kCount = 0;
     int bram36kCount = 0;
+    int uramCount = 0;
     int tallestShape = 0;
     int widestShape = 0;
     int shapeArea = 0;
@@ -151,14 +152,20 @@ public class PBlockGenerator {
                 lutCount = Integer.parseInt(line.split("\\s+")[4]);
             } else if (line.startsWith("| CLB Registers") || line.startsWith("| Slice Registers")) {
                 regCount = Integer.parseInt(line.split("\\s+")[4]);
+            } else if (line.startsWith("| Registers")) {
+                regCount = Integer.parseInt(line.split("\\s+")[3]);
             } else if (line.startsWith("|   LUT as Memory")) {
                 lutRAMCount = Integer.parseInt(line.split("\\s+")[5]);
-            } else if (line.startsWith("|   RAMB36/FIFO")) {
+            } else if (line.startsWith("|   RAMB36/FIFO") || line.startsWith("|   RAMB36E5")) {
                 bram36kCount = Integer.parseInt(line.split("\\s+")[3]);
-            } else if (line.startsWith("|   RAMB18")) {
+            } else if (line.startsWith("|   RAMB18") || line.startsWith("|   RAMB18E5*")) {
                 bram18kCount = Integer.parseInt(line.split("\\s+")[3]);
+            } else if (line.startsWith("|   URAM")) {
+                uramCount = Integer.parseInt(line.split("\\s+")[3]);
             } else if (line.startsWith("| DSPs")) {
                 dspCount = Integer.parseInt(line.split("\\s+")[3]);
+            } else if (line.startsWith("| DSP Slices")) {
+                dspCount = Integer.parseInt(line.split("\\s+")[4]);
             } else if (line.startsWith("| CARRY")) {
                 carryCount = Integer.parseInt(line.split("\\s+")[3]);
             }
@@ -168,6 +175,10 @@ public class PBlockGenerator {
         if (dev.getSeries() == Series.Series7) {
             CARRY_PER_CLE = 2;
             RAMLUTS_PER_CLE = 4;
+            SLICES_PER_TILE = 2;
+        } else if (dev.getSeries() == Series.Versal) {
+            CLES_PER_DSP = 1f;
+            CLES_PER_BRAM = 4f;
             SLICES_PER_TILE = 2;
         }
         if (debug) {
@@ -758,8 +769,15 @@ public class PBlockGenerator {
 
     private String generatePblock(Site upperLeft, int columns, int rows) {
         String siteTypeName = upperLeft.getNameSpacePrefix();
-        return siteTypeName+"X" + upperLeft.getInstanceX() + "Y" + (upperLeft.getInstanceY()-(rows-1)) +
-                ":"+siteTypeName+"X" + (upperLeft.getInstanceX()+columns-1) + "Y" + upperLeft.getInstanceY();
+        int x = (upperLeft.getInstanceX() + columns - 1);
+        int y = (upperLeft.getInstanceY() + rows - 1);
+        String pblock = siteTypeName + "X" + upperLeft.getInstanceX() + "Y" + y + ":" + siteTypeName + "X" + x + "Y"
+                + upperLeft.getInstanceY();
+        if (x < 0 || y < 0) {
+            throw new RuntimeException("ERROR: Invalid pblock generated: " + pblock);
+        }
+
+        return pblock;
     }
 
     public ArrayList<String> generatePBlockFromReport2(String reportFileName, String shapesReportFileName) {
@@ -922,6 +940,13 @@ public class PBlockGenerator {
                     pblockCLEHeight -= excessHeight;
                 }
             }
+        }
+
+        // Versal devices have a 50/50 mix of SLICEM and SLICEL with two SLICEs (one of
+        // each) in each tile
+        if (dev.getSeries() == Series.Versal) {
+            numSLICEColumns = numSLICEColumns + numSLICEMColumns;
+            numSLICEMColumns = 0;
         }
 
         // Fail safe in case we get too short, make sure shapes (carry chains,etc) can fit
@@ -1093,12 +1118,13 @@ public class PBlockGenerator {
             if (numSLICEColumns > 0 || numSLICEMColumns > 0) {
                 int pIdx = 0;
                 for (int i=0; pIdx < p.size(); i++) {
-                    TileTypeEnum t = dev.getTile(row, col+i).getTileTypeEnum();
-                    if (Utils.isCLB(t)) {
-                        upperLeft = dev.getTile(row - 4 /* TODO - Make Data Driven*/, col+i).getSites()[0];
+                    Tile tile = dev.getTile(row, col + i);
+                    if (Utils.isCLB(tile.getTileTypeEnum())) {
+                        upperLeft = tile.getSites()[0];
                         break;
                     }
-                    if (p.get(pIdx) == t) pIdx++;
+                    if (p.get(pIdx) == tile.getTileTypeEnum())
+                        pIdx++;
                 }
                 sb.append(generatePblock(upperLeft, numSLICEColumns+numSLICEMColumns, numSLICERows));
             }
@@ -1136,44 +1162,42 @@ public class PBlockGenerator {
     }
 
     private int getTileRowInRegionBelow(int col, int row) {
-        Tile tmp = dev.getTile(row, col);
+        Tile refTile = null;
+        int targetCRColumn = dev.getNumOfClockRegionsColumns() / 2;
         for (int c = 0; c < dev.getColumns(); c++) {
-            if (Utils.isCLB(dev.getTile(row, c).getTileTypeEnum())) {
-                tmp = dev.getTile(row, c);
+            Tile tile = dev.getTile(row, c);
+            if (tile.getClockRegion().getColumn() == targetCRColumn && Utils.isCLB(tile.getTileTypeEnum())) {
+                refTile = tile;
+                break;
             }
         }
         int cleHeight = dev.getSeries().getCLEHeight();
 
-        int sliceX = tmp.getSites()[0].getInstanceX();
-        int sliceY = tmp.getSites()[0].getInstanceY() - cleHeight;
+        int sliceX = refTile.getSites()[0].getInstanceX();
+        int sliceY = refTile.getSites()[0].getInstanceY() - cleHeight;
         Site tmpSite = dev.getSite("SLICE_X" + sliceX + "Y" + sliceY);
-        tmp = tmpSite.getTile();
+        refTile = tmpSite.getTile();
 
         if (dev.getNumOfSLRs() > 1) {
-            SLR master = null;
-            for (int i=0; i < dev.getNumOfSLRs(); i++) {
-                if (dev.getSLR(i).isMasterSLR()) {
-                    master = dev.getSLR(i);
-                    break;
-                }
-            }
+            SLR master = dev.getMasterSLR();
 
             // Relocate to master SLR if necessary
             int slrCLBHeight = (dev.getNumOfClockRegionRows() / dev.getNumOfSLRs()) * cleHeight;
             // If we're below master, add
-            if (tmp.getRow() < master.getLowerRight().getRow()) {
-                while (tmp.getRow() < master.getLowerRight().getRow()) {
+            int lowerRightRow = master.getLowerRight().getRow();
+            if (refTile.getRow() < lowerRightRow) {
+                while (refTile.getRow() < lowerRightRow && (tmpSite.getInstanceY() - slrCLBHeight >= 0)) {
                     tmpSite = tmpSite.getNeighborSite(0, -slrCLBHeight);
-                    tmp = tmpSite.getTile();
+                    refTile = tmpSite.getTile();
                 }
             } else { // Subtract
-                while (tmp.getRow() > master.getUpperLeft().getRow()) {
+                while (refTile.getRow() > master.getUpperLeft().getRow()) {
                     tmpSite = tmpSite.getNeighborSite(0, slrCLBHeight);
-                    tmp = tmpSite.getTile();
+                    refTile = tmpSite.getTile();
                 }
             }
         }
-        row = tmp.getRow();
+        row = refTile.getRow();
         return row;
     }
 

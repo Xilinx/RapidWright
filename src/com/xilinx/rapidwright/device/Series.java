@@ -37,7 +37,7 @@ public enum Series {
     Series7       ("\\-7",          23,  3, 22, 17,  5,  7, 10,  0,  7, 50),
     UltraScale    ("UltraScale$",   23,  3, -1, 17,  6,  7, 10,  0,  7, 60),
     UltraScalePlus("UltraScale\\+", 24,  3, -1, 18,  6,  8, 10,  0,  8, 60),
-    Versal        ("Versal",        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
+    Versal        ("Versal",        -1, -1, -1, -1, -1, -1, -1, -1, -1, 96);
 
     private Pattern archRegex;
 
