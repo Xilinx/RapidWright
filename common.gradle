@@ -46,6 +46,7 @@ dependencies {
   api 'org.json:json:20160810'
   api 'com.jcraft:jzlib:1.1.3'
   api 'commons-io:commons-io:2.20.0'
+  api 'com.google.guava:guava:33.5.0-jre'
   api 'com.xilinx.rapidwright:qtjambi-'+os+':4.5.2_01'
   api 'com.xilinx.rapidwright:jupyter-kernel-jsr223:1.0.1'
   if (JavaVersion.current() < JavaVersion.VERSION_17) {
