@@ -347,6 +347,10 @@ public class TimingManager {
     private boolean postBuild() {
         if (routerTimer != null) routerTimer.createRuntimeTracker("post graph build", "Initialization").start();
         timingGraph.removeClockCrossingPaths();
+        // setOrderedTimingVertexLists() uses a topological-order iterator which
+        // throws on cycles. Break any cycles first (analog of Vivado's automatic
+        // arc disabling for latch feedback / combinational loops / etc.).
+        timingGraph.breakCycles();
         timingGraph.buildSuperGraphPaths();
         timingGraph.setOrderedTimingVertexLists();
         if (routerTimer != null) routerTimer.getRuntimeTracker("post graph build").stop();

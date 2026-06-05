@@ -37,6 +37,7 @@ import java.util.Queue;
 import java.util.Set;
 
 import org.jgrapht.GraphPath;
+import org.jgrapht.alg.cycle.CycleDetector;
 import org.jgrapht.alg.shortestpath.AllDirectedPaths;
 import org.jgrapht.alg.shortestpath.BellmanFordShortestPath;
 import org.jgrapht.alg.shortestpath.KShortestSimplePaths;
@@ -268,6 +269,87 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         computeArrivalTimes();
     }
     
+    /**
+     * Detects cycles in the timing graph and removes one back-edge per cycle
+     * until the graph is acyclic.
+     *
+     * Combinational cycles in the timing graph can arise from latch feedback,
+     * intentional combinational loops that Vivado disables via
+     * {@code set_disable_timing}, internal DSP/BRAM feedback the lightweight
+     * model does not know about, or LUT-output-fed-back-to-LUT-input patterns
+     * through routethrus. Because {@link #setOrderedTimingVertexLists()} and
+     * the topological-order arrival computation require a DAG, any such cycle
+     * crashes path enumeration. Breaking back-edges here is the analog of
+     * Vivado's automatic arc disabling.
+     *
+     * Each removal is reported on {@code System.err} when {@link #verbose} is
+     * true so the broken arcs can be inspected.
+     *
+     * Termination: each iteration either exits or removes exactly one edge,
+     * so the loop runs at most {@code edgeSet().size()} times. As a defensive
+     * guard against future changes that might violate that invariant (a
+     * removeEdge that silently fails, or a mutation of the graph from another
+     * thread), the loop also enforces an explicit iteration cap based on the
+     * initial edge count and throws {@link IllegalStateException} if the cap
+     * is hit or {@code removeEdge} fails to shrink the graph.
+     *
+     * @return The number of edges removed.
+     */
+    public int breakCycles() {
+        int removed = 0;
+        // Initial edge count gives a hard upper bound on useful iterations:
+        // we cannot remove more edges than exist, and each successful pass
+        // removes exactly one.
+        final int maxIters = edgeSet().size();
+        for (int i = 0; i <= maxIters; i++) {
+            CycleDetector<TimingVertex, TimingEdge> detector = new CycleDetector<>(this);
+            if (!detector.detectCycles()) {
+                return removed;
+            }
+            Set<TimingVertex> inCycle = detector.findCycles();
+            if (inCycle.isEmpty()) {
+                return removed;
+            }
+            TimingVertex v = inCycle.iterator().next();
+            TimingEdge backEdge = null;
+            for (TimingEdge e : outgoingEdgesOf(v)) {
+                if (inCycle.contains(e.getDst())) {
+                    backEdge = e;
+                    break;
+                }
+            }
+            if (backEdge == null) {
+                // Should be unreachable: a vertex returned by findCycles() must
+                // have an outgoing edge to another in-cycle vertex.
+                throw new IllegalStateException(
+                        "breakCycles: vertex " + v.getName() + " was reported "
+                                + "as participating in a cycle but has no "
+                                + "outgoing edge to another in-cycle vertex");
+            }
+            if (verbose) {
+                System.err.println("[TimingGraph] breaking cycle by removing "
+                        + backEdge.getSrc().getName() + " -> "
+                        + backEdge.getDst().getName());
+            }
+            int beforeEdges = edgeSet().size();
+            removeEdge(backEdge);
+            if (edgeSet().size() != beforeEdges - 1) {
+                // removeEdge claimed to act but the graph didn't shrink:
+                // without monotonic progress the loop could spin forever.
+                throw new IllegalStateException(
+                        "breakCycles: removeEdge did not shrink the graph "
+                                + "(before=" + beforeEdges
+                                + ", after=" + edgeSet().size() + ")");
+            }
+            removed++;
+        }
+        // Iteration cap reached. The bound is exactly the initial edge count,
+        // so reaching it means progress is no longer monotonic.
+        throw new IllegalStateException(
+                "breakCycles: exceeded iteration cap (" + maxIters
+                        + "); graph may still contain cycles");
+    }
+
     /**
      * Creates and Sets the lists of ordered TimingVertices
      */

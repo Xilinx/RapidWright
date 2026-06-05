@@ -23,8 +23,10 @@
 package com.xilinx.rapidwright.timing;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 
 import org.jgrapht.GraphPath;
+import org.jgrapht.alg.cycle.CycleDetector;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -117,5 +119,118 @@ public class TestTimingGraph {
                 .count();
         Assertions.assertTrue(pathEdgesWithNet > 0,
                 "enumerated path has no edges with Net annotation");
+    }
+
+    /**
+     * Verifies that TimingGraph.breakCycles() recovers from a non-DAG state.
+     *
+     * Combinational cycles can show up in real designs (latch feedback,
+     * intentional combinational loops, internal DSP/BRAM feedback the
+     * lightweight model doesn't know about). Without a loop breaker,
+     * setOrderedTimingVertexLists()'s topological-order iterator throws
+     * IllegalArgumentException("Graph is not a DAG").
+     *
+     * The test loads picoblaze_2022.2.dcp (Versal, so the graph itself is built
+     * in topology-only mode), injects an artificial back-edge to simulate the
+     * cycle pattern, asserts the cycle is detected, runs breakCycles(), and
+     * asserts the graph is acyclic and topological order succeeds.
+     */
+    @Test
+    public void testBreakCyclesRecoversFromInjectedCycle() {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        TimingManager tm = new TimingManager(d);
+        TimingGraph tg = tm.getTimingGraph();
+
+        // postBuild() already ran breakCycles() once; the graph should be a DAG.
+        Assertions.assertFalse(new CycleDetector<>(tg).detectCycles(),
+                "graph should be acyclic after initial postBuild");
+
+        // Pick an interior edge (not super-source/sink) and add the reverse
+        // edge to introduce a 2-cycle.
+        TimingEdge sample = tg.edgeSet().stream()
+                .filter(e -> e.getSrc() != null && e.getDst() != null)
+                .filter(e -> !"superSource".equals(e.getSrc().getName()))
+                .filter(e -> !"superSink".equals(e.getDst().getName()))
+                .findFirst()
+                .orElseThrow(() -> new NoSuchElementException(
+                        "no interior edge found to seed the cycle"));
+        TimingVertex a = sample.getSrc();
+        TimingVertex b = sample.getDst();
+        Assertions.assertNull(tg.getEdge(b, a),
+                "test precondition: reverse edge should not already exist");
+        TimingEdge backEdge = new TimingEdge(tg, b, a);
+        Assertions.assertTrue(tg.addEdge(b, a, backEdge),
+                "failed to inject reverse edge");
+        Assertions.assertTrue(new CycleDetector<>(tg).detectCycles(),
+                "injected back-edge should have introduced a cycle");
+
+        // Without breakCycles(), setOrderedTimingVertexLists() throws.
+        Assertions.assertThrows(IllegalArgumentException.class,
+                () -> tg.setOrderedTimingVertexLists(),
+                "topological-order iterator should throw on a non-DAG");
+
+        // breakCycles() should remove at least the back-edge we added and
+        // leave the graph acyclic.
+        int removed = tg.breakCycles();
+        Assertions.assertTrue(removed >= 1,
+                "breakCycles() should have removed at least one edge");
+        Assertions.assertFalse(new CycleDetector<>(tg).detectCycles(),
+                "graph should be acyclic after breakCycles()");
+
+        // Topological order should now succeed.
+        Assertions.assertDoesNotThrow(tg::setOrderedTimingVertexLists,
+                "setOrderedTimingVertexLists() should succeed after breakCycles()");
+    }
+
+    /**
+     * Stress-test breakCycles() with many injected cycles.
+     *
+     * Injects N independent back-edges into the picoblaze Versal graph
+     * (creating N separate 2-cycles), then verifies that:
+     *  - breakCycles() terminates,
+     *  - the number of edges removed is in the range [N, edgeCountBefore],
+     *  - the final edge count equals (edgeCountBefore - removed),
+     *  - the graph is acyclic afterwards.
+     *
+     * This pins down the termination bound: each successful iteration must
+     * strictly shrink the edge count, so the loop can run at most
+     * edgeSet().size() times no matter how many cycles are present.
+     */
+    @Test
+    public void testBreakCyclesTerminatesUnderManyInjectedCycles() {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        TimingManager tm = new TimingManager(d);
+        TimingGraph tg = tm.getTimingGraph();
+
+        final int target = 50;
+        int injected = 0;
+        for (TimingEdge e : new java.util.ArrayList<>(tg.edgeSet())) {
+            if (injected >= target) break;
+            TimingVertex a = e.getSrc();
+            TimingVertex b = e.getDst();
+            if (a == null || b == null) continue;
+            if ("superSource".equals(a.getName())) continue;
+            if ("superSink".equals(b.getName()))   continue;
+            if (tg.getEdge(b, a) != null) continue; // skip if reverse already exists
+            tg.addEdge(b, a, new TimingEdge(tg, b, a));
+            injected++;
+        }
+        Assertions.assertEquals(target, injected,
+                "could not inject the requested number of back-edges");
+        Assertions.assertTrue(new CycleDetector<>(tg).detectCycles(),
+                "expected cycles after injection");
+
+        int edgesBefore = tg.edgeSet().size();
+        int removed = tg.breakCycles();
+
+        Assertions.assertTrue(removed >= injected,
+                "breakCycles should remove at least one edge per injected cycle"
+                        + "; injected=" + injected + " removed=" + removed);
+        Assertions.assertTrue(removed <= edgesBefore,
+                "breakCycles cannot remove more edges than existed");
+        Assertions.assertEquals(edgesBefore - removed, tg.edgeSet().size(),
+                "edge count decrease must match the reported removal count");
+        Assertions.assertFalse(new CycleDetector<>(tg).detectCycles(),
+                "graph should be acyclic after breakCycles()");
     }
 }
