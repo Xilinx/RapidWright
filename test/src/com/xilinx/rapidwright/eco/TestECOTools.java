@@ -1346,5 +1346,4 @@ public class TestECOTools {
 
         VivadoToolsHelper.assertFullyRouted(design);
     }
-
 }

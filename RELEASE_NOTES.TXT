@@ -1,3 +1,26 @@
+============= RapidWright 2025.2.2-beta released on 2026-06-04 ================
+Notes:
+  - [Params] Adds parameters to control how readable EDIF is extracted when DCP is loaded (#1374)
+  - Enable {dis,}connectNet() to operate on macro port insts (#1367)
+  - Array Builder Tool - Replicate Optimized Kernels in an Array (#1163)
+  - [RWRoute] On Versal, preserve node uphill of sink SPIs (#1369)
+  - [Clock Routing]Fix isse related to Versal clock routing to NoC sinks (#1370)
+  - Add test case for fixes to getCorrespondingTile when called on certain SLL tiles (#1360)
+  - Correctly handle NOC clock pins when routing (#1365)
+  - Fix IBUF creation for UltraScale+ (#1357)
+  - [DesignTools] Fix NPE in fullyUnplaceCell() (#1358)
+  - [PathExtractor] Fix unconnected static inputs (#1352)
+  - Auto extract readable EDIFs from DCPs to enable parallel parsing
+  - Fix create IOB on UltraScale+
+  - Fixes to allow Vivado 2025.2 designs with NOC components to be loaded in RapidWright
+  - Fixes for site routing
+  - Adds several missing IDCodes for UltraScale+ parts
+  - Fix SLL module relocation for Versal
+
+API Additions:
+  - com.xilinx.rapidwright.design.noc.NOCDesign "public void clearSolution()"
+
+
 ============= RapidWright 2025.2.1-beta released on 2026-02-18 ================
 Notes:
   - Fixes Issues with PathExtractor#1350

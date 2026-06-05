@@ -279,7 +279,6 @@ public abstract class UnsupportedConstraintElement {
         }
 
         while (suffix!=null) {
-            System.out.println("try to expand " + cell + " and " + suffix);
             int slashPos = suffix.indexOf("/");
             String currLevel, remaining;
             if (slashPos == -1) {
@@ -289,7 +288,6 @@ public abstract class UnsupportedConstraintElement {
                 currLevel = suffix.substring(0, slashPos);
                 remaining = suffix.substring(slashPos+1);
             }
-            System.out.println("decomposed into "+currLevel+" and "+remaining);
             T child = lookup.getChild(cell, currLevel);
             if (child == null) {
                 if (applyWildcardsChooseAny) {
@@ -300,9 +298,6 @@ public abstract class UnsupportedConstraintElement {
                         break;
                     }
                     child = matches.get(0);
-                    if (matches.size() > 1) {
-                        System.out.println("chose arbitrary wildcard match for "+currLevel+": "+child);
-                    }
                 } else {
                     break;
                 }
@@ -317,15 +312,11 @@ public abstract class UnsupportedConstraintElement {
         if (cell==lookup.getRoot()) {
             return;
         }
-        System.out.println("applying absorption: "+cell+" and "+suffix);
 
         res.clear();
         res.add(new UnsupportedConstraintElement.CellConstraintElement(lookup.getAbsoluteFinalName(cell)));
         if (suffix!=null) {
             res.add(new NameConstraintElement("/"+suffix));
         }
-
-        System.out.println(res);
-
     }
 }
