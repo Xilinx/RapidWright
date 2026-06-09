@@ -595,7 +595,6 @@ public class RouteNodeGraph {
 
     private Net preserve(Tile tile, int wireIndex, Net net) {
         // Assumes that tile/wireIndex describes the base wire on the node
-        // No need to synchronize access to 'nets' since collisions are not expected
         int tileAddress = tile.getUniqueAddress();
         final Net[] oldNet = new Net[1];
         preservedMap.updateAndGet(tileAddress, (current) -> {
