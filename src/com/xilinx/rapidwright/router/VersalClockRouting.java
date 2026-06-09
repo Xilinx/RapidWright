@@ -674,7 +674,7 @@ public class VersalClockRouting {
                 }
             }
 
-            System.out.printf("CRITICAL WARNING: Unroutable pin " + p.getSitePinName() + " on net " + clk);
+            System.out.println("CRITICAL WARNING: Unroutable pin " + p.getSitePinName() + " on clock net " + clk);
         }
         clk.getPIPs().addAll(allPIPs);
     }
