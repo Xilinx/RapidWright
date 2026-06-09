@@ -673,6 +673,8 @@ public class VersalClockRouting {
                     q.add(new NodeWithPrevAndCost(downhill, curr, cost));
                 }
             }
+
+            System.out.println("CRITICAL WARNING: Unroutable pin " + p.getSitePinName() + " on clock net " + clk);
         }
         clk.getPIPs().addAll(allPIPs);
     }

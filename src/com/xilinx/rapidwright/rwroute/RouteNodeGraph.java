@@ -557,25 +557,31 @@ public class RouteNodeGraph {
     }
 
     /*
-     * Return the highest base wire index across all Nodes in this tile
+     * Return the highest base wire index across all Nodes in the given tile.
+     * If its TileTypeEnum has not been seen already, compute this highest index,
+     * and assume that is same for all tiles with this TileTypeEnum.
+     * If this assumption fails, recompute with the given tile.
      */
     protected int getHighestBaseWireIndex(Tile tile, int startWireIndex) {
-        return highestBaseWireIndex.computeIfAbsent(tile.getTileTypeEnum(), (e) -> {
-            final boolean isSLLType = e == TileTypeEnum.SLL; // Versal only
-            // Check all wires in tile to find the index of the last base wire
-            int lastBaseWire = startWireIndex;
-            for (int i = lastBaseWire + 1; i < tile.getWireCount(); i++) {
-                Node node = Node.getNode(tile, i);
-                if (node == null) {
-                    continue;
+        return highestBaseWireIndex.compute(tile.getTileTypeEnum(), (tte, highestBaseWire) -> {
+            if (highestBaseWire == null || highestBaseWire <= startWireIndex) {
+                final boolean isSLLType = (tte == TileTypeEnum.SLL); // Versal only
+                // Check all wires in tile to find the index of the last base wire
+                int lastBaseWire = startWireIndex;
+                for (int i = lastBaseWire + 1; i < tile.getWireCount(); i++) {
+                    Node node = Node.getNode(tile, i);
+                    if (node == null) {
+                        continue;
+                    }
+                    if ((node.getTile() == tile && node.getWireIndex() == i) ||
+                            // Count Versal SLLs even if they're not based in this tile, since they are bidir
+                            (isSLLType && node.getTile().getTileTypeEnum() == tte && node.getIntentCode() == IntentCode.NODE_SLL_DATA)) {
+                        lastBaseWire = i;
+                    }
                 }
-                if ((node.getTile() == tile && node.getWireIndex() == i) ||
-                        // Count Versal SLLs even if they're not based in this tile, since they are bidir
-                        (isSLLType && node.getTile().getTileTypeEnum() == e && node.getIntentCode() == IntentCode.NODE_SLL_DATA)) {
-                    lastBaseWire = i;
-                }
+                highestBaseWire = lastBaseWire + 1;
             }
-            return lastBaseWire + 1;
+            return highestBaseWire;
         });
     }
 
@@ -589,23 +595,27 @@ public class RouteNodeGraph {
 
     private Net preserve(Tile tile, int wireIndex, Net net) {
         // Assumes that tile/wireIndex describes the base wire on the node
-        // No need to synchronize access to 'nets' since collisions are not expected
         int tileAddress = tile.getUniqueAddress();
-        Net[] nets = preservedMap.get(tileAddress);
-        if (nets == null) {
-            int baseWireCount = getHighestBaseWireIndex(tile, wireIndex);
-            nets = new Net[baseWireCount];
-            if (!preservedMap.compareAndSet(tileAddress, null, nets)) {
-                // Another thread must have beat us to a compareAndSet, use that result
-                nets = preservedMap.get(tileAddress);
+        final Net[] oldNet = new Net[1];
+        preservedMap.updateAndGet(tileAddress, (current) -> {
+            if (current == null) {
+                // First time
+                int baseWireCount = getHighestBaseWireIndex(tile, wireIndex);
+                current = new Net[baseWireCount];
+            } else if (wireIndex >= current.length) {
+                int baseWireCount = getHighestBaseWireIndex(tile, wireIndex);
+                current = Arrays.copyOf(current, baseWireCount);
             }
-        }
-        Net oldNet = nets[wireIndex];
-        // Do not clobber the old value
-        if (oldNet == null) {
-            nets[wireIndex] = net;
-        }
-        return oldNet;
+
+            oldNet[0] = current[wireIndex];
+            // Do not clobber the old value
+            if (oldNet[0] == null) {
+                current[wireIndex] = net;
+            }
+            return current;
+        });
+
+        return oldNet[0];
     }
 
     public void preserve(Net net, List<SitePinInst> pins) {
