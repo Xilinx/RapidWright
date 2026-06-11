@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Advanced Micro Devices, Inc.
@@ -27,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Thu Nov 21 13:34:08 MST 2024
+ * Generated on: Tue Jun 09 13:13:33 MDT 2026
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  *
  * Enumeration of IOStandard type for all valid devices within Vivado.
@@ -53,6 +53,7 @@ public enum IOStandard {
     DIFF_HSTL_I_DCI_18,
     DIFF_HSUL_12,
     DIFF_HSUL_12_DCI,
+    DIFF_LVSTL055_11,
     DIFF_LVSTL05_10,
     DIFF_LVSTL05_10_HS,
     DIFF_LVSTL06_12,
@@ -105,6 +106,7 @@ public enum IOStandard {
     LVCMOS11,
     LVCMOS12,
     LVCMOS12_LVAUX,
+    LVCMOS135,
     LVCMOS15,
     LVCMOS18,
     LVCMOS25,
@@ -119,6 +121,7 @@ public enum IOStandard {
     LVDS15,
     LVDS_25,
     LVPECL,
+    LVSTL055_11,
     LVSTL05_10,
     LVSTL05_10_HS,
     LVSTL06_12,
