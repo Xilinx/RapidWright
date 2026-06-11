@@ -651,7 +651,13 @@ public class VersalClockRouting {
 
             while (!q.isEmpty()) {
                 NodeWithPrevAndCost curr = q.poll();
-                if (getNodeStatus.apply(curr) != NodeStatus.AVAILABLE) {
+                // Only block nodes used by other nets; nodes that are INUSE (already
+                // preserved/used by this same clock net) must remain traversable so
+                // that sinks projecting onto such a node -- e.g. an off-chip clock
+                // output whose dedicated uphill node was preserved by this net -- can
+                // still be reached. This mirrors routeLCBsToSinks(), which similarly
+                // treats only UNAVAILABLE as blocking.
+                if (getNodeStatus.apply(curr) == NodeStatus.UNAVAILABLE) {
                     continue;
                 }
                 visited.add(curr);
