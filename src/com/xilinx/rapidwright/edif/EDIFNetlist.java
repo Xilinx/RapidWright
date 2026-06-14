@@ -893,14 +893,7 @@ public class EDIFNetlist extends EDIFName {
             }
             os.write(EXPORT_CONST_DOUBLE_CLOSE);
 
-            List<EDIFLibrary> librariesToWrite = new ArrayList<>();
-            librariesToWrite.add(getHDIPrimitivesLibrary());
-            for (EDIFLibrary lib : EDIFTools.sortIfStable(getLibrariesMap().values(), stable)) {
-                if (lib.isHDIPrimitivesLibrary()) {
-                    continue;
-                }
-                librariesToWrite.add(lib);
-            }
+            List<EDIFLibrary> librariesToWrite = getLibrariesInExportOrder();
 
             if (dos != null) {
                 Deque<Future<ParallelDCPInput>> streamFutures = new ArrayDeque<>();
