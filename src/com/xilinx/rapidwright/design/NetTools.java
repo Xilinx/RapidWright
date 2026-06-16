@@ -543,6 +543,10 @@ public class NetTools {
                 EDIFHierNet parentNet = d.getNetlist().getParentNet(hierNet);
                 Net net = d.getNet(parentNet.getHierarchicalNetName());
 
+                if (net == null) {
+                    continue;
+                }
+
                 boolean leavesPBlock = false;
                 for (PIP pip : net.getPIPs()) {
                     if (!pBlock.containsTile(pip.getTile())) {
