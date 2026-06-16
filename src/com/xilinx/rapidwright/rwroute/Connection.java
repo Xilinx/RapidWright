@@ -269,12 +269,20 @@ public class Connection implements Comparable<Connection>{
         return sourceRnode;
     }
 
+    public RouteNode getSourceRnode(boolean backwardRouting) {
+        return backwardRouting ? sinkRnode : sourceRnode;
+    }
+
     public void setSourceRnode(RouteNode sourceNode) {
         sourceRnode = sourceNode;
     }
 
     public RouteNode getSinkRnode() {
         return sinkRnode;
+    }
+
+    public RouteNode getSinkRnode(boolean backwardRouting) {
+        return backwardRouting ? sourceRnode : sinkRnode;
     }
 
     public void setSinkRnode(RouteNode sinkRnode) {
@@ -483,9 +491,10 @@ public class Connection implements Comparable<Connection>{
         return s.toString();
     }
 
-    public void setAllTargets(RWRoute.ConnectionState state) {
-        sinkRnode.markTarget(state);
+    public void setAllTargets(RWRoute.ConnectionState state, boolean backwardRouting) {
+        getSinkRnode(backwardRouting).markTarget(state);
         if (altSinkRnodes != null) {
+            assert(!backwardRouting); // TODO
             for (RouteNode rnode : altSinkRnodes) {
                 assert(rnode.countConnectionsOfUser(netWrapper) == 0);
                 assert(!rnode.getType().isAnyExclusiveSink());

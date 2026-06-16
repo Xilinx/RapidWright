@@ -173,6 +173,10 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_LAGUNA_DATA:   // LAG_LAG.UBUMP* super long lines for u-turns at the boundary of the device (US+)
                     case NODE_SLL_INPUT:     // Versal only
                     case NODE_SLL_OUTPUT:    // Versal only
+                    case NODE_GLOBAL_LEAF:
+                    case NODE_INT_INTERFACE:
+                    case NODE_DEDICATED:
+                    case NODE_OPTDELAY:
                     case INTENT_DEFAULT:     // INT.VCC_WIRE
                         assert(length == 0);
                         break;
@@ -495,7 +499,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     public RouteNode[] getChildren(RouteNodeGraph routingGraph) {
         if (children == null) {
             long start = RuntimeTracker.now();
-            List<Node> allDownHillNodes = getAllDownhillNodes();
+            List<Node> allDownHillNodes = routingGraph.backwardRouting ? getAllUphillNodes() : getAllDownhillNodes();
             List<RouteNode> childrenList = new ArrayList<>(allDownHillNodes.size());
             for (Node downhill : allDownHillNodes) {
                 if (isExcluded(routingGraph, downhill)) {
