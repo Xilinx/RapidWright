@@ -23,11 +23,14 @@ package com.xilinx.rapidwright.timing;
 
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -37,7 +40,6 @@ import java.util.Queue;
 import java.util.Set;
 
 import org.jgrapht.GraphPath;
-import org.jgrapht.alg.cycle.CycleDetector;
 import org.jgrapht.alg.shortestpath.AllDirectedPaths;
 import org.jgrapht.alg.shortestpath.BellmanFordShortestPath;
 import org.jgrapht.alg.shortestpath.KShortestSimplePaths;
@@ -54,6 +56,8 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
@@ -270,8 +274,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     }
     
     /**
-     * Detects cycles in the timing graph and removes one back-edge per cycle
-     * until the graph is acyclic.
+     * Removes all DFS back-edges from the timing graph, making it acyclic, in a
+     * single O(V + E) traversal.
      *
      * Combinational cycles in the timing graph can arise from latch feedback,
      * intentional combinational loops that Vivado disables via
@@ -282,72 +286,71 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
      * crashes path enumeration. Breaking back-edges here is the analog of
      * Vivado's automatic arc disabling.
      *
+     * Algorithm: a single iterative (non-recursive, to avoid stack overflow on
+     * deep graphs) depth-first search colors vertices WHITE/GRAY/BLACK. An edge
+     * encountered to a GRAY vertex (one currently on the DFS recursion stack) is
+     * a back-edge. By the standard DFS theorem, every directed cycle contains at
+     * least one back-edge, and removing all back-edges found in one DFS pass
+     * yields a DAG. Back-edges are collected during the traversal and removed
+     * afterward (so the live edge views are not mutated mid-iteration).
+     *
+     * This replaces an earlier implementation that rebuilt a {@code CycleDetector}
+     * and rescanned the whole graph for every edge removed -- O(cycles * (V + E)),
+     * which hung on large designs (hundreds of thousands of cells/nets).
+     *
      * Each removal is reported on {@code System.err} when {@link #verbose} is
      * true so the broken arcs can be inspected.
-     *
-     * Termination: each iteration either exits or removes exactly one edge,
-     * so the loop runs at most {@code edgeSet().size()} times. As a defensive
-     * guard against future changes that might violate that invariant (a
-     * removeEdge that silently fails, or a mutation of the graph from another
-     * thread), the loop also enforces an explicit iteration cap based on the
-     * initial edge count and throws {@link IllegalStateException} if the cap
-     * is hit or {@code removeEdge} fails to shrink the graph.
      *
      * @return The number of edges removed.
      */
     public int breakCycles() {
-        int removed = 0;
-        // Initial edge count gives a hard upper bound on useful iterations:
-        // we cannot remove more edges than exist, and each successful pass
-        // removes exactly one.
-        final int maxIters = edgeSet().size();
-        for (int i = 0; i <= maxIters; i++) {
-            CycleDetector<TimingVertex, TimingEdge> detector = new CycleDetector<>(this);
-            if (!detector.detectCycles()) {
-                return removed;
+        final byte WHITE = 0, GRAY = 1, BLACK = 2;
+        Map<TimingVertex, Byte> color = new HashMap<>(vertexSet().size() * 2);
+        List<TimingEdge> backEdges = new ArrayList<>();
+
+        // Iterative DFS. Each stack frame is a vertex plus an iterator over its
+        // outgoing edges, so we resume where we left off after descending.
+        Deque<TimingVertex> vStack = new ArrayDeque<>();
+        Deque<Iterator<TimingEdge>> itStack = new ArrayDeque<>();
+
+        for (TimingVertex root : vertexSet()) {
+            if (color.getOrDefault(root, WHITE) != WHITE) {
+                continue;
             }
-            Set<TimingVertex> inCycle = detector.findCycles();
-            if (inCycle.isEmpty()) {
-                return removed;
-            }
-            TimingVertex v = inCycle.iterator().next();
-            TimingEdge backEdge = null;
-            for (TimingEdge e : outgoingEdgesOf(v)) {
-                if (inCycle.contains(e.getDst())) {
-                    backEdge = e;
-                    break;
+            color.put(root, GRAY);
+            vStack.push(root);
+            itStack.push(outgoingEdgesOf(root).iterator());
+
+            while (!vStack.isEmpty()) {
+                Iterator<TimingEdge> it = itStack.peek();
+                if (it.hasNext()) {
+                    TimingEdge e = it.next();
+                    TimingVertex w = getEdgeTarget(e);
+                    byte wc = color.getOrDefault(w, WHITE);
+                    if (wc == WHITE) {
+                        color.put(w, GRAY);
+                        vStack.push(w);
+                        itStack.push(outgoingEdgesOf(w).iterator());
+                    } else if (wc == GRAY) {
+                        // w is on the current DFS stack: e closes a cycle.
+                        backEdges.add(e);
+                    }
+                    // wc == BLACK: cross/forward edge, not part of a cycle.
+                } else {
+                    color.put(vStack.pop(), BLACK);
+                    itStack.pop();
                 }
             }
-            if (backEdge == null) {
-                // Should be unreachable: a vertex returned by findCycles() must
-                // have an outgoing edge to another in-cycle vertex.
-                throw new IllegalStateException(
-                        "breakCycles: vertex " + v.getName() + " was reported "
-                                + "as participating in a cycle but has no "
-                                + "outgoing edge to another in-cycle vertex");
-            }
+        }
+
+        for (TimingEdge e : backEdges) {
             if (verbose) {
                 System.err.println("[TimingGraph] breaking cycle by removing "
-                        + backEdge.getSrc().getName() + " -> "
-                        + backEdge.getDst().getName());
+                        + e.getSrc().getName() + " -> " + e.getDst().getName());
             }
-            int beforeEdges = edgeSet().size();
-            removeEdge(backEdge);
-            if (edgeSet().size() != beforeEdges - 1) {
-                // removeEdge claimed to act but the graph didn't shrink:
-                // without monotonic progress the loop could spin forever.
-                throw new IllegalStateException(
-                        "breakCycles: removeEdge did not shrink the graph "
-                                + "(before=" + beforeEdges
-                                + ", after=" + edgeSet().size() + ")");
-            }
-            removed++;
+            removeEdge(e);
         }
-        // Iteration cap reached. The bound is exactly the initial edge count,
-        // so reaching it means progress is no longer monotonic.
-        throw new IllegalStateException(
-                "breakCycles: exceeded iteration cap (" + maxIters
-                        + "); graph may still contain cycles");
+        return backEdges.size();
     }
 
     /**
@@ -725,6 +728,151 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             setEdgeWeight(e, -1 * e.getDelay());
         }
         return new BellmanFordShortestPath<>(this).getPath(srcVertex, snkVertex);
+    }
+
+    /** Default search depth (pin-to-pin hops) for {@link #getConePath}. A
+     *  register-to-register timing path spans one clock cycle and is only a few
+     *  logic levels deep, so a modest cap bounds the search. */
+    public static final int DEFAULT_CONE_MAX_DEPTH = 40;
+
+    /**
+     * Finds a logical timing path between two hierarchical cell pins by walking
+     * the EDIF netlist on demand, WITHOUT building the global timing graph.
+     *
+     * This is a memory-scalable alternative to {@link #getTimingPath} for very
+     * large designs (millions of nets) where materializing the whole graph is
+     * infeasible. It runs a forward breadth-first search from {@code src},
+     * stopping as soon as {@code snk} is reached, so the work is bounded by the
+     * fan-out cone between the two pins rather than the whole device. Memory is
+     * O(explored frontier), not O(design).
+     *
+     * Traversal model: an output pin reaches the sink (input) pins on its net; a
+     * combinational input pin reaches its cell's output pins. Flip-flop inputs
+     * are not expanded through (they are capture endpoints), so the path stays
+     * within a single clock cycle's combinational logic.
+     *
+     * Expansion is inlined (no per-node collection allocation) to keep the
+     * search cheap on dense designs.
+     *
+     * @param src Source (launch) hierarchical pin, typically a flop Q output.
+     * @param snk Sink (capture) hierarchical pin, typically a flop D input.
+     * @param maxDepth Maximum number of pin-to-pin hops to search.
+     * @return Ordered list of pins from {@code src} to {@code snk} inclusive, or
+     *         {@code null} if no path exists within {@code maxDepth}.
+     */
+    public List<EDIFHierPortInst> getConePath(EDIFHierPortInst src, EDIFHierPortInst snk, int maxDepth) {
+        if (src == null || snk == null) return null;
+        if (src.equals(snk)) {
+            List<EDIFHierPortInst> single = new ArrayList<>();
+            single.add(src);
+            return single;
+        }
+        Map<EDIFHierPortInst, EDIFHierPortInst> pred = new HashMap<>();
+        Map<EDIFHierPortInst, Integer> depth = new HashMap<>();
+        Deque<EDIFHierPortInst> queue = new ArrayDeque<>();
+        pred.put(src, null);
+        depth.put(src, 0);
+        queue.add(src);
+        boolean found = false;
+
+        bfs:
+        while (!queue.isEmpty()) {
+            EDIFHierPortInst node = queue.poll();
+            int nd = depth.get(node) + 1;
+            if (nd > maxDepth) continue;
+
+            if (node.isOutput()) {
+                // Output pin -> sink (input) pins on its net.
+                EDIFHierNet net = node.getHierarchicalNet();
+                if (net == null) continue;
+                for (EDIFHierPortInst sink : net.getLeafHierPortInsts(false, true)) {
+                    if (!sink.isInput()) continue;
+                    if (sink.equals(snk)) { pred.put(sink, node); found = true; break bfs; }
+                    if (isFlopType(sink)) continue;          // capture endpoint: don't expand
+                    if (pred.putIfAbsent(sink, node) == null) {
+                        depth.put(sink, nd);
+                        queue.add(sink);
+                    }
+                }
+            } else {
+                // Combinational input pin -> its cell's output pins.
+                if (isFlopType(node)) continue;              // should not happen (not enqueued)
+                for (EDIFHierPortInst cellPin : node.getHierarchicalInst().getHierPortInsts()) {
+                    if (!cellPin.isOutput()) continue;
+                    if (cellPin.equals(snk)) { pred.put(cellPin, node); found = true; break bfs; }
+                    if (pred.putIfAbsent(cellPin, node) == null) {
+                        depth.put(cellPin, nd);
+                        queue.add(cellPin);
+                    }
+                }
+            }
+        }
+
+        if (!found) return null;
+        List<EDIFHierPortInst> path = new ArrayList<>();
+        for (EDIFHierPortInst p = snk; p != null; p = pred.get(p)) path.add(p);
+        Collections.reverse(path);
+        return path;
+    }
+
+    /**
+     * Convenience overload resolving pin names against the netlist and using
+     * {@link #DEFAULT_CONE_MAX_DEPTH}.
+     *
+     * @param srcName Full hierarchical name of the source pin.
+     * @param snkName Full hierarchical name of the sink pin.
+     * @return The cone path, or {@code null} if either pin can't be resolved or
+     *         no path is found.
+     */
+    public List<EDIFHierPortInst> getConePath(String srcName, String snkName) {
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFHierPortInst src = netlist.getHierPortInstFromName(srcName);
+        EDIFHierPortInst snk = netlist.getHierPortInstFromName(snkName);
+        if (src == null) {
+            System.err.println("ERROR: Couldn't find src pin '" + srcName + "' in getConePath()");
+            return null;
+        }
+        if (snk == null) {
+            System.err.println("ERROR: Couldn't find snk pin '" + snkName + "' in getConePath()");
+            return null;
+        }
+        return getConePath(src, snk, DEFAULT_CONE_MAX_DEPTH);
+    }
+
+    /** True if the pin belongs to a supported unisim flip-flop (FDRE/FDSE/FDPE/FDCE). */
+    private boolean isFlopType(EDIFHierPortInst pin) {
+        return isUnisimFlipFlopType(pin.getCellType().getName());
+    }
+
+    /**
+     * Returns the routing-resource span (Manhattan tile bounding-box, in tiles)
+     * of the physical net driven by the given output pin, as a coarse proxy for
+     * route length when analyzing a {@link #getConePath} result. Long spans on a
+     * single net often indicate the dominant routing delay on a path.
+     *
+     * @param outputPin An output hierarchical pin from a cone path.
+     * @return The (cols + rows) tile-bbox span of the net's PIPs, or -1 if the
+     *         pin is not an output, has no physical net, or the net has no PIPs.
+     */
+    public int getRouteSpan(EDIFHierPortInst outputPin) {
+        if (outputPin == null || !outputPin.isOutput()) return -1;
+        EDIFHierNet hierNet = outputPin.getHierarchicalNet();
+        if (hierNet == null) return -1;
+        Net net = design.getNet(hierNet.getHierarchicalNetName());
+        if (net == null || !net.hasPIPs()) return -1;
+        int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE;
+        for (PIP pip : net.getPIPs()) {
+            Tile t = pip.getTile();
+            if (t == null) continue;
+            int x = t.getColumn(), y = t.getRow();
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+        }
+        if (minX == Integer.MAX_VALUE) return -1;
+        return (maxX - minX) + (maxY - minY);
     }
 
     /**

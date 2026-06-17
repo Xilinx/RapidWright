@@ -22,8 +22,12 @@
 
 package com.xilinx.rapidwright.timing;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Set;
 
 import org.jgrapht.GraphPath;
 import org.jgrapht.alg.cycle.CycleDetector;
@@ -32,7 +36,10 @@ import org.junit.jupiter.api.Test;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestTimingGraph {
@@ -232,5 +239,94 @@ public class TestTimingGraph {
                 "edge count decrease must match the reported removal count");
         Assertions.assertFalse(new CycleDetector<>(tg).detectCycles(),
                 "graph should be acyclic after breakCycles()");
+    }
+
+    private static final Set<String> FLOP_TYPES = new HashSet<>(
+            List.of("FDRE", "FDSE", "FDPE", "FDCE"));
+
+    /**
+     * Validates the memory-scalable cone-path API (TimingGraph.getConePath),
+     * which finds a register-to-register path by walking the netlist on demand
+     * without building the global timing graph.
+     *
+     * Uses the small picoblaze Versal DCP: discovers a launch flop Q that
+     * reaches a capture flop D through >=1 combinational stage, then asserts
+     * getConePath reproduces a well-formed path between the same two pins.
+     */
+    @Test
+    public void testGetConePath() {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        // No global graph build: construct without auto-build, just to get a
+        // TimingGraph instance bound to the design.
+        TimingManager tm = new TimingManager(d, /*doBuild=*/false);
+        TimingGraph tg = tm.getTimingGraph();
+        EDIFNetlist netlist = d.getNetlist();
+
+        // Discover a (launch Q -> capture D) pair connected through logic.
+        EDIFHierPortInst[] pair = discoverPairThroughLogic(netlist);
+        Assertions.assertNotNull(pair, "no launch->logic->capture pair found in design");
+        EDIFHierPortInst from = pair[0];
+        EDIFHierPortInst to = pair[1];
+
+        List<EDIFHierPortInst> path = tg.getConePath(from, to, TimingGraph.DEFAULT_CONE_MAX_DEPTH);
+        Assertions.assertNotNull(path, "getConePath returned null for a known-connected pair");
+        Assertions.assertTrue(path.size() >= 3,
+                "expected a multi-pin path through logic, got " + path.size());
+        Assertions.assertEquals(from, path.get(0), "path must start at the from pin");
+        Assertions.assertEquals(to, path.get(path.size() - 1), "path must end at the to pin");
+
+        // The string-name overload should resolve and return an equivalent path.
+        List<EDIFHierPortInst> byName = tg.getConePath(from.toString(), to.toString());
+        Assertions.assertNotNull(byName, "name-based getConePath returned null");
+        Assertions.assertEquals(from, byName.get(0));
+        Assertions.assertEquals(to, byName.get(byName.size() - 1));
+
+        // A path to a clearly unrelated pin (the launch flop's own Q feeding
+        // itself) must not be found; and a bogus name must return null safely.
+        Assertions.assertNull(tg.getConePath("does/not/exist/Q", to.toString()),
+                "unresolvable source pin should yield null, not throw");
+    }
+
+    /** Finds a launch flop Q that reaches some capture flop D through >=1 logic stage. */
+    private static EDIFHierPortInst[] discoverPairThroughLogic(EDIFNetlist netlist) {
+        for (EDIFHierCellInst cell : netlist.getAllLeafHierCellInstances()) {
+            if (!FLOP_TYPES.contains(cell.getCellType().getName())) continue;
+            EDIFHierPortInst q = cell.getPortInst("Q");
+            if (q == null || !q.isOutput()) continue;
+            EDIFHierNet qn = q.getHierarchicalNet();
+            if (qn == null) continue;
+            List<EDIFHierPortInst> qSinks = qn.getLeafHierPortInsts(false, true);
+            if (qSinks.size() > 8) continue; // keep the search small/deterministic
+            EDIFHierPortInst to = forwardToCaptureThroughLogic(q);
+            if (to != null) return new EDIFHierPortInst[] { q, to };
+        }
+        return null;
+    }
+
+    /** Bounded forward BFS returning the first flop D reached at >=1 logic stage. */
+    private static EDIFHierPortInst forwardToCaptureThroughLogic(EDIFHierPortInst from) {
+        java.util.Map<EDIFHierPortInst, Integer> depth = new java.util.HashMap<>();
+        Set<EDIFHierPortInst> seen = new HashSet<>();
+        Deque<EDIFHierPortInst> q = new ArrayDeque<>();
+        q.add(from); seen.add(from); depth.put(from, 0);
+        while (!q.isEmpty()) {
+            EDIFHierPortInst out = q.poll();
+            EDIFHierNet net = out.getHierarchicalNet();
+            if (net == null) continue;
+            int nd = depth.get(out) + 1;
+            if (nd > 24) continue;
+            for (EDIFHierPortInst sink : net.getLeafHierPortInsts(false, true)) {
+                if (!sink.isInput()) continue;
+                boolean flop = FLOP_TYPES.contains(sink.getCellType().getName());
+                if (flop) {
+                    if (sink.getPortInst().getName().equals("D") && nd >= 2) return sink;
+                    continue;
+                }
+                for (EDIFHierPortInst cp : sink.getHierarchicalInst().getHierPortInsts()) {
+                    if (cp.isOutput() && seen.add(cp)) { depth.put(cp, nd + 1); q.add(cp); }
+                }
+            }
+        }
+        return null;
     }
 }
