@@ -4820,9 +4820,8 @@ public class DesignTools {
     public static void updateVersalXPHYPinsForDMC(Design design) {
         // Check for XPHY BEL pin remapping needs (DMC remappings)
         for (Cell cell : design.getCells()) {
-            if (cell.getType() == null)
-                continue;
-            if (!cell.getType().equals("XPHY"))
+            String type = cell.getType();
+            if (cell.getType() == null || !cell.getType().equals("XPHY"))
                 continue;
             for (EDIFHierPortInst portInst : cell.getEDIFHierCellInst().getHierPortInsts()) {
                 if (portInst.isInput()) {
