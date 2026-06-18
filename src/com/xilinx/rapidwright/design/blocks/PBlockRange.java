@@ -222,9 +222,9 @@ public class PBlockRange {
         // We may need to expand column to include outward facing CLB/DSP/BRAM to INT tiles
         if (isSiteRange()) {
             Tile t = getLowerLeftSite().getIntTile();
-            if (t.getColumn() < colMin) colMin = t.getColumn();
+            if (t != null && t.getColumn() < colMin) colMin = t.getColumn();
             t = getUpperRightSite().getIntTile();
-            if (t.getColumn() > colMax) colMax = t.getColumn();
+            if (t != null && t.getColumn() > colMax) colMax = t.getColumn();
         }
 
         for (int col=colMin; col <= colMax; col++) {
