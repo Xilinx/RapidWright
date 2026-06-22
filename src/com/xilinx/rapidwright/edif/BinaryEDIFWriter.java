@@ -159,15 +159,15 @@ public class BinaryEDIFWriter {
      * @see BinaryEDIFReader#readEDIFObject(EDIFPropertyObject, Input, String[])
      */
     private static void writeEDIFObject(EDIFPropertyObject o, Output os, Map<String,Integer> stringMap) {
-        boolean hasProperties = o.getPropertiesMap().size() > 0;
+        boolean hasProperties = o.getPropertyCount() > 0;
         writeEDIFName(o, os, stringMap, hasProperties);
         if (hasProperties) {
-            if (o.getPropertiesMap().size() > 0x0000ffff) {
+            if (o.getPropertyCount() > 0x0000ffff) {
                 throw new RuntimeException("ERROR: EDIF object exceeded number of encoded "
                         + "properties on object '" + o.getName() + "'");
             }
 
-            os.writeInt(o.getPropertiesMap().size());
+            os.writeInt(o.getPropertyCount());
 
             for (Entry<String, EDIFPropertyValue> e : o.getPropertiesMap().entrySet()) {
                 int ownerFlag = e.getValue().getOwner() != null ? EDIF_HAS_OWNER : 0;

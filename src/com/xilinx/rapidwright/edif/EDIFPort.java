@@ -300,7 +300,7 @@ public class EDIFPort extends EDIFPropertyObject {
         os.write(EXPORT_CONST_DIRECTION_START);
         os.write(direction.toByteArray());
         os.write(')');
-        if (getPropertiesMap().size() > 0) {
+        if (getPropertyCount() > 0) {
             os.write('\n');
             exportEDIFProperties(os, EXPORT_CONST_CHILD_INDENT, cache, stable);
             os.write(EXPORT_CONST_INDENT);
