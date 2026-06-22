@@ -50,9 +50,11 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.rwroute.NodeStatus;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.rwroute.RouterHelper.NodeWithPrev;
+import com.xilinx.rapidwright.router.VTreeType;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
@@ -64,6 +66,8 @@ import com.xilinx.rapidwright.util.Utils;
  * Created on: Nov 1, 2024
  */
 public class VersalClockRouting {
+
+    public static final String USER_CLOCK_VTREE_TYPE = "USER_CLOCK_VTREE_TYPE";
 
     private static final EnumSet<IntentCode> hRouteTypes;
     private static final EnumSet<IntentCode> vRouteTypes;
@@ -287,7 +291,7 @@ public class VersalClockRouting {
             verticalSpineCRs.add(device.getClockRegion(i, x));
         }
 
-        VersalClockTree clkTree = getVersalClockTree(device, minY, maxY);
+        VersalClockTree clkTree = getVersalClockTree(clk, device, minY, maxY);
         assert (clkTree != null);
         if (clkTree == null) {
             System.err.println("ERROR: No clock tree found for " + device + " Y" + minY + "-Y" + maxY
@@ -692,8 +696,16 @@ public class VersalClockRouting {
     }
 
     public static VersalClockTree getVersalClockTree(Device device, int minY, int maxY) {
+        return getVersalClockTree(device, minY, maxY, VTreeType.BALANCED);
+    }
+
+    public static VersalClockTree getVersalClockTree(Device device, int minY, int maxY, VTreeType vtreeType) {
         Map<Integer, VersalClockTree> map = getDeviceVDistrTrees(device.getName());
-        return map == null ? null : map.get(VersalClockTree.getMinMaxYRangeKey(minY, maxY));
+        return map == null ? null : map.get(VersalClockTree.getMinMaxYRangeKey(minY, maxY, vtreeType));
+    }
+
+    public static VersalClockTree getVersalClockTree(Net clk, Device device, int minY, int maxY) {
+        return getVersalClockTree(device, minY, maxY, getUserClockVTreeType(clk));
     }
 
     private static Map<Integer, VersalClockTree> getDeviceVDistrTrees(String deviceName) {
@@ -716,5 +728,22 @@ public class VersalClockRouting {
     public static Integer getPreferredClockRootYCoord(Device device, int minY, int maxY) {
         VersalClockTree clkTree = getVersalClockTree(device, minY, maxY);
         return clkTree == null ? null : clkTree.getPreferredClockRootYCoord();
+    }
+
+    public static Integer getPreferredClockRootYCoord(Device device, int minY, int maxY, VTreeType vtreeType) {
+        VersalClockTree clkTree = getVersalClockTree(device, minY, maxY, vtreeType);
+        return clkTree == null ? null : clkTree.getPreferredClockRootYCoord();
+    }
+
+    public static Integer getPreferredClockRootYCoord(Net clk, Device device, int minY, int maxY) {
+        return getPreferredClockRootYCoord(device, minY, maxY, getUserClockVTreeType(clk));
+    }
+
+    public static VTreeType getUserClockVTreeType(Net clk) {
+        if (clk == null || clk.getLogicalNet() == null) {
+            return VTreeType.BALANCED;
+        }
+        EDIFPropertyValue prop = clk.getLogicalNet().getProperty(USER_CLOCK_VTREE_TYPE);
+        return prop == null ? VTreeType.BALANCED : VTreeType.fromVivadoName(prop.getValue());
     }
 }
