@@ -280,6 +280,14 @@ public class ParallelEDIFParser implements AutoCloseable{
                         }
                     }
                 });
+        t.stop().start("Trim PortInst Lists");
+        // Port instance lists are built via incremental ArrayList insertion, which
+        // leaves unused capacity slack. Trim it now that all insertions are done.
+        List<EDIFCell> allCells = new ArrayList<>();
+        for (EDIFLibrary lib : netlist.getLibraries()) {
+            allCells.addAll(lib.getCells());
+        }
+        ParallelismTools.invokeAllRunnable(allCells, EDIFCell::trimEDIFPortInstLists);
         t.stop();
     }
 

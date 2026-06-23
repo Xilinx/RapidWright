@@ -672,7 +672,7 @@ public class EDIFCell extends EDIFPropertyObject {
             }
             os.write(EXPORT_CONST_CONTENTS_END); // Contents end
         }
-        if (getPropertiesMap().size() > 0) {
+        if (getPropertyCount() > 0) {
             os.write('\n');
             exportEDIFProperties(os, EXPORT_CONST_PROP_INDENT, cache, stable);
         }
@@ -762,6 +762,25 @@ public class EDIFCell extends EDIFPropertyObject {
         for (EDIFCellInst inst : getCellInsts()) {
             EDIFPortInstList list = inst.getEDIFPortInstList();
             if (list != null) list.reSortList();
+        }
+    }
+
+    /**
+     * Trims the backing capacity of all {@link EDIFPortInstList} objects on the
+     * nets and cell instances of this cell down to their current size. The lists
+     * are built via incremental {@link java.util.ArrayList} insertion (which
+     * leaves unused capacity slack), so calling this after a netlist is fully
+     * loaded reclaims that slack. This is purely a memory optimization and does
+     * not change the contents of any list.
+     */
+    public void trimEDIFPortInstLists() {
+        for (EDIFNet net : getNets()) {
+            EDIFPortInstList list = net.getEDIFPortInstList();
+            if (list != null) list.trimToSize();
+        }
+        for (EDIFCellInst inst : getCellInsts()) {
+            EDIFPortInstList list = inst.getEDIFPortInstList();
+            if (list != null) list.trimToSize();
         }
     }
 
