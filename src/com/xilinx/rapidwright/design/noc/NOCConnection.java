@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -60,6 +61,7 @@ public class NOCConnection implements Serializable {
 
 
     private static final ArrayList<String> unsupportedFields = new ArrayList<String>();
+    private static final Set<String> warnedUnsupportedFields = new HashSet<>();
     static {
         unsupportedFields.add("WriteBurstSize");
         unsupportedFields.add("ReadBurstSize");
@@ -122,10 +124,6 @@ public class NOCConnection implements Serializable {
         if (json.has(NOCJSONUtil.JSON_FIELD_EXCLUSIVE_GROUP)) {
             exclusiveGroup = json.getString(NOCJSONUtil.JSON_FIELD_EXCLUSIVE_GROUP);
         }
-
-        //= json.getString("ReadTC"); //Redundant: NOC Master
-        //= json.getString("WriteTC"); //Redundant: NOC Master
-        checkUnsupportedFields(json);
     }
 
     /**
@@ -135,9 +133,11 @@ public class NOCConnection implements Serializable {
      */
     public void checkUnsupportedFields(JSONObject json) {
         for (String s : unsupportedFields) {
-            if (json.has(s))
-                System.out.println("Unsupported field " + s +
-                    " encountered in Path " + source + " -> " + dest);
+            if (json.has(s) && warnedUnsupportedFields.add(s)) {
+                System.out.println("WARNING: Unsupported NOC field '" + s +
+                    "' encountered (e.g., Path " + source + " -> " + dest +
+                    "); field will be ignored.");
+            }
         }
     }
 
