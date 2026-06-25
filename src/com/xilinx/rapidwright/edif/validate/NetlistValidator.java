@@ -162,6 +162,33 @@ public class NetlistValidator {
             add(IssueCode.MISSING_PART_PROPERTY, loc(netlist),
                     "No PART property found on the design; Vivado requires a part");
         }
+        checkVivadoBusGrouping(top);
+    }
+
+    /**
+     * Flags top-level single-bit ports that Vivado would incorrectly group into a
+     * bus on read-back (e.g. {@code port[0]}, {@code port[1]} merged into
+     * {@code port[1:0]}), which breaks interface matching against a black box. The
+     * remedy is {@link EDIFTools#ensurePreservedInterfaceVivado(EDIFNetlist)},
+     * which prepends {@link EDIFTools#VIVADO_PRESERVE_PORT_INTERFACE} ("[]") to
+     * these names. This uses the exact predicate of that method, so a netlist that
+     * has already been preserved reports nothing.
+     *
+     * @param top The top cell whose interface ports are checked.
+     */
+    private void checkVivadoBusGrouping(EDIFCell top) {
+        for (EDIFPort p : top.getPorts()) {
+            String name = p.getName();
+            if (!p.isBus()
+                    && !name.startsWith(EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE)
+                    && name.endsWith("]")) {
+                add(IssueCode.PORT_VIVADO_BUS_GROUPING, portLoc(top, p),
+                        "Top-level single-bit port '" + name + "' would be merged into a bus by "
+                                + "Vivado on read-back, breaking interface matching; prefix it with '"
+                                + EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE
+                                + "' (EDIFTools.ensurePreservedInterfaceVivado())");
+            }
+        }
     }
 
     /* ------------------------------------------------------------------ *

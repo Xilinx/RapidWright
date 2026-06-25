@@ -62,6 +62,11 @@ public enum IssueCode {
     PORT_NONPOSITIVE_WIDTH(Severity.ERROR),
     PORT_WIDTH_MISMATCH(Severity.ERROR),
     PORT_NULL_DIRECTION(Severity.ERROR),
+    // A top-level single-bit port whose name ends with ']' (e.g. port[0]) that is
+    // not protected with the EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE ("[]") prefix.
+    // Vivado will incorrectly merge such ports into a bus, breaking interface
+    // matching against a black box. See EDIFTools.ensurePreservedInterfaceVivado().
+    PORT_VIVADO_BUS_GROUPING(Severity.WARNING),
 
     // F. Net
     NET_PARENT_BROKEN(Severity.ERROR),

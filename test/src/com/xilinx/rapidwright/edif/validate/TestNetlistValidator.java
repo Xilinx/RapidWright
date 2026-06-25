@@ -203,6 +203,30 @@ class TestNetlistValidator {
     }
 
     @Test
+    void testVivadoBusGroupingFlaggedAndFixed() {
+        EDIFNetlist n = buildMinimalNetlist();
+        EDIFCell top = getTop(n);
+        // Single-bit top-level ports named like bus members -> Vivado would merge them.
+        top.createPort("sel[0]", EDIFDirection.INPUT, 1);
+        top.createPort("sel[1]", EDIFDirection.INPUT, 1);
+        Assertions.assertEquals(2, validate(n).getCount(IssueCode.PORT_VIVADO_BUS_GROUPING),
+                "unpreserved indexed single-bit top ports must be flagged");
+
+        // After applying the RapidWright remedy, nothing should be flagged.
+        EDIFTools.ensurePreservedInterfaceVivado(n);
+        Assertions.assertEquals(0, validate(n).getCount(IssueCode.PORT_VIVADO_BUS_GROUPING),
+                "ports preserved with the '[]' prefix must not be flagged");
+    }
+
+    @Test
+    void testRealBusPortNotFlaggedForBusGrouping() {
+        EDIFNetlist n = buildMinimalNetlist();
+        // A genuinely declared bus must not be flagged.
+        getTop(n).createPort("data[3:0]", EDIFDirection.INPUT, 4);
+        Assertions.assertEquals(0, validate(n).getCount(IssueCode.PORT_VIVADO_BUS_GROUPING));
+    }
+
+    @Test
     void testNetUndriven() {
         EDIFNetlist n = buildMinimalNetlist();
         EDIFCell top = getTop(n);
