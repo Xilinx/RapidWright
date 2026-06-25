@@ -41,6 +41,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.util.FileTools;
@@ -359,7 +360,6 @@ public class MetadataParser {
                             if (currPort.getType()!=PortType.UNCONNECTED) {
                                 netsToPorts.computeIfAbsent(currPortNet, x -> new ArrayList<>()).add(currPort);
                             }
-                            createImplicitConnections(currPortNet, currPort);
                         }
                     } else {
                         currState = MDParserState.PORT_CONNS_BEGIN;
@@ -521,9 +521,21 @@ public class MetadataParser {
             throw new RuntimeException("no net for port "+currPort);
         }
         List<EDIFHierPortInst> physicalPins = m.getNetlist().getPhysicalPins(currPortNet);
-        Stream<EDIFHierPortInst> realPhysPins = (physicalPins != null ? physicalPins.stream() : Stream.<EDIFHierPortInst>empty());
-        boolean hasAnyPins = false;
-        realPhysPins
+
+        if (physicalPins==null || physicalPins.isEmpty()) {
+            //Need to figure out if this is allowed
+            if (!currPort.isOutPort()) {
+                //Port is actually unused
+                return;
+            }
+            if (currPort.getPassThruPortNames().stream().map(p->m.getPort(p)).anyMatch(p->!p.isOutPort())) {
+                //Passthru for an input
+                return;
+            }
+            throw new RuntimeException("no prims are driving output port "+currPort.getName());
+        }
+
+        physicalPins.stream()
                 .flatMap(pin -> {
                     if (pin.isOutput() != currPort.isOutPort()) {
                         return Stream.empty();
@@ -538,7 +550,14 @@ public class MetadataParser {
                             .get(pin.getPortInst().getName())
                             .stream()
                             .flatMap(physical ->
-                                    DesignTools.getAllRoutedSitePinsFromPhysicalPin(cell, currPortNet, physical).stream()
+                                    {
+                                        List<String> spis = DesignTools.getAllRoutedSitePinsFromPhysicalPin(cell, currPortNet, physical);
+                                        if (spis.isEmpty()) {
+                                            String newSitePin = bringOutputToSitePin(cell, currPortNet, pin.getPortInst().getName(), physical);
+                                            return Stream.of(newSitePin);
+                                        }
+                                        return spis.stream();
+                                    }
                             )
                             .map(p -> {
                                 String primarySitePinName = siteInst.getPrimarySitePinName(p);
@@ -567,9 +586,33 @@ public class MetadataParser {
                     currPortNet.addPin(sitePinInst);
                 });
 
-        if (!hasAnyPins && currPort.isOutPort()) {
+        if (currPort.getSitePinInsts().isEmpty() && currPort.isOutPort() && currPort.getPassThruPortNames().isEmpty()) {
             throw new RuntimeException("in creating implicit module connections, no pin for "+currPort+" is routed to Site Pin");
         }
+    }
+
+    /**
+     * Handle the rare case where Vivado does not route an output to a Site Pin. We have to choose a Site Pin ourselves.
+     */
+    private String bringOutputToSitePin(Cell cell, Net net, String logicalPin, String pin) {
+
+        BELPin cellPin = Objects.requireNonNull(cell.getBEL().getPin(pin));
+        String sitePinName = cellPin.getConnectedSitePinName();
+        if (sitePinName==null) {
+            sitePinName = cell.getCorrespondingSitePinName(logicalPin, pin, null);
+        }
+        if (sitePinName==null) {
+            throw new RuntimeException("did not find Site Pin for "+logicalPin+" physical pin "+pin+" on "+cell.getSite()+"."+cell.getBEL() +" "+cell.getType());
+        }
+        SitePinInst existing = cell.getSiteInst().getSitePinInst(sitePinName);
+        if (existing != null) {
+            throw new RuntimeException("cannot bring cell pin "+cell+"."+pin+" with net "+net+" out to site pin "+sitePinName+" as it is used by "+existing.getNet());
+        }
+        SitePinInst newPin = new SitePinInst(cellPin.isOutput(), sitePinName, cell.getSiteInst());
+        if (!cell.getSiteInst().routeIntraSiteNet(net, cellPin, newPin.getBELPin())) {
+            throw new RuntimeException("while bringing cellpin "+cell+"."+pin+" out to site pin "+sitePinName+", failed to route site net");
+        }
+        return sitePinName;
     }
 
     private boolean expect(String expected, String found) {
