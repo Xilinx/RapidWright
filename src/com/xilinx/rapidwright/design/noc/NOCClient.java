@@ -26,8 +26,10 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.json.JSONObject;
 
@@ -55,6 +57,7 @@ public class NOCClient implements Serializable {
     private Map<String, String> simMetaData;
 
     private static final ArrayList<String> unsupportedFields = new ArrayList<String>();
+    private static final Set<String> warnedUnsupportedFields = new HashSet<>();
 
     static {
         unsupportedFields.add("SysAddress");
@@ -64,7 +67,6 @@ public class NOCClient implements Serializable {
         unsupportedFields.add("NumWriteOutstanding");
         unsupportedFields.add("ReadRateLimiter");
         unsupportedFields.add("WriteRateLimiter");
-        //unsupportedFields.add("InterleaveSize");
     };
 
     /**
@@ -130,8 +132,6 @@ public class NOCClient implements Serializable {
                 simMetaData.put(key, value);
             }
         }
-
-        checkUnsupportedFields(json);
     }
 
     /**
@@ -141,8 +141,10 @@ public class NOCClient implements Serializable {
      */
     public void checkUnsupportedFields(JSONObject json) {
         for (String s : unsupportedFields) {
-            if (json.has(s))
-                System.out.println("Unsupported field " + s + " encountered in " + name);
+            if (json.has(s) && warnedUnsupportedFields.add(s)) {
+                System.out.println("WARNING: Unsupported NOC field '" + s +
+                    "' encountered (e.g., client " + name + "); field will be ignored.");
+            }
         }
     }
 
