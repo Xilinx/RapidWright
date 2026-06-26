@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.edif;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -117,21 +118,25 @@ public class TestEDIFPropertyMap {
 
         Assertions.assertEquals(3, m.keySet().size());
         Assertions.assertTrue(m.keySet().contains("a"));
-        Assertions.assertTrue(m.keySet().containsAll(List.of("a", "b", "c")));
+        Assertions.assertTrue(m.keySet().containsAll(Arrays.asList("a", "b", "c")));
 
         Assertions.assertEquals(3, m.values().size());
         List<String> values = new ArrayList<>();
         for (EDIFPropertyValue val : m.values()) {
             values.add(val.getValue());
         }
-        Assertions.assertTrue(values.containsAll(List.of("1", "2", "3")));
+        Assertions.assertTrue(values.containsAll(Arrays.asList("1", "2", "3")));
 
         // entrySet iteration
         Map<String, String> seen = new HashMap<>();
         for (Map.Entry<String, EDIFPropertyValue> e : m.entrySet()) {
             seen.put(e.getKey(), e.getValue().getValue());
         }
-        Assertions.assertEquals(Map.of("a", "1", "b", "2", "c", "3"), seen);
+        Map<String, String> expected = new HashMap<>();
+        expected.put("a", "1");
+        expected.put("b", "2");
+        expected.put("c", "3");
+        Assertions.assertEquals(expected, seen);
     }
 
     @Test
