@@ -39,6 +39,7 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 public class VivadoTools {
 
     public static final String REPORT_ROUTE_STATUS = "report_route_status";
+    public static final String REPORT_PLACE_STATUS = "report_place_status";
     public static final String PLACE_DESIGN = "place_design";
     public static final String ROUTE_DESIGN = "route_design";
     public static final String WRITE_CHECKPOINT = "write_checkpoint";
@@ -315,6 +316,72 @@ public class VivadoTools {
 
         List<String> log = VivadoTools.runTcl(outputLog, sb.toString(), true);
         return new ReportRouteStatusResult(log);
+    }
+
+    /**
+     * Run Vivado's `report_place_status` command on the provided Design object
+     * and return its result as a ReportPlaceStatusResult object.
+     *
+     * @param design Design object to report on.
+     * @return ReportPlaceStatusResult object.
+     */
+    public static ReportPlaceStatusResult reportPlaceStatus(Design design) {
+        final Path dcp = writeCheckpoint(design);
+        boolean hasEncryptedCells = design.getNetlist().hasEncryptedCells();
+        ReportPlaceStatusResult rps = reportPlaceStatus(dcp, dcp.getParent(), hasEncryptedCells);
+
+        FileTools.deleteFolder(dcp.getParent().toString());
+
+        return rps;
+    }
+
+    /**
+     * Run Vivado's `report_place_status` command on the provided DCP. Assume the
+     * given DCP is encrypted if, given <path>/<name>.dcp, <path>/<name>_load.tcl
+     * exists. Return report as a ReportPlaceStatusResult object.
+     *
+     * @param dcp Path to DCP to report on.
+     * @return ReportPlaceStatusResult object.
+     */
+    public static ReportPlaceStatusResult reportPlaceStatus(Path dcp) {
+        Path tcl = FileTools.replaceExtension(dcp, EDIFTools.LOAD_TCL_SUFFIX);
+        boolean encrypted = tcl.toFile().exists();
+        return reportPlaceStatus(dcp, encrypted);
+    }
+
+    /**
+     * Run Vivado's `report_place_status` command on the provided DCP path
+     * and return its result as a ReportPlaceStatusResult object.
+     *
+     * @param dcp Path to DCP to report on.
+     * @param encrypted Indicates whether DCP contains encrypted EDIF cells.
+     * @return ReportPlaceStatusResult object.
+     */
+    public static ReportPlaceStatusResult reportPlaceStatus(Path dcp, boolean encrypted) {
+        final Path workdir = createTempVivadoToolsWorkDir();
+        ReportPlaceStatusResult rps = reportPlaceStatus(dcp, workdir, encrypted);
+        FileTools.deleteFolder(workdir.toString());
+        return rps;
+    }
+
+    /**
+     * Run Vivado's `report_place_status` command on the provided DCP path
+     * and return its result as a ReportPlaceStatusResult object.
+     *
+     * @param dcp Path to DCP to report on.
+     * @param workdir Directory to work within.
+     * @param encrypted Indicates whether DCP contains encrypted EDIF cells.
+     * @return ReportPlaceStatusResult object.
+     */
+    public static ReportPlaceStatusResult reportPlaceStatus(Path dcp, Path workdir, boolean encrypted) {
+        final Path outputLog = workdir.resolve("outputLog.log");
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(createTclDCPLoadCommand(dcp, encrypted));
+        sb.append(REPORT_PLACE_STATUS);
+
+        List<String> log = VivadoTools.runTcl(outputLog, sb.toString(), true);
+        return new ReportPlaceStatusResult(log);
     }
 
     /**
