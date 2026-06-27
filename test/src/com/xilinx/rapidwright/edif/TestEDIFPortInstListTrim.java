@@ -55,7 +55,8 @@ public class TestEDIFPortInstListTrim {
         boolean ok = false;
         try {
             f = ArrayList.class.getDeclaredField("elementData");
-            ok = f.trySetAccessible();
+            f.setAccessible(true);
+            ok = f.isAccessible();
         } catch (Throwable t) {
             ok = false;
         }
