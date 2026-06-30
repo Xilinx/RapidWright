@@ -302,7 +302,7 @@ public class EDIFCellInst extends EDIFPropertyObject {
         os.write(cache.getLegalEDIFName(cellType.getName()));
         os.write(EXPORT_CONST_LIBRARYREF);
         os.write(cache.getLegalEDIFName(cellType.getLibrary().getName()));
-        if (getPropertiesMap().size() > 0) {
+        if (getPropertyCount() > 0) {
             os.write(EXPORT_CONST_CLOSE_WITH_PROPS);
             exportEDIFProperties(os,EXPORT_CONST_PROP_INDENT, cache, stable);
             os.write(EXPORT_CONST_CLOSE);

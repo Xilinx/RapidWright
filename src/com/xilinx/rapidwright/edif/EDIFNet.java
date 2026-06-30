@@ -465,7 +465,7 @@ public class EDIFNet extends EDIFPropertyObject {
             p.writeEDIFExport(os, EXPORT_CONST_PORT_INDENT, cache);
         }
         os.write(EXPORT_CONST_JOINED_END); // joined end
-        if (getPropertiesMap().size() > 0) {
+        if (getPropertyCount() > 0) {
             os.write('\n');
             exportEDIFProperties(os, EXPORT_CONST_PROP_INDENT, cache, stable);
         }

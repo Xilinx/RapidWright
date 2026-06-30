@@ -792,6 +792,22 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
+     * Trims the backing capacity of every {@link EDIFPortInstList} in the netlist
+     * down to its current size (see {@link EDIFCell#trimEDIFPortInstLists()}).
+     * Port instance lists are built via incremental {@link java.util.ArrayList}
+     * insertion during parsing, which leaves unused capacity slack; calling this
+     * once after a netlist is fully loaded reclaims that slack. This is purely a
+     * memory optimization and does not change the netlist contents.
+     */
+    public void trimEDIFPortInstLists() {
+        for (EDIFLibrary lib : getLibraries()) {
+            for (EDIFCell cell : lib.getCells()) {
+                cell.trimEDIFPortInstLists();
+            }
+        }
+    }
+
+    /**
      * Get Libraries in export order so that any cell instance appearing in a library will only
      * refer to cells in its own library or previous libraries in the list.  This is a pre-requisite
      * for export to a file.
