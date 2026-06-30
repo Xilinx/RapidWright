@@ -2076,7 +2076,7 @@ public class FileTools {
                     while ((e = zip.getNextEntry()) != null) {
                         String name = e.getName();
                         if (name.startsWith(folderName)) {
-                            if (!e.isDirectory()) {
+                            if (!e.isDirectory() && !name.endsWith(".class")) {
                                 String fileName = outputPath + File.separator + e.getName();
                                 System.out.println("Unpacking " + fileName);
                                 File newFile = new File(fileName);
