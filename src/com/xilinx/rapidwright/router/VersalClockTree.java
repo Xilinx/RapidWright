@@ -38,6 +38,11 @@ import com.xilinx.rapidwright.util.Pair;
  */
 public class VersalClockTree {
 
+    private static final int VTREE_TYPE_SHIFT = 30;
+    private static final int VTREE_TYPE_MASK = 0x3 << VTREE_TYPE_SHIFT;
+    private static final int MIN_Y_MASK = 0x3fff;
+    private static final int MAX_Y_MASK = 0xffff;
+
     private int minMaxYKey;
 
     private int preferredClockRootY;
@@ -56,19 +61,27 @@ public class VersalClockTree {
     }
 
     public VersalClockTree(int minY, int maxY) {
-        this.minMaxYKey = getMinMaxYRangeKey(minY, maxY);
+        this(minY, maxY, VTreeType.BALANCED);
+    }
+
+    public VersalClockTree(int minY, int maxY, VTreeType vtreeType) {
+        this.minMaxYKey = getMinMaxYRangeKey(minY, maxY, vtreeType);
     }
 
     public int getMinY() {
-        return minMaxYKey >>> 16;
+        return (minMaxYKey >>> 16) & MIN_Y_MASK;
     }
 
     public int getMaxY() {
-        return minMaxYKey & 0xffff;
+        return minMaxYKey & MAX_Y_MASK;
     }
 
     public int getMinMaxYKey() {
         return minMaxYKey;
+    }
+
+    public VTreeType getVTreeType() {
+        return getVTreeType(minMaxYKey);
     }
 
     public int getPreferredClockRootYCoord() {
@@ -137,7 +150,23 @@ public class VersalClockTree {
     }
 
     public static int getMinMaxYRangeKey(int minY, int maxY) {
+        return getMinMaxYRangeKey(minY, maxY, VTreeType.BALANCED);
+    }
+
+    public static int getMinMaxYRangeKey(int minY, int maxY, VTreeType vtreeType) {
         assert (minY >= 0 && maxY >= 0 && maxY >= minY);
-        return (minY << 16) | maxY;
+        if (minY > MIN_Y_MASK) {
+            throw new IllegalArgumentException("Minimum clock region Y coordinate exceeds "
+                    + MIN_Y_MASK + ": " + minY);
+        }
+        if (maxY > MAX_Y_MASK) {
+            throw new IllegalArgumentException("Maximum clock region Y coordinate exceeds "
+                    + MAX_Y_MASK + ": " + maxY);
+        }
+        return (vtreeType.getKeyBits() << VTREE_TYPE_SHIFT) | (minY << 16) | maxY;
+    }
+
+    public static VTreeType getVTreeType(int minMaxYKey) {
+        return VTreeType.fromKeyBits((minMaxYKey & VTREE_TYPE_MASK) >>> VTREE_TYPE_SHIFT);
     }
 }

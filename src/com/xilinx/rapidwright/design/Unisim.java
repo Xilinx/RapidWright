@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025, Advanced Micro Devices, Inc.
+ * Copyright (c) 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Advanced Micro Devices, Inc.
@@ -33,7 +33,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 
 /**
- * Generated on: Tue Nov 11 17:13:57 MST 2025
+ * Generated on: Tue Jun 09 13:13:33 MDT 2026
  * by: com.xilinx.rapidwright.release.UnisimParser
  *
  * Enumerates supported Unisim primitives that map to Xilinx devices.
@@ -1252,6 +1252,7 @@ public enum Unisim {
     PLL_BASE,
     PS11,
     PS11_A,
+    PS11_B,
     PS7,
     PS8,
     PS9,
