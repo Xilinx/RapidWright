@@ -1,3 +1,26 @@
+============= RapidWright 2026.1.0-beta released on 2026-06-30 ================
+Notes: 
+  - 2026.1.0 Vivado DCP and device compatibility
+  - Fix tests to be Java 8 compatible (#1390)
+  - Add ReportPlaceStatusResult, with VivadoTools.reportPlaceStatus() (#1389)
+  - Fixes some testing failures related to api-lib fixes (#1388)
+  - 2026.1.0 VTree updates; includes all 3 modes of USER_CLOCK_VTREE_TYPE (#1385)
+  - Remove unnecessary reporting in NOC json (#1386)
+  - NOC Design representation classes (#1382)
+  - [EDIFNetlist] Mem Optimizations - Trim PortInsts & Property Map Storage (#1383)
+  - Fix Clock Routing for IOB pin (#1377)
+  - [RWRoute] Check and extend highest base wire for preservedMap (#1375)
+  - Update RapidWrightDCP to new url under Xilinx org (#1376)
+  - Fixes an issue in Cell.getSitePinFromLogicalPin() 
+
+API Additions:
+  - com.xilinx.rapidwright.device.Device "public int getIDCode()"
+  - com.xilinx.rapidwright.device.SLR "public int getIDCode()"
+
+API Removals:
+  - com.xilinx.rapidwright.bitstream "public static int createIDCode(int devIDCode, int revision)"
+  - com.xilinx.rapidwright.bitstream "public static Integer getIDCode(String partName)"
+
 ============= RapidWright 2025.2.2-beta released on 2026-06-04 ================
 Notes:
   - [Params] Adds parameters to control how readable EDIF is extracted when DCP is loaded (#1374)

@@ -44,8 +44,7 @@ public class TestVivadoTools {
 
         List<String> log = VivadoTools.runTcl(tempDir.resolve("outputLog.log"), "exit", true);
 
-        List<String> results = VivadoTools.searchVivadoLog(log, "INFO");
-        Assertions.assertTrue(results.get(0).contains("Exiting Vivado"));
+        assertVivadoLogContains(log, "Exiting Vivado");
     }
 
     @Test
