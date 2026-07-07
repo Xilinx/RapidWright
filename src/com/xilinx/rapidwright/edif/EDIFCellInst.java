@@ -260,6 +260,13 @@ public class EDIFCellInst extends EDIFPropertyObject {
             if (port == null || port.getWidth() != origPort.getWidth()) {
                 port = cellType.getPort(origPort.getName());
             }
+            if (port == null) {
+                throw new RuntimeException("ERROR: Cannot remap port '" + origPort.getName()
+                        + "' from old cell type '" + origPort.getParentCell().getName()
+                        + "' to new cell type '" + cellType.getName()
+                        + "' on instance '" + getName()
+                        + "'. Port not found on new cell type.");
+            }
             portInst.setPort(port);
         }
     }

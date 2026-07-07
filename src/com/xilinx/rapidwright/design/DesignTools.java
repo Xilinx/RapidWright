@@ -3536,6 +3536,9 @@ public class DesignTools {
                 }
 
                 String cellType = cell.getType();
+                if (cellType == null) {
+                    continue;
+                }
                 if (cellType.equals("AND2B1L") || cellType.equals("OR2L")) {
                     // pass
                 } else if (cell.isFFRoutethruCell()) {
@@ -4817,7 +4820,8 @@ public class DesignTools {
     public static void updateVersalXPHYPinsForDMC(Design design) {
         // Check for XPHY BEL pin remapping needs (DMC remappings)
         for (Cell cell : design.getCells()) {
-            if (!cell.getType().equals("XPHY"))
+            String type = cell.getType();
+            if (cell.getType() == null || !cell.getType().equals("XPHY"))
                 continue;
             for (EDIFHierPortInst portInst : cell.getEDIFHierCellInst().getHierPortInsts()) {
                 if (portInst.isInput()) {
