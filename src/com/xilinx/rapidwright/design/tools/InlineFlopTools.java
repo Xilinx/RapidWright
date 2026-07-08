@@ -22,6 +22,17 @@
 
 package com.xilinx.rapidwright.design.tools;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
@@ -32,6 +43,8 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockSide;
+import com.xilinx.rapidwright.design.xdc.XDCConstraints;
+import com.xilinx.rapidwright.design.xdc.XDCParser;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.SLR;
@@ -54,17 +67,6 @@ import com.xilinx.rapidwright.placer.blockplacer.Point;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.StringTools;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import static com.xilinx.rapidwright.util.Utils.isCLB;
 
@@ -170,7 +172,7 @@ public class InlineFlopTools {
      * @param portSideMap Map from ports to side of the pblock the flop should be placed on
      */
     public static void createAndPlacePortFlopsOnSide(Design design, String clkNet, PBlock keepOut,
-                                                     Map<EDIFPort, PBlockSide> portSideMap) {
+                                                      Map<EDIFPort, PBlockSide> portSideMap) {
         assert (design.getSiteInsts().isEmpty());
         Site start = keepOut.getAllSites("SLICE").iterator().next(); // TODO this is a bit wasteful
         boolean exclude = true;
@@ -181,9 +183,6 @@ public class InlineFlopTools {
 
         for (Entry<EDIFPort, PBlockSide> entry : portSideMap.entrySet()) {
             EDIFPort port = entry.getKey();
-            if (port.getName().startsWith("[]")) {
-                System.out.println();
-            }
             PBlockSide side = entry.getValue();
             if (port.getName().equals(clkNet)) {
                 continue;
@@ -211,8 +210,8 @@ public class InlineFlopTools {
             }
 
             if (internallyUnconnected) {
-                throw new RuntimeException("Port " + port + " is internally unconnected in design, either " +
-                        "fix the synthesized design for remove from the side map");
+                throw new RuntimeException("Port " + port.getName() + " is internally unconnected in design, either " +
+                        "fix the synthesized design or remove it from the side map");
             }
         }
         for (SiteInst si : siteInstsToRoute) {
@@ -455,7 +454,7 @@ public class InlineFlopTools {
         List<EDIFCellInst> cellsToRemove = new ArrayList<>();
         Set<String> inlineFlopCellNames = new HashSet<>();
         for (EDIFCellInst inst : design.getTopEDIFCell().getCellInsts()) {
-            if (inst.getName().endsWith(INLINE_SUFFIX)) {
+            if (isInlineFlopName(inst.getName())) {
                 Cell flop = design.getCell(inst.getName());
                 if (flop == null) {
                     flop = design.getCell(EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE + inst.getName());
@@ -488,7 +487,7 @@ public class InlineFlopTools {
             EDIFNet dNet = d.getNet();
             EDIFPortInst q = c.getPortInst("Q");
             EDIFNet qNet = q.getNet();
-            if (dNet.getName().endsWith(INLINE_SUFFIX)) {
+            if (isInlineFlopName(dNet.getName())) {
                 // Input port
                 for (EDIFPortInst pi : new ArrayList<>(d.getNet().getPortInsts())) {
                     if (pi.getCellInst() != c) {
@@ -549,7 +548,7 @@ public class InlineFlopTools {
         // into Module relocation as a Net with edifNet=NO and unrouted sinks.
         List<Net> orphanNets = new ArrayList<>();
         for (Net n : design.getNets()) {
-            if (n.getName().contains(INLINE_SUFFIX)) {
+            if (isInlineFlopName(n.getName())) {
                 orphanNets.add(n);
             }
         }
@@ -565,7 +564,7 @@ public class InlineFlopTools {
     }
 
     private static boolean isInlineHarnessSiteCell(Cell cell, Set<Cell> inlineCells) {
-        if (inlineCells.contains(cell) || cell.getName().contains(INLINE_SUFFIX)) {
+        if (inlineCells.contains(cell) || isInlineFlopName(cell.getName())) {
             return true;
         }
         BEL bel = cell.getBEL();
@@ -574,20 +573,20 @@ public class InlineFlopTools {
 
     private static void assertNoInlineFlopPhysicalState(Design design, Set<String> removedCellNames) {
         for (Cell cell : design.getCells()) {
-            if (cell.getName().contains(INLINE_SUFFIX) || removedCellNames.contains(cell.getName())) {
+            if (isInlineFlopName(cell.getName()) || removedCellNames.contains(cell.getName())) {
                 throw new RuntimeException("Inline flop physical cell remains after removal: "
                         + cell.getName());
             }
         }
         for (Net net : design.getNets()) {
-            if (net.getName().contains(INLINE_SUFFIX)) {
+            if (isInlineFlopName(net.getName())) {
                 throw new RuntimeException("Inline flop physical net remains after removal: "
                         + net.getName());
             }
         }
         for (SiteInst si : design.getSiteInsts()) {
             for (Cell cell : si.getCells()) {
-                if (cell.getName().contains(INLINE_SUFFIX) || removedCellNames.contains(cell.getName())) {
+                if (isInlineFlopName(cell.getName()) || removedCellNames.contains(cell.getName())) {
                     throw new RuntimeException("Inline flop site cell remains after removal: "
                             + cell.getName() + " in " + si.getName());
                 }
@@ -596,26 +595,65 @@ public class InlineFlopTools {
     }
 
     /**
-     * Removes XDC constraints that reference inline flop nets which may no longer
-     * exist after flattening and uniqueification.
+     * Removes XDC constraints that reference inline flop cells or nets which may
+     * no longer exist after flattening and uniqueification. Constraints are
+     * parsed with {@link XDCParser} so that only constraints whose referenced
+     * objects carry the inline flop suffix are dropped; if a constraint group
+     * cannot be parsed, it falls back to removing any line containing the
+     * suffix.
      */
     public static void removeInlineFlopConstraints(Design design) {
         for (ConstraintGroup cg : ConstraintGroup.values()) {
             List<String> constraints = design.getXDCConstraints(cg);
             if (constraints.isEmpty()) continue;
-            List<String> filtered = new ArrayList<>();
-            int removed = 0;
-            for (String line : constraints) {
-                if (line.contains(INLINE_SUFFIX)) {
-                    removed++;
-                } else {
-                    filtered.add(line);
-                }
-            }
-            if (removed > 0) {
+            List<String> filtered = filterInlineFlopConstraints(design.getDevice(), constraints);
+            if (filtered != null) {
                 design.setXDCConstraints(filtered, cg);
             }
         }
+    }
+
+    /**
+     * Filters constraints referencing inline flops from the given XDC lines.
+     * Uses a null cell lookup as inline flop cells have already been removed
+     * from the netlist, so object references are matched by name only.
+     *
+     * @return the filtered constraint lines, or null if nothing was removed and
+     *         the original lines should be kept as-is.
+     */
+    private static List<String> filterInlineFlopConstraints(Device device, List<String> constraints) {
+        XDCConstraints parsed;
+        try {
+            parsed = XDCParser.parseXDC(device, constraints, null);
+        } catch (RuntimeException e) {
+            // The parser covers a subset of Tcl; on failure fall back to
+            // dropping raw lines that mention the inline flop suffix
+            List<String> filtered = constraints.stream()
+                    .filter(line -> !line.contains(INLINE_SUFFIX))
+                    .collect(Collectors.toList());
+            return filtered.size() == constraints.size() ? null : filtered;
+        }
+        boolean removed = false;
+        // Inline flop cell references
+        removed |= parsed.getCellProperties().keySet().removeIf(InlineFlopTools::isInlineFlopName);
+        // Inline flop net (and cell) references in constraints the parser does
+        // not model, e.g. set_property on the result of get_nets
+        removed |= parsed.getUnsupportedConstraints().removeIf(elements ->
+                elements.stream().anyMatch(e -> e.toXdc().contains(INLINE_SUFFIX)));
+        if (!removed) {
+            // Preserve the original lines verbatim when nothing referenced an
+            // inline flop, avoiding the parser's reformatting on round-trip
+            return null;
+        }
+        return parsed.getAllAsXdc().collect(Collectors.toList());
+    }
+
+    /**
+     * Checks if a cell or net name belongs to an inline flop created by this
+     * class, i.e. it ends with {@link #INLINE_SUFFIX}.
+     */
+    private static boolean isInlineFlopName(String name) {
+        return name.endsWith(INLINE_SUFFIX);
     }
 
     private static final Map<Series, String[]> staticPinsMap;
