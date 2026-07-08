@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.design.tools;
 
 import com.xilinx.rapidwright.design.Cell;
+import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
@@ -47,6 +48,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -173,6 +175,87 @@ public class TestInlineFlopTools {
             Assertions.assertFalse(c.getName().endsWith(InlineFlopTools.INLINE_SUFFIX));
         }
         Assertions.assertEquals(1, design.getVccNet().getSinkPins().size());
+    }
+
+    @Test
+    public void testRemoveInlineFlopConstraints() {
+        String partName = "xcvu3p-ffvc1517-2-i";
+        String ffBel = "SLICE_X14Y237/AFF";
+        String harnessBel = "AFF";
+        String pblockRange = "RAMB36_X1Y47:RAMB36_X1Y47 RAMB18_X1Y94:RAMB18_X1Y95 SLICE_X13Y235:SLICE_X16Y239";
+
+        Design design = new Design("inline_flops", partName);
+        design.setDesignOutOfContext(true);
+        design.setAutoIOBuffers(false);
+        EDIFCell topCell = design.getNetlist().getTopCell();
+
+        EDIFPort clkPort = topCell.createPort("clk", EDIFDirection.INPUT, 1);
+        Net clk = design.createNet("clk");
+        clk.getLogicalHierNet().getNet().createPortInst(clkPort);
+
+        EDIFPort inPort = topCell.createPort("in", EDIFDirection.INPUT, 1);
+        Net inNet = design.createNet("in");
+        inNet.getLogicalHierNet().getNet().createPortInst(inPort);
+
+        EDIFPort outPort = topCell.createPort("out", EDIFDirection.OUTPUT, 1);
+        Net outNet = design.createNet("out");
+        outNet.getLogicalHierNet().getNet().createPortInst(outPort);
+
+        Cell flop0 = design.createAndPlaceCell(design.getTopEDIFCell(), "flop0", Unisim.FDRE, ffBel);
+        inNet.connect(flop0, "D");
+        outNet.connect(flop0, "Q");
+        design.getGndNet().connect(flop0, "R");
+        design.getVccNet().connect(flop0, "CE");
+        clk.connect(flop0, "C");
+
+        PBlock pblock = new PBlock(design.getDevice(), pblockRange);
+        createAndPlaceFlopInlineAtSpecificBEL(design, "clk", inPort, harnessBel, pblock);
+        design.getNetlist().resetParentNetMap();
+        createAndPlaceFlopInlineAtSpecificBEL(design, "clk", outPort, harnessBel, pblock);
+
+        String inlineCell = "in" + InlineFlopTools.INLINE_SUFFIX;
+        String inlineNet = "out" + InlineFlopTools.INLINE_SUFFIX;
+        // Cell name that contains the inline suffix but does not end with it;
+        // the raw substring filter would have wrongly removed this constraint.
+        String nearMissCell = "keeper" + InlineFlopTools.INLINE_SUFFIX + "_extra";
+        // Constraint that must survive (references a real cell).
+        String keepConstraint = "set_property DONT_TOUCH true [get_cells {flop0}]";
+        // Reference to an inline flop cell (lands in cellProperties).
+        String inlineCellConstraint = "set_property DONT_TOUCH true [get_cells {" + inlineCell + "}]";
+        // Reference to an inline flop net; note this line does NOT end with the
+        // inline suffix, so the legacy endsWith() filter would have missed it.
+        String inlineNetConstraint = "set_property DONT_TOUCH true [get_nets {" + inlineNet + "}]";
+        String nearMissConstraint = "set_property DONT_TOUCH true [get_cells {" + nearMissCell + "}]";
+        design.addXDCConstraint(ConstraintGroup.NORMAL, keepConstraint);
+        design.addXDCConstraint(ConstraintGroup.NORMAL, inlineCellConstraint);
+        design.addXDCConstraint(ConstraintGroup.NORMAL, inlineNetConstraint);
+        design.addXDCConstraint(ConstraintGroup.NORMAL, nearMissConstraint);
+
+        InlineFlopTools.removeInlineFlops(design);
+
+        boolean keptSurvives = false;
+        boolean nearMissSurvives = false;
+        for (ConstraintGroup cg : ConstraintGroup.values()) {
+            List<String> constraints = design.getXDCConstraints(cg);
+            if (constraints == null) {
+                continue;
+            }
+            for (String line : constraints) {
+                Assertions.assertFalse(line.contains(inlineCell),
+                        "Inline flop cell constraint was not removed: " + line);
+                Assertions.assertFalse(line.contains(inlineNet),
+                        "Inline flop net constraint was not removed: " + line);
+                if (line.contains("flop0") && line.contains("DONT_TOUCH")) {
+                    keptSurvives = true;
+                }
+                if (line.contains(nearMissCell) && line.contains("DONT_TOUCH")) {
+                    nearMissSurvives = true;
+                }
+            }
+        }
+        Assertions.assertTrue(keptSurvives, "Non-inline constraint referencing flop0 should be preserved");
+        Assertions.assertTrue(nearMissSurvives,
+                "Constraint whose cell name merely contains the inline suffix should be preserved");
     }
 
     @Test
