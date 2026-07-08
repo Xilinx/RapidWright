@@ -41,7 +41,7 @@ import java.util.Arrays;
  */
 public class RegisterInitTools {
 
-    private static final String INIT_PROPERTY = "INIT";
+    public static final String INIT_PROPERTY = "INIT";
 
     private static Boolean getInitValue(Cell cell) {
         if (cell == null) return null;
@@ -117,7 +117,7 @@ public class RegisterInitTools {
      * @param design The design containing the register
      * @param registerBaseName The base name of the register without bus index
      * @param width The width of the register in bits
-     * @return The current value as a BigInteger, or null if register not found
+     * @return The current value as a BigInteger, or throws a runtime exception if register not found
      */
     public static BigInteger getRegisterValue(Design design, String registerBaseName, int width) {
         BigInteger value = BigInteger.ZERO;
