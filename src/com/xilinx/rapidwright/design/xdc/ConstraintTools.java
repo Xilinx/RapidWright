@@ -54,12 +54,12 @@ public class ConstraintTools {
         return pblockMap;
     }
 
-    public static List<String> getClockNetsFromXDC(Design d) {
+    public static List<String> getClockNetPortNamesFromXDC(Design d) {
         Set<String> clockNets = new HashSet<>();
 
         for (ConstraintGroup cg : ConstraintGroup.values()) {
             XDCConstraints xdcConstraints = XDCParser.parseXDC(d.getDevice(), d.getXDCConstraints(cg), new RegularEdifCellLookup(d.getNetlist()));
-            xdcConstraints.getClockConstraints().forEach((k, v) -> {
+            xdcConstraints.getClockConstraints().values().forEach((v) -> {
                 clockNets.add(v.getPortName());
             });
         }
