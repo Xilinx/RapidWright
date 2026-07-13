@@ -30,8 +30,19 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.util.FileTools;
 
 /**
@@ -86,7 +97,7 @@ public class MetadataParser {
 
     private enum MDParserState {BLOCK_BEGIN, BLOCK_NAME, BLOCK_PBLOCKS, BLOCK_CLOCKS, BLOCK_INPUTS, BLOCK_OUTPUTS,
                                 PBLOCK_BEGIN, PBLOCK_NAME, PBLOCK_GRID_RANGES, PBLOCK_END,
-                                CLOCK_BEGIN, CLOCK_NAME, CLOCK_PERIOD, CLOCK_END,
+                                CLOCK_BEGIN, CONNECTIONS_EXPLICITNESS, CLOCK_NAME, CLOCK_PERIOD, CLOCK_END,
                                 PORT_BEGIN, PORT_NAME, PORT_NET, PORT_NUMPRIMS, PORT_TYPE, PORT_MAXDELAY,
                                 PORT_CONNS_BEGIN, PORT_CONNS_PIN, PORT_CONNS_END, PORT_END, PORT_PPLOCS, BLOCK_END};
 
@@ -128,6 +139,8 @@ public class MetadataParser {
         int inputCount = -1;
         int outputCount = -1;
         int currPrimCount = -1;
+        boolean implicitConnections = false;
+        Map<Net, List<Port>> netsToPorts = new HashMap<>();
         Port currPort = null;
         String currPBlockName = null;
         String currClockName = null;
@@ -179,7 +192,7 @@ public class MetadataParser {
                     } else if (nextTokens[2].equals(CLOCK)) {
                         currState = MDParserState.CLOCK_BEGIN;
                     } else {
-                        currState = MDParserState.PORT_BEGIN;
+                        currState = MDParserState.CONNECTIONS_EXPLICITNESS;
                     }
                     break;
                 }
@@ -210,7 +223,7 @@ public class MetadataParser {
                         if (clockCount > 0) {
                             currState = MDParserState.CLOCK_BEGIN;
                         } else {
-                            currState = MDParserState.PORT_BEGIN;
+                            currState = MDParserState.CONNECTIONS_EXPLICITNESS;
                         }
                     } else {
                         currState = MDParserState.PBLOCK_BEGIN;
@@ -241,11 +254,22 @@ public class MetadataParser {
                     expect(CLOCK, tokens[2]);
                     clockCount--;
                     if (clockCount == 0) {
-                        currState = MDParserState.PORT_BEGIN;
+                        currState = MDParserState.CONNECTIONS_EXPLICITNESS;
                     } else {
                         currState = MDParserState.CLOCK_BEGIN;
                     }
                     break;
+                }
+                case CONNECTIONS_EXPLICITNESS: {
+                    if (tokens[1].equals(CONNECTIONS)) {
+                        implicitConnections = tokens[2].equals("implicit");
+                        if (!implicitConnections && !tokens[2].equals("explicit")) {
+                            expect("<explicit|implicit>", tokens[2]);
+                        }
+                        currState = MDParserState.PORT_BEGIN;
+                        break;
+                    }
+                    //fallthrough
                 }
                 case PORT_BEGIN:{
                     expect(BEGIN,tokens[1]);
@@ -289,9 +313,14 @@ public class MetadataParser {
                 case PORT_NET:{
                     expect(NETNAME, tokens[1]);
                     currPortNet = m.getNet(tokens[2]);
-                    /*if (currPortNet == null) {
-                        expect("<Net Name>",tokens[2]);
-                    }*/
+                    if (currPortNet==null) {
+                        String parentNetName = m.getNetlist().getParentNetName(tokens[2]);
+                        currPortNet = m.getNet(parentNetName);
+                        if (currPortNet==null) {
+                            currPortNet = new Net(parentNetName);
+                            m.addNet(currPortNet);
+                        }
+                    }
                     currState = MDParserState.PORT_NUMPRIMS;
                     break;
                 }
@@ -326,6 +355,12 @@ public class MetadataParser {
                     currPort.setWorstCasePortDelay(Float.parseFloat(tokens[2]));
                     if (nextTokens[1].equals(END)) {
                         currState = MDParserState.PORT_END;
+                        if (implicitConnections) {
+                            if (currPort.getType()!=PortType.UNCONNECTED) {
+                                netsToPorts.computeIfAbsent(currPortNet, x -> new ArrayList<>()).add(currPort);
+                            }
+                            createImplicitConnections(currPortNet, currPort);
+                        }
                     } else {
                         currState = MDParserState.PORT_CONNS_BEGIN;
                     }
@@ -356,6 +391,10 @@ public class MetadataParser {
                                 }
                             }
                             SiteInst si = m.getSiteInstAtSite(dev.getSite(siteName));
+
+                            if (si==null) {
+                                throw new RuntimeException("did not find site inst at "+siteName+" in device "+dev);
+                            }
 
                             SitePinInst p = si.getSitePinInst(pinName);
                             if (p == null) {
@@ -425,6 +464,111 @@ public class MetadataParser {
             br.close();
         } catch (IOException e) {
             throw new RuntimeException("ERROR: IOException encountered on closing file " + fileName + "\nStack Trace:");
+        }
+
+        if (implicitConnections) {
+            addPassThruNames(netsToPorts);
+            netsToPorts.forEach((net, ports) -> {
+                for (Port port : ports) {
+                    createImplicitConnections(net, port);
+                }
+            });
+
+        } else {
+            for (Port port : m.getPorts()) {
+                checkForOutputPortSource(port);
+            }
+        }
+    }
+
+    /**
+     * For ports on the same net, check if we ran into a Vivado issue where it does not route
+     * an output BEL to an SPI
+     * @param port the port to check
+     */
+    private void checkForOutputPortSource(Port port) {
+        if (!port.isOutPort()) {
+            return;
+        }
+        if (!port.getSitePinInsts().isEmpty() || port.getType() == PortType.GROUND || port.getType() == PortType.POWER) {
+            return;
+        }
+        //Any input among passthru ports?
+        if (port.getPassThruPortNames().stream().map(name->m.getPort(name)).anyMatch(p->!p.isOutPort())) {
+            return;
+        }
+        throw new NoSuchElementException("in module "+m+" we have output port "+port+" which neither passes through an input nor has any assigned SPIs");
+    }
+
+    private void addPassThruNames(Map<Net, List<Port>> netsToPorts) {
+        for (List<Port> passedThru : netsToPorts.values()) {
+            for (Port from : passedThru) {
+                for (Port to : passedThru) {
+                    if (from==to) {
+                        continue;
+                    }
+                    from.addPassThruPortName(to.getName());
+                }
+            }
+        }
+    }
+
+    private void createImplicitConnections(Net currPortNet, Port currPort) {
+        if (currPort.getType().equals(PortType.POWER) || currPort.getType().equals(PortType.GROUND) || currPort.getType().equals(PortType.UNCONNECTED)) {
+            return;
+        }
+        if (currPortNet==null) {
+            throw new RuntimeException("no net for port "+currPort);
+        }
+        List<EDIFHierPortInst> physicalPins = m.getNetlist().getPhysicalPins(currPortNet);
+        Stream<EDIFHierPortInst> realPhysPins = (physicalPins != null ? physicalPins.stream() : Stream.<EDIFHierPortInst>empty());
+        boolean hasAnyPins = false;
+        realPhysPins
+                .flatMap(pin -> {
+                    if (pin.isOutput() != currPort.isOutPort()) {
+                        return Stream.empty();
+                    }
+
+                    Cell cell = pin.getPhysicalCell(m);
+                    if (cell == null) {
+                        throw new RuntimeException("did not find physical cell for " + pin + " in " + m + ". are macro unisims expanded?");
+                    }
+                    SiteInst siteInst = cell.getSiteInst();
+                    return cell.getPinMappingsL2P()
+                            .get(pin.getPortInst().getName())
+                            .stream()
+                            .flatMap(physical ->
+                                    DesignTools.getAllRoutedSitePinsFromPhysicalPin(cell, currPortNet, physical).stream()
+                            )
+                            .map(p -> {
+                                String primarySitePinName = siteInst.getPrimarySitePinName(p);
+
+                                String realSitePinName = p;
+
+                                if (siteInst.getSiteTypeEnum()!=siteInst.getSite().getSiteTypeEnum()) {
+                                    realSitePinName = primarySitePinName;
+                                }
+
+                                SitePinInst spi = siteInst.getSitePinInst(realSitePinName);
+                                if (spi == null) {
+                                    spi = new SitePinInst(currPort.isOutPort(), realSitePinName, siteInst);
+                                }
+                                try {
+                                    spi.getBELPin();
+                                } catch (NullPointerException e) {
+                                    throw new RuntimeException("Failed to get bel pin for "+spi+". pin name: "+p+", primary name "+primarySitePinName+" at port "+currPort+" with net "+currPortNet, e);
+                                }
+                                return spi;
+                            });
+                })
+                .distinct()
+                .forEach(sitePinInst -> {
+                    currPort.addSitePinInst(sitePinInst);
+                    currPortNet.addPin(sitePinInst);
+                });
+
+        if (!hasAnyPins && currPort.isOutPort()) {
+            throw new RuntimeException("in creating implicit module connections, no pin for "+currPort+" is routed to Site Pin");
         }
     }
 

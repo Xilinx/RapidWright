@@ -120,7 +120,7 @@ proc write_cache_impl { dcpFile implIdx } {
     exportTest $routedDcpFile
 }
 
-proc generate_metadata { dcpFile includePaths implIdx } {
+proc generate_metadata { dcpFile includePaths implIdx { includeConnections "false"} } {
     puts "Entering generate_metadata with $dcpFile"
     set tmp [string map {".dcp" ""} $dcpFile]
     set blockname [string range $tmp [string last "/" $tmp]+1 end]
@@ -144,6 +144,11 @@ proc generate_metadata { dcpFile includePaths implIdx } {
         puts $md "    name $clk "
         puts $md "    period [get_property PERIOD $clk]"
         puts $md "  end clock"
+    }
+    if {$includeConnections == "true"} {
+        puts $md "  connections explicit"
+    } {
+        puts $md "  connections implicit"
     }
     set inports [get_ports -filter { DIRECTION==IN }]
     set outports [get_ports -filter { DIRECTION==OUT }]
@@ -257,22 +262,25 @@ proc generate_metadata { dcpFile includePaths implIdx } {
                     }
                 }
             }
-            puts $md "    begin connections"
-            set cports [get_ports -quiet -of [get_nets -segments $netname]]
-            foreach cport $cports {
-                if {$cport != $port} {
-                    puts $md "      port $cport"
-                }
-            }
 
-            set cpins [get_pins -quiet -leaf -of [get_nets -segments $netname]]
-            foreach cpin $cpins {
-                set ccell [get_cells -of [get_pins $cpin]]
-                set loc [get_property -quiet LOC $ccell]
-                set sitePin [get_site_pins -quiet -of $cpin]
-                puts $md "      pin $cpin $loc $sitePin"
+            if {$includeConnections == "true"} {
+                puts $md "    begin connections"
+                set cports [get_ports -quiet -of [get_nets -segments $netname]]
+                foreach cport $cports {
+                    if {$cport != $port} {
+                        puts $md "      port $cport"
+                    }
+                }
+
+                set cpins [get_pins -quiet -leaf -of [get_nets -segments $netname]]
+                foreach cpin $cpins {
+                    set ccell [get_cells -of [get_pins $cpin]]
+                    set loc [get_property -quiet LOC $ccell]
+                    set sitePin [get_site_pins -quiet -of $cpin]
+                    puts $md "      pin $cpin $loc $sitePin"
+                }
+                puts $md "    end connections"
             }
-            puts $md "    end connections"
             puts $md "  end $inout"
         }
     }
