@@ -120,7 +120,12 @@ proc write_cache_impl { dcpFile implIdx } {
     exportTest $routedDcpFile
 }
 
-proc generate_metadata { dcpFile includePaths implIdx { includeConnections "false"} } {
+proc contains_encrypted_cells { } {
+    #TODO!
+    return "false"
+}
+
+proc generate_metadata { dcpFile includePaths implIdx { includeConnections "auto"} } {
     puts "Entering generate_metadata with $dcpFile"
     set tmp [string map {".dcp" ""} $dcpFile]
     set blockname [string range $tmp [string last "/" $tmp]+1 end]
@@ -144,6 +149,9 @@ proc generate_metadata { dcpFile includePaths implIdx { includeConnections "fals
         puts $md "    name $clk "
         puts $md "    period [get_property PERIOD $clk]"
         puts $md "  end clock"
+    }
+    if {$includeConnections == "auto"} {
+      set includeConnections [contains_encrypted_cells]
     }
     if {$includeConnections == "true"} {
         puts $md "  connections explicit"
