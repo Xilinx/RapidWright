@@ -20,7 +20,6 @@ application {
 }
 
 def standaloneClassName = "com.xilinx.rapidwright.StandaloneEntrypoint"
-def preserveDir = ".preserveBin"
 
 def read_rapidwright_version() {
     def sw = new StringWriter()
@@ -45,7 +44,6 @@ dependencies {
 
 sourceSets {
   main {
-    java.destinationDirectory.fileValue(file('bin'))
     java {
       srcDirs = ['src']
     }
@@ -77,11 +75,6 @@ tasks.named('testFixturesJar', Jar) {
   archiveFileName = 'rapidwright-test-fixtures.jar'
 }
 
-task preserveBin(type: Copy) {
-     from "bin/rapidwright", "bin/rapidwright.bat"
-     into preserveDir
-}
-
 task copyJars(type: Copy) {
     from({
         configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts.collect { it.file } .findAll { it.name != tasks.getByName("jar").archiveFile.get().asFile.name }
@@ -94,22 +87,6 @@ task copyJars(type: Copy) {
     into 'jars'
 }
 compileJava.dependsOn(copyJars)
-compileJava.dependsOn(preserveBin)
-
-task cleanupScripts(type: Delete) {
-    delete preserveDir
-}
-
-task restoreScripts(type: Copy) {
-    dependsOn(tasks.named("jar"))
-    dependsOn(tasks.named("compileTestFixturesJava"))
-    dependsOn(tasks.named("compileTestJava"))
-    from preserveDir
-    into 'bin'
-    finalizedBy(cleanupScripts)
-}
-
-run.dependsOn(restoreScripts)
 
 task mainJar(type: Jar, dependsOn: classes) {
     archiveFileName = 'main.jar'
@@ -119,7 +96,6 @@ task mainJar(type: Jar, dependsOn: classes) {
         attributes 'Class-Path': ([destinationDirectory.get().getAsFile().toPath().relativize(sourceSets.main.java.destinationDirectory.get().getAsFile().toPath()).toString() + File.separator]
             + configurations.runtimeClasspath.collect { destinationDirectory.get().getAsFile().toPath().relativize(projectDir.toPath()).resolve('jars').resolve(it.getName()) }).join(' ')
     }
-    finalizedBy(restoreScripts)
 }
 compileJava.finalizedBy(mainJar)
 
