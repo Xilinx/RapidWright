@@ -583,7 +583,9 @@ public class MetadataParser {
                 .distinct()
                 .forEach(sitePinInst -> {
                     currPort.addSitePinInst(sitePinInst);
-                    currPortNet.addPin(sitePinInst);
+                    if (sitePinInst.getNet()!=currPortNet) {
+                        currPortNet.addPin(sitePinInst);
+                    }
                 });
 
         if (currPort.getSitePinInsts().isEmpty() && currPort.isOutPort() && currPort.getPassThruPortNames().isEmpty()) {
