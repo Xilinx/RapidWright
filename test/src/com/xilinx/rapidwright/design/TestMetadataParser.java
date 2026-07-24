@@ -35,9 +35,9 @@ public class TestMetadataParser {
     private static WeakReference<Design> moduleDesign = null;
 
     private static Design loadDesign() {
-        if (moduleDesign!=null) {
+        if (moduleDesign != null) {
             Design existing = moduleDesign.get();
-            if (existing!=null) {
+            if (existing != null) {
                 return existing;
             }
         }

@@ -583,7 +583,7 @@ public class MetadataParser {
                 .distinct()
                 .forEach(sitePinInst -> {
                     currPort.addSitePinInst(sitePinInst);
-                    if (sitePinInst.getNet()!=currPortNet) {
+                    if (sitePinInst.getNet() != currPortNet) {
                         currPortNet.addPin(sitePinInst);
                     }
                 });
@@ -597,7 +597,6 @@ public class MetadataParser {
      * Handle the rare case where Vivado does not route an output to a Site Pin. We have to choose a Site Pin ourselves.
      */
     private String bringOutputToSitePin(Cell cell, Net net, String logicalPin, String pin) {
-
         BELPin cellPin = Objects.requireNonNull(cell.getBEL().getPin(pin));
         String sitePinName = cellPin.getConnectedSitePinName();
         if (sitePinName==null) {
