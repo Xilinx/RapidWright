@@ -120,10 +120,15 @@ proc write_cache_impl { dcpFile implIdx } {
     exportTest $routedDcpFile
 }
 
-proc contains_encrypted_cells { } {
-    #TODO!
-    return "false"
+proc contains_encrypted_cells {} {
+    return [expr {
+        [llength [
+            get_cells -quiet -hierarchical \
+                -filter {IS_DU_WITHIN_ENVELOPE == 1}
+        ]] > 0
+    }]
 }
+
 
 proc generate_metadata { dcpFile includePaths implIdx { includeConnections "auto"} } {
     puts "Entering generate_metadata with $dcpFile"
