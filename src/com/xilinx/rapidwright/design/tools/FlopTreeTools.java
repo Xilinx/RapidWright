@@ -205,18 +205,12 @@ public class FlopTreeTools {
         return portInstMap;
     }
 
-    /**
-     * Wraps a spiral-out site iterator so that only sites whose tile row falls
-     * within {@code [minRow, maxRow]} are yielded. Bounded by {@code maxScans}
-     * so we don't loop forever on infinite spirals when no valid site exists in
-     * the band.
-     */
-    /**
-     * Wraps a site iterator so that only sites whose tile is NOT inside any of
-     * {@link #activeNoGoBboxes} are yielded. If the active list is empty (the
-     * common case for callers that don't supply no-go regions), returns the
-     * base iterator unchanged.
-     */
+/**
+ * Wraps a site iterator so that only sites whose tile is NOT inside any of
+ * {@link #activeNoGoBboxes} are yielded. If the active list is empty (the
+ * common case for callers that don't supply no-go regions), returns the
+ * base iterator unchanged.
+ */
     private static Iterator<Site> applyNoGoFilter(Iterator<Site> base) {
         if (activeNoGoBboxes.isEmpty()) return base;
         final List<RelocatableTileRectangle> bboxes = activeNoGoBboxes;
