@@ -3,6 +3,10 @@ buildscript {
     gradle.ext.rapidwrightDir = "."
 }
 
+import java.nio.file.DirectoryNotEmptyException
+import java.nio.file.Files
+import java.nio.file.LinkOption
+
 plugins {
     id 'java'
     id 'maven-publish'
@@ -89,29 +93,51 @@ task copyJars(type: Copy) {
 compileJava.dependsOn(copyJars)
 
 // External requirement: the compiled class files must be available under 'bin'.
-// We deliberately do NOT set the Java compiler's destinationDirectory to 'bin':
-// the incremental compiler treats its output directory as exclusively its own and
-// prunes anything it did not produce, which is what randomly deleted the tracked
-// bin/rapidwright[.bat] launcher scripts. Instead we compile to Gradle's default
-// output directory (which the compiler can safely own and clean) and mirror the
-// classes into 'bin' with a Sync that preserves the launcher scripts. Sync also
-// removes stale .class files left behind by deleted/renamed sources.
-task copyClassesToBin(type: Sync) {
-    dependsOn(compileJava)
-    from sourceSets.main.java.destinationDirectory
-    into 'bin'
-    preserve {
-        include 'rapidwright'
-        include 'rapidwright.bat'
+// Keep Gradle's compiler output in its default location, which the incremental
+// compiler can safely own, and expose its package directory at bin/com without
+// putting the tracked bin/rapidwright[.bat] launchers in the compiler's output.
+def binClasses = file('bin/com')
+def isWindows = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
+
+def removeBinClasses = {
+    def path = binClasses.toPath()
+    if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
+        return
+    }
+
+    try {
+        // Deletes a symbolic link or Windows junction without touching its target.
+        Files.delete(path)
+    } catch (DirectoryNotEmptyException ignored) {
+        // Migrate a real bin/com directory created by older builds.
+        delete binClasses
     }
 }
-compileJava.finalizedBy(copyClassesToBin)
 
-// 'clean' only removes the build directory by default. Also remove the compiled
-// classes mirrored into 'bin' (all under bin/com, see copyClassesToBin) so a clean
-// leaves 'bin' with just the tracked launcher scripts.
+task linkClassesToBin {
+    dependsOn(compileJava)
+
+    doLast {
+        removeBinClasses()
+
+        def target = sourceSets.main.java.destinationDirectory.get().asFile.toPath().resolve('com')
+        if (isWindows) {
+            exec {
+                commandLine 'cmd', '/c', 'mklink', '/J', binClasses.absolutePath, target.toAbsolutePath().toString()
+            }
+        } else {
+            def link = binClasses.toPath()
+            Files.createSymbolicLink(link, link.parent.relativize(target))
+        }
+    }
+}
+compileJava.finalizedBy(linkClassesToBin)
+
+// Remove the link/junction before its target so clean leaves only the launchers.
 clean {
-    delete 'bin/com'
+    doFirst {
+        removeBinClasses()
+    }
 }
 
 task mainJar(type: Jar, dependsOn: classes) {
