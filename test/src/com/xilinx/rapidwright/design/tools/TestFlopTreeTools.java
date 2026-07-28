@@ -26,6 +26,7 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.design.RelocatableTileRectangle;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
@@ -70,10 +71,6 @@ public class TestFlopTreeTools {
             }
         }
         return flops;
-    }
-
-    private static String portId(EDIFHierPortInst p) {
-        return p.getFullHierarchicalInstName() + "/" + p.getPortInst().getName();
     }
 
     /** Each inserted flop must be placed and wired as a transparent register: R=GND, CE=VCC, C=clk. */
@@ -123,7 +120,7 @@ public class TestFlopTreeTools {
         Assertions.assertNotNull(net);
         List<EDIFHierPortInst> sinks = net.getLogicalHierNet().getLeafHierPortInsts(false, true);
         Assertions.assertEquals(1, sinks.size());
-        String origSinkId = portId(sinks.get(0));
+        String origSinkId = sinks.get(0).toString();
 
         Set<String> before = cellNames(design);
         int depth = 3;
@@ -137,7 +134,7 @@ public class TestFlopTreeTools {
         // Rewire: the chain output drives the original sink and is sourced by an inserted flop...
         EDIFHierNet outNet = out.getLogicalHierNet();
         Assertions.assertTrue(
-                outNet.getLeafHierPortInsts(false, true).stream().anyMatch(p -> portId(p).equals(origSinkId)),
+                outNet.getLeafHierPortInsts(false, true).stream().anyMatch(p -> p.toString().equals(origSinkId)),
                 "original sink is not driven by the chain output");
         Assertions.assertTrue(
                 insertedNames.contains(outNet.getSourcePortInsts(false).get(0).getFullHierarchicalInstName()),
@@ -151,6 +148,38 @@ public class TestFlopTreeTools {
     }
 
     /**
+     * insertFlopChain must not place flops inside supplied no-go bounding boxes.
+     * Calibrates by first inserting without restrictions to find where flops
+     * naturally land, then reruns on a fresh design with those tiles forbidden.
+     */
+    @Test
+    public void insertFlopChainAvoidsNoGoBboxes() {
+        Design design = RapidWrightDCP.loadDCP(DCP);
+        Net net = design.getNet(CHAIN_NET);
+        List<EDIFHierPortInst> sinks = net.getLogicalHierNet().getLeafHierPortInsts(false, true);
+        Set<String> before = cellNames(design);
+        int depth = 3;
+        FlopTreeTools.insertFlopChain(design, net, CLK, depth, sinks, new HashSet<>());
+        List<RelocatableTileRectangle> noGoBboxes = insertedFlops(design, before).stream()
+                .map(c -> new RelocatableTileRectangle(c.getTile()))
+                .collect(Collectors.toList());
+        Assertions.assertFalse(noGoBboxes.isEmpty());
+
+        design = RapidWrightDCP.loadDCP(DCP);
+        net = design.getNet(CHAIN_NET);
+        sinks = net.getLogicalHierNet().getLeafHierPortInsts(false, true);
+        before = cellNames(design);
+        FlopTreeTools.insertFlopChain(design, net, CLK, depth, sinks, new HashSet<>(), noGoBboxes);
+
+        List<Cell> inserted = insertedFlops(design, before);
+        Assertions.assertEquals(depth, inserted.size());
+        for (Cell c : inserted) {
+            Assertions.assertTrue(noGoBboxes.stream().noneMatch(bb -> bb.isInside(c.getTile())),
+                    c.getName() + " was placed at " + c.getTile() + " inside a no-go bbox");
+        }
+    }
+
+    /**
      * insertFlopTreeForNet on a cross-SLR net inserts placed buffer flops, rewires the net
      * through them, and moves the original sink off the source net.
      */
@@ -159,7 +188,7 @@ public class TestFlopTreeTools {
         Design design = RapidWrightDCP.loadDCP(DCP);
         Net net = design.getNet(CROSS_SLR_NET);
         Assertions.assertNotNull(net);
-        String origSinkId = portId(net.getLogicalHierNet().getLeafHierPortInsts(false, true).get(0));
+        String origSinkId = net.getLogicalHierNet().getLeafHierPortInsts(false, true).get(0).toString();
         Set<String> before = cellNames(design);
 
         int depth = 4;
@@ -177,7 +206,7 @@ public class TestFlopTreeTools {
                 newSinks.stream().anyMatch(p -> insertedNames.contains(p.getFullHierarchicalInstName())),
                 "source net does not feed the tree");
         Assertions.assertTrue(
-                newSinks.stream().noneMatch(p -> portId(p).equals(origSinkId)),
+                newSinks.stream().noneMatch(p -> p.toString().equals(origSinkId)),
                 "original sink is still directly on the source net");
     }
 }
