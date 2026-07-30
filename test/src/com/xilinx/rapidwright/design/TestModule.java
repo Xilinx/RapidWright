@@ -70,4 +70,37 @@ public class TestModule {
         Assertions.assertNotNull(newTile);
         Assertions.assertEquals("SLL_1_X23Y900", newTile.getName());
     }
+
+    @Test
+    public void testGetCorrespondingTileModularSLR() {
+        // On modular-SLR devices (e.g. Versal VP1902), tile X/Y coordinates are
+        // die-local and restart in each SLR: CLE_W_CORE_S0X54Y284 and
+        // CLE_W_CORE_S3X54Y284 are different tiles in different dies. Relocating
+        // a module across dies must translate within the new anchor's own die,
+        // not silently jump to whichever die happens to share the same X/Y.
+        Device dev = Device.getDevice("xcvp1902");
+        Assertions.assertTrue(dev.hasModularSLRs());
+
+        Tile templateTile = dev.getTile("CLE_W_CORE_S0X54Y284");
+
+        // Zero-offset: the template tile is itself the anchor, so relocating to
+        // an anchor in a different die must reproduce the same tile in that die.
+        Tile newAnchorTile = dev.getTile("CLE_W_CORE_S3X54Y284");
+        Tile zeroOffset = Module.getCorrespondingTile(templateTile, newAnchorTile, templateTile);
+        Assertions.assertNotNull(zeroOffset);
+        Assertions.assertEquals("CLE_W_CORE_S3X54Y284", zeroOffset.getName());
+
+        // Non-zero offset: originalAnchor is 4 tile columns to the left of
+        // templateTile in S0; the same offset must land in the new anchor's die.
+        Tile originalAnchor = dev.getTile("CLE_W_CORE_S0X50Y284");
+        Tile withOffset = Module.getCorrespondingTile(templateTile, newAnchorTile, originalAnchor);
+        Assertions.assertNotNull(withOffset);
+        Assertions.assertEquals("CLE_W_CORE_S3X58Y284", withOffset.getName());
+
+        // Same-die relocation must continue to work exactly as before.
+        Tile newAnchorSameDie = dev.getTile("CLE_W_CORE_S0X60Y284");
+        Tile sameDie = Module.getCorrespondingTile(templateTile, newAnchorSameDie, originalAnchor);
+        Assertions.assertNotNull(sameDie);
+        Assertions.assertEquals("CLE_W_CORE_S0X64Y284", sameDie.getName());
+    }
 }
