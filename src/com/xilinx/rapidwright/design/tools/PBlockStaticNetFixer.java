@@ -204,12 +204,12 @@ public class PBlockStaticNetFixer {
      * routing is preserved.
      */
     public static void fix(Design design, Collection<PBlock> pblocks) {
-        int removed = stripOutOfPBlockStaticRouting(design, pblocks);
-        if (removed == 0) {
-            System.out.println("** PBlockStaticNetFixer: no out-of-pblock static-net PIPs found, skipping reroute");
-            return;
-        }
+        stripOutOfPBlockStaticRouting(design, pblocks);
 
+        // The orphan scan must run even when no PIPs were stripped: removing
+        // an out-of-pblock source pin can by itself orphan an in-pblock sink,
+        // e.g. one reached through a direct pin-to-pin node connection that
+        // involves no PIPs.
         // Re-derive isRouted() from current PIPs, then collect in-pblock
         // sinks that became orphaned. Out-of-pblock sinks are intentionally
         // left alone — they belong to inline flops removed downstream.

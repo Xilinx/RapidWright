@@ -66,28 +66,8 @@ public class TestPBlockStaticNetFixer {
      * @return The PIPs added to the GND net.
      */
     private static List<PIP> injectOutOfPblockGndSource(Design design, Set<Tile> pblockTiles) {
-        Site fakeSite = null;
-        for (Site site : design.getDevice().getAllCompatibleSites(SiteTypeEnum.SLICEL)) {
-            if (pblockTiles.contains(site.getTile())) continue;
-            if (design.getSiteInstFromSite(site) != null) continue;
-            fakeSite = site;
-            break;
-        }
-        Assertions.assertNotNull(fakeSite);
-        SiteInst si = design.createSiteInst(fakeSite);
-
+        SitePinInst sourcePin = createOutOfPblockGndSourcePin(design, pblockTiles);
         Net gnd = design.getGndNet();
-        SitePinInst sourcePin = null;
-        for (int i = 0; i < fakeSite.getSitePinCount(); i++) {
-            if (!fakeSite.isOutputPin(i)) continue;
-            SitePinInst spi = gnd.createPin(fakeSite.getPinName(i), si);
-            if (spi.getConnectedNode() != null && !spi.getConnectedNode().getAllDownhillPIPs().isEmpty()) {
-                sourcePin = spi;
-                break;
-            }
-            gnd.removePin(spi);
-        }
-        Assertions.assertNotNull(sourcePin);
 
         List<PIP> fakePips = new ArrayList<>();
         Set<Node> visited = new HashSet<>();
@@ -110,6 +90,70 @@ public class TestPBlockStaticNetFixer {
         }
         Assertions.assertFalse(fakePips.isEmpty());
         return fakePips;
+    }
+
+    /**
+     * Creates a SiteInst on an unused out-of-pblock SLICE and adds one of its
+     * output site pins to the GND net, without adding any routing. This is the
+     * pin-only half of {@link #injectOutOfPblockGndSource}.
+     */
+    private static SitePinInst createOutOfPblockGndSourcePin(Design design, Set<Tile> pblockTiles) {
+        Site fakeSite = null;
+        for (Site site : design.getDevice().getAllCompatibleSites(SiteTypeEnum.SLICEL)) {
+            if (pblockTiles.contains(site.getTile())) continue;
+            if (design.getSiteInstFromSite(site) != null) continue;
+            fakeSite = site;
+            break;
+        }
+        Assertions.assertNotNull(fakeSite);
+        SiteInst si = design.createSiteInst(fakeSite);
+
+        Net gnd = design.getGndNet();
+        SitePinInst sourcePin = null;
+        for (int i = 0; i < fakeSite.getSitePinCount(); i++) {
+            if (!fakeSite.isOutputPin(i)) continue;
+            SitePinInst spi = gnd.createPin(fakeSite.getPinName(i), si);
+            if (spi.getConnectedNode() != null && !spi.getConnectedNode().getAllDownhillPIPs().isEmpty()) {
+                sourcePin = spi;
+                break;
+            }
+            gnd.removePin(spi);
+        }
+        Assertions.assertNotNull(sourcePin);
+        return sourcePin;
+    }
+
+    /**
+     * Orphans an in-pblock GND sink by deleting the terminal PIP into its
+     * connected node.
+     *
+     * @return The orphaned sink pin.
+     */
+    private static SitePinInst orphanInPblockGndSink(Design design) {
+        Net gnd = design.getGndNet();
+        SitePinInst orphan = null;
+        List<PIP> keep = null;
+        for (SitePinInst spi : gnd.getPins()) {
+            if (spi.isOutPin()) continue;
+            Node sinkNode = spi.getConnectedNode();
+            if (sinkNode == null) continue;
+            keep = new ArrayList<>();
+            boolean found = false;
+            for (PIP pip : gnd.getPIPs()) {
+                if (!found && sinkNode.equals(pip.getEndNode())) {
+                    found = true;
+                    continue;
+                }
+                keep.add(pip);
+            }
+            if (found) {
+                orphan = spi;
+                break;
+            }
+        }
+        Assertions.assertNotNull(orphan);
+        gnd.setPIPs(keep);
+        return orphan;
     }
 
     @Test
@@ -186,32 +230,9 @@ public class TestPBlockStaticNetFixer {
 
         injectOutOfPblockGndSource(design, pblockTiles);
 
-        // Orphan an in-pblock GND sink by deleting the terminal PIP into its
-        // connected node, as if the stripped out-of-pblock route had been
-        // serving it.
-        Net gnd = design.getGndNet();
-        SitePinInst orphan = null;
-        List<PIP> keep = null;
-        for (SitePinInst spi : gnd.getPins()) {
-            if (spi.isOutPin()) continue;
-            Node sinkNode = spi.getConnectedNode();
-            if (sinkNode == null) continue;
-            keep = new ArrayList<>();
-            boolean found = false;
-            for (PIP pip : gnd.getPIPs()) {
-                if (!found && sinkNode.equals(pip.getEndNode())) {
-                    found = true;
-                    continue;
-                }
-                keep.add(pip);
-            }
-            if (found) {
-                orphan = spi;
-                break;
-            }
-        }
-        Assertions.assertNotNull(orphan);
-        gnd.setPIPs(keep);
+        // Orphan an in-pblock GND sink, as if the stripped out-of-pblock
+        // route had been serving it.
+        SitePinInst orphan = orphanInPblockGndSink(design);
 
         // fix() reads the pblock from the design's XDC, strips the injected
         // out-of-pblock routing, and reroutes the orphaned in-pblock sink.
@@ -230,6 +251,36 @@ public class TestPBlockStaticNetFixer {
         }
     }
 
+    /**
+     * An out-of-pblock static source that drives no PIPs is still removed by
+     * the strip, and its removal can orphan in-pblock sinks (e.g. via a
+     * direct pin-to-pin node connection). fix() must therefore run the
+     * orphan scan and reroute even when zero PIPs were stripped.
+     */
+    @Test
+    public void testFixReroutesOrphansWhenNoPipsStripped() {
+        Design design = RapidWrightDCP.loadDCP(DCP);
+        PBlock pblock = getPBlock(design);
+        Set<Tile> pblockTiles = new HashSet<>(pblock.getAllTiles());
+
+        // A pin-only out-of-pblock source: an output SitePinInst on GND with
+        // no routing, so the strip removes zero PIPs.
+        SitePinInst sourcePin = createOutOfPblockGndSourcePin(design, pblockTiles);
+        Site fakeSite = sourcePin.getSite();
+
+        SitePinInst orphan = orphanInPblockGndSink(design);
+
+        PBlockStaticNetFixer.fix(design);
+
+        // The pin-only source is gone even though it drove no PIPs...
+        Assertions.assertNull(design.getSiteInstFromSite(fakeSite));
+
+        // ...and the orphaned in-pblock sink was still rerouted.
+        DesignTools.updatePinsIsRouted(design);
+        Assertions.assertTrue(orphan.isRouted(),
+                "in-pblock orphan " + orphan + " was not rerouted when the strip removed no PIPs");
+    }
+
     @Test
     public void testMergeOrphanStaticTieNetsIntoGlobals() {
         Design design = RapidWrightDCP.loadDCP(DCP);
@@ -238,13 +289,15 @@ public class TestPBlockStaticNetFixer {
 
         // Physical-only orphans with no logical counterpart, as produced by
         // Module relocation / readCheckpoint.
-        SitePinInst vccPin = vcc.getPins().stream().filter(p -> !p.isOutPin()).findFirst().get();
+        SitePinInst vccPin = vcc.getPins().stream().filter(p -> !p.isOutPin()).findFirst()
+                .orElseThrow(() -> new AssertionError("Test fixture " + DCP + " has no VCC sink pin"));
         vcc.removePin(vccPin, true);
         Net vccOrphan = new Net("fake_cell/VCC_1");
         design.addNet(vccOrphan);
         vccOrphan.addPin(vccPin);
 
-        SitePinInst gndPin = gnd.getPins().stream().filter(p -> !p.isOutPin()).findFirst().get();
+        SitePinInst gndPin = gnd.getPins().stream().filter(p -> !p.isOutPin()).findFirst()
+                .orElseThrow(() -> new AssertionError("Test fixture " + DCP + " has no GND sink pin"));
         gnd.removePin(gndPin, true);
         Net gndOrphan = new Net("fake_cell/GND_0");
         design.addNet(gndOrphan);
