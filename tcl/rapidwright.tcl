@@ -160,7 +160,7 @@ proc generate_metadata { dcpFile includePaths implIdx { includeConnections "auto
     }
     if {$includeConnections == "true"} {
         puts $md "  connections explicit"
-    } {
+    } else {
         puts $md "  connections implicit"
     }
     set inports [get_ports -filter { DIRECTION==IN }]
