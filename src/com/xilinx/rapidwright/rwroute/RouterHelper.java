@@ -664,34 +664,6 @@ public class RouterHelper {
     }
 
     /**
-     *  Gets the delay of a given path, using output pin only.
-     *  The path format:
-     *  {@code superSource -> Q -> O -> --- -> D.}
-     */
-    public static void getSamplePathDelay(String filePath, TimingManager timingManager,
-            Map<TimingEdge, Connection> timingEdgeConnectionMap, RouteNodeGraph routingGraph) {
-        List<String> verticesOfVivadoPath = new ArrayList<>();
-        // Include CLK if the first in the path is BRAM or DSP to check the logic delay
-        // NOTE: remember to change the pin names of DSPs from subblock to top-level block that we use
-        verticesOfVivadoPath.add("superSource");
-        File vivadoReport = new File(filePath);
-        if (!vivadoReport.exists()) {
-            System.err.println("ERROR: Target file does not exist for getting the sample path delay");
-            return;
-        }
-        try {
-            List<String> path = parseVivadoPathToStringList(vivadoReport);
-            System.out.println("INFO: Given path: " + path);
-            verticesOfVivadoPath.addAll(path);
-        } catch (IOException e) {
-
-            e.printStackTrace();
-        }
-        System.out.println(verticesOfVivadoPath);
-        timingManager.getSamplePathDelayInfo(verticesOfVivadoPath, timingEdgeConnectionMap, true, routingGraph);
-    }
-
-    /**
      * Parses the data path from an input file indicating data path of a Vivado timing report.
      * @param file The file contains a data path of a Vivado timing report.
      * @return The data path.

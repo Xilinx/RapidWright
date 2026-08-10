@@ -199,20 +199,7 @@ public class TimingManager {
         
         printPathDelayBreakDown(arr, criticalEdges, timingGraph.getTimingEdgeConnectionMap(), useRoutable, routingGraph);
     }
-    
-    /**
-     * Gets and prints the given path from the TimingGraph
-     */
-    public void getSamplePathDelayInfo(List<String> verticesOfVivadoPath, Map<TimingEdge, Connection> timingEdgeConnctionMap, boolean routableBased, RouteNodeGraph routingGraph) {
-        List<TimingEdge> edges = timingGraph.getTimingEdgeOfPath(verticesOfVivadoPath);
-        short totalDelay = 0;
-        for (TimingEdge edge : edges) {
-            totalDelay += edge.getDelay();
-        }
-        System.out.println("Total delay: " + totalDelay);
-        printPathDelayBreakDown(totalDelay, edges, timingEdgeConnctionMap, routableBased, routingGraph);
-    }
-    
+
     private void printPathDelayBreakDown(short arr, List<TimingEdge> criticalEdges, Map<TimingEdge, Connection> timingEdgeConnctionMap, boolean useRoutable, RouteNodeGraph routingGraph) {
         if (verbose) {
             System.out.println("\nTimingEdges:");
