@@ -586,7 +586,7 @@ public class RouterHelper {
                 }
             }
 
-            short routeDelay = (short) delayMap.get(sinkNode).intValue();
+            short routeDelay = (short) delayMap.getOrDefault(sinkNode, 0).intValue();
             sinkNodeDelays.put(sink, new Pair<>(sinkNode,routeDelay));
         }
 

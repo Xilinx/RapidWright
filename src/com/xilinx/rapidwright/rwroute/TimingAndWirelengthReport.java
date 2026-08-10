@@ -167,6 +167,11 @@ public class TimingAndWirelengthReport{
             System.out.println("USAGE:\n <input.dcp>");
         }
         Design design = Design.readCheckpoint(args[0]);
+        if (design.getNets().isEmpty()) {
+            // A placed-only checkpoint can contain no physical nets at all; recover them (along with
+            // their intra-site routing) from the logical netlist so that a timing graph can be built.
+            design.routeSites();
+        }
         //design manipulations are necessary, otherwise there will be problems in associating timing edges with connections.
         DesignTools.makePhysNetNamesConsistent(design);
         DesignTools.createMissingSitePinInsts(design);

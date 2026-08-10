@@ -531,9 +531,13 @@ public class TestRWRoute {
         Assertions.assertTrue(Files.exists(outputFile));
     }
 
-    @Test
-    public void testTimingAndWirelengthReport() {
-        String dcp = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.dcp");
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "picoblaze_ooc_X10Y235.dcp",
+            "gnl_2_4_3_1.3_gnl_3000_07_3_80_80_placed.dcp",
+    })
+    public void testTimingAndWirelengthReport(String dcpShortPath) {
+        String dcp = RapidWrightDCP.getString(dcpShortPath);
         TimingAndWirelengthReport.main(new String[]{dcp});
     }
 
