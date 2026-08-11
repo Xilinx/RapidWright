@@ -415,67 +415,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     }
     
     /**
-     * Finds the given critical path in the timing graph and reports the delay detail
-     * @param verticesNames, the given TimingVertices
-     * @return A list of TimingEdges associated with the given TimingVertices
-     */
-    // output vertices only
-    // return null if path not found in the graph
-    public List<TimingEdge> getTimingEdgeOfPath(List<String> verticesNames) {
-        boolean verbose = true;
-        
-        if (verbose) System.out.println("\nGET DELAY OF GIVEN PATH:\n");
-        List<TimingVertex> vertices = new ArrayList<>();
-        for (String str : verticesNames) {
-            TimingVertex v = safeVertexCheck.get(str);
-            if (v != null) {
-                vertices.add(v);
-            } else {
-                System.err.println("graph does not contain: " + str);
-            }
-        }
-        if (verbose) System.out.println(vertices.size() + " / " + verticesNames.size() + " vertices from the path found in TimingGraph");
-        List<TimingEdge> edges = new ArrayList<>();
-        // Q -> O -> O -> --- -> D
-        for (int i = 0; i < vertices.size() - 1; i++) {
-            if (verbose) {
-                if (i > 0) {//skip superSource outgoing timing edges printout as there are too many
-                    System.out.println(vertices.get(i) + " outgoing timing eges:\n " + outgoingEdgesOf(vertices.get(i)));
-                }
-            }
-            boolean found = false;
-            for (TimingEdge e : outgoingEdgesOf(vertices.get(i))) {
-                if (found) {
-                    break;
-                }
-                if (outgoingEdgesOf(e.getDst()).size() == 0)
-                    System.out.println(e.getDst() + " no outgoing edges, delay =  " + e.getDelay());
-                for (TimingEdge nexte : outgoingEdgesOf(e.getDst())) {
-                    // this means the hops between adjacent pins could be more than two
-                    // otherwise, it will report as NULL TimingEdge found
-                    if (nexte.getDst().equals(vertices.get(i+1))) {
-                        if (verbose) System.out.println("TimingEdge found between: \n  " + vertices.get(i) + ", " + vertices.get(i+1));
-                        edges.add(e);
-                        edges.add(nexte);
-                        found = true;
-                        break;
-                    }
-                }
-                if (e.getDst().equals(vertices.get(i+1))) {
-                    edges.add(e);
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                System.out.println("NULL TimingEdge found between: \n  " + vertices.get(i) + ", " + vertices.get(i+1));
-            }
-            if (verbose) System.out.println();
-        }
-        return edges;
-    }
-        
-    /**
      * Sets the same specified timing requirement on a specified GraphPath.
      * @param requirement The required time in picoseconds at the sink of the path.
      * @param graphPath The GraphPath receiving this required time in picoseconds at the sink of the

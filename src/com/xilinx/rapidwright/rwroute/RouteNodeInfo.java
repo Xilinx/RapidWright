@@ -47,6 +47,14 @@ public class RouteNodeInfo {
         this.length = length;
     }
 
+    /**
+     * Gets the information that a {@link RouteNode} is built out of, for a given node.
+     * @param node Node to describe.
+     * @param routingGraph Graph the node is to be a part of, or null to describe the node on its
+     *                     own; the returned {@link #type} is then null, since a type only has
+     *                     meaning within a graph.
+     * @return That information.
+     */
     public static RouteNodeInfo get(Node node, RouteNodeGraph routingGraph) {
         Wire[] wires = node.getAllWiresInNode();
         assert(wires[0].getTile() == node.getTile() && wires[0].getWireIndex() == node.getWireIndex());
@@ -70,13 +78,20 @@ public class RouteNodeInfo {
             break;
         }
 
-        RouteNodeType type = getType(node, routingGraph);
+        // Without a routing graph there is no type to be determined, nor anything to check the
+        // length against; only the length itself is recoverable
+        RouteNodeType type = (routingGraph != null) ? getType(node, routingGraph) : null;
         short endTileXCoordinate = getEndTileXCoordinate(node, (short) endTile.getTileXCoordinate());
         short endTileYCoordinate = (short) endTile.getTileYCoordinate();
-        short length = getLength(baseTile, endTileXCoordinate, endTileYCoordinate);
+        short length = (short) Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate());
+        if (baseTileType == TileTypeEnum.LAG_LAG) {
+            // Nodes in LAGUNA tiles must have no X distance
+            assert(baseTile.getTileXCoordinate() == endTileXCoordinate - 1);
+        } else {
+            length += Math.abs(endTileXCoordinate - baseTile.getTileXCoordinate());
+        }
         if (routingGraph != null) {
-            TileTypeEnum tileType = baseTile.getTileTypeEnum();
-            switch (tileType) {
+            switch (baseTileType) {
                 case LAG_LAG:
                 case LAGUNA_TILE:
                     assert(length == routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES ||
@@ -92,20 +107,6 @@ public class RouteNodeInfo {
         }
 
         return new RouteNodeInfo(type, endTileXCoordinate, endTileYCoordinate, length);
-    }
-
-    private static short getLength(Tile baseTile,
-                                   short endTileXCoordinate,
-                                   short endTileYCoordinate) {
-        TileTypeEnum tileType = baseTile.getTileTypeEnum();
-        short length = (short) Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate());
-        if (tileType == TileTypeEnum.LAG_LAG) {
-            // Nodes in LAGUNA tiles must have no X distance
-            assert(baseTile.getTileXCoordinate() == endTileXCoordinate - 1);
-        } else {
-            length += Math.abs(endTileXCoordinate - baseTile.getTileXCoordinate());
-        }
-        return length;
     }
 
     private static short getEndTileXCoordinate(Node node, short endTileXCoordinate) {
@@ -137,10 +138,6 @@ public class RouteNodeInfo {
     }
 
     public static RouteNodeType getType(Node node, RouteNodeGraph routingGraph) {
-        if (routingGraph == null) {
-            return null;
-        }
-
         // NOTE: IntentCode is device-dependent
         IntentCode ic = node.getIntentCode();
         TileTypeEnum tileTypeEnum = node.getTile().getTileTypeEnum();

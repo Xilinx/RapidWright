@@ -65,8 +65,12 @@ public class TimingManager {
     private float pessimismA = (float) 1.03;
     private float pessimismB = 100;
 
-    private DelayEstimatorBase<InterconnectInfo> estimator;
-    
+    /** Used to break the delay of the critical path down per node; null when no breakdown is wanted */
+    private final DelayEstimatorBase<InterconnectInfo> estimator;
+
+    /** Format of one line of that breakdown: its delay, what kind of hop it is, and the hop itself */
+    private static final String DELAY_LINE_FORMAT = "\tdelay = %4d, %-18s, %s\n";
+
     /**
      * Default constructor: creates the TimingManager object, which the user needs to create for 
      * using our TimingModel, and then it builds the model.
@@ -80,6 +84,8 @@ public class TimingManager {
         timingGraph.setTimingManager(this);
         timingGraph.setTimingModel(timingModel);
         device = design.getDevice();
+        // No critical path breakdown is printed through this constructor, since it leaves verbose off
+        estimator = null;
         build(false, design.getNets());
     }
     
@@ -198,10 +204,10 @@ public class TimingManager {
         System.out.printf(MessageGenerator.formatString("Critical path delay (ps):", adjusted));
         System.out.printf(MessageGenerator.formatString("Slack (ps):", (int)(timingRequirement - adjusted)));
         
-        printPathDelayBreakDown(arr, criticalEdges, timingGraph.getTimingEdgeConnectionMap());
+        printPathDelayBreakDown(arr, criticalEdges);
     }
 
-    private void printPathDelayBreakDown(short arr, List<TimingEdge> criticalEdges, Map<TimingEdge, Connection> timingEdgeConnctionMap) {
+    private void printPathDelayBreakDown(short arr, List<TimingEdge> criticalEdges) {
         if (verbose) {
             System.out.println("\nTimingEdges:");
             int id = 0;
@@ -215,8 +221,9 @@ public class TimingManager {
         }
 
         System.out.println();
+        Map<TimingEdge, Connection> timingEdgeConnectionMap = timingGraph.getTimingEdgeConnectionMap();
         for (TimingEdge edge : criticalEdges) {
-            Connection connection = timingEdgeConnctionMap.get(edge);
+            Connection connection = timingEdgeConnectionMap.get(edge);
             if (connection != null) {
                 System.out.println(connection);
                 // Walk the path in source-to-sink order: the hop taken inside the source site,
@@ -237,7 +244,7 @@ public class TimingManager {
                         // accumulated route delay of the connection does
                         delay += DelayEstimatorBase.getExtraDelay(node, DelayEstimatorBase.isLong(nodes.get(iGroup + 1)));
                     }
-                    System.out.printf("\tdelay = %4d, %-18s, %s\n", delay, node.getIntentCode(), node);
+                    System.out.printf(DELAY_LINE_FORMAT, delay, node.getIntentCode(), node);
                 }
                 printIntraSiteDelayTerm(timingModel.getSinkIntraSiteDelayTerm(connection.getSink()));
                 System.out.println();
@@ -277,7 +284,7 @@ public class TimingManager {
         if (term == null) {
             return;
         }
-        System.out.printf("\tdelay = %4d, %-18s, %s\n", term.getSecond(), "(intrasite)", term.getFirst());
+        System.out.printf(DELAY_LINE_FORMAT, term.getSecond(), "(intrasite)", term.getFirst());
     }
 
     /**

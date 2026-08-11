@@ -55,6 +55,7 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.Utils;
@@ -1249,7 +1250,7 @@ public class RouteNodeGraph {
      * Gets the delay estimator that this graph computes its node delays with.
      * @return That delay estimator, or null since this graph is not timing driven.
      */
-    public DelayEstimatorBase getDelayEstimator() {
+    public DelayEstimatorBase<InterconnectInfo> getDelayEstimator() {
         return null;
     }
 
