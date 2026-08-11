@@ -186,7 +186,7 @@ public class PartialRouter extends RWRoute {
     protected TimingManager createTimingManager(ClkRouteTiming clkTiming, Collection<Net> timingNets) {
         final boolean isPartialRouting = true;
         return new TimingManager(design, routerTimer, config, clkTiming, timingNets, isPartialRouting,
-                ((RouteNodeGraphTimingDriven) routingGraph).delayEstimator);
+                routingGraph.getDelayEstimator());
     }
 
     @Override

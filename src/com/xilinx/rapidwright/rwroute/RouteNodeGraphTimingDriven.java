@@ -96,6 +96,11 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
     private final Set<Integer> excludeAboveRclk;
     private final Set<Integer> excludeBelowRclk;
 
+    @Override
+    public DelayEstimatorBase getDelayEstimator() {
+        return delayEstimator;
+    }
+
     protected static class RouteNodeTimingDriven extends RouteNode {
 
         /** The delay of this rnode computed based on the timing model */
