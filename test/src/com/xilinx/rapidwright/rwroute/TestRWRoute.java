@@ -532,13 +532,19 @@ public class TestRWRoute {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {
-            "picoblaze_ooc_X10Y235.dcp",
-            "gnl_2_4_3_1.3_gnl_3000_07_3_80_80_placed.dcp",
+    @CsvSource({
+            "picoblaze_ooc_X10Y235.dcp,false",
+            "picoblaze_ooc_X10Y235.dcp,true",
+            "gnl_2_4_3_1.3_gnl_3000_07_3_80_80_placed.dcp,false",
+            "gnl_2_4_3_1.3_gnl_3000_07_3_80_80_placed.dcp,true",
     })
-    public void testTimingAndWirelengthReport(String dcpShortPath) {
+    public void testTimingAndWirelengthReport(String dcpShortPath, boolean verbose) {
         String dcp = RapidWrightDCP.getString(dcpShortPath);
-        TimingAndWirelengthReport.main(new String[]{dcp});
+        if (verbose) {
+            TimingAndWirelengthReport.main(new String[]{dcp, "--verbose"});
+        } else {
+            TimingAndWirelengthReport.main(new String[]{dcp});
+        }
     }
 
     @ParameterizedTest

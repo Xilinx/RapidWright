@@ -312,7 +312,8 @@ public class RWRoute {
 
     protected TimingManager createTimingManager(ClkRouteTiming clkTiming, Collection<Net> timingNets) {
         final boolean isPartialRouting = false;
-        return new TimingManager(design, routerTimer, config, clkTiming, timingNets, isPartialRouting);
+        return new TimingManager(design, routerTimer, config, clkTiming, timingNets, isPartialRouting,
+                ((RouteNodeGraphTimingDriven) routingGraph).delayEstimator);
     }
 
     /**
@@ -1423,7 +1424,7 @@ public class RWRoute {
                     continue;
                 }
                 totalINTNodes++;
-                int wl = RouteNode.getLength(node, routingGraph);
+                int wl = RouteNode.getLength(node);
                 totalWL += wl;
 
                 RouterHelper.addNodeTypeLengthToMap(node, wl, nodeTypeUsage, nodeTypeLength);
@@ -2303,7 +2304,7 @@ public class RWRoute {
 
     private void printTimingInfo() {
         if (!sortedIndirectConnections.isEmpty()) {
-            timingManager.getCriticalPathInfo(maxDelayAndTimingVertex, false, routingGraph);
+            timingManager.getCriticalPathInfo(maxDelayAndTimingVertex);
         }
     }
 

@@ -344,8 +344,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         return getOccupancy() > 0;
     }
 
-    public static short getLength(Node node, RouteNodeGraph routingGraph) {
-        return RouteNodeInfo.get(node, routingGraph).length;
+    public static short getLength(Node node) {
+        return RouteNodeInfo.get(node, null).length;
     }
 
     @Override

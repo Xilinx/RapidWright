@@ -73,16 +73,30 @@ public class RouteNodeInfo {
         RouteNodeType type = getType(node, routingGraph);
         short endTileXCoordinate = getEndTileXCoordinate(node, (short) endTile.getTileXCoordinate());
         short endTileYCoordinate = (short) endTile.getTileYCoordinate();
-        short length = getLength(baseTile, type, endTileXCoordinate, endTileYCoordinate, routingGraph);
+        short length = getLength(baseTile, endTileXCoordinate, endTileYCoordinate);
+        if (routingGraph != null) {
+            TileTypeEnum tileType = baseTile.getTileTypeEnum();
+            switch (tileType) {
+                case LAG_LAG:
+                case LAGUNA_TILE:
+                    assert(length == routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES ||
+                           // U-turn
+                           length == 0);
+                    break;
+                case INT:
+                    if (type.leadsToLaguna()) {
+                        assert(length <= 1); // 1 only if INODE_[EW]_\d+_FT[01]
+                    }
+                    break;
+            }
+        }
 
         return new RouteNodeInfo(type, endTileXCoordinate, endTileYCoordinate, length);
     }
 
     private static short getLength(Tile baseTile,
-                                   RouteNodeType type,
                                    short endTileXCoordinate,
-                                   short endTileYCoordinate,
-                                   RouteNodeGraph routingGraph) {
+                                   short endTileYCoordinate) {
         TileTypeEnum tileType = baseTile.getTileTypeEnum();
         short length = (short) Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate());
         if (tileType == TileTypeEnum.LAG_LAG) {
@@ -90,19 +104,6 @@ public class RouteNodeInfo {
             assert(baseTile.getTileXCoordinate() == endTileXCoordinate - 1);
         } else {
             length += Math.abs(endTileXCoordinate - baseTile.getTileXCoordinate());
-        }
-        switch (tileType) {
-            case LAG_LAG:
-            case LAGUNA_TILE:
-                assert(length == routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES ||
-                       // U-turn
-                       length == 0);
-                break;
-            case INT:
-                if (type.leadsToLaguna()) {
-                    assert(length <= 1); // 1 only if INODE_[EW]_\d+_FT[01]
-                }
-                break;
         }
         return length;
     }
@@ -136,6 +137,10 @@ public class RouteNodeInfo {
     }
 
     public static RouteNodeType getType(Node node, RouteNodeGraph routingGraph) {
+        if (routingGraph == null) {
+            return null;
+        }
+
         // NOTE: IntentCode is device-dependent
         IntentCode ic = node.getIntentCode();
         TileTypeEnum tileTypeEnum = node.getTile().getTileTypeEnum();

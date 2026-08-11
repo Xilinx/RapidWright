@@ -24,7 +24,6 @@ package com.xilinx.rapidwright.timing;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
@@ -35,8 +34,9 @@ import com.xilinx.rapidwright.rwroute.Connection;
 import com.xilinx.rapidwright.rwroute.NetWrapper;
 import com.xilinx.rapidwright.rwroute.RWRouteConfig;
 import com.xilinx.rapidwright.rwroute.RouteNode;
-import com.xilinx.rapidwright.rwroute.RouteNodeGraph;
+import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.RuntimeTrackerTree;
@@ -60,6 +60,8 @@ public class TimingManager {
     private float timingRequirement;
     private float pessimismA = (float) 1.03;
     private float pessimismB = 100;
+
+    private DelayEstimatorBase<InterconnectInfo> estimator;
     
     /**
      * Default constructor: creates the TimingManager object, which the user needs to create for 
@@ -67,17 +69,6 @@ public class TimingManager {
      * @param design RapidWright Design object.
      */
     public TimingManager(Design design) {
-        this(design, true);
-    }
-
-    /**
-     * Alternate constructor for creating the objects for the TimingModel, but with the choice to 
-     * not build the model yet.
-     * @param design RapidWright Design object.
-     * @param doBuild Whether to go ahead and build the model now.  For example, a user might not 
-     * want to build the TimingGraph yet.
-     */
-    public TimingManager(Design design, boolean doBuild) {
         this.design = design;
         timingModel = new TimingModel(design.getDevice());
         timingGraph = new TimingGraph(design);
@@ -85,11 +76,16 @@ public class TimingManager {
         timingGraph.setTimingManager(this);
         timingGraph.setTimingModel(timingModel);
         device = design.getDevice();
-        if (doBuild)
-            build(false, design.getNets());
+        build(false, design.getNets());
     }
     
-    public TimingManager(Design design, RuntimeTrackerTree timer, RWRouteConfig config, ClkRouteTiming clkTiming, Collection<Net> targetNets, boolean isPartialRouting) {
+    public TimingManager(Design design,
+                         RuntimeTrackerTree timer,
+                         RWRouteConfig config,
+                         ClkRouteTiming clkTiming,
+                         Collection<Net> targetNets,
+                         boolean isPartialRouting,
+                         DelayEstimatorBase<InterconnectInfo> estimator) {
         this.design = design;
         setTimingRequirement();
         verbose = config.isVerbose();
@@ -101,6 +97,7 @@ public class TimingManager {
         timingGraph.setTimingManager(this);
         timingGraph.setTimingModel(timingModel);
         device = design.getDevice();
+        this.estimator = estimator;
         build(isPartialRouting, targetNets);
     }
     
@@ -180,7 +177,7 @@ public class TimingManager {
         }
     }
     
-    public void getCriticalPathInfo(Pair<Float, TimingVertex> maxDelayTimingVertex, boolean useRoutable, RouteNodeGraph routingGraph) {
+    public void getCriticalPathInfo(Pair<Float, TimingVertex> maxDelayTimingVertex) {
         TimingVertex maxV = maxDelayTimingVertex.getSecond();
         float maxDelay = maxDelayTimingVertex.getFirst();
         System.out.printf(MessageGenerator.formatString("Timing requirement (ps):", timingRequirement));
@@ -197,10 +194,10 @@ public class TimingManager {
         System.out.printf(MessageGenerator.formatString("Critical path delay (ps):", adjusted));
         System.out.printf(MessageGenerator.formatString("Slack (ps):", (int)(timingRequirement - adjusted)));
         
-        printPathDelayBreakDown(arr, criticalEdges, timingGraph.getTimingEdgeConnectionMap(), useRoutable, routingGraph);
+        printPathDelayBreakDown(arr, criticalEdges, timingGraph.getTimingEdgeConnectionMap());
     }
 
-    private void printPathDelayBreakDown(short arr, List<TimingEdge> criticalEdges, Map<TimingEdge, Connection> timingEdgeConnctionMap, boolean useRoutable, RouteNodeGraph routingGraph) {
+    private void printPathDelayBreakDown(short arr, List<TimingEdge> criticalEdges, Map<TimingEdge, Connection> timingEdgeConnctionMap) {
         if (verbose) {
             System.out.println("\nTimingEdges:");
             int id = 0;
@@ -209,29 +206,19 @@ public class TimingManager {
             }
         }
         printTimingPathInTable(criticalEdges, arr);
-        if (routingGraph == null) return;
         if (!verbose) return;
         for (TimingEdge edge : criticalEdges) {
-            if (timingEdgeConnctionMap.containsKey(edge)) {
-                System.out.println(timingEdgeConnctionMap.get(edge));
-                if (useRoutable) {
-                    List<RouteNode> groups = timingEdgeConnctionMap.get(edge).getRnodes();
-                    for (int iGroup = groups.size() -1; iGroup >= 0; iGroup--) {
-                        System.out.println("\t " + groups.get(iGroup));
-                    }
-                } else {
-                    List<Node> nodes = timingEdgeConnctionMap.get(edge).getNodes();
-                    for (int iGroup = nodes.size() -1; iGroup >= 0; iGroup--) {
-                        RouteNode rnode = routingGraph.getNode(nodes.get(iGroup));
-                        if (rnode != null) {
-                            System.out.println("\t " + rnode.getNode() + ", " + rnode.getIntentCode() + ", delay = " + (short) rnode.getDelay());
-                        } else {
-                            System.out.println("\t " + nodes.get(iGroup) + ", " + nodes.get(iGroup).getIntentCode() + ", delay = " + 0);
-                        }
-                    }
+            Connection connection = timingEdgeConnctionMap.get(edge);
+            if (connection != null) {
+                System.out.println(connection);
+                List<Node> nodes = connection.getNodes();
+                for (int iGroup = nodes.size() -1; iGroup >= 0; iGroup--) {
+                    Node node = nodes.get(iGroup);
+                    short delay = RouterHelper.computeNodeDelay(estimator, node);
+                    System.out.println("\t " + node + ", " + node.getIntentCode() + ", delay = " + delay);
                 }
+                System.out.println();
             }
-            System.out.println();
         }
     }
     

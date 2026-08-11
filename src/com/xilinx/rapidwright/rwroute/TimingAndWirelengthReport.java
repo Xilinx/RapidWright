@@ -24,6 +24,7 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -54,14 +55,12 @@ public class TimingAndWirelengthReport{
     private DelayEstimatorBase<InterconnectInfo> estimator;
     private Map<IntentCode, Long> nodeTypeUsage ;
     private Map<IntentCode, Long> nodeTypeLength;
-    private RouteNodeGraph routingGraph;
 
     public TimingAndWirelengthReport(Design design, RWRouteConfig config, boolean isPartialRouting) {
         this.design = design;
-        timingManager = new TimingManager(design, null, config, RWRoute.createClkTimingData(config), design.getNets(), isPartialRouting);
-        estimator = new DelayEstimatorBase<InterconnectInfo>(design.getDevice(),
+        estimator = new DelayEstimatorBase<>(design.getDevice(),
                 new InterconnectInfo(), config.isUseUTurnNodes(), 0);
-        routingGraph = new RouteNodeGraphTimingDriven(design, config, estimator);
+        timingManager = new TimingManager(design, null, config, RWRoute.createClkTimingData(config), design.getNets(), isPartialRouting, estimator);
         wirelength = 0;
         usedNodes = 0;
         nodeTypeUsage = new HashMap<>();
@@ -76,9 +75,9 @@ public class TimingAndWirelengthReport{
 
         Pair<Float, TimingVertex> maxDelayAndTimingVertex = timingManager.calculateArrivalRequiredTimes();
         System.out.println();
-        timingManager.getCriticalPathInfo(maxDelayAndTimingVertex, false, routingGraph);
+        timingManager.getCriticalPathInfo(maxDelayAndTimingVertex);
 
-        System.out.println("\n");
+        System.out.println();
         System.out.println("Total nodes: " + usedNodes);
         System.out.println("Total wirelength: " + wirelength);
         RWRoute.printNodeTypeUsageAndWirelength(true, nodeTypeUsage, nodeTypeLength, design.getSeries());
@@ -98,7 +97,7 @@ public class TimingAndWirelengthReport{
                     continue;
                 }
                 usedNodes++;
-                int wl = RouteNode.getLength(node, routingGraph);
+                int wl = RouteNode.getLength(node);
                 wirelength += wl;
                 RouterHelper.addNodeTypeLengthToMap(node, wl, nodeTypeUsage, nodeTypeLength);
             }
@@ -115,7 +114,6 @@ public class TimingAndWirelengthReport{
     private NetWrapper createNetWrapper(Net net) {
         NetWrapper netWrapper = new NetWrapper(numWireNetsToRoute++, net);
         SitePinInst source = net.getSource();
-        Node sourceINTNode = null;
         for (SitePinInst sink:net.getSinkPins()) {
             if (RouterHelper.isExternalConnectionToCout(source, sink)) {
                 source = net.getAlternateSource();
@@ -126,16 +124,7 @@ public class TimingAndWirelengthReport{
             }
             Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
             Node sinkINTNode = RouterHelper.projectInputPinToINTNode(sink);
-            if (sinkINTNode == null) {
-                connection.setDirect(true);
-            } else {
-                if (sourceINTNode == null) {
-                    sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
-                }
-                connection.setSourceRnode(routingGraph.getOrCreate(sourceINTNode, RouteNodeType.EXCLUSIVE_SOURCE));
-                connection.setSinkRnode(routingGraph.getOrCreate(sinkINTNode));
-                connection.setDirect(false);
-            }
+            connection.setDirect(sinkINTNode == null);
         }
         return netWrapper;
     }
@@ -164,7 +153,8 @@ public class TimingAndWirelengthReport{
 
     public static void main(String[] args) {
         if (args.length < 1) {
-            System.out.println("USAGE:\n <input.dcp>");
+            System.out.println("USAGE: <input.dcp>");
+            System.exit(1);
         }
         Design design = Design.readCheckpoint(args[0]);
         if (design.getNets().isEmpty()) {
@@ -175,7 +165,7 @@ public class TimingAndWirelengthReport{
         //design manipulations are necessary, otherwise there will be problems in associating timing edges with connections.
         DesignTools.makePhysNetNamesConsistent(design);
         DesignTools.createMissingSitePinInsts(design);
-        RWRouteConfig config = new RWRouteConfig(new String[0]);
+        RWRouteConfig config = new RWRouteConfig(Arrays.copyOfRange(args, 1, args.length));
         config.setTimingDriven(true);
         final boolean isPartialRouting = false;
         TimingAndWirelengthReport reporter = new TimingAndWirelengthReport(design, config, isPartialRouting);
