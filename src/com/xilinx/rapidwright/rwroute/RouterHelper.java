@@ -559,6 +559,20 @@ public class RouterHelper {
      * @return The map containing net delay for each sink pin paired with an INT tile node of a routed net.
      */
     public static Map<SitePinInst, Pair<Node,Short>> getSourceToSinkINTNodeDelays(Net net, DelayEstimatorBase estimator) {
+        return getSourceToSinkINTNodeDelays(net, estimator, null);
+    }
+
+    /**
+     * Gets a map containing net delay for each sink pin paired with an INT tile node of a routed net.
+     * @param net The target routed net.
+     * @param estimator An instantiation of DelayEstimatorBase.
+     * @param nodeToDriver If non-null, populated during the same traversal of the net's PIPs with a
+     *                     mapping from each node onto the node driving it, so that the routing of any
+     *                     one sink can be recovered by walking backwards from it.
+     * @return The map containing net delay for each sink pin paired with an INT tile node of a routed net.
+     */
+    public static Map<SitePinInst, Pair<Node,Short>> getSourceToSinkINTNodeDelays(Net net, DelayEstimatorBase estimator,
+                                                                                  Map<Node, Node> nodeToDriver) {
         List<PIP> pips = net.getPIPs();
         Map<Node, Integer> delayMap = new HashMap<>();
         for (PIP pip : pips) {
@@ -572,6 +586,9 @@ public class RouterHelper {
                         + DelayEstimatorBase.getExtraDelay(endNode, DelayEstimatorBase.isLong(startNode));
             }
             delayMap.put(endNode, upstreamDelay + delay);
+            if (nodeToDriver != null) {
+                nodeToDriver.put(endNode, startNode);
+            }
         }
 
         Map<SitePinInst, Pair<Node,Short>> sinkNodeDelays = new HashMap<>();

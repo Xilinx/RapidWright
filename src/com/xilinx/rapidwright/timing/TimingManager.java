@@ -211,10 +211,16 @@ public class TimingManager {
             Connection connection = timingEdgeConnctionMap.get(edge);
             if (connection != null) {
                 System.out.println(connection);
+                // Nodes are ordered sink-first, so the driver of nodes[i] is nodes[i + 1]
                 List<Node> nodes = connection.getNodes();
                 for (int iGroup = nodes.size() -1; iGroup >= 0; iGroup--) {
                     Node node = nodes.get(iGroup);
                     short delay = RouterHelper.computeNodeDelay(estimator, node);
+                    if (iGroup + 1 < nodes.size()) {
+                        // Account for the extra delay this node incurs from its driver, as the
+                        // accumulated route delay of the connection does
+                        delay += DelayEstimatorBase.getExtraDelay(node, DelayEstimatorBase.isLong(nodes.get(iGroup + 1)));
+                    }
                     System.out.println("\t " + node + ", " + node.getIntentCode() + ", delay = " + delay);
                 }
                 System.out.println();
