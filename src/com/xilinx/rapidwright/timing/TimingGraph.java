@@ -974,8 +974,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             return false;
         }
         TimingEdge prev = getEdge(vs, vd);
-        boolean tmp = (prev != null && prev.getNet() != null);
-        if (tmp) {
+        if (prev != null) {
             if (verbose)
                 System.out.println("replacing edge:"+e);
             else {
@@ -1123,7 +1122,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                         
                         TimingVertex v1 = newTimingVertex(cellName+"/"+s1);
                         TimingVertex v2 = newTimingVertex(cellName+"/"+s2);
-                        TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
+                        TimingEdge e = new TimingEdge(this, v1, v2, null, null);
                         
                         safeAddEdge(e.getSrc(), e.getDst(), e);
                         e.setLogicDelay(delay);
@@ -1345,7 +1344,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 
                             TimingVertex v1 = newTimingVertex(s1);
                             TimingVertex v2 = newTimingVertex(s2);
-                            TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
+                            TimingEdge e = new TimingEdge(this, v1, v2, null, null);
                             safeAddEdge(e.getSrc(), e.getDst(), e);
                             e.setLogicDelay(logicDelay);
                             setEdgeWeight(e, e.getDelay());
@@ -1414,7 +1413,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                                         for (int i = 0; i < 8; i++) {
                                             TimingVertex v1 = newTimingVertex(cellName + "/" + ep1FirstLetter + j);
                                             TimingVertex v2 = newTimingVertex(cellName + "/" + s2 + i);
-                                            TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
+                                            TimingEdge e = new TimingEdge(this, v1, v2, null, null);
                                             safeAddEdge(e.getSrc(), e.getDst(), e);
                                             e.setLogicDelay(logicDelay);
                                             setEdgeWeight(e, e.getDelay());
@@ -1424,7 +1423,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                                         }
                                         TimingVertex v1 = newTimingVertex(cellName + "/" + ep1FirstLetter + j);
                                         TimingVertex v2 = newTimingVertex(cellName + "/" + "OUT1");
-                                        TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
+                                        TimingEdge e = new TimingEdge(this, v1, v2, null, null);
                                         safeAddEdge(e.getSrc(), e.getDst(), e);
                                         e.setLogicDelay(logicDelay);
                                         setEdgeWeight(e, e.getDelay());
@@ -1436,7 +1435,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                                     for (int i = 0; i < 8; i++) {
                                         TimingVertex v1 = newTimingVertex(s1);
                                         TimingVertex v2 = newTimingVertex(s2 + i);
-                                        TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
+                                        TimingEdge e = new TimingEdge(this, v1, v2, null, null);
                                         safeAddEdge(e.getSrc(), e.getDst(), e);
                                         e.setLogicDelay(logicDelay);
                                         setEdgeWeight(e, e.getDelay());
@@ -1446,7 +1445,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                                     }
                                     TimingVertex v1 = newTimingVertex(s1);
                                     TimingVertex v2 = newTimingVertex(cellName + "/" + "OUT1");
-                                    TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
+                                    TimingEdge e = new TimingEdge(this, v1, v2, null, null);
                                     safeAddEdge(e.getSrc(), e.getDst(), e);
                                     e.setLogicDelay(logicDelay);
                                     setEdgeWeight(e, e.getDelay());
@@ -1457,7 +1456,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                             } else {
                                 TimingVertex v1 = newTimingVertex(s1);
                                 TimingVertex v2 = newTimingVertex(s2);
-                                TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
+                                TimingEdge e = new TimingEdge(this, v1, v2, null, null);
                                 safeAddEdge(e.getSrc(), e.getDst(), e);
                                 e.setLogicDelay(logicDelay);
                                 setEdgeWeight(e, e.getDelay());
@@ -1504,7 +1503,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 String s2 = cellName + "/" + "O";
                 TimingVertex v1 = newTimingVertex(s1);
                 TimingVertex v2 = newTimingVertex(s2);
-                TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
+                TimingEdge e = new TimingEdge(this, v1, v2, null, null);
                 safeAddEdge(e.getSrc(), e.getDst(), e);
                 e.setLogicDelay(0);
                 setEdgeWeight(e, e.getDelay());
@@ -1518,7 +1517,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             for (Pair<String, String> inOut : dspTimingData.getInputOutputDelays().keySet()) {
                 TimingVertex v1 = newTimingVertex(dspTimingData.getBlockName() + "/" + inOut.getFirst());
                 TimingVertex v2 = newTimingVertex(dspTimingData.getBlockName() + "/" + inOut.getSecond());
-                TimingEdge e = new TimingEdge(this, v1, v2, null, new Net());
+                TimingEdge e = new TimingEdge(this, v1, v2, null, null);
                
                 safeAddEdge(e.getSrc(), e.getDst(), e);
                 e.setLogicDelay(dspTimingData.getInputOutputDelays().get(inOut));

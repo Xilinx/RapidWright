@@ -38,6 +38,7 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
 import org.python.google.common.collect.SetMultimap;
 import org.python.google.common.collect.TreeMultimap;
@@ -1538,7 +1539,20 @@ public class TimingModel {
     }
     
     private void checkForIntrasiteDelay() {
-        String sourceType = "";
+        intrasiteDelay += getSinkIntrasiteDelay(endPinInst, null);
+        intrasiteDelay += getSourceIntrasiteDelay(startPinInst, sourceBELPin, sinkBELPin, null);
+    }
+
+    /**
+     * Gets the delay of the hop taken inside the sink site, from the sink site pin onto the BEL pin
+     * of the cell it drives.
+     * @param endPinInst Sink pin as a SitePinInst for the physical Net.
+     * @param description If non-null, appended with the BEL pins the delay was looked up for.
+     *                    Left untouched when there is no such hop. Only pass one when the
+     *                    description is actually going to be used, as building it is not free.
+     * @return The delay in picoseconds, zero if there is no such hop.
+     */
+    private short getSinkIntrasiteDelay(SitePinInst endPinInst, StringBuilder description) {
         String sinkType = "";
         if (endPinInst != null) {
             Set<Cell> cells = DesignTools.getConnectedCells(endPinInst);
@@ -1549,12 +1563,54 @@ public class TimingModel {
                 }
             }
         }
+
+        if (ultraScaleFlopNames.contains(sinkType)) {
+            if (endPinInst != null) {
+                String sourcepin = endPinInst.getName();
+
+                if (!sourcepin.startsWith("CKEN") &&
+                        !sourcepin.startsWith("CLK1") &&
+                        !sourcepin.startsWith("CLK2") &&
+                        !sourcepin.startsWith("SRST")) {
+
+                    short tmpIntrasiteDelay = intrasiteAndLogicDelayModel.getIntraSiteDelay(SiteTypeEnum.SLICEL,
+                                            sourcepin, sinkType + "/" + "D");
+                    describeIntrasiteDelay(description, sourcepin, sinkType + "/" + "D");
+                    return tmpIntrasiteDelay;
+                } else if (sourcepin.startsWith("CKEN")) {
+                    describeIntrasiteDelay(description, sourcepin, sinkType + "/" + "CKEN");
+                    return (short) INTRASITE_DELAY_SITEPIN_TO_FF_INPUT;
+                }
+            }
+        } else if (endPinInst != null && endPinInst.getName().startsWith("CIN")) {
+            describeIntrasiteDelay(description, endPinInst.getName(), sinkType + "/" + "CIN");
+            return intrasiteAndLogicDelayModel.getIntraSiteDelay(SiteTypeEnum.SLICEL,
+                    endPinInst.getName(), sinkType + "/" + "CIN");
+        }
+        return 0;
+    }
+
+    /**
+     * Gets the delay of the hop taken inside the source site, from the BEL pin driving the source
+     * site pin onto that site pin.
+     * @param startPinInst Source pin as a SitePinInst for the physical Net.
+     * @param sourceBELPin BEL pin driving startPinInst, or null to recover it from the cell
+     *                     connected to startPinInst.
+     * @param sinkBELPin BEL pin driven by the sink pin of the physical Net, or null.
+     * @param description If non-null, appended with the BEL pins the delay was looked up for.
+     *                    Left untouched when there is no such hop. Only pass one when the
+     *                    description is actually going to be used, as building it is not free.
+     * @return The delay in picoseconds, zero if there is no such hop.
+     */
+    private short getSourceIntrasiteDelay(SitePinInst startPinInst,
+                                          BELPin sourceBELPin, BELPin sinkBELPin,
+                                          StringBuilder description) {
+        String sourceType = "";
         BELPin tmpPin = null;
-        SitePinInst pin = endPinInst;
         Integer startPinSiteWireIdx = null;
 
         if (startPinInst != null) {
-            Site site = pin.getSiteInst().getSite();
+            Site site = startPinInst.getSiteInst().getSite();
             startPinSiteWireIdx = site.getSiteWireIndex(startPinInst.getName());
         }
         
@@ -1593,34 +1649,13 @@ public class TimingModel {
             }
         }
 
-        if (ultraScaleFlopNames.contains(sinkType)) {
-            if (endPinInst != null) {
-                String sourcepin = endPinInst.getName();
-
-                if (!sourcepin.startsWith("CKEN") &&
-                        !sourcepin.startsWith("CLK1") &&
-                        !sourcepin.startsWith("CLK2") &&
-                        !sourcepin.startsWith("SRST")) {
-
-                    short tmpIntrasiteDelay = intrasiteAndLogicDelayModel.getIntraSiteDelay(SiteTypeEnum.SLICEL,
-                                            sourcepin, sinkType + "/" + "D");
-                    intrasiteDelay += tmpIntrasiteDelay;
-                } else if (sourcepin.startsWith("CKEN")) {
-                    intrasiteDelay += INTRASITE_DELAY_SITEPIN_TO_FF_INPUT;
-                }
-            }
-        } else if (endPinInst != null && endPinInst.getName().startsWith("CIN")) {
-            intrasiteDelay += intrasiteAndLogicDelayModel.getIntraSiteDelay(SiteTypeEnum.SLICEL, 
-                    endPinInst.getName(), sinkType + "/" + "CIN");
-        }
-
         /**
          * Checking for additional intrasite delays
          */
         
         if ((startPinInst == null || sourceType == null) || 
                 (tmpPin == null && sourceBELPin == null)) {
-                return;
+                return 0;
         }
         
         //TODO cleaning up: remove if-else, call the intrasiteAndLogicDelayModel.getIntraSiteDelay() instead
@@ -1631,13 +1666,67 @@ public class TimingModel {
             else {
                 fromPinName += sourceBELPin.getName();
             }
-            short tmpIntrasiteDelay = intrasiteAndLogicDelayModel.getIntraSiteDelay(
+            describeIntrasiteDelay(description, fromPinName, startPinInst.getName());
+            return intrasiteAndLogicDelayModel.getIntraSiteDelay(
                     SiteTypeEnum.SLICEL, fromPinName, startPinInst.getName());
-            intrasiteDelay += tmpIntrasiteDelay;
-           
         } else if (startPinInst.getName().endsWith("_O")) {
-            intrasiteDelay += INTRASITE_DELAY_LUT_OUTPUT_TO_O_SITEPIN;   
+            describeIntrasiteDelay(description, sourceType + "/O", startPinInst.getName());
+            return (short) INTRASITE_DELAY_LUT_OUTPUT_TO_O_SITEPIN;
         }
+        return 0;
+    }
+
+    /**
+     * Describes one intra-site hop, for the verbose critical path breakdown.
+     * @param description Appended with the description; does nothing when null.
+     * @param fromPinName Name of the BEL pin or site pin the hop starts at.
+     * @param toPinName Name of the BEL pin or site pin the hop ends at.
+     */
+    private static void describeIntrasiteDelay(StringBuilder description,
+                                               String fromPinName, String toPinName) {
+        if (description == null) {
+            return;
+        }
+        description.append(fromPinName).append(" -> ").append(toPinName);
+    }
+
+    /**
+     * Recovers the hop inside the source site that the intra-site delay of a connection accounts
+     * for. Not cached, so only call this for the few connections whose breakdown is wanted.
+     * @param startPinInst Source pin as a SitePinInst for the physical Net.
+     * @return The BEL pins the delay was looked up for paired with that delay, or null if there is
+     *         no such hop.
+     */
+    public Pair<String,Short> getSourceIntraSiteDelayTerm(SitePinInst startPinInst) {
+        StringBuilder description = new StringBuilder();
+        short delay = getSourceIntrasiteDelay(startPinInst, null, null, description);
+        return description.length() == 0 ? null : new Pair<>(description.toString(), delay);
+    }
+
+    /**
+     * Recovers the hop inside the sink site that the intra-site delay of a connection accounts for.
+     * Not cached, so only call this for the few connections whose breakdown is wanted.
+     * @param endPinInst Sink pin as a SitePinInst for the physical Net.
+     * @return The BEL pins the delay was looked up for paired with that delay, or null if there is
+     *         no such hop.
+     */
+    public Pair<String,Short> getSinkIntraSiteDelayTerm(SitePinInst endPinInst) {
+        StringBuilder description = new StringBuilder();
+        short delay = getSinkIntrasiteDelay(endPinInst, description);
+        return description.length() == 0 ? null : new Pair<>(description.toString(), delay);
+    }
+
+    /**
+     * Looks up the delay of a hop between two BEL pins of the same site.
+     * @param siteType Type of the site both BEL pins belong to.
+     * @param fromBelPin BEL pin the hop starts at, named "&lt;BEL&gt;/&lt;pin&gt;".
+     * @param toBelPin BEL pin the hop ends at, named "&lt;BEL&gt;/&lt;pin&gt;".
+     * @return The delay in picoseconds, or null if the model holds no term for this hop.
+     */
+    public Short lookupIntraSiteDelay(SiteTypeEnum siteType, String fromBelPin, String toBelPin) {
+        Short delay = intrasiteAndLogicDelayModel.getIntraSiteDelay(siteType, fromBelPin, toBelPin);
+        // An unknown hop is reported as a negative delay rather than as absent
+        return (delay == null || delay < 0) ? null : delay;
     }
 
     /**

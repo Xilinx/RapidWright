@@ -161,9 +161,12 @@ public class TimingAndWirelengthReport{
             connection.setTimingEdgesDelay(connectionDelay);
 
             if (nodeToDriver != null) {
-                // Connection.getNodes() is expected to be ordered sink-first, source-last
+                // Connection.getNodes() is expected to be ordered sink-first, source-last.
+                // Stop at the first node without a driver: either the source node of the net, or
+                // the sink itself if this connection is not routed.
                 List<Node> nodes = new ArrayList<>();
-                for (Node node = sinkINTNodeDelay.getFirst(); node != null; node = nodeToDriver.get(node)) {
+                Node node = sinkINTNodeDelay.getFirst();
+                for (Node driver; (driver = nodeToDriver.get(node)) != null; node = driver) {
                     nodes.add(node);
                 }
                 connection.setNodes(nodes);
