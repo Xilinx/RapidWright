@@ -28,6 +28,7 @@ import java.util.Map;
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.BELPin;
@@ -234,7 +235,14 @@ public class TimingManager {
                 // Nodes are ordered sink-first, so the driver of nodes[i] is nodes[i + 1]
                 List<Node> nodes = connection.getNodes();
                 if (nodes.isEmpty()) {
-                    System.out.println("\t(no intersite routing)");
+                    if (connection.getNet().hasPIPs()) {
+                        // A connection only carries its nodes when a router assigned them to it; walk
+                        // the PIPs of its net to recover them otherwise. Only the connections of this
+                        // one path are worth paying that for, hence not doing so for every connection.
+                        nodes = NetTools.getNodesToSink(connection.getSink());
+                    } else {
+                        System.out.println("\t(no intersite routing)");
+                    }
                 }
                 for (int iGroup = nodes.size() -1; iGroup >= 0; iGroup--) {
                     Node node = nodes.get(iGroup);
@@ -249,10 +257,10 @@ public class TimingManager {
                 printIntraSiteDelayTerm(timingModel.getSinkIntraSiteDelayTerm(connection.getSink()));
                 System.out.println();
             } else if (edge.getNet() != null) {
-                // No Connection means RWRoute never routed this edge: it is either a direct
-                // connection (e.g. COUT -> CIN) or a net that never leaves its site. Either way
-                // only intra-site hops contribute, so there is nothing to show unless one does.
+                // No Connection means RWRoute never routed this edge: it must be an intra-site
+                // connection (e.g. ALUT6/O -> CARRY8/S[0]).
                 short intraSiteDelay = (short) edge.getIntraSiteDelay();
+                assert(edge.getNetDelay() == intraSiteDelay);
                 // A direct connection crosses a site pin at each end, so describe those hops
                 Pair<String,Short> sourceTerm = (edge.getFirstPin() != null) ?
                         timingModel.getSourceIntraSiteDelayTerm(edge.getFirstPin()) : null;

@@ -24,10 +24,8 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import com.xilinx.rapidwright.design.Design;
@@ -57,13 +55,9 @@ public class TimingAndWirelengthReport{
     private DelayEstimatorBase<InterconnectInfo> estimator;
     private Map<IntentCode, Long> nodeTypeUsage ;
     private Map<IntentCode, Long> nodeTypeLength;
-    /** Only when verbose does {@link TimingManager} print the per-node delay breakdown of the
-     *  critical path, so only then is it worth collecting the nodes of each connection. */
-    private boolean verbose;
 
     public TimingAndWirelengthReport(Design design, RWRouteConfig config, boolean isPartialRouting) {
         this.design = design;
-        verbose = config.isVerbose();
         estimator = new DelayEstimatorBase<>(design.getDevice(),
                 new InterconnectInfo(), config.isUseUTurnNodes(), 0);
         timingManager = new TimingManager(design, null, config, RWRoute.createClkTimingData(config), design.getNets(), isPartialRouting, estimator);
@@ -142,35 +136,18 @@ public class TimingAndWirelengthReport{
      */
     private void setAccumulativeDelayOfEachNetNode(NetWrapper netWrapper) {
         Net net = netWrapper.getNet();
-        // Collect each node of this net's routing mapped onto the node driving it, so that the nodes
-        // of each connection below can be recovered by walking backwards from that connection's sink.
-        // Only the verbose critical path breakdown consumes them, so do not pay for them otherwise.
-        Map<Node, Node> nodeToDriver = verbose ? new HashMap<>() : null;
         Map<SitePinInst, Pair<Node,Short>> sourceToSinkINTNodeDelays =
-                RouterHelper.getSourceToSinkINTNodeDelays(net, estimator, nodeToDriver);
+                RouterHelper.getSourceToSinkINTNodeDelays(net, estimator);
 
         for (Connection connection : netWrapper.getConnections()) {
             if (connection.isDirect()) {
                 continue;
             }
-            Pair<Node,Short> sinkINTNodeDelay = sourceToSinkINTNodeDelays.get(connection.getSink());
-            short connectionDelay = sinkINTNodeDelay.getSecond();
+            short connectionDelay = sourceToSinkINTNodeDelays.get(connection.getSink()).getSecond();
             if (connection.getTimingEdges() == null) {
                 continue;
             }
             connection.setTimingEdgesDelay(connectionDelay);
-
-            if (nodeToDriver != null) {
-                // Connection.getNodes() is expected to be ordered sink-first, source-last.
-                // Stop at the first node without a driver: either the source node of the net, or
-                // the sink itself if this connection is not routed.
-                List<Node> nodes = new ArrayList<>();
-                Node node = sinkINTNodeDelay.getFirst();
-                for (Node driver; (driver = nodeToDriver.get(node)) != null; node = driver) {
-                    nodes.add(node);
-                }
-                connection.setNodes(nodes);
-            }
         }
     }
 

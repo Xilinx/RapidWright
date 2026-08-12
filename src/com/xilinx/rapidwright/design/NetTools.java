@@ -562,4 +562,58 @@ public class NetTools {
         }
         return unroutedNets;
     }
+
+    /**
+     * Builds a map from each {@link Node} driven by a PIP of the given net onto the node driving it,
+     * so that the routing reaching any one node can be recovered by walking backwards from it (see
+     * {@link #getNodesToSink(SitePinInst)}). The direction of bidirectional PIPs is taken from
+     * {@link PIP#isReversed()}. Since a node has at most one entry, a multiply-driven node (which
+     * only an illegally routed net can have) retains just the driver of the last such PIP visited;
+     * use {@link #getNodeTrees(Net)} when all drivers matter. Nodes that the net's routing merely
+     * passes through without a PIP terminating on them (e.g. the source pin's node) are absent.
+     *
+     * The net's routing is assumed to be loop-free, so that following these drivers backwards from
+     * any node terminates.
+     *
+     * @param net The net to examine; it need not be fully routed.
+     * @return A map from driven node onto driving node, empty if the net has no PIPs.
+     */
+    public static Map<Node,Node> getNodeToDriver(Net net) {
+        Map<Node, Node> nodeToDriver = new HashMap<>();
+        for (PIP pip : net.getPIPs()) {
+            if (pip.isReversed()) {
+                nodeToDriver.put(pip.getStartNode(), pip.getEndNode());
+            } else {
+                nodeToDriver.put(pip.getEndNode(), pip.getStartNode());
+            }
+        }
+        return nodeToDriver;
+    }
+
+    /**
+     * Recovers the {@link Node} instances that route the net of the given sink pin as far as that
+     * pin, by walking backwards from it through the drivers given by
+     * {@link #getNodeToDriver(Net)}. Since that map is rebuilt on every call, prefer building it
+     * once and walking it directly when more than one sink of the same net is of interest.
+     *
+     * The walk stops at the first node that no PIP drives, which is not included in the result:
+     * for a fully routed sink that is the source pin's node, but for a partially routed one it is
+     * wherever its routing gives out, which this method does not distinguish. The net's routing is
+     * assumed to be loop-free; this walk does not terminate on one that is not.
+     *
+     * @param spi The sink {@link SitePinInst} to walk back from; it must belong to a net.
+     * @return The nodes reaching that pin, ordered sink-first and excluding the node the walk
+     *         stopped at, or an empty list if nothing drives the pin (e.g. an unrouted net).
+     */
+    public static List<Node> getNodesToSink(SitePinInst spi) {
+        Map<Node, Node> nodeToDriver = getNodeToDriver(spi.getNet());
+        Node sinkNode = spi.getConnectedNode();
+        // Walk backwards, stopping at the first node without a driver: either the source node of
+        // the net, or the sink itself when this connection has not been routed to
+        List<Node> nodes = new ArrayList<>();
+        for (Node node = sinkNode, driver; (driver = nodeToDriver.get(node)) != null; node = driver) {
+            nodes.add(node);
+        }
+        return nodes;
+    }
 }
