@@ -353,7 +353,7 @@ public class TimingModel {
         if (groups != null) {
             result = calcDelay(startPinInst, endPinInst, sourceBELPin, sinkBELPin, groups);
         } else {
-            checkForIntrasiteDelay();
+            accumulateIntrasiteDelays();
         }
 
         return result;
@@ -1135,7 +1135,7 @@ public class TimingModel {
             }
         }
 
-        // set these member variables for use in method: "checkForSomeIntrasiteDelays()" down below
+        // set these member variables for use in method: "accumulateIntrasiteDelays()" down below
         intrasiteDelay = 0;
         this.startPinInst = startPinInst;
         this.endPinInst = endPinInst;
@@ -1258,7 +1258,7 @@ public class TimingModel {
 
         netDelayCalc += checkForSitePinDelay(groups);
         
-        checkForIntrasiteDelay();  // implementation refactored into a helper method below
+        accumulateIntrasiteDelays();
 
         for (int i =1 ; i < groups.size(); i++) {
             TimingGroup gprev = groups.get(i-1);
@@ -1538,7 +1538,17 @@ public class TimingModel {
         }
     }
     
-    private void checkForIntrasiteDelay() {
+    /**
+     * Accumulates onto {@link #intrasiteDelay} the delay of the two intra-site hops that bookend
+     * the inter-site routing of a connection: from the driving BEL pin out to the source site pin,
+     * and from the sink site pin in to the driven BEL pin. Either hop contributes zero when it does
+     * not exist (for example, a source pin that is neither a MUX nor an "_O" output).
+     * Operates on the {@link #startPinInst}, {@link #endPinInst}, {@link #sourceBELPin} and
+     * {@link #sinkBELPin} member variables, which
+     * {@link #calcDelay(SitePinInst, SitePinInst, BELPin, BELPin, List)} sets (along with resetting
+     * {@link #intrasiteDelay}) before calling this.
+     */
+    private void accumulateIntrasiteDelays() {
         intrasiteDelay += getSinkIntrasiteDelay(endPinInst, null);
         intrasiteDelay += getSourceIntrasiteDelay(startPinInst, sourceBELPin, sinkBELPin, null);
     }
@@ -1568,19 +1578,17 @@ public class TimingModel {
             if (endPinInst != null) {
                 String sourcepin = endPinInst.getName();
 
-                if (!sourcepin.startsWith("CKEN") &&
-                        !sourcepin.startsWith("CLK1") &&
-                        !sourcepin.startsWith("CLK2") &&
-                        !sourcepin.startsWith("SRST")) {
-
+                if (sourcepin.startsWith("CKEN")) {
+                    describeIntrasiteDelay(description, sourcepin, sinkType + "/" + "CKEN");
+                    return (short) INTRASITE_DELAY_SITEPIN_TO_FF_INPUT;
+                } else if (!sourcepin.startsWith("CLK") &&
+                           !sourcepin.startsWith("SRST")) {
                     short tmpIntrasiteDelay = intrasiteAndLogicDelayModel.getIntraSiteDelay(SiteTypeEnum.SLICEL,
                                             sourcepin, sinkType + "/" + "D");
                     describeIntrasiteDelay(description, sourcepin, sinkType + "/" + "D");
                     return tmpIntrasiteDelay;
-                } else if (sourcepin.startsWith("CKEN")) {
-                    describeIntrasiteDelay(description, sourcepin, sinkType + "/" + "CKEN");
-                    return (short) INTRASITE_DELAY_SITEPIN_TO_FF_INPUT;
                 }
+                // Clock and reset site pins carry no site-pin-to-FF-input term
             }
         } else if (endPinInst != null && endPinInst.getName().startsWith("CIN")) {
             describeIntrasiteDelay(description, endPinInst.getName(), sinkType + "/" + "CIN");

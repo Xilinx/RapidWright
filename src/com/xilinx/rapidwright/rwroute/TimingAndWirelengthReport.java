@@ -135,9 +135,8 @@ public class TimingAndWirelengthReport{
      * @param netWrapper
      */
     private void setAccumulativeDelayOfEachNetNode(NetWrapper netWrapper) {
-        Net net = netWrapper.getNet();
         Map<SitePinInst, Pair<Node,Short>> sourceToSinkINTNodeDelays =
-                RouterHelper.getSourceToSinkINTNodeDelays(net, estimator);
+                RouterHelper.getSourceToSinkINTNodeDelays(netWrapper.getNet(), estimator);
 
         for (Connection connection : netWrapper.getConnections()) {
             if (connection.isDirect()) {

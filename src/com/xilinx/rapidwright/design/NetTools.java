@@ -572,9 +572,6 @@ public class NetTools {
      * use {@link #getNodeTrees(Net)} when all drivers matter. Nodes that the net's routing merely
      * passes through without a PIP terminating on them (e.g. the source pin's node) are absent.
      *
-     * The net's routing is assumed to be loop-free, so that following these drivers backwards from
-     * any node terminates.
-     *
      * @param net The net to examine; it need not be fully routed.
      * @return A map from driven node onto driving node, empty if the net has no PIPs.
      */
@@ -606,6 +603,10 @@ public class NetTools {
      *         stopped at, or an empty list if nothing drives the pin (e.g. an unrouted net).
      */
     public static List<Node> getNodesToSink(SitePinInst spi) {
+        if (spi.isOutPin()) {
+            throw new RuntimeException("ERROR: " + spi + " is an output pin");
+        }
+
         Map<Node, Node> nodeToDriver = getNodeToDriver(spi.getNet());
         Node sinkNode = spi.getConnectedNode();
         // Walk backwards, stopping at the first node without a driver: either the source node of
