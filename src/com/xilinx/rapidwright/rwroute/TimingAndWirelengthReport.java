@@ -142,7 +142,8 @@ public class TimingAndWirelengthReport{
             if (connection.isDirect()) {
                 continue;
             }
-            short connectionDelay = sourceToSinkINTNodeDelays.get(connection.getSink()).getSecond();
+            Pair<Node,Short> sinkINTNodeDelay = sourceToSinkINTNodeDelays.get(connection.getSink());
+            short connectionDelay = sinkINTNodeDelay.getSecond();
             if (connection.getTimingEdges() == null) {
                 continue;
             }
