@@ -29,6 +29,7 @@ import java.util.Objects;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Module;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -208,6 +209,17 @@ public class EDIFHierPortInst implements Comparable<EDIFHierPortInst> {
     }
 
     /**
+     * Gets the routed site pin if this port is on a placed leaf cell and its' site is routed
+     * @param module The current module
+     * @return The connected site pin to the connected to this cell pin.
+     */
+    public SitePinInst getRoutedSitePinInst(Module module) {
+        Cell cell = getPhysicalCell(module);
+        if (cell == null) return null;
+        return cell.getSitePinFromPortInst(getPortInst(), null);
+    }
+
+    /**
      * Gets the physical cell to which this port instance has been placed
      * @param design The design corresponding to the implementation of this port instance's netlist
      * @return The placed physical cell mapped for this port instance or null if none could be found
@@ -215,6 +227,17 @@ public class EDIFHierPortInst implements Comparable<EDIFHierPortInst> {
     public Cell getPhysicalCell(Design design) {
         String cellName = getFullHierarchicalInstName();
         Cell cell = design.getCell(cellName);
+        return cell;
+    }
+
+    /**
+     * Gets the physical cell to which this port instance has been placed
+     * @param module The module corresponding to the implementation of this port instance's netlist
+     * @return The placed physical cell mapped for this port instance or null if none could be found
+     */
+    public Cell getPhysicalCell(Module module) {
+        String cellName = getFullHierarchicalInstName();
+        Cell cell = module.getCell(cellName);
         return cell;
     }
 
