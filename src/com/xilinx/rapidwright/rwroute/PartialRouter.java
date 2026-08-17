@@ -391,8 +391,9 @@ public class PartialRouter extends RWRoute {
 
                     // Do not include arcs that the router wouldn't explore
                     // e.g. those that leave the INT tile, since we project pins to their INT tile
-                    // Except for routethru PIPs.
-                    if (RouteNodeGraph.isExcludedTile(end) && !pip.isRouteThru()) {
+                    // Except for routethru PIPs where the start node is not in an excluded tile.
+                    if (RouteNodeGraph.isExcludedTile(end) &&
+                            (!pip.isRouteThru() || RouteNodeGraph.isExcludedTile(start))) {
                         continue;
                     }
 
@@ -630,9 +631,10 @@ public class PartialRouter extends RWRoute {
                 Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
 
                 // Do not include arcs that the router wouldn't explore
-                // e.g. those that leave the INT tile, since we project pins to their INT tile.
-                // Except for routethru PIPs.
-                if (RouteNodeGraph.isExcludedTile(end) && !pip.isRouteThru()) {
+                // e.g. those that leave the INT tile, since we project pins to their INT tile
+                // Except for routethru PIPs where the start node is not in an excluded tile.
+                if (RouteNodeGraph.isExcludedTile(end) &&
+                        (!pip.isRouteThru() || RouteNodeGraph.isExcludedTile(start))) {
                     continue;
                 }
 
