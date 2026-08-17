@@ -793,7 +793,9 @@ public class RouteNodeGraph {
                 if (childRnode != null) {
                     assert(childRnode.getType().isAnyExclusiveSink() ||
                            childRnode.getType().isLocalLeadingToLaguna() ||
-                           ((lutRoutethru || lutPinSwapping) && childRnode.getType().isAnyLocal()));
+                           ((lutRoutethru || lutPinSwapping) && childRnode.getType().isAnyLocal()) ||
+                           // This is a routethru node used on a now-unpreserved net
+                           (!lutRoutethru && childRnode.getType() == RouteNodeType.INACCESSIBLE));
                 } else if (!lutRoutethru) {
                     // child does not already exist in our routing graph, meaning it's not a used site pin
                     // in our design, but it could be a IMUX that leads to a Laguna
