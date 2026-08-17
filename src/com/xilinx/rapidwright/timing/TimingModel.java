@@ -349,11 +349,20 @@ public class TimingModel {
         if (nodeList.size() > 0)
             groups = determineGroups(nodeList, nodeIntents, relevantPIPs);
 
+        // Set the member variables used by "calcIntrasiteDelays()" here too, since the
+        // groups-less path below calls it without going through the List<TimingGroup> overload
+        // (which would otherwise be responsible for setting them)
+        intrasiteDelay = 0;
+        this.startPinInst = startPinInst;
+        this.endPinInst = endPinInst;
+        this.sourceBELPin = sourceBELPin;
+        this.sinkBELPin = sinkBELPin;
+
         float result = 0f;
         if (groups != null) {
             result = calcDelay(startPinInst, endPinInst, sourceBELPin, sinkBELPin, groups);
         } else {
-            accumulateIntrasiteDelays();
+            calcIntrasiteDelays();
         }
 
         return result;
@@ -1135,7 +1144,7 @@ public class TimingModel {
             }
         }
 
-        // set these member variables for use in method: "accumulateIntrasiteDelays()" down below
+        // set these member variables for use in method: "calcIntrasiteDelays()" down below
         intrasiteDelay = 0;
         this.startPinInst = startPinInst;
         this.endPinInst = endPinInst;
@@ -1258,7 +1267,7 @@ public class TimingModel {
 
         netDelayCalc += checkForSitePinDelay(groups);
         
-        accumulateIntrasiteDelays();
+        calcIntrasiteDelays();
 
         for (int i =1 ; i < groups.size(); i++) {
             TimingGroup gprev = groups.get(i-1);
@@ -1539,18 +1548,20 @@ public class TimingModel {
     }
     
     /**
-     * Accumulates onto {@link #intrasiteDelay} the delay of the two intra-site hops that bookend
+     * Computes into {@link #intrasiteDelay} the delay of the two intra-site hops that bookend
      * the inter-site routing of a connection: from the driving BEL pin out to the source site pin,
      * and from the sink site pin in to the driven BEL pin. Either hop contributes zero when it does
      * not exist (for example, a source pin that is neither a MUX nor an "_O" output).
      * Operates on the {@link #startPinInst}, {@link #endPinInst}, {@link #sourceBELPin} and
-     * {@link #sinkBELPin} member variables, which
-     * {@link #calcDelay(SitePinInst, SitePinInst, BELPin, BELPin, List)} sets (along with resetting
+     * {@link #sinkBELPin} member variables, which both
+     * {@link #calcDelay(SitePinInst, SitePinInst, BELPin, BELPin, List)} and
+     * {@link #calcDelay(SitePinInst, SitePinInst, BELPin, BELPin, Net)} set (along with resetting
      * {@link #intrasiteDelay}) before calling this.
      */
-    private void accumulateIntrasiteDelays() {
-        intrasiteDelay += getSinkIntrasiteDelay(endPinInst, null);
-        intrasiteDelay += getSourceIntrasiteDelay(startPinInst, sourceBELPin, sinkBELPin, null);
+    private void calcIntrasiteDelays() {
+        assert(intrasiteDelay == 0);
+        intrasiteDelay = getSinkIntrasiteDelay(endPinInst, null) +
+                getSourceIntrasiteDelay(startPinInst, sourceBELPin, sinkBELPin, null);
     }
 
     /**
