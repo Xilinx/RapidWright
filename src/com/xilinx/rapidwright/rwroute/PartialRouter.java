@@ -720,11 +720,28 @@ public class PartialRouter extends RWRoute {
      * @param design The {@link Design} instance to be routed.
      * @param args An array of string arguments, can be null.
      * If null, the design will be routed in the full timing-driven routing mode with default a {@link RWRouteConfig} instance.
+     * The "--softPreserve" argument, if present, is consumed here (and not forwarded to {@link RWRouteConfig})
+     * to allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
      * For more options of the configuration, please refer to the {@link RWRouteConfig} class.
      * @return Routed design.
      */
     public static Design routeDesignWithUserDefinedArguments(Design design, String[] args) {
         boolean softPreserve = false;
+        if (args != null) {
+            // Splice out every occurrence, since RWRouteConfig would not recognize this argument.
+            // No copying occurs when absent (the common case)
+            for (int i = 0; i < args.length; i++) {
+                if (!args[i].equals("--softPreserve")) {
+                    continue;
+                }
+                softPreserve = true;
+                String[] filtered = new String[args.length - 1];
+                System.arraycopy(args, 0, filtered, 0, i);
+                System.arraycopy(args, i + 1, filtered, i, filtered.length - i);
+                args = filtered;
+                i--;
+            }
+        }
         List<SitePinInst> pinsToRoute = null;
 
         // Uses the default configuration if basic usage only.
@@ -847,7 +864,7 @@ public class PartialRouter extends RWRoute {
      */
     public static void main(String[] args) {
         if (args.length < 2) {
-            System.out.println("USAGE: <input.dcp> <output.dcp>");
+            System.out.println("USAGE: <input.dcp> <output.dcp> [--softPreserve]");
             return;
         }
         // Reads the output directory and set the output design checkpoint file name
