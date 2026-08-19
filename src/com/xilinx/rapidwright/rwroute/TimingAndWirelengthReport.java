@@ -113,14 +113,20 @@ public class TimingAndWirelengthReport{
      */
     private NetWrapper createNetWrapper(Net net) {
         NetWrapper netWrapper = new NetWrapper(numWireNetsToRoute++, net);
-        SitePinInst source = net.getSource();
         for (SitePinInst sink:net.getSinkPins()) {
+            SitePinInst source = net.getSource();
             if (RouterHelper.isExternalConnectionToCout(source, sink)) {
-                source = net.getAlternateSource();
-                if (source == null) {
-                    String errMsg = "Null alternate source is for COUT-CIN connection: " + net.toStringFull();
-                     throw new IllegalArgumentException(errMsg);
+                SitePinInst altSource = net.getAlternateSource();
+                if (altSource == null) {
+                    altSource = DesignTools.getLegalAlternativeOutputPin(net);
+                    if (altSource == null) {
+                        String errMsg = "Null alternate source is for COUT-CIN connection: " + net.toStringFull();
+                        throw new IllegalArgumentException(errMsg);
+                    }
+                    net.addPin(altSource);
+                    DesignTools.routeAlternativeOutputSitePin(net, altSource);
                 }
+                source = altSource;
             }
             Connection connection = new Connection(numConnectionsToRoute++, source, sink, netWrapper);
             Node sinkINTNode = RouterHelper.projectInputPinToINTNode(sink);
