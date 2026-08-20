@@ -42,6 +42,7 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -548,25 +549,18 @@ public class RouterHelper {
 
     /**
      * Gets a map containing net delay for each sink pin paired with an INT tile node of a routed net.
+     * The delay to each sink is accumulated by walking upstream from it to the start of the net's
+     * routing; the net is assumed to be loop-free, and this walk does not terminate on one that is not.
      * @param net The target routed net.
      * @param estimator An instantiation of DelayEstimatorBase.
      * @return The map containing net delay for each sink pin paired with an INT tile node of a routed net.
      */
     public static Map<SitePinInst, Pair<Node,Short>> getSourceToSinkINTNodeDelays(Net net, DelayEstimatorBase estimator) {
-        List<PIP> pips = net.getPIPs();
+        // Net.getPIPs() is in no particular order, so accumulating delay by walking it would use
+        // an upstream delay that is not yet final. Walk upstream from each sink instead, using a
+        // map that also gives bidirectional PIPs the direction PIP.isReversed() indicates.
+        Map<Node, Node> nodeToDriver = NetTools.getNodeToDriver(net);
         Map<Node, Integer> delayMap = new HashMap<>();
-        for (PIP pip : pips) {
-            Node startNode = pip.getStartNode();
-            int upstreamDelay = delayMap.getOrDefault(startNode, 0);
-
-            Node endNode = pip.getEndNode();
-            int delay = 0;
-            if (endNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {//device independent?
-                delay = computeNodeDelay(estimator, endNode)
-                        + DelayEstimatorBase.getExtraDelay(endNode, DelayEstimatorBase.isLong(startNode));
-            }
-            delayMap.put(endNode, upstreamDelay + delay);
-        }
 
         Map<SitePinInst, Pair<Node,Short>> sinkNodeDelays = new HashMap<>();
         for (SitePinInst sink : net.getSinkPins()) {
@@ -580,11 +574,37 @@ public class RouterHelper {
                 }
             }
 
-            // A sink that no PIP arrives at has not been routed to yet (e.g. on a placed-only
-            // design), so it has accumulated no route delay
-            Integer delay = delayMap.get(sinkNode);
-            short routeDelay = (delay == null) ? 0 : delay.shortValue();
-            sinkNodeDelays.put(sink, new Pair<>(sinkNode,routeDelay));
+            // Walk upstream until a node of already known delay, or the start of this net's
+            // routing, is reached
+            List<Node> upstreamNodes = new ArrayList<>();
+            Node curr = sinkNode;
+            Integer knownDelay;
+            while ((knownDelay = delayMap.get(curr)) == null) {
+                Node driver = nodeToDriver.get(curr);
+                if (driver == null) {
+                    // No PIP arrives at this node: either it is the node of the net's source pin,
+                    // or it is where the routing to a sink not routed to yet gives out (e.g. on a
+                    // placed-only design), in which case no route delay has been accumulated
+                    break;
+                }
+                upstreamNodes.add(curr);
+                curr = driver;
+            }
+
+            // Then accumulate back downstream from there, memoizing every node walked through so
+            // that nodes shared by more than one sink of this net are only visited once
+            int delay = (knownDelay == null) ? 0 : knownDelay;
+            for (int i = upstreamNodes.size() - 1; i >= 0; i--) {
+                Node downhill = upstreamNodes.get(i);
+                if (downhill.getTile().getTileTypeEnum() == TileTypeEnum.INT) {//device independent?
+                    delay += computeNodeDelay(estimator, downhill)
+                            + DelayEstimatorBase.getExtraDelay(downhill, DelayEstimatorBase.isLong(curr));
+                }
+                delayMap.put(downhill, delay);
+                curr = downhill;
+            }
+
+            sinkNodeDelays.put(sink, new Pair<>(sinkNode,(short) delay));
         }
 
         return sinkNodeDelays;
