@@ -966,6 +966,14 @@ public class DesignTools {
                 HashSet<PIP> uniquePIPs = new HashSet<PIP>(net.getPIPs());
                 uniquePIPs.addAll(staticNet.getPIPs());
                 staticNet.setPIPs(uniquePIPs);
+
+		// Update intra-site routing
+                for (SiteInst si : new ArrayList<>(net.getSiteInsts())) {
+                    for (String siteWire : si.getSiteWiresFromNet(net)) {
+                        BELPin[] bp = si.getSiteWirePins(siteWire);
+                        si.routeIntraSiteNet(staticNet, bp[0], bp[0]);
+                    }
+                }
             } else {
                 net.updateName(hierarchicalCellName + "/" + net.getName());
                 design.addNet(net);
