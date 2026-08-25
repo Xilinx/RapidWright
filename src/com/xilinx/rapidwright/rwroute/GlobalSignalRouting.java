@@ -514,7 +514,7 @@ public class GlobalSignalRouting {
                             tileTypeEnum != TileTypeEnum.BLI_CLE_BOT_CORE &&
                             tileTypeEnum != TileTypeEnum.BLI_CLE_BOT_CORE_MY);
                     for (Node uphillNode : node.getAllUphillNodes()) {
-                        if (routeThruHelper.isRouteThru(uphillNode, node) && notIriRoutethru) {
+                        if (Utils.isCLB(tileTypeEnum) && routeThruHelper.isRouteThru(uphillNode, node) /*&& notIriRoutethru*/) {
                             continue;
                         }
 
