@@ -570,7 +570,13 @@ public class RouteNodeGraph {
     public void preserve(Net net, List<SitePinInst> pins) {
         boolean isStaticNet = net.isStaticNet();
         for (SitePinInst pin : pins) {
-            preserve(pin.getConnectedNode(), net);
+            Node node = pin.getConnectedNode();
+            if (node == null) {
+                // The IOB_X?Y?.IO SitePinInst doesn't have a connected node
+                assert(Utils.isIOB(pin.getSiteInst()) && pin.getName().equals("IO"));
+                continue;
+            }
+            preserve(node, net);
 
             if (isStaticNet && pin.isOutPin()) {
                 // When a LUT output is used as a static source, also preserve the other pin
