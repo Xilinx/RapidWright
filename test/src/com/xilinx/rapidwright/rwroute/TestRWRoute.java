@@ -23,6 +23,8 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -531,10 +533,35 @@ public class TestRWRoute {
         Assertions.assertTrue(Files.exists(outputFile));
     }
 
-    @Test
-    public void testTimingAndWirelengthReport() {
-        String dcp = RapidWrightDCP.getString("picoblaze_ooc_X10Y235.dcp");
-        TimingAndWirelengthReport.main(new String[]{dcp});
+    @ParameterizedTest
+    @CsvSource({
+            "picoblaze_ooc_X10Y235.dcp,false",
+            "picoblaze_ooc_X10Y235.dcp,true",
+            "gnl_2_4_3_1.3_gnl_3000_07_3_80_80_placed.dcp,false",
+            "gnl_2_4_3_1.3_gnl_3000_07_3_80_80_placed.dcp,true",
+    })
+    public void testTimingAndWirelengthReport(String dcpShortPath, boolean verbose) {
+        String dcp = RapidWrightDCP.getString(dcpShortPath);
+        String[] args = verbose ? new String[]{dcp, "--verbose"} : new String[]{dcp};
+
+        ByteArrayOutputStream capture = new ByteArrayOutputStream();
+        PrintStream originalOut = System.out;
+        try {
+            System.setOut(new PrintStream(capture, true));
+            TimingAndWirelengthReport.main(args);
+        } finally {
+            System.setOut(originalOut);
+        }
+
+        String output = capture.toString();
+        System.out.print(output);
+        Assertions.assertTrue(output.contains("Critical path delay (ps):"));
+        if (verbose) {
+            // Every critical path ends on a flop input, so it must cross into that flop's site
+            Assertions.assertTrue(output.contains("(intrasite)"));
+            // Each intra-site hop must be attributable to a specific pair of BEL pins
+            Assertions.assertFalse(output.contains("(BEL pins not recoverable)"));
+        }
     }
 
     @ParameterizedTest

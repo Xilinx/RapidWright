@@ -24,10 +24,6 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -66,8 +62,6 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.timing.TimingEdge;
-import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
@@ -586,7 +580,10 @@ public class RouterHelper {
                 }
             }
 
-            short routeDelay = (short) delayMap.get(sinkNode).intValue();
+            // A sink that no PIP arrives at has not been routed to yet (e.g. on a placed-only
+            // design), so it has accumulated no route delay
+            Integer delay = delayMap.get(sinkNode);
+            short routeDelay = (delay == null) ? 0 : delay.shortValue();
             sinkNodeDelays.put(sink, new Pair<>(sinkNode,routeDelay));
         }
 
@@ -661,57 +658,5 @@ public class RouterHelper {
 
         System.err.println("ERROR: Failed to find a path between two nodes: " + source + ", " + sink);
         return Collections.emptyList();
-    }
-
-    /**
-     *  Gets the delay of a given path, using output pin only.
-     *  The path format:
-     *  {@code superSource -> Q -> O -> --- -> D.}
-     */
-    public static void getSamplePathDelay(String filePath, TimingManager timingManager,
-            Map<TimingEdge, Connection> timingEdgeConnectionMap, RouteNodeGraph routingGraph) {
-        List<String> verticesOfVivadoPath = new ArrayList<>();
-        // Include CLK if the first in the path is BRAM or DSP to check the logic delay
-        // NOTE: remember to change the pin names of DSPs from subblock to top-level block that we use
-        verticesOfVivadoPath.add("superSource");
-        File vivadoReport = new File(filePath);
-        if (!vivadoReport.exists()) {
-            System.err.println("ERROR: Target file does not exist for getting the sample path delay");
-            return;
-        }
-        try {
-            List<String> path = parseVivadoPathToStringList(vivadoReport);
-            System.out.println("INFO: Given path: " + path);
-            verticesOfVivadoPath.addAll(path);
-        } catch (IOException e) {
-
-            e.printStackTrace();
-        }
-        System.out.println(verticesOfVivadoPath);
-        timingManager.getSamplePathDelayInfo(verticesOfVivadoPath, timingEdgeConnectionMap, true, routingGraph);
-    }
-
-    /**
-     * Parses the data path from an input file indicating data path of a Vivado timing report.
-     * @param file The file contains a data path of a Vivado timing report.
-     * @return The data path.
-     * @throws IOException
-     */
-    public static List<String> parseVivadoPathToStringList(File file) throws IOException{
-        List<String> path = new ArrayList<>();
-        BufferedReader reader = new BufferedReader(new FileReader(file));
-        String line;
-        while ((line = reader.readLine()) != null) {
-            if (line.length() == 0) {
-                break;
-            }
-
-            if (!line.contains(" r  ") && !line.contains(" f  ")) continue;
-
-            String[] dataStrings = line.split("\\s+");
-            path.add(dataStrings[dataStrings.length - 1]);
-        }
-        reader.close();
-        return path;
     }
 }

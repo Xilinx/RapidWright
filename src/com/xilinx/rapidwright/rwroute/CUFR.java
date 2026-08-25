@@ -91,7 +91,7 @@ public class CUFR extends RWRoute {
     }
 
     public static class RouteNodeGraphCUFRTimingDriven extends RouteNodeGraphTimingDriven {
-        public RouteNodeGraphCUFRTimingDriven(Design design, RWRouteConfig config, DelayEstimatorBase delayEstimator) {
+        public RouteNodeGraphCUFRTimingDriven(Design design, RWRouteConfig config, DelayEstimatorBase<InterconnectInfo> delayEstimator) {
             super(design, config, delayEstimator);
         }
 
@@ -104,7 +104,7 @@ public class CUFR extends RWRoute {
     protected RouteNodeGraph createRouteNodeGraph() {
         if (config.isTimingDriven()) {
             /* An instantiated delay estimator that is used to calculate delay of routing resources */
-            DelayEstimatorBase estimator = new DelayEstimatorBase<>(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+            DelayEstimatorBase<InterconnectInfo> estimator = new DelayEstimatorBase<>(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
             return new RouteNodeGraphCUFRTimingDriven(design, config, estimator);
         } else {
             return new RouteNodeGraphCUFR(design, config);
