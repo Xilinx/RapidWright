@@ -391,7 +391,9 @@ public class PartialRouter extends RWRoute {
 
                     // Do not include arcs that the router wouldn't explore
                     // e.g. those that leave the INT tile, since we project pins to their INT tile
-                    if (RouteNodeGraph.isExcludedTile(end)) {
+                    // Except for routethru PIPs where the start node is not in an excluded tile.
+                    if (RouteNodeGraph.isExcludedTile(end) &&
+                            (!pip.isRouteThru() || RouteNodeGraph.isExcludedTile(start))) {
                         continue;
                     }
 
@@ -407,6 +409,15 @@ public class PartialRouter extends RWRoute {
                     }
                     assert(rend.getPrev() == null);
                     rend.setPrev(rstart);
+
+                    // When lutRoutethru is disabled, RWRoute does not normally explore non-sink PINFEED nodes.
+                    // Here, these nodes exist because they were on a previously-preserved net: mark these as
+                    // INACCESSIBLE such that once this connection gets rerouted, this node can't be used again.
+                    if (!routingGraph.lutRoutethru && pip.isRouteThru()) {
+                        assert(rstart.getIntentCode() == IntentCode.NODE_PINFEED);
+                        assert(rstart.getType() == RouteNodeType.LOCAL_EAST || rstart.getType() == RouteNodeType.LOCAL_WEST);
+                        rstart.setType(RouteNodeType.INACCESSIBLE);
+                    }
                 }
 
                 // Use the prev pointers to attempt to recover routing for all indirect connections
@@ -576,9 +587,11 @@ public class PartialRouter extends RWRoute {
                 Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
 
                 // Do not include arcs that the router wouldn't explore
-                // e.g. those that leave the INT tile, since we project pins to their INT tile
-                if (RouteNodeGraph.isExcludedTile(end))
+                // e.g. those that leave the INT tile, since we project pins to their INT tile.
+                // Except for routethru PIPs.
+                if (RouteNodeGraph.isExcludedTile(end) && !pip.isRouteThru()) {
                     continue;
+                }
 
                 // Skip PIPs that would otherwise get projected away
                 if (isExcludedPip(start, end)) {
@@ -619,8 +632,11 @@ public class PartialRouter extends RWRoute {
 
                 // Do not include arcs that the router wouldn't explore
                 // e.g. those that leave the INT tile, since we project pins to their INT tile
-                if (RouteNodeGraph.isExcludedTile(end))
+                // Except for routethru PIPs where the start node is not in an excluded tile.
+                if (RouteNodeGraph.isExcludedTile(end) &&
+                        (!pip.isRouteThru() || RouteNodeGraph.isExcludedTile(start))) {
                     continue;
+                }
 
                 if (pip.isPIPFixed()) {
                     // Do not unpreserve locked nodes
@@ -647,6 +663,15 @@ public class PartialRouter extends RWRoute {
                 // Also set the prev pointer according to the PIP
                 assert (rend.getPrev() == null);
                 rend.setPrev(rstart);
+
+                // When lutRoutethru is disabled, RWRoute does not normally explore non-sink PINFEED nodes.
+                // Here, these nodes exist because they were on a previously-preserved net: mark these as
+                // INACCESSIBLE such that once this connection gets rerouted, this node can't be used again.
+                if (!routingGraph.lutRoutethru && pip.isRouteThru()) {
+                    assert(rstart.getIntentCode() == IntentCode.NODE_PINFEED);
+                    assert(rstart.getType() == RouteNodeType.LOCAL_EAST || rstart.getType() == RouteNodeType.LOCAL_WEST);
+                    rstart.setType(RouteNodeType.INACCESSIBLE);
+                }
             }
 
             // Try and use prev pointers to recover the routing for each connection
@@ -675,6 +700,10 @@ public class PartialRouter extends RWRoute {
         for (RouteNode rnode : rnodes) {
             // Check already unpreserved above
             assert(!routingGraph.isPreserved(rnode));
+
+            if (rnode.getType() == RouteNodeType.INACCESSIBLE) {
+                continue;
+            }
 
             // Each rnode should be added as a child to all of its parents
             // that already exist
