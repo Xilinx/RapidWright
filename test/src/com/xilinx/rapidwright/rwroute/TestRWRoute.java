@@ -539,6 +539,8 @@ public class TestRWRoute {
             "picoblaze_ooc_X10Y235.dcp,true",
             "gnl_2_4_3_1.3_gnl_3000_07_3_80_80_placed.dcp,false",
             "gnl_2_4_3_1.3_gnl_3000_07_3_80_80_placed.dcp,true",
+            "optical-flow.dcp,false",
+            "optical-flow.dcp,true",
     })
     public void testTimingAndWirelengthReport(String dcpShortPath, boolean verbose) {
         String dcp = RapidWrightDCP.getString(dcpShortPath);
