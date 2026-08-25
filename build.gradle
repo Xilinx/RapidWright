@@ -3,6 +3,10 @@ buildscript {
     gradle.ext.rapidwrightDir = "."
 }
 
+import java.nio.file.DirectoryNotEmptyException
+import java.nio.file.Files
+import java.nio.file.LinkOption
+
 plugins {
     id 'java'
     id 'maven-publish'
@@ -20,7 +24,6 @@ application {
 }
 
 def standaloneClassName = "com.xilinx.rapidwright.StandaloneEntrypoint"
-def preserveDir = ".preserveBin"
 
 def read_rapidwright_version() {
     def sw = new StringWriter()
@@ -45,7 +48,6 @@ dependencies {
 
 sourceSets {
   main {
-    java.destinationDirectory.fileValue(file('bin'))
     java {
       srcDirs = ['src']
     }
@@ -77,11 +79,6 @@ tasks.named('testFixturesJar', Jar) {
   archiveFileName = 'rapidwright-test-fixtures.jar'
 }
 
-task preserveBin(type: Copy) {
-     from "bin/rapidwright", "bin/rapidwright.bat"
-     into preserveDir
-}
-
 task copyJars(type: Copy) {
     from({
         configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts.collect { it.file } .findAll { it.name != tasks.getByName("jar").archiveFile.get().asFile.name }
@@ -94,22 +91,60 @@ task copyJars(type: Copy) {
     into 'jars'
 }
 compileJava.dependsOn(copyJars)
-compileJava.dependsOn(preserveBin)
 
-task cleanupScripts(type: Delete) {
-    delete preserveDir
+// External requirement: the compiled class files must be available under 'bin'.
+// Keep Gradle's compiler output in its default location, which the incremental
+// compiler can safely own, and expose its package directory at bin/com without
+// putting the tracked bin/rapidwright[.bat] launchers in the compiler's output.
+def binClasses = file('bin/com')
+def isWindows = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
+
+def removeBinClasses = {
+    def path = binClasses.toPath()
+    if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
+        return
+    }
+
+    try {
+        // Deletes a symbolic link or Windows junction without touching its target.
+        Files.delete(path)
+    } catch (DirectoryNotEmptyException ignored) {
+        // Migrate a real bin/com directory created by older builds.
+        delete binClasses
+    }
 }
 
-task restoreScripts(type: Copy) {
-    dependsOn(tasks.named("jar"))
-    dependsOn(tasks.named("compileTestFixturesJava"))
-    dependsOn(tasks.named("compileTestJava"))
-    from preserveDir
-    into 'bin'
-    finalizedBy(cleanupScripts)
-}
+task linkClassesToBin {
+    dependsOn(compileJava)
 
-run.dependsOn(restoreScripts)
+    doLast {
+        removeBinClasses()
+
+        def target = sourceSets.main.java.destinationDirectory.get().asFile.toPath().resolve('com')
+        if (isWindows) {
+            def process = new ProcessBuilder(
+                'cmd', '/c', 'mklink', '/J',
+                binClasses.absolutePath,
+                target.toAbsolutePath().toString()
+            ).inheritIO().start()
+            def exitCode = process.waitFor()
+            if (exitCode != 0) {
+                throw new GradleException("mklink /J failed with exit code ${exitCode}")
+            }
+        } else {
+            def link = binClasses.toPath()
+            Files.createSymbolicLink(link, link.parent.relativize(target))
+        }
+    }
+}
+compileJava.finalizedBy(linkClassesToBin)
+
+// Remove the link/junction before its target so clean leaves only the launchers.
+clean {
+    doFirst {
+        removeBinClasses()
+    }
+}
 
 task mainJar(type: Jar, dependsOn: classes) {
     archiveFileName = 'main.jar'
@@ -119,7 +154,6 @@ task mainJar(type: Jar, dependsOn: classes) {
         attributes 'Class-Path': ([destinationDirectory.get().getAsFile().toPath().relativize(sourceSets.main.java.destinationDirectory.get().getAsFile().toPath()).toString() + File.separator]
             + configurations.runtimeClasspath.collect { destinationDirectory.get().getAsFile().toPath().relativize(projectDir.toPath()).resolve('jars').resolve(it.getName()) }).join(' ')
     }
-    finalizedBy(restoreScripts)
 }
 compileJava.finalizedBy(mainJar)
 
