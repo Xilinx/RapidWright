@@ -122,8 +122,14 @@ task linkClassesToBin {
 
         def target = sourceSets.main.java.destinationDirectory.get().asFile.toPath().resolve('com')
         if (isWindows) {
-            exec {
-                commandLine 'cmd', '/c', 'mklink', '/J', binClasses.absolutePath, target.toAbsolutePath().toString()
+            def process = new ProcessBuilder(
+                'cmd', '/c', 'mklink', '/J',
+                binClasses.absolutePath,
+                target.toAbsolutePath().toString()
+            ).inheritIO().start()
+            def exitCode = process.waitFor()
+            if (exitCode != 0) {
+                throw new GradleException("mklink /J failed with exit code ${exitCode}")
             }
         } else {
             def link = binClasses.toPath()
