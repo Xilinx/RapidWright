@@ -655,9 +655,11 @@ public class GlobalSignalRouting {
                 // Create a dummy TIEOFF SiteInst
                 String name = SiteInst.STATIC_SOURCE + "_" + site.getName();
                 si = new SiteInst(name, site.getSiteTypeEnum());
+                si.setDesign(design);
                 si.place(site);
-                // Ensure it is not attached to the design
-                assert (si.getDesign() == null);
+                // Ensure site is marked as used in the design, but not attached to the design through its name
+                assert (design.isSiteUsed(site));
+                assert (design.getSiteInst(name) == null);
 
                 // The site instance stays off the design, so a flow tracking changes
                 // to generate an incremental bitstream has no way of reaching it
