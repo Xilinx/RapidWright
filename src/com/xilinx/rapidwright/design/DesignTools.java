@@ -954,7 +954,18 @@ public class DesignTools {
                     }
                 }
             }
+            //The site instance is arriving whole from the cell being placed into the black box, so none of
+            //what it holds is in the bitstream yet. What it is changing from is therefore an empty site
+            //instance at the same site, and that is what is recorded as the original: a copy of the site
+            //instance as it now stands would compare equal to itself cell for cell and every LUT and flop
+            //it carries would be left unwritten
+            if (design.isCopyingOriginalSiteInsts()) {
+                SiteInst empty = new SiteInst(si.getName(), si.getSiteTypeEnum());
+                empty.place(si.getSite());
+                design.getOriginalSiteInsts().put(si.getName(), empty);
+            }
             design.addSiteInst(si);
+            design.addModifiedSiteInst(si);
         }
 
         // Add routing information
@@ -969,6 +980,7 @@ public class DesignTools {
             } else {
                 net.updateName(hierarchicalCellName + "/" + net.getName());
                 design.addNet(net);
+                design.addModifiedNet(net);
             }
         }
 
