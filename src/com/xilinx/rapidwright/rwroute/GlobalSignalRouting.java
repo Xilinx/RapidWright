@@ -673,6 +673,12 @@ public class GlobalSignalRouting {
             boolean updateSiteRouting = false;
             currNet.addPin(spi, updateSiteRouting);
             spi.setRouted(true);
+
+            // An [A-H]MUX pin is reached from the 6LUT output through the site's output multiplexer,
+            // which has to be told to take its D6 input; an [A-H]_O pin leaves the site directly
+            if (pinName.endsWith("MUX")) {
+                si.addSitePIP("OUTMUX" + pinName.charAt(0), "D6");
+            }
         }
     }
 
