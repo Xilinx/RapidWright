@@ -658,6 +658,17 @@ public class GlobalSignalRouting {
                 si.place(site);
                 // Ensure it is not attached to the design
                 assert (si.getDesign() == null);
+
+                // The site instance stays off the design, so a flow tracking changes
+                // to generate an incremental bitstream has no way of reaching it
+                // through the design's own site instances: hand it over here, against
+                // an original that is empty because the site held nothing before
+                if (design.isCopyingOriginalSiteInsts() && !design.getOriginalSiteInsts().containsKey(name)) {
+                    SiteInst empty = new SiteInst(name, site.getSiteTypeEnum());
+                    empty.place(site);
+                    design.getOriginalSiteInsts().put(name, empty);
+                    design.addModifiedSiteInst(si);
+                }
             } else {
                 SitePinInst spi = si.getSitePinInst(pinName);
                 if (spi != null) {
