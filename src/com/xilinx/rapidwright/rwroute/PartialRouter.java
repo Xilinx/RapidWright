@@ -403,8 +403,13 @@ public class PartialRouter extends RWRoute {
         while (!queue.isEmpty()) {
             NetTools.NodeTree node = queue.remove();
             boolean active = activeQueue.remove();
-            if (active && sinkNodes.contains(node)) {
-                // Nothing beyond a sink belongs to any connection
+            if (active && node.fanouts.isEmpty() && sinkNodes.contains(node)) {
+                // Nothing beyond a sink belongs to any connection -- unless the routing carries
+                // on through it, which a NODE_PINBOUNCE sink does when the net bounces off the
+                // pin to reach another sink below it. Stopping there would leave every node on
+                // that continuation without a prev pointer, so finishRouteConnection() could not
+                // recover the branch and the connection would be re-routed into its own
+                // preserved sink node
                 continue;
             }
             for (NetTools.NodeTree fanout : node.fanouts) {
