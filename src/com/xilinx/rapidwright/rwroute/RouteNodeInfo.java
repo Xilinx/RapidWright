@@ -131,6 +131,13 @@ public class RouteNodeInfo {
     }
 
     public static RouteNodeType getType(Node node, RouteNodeGraph routingGraph) {
+        if (RouteNodeGraph.isExcludedTile(node)) {
+            // The router never explores into these tiles (e.g. the leaf clock network in
+            // RCLK_INT_[LR]) so such nodes have no east/west flavour to discover here; they
+            // exist only to carry the previous pointers of already-routed nets
+            return RouteNodeType.NON_LOCAL;
+        }
+
         // NOTE: IntentCode is device-dependent
         IntentCode ic = node.getIntentCode();
         TileTypeEnum tileTypeEnum = node.getTile().getTileTypeEnum();

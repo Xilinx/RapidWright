@@ -310,8 +310,13 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                                // Feedthrough nodes to reach tiles immediately above/below
                                (length == 1 && getWireName().matches("OUT_[NESW]NODE_[EW]_\\d+")));
                         break;
+                    case NODE_GLOBAL_LEAF:
+                    case NODE_PINFEED:
+                        // TODO: Assert that this is on the preserved section of a partially routed net
+                        assert(RouteNodeGraph.isExcludedTile(this));
+                        break;
                     default:
-                        throw new RuntimeException(ic.toString());
+                        throw new RuntimeException("ERROR: Unexpected IntentCode: " + ic + " for " + super.toString());
                 }
                 break;
             default:
