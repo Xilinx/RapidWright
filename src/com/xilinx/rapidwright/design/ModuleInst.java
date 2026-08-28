@@ -809,7 +809,7 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         for (SitePinInst pin : input.getSitePinInsts()) {
             SitePinInst instPin = getCorrespondingPin(pin);
             if (instPin.getNet() != null) {
-                instPin.getNet().removePin(pin);
+                instPin.getNet().removePin(instPin);
             }
             physNet.addPin(instPin);
         }
