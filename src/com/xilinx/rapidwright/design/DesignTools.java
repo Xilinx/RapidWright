@@ -71,6 +71,7 @@ import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.eco.ECOTools;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
@@ -941,6 +942,10 @@ public class DesignTools {
         inst.setCellType(cell.getTopEDIFCell());
         netlist.removeUnusedCellsFromAllWorkLibraries();
 
+        // The logical netlist is final from here on, so the cached parent net map -- which describes
+        // the black box as it was, empty -- can be dropped now
+        netlist.resetParentNetMap();
+
         // Static source pins displaced by the incoming site instances. They cannot be removed as they
         // are found since unrouting a static net walks its pins, so they are collected and taken off in
         // one batch once every site instance is in
@@ -1001,7 +1006,8 @@ public class DesignTools {
         DesignTools.batchRemoveSitePins(deferredRemovals, preserveOtherRoutes);
 
         // Add routing information
-        List<Net> insertedNets = new ArrayList<>();
+        final String cellPrefix = hierarchicalCellName + EDIFTools.EDIF_HIER_SEP;
+        Map<Net, EDIFHierNet> boundaryNets = new HashMap<>();
         for (Net net : new ArrayList<>(cell.getNets())) {
             if (net.getName().equals(Net.USED_NET)) continue;
             if (net.isStaticNet()) {
@@ -1011,17 +1017,32 @@ public class DesignTools {
                 uniquePIPs.addAll(staticNet.getPIPs());
                 staticNet.setPIPs(uniquePIPs);
             } else {
-                net.updateName(hierarchicalCellName + "/" + net.getName());
+                net.updateName(cellPrefix + net.getName());
                 design.addNet(net);
                 design.addModifiedNet(net);
-                insertedNets.add(net);
+                EDIFHierNet parentNet = getBoundaryOwner(netlist, net, cellPrefix);
+                if (parentNet != null) boundaryNets.put(net, parentNet);
             }
         }
 
-        // Rectify boundary nets
-        netlist.resetParentNetMap();
+        // The nets above cover every crossing the shell drives, because the physical net follows the
+        // cell in. A crossing the cell drives is the other way round: the alias is the shell-side net,
+        // which never moved, so nothing above has seen it. Only a port the cell drives can be in that
+        // position, and its net sits in the cell enclosing the black box
+        String parentCellName = hierarchicalCellName.substring(0,
+                Math.max(hierarchicalCellName.lastIndexOf(EDIFTools.EDIF_HIER_SEP), 0));
+        for (EDIFPortInst portInst : inst.getPortInsts()) {
+            if (portInst.getDirection() == EDIFDirection.INPUT) continue;
+            EDIFNet outerNet = portInst.getNet();
+            if (outerNet == null) continue;
+            Net net = design.getNet(parentCellName.isEmpty() ? outerNet.getName()
+                    : parentCellName + EDIFTools.EDIF_HIER_SEP + outerNet.getName());
+            if (net == null) continue;
+            EDIFHierNet parentNet = getBoundaryOwner(netlist, net, cellPrefix);
+            if (parentNet != null) boundaryNets.put(net, parentNet);
+        }
 
-        postBlackBoxCleanup(design, keepBoundaryRouting, insertedNets);
+        postBlackBoxCleanup(design, keepBoundaryRouting, boundaryNets);
 
         List<String> encryptedCells = cell.getNetlist().getEncryptedCells();
         if (encryptedCells != null && encryptedCells.size() > 0) {
@@ -1030,33 +1051,50 @@ public class DesignTools {
     }
 
     /**
-     * Merges the physical nets that arrived with a cell just placed into a black box onto the nets
+     * Identifies whether a physical net crosses the boundary of a black box that has just been
+     * populated, and if so returns the net that owns it.
+     *
+     * @param netlist    The design's netlist, whose parent net map says which net owns which.
+     * @param net        The physical net to test. Its name is what gets looked up, rather than
+     *                   getLogicalHierNet(): a net that arrived with the cell still carries the
+     *                   hierarchy it had inside, which the shell's netlist knows nothing about.
+     * @param cellPrefix The black box's hierarchical name and a separator. The separator matters --
+     *                   without it a cell 'foo1' would also claim the nets of 'foo10'.
+     * @return The owning net, or null if this net owns itself, holds nothing worth moving, or sits on
+     *         the same side of the boundary as its owner.
+     */
+    private static EDIFHierNet getBoundaryOwner(EDIFNetlist netlist, Net net, String cellPrefix) {
+        // A net with no physical presence has nothing to move, so it is not worth asking about
+        if (net.getPins().isEmpty() && net.getSiteInsts().isEmpty()) return null;
+        EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
+        if (hierNet == null) return null;
+        EDIFHierNet parentNet = netlist.getParentNetMap().get(hierNet);
+        if (parentNet == null || parentNet.equals(hierNet)) return null;
+        // An alias sitting on the same side as its owner -- both within the cell, or both without --
+        // is a purely internal one, and it is expected that makePhysNetNamesConsistent() will
+        // reconcile those prior to routing
+        if (net.getName().startsWith(cellPrefix)
+                == parentNet.getHierarchicalNetName().startsWith(cellPrefix)) return null;
+        return parentNet;
+    }
+
+    /**
+     * Merges the nets crossing the boundary of a black box that has just been populated onto the nets
      * that own them, so that every physical net is once again named after its source.
      *
      * @param design              The current design.
      * @param keepBoundaryRouting Preserves the routing on the boundaries of the
      *                            black box.
-     * @param insertedNets        The physical nets that arrived with the cell. Asking the parent net
-     *                            map which of them are aliases is far cheaper on a large netlist than
-     *                            walking the electrical tree of every boundary net.
+     * @param boundaryNets        The nets crossing the boundary, mapped to the net that owns each --
+     *                            as identified by {@link #getBoundaryOwner}.
      */
     private static void postBlackBoxCleanup(Design design, boolean keepBoundaryRouting,
-            Collection<Net> insertedNets) {
-        EDIFNetlist netlist = design.getNetlist();
-        // Everything the cell brought in is named after a net inside it, but a net that crosses the
-        // boundary belongs to whichever driver owns it -- in the shell for an input, in the cell for
-        // an output. The parent net map says which is which; the pins say which nets are worth
-        // asking about at all
-        Map<EDIFHierNet, EDIFHierNet> parentNetMap = netlist.getParentNetMap();
-        for (Net alias : insertedNets) {
-            if (alias.getPins().isEmpty() && alias.getSiteInsts().isEmpty()) continue;
-            // Resolved from the name the net was just given, not from getLogicalHierNet(): the cell's
-            // nets still carry the hierarchy they had inside the cell, which the shell's netlist - and
-            // so the parent net map - knows nothing about
-            EDIFHierNet aliasName = netlist.getHierNetFromName(alias.getName());
-            if (aliasName == null) continue;
-            EDIFHierNet parentNetName = parentNetMap.get(aliasName);
-            if (parentNetName == null || parentNetName.equals(aliasName)) continue;
+            Map<Net, EDIFHierNet> boundaryNets) {
+        for (Entry<Net, EDIFHierNet> e : boundaryNets.entrySet()) {
+            Net alias = e.getKey();
+            EDIFHierNet parentNetName = e.getValue();
+            // A crossing owned by the logical <const0>/<const1> net has no physical net of that name:
+            // its pins belong on the design's GND/VCC net
             NetType parentNetType = NetType.getNetTypeFromNetName(parentNetName.getHierarchicalNetName());
             Net parentNet = parentNetType.isStaticNetType() ? design.getStaticNet(parentNetType)
                                                             : design.getNet(parentNetName.getHierarchicalNetName());
