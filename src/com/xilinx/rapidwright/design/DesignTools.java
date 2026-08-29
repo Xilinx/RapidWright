@@ -1001,6 +1001,7 @@ public class DesignTools {
         DesignTools.batchRemoveSitePins(deferredRemovals, preserveOtherRoutes);
 
         // Add routing information
+        List<Net> insertedNets = new ArrayList<>();
         for (Net net : new ArrayList<>(cell.getNets())) {
             if (net.getName().equals(Net.USED_NET)) continue;
             if (net.isStaticNet()) {
@@ -1013,13 +1014,14 @@ public class DesignTools {
                 net.updateName(hierarchicalCellName + "/" + net.getName());
                 design.addNet(net);
                 design.addModifiedNet(net);
+                insertedNets.add(net);
             }
         }
 
         // Rectify boundary nets
         netlist.resetParentNetMap();
 
-        postBlackBoxCleanup(hierarchicalCellName, design, keepBoundaryRouting);
+        postBlackBoxCleanup(design, keepBoundaryRouting, insertedNets);
 
         List<String> encryptedCells = cell.getNetlist().getEncryptedCells();
         if (encryptedCells != null && encryptedCells.size() > 0) {
@@ -1028,66 +1030,48 @@ public class DesignTools {
     }
 
     /**
-     * Attempts to rename boundary nets around the previous blackbox to follow
-     * naming convention (net is named after source).
-     * 
-     * @param hierCellName        The hierarchical cell instance that was previously
-     *                            a black box
+     * Merges the physical nets that arrived with a cell just placed into a black box onto the nets
+     * that own them, so that every physical net is once again named after its source.
+     *
      * @param design              The current design.
      * @param keepBoundaryRouting Preserves the routing on the boundaries of the
      *                            black box.
+     * @param insertedNets        The physical nets that arrived with the cell. Asking the parent net
+     *                            map which of them are aliases is far cheaper on a large netlist than
+     *                            walking the electrical tree of every boundary net.
      */
-    public static void postBlackBoxCleanup(String hierCellName, Design design, boolean keepBoundaryRouting) {
+    private static void postBlackBoxCleanup(Design design, boolean keepBoundaryRouting,
+            Collection<Net> insertedNets) {
         EDIFNetlist netlist = design.getNetlist();
-        EDIFHierCellInst inst = netlist.getHierCellInstFromName(hierCellName);
-        final EDIFHierCellInst parentInst = inst.getParent();
-
-        // for each port on the black box,
-        //   iterate over all the nets and regularize on the proper net name for the physical
-        //   net.  Put all physical pins on the correct physical net once the black box has been
-        //   updated.
-        for (EDIFPortInst portInst : inst.getInst().getPortInsts()) {
-            EDIFNet net = portInst.getNet();
-            EDIFHierNet netName = new EDIFHierNet(parentInst, net);
-            EDIFHierNet parentNetName = netlist.getParentNet(netName);
-            // A boundary net whose parent is the logical <const0>/<const1> net has no physical net of
-            // that name: its pins belong on the design's GND/VCC net. Any other parent net that the
-            // design does not know about yet has to be registered, otherwise the pins moved onto it
-            // below hang off a net that no design.getNets() traversal - and hence no router - can see
+        // Everything the cell brought in is named after a net inside it, but a net that crosses the
+        // boundary belongs to whichever driver owns it -- in the shell for an input, in the cell for
+        // an output. The parent net map says which is which; the pins say which nets are worth
+        // asking about at all
+        Map<EDIFHierNet, EDIFHierNet> parentNetMap = netlist.getParentNetMap();
+        for (Net alias : insertedNets) {
+            if (alias.getPins().isEmpty() && alias.getSiteInsts().isEmpty()) continue;
+            // Resolved from the name the net was just given, not from getLogicalHierNet(): the cell's
+            // nets still carry the hierarchy they had inside the cell, which the shell's netlist - and
+            // so the parent net map - knows nothing about
+            EDIFHierNet aliasName = netlist.getHierNetFromName(alias.getName());
+            if (aliasName == null) continue;
+            EDIFHierNet parentNetName = parentNetMap.get(aliasName);
+            if (parentNetName == null || parentNetName.equals(aliasName)) continue;
             NetType parentNetType = NetType.getNetTypeFromNetName(parentNetName.getHierarchicalNetName());
             Net parentNet = parentNetType.isStaticNetType() ? design.getStaticNet(parentNetType)
                                                             : design.getNet(parentNetName.getHierarchicalNetName());
             if (parentNet == null) {
                 throw new RuntimeException("ERROR: Could not find net '" + parentNetName.getHierarchicalNetName() + "'");
             }
-            for (EDIFHierNet netAlias : netlist.getNetAliases(netName)) {
-                if (parentNet.getName().equals(netAlias.getHierarchicalNetName())) continue;
-                Net alias = design.getNet(netAlias.getHierarchicalNetName());
-                if (alias != null) {
-                    // Move this non-parent net physical information to the parent
-                    for (SiteInst si : new ArrayList<>(alias.getSiteInsts())) {
-                        List<String> siteWires = si.getSiteWiresFromNet(alias);
-                        if (siteWires != null) {
-                            for (String siteWire : new ArrayList<>(siteWires)) {
-                                BELPin belPin = si.getSite().getBELPins(siteWire)[0];
-                                si.unrouteIntraSiteNet(belPin, belPin);
-                                si.routeIntraSiteNet(parentNet, belPin, belPin);
-                            }
-                        }
-                    }
-                    if (keepBoundaryRouting) {
-                        for (PIP p : alias.getPIPs()) {
-                            parentNet.addPIP(p);
-                        }
-                    }
-                    for (SitePinInst pin : new ArrayList<SitePinInst>(alias.getPins())) {
-                        alias.removePin(pin);
-                        parentNet.addPin(pin);
-                    }
-                    if (!keepBoundaryRouting) alias.unroute();
+            // The pins and site wires come across in the move below, so the PIPs are all that is left
+            // to deal with -- and they have to be taken off the alias first, since the move also
+            // removes it from the design
+            if (keepBoundaryRouting) {
+                for (PIP p : alias.getPIPs()) {
+                    parentNet.addPIP(p);
                 }
             }
-            if (!keepBoundaryRouting) parentNet.unroute();
+            design.movePinsToNewNetDeleteOldNet(alias, parentNet, keepBoundaryRouting);
         }
     }
 
