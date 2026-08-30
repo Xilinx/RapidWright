@@ -1001,7 +1001,18 @@ public class DesignTools {
             // We need to prefix all cell and net names with the hierarchicalCellName as a prefix
             for (SiteInst si : cell.getSiteInsts()) {
                 for (Cell c : new ArrayList<Cell>(si.getCells())) {
-                    c.updateName(hierarchicalCellName + "/" + c.getName());
+                    // Cell caches its EDIFHierCellInst, and that cache is an array of EDIFCellInst
+                    // references rooted at the top instance of whichever netlist built it - here the
+                    // circuit's own, which is not the top instance of the netlist being merged into.
+                    // updateName() re-keys the design's cell map but leaves that cache alone, so drop
+                    // it and let the getter rebuild it lazily once the merge is complete. Only when the
+                    // rename actually happened: updateName() returns false without renaming if the new
+                    // name is taken, and the old cache is still the right one in that case.
+                    // TODO: belongs in Cell.updateName() in the API lib, which is where the cache is
+                    // invalidated by the rename. Doing it there would also cover ECOTools, which renames
+                    // cells the same way in two places and has the same stale cache
+                    if (c.updateName(hierarchicalCellName + "/" + c.getName()))
+                        c.setEDIFHierCellInst(null);
                     if (!c.isRoutethru())
                         design.addCell(c);
                     else {
