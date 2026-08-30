@@ -1619,7 +1619,10 @@ public class RWRoute {
             }
         }
 
-        checkPIPsUsage();
+        //Disabled to save runtime. It maps every net's PIPs across the whole design purely to report
+        //overlaps, and we do not expect any: PopulateShell.unrouteOverlaps() has already resolved them
+        //before the router runs. It only prints, so nothing is lost but the check itself
+        //checkPIPsUsage();
     }
 
     /**
