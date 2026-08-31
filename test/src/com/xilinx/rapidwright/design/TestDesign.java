@@ -866,8 +866,8 @@ public class TestDesign {
     }
 
     @Test
-    public void testRemoveNetUnroutes() {
-        Design design = new Design("testRemoveNetUnroutes", "xcvu3p");
+    public void testRemoveNetRecordsRouting() {
+        Design design = new Design("testRemoveNetRecordsRouting", "xcvu3p");
         SiteInst si = design.createSiteInst("SLICE_X0Y0");
         Net net = design.createNet("net0");
         PIP pip = routeToSitePin(net, si, "A1");
@@ -877,11 +877,16 @@ public class TestDesign {
         Assertions.assertSame(net, design.removeNet(net));
         Assertions.assertNull(design.getNet(net.getName()));
 
-        // Unrouted while still tracked, so that a consumer undoing the original routing and then
-        // applying the current routing is left with the net unrouted rather than still routed
+        // Recorded while still tracked, so a consumer undoing the original routing hears about
+        // the removal; otherwise the net leaves no trace and its PIPs stay programmed
+        Assertions.assertTrue(design.getModifiedNets().contains(net));
         List<PIP> origPIPs = design.getOriginalNetRouting().get(net.getName());
         Assertions.assertEquals(Collections.singletonList(pip), origPIPs);
-        Assertions.assertTrue(net.getPIPs().isEmpty());
+
+        // Recorded rather than unrouted, so removeNet() leaves the caller's net intact. A
+        // detached net is how a consumer tells a removal from a modification
+        Assertions.assertNull(net.getDesign());
+        Assertions.assertEquals(Collections.singletonList(pip), net.getPIPs());
     }
 
     @Test
