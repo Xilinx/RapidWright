@@ -757,7 +757,8 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
         for (SitePinInst inPin : modInst.getCorrespondingPins(inPort)) {
             Net oldPhysicalNet = inPin.getNet();
             if (oldPhysicalNet != null) {
-                oldPhysicalNet.removePin(inPin, true);
+                boolean removed = oldPhysicalNet.removePin(inPin, true);
+                assert (removed);
             }
             physicalNet.addPin(inPin);
         }
@@ -808,8 +809,10 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
 
         for (SitePinInst pin : input.getSitePinInsts()) {
             SitePinInst instPin = getCorrespondingPin(pin);
-            if (instPin.getNet() != null) {
-                instPin.getNet().removePin(pin);
+            Net instNet = instPin.getNet();
+            if (instNet != null) {
+                boolean removed = instNet.removePin(instPin);
+                assert (removed);
             }
             physNet.addPin(instPin);
         }
