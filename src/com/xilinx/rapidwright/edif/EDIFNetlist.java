@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.edif;
 
 import java.io.BufferedOutputStream;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -108,6 +109,12 @@ public class EDIFNetlist extends EDIFName {
     private String origDirectory;
 
     private List<String> encryptedCells;
+    
+    private EDIFLibrary external;
+
+    private Map<EDIFCell, EDIFCell> externalMappings;
+
+    private boolean encryptedCellsValidated = false;
 
     private boolean trackCellChanges = false;
 
@@ -785,6 +792,22 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
+     * Trims the backing capacity of every {@link EDIFPortInstList} in the netlist
+     * down to its current size (see {@link EDIFCell#trimEDIFPortInstLists()}).
+     * Port instance lists are built via incremental {@link java.util.ArrayList}
+     * insertion during parsing, which leaves unused capacity slack; calling this
+     * once after a netlist is fully loaded reclaims that slack. This is purely a
+     * memory optimization and does not change the netlist contents.
+     */
+    public void trimEDIFPortInstLists() {
+        for (EDIFLibrary lib : getLibraries()) {
+            for (EDIFCell cell : lib.getCells()) {
+                cell.trimEDIFPortInstLists();
+            }
+        }
+    }
+
+    /**
      * Get Libraries in export order so that any cell instance appearing in a library will only
      * refer to cells in its own library or previous libraries in the list.  This is a pre-requisite
      * for export to a file.
@@ -1146,10 +1169,10 @@ public class EDIFNetlist extends EDIFName {
         }
 
         Map<EDIFHierNet,EDIFHierNet> parentNetMap = getParentNetMap();
-        EDIFHierNet parentNetName = parentNetMap.get(p.getHierarchicalNet());
-        Net n = parentNetName == null ? null : d.getNet(parentNetName.getHierarchicalNetName());
+        EDIFHierNet parentNet = parentNetMap.get(p.getHierarchicalNet());
+        Net n = parentNet == null ? null : d.getNet(parentNet.getHierarchicalNetName());
         if (n == null) {
-            if (parentNetName == null) {
+            if (parentNet == null) {
                 // Maybe it is GND/VCC
                 List<EDIFPortInst> src = p.getNet().getSourcePortInsts(false);
                 if (src.size() > 0 && src.get(0).getCellInst() != null) {
@@ -1158,12 +1181,12 @@ public class EDIFNetlist extends EDIFName {
                     if (cellType.equals("VCC")) return d.getVccNet();
                 }
             }
-            if (parentNetName == null) {
+            if (parentNet == null) {
                 System.err.println("WARNING: Could not find parent of net \"" + p.getHierarchicalNet() +
                         "\", please check that the netlist is fully connected through all levels of "
                         + "hierarchy for this net.");
             }
-            EDIFNet logicalNet = parentNetName.getNet();
+            EDIFNet logicalNet = parentNet.getNet();
             List<EDIFPortInst> eprList = logicalNet.getSourcePortInsts(false);
             if (eprList.size() > 1) throw new RuntimeException("ERROR: Bad assumption on net, has two sources.");
             if (eprList.size() == 1) {
@@ -1176,8 +1199,13 @@ public class EDIFNetlist extends EDIFName {
             }
             // If size is 0, assume top level port in an OOC design
 
-            n = d.createNet(parentNetName.getHierarchicalNetName());
-            n.setLogicalHierNet(parentNetName);
+            n = d.createNet(parentNet.getHierarchicalNetName());
+            n.setLogicalHierNet(parentNet);
+        } else {
+            NetType staticType = p.getNet().getPhysStaticSourceType();
+            if (staticType != NetType.UNKNOWN) {
+                d.getStaticNet(staticType);
+            }
         }
         return n;
     }
@@ -1685,7 +1713,7 @@ public class EDIFNetlist extends EDIFName {
             case VCC:
                 return getPhysicalVccPins();
             default:
-                final EDIFHierNet hierNet = getHierNetFromName(net.getName());
+                final EDIFHierNet hierNet = net.getLogicalHierNet();
                 return getPhysicalNetPinMap().get(hierNet);
         }
     }
@@ -1889,6 +1917,28 @@ public class EDIFNetlist extends EDIFName {
             }
         }
     }
+    
+    public void populateExternalCells() {
+        externalMappings = new HashMap<>();
+        for (EDIFLibrary lib : getLibraries()) {
+            if (lib.isHDIPrimitivesLibrary()) {
+                continue;
+            }
+            
+            for (EDIFCell cell : lib.getCells()) { 
+                for (EDIFCellInst inst : cell.getCellInsts()) {
+                    if (!inst.getCellType().isPrimitive() && inst.getCellType().isLeafCellOrBlackBox()) {
+                        // Likely an encrypted cell, see if we have a substitute netlist in external lib
+                        EDIFCell sub = external.getCell(inst.getCellName());
+                        externalMappings.put(sub, inst.getCellType());
+                        if (sub != null) {
+                            inst.setCellType(sub);
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     private Boolean checkIOStandardForExpansion(EDIFCellInst inst, Pair<String, EnumSet<IOStandard>> exception) {
         Boolean expand = null;
@@ -1986,8 +2036,31 @@ public class EDIFNetlist extends EDIFName {
         for (String name : primsToRemoveOnCollapse) {
             prims.removeCell(name);
         }
+
+        if (external != null) {
+            blackBoxExternalCells();
+        }
+
         // Invalidate parent net map due to macro collapses
         resetParentNetMap();
+    }
+
+    public void blackBoxExternalCells() {
+        for (EDIFLibrary lib : getLibraries()) {
+            if (lib.isHDIPrimitivesLibrary()) {
+                continue;
+            }
+
+            for (EDIFCell cell : lib.getCells()) {
+                for (EDIFCellInst inst : cell.getCellInsts()) {
+                    if (inst.getCellType().getLibrary() == external) {
+                        EDIFCell origBB = externalMappings.get(inst.getCellType());
+                        assert (origBB != null);
+                        inst.setCellType(origBB);
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -2009,13 +2082,47 @@ public class EDIFNetlist extends EDIFName {
      * @return A list of EDN filenames that may populate encrypted cells within the netlist.
      */
     public List<String> getEncryptedCells() {
-        return encryptedCells != null ? encryptedCells : Collections.emptyList();
+        if (encryptedCells != null) {
+            if (!encryptedCellsValidated) {
+                validateEncryptedCells();
+            }
+            return encryptedCells;
+        }
+        return Collections.emptyList();
+    }
+    
+    /**
+     * Checks if this design has encrypted cells.
+     * 
+     * @return If this design has at least one encrypted cell in it, false if none.
+     */
+    public boolean hasEncryptedCells() { 
+       return getEncryptedCells().size() > 0; 
+    }
+
+    private void validateEncryptedCells() {
+        // Verify that at least one of the edn files collected are actually in the design
+        for (String edn : encryptedCells) {
+            int start = edn.lastIndexOf(File.separator);
+            int end = edn.lastIndexOf(".edn");
+            String cellName = edn.substring(start == -1 ? 0 : start + 1, end);
+            EDIFCell cell = getCell(cellName);
+            if (cell != null && cell.isLeafCellOrBlackBox()) {
+                encryptedCellsValidated = true;
+                return;
+            }
+        }
+        // The EDN files in encryptedCells are unrelated to this design, let's remove them.
+        encryptedCells.clear();
+        encryptedCellsValidated = true;
     }
 
     public void setEncryptedCells(List<String> encryptedCells) {
         if (encryptedCells == null || encryptedCells.isEmpty()) {
+            encryptedCellsValidated = true;
             this.encryptedCells = null;
         } else {
+            encryptedCellsValidated = false;
             this.encryptedCells = encryptedCells;
         }
     }
@@ -2028,6 +2135,7 @@ public class EDIFNetlist extends EDIFName {
             setEncryptedCells(encryptedCells);
             return;
         }
+        encryptedCellsValidated = false;
         this.encryptedCells.addAll(encryptedCells);
     }
 
@@ -2039,7 +2147,6 @@ public class EDIFNetlist extends EDIFName {
      * @param tclPath Path to the existing Tcl load script for the accompanying DCP file
      */
     public void addTclLoadEncryptedCells(Path tclPath) {
-
         List<String> encryptedCells = new ArrayList<>();
         for (String line : FileTools.getLinesFromTextFile(tclPath.toFile().getAbsolutePath())) {
             if (line.startsWith(READ_EDIF_CMD) && line.endsWith(".edn")) {
@@ -2188,6 +2295,17 @@ public class EDIFNetlist extends EDIFName {
      */
     public void resetCellInstIOStandardFallbackMap() {
         cellInstIOStandardFallback = null;
+    }
+
+    public void setExternalLibrary(EDIFLibrary external) {
+        this.external = external;
+        if (external != null) {
+            populateExternalCells();
+        }
+    }
+
+    public EDIFLibrary getExternalLibrary() {
+        return external;
     }
 
     public static void main(String[] args) throws FileNotFoundException {

@@ -41,6 +41,7 @@ public class TestReportRouteStatus {
     @Test
     public void testReportRouteStatus() {
         Design design = RapidWrightDCP.loadDCP("optical-flow.dcp");
+        DesignTools.makePhysNetNamesConsistent(design);
         DesignTools.createMissingSitePinInsts(design);
         ReportRouteStatusResult rrs = ReportRouteStatus.reportRouteStatus(design);
         Assertions.assertEquals(185994, rrs.logicalNets);

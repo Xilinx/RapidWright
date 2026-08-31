@@ -345,6 +345,7 @@ public class ParallelismTools {
      * @param <T> item type
      */
     public static <T,R> List<Future<R>> invokeAll(Collection<T> items, Function<T,R> task) {
+        @SuppressWarnings("unchecked")
         final Callable<R>[] callables = items.stream()
                 .map(i -> (Callable<R>)() -> task.apply(i))
                 .toArray(value -> (Callable<R>[])new Callable[value]); //Can't create generic arrays, so we need to cast
@@ -357,6 +358,7 @@ public class ParallelismTools {
      * @param <T> Type returned by all tasks.
      * @return A list of Future objects used to hold returned data.
      */
+    @SafeVarargs
     public static <T> List<Future<T>> invokeAll(Callable<T>... tasks) {
         List<Future<T>> futures = new ArrayList<>(tasks.length);
         if (tasks.length == 0) {

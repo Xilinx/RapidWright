@@ -36,10 +36,14 @@ import com.xilinx.rapidwright.design.MetadataParser;
 import com.xilinx.rapidwright.design.blocks.ImplGuide;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.PBlockGenerator;
+import com.xilinx.rapidwright.design.compare.DesignComparator;
 import com.xilinx.rapidwright.design.merge.MergeDesigns;
+import com.xilinx.rapidwright.design.tools.ArrayBuilder;
 import com.xilinx.rapidwright.design.tools.CopyImplementation;
 import com.xilinx.rapidwright.design.tools.DesignObfuscator;
 import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.design.tools.NetlistClockDetection;
+import com.xilinx.rapidwright.design.tools.PathExtractor;
 import com.xilinx.rapidwright.design.tools.RegroupInstances;
 import com.xilinx.rapidwright.design.tools.RelocationTools;
 import com.xilinx.rapidwright.device.IntentCode;
@@ -53,6 +57,7 @@ import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFParser;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.edif.compare.EDIFNetlistComparator;
 import com.xilinx.rapidwright.examples.AddSubGenerator;
 import com.xilinx.rapidwright.examples.CopyMMCMCell;
 import com.xilinx.rapidwright.examples.CountRoutedNets;
@@ -132,6 +137,7 @@ public class MainEntrypoint {
 
     static {
         addFunction("AddSubGenerator", AddSubGenerator::main);
+        addFunction("ArrayBuilder", ArrayBuilder::main);
         addFunction("BlockCreator", BlockCreator::main);
         addFunction("BlockStitcher", BlockStitcher::main);
         addFunction("BlockUpdater", BlockUpdater::main);
@@ -145,6 +151,7 @@ public class MainEntrypoint {
         addFunction("CustomRouting", CustomRouting::main);
         addFunction("DcpToInterchange", DcpToInterchange::main);
         addFunction("DecomposeLUT", DecomposeLUT::main);
+        addFunction("DesignComparator", DesignComparator::main);
         addFunction("DesignImplementationDiff", DesignImplementationDiff::main);
         addFunction("DesignInstrumentor", DesignInstrumentor::main);
         addFunction("DesignObfuscator", DesignObfuscator::main);
@@ -152,6 +159,7 @@ public class MainEntrypoint {
         addFunction("DeviceLoader", DeviceLoader::main);
         addFunction("DeviceResourcesExample", DeviceResourcesExample::main);
         addFunction("EDIFNetlist", EDIFNetlist::main);
+        addFunction("EDIFNetlistComparator", EDIFNetlistComparator::main);
         addFunction("EDIFParser", EDIFParser::main);
         addFunction("EDIFPropertyValue", EDIFPropertyValue::main);
         addFunction("EDIFToLogicalNetlist", EdifToLogicalNetlist::main);
@@ -180,11 +188,13 @@ public class MainEntrypoint {
         addFunction("ModuleOptimizer", ModuleOptimizer::main);
         addFunction("MultGenerator", MultGenerator::main);
         addFunction("NetlistBrowser", NetlistBrowser::main);
+        addFunction("NetlistClockDetection", NetlistClockDetection::main);
         addFunction("PartPrinter", PartPrinter::main);
         addFunction("PartTileBrowser", PartTileBrowser::main);
         addFunction("PartialCUFR", PartialCUFR::main);
         addFunction("PartialRouter", PartialRouter::main);
         addFunction("PartialDFXRouter", PartialDFXRouter::main);
+        addFunction("PathExtractor", PathExtractor::main);
         addFunction("PBlockGenDebugger", PBlockGenDebugger::main);
         addFunction("PBlockGenerator", PBlockGenerator::main);
         addFunction("PBlock", PBlock::main);

@@ -127,6 +127,8 @@ public class FileTools {
     public static final String PART_DB_PATH = DATA_FOLDER_NAME + File.separator + "parts.db";
     /** Location of the cell pins default data file */
     public static final String CELL_PIN_DEFAULTS_FILE_NAME = DATA_FOLDER_NAME + File.separator + "cell_pin_defaults.dat";
+    /** Location of the Versal VDISTR Tree paths for clock routing */
+    public static final String VERSAL_VDISTR_TREES_FILE_NAME = DATA_FOLDER_NAME + File.separator + "versal_vdistr_trees.dat";
     /** Location of cached routethru helper files */
     public static final String ROUTETHRU_FOLDER_NAME = DATA_FOLDER_NAME + File.separator + "routeThrus";
     /** Common instance of the Kryo class for serialization purposes */
@@ -143,7 +145,7 @@ public class FileTools {
     /** Part Database File Version */
     public static final int PART_DB_FILE_VERSION = 1;
     /** Unisim Data File Version */
-    public static final int UNISIM_DATA_FILE_VERSION = 1;
+    public static final int UNISIM_DATA_FILE_VERSION = 2;
     /** Base URL for download data files */
     public static final String RAPIDWRIGHT_DATA_URL = "http://data.rapidwright.io/";
     /** Suffix added to data file names to capture md5 status */
@@ -1501,6 +1503,7 @@ public class FileTools {
 
     public static Pair<InputStream,Long> getInputStreamFromZipFile(String zipFileName, String fileEndsWith) {
         try {
+            @SuppressWarnings("resource")
             final ZipFile zip = new ZipFile(zipFileName);
             Enumeration<? extends ZipEntry> entries = zip.entries();
             ZipEntry match = null;
@@ -2073,7 +2076,7 @@ public class FileTools {
                     while ((e = zip.getNextEntry()) != null) {
                         String name = e.getName();
                         if (name.startsWith(folderName)) {
-                            if (!e.isDirectory()) {
+                            if (!e.isDirectory() && !name.endsWith(".class")) {
                                 String fileName = outputPath + File.separator + e.getName();
                                 System.out.println("Unpacking " + fileName);
                                 File newFile = new File(fileName);

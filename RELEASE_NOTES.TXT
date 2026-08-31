@@ -1,3 +1,154 @@
+============= RapidWright 2026.1.0-beta released on 2026-06-30 ================
+Notes: 
+  - 2026.1.0 Vivado DCP and device compatibility
+  - Fix tests to be Java 8 compatible (#1390)
+  - Add ReportPlaceStatusResult, with VivadoTools.reportPlaceStatus() (#1389)
+  - Fixes some testing failures related to api-lib fixes (#1388)
+  - 2026.1.0 VTree updates; includes all 3 modes of USER_CLOCK_VTREE_TYPE (#1385)
+  - Remove unnecessary reporting in NOC json (#1386)
+  - NOC Design representation classes (#1382)
+  - [EDIFNetlist] Mem Optimizations - Trim PortInsts & Property Map Storage (#1383)
+  - Fix Clock Routing for IOB pin (#1377)
+  - [RWRoute] Check and extend highest base wire for preservedMap (#1375)
+  - Update RapidWrightDCP to new url under Xilinx org (#1376)
+  - Fixes an issue in Cell.getSitePinFromLogicalPin() 
+
+API Additions:
+  - com.xilinx.rapidwright.device.Device "public int getIDCode()"
+  - com.xilinx.rapidwright.device.SLR "public int getIDCode()"
+
+API Removals:
+  - com.xilinx.rapidwright.bitstream "public static int createIDCode(int devIDCode, int revision)"
+  - com.xilinx.rapidwright.bitstream "public static Integer getIDCode(String partName)"
+
+============= RapidWright 2025.2.2-beta released on 2026-06-04 ================
+Notes:
+  - [Params] Adds parameters to control how readable EDIF is extracted when DCP is loaded (#1374)
+  - Enable {dis,}connectNet() to operate on macro port insts (#1367)
+  - Array Builder Tool - Replicate Optimized Kernels in an Array (#1163)
+  - [RWRoute] On Versal, preserve node uphill of sink SPIs (#1369)
+  - [Clock Routing]Fix isse related to Versal clock routing to NoC sinks (#1370)
+  - Add test case for fixes to getCorrespondingTile when called on certain SLL tiles (#1360)
+  - Correctly handle NOC clock pins when routing (#1365)
+  - Fix IBUF creation for UltraScale+ (#1357)
+  - [DesignTools] Fix NPE in fullyUnplaceCell() (#1358)
+  - [PathExtractor] Fix unconnected static inputs (#1352)
+  - Auto extract readable EDIFs from DCPs to enable parallel parsing
+  - Fix create IOB on UltraScale+
+  - Fixes to allow Vivado 2025.2 designs with NOC components to be loaded in RapidWright
+  - Fixes for site routing
+  - Adds several missing IDCodes for UltraScale+ parts
+  - Fix SLL module relocation for Versal
+
+API Additions:
+  - com.xilinx.rapidwright.design.noc.NOCDesign "public void clearSolution()"
+
+
+============= RapidWright 2025.2.1-beta released on 2026-02-18 ================
+Notes:
+  - Fixes Issues with PathExtractor#1350
+  - [Python] Set JAVA_HOME from PATH if not already set (#1351)
+  - Export schematic viewer scene as a PDF or SVG vector graphic. (#1344)
+  - Functional Fixes for PolynomialGenerator (#1349)
+  - [DesignComparator] Add command line entrypoint (#1341)
+  - Path extraction tool (#1345)
+  - [ModuleInst] Test for handling routethrus correctly (#1333)
+  - [FanOutOptimization] Improvements to support LUT replication and more (#1338)
+  - Fix PBlock creation and movement for Versal IRI_QUAD (#1335)
+
+API Additions:
+  - com.xilinx.rapidwright.design.Module "public Collection<Cell> getCells()"
+
+
+============= RapidWright 2025.2.0-beta released on 2025-12-01 ================
+Notes:
+  - [RWRoute] Initial Versal SLR crossing support (#1302)
+  - [VersalClockRouting] VDISTR tree storage map for Versal (#1311)
+  - [DesignTools] Parallelize preprocessing methods (#1324)
+  - [VersalClockRouting] Mark sink pins as routed once LCBs are connected (#1326)
+  - Adds external library for netlists to compensate for black boxed cells (#1294)
+  - 2025.2.0 devices (#1325)
+  - [NetlistBrowser] Cell Instance Schematic Viewer (#1322)
+  - [EDIFPort] Refactor getBitBlastedIndices() (#1321)
+  - Full TCL parser for XDC (#1265)
+  - [PBlock] Add IsSoft and ExcludePlacement property in pblock (#1315)
+  - Add vertical clock spine printing and clock root detection (#1314)
+  - [ConstraintTools] Tools to handle the xdc constraint on pblock (#1307)
+  - [ECOTools] disconnectNet() to use skipUnrouteIntraSite property (#1300)
+  - Add or-tools 9.14.6206, update protobuf to 4.31.1, update commons-io to 2.20.0 (#1306)
+  - Add HierNet clock detection command line tool (#1304)
+  - [PicoBlazeArray] Fixes EDIF cell export issue (#1305)
+  - Adds encrypted cells check flag; hasEncryptedCells() (#1303)
+  - [Write EDIF] Validate .edn files attached to netlist before DCP write (#1299)
+  - [NetTools] Adds alternate pretty print for Nets/Clock Spine (#1298)
+  - [RWRoute] Improves clock root routing and correctly annotates net for Vivado (#1297)
+  - [PartialRouter] Add and use isExcludedPip() for unpreserving too (#1296)
+  - Add method to prevent Vivado from grouping together certain ports into buses (#1293)
+  - Improve module placement calculation performance
+  - DCP read of place storage support in Vivado 2025.2
+  - [Cell] getAllCorrespondingSitePinNamesFromPhysicalPin() to check LUT RTs
+
+API Additions:
+  - com.xilinx.rapidwright.design.Net "public boolean isZNet()"
+  - com.xilinx.rapidwright.design.SiteInst "public List<Integer> getSiteWireIndicesFromNet(Net net)"
+  - com.xilinx.rapidwright.design.SiteInst "public Net getNetFromSiteWireIndex(int siteWireIndex)"
+  - com.xilinx.rapidwright.design.UnisimManager "public Map<SiteTypeEnum, Set<String>> getCompatiblePlacements(FamilyType f, Unisim u)"
+
+
+============= RapidWright 2025.1.3-beta released on 2025-10-02 ================
+Notes:
+  - [RWRoute] Versal fixes for clocking, static nets and general routing (#1280)
+  - [DesignTools] createCeClkOfRoutethruFFToVCC() to handle AND2B1L/OR2L (#1286)
+  - [TestBELPin] Test that BELPin.getConnectedSitePin() thru IMRs (#1285)
+  - Adds RW_COPY_EDNS_ON_DCP_WRITE and adds helper to extract EDNs (#1288)
+  - Move Site.getIntTile() -> DeviceTools.getIntTile() and fix for Versal (#1287)
+  - Cannot close the zip file (refactor?) (#1289)
+  - Cleanup gradle 9 warnings and Java linting warnings for Java 17 (#1277)
+  - [DesignTools] Handles VCC/GND connections properly in populateBlackBox() (#1278)
+  - rc2 and tests for removing alternate SPIs (#1276)
+  - [TimingGraph] Improving Report Timing Example; add some APIs (#1273)
+  - Propagates EDN files when loading RapidWright-generated DCPs
+  - [BELPin] getConnectedSitePin() to punch thru IMRs
+  - Site.getIntTile() to call DeviceTools.getIntTile(Site)
+  - Fix SitePinInst removal for alternate pins
+  - Address unplaced modules when getting BELPins
+
+API Additions:
+
+============= RapidWright 2025.1.2-beta released on 2025-10-02 ================
+The rapidwright-api-lib jar got corrupted on Maven Central so this release version
+had to be abandoned. Please use 2025.1.3 instead.
+
+============= RapidWright 2025.1.1-beta released on 2025-08-13 ================
+Notes:
+  - Unisim Primitive Mappings Updates for Versal (#1271)
+  - [ECOTools.connectNet()] Fixes static net connection and no source issues (#1270)
+  - [RWRoute] Add support for SLL tile types (#1269)
+  - Test and fixes for Versal site routing support (#1267)
+  - Netlist Comparator Inst and Property Tracking (#1260)
+  - Fix an issue on calculateUtilization function for Versal devices. (#1264)
+  - Add support for shared sink SitePinInsts in LUTInputConeOpt (#1262)
+  - Update Versal Unisims (#1261)
+  - EDIFNetlistComparator Test (#1263)
+  - Minor Changes to PBlock and LUT eval fixes (#1257)
+  - Versal LUT Input Routing Fixes and Test (#1254)
+  - [EDIFTools] Fix connectPortInstsThruHier when finding source pin (#1258)
+  - [RWRoute] Cleanup RWRoute.isAccessibleSink() (#1256)
+  - [EDIFTools] Add support for connecting logical nets through both hierarchical directions (#1253)
+  - [RWRoute] General + SLR crossing optimizations (#1232)
+  - [ReportRouteStatus] Do not count nets with no pins (#1248)
+  - [EDIFNetlist] Create a wrapper EDIFCell constructor (#1238)
+  - Test that Versal site pins are acquired correctly (#1247)
+  - Inline Flop Insertion/Removal Tool (#1242)
+  - Reset diffCount when compareNetlists is ran (#1251)
+  - Continue if cell is null (#1250)
+
+API Additions:
+  - com.xilinx.rapidwright.design.Design "public static Map<SiteTypeEnum, Set<String>> getCompatiblePlacements(Device device, Unisim u)"
+  - com.xilinx.rapidwright.design.Design "public static Map<SiteTypeEnum, Set<String>> getCompatiblePlacements(String deviceName, Unisim u)"
+  - com.xilinx.rapidwright.device.BEL "public boolean isAnyIMR()"
+
+
 ============= RapidWright 2025.1.0-beta released on 2025-06-25 ================
 Notes:
   - Add methods to access internal DiffMap (#1234)

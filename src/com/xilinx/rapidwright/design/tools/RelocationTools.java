@@ -240,6 +240,7 @@ public class RelocationTools {
             return false;
         }
 
+        DesignTools.makePhysNetNamesConsistent(design);
         DesignTools.createMissingSitePinInsts(design);
 
         for (Net n : design.getNets()) {
@@ -387,10 +388,10 @@ public class RelocationTools {
      * unplacing/unrouting incompatible cells/routes) when provided a DCP, output
      * location and set of offsets.
      * 
-     * @param args Two modes, for listing relocation options args[0]==<input.dcp>;
+     * @param args Two modes, for listing relocation options {@literal args[0]==<input.dcp>;} 
      *             for relocation (full or best effort partial)
-     *             args[0]==<input.dcp>, args[1]==<output.dcp>,
-     *             args[2]==<tile_x_offset>, args[3]==<tile_y_offset>.
+     *             {@literal args[0]==<input.dcp>, args[1]==<output.dcp>,
+     *             args[2]==<tile_x_offset>, args[3]==<tile_y_offset>}.
      */
     public static void main(String[] args) {
         if (args.length != 4 && args.length != 1) {

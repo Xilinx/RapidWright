@@ -82,8 +82,8 @@ public class TestEDIFPort {
         EDIFCell cell = new EDIFCell(netlist.getWorkLibrary(), "cell_1");
         int outer = 0;
         // Creates ports: {bus_output[0][3:0], bus_output[2][5:2],
-        // bus_output[1][0:3], bus_output[3][2:5]}
-        for (String range : new String[] { "3:0", "0:3", "5:2", "2:5" }) {
+        // bus_output[1][0:3], bus_output[3][2:5], , bus_output[4][0:-1], bus_output[5][-3:-1]}
+        for (String range : new String[] { "3:0", "0:3", "5:2", "2:5", "0:-1", "-3:-1" }) {
             int left = Integer.parseInt(range.substring(0, range.indexOf(':')));
             int right = Integer.parseInt(range.substring(range.indexOf(':') + 1));
             int width = Math.abs(left - right) + 1;
@@ -96,7 +96,7 @@ public class TestEDIFPort {
             EDIFPort copy = cell.getPort("bus_output[" + outer + "][");
             Assertions.assertEquals(busOutput, copy);
 
-            int[] portIndices = busOutput.getBitBlastedIndicies();
+            int[] portIndices = busOutput.getBitBlastedIndices();
             Assertions.assertEquals(width, portIndices.length);
             Assertions.assertEquals(left, portIndices[0]);
             Assertions.assertEquals(right, portIndices[portIndices.length - 1]);

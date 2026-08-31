@@ -92,10 +92,9 @@ public class TestEDIFHierPortInst {
             // nothing is using DMUX
             "processor/stack_loop[3].upper_stack.stack_pointer_lut/LUT5/O,null,true",
 
-            // FIXME: Known broken -- see https://github.com/Xilinx/RapidWright/pull/577
             // Cell pin placed onto a E5LUT/O5 -- its net does not exit the site but
             // another net is using EMUX
-            "processor/stack_loop[4].upper_stack.stack_pointer_lut/LUT5/O,null,false",
+            "processor/stack_loop[4].upper_stack.stack_pointer_lut/LUT5/O,null,true",
 
     })
     void testGetRoutedSitePinInst(String hierPortInstName, String expected, boolean expectPass) {

@@ -24,6 +24,25 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.PriorityQueue;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
+
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
@@ -34,6 +53,7 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
@@ -57,25 +77,6 @@ import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 import com.xilinx.rapidwright.util.RuntimeTrackerTree;
 import com.xilinx.rapidwright.util.Utils;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.IdentityHashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.PriorityQueue;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Function;
 
 /**
  * RWRoute class provides the main methods for routing a design.
@@ -228,6 +229,9 @@ public class RWRoute {
         DesignTools.makePhysNetNamesConsistent(design);
         DesignTools.createPossiblePinsToStaticNets(design);
         DesignTools.createMissingSitePinInsts(design);
+        if (series == Series.Versal) {
+            DesignTools.updateVersalXPHYPinsForDMC(design);
+        }
     }
 
     protected void preprocess() {
@@ -294,7 +298,8 @@ public class RWRoute {
     protected RouteNodeGraph createRouteNodeGraph() {
         if (config.isTimingDriven()) {
             /* An instantiated delay estimator that is used to calculate delay of routing resources */
-            DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+            DelayEstimatorBase<InterconnectInfo> estimator = new DelayEstimatorBase<InterconnectInfo>(
+                    design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
             return new RouteNodeGraphTimingDriven(design, config, estimator);
         } else {
             return new RouteNodeGraph(design, config);
@@ -307,7 +312,8 @@ public class RWRoute {
 
     protected TimingManager createTimingManager(ClkRouteTiming clkTiming, Collection<Net> timingNets) {
         final boolean isPartialRouting = false;
-        return new TimingManager(design, routerTimer, config, clkTiming, timingNets, isPartialRouting);
+        return new TimingManager(design, routerTimer, config, clkTiming, timingNets, isPartialRouting,
+                routingGraph.getDelayEstimator());
     }
 
     /**
@@ -458,12 +464,13 @@ public class RWRoute {
      * TODO: fix the potential issue.
      */
     protected void routeGlobalClkNets() {
+        Map<Integer, Set<ClockRegion>> usedRoutingTracks = new HashMap<>();
         for (Net clk : clkNets) {
-            routeGlobalClkNet(clk);
+            routeGlobalClkNet(clk, usedRoutingTracks);
         }
     }
 
-    protected void routeGlobalClkNet(Net clk) {
+    protected void routeGlobalClkNet(Net clk, Map<Integer, Set<ClockRegion>> usedRoutingTracks) {
         // Since we preserved all pins in addGlobalClkRoutingTargets(), unpreserve them here
         for (SitePinInst spi : clk.getPins()) {
             routingGraph.unpreserve(spi.getConnectedNode());
@@ -476,7 +483,7 @@ public class RWRoute {
         } else {
             // routes clock nets from scratch
             System.out.println("INFO: Routing " + clk.getPins().size() + " pins of clock " + clk + " (non timing-driven)");
-            GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), gns);
+            GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), gns, usedRoutingTracks);
         }
         preserveNet(clk, false);
 
@@ -749,14 +756,13 @@ public class RWRoute {
         }
 
         if (indirect > 0) {
-            netWrapper.computeHPWLAndCenterCoordinates(routingGraph.nextLagunaColumn, routingGraph.prevLagunaColumn);
+            netWrapper.computeHPWLAndCenterCoordinates(routingGraph);
             if (config.isUseBoundingBox()) {
                 for (Connection connection : netWrapper.getConnections()) {
                     if (connection.isDirect()) continue;
                     connection.computeConnectionBoundingBox(config.getBoundingBoxExtensionX(),
                             config.getBoundingBoxExtensionY(),
-                            routingGraph.nextLagunaColumn,
-                            routingGraph.prevLagunaColumn);
+                            routingGraph);
                 }
             }
         }
@@ -799,6 +805,7 @@ public class RWRoute {
             for (Connection connection : indirectConnections) {
                 RouteNode sinkRnode = connection.getSinkRnode();
                 if (sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH) {
+                    IntentCode sinkIntent = sinkRnode.getIntentCode();
                     for (Node uphill : sinkRnode.getAllUphillNodes()) {
                         if (uphill.isTiedToVcc()) {
                             continue;
@@ -807,10 +814,17 @@ public class RWRoute {
                         if (preservedNet != null && preservedNet != connection.getNet()) {
                             continue;
                         }
-                        assert((sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL &&
-                                (uphill.getIntentCode() == IntentCode.NODE_CLE_CNODE || uphill.getIntentCode() == IntentCode.NODE_CLE_BNODE)) ||
-                                (sinkRnode.getIntentCode() == IntentCode.NODE_INTF_CTRL &&
-                                        (uphill.getIntentCode() == IntentCode.NODE_INTF_CNODE || uphill.getIntentCode() == IntentCode.NODE_INTF_BNODE)));
+                        if (sinkIntent == IntentCode.NODE_SLL_INPUT && uphill.getIntentCode() == IntentCode.NODE_SLL_OUTPUT) {
+                            // No need to reserve NODE_SLL_OUTPUT nodes of a NODE_SLL_INPUT
+                            continue;
+                        }
+                        assert((sinkIntent == IntentCode.NODE_CLE_CTRL &&
+                                        (uphill.getIntentCode() == IntentCode.NODE_CLE_CNODE || uphill.getIntentCode() == IntentCode.NODE_CLE_BNODE)) ||
+                                (sinkIntent == IntentCode.NODE_INTF_CTRL &&
+                                        (uphill.getIntentCode() == IntentCode.NODE_INTF_CNODE || uphill.getIntentCode() == IntentCode.NODE_INTF_BNODE)) ||
+                                (sinkIntent == IntentCode.NODE_SLL_INPUT &&
+                                        uphill.getIntentCode() == IntentCode.NODE_CLE_BNODE)
+                        );
                         RouteNode rnode = routingGraph.getOrCreate(uphill, RouteNodeType.LOCAL_RESERVED);
                         rnode.setType(RouteNodeType.LOCAL_RESERVED);
                     }
@@ -1410,7 +1424,7 @@ public class RWRoute {
                     continue;
                 }
                 totalINTNodes++;
-                int wl = RouteNode.getLength(node, routingGraph);
+                int wl = RouteNode.getLength(node);
                 totalWL += wl;
 
                 RouterHelper.addNodeTypeLengthToMap(node, wl, nodeTypeUsage, nodeTypeLength);
@@ -1455,9 +1469,7 @@ public class RWRoute {
         nodeUsageForVersal.add(IntentCode.NODE_IMUX);
         // NODE_PINFEED exists on Versal but is behind a NODE_IMUX
         // and gets projectInputPinToINTNode() -ed away
-
-        // TODO: Enable when SLR crossings are supported
-        // nodeUsageForVersal.add(IntentCode.NODE_SLL_DATA);
+        nodeUsageForVersal.add(IntentCode.NODE_SLL_DATA);
     }
 
     /**
@@ -1929,9 +1941,13 @@ public class RWRoute {
                         // Verify invariant that east/west wires stay east/west ...
                         assert(!rnodeType.isEastLocal() || childType.isEastLocal() ||
                                 // ... unless it's an exclusive sink using a LOCAL_RESERVED node
-                                (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH));
+                                (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH) ||
+                                // ... or unless it's a Versal SLL input
+                                childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT);
                         assert(!rnodeType.isWestLocal() || childType.isWestLocal() ||
-                                (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH));
+                                (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH) ||
+                                // ... or unless it's a Versal SLL input
+                                childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT);
                         break;
                     case NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
                     case NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
@@ -1948,7 +1964,11 @@ public class RWRoute {
                         //   (a) IMUX (LOCAL_*_LEADING_TO_*_LAGUNA) -> LAG_MUX_ATOM_\\d+_TXOUT
                         //   (b) via a LUT routethru: IMUX (LOCAL*) -> CLE_CLE_*_SITE_0_[A-H]_O
                         assert(!rnodeType.isAnyLocal() || rnodeType.isLocalLeadingToLaguna() ||
-                               (routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED));
+                               (routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED) ||
+                                // Allow CLE/*LAG*_PIN -> CLE/*[A-H]Q2?_PIN
+                                (routingGraph.isVersal && connection.isCrossSLR() &&
+                                       routingGraph.isVersalLagOutRoutethru(rnode, childRNode))
+                        );
 
                         if (!routingGraph.isAccessible(childRNode, rnode, connection)) {
                             continue;
@@ -2085,61 +2105,65 @@ public class RWRoute {
                 // Check for overshooting which occurs when child and sink node are in
                 // adjacent SLRs and less than a SLL wire's length apart in the Y axis.
                 if (deltaSLR == 1) {
-                    int overshootByY = deltaY - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
+                    int overshootByY = deltaY - routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
                     if (overshootByY < 0) {
-                        assert(deltaY < RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
-                        deltaY = RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - overshootByY;
+                        assert(deltaY < routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
+                        deltaY = routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - overshootByY;
                     }
                 }
 
-                // Account for any detours that must be taken to get to the closest Laguna column
-                // and from there onto the sink
-                int nextLagunaColumn = routingGraph.nextLagunaColumn[childX];
-                int prevLagunaColumn = routingGraph.prevLagunaColumn[childX];
-                if (nextLagunaColumn == prevLagunaColumn) {
-                    // On top of the column
-                    assert(deltaX == Math.abs(sinkX - nextLagunaColumn));
-                } else {
-                    assert(rnode.getType() != RouteNodeType.SUPER_LONG_LINE);
+                if (!routingGraph.isVersal) {
+                    // For UltraScale/UltraScale+, account for any detours that must be taken
+                    // to get to the closest Laguna column and from there onto the sink.
+                    // This optimization is not currently performed on Versal due to the
+                    // distributed nature of its SLLs.
+                    int nextLagunaColumn = routingGraph.nextLagunaColumn[childX];
+                    int prevLagunaColumn = routingGraph.prevLagunaColumn[childX];
+                    if (nextLagunaColumn == prevLagunaColumn) {
+                        // On top of the column
+                        assert(deltaX == Math.abs(sinkX - nextLagunaColumn));
+                    } else {
+                        assert(rnode.getType() != RouteNodeType.SUPER_LONG_LINE);
 
-                    final int deltaXToNextColumn;
-                    final int deltaXToPrevColumn;
-                    final int deltaXToAndFromNextColumn;
-                    final int deltaXToAndFromPrevColumn;
-                    if (nextLagunaColumn == Integer.MAX_VALUE  || nextLagunaColumn >= connection.getXMaxBB()) {
-                        deltaXToNextColumn = Integer.MAX_VALUE;
-                        deltaXToAndFromNextColumn = Integer.MAX_VALUE;
-                    } else {
-                        deltaXToNextColumn = Math.abs(nextLagunaColumn - childX);
-                        deltaXToAndFromNextColumn = deltaXToNextColumn + Math.abs(sinkX - nextLagunaColumn);
+                        final int deltaXToNextColumn;
+                        final int deltaXToPrevColumn;
+                        final int deltaXToAndFromNextColumn;
+                        final int deltaXToAndFromPrevColumn;
+                        if (nextLagunaColumn == Integer.MAX_VALUE  || nextLagunaColumn >= connection.getXMaxBB()) {
+                            deltaXToNextColumn = Integer.MAX_VALUE;
+                            deltaXToAndFromNextColumn = Integer.MAX_VALUE;
+                        } else {
+                            deltaXToNextColumn = Math.abs(nextLagunaColumn - childX);
+                            deltaXToAndFromNextColumn = deltaXToNextColumn + Math.abs(sinkX - nextLagunaColumn);
+                        }
+                        if (prevLagunaColumn == Integer.MIN_VALUE || prevLagunaColumn <= connection.getXMinBB()) {
+                            deltaXToPrevColumn = Integer.MAX_VALUE;
+                            deltaXToAndFromPrevColumn = Integer.MAX_VALUE;
+                        } else {
+                            deltaXToPrevColumn = Math.abs(prevLagunaColumn - childX);
+                            deltaXToAndFromPrevColumn = deltaXToPrevColumn + Math.abs(sinkX - prevLagunaColumn);
+                        }
+                        if (deltaXToNextColumn == deltaXToPrevColumn) {
+                            // Equidistant from both columns, prefer the one closer when considering to/from the sink
+                            deltaX = Math.min(deltaXToAndFromNextColumn, deltaXToAndFromPrevColumn);
+                        } else if (deltaXToNextColumn < deltaXToPrevColumn &&
+                                deltaXToAndFromNextColumn <= deltaXToAndFromPrevColumn + maxDetourToSnapBackToPrevLagunaColumn) {
+                            // Closer to the next column and not detouring more than 4 tiles extra to/from using the prev column
+                            assert(deltaX <= deltaXToAndFromNextColumn);
+                            deltaX = deltaXToAndFromNextColumn;
+                        } else if (deltaXToPrevColumn < deltaXToNextColumn &&
+                                deltaXToAndFromPrevColumn <= deltaXToAndFromNextColumn + maxDetourToSnapBackToPrevLagunaColumn) {
+                            // Closer to the next column and not detouring more than 4 tiles extra to/from using the prev column
+                            assert(deltaX <= deltaXToAndFromPrevColumn);
+                            deltaX = deltaXToAndFromPrevColumn;
+                        } else {
+                            // Pretty much same distance to/from both columns; prefer the closer to column
+                            deltaX = (deltaXToNextColumn < deltaXToPrevColumn) ? deltaXToAndFromNextColumn
+                                                                               : deltaXToAndFromPrevColumn;
+                        }
                     }
-                    if (prevLagunaColumn == Integer.MIN_VALUE || prevLagunaColumn <= connection.getXMinBB()) {
-                        deltaXToPrevColumn = Integer.MAX_VALUE;
-                        deltaXToAndFromPrevColumn = Integer.MAX_VALUE;
-                    } else {
-                        deltaXToPrevColumn = Math.abs(prevLagunaColumn - childX);
-                        deltaXToAndFromPrevColumn = deltaXToPrevColumn + Math.abs(sinkX - prevLagunaColumn);
-                    }
-                    if (deltaXToNextColumn == deltaXToPrevColumn) {
-                        // Equidistant from both columns, prefer the one closer when considering to/from the sink
-                        deltaX = Math.min(deltaXToAndFromNextColumn, deltaXToAndFromPrevColumn);
-                    } else if (deltaXToNextColumn < deltaXToPrevColumn &&
-                            deltaXToAndFromNextColumn <= deltaXToAndFromPrevColumn + maxDetourToSnapBackToPrevLagunaColumn) {
-                        // Closer to the next column and not detouring more than 4 tiles extra to/from using the prev column
-                        assert(deltaX <= deltaXToAndFromNextColumn);
-                        deltaX = deltaXToAndFromNextColumn;
-                    } else if (deltaXToPrevColumn < deltaXToNextColumn &&
-                            deltaXToAndFromPrevColumn <= deltaXToAndFromNextColumn + maxDetourToSnapBackToPrevLagunaColumn) {
-                        // Closer to the next column and not detouring more than 4 tiles extra to/from using the prev column
-                        assert(deltaX <= deltaXToAndFromPrevColumn);
-                        deltaX = deltaXToAndFromPrevColumn;
-                    } else {
-                        // Pretty much same distance to/from both columns; prefer the closer to column
-                        deltaX = (deltaXToNextColumn < deltaXToPrevColumn) ? deltaXToAndFromNextColumn
-                                                                           : deltaXToAndFromPrevColumn;
-                    }
+                    assert(deltaX >= 0 && deltaX < Integer.MAX_VALUE);
                 }
-                assert(deltaX >= 0 && deltaX < Integer.MAX_VALUE);
             }
         }
 
@@ -2283,7 +2307,7 @@ public class RWRoute {
 
     private void printTimingInfo() {
         if (!sortedIndirectConnections.isEmpty()) {
-            timingManager.getCriticalPathInfo(maxDelayAndTimingVertex, false, routingGraph);
+            timingManager.getCriticalPathInfo(maxDelayAndTimingVertex);
         }
     }
 

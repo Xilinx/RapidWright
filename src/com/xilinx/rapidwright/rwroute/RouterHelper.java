@@ -24,10 +24,6 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -46,6 +42,7 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -66,8 +63,6 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.timing.TimingEdge;
-import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
@@ -233,7 +228,7 @@ public class RouterHelper {
                 TileTypeEnum uphillTileType = uphill.getTile().getTileTypeEnum();
                 if (uphillTileType == TileTypeEnum.INT ||
                         // Versal only: Terminate at non INT (e.g. CLE_BC_CORE) tile type for CTRL pin inputs
-                        EnumSet.of(IntentCode.NODE_CLE_CTRL, IntentCode.NODE_INTF_CTRL).contains(uphill.getIntentCode())) {
+                        EnumSet.of(IntentCode.NODE_CLE_CTRL, IntentCode.NODE_INTF_CTRL, IntentCode.NODE_SLL_INPUT).contains(uphill.getIntentCode())) {
                     return uphill;
                 }
                 if (isLagunaRXD && uphill.getTile() == sink.getTile() && node.getWireName().startsWith("UBUMP")) {
@@ -554,25 +549,18 @@ public class RouterHelper {
 
     /**
      * Gets a map containing net delay for each sink pin paired with an INT tile node of a routed net.
+     * The delay to each sink is accumulated by walking upstream from it to the start of the net's
+     * routing; the net is assumed to be loop-free, and this walk does not terminate on one that is not.
      * @param net The target routed net.
      * @param estimator An instantiation of DelayEstimatorBase.
      * @return The map containing net delay for each sink pin paired with an INT tile node of a routed net.
      */
     public static Map<SitePinInst, Pair<Node,Short>> getSourceToSinkINTNodeDelays(Net net, DelayEstimatorBase estimator) {
-        List<PIP> pips = net.getPIPs();
+        // Net.getPIPs() is in no particular order, so accumulating delay by walking it would use
+        // an upstream delay that is not yet final. Walk upstream from each sink instead, using a
+        // map that also gives bidirectional PIPs the direction PIP.isReversed() indicates.
+        Map<Node, Node> nodeToDriver = NetTools.getNodeToDriver(net);
         Map<Node, Integer> delayMap = new HashMap<>();
-        for (PIP pip : pips) {
-            Node startNode = pip.getStartNode();
-            int upstreamDelay = delayMap.getOrDefault(startNode, 0);
-
-            Node endNode = pip.getEndNode();
-            int delay = 0;
-            if (endNode.getTile().getTileTypeEnum() == TileTypeEnum.INT) {//device independent?
-                delay = computeNodeDelay(estimator, endNode)
-                        + DelayEstimatorBase.getExtraDelay(endNode, DelayEstimatorBase.isLong(startNode));
-            }
-            delayMap.put(endNode, upstreamDelay + delay);
-        }
 
         Map<SitePinInst, Pair<Node,Short>> sinkNodeDelays = new HashMap<>();
         for (SitePinInst sink : net.getSinkPins()) {
@@ -586,8 +574,37 @@ public class RouterHelper {
                 }
             }
 
-            short routeDelay = (short) delayMap.get(sinkNode).intValue();
-            sinkNodeDelays.put(sink, new Pair<>(sinkNode,routeDelay));
+            // Walk upstream until a node of already known delay, or the start of this net's
+            // routing, is reached
+            List<Node> upstreamNodes = new ArrayList<>();
+            Node curr = sinkNode;
+            Integer knownDelay;
+            while ((knownDelay = delayMap.get(curr)) == null) {
+                Node driver = nodeToDriver.get(curr);
+                if (driver == null) {
+                    // No PIP arrives at this node: either it is the node of the net's source pin,
+                    // or it is where the routing to a sink not routed to yet gives out (e.g. on a
+                    // placed-only design), in which case no route delay has been accumulated
+                    break;
+                }
+                upstreamNodes.add(curr);
+                curr = driver;
+            }
+
+            // Then accumulate back downstream from there, memoizing every node walked through so
+            // that nodes shared by more than one sink of this net are only visited once
+            int delay = (knownDelay == null) ? 0 : knownDelay;
+            for (int i = upstreamNodes.size() - 1; i >= 0; i--) {
+                Node downhill = upstreamNodes.get(i);
+                if (downhill.getTile().getTileTypeEnum() == TileTypeEnum.INT) {//device independent?
+                    delay += computeNodeDelay(estimator, downhill)
+                            + DelayEstimatorBase.getExtraDelay(downhill, DelayEstimatorBase.isLong(curr));
+                }
+                delayMap.put(downhill, delay);
+                curr = downhill;
+            }
+
+            sinkNodeDelays.put(sink, new Pair<>(sinkNode,(short) delay));
         }
 
         return sinkNodeDelays;
@@ -661,57 +678,5 @@ public class RouterHelper {
 
         System.err.println("ERROR: Failed to find a path between two nodes: " + source + ", " + sink);
         return Collections.emptyList();
-    }
-
-    /**
-     *  Gets the delay of a given path, using output pin only.
-     *  The path format:
-     *  {@code superSource -> Q -> O -> --- -> D.}
-     */
-    public static void getSamplePathDelay(String filePath, TimingManager timingManager,
-            Map<TimingEdge, Connection> timingEdgeConnectionMap, RouteNodeGraph routingGraph) {
-        List<String> verticesOfVivadoPath = new ArrayList<>();
-        // Include CLK if the first in the path is BRAM or DSP to check the logic delay
-        // NOTE: remember to change the pin names of DSPs from subblock to top-level block that we use
-        verticesOfVivadoPath.add("superSource");
-        File vivadoReport = new File(filePath);
-        if (!vivadoReport.exists()) {
-            System.err.println("ERROR: Target file does not exist for getting the sample path delay");
-            return;
-        }
-        try {
-            List<String> path = parseVivadoPathToStringList(vivadoReport);
-            System.out.println("INFO: Given path: " + path);
-            verticesOfVivadoPath.addAll(path);
-        } catch (IOException e) {
-
-            e.printStackTrace();
-        }
-        System.out.println(verticesOfVivadoPath);
-        timingManager.getSamplePathDelayInfo(verticesOfVivadoPath, timingEdgeConnectionMap, true, routingGraph);
-    }
-
-    /**
-     * Parses the data path from an input file indicating data path of a Vivado timing report.
-     * @param file The file contains a data path of a Vivado timing report.
-     * @return The data path.
-     * @throws IOException
-     */
-    public static List<String> parseVivadoPathToStringList(File file) throws IOException{
-        List<String> path = new ArrayList<>();
-        BufferedReader reader = new BufferedReader(new FileReader(file));
-        String line;
-        while ((line = reader.readLine()) != null) {
-            if (line.length() == 0) {
-                break;
-            }
-
-            if (!line.contains(" r  ") && !line.contains(" f  ")) continue;
-
-            String[] dataStrings = line.split("\\s+");
-            path.add(dataStrings[dataStrings.length - 1]);
-        }
-        reader.close();
-        return path;
     }
 }

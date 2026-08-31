@@ -288,14 +288,14 @@ public class DeviceResourcesWriter {
         writeAllSiteTypesToBuilder(design, device, devBuilder);
 
         t.stop().start("TileTypes");
-        Map<TileTypeEnum, Integer> tileTypeIndicies = writeAllTileTypesToBuilder(design, device, devBuilder);
+        Map<TileTypeEnum, Integer> tileTypeIndices = writeAllTileTypesToBuilder(design, device, devBuilder);
         Map<TileTypeEnum, TileType.Builder> tileTypesObj = new HashMap<TileTypeEnum, TileType.Builder>();
-        for (Map.Entry<TileTypeEnum, Integer> tileType : tileTypeIndicies.entrySet()) {
+        for (Map.Entry<TileTypeEnum, Integer> tileType : tileTypeIndices.entrySet()) {
             tileTypesObj.put(tileType.getKey(), devBuilder.getTileTypeList().get(tileType.getValue()));
         }
 
         t.stop().start("Tiles");
-        writeAllTilesToBuilder(device, devBuilder, tileTypeIndicies);
+        writeAllTilesToBuilder(device, devBuilder, tileTypeIndices);
 
         t.stop().start("Wires&Nodes");
         writeAllWiresAndNodesToBuilder(device, devBuilder, skipRouteResources);
@@ -696,7 +696,7 @@ public class DeviceResourcesWriter {
     public static Map<TileTypeEnum, Integer> writeAllTileTypesToBuilder(Design design, Device device, DeviceResources.Device.Builder devBuilder) {
         StructList.Builder<TileType.Builder> tileTypesList = devBuilder.initTileTypeList(tileTypes.size());
 
-        Map<TileTypeEnum, Integer> tileTypeIndicies = new HashMap<TileTypeEnum, Integer>();
+        Map<TileTypeEnum, Integer> tileTypeIndices = new HashMap<TileTypeEnum, Integer>();
 
         // Order tile types by their TILE_TYPE_IDX (may not be contiguous)
         Map<Integer, TileTypeEnum> tileTypeIndexMap = new TreeMap<>();
@@ -709,7 +709,7 @@ public class DeviceResourcesWriter {
             TileTypeEnum type = e.getValue();
             Tile tile = tileTypes.get(type);
             TileType.Builder tileType = tileTypesList.get(i);
-            tileTypeIndicies.put(type, i);
+            tileTypeIndices.put(type, i);
             // name
             tileType.setName(allStrings.getIndex(type.name()));
 
@@ -792,10 +792,10 @@ public class DeviceResourcesWriter {
             i++;
         }
 
-        return tileTypeIndicies;
+        return tileTypeIndices;
     }
 
-    public static void writeAllTilesToBuilder(Device device, DeviceResources.Device.Builder devBuilder, Map<TileTypeEnum, Integer> tileTypeIndicies) {
+    public static void writeAllTilesToBuilder(Device device, DeviceResources.Device.Builder devBuilder, Map<TileTypeEnum, Integer> tileTypeIndices) {
         StructList.Builder<DeviceResources.Device.Tile.Builder> tileBuilders =
                 devBuilder.initTileList(device.getColumns() * device.getRows());
 
@@ -804,7 +804,7 @@ public class DeviceResourcesWriter {
             for (Tile tile : tiles) {
                 DeviceResources.Device.Tile.Builder tileBuilder = tileBuilders.get(i);
                 tileBuilder.setName(allStrings.getIndex(tile.getName()));
-                tileBuilder.setType(tileTypeIndicies.get(tile.getTileTypeEnum()));
+                tileBuilder.setType(tileTypeIndices.get(tile.getTileTypeEnum()));
                 Site[] sites = tile.getSites();
                 StructList.Builder<DeviceResources.Device.Site.Builder> siteBuilders = tileBuilder
                         .initSites(sites.length);

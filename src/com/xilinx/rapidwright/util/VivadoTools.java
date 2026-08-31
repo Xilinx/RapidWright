@@ -39,6 +39,7 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 public class VivadoTools {
 
     public static final String REPORT_ROUTE_STATUS = "report_route_status";
+    public static final String REPORT_PLACE_STATUS = "report_place_status";
     public static final String PLACE_DESIGN = "place_design";
     public static final String ROUTE_DESIGN = "route_design";
     public static final String WRITE_CHECKPOINT = "write_checkpoint";
@@ -135,8 +136,8 @@ public class VivadoTools {
      */
     public static ReportRouteStatusResult reportRouteStatus(Design design) {
         final Path dcp = writeCheckpoint(design);
-        boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
-        ReportRouteStatusResult rrs = reportRouteStatus(dcp, dcp.getParent(), encrypted);
+        boolean hasEncryptedCells = design.getNetlist().hasEncryptedCells();
+        ReportRouteStatusResult rrs = reportRouteStatus(dcp, dcp.getParent(), hasEncryptedCells);
 
         FileTools.deleteFolder(dcp.getParent().toString());
 
@@ -153,21 +154,31 @@ public class VivadoTools {
     public static String reportRouteStatus(Design design, String netName) {
         final Path dcp = writeCheckpoint(design);
         try {
-            boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
-            return reportRouteStatus(netName, dcp, dcp.getParent(), encrypted);
+            boolean hasEncryptedCells = design.getNetlist().hasEncryptedCells();
+            return reportRouteStatus(netName, dcp, dcp.getParent(), hasEncryptedCells);
         } finally {
             FileTools.deleteFolder(dcp.getParent().toString());
         }
     }
 
     private static Path writeCheckpoint(Design design) {
-        final Path workdir = FileSystems.getDefault()
-                .getPath("vivadoToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
-        File workdirHandle = new File(workdir.toString());
-        workdirHandle.mkdirs();
+        final Path workdir = createTempVivadoToolsWorkDir();
         final Path dcp = workdir.resolve("checkpoint.dcp");
         design.writeCheckpoint(dcp);
         return dcp;
+    }
+
+    /**
+     * Creates a unique, temporary work directory for Vivado interaction.
+     * 
+     * @return
+     */
+    public static Path createTempVivadoToolsWorkDir() {
+        Path workDir = FileSystems.getDefault().getPath("vivadoToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
+        ;
+        File workDirHandle = new File(workDir.toString());
+        workDirHandle.mkdirs();
+        return workDir;
     }
 
     /**
@@ -209,7 +220,6 @@ public class VivadoTools {
                 .getPath("vivadoToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
         File workdirHandle = new File(workdir.toString());
         workdirHandle.mkdirs();
-
         final Path outputLog = workdir.resolve("outputLog.log");
         StringBuilder sb = new StringBuilder();
         sb.append(createTclDCPLoadCommand(dcp, hasEncryptedIP));
@@ -282,15 +292,9 @@ public class VivadoTools {
      * @return ReportRouteStatusResult object.
      */
     public static ReportRouteStatusResult reportRouteStatus(Path dcp, boolean encrypted) {
-        final Path workdir = FileSystems.getDefault()
-                .getPath("vivadoToolsWorkdir" + FileTools.getUniqueProcessAndHostID());
-        File workdirHandle = new File(workdir.toString());
-        workdirHandle.mkdirs();
-
+        final Path workdir = createTempVivadoToolsWorkDir();
         ReportRouteStatusResult rrs = reportRouteStatus(dcp, workdir, encrypted);
-
         FileTools.deleteFolder(workdir.toString());
-
         return rrs;
     }
 
@@ -312,6 +316,72 @@ public class VivadoTools {
 
         List<String> log = VivadoTools.runTcl(outputLog, sb.toString(), true);
         return new ReportRouteStatusResult(log);
+    }
+
+    /**
+     * Run Vivado's `report_place_status` command on the provided Design object
+     * and return its result as a ReportPlaceStatusResult object.
+     *
+     * @param design Design object to report on.
+     * @return ReportPlaceStatusResult object.
+     */
+    public static ReportPlaceStatusResult reportPlaceStatus(Design design) {
+        final Path dcp = writeCheckpoint(design);
+        boolean hasEncryptedCells = design.getNetlist().hasEncryptedCells();
+        ReportPlaceStatusResult rps = reportPlaceStatus(dcp, dcp.getParent(), hasEncryptedCells);
+
+        FileTools.deleteFolder(dcp.getParent().toString());
+
+        return rps;
+    }
+
+    /**
+     * Run Vivado's `report_place_status` command on the provided DCP. Assume the
+     * given DCP is encrypted if, given <path>/<name>.dcp, <path>/<name>_load.tcl
+     * exists. Return report as a ReportPlaceStatusResult object.
+     *
+     * @param dcp Path to DCP to report on.
+     * @return ReportPlaceStatusResult object.
+     */
+    public static ReportPlaceStatusResult reportPlaceStatus(Path dcp) {
+        Path tcl = FileTools.replaceExtension(dcp, EDIFTools.LOAD_TCL_SUFFIX);
+        boolean encrypted = tcl.toFile().exists();
+        return reportPlaceStatus(dcp, encrypted);
+    }
+
+    /**
+     * Run Vivado's `report_place_status` command on the provided DCP path
+     * and return its result as a ReportPlaceStatusResult object.
+     *
+     * @param dcp Path to DCP to report on.
+     * @param encrypted Indicates whether DCP contains encrypted EDIF cells.
+     * @return ReportPlaceStatusResult object.
+     */
+    public static ReportPlaceStatusResult reportPlaceStatus(Path dcp, boolean encrypted) {
+        final Path workdir = createTempVivadoToolsWorkDir();
+        ReportPlaceStatusResult rps = reportPlaceStatus(dcp, workdir, encrypted);
+        FileTools.deleteFolder(workdir.toString());
+        return rps;
+    }
+
+    /**
+     * Run Vivado's `report_place_status` command on the provided DCP path
+     * and return its result as a ReportPlaceStatusResult object.
+     *
+     * @param dcp Path to DCP to report on.
+     * @param workdir Directory to work within.
+     * @param encrypted Indicates whether DCP contains encrypted EDIF cells.
+     * @return ReportPlaceStatusResult object.
+     */
+    public static ReportPlaceStatusResult reportPlaceStatus(Path dcp, Path workdir, boolean encrypted) {
+        final Path outputLog = workdir.resolve("outputLog.log");
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(createTclDCPLoadCommand(dcp, encrypted));
+        sb.append(REPORT_PLACE_STATUS);
+
+        List<String> log = VivadoTools.runTcl(outputLog, sb.toString(), true);
+        return new ReportPlaceStatusResult(log);
     }
 
     /**
@@ -382,10 +452,49 @@ public class VivadoTools {
      * @return The results of `report_route_status`.
      */
     public static ReportRouteStatusResult routeDesignAndGetStatus(Design design, Path workdir) {
-        boolean encrypted = !design.getNetlist().getEncryptedCells().isEmpty();
+        boolean hasEncryptedCells = design.getNetlist().hasEncryptedCells();
         Path dcp = workdir.resolve("routeDesignAndGetStatus.dcp");
         design.writeCheckpoint(dcp);
-        return routeDesignAndGetStatus(dcp, workdir, encrypted);
+        return routeDesignAndGetStatus(dcp, workdir, hasEncryptedCells);
+    }
+
+    /**
+     * Run Vivado's `place_design` and `route_design` command on the design provided
+     * and get the `report_route_status` results. Note: this method does not
+     * preserve the routed output from Vivado.
+     * 
+     * @param design  The design to route and report on.
+     * @param workdir Directory to work within.
+     * @return The results of `report_route_status`.
+     */
+    public static ReportRouteStatusResult placeAndRouteDesignAndGetStatus(Design design, Path workdir) {
+        boolean hasEncryptedCells = design.getNetlist().hasEncryptedCells();
+        Path dcp = workdir.resolve("placeAndRouteDesignAndGetStatus.dcp");
+        design.writeCheckpoint(dcp);
+        return placeAndRouteDesignAndGetStatus(dcp, workdir, hasEncryptedCells);
+    }
+
+    /**
+     * Run Vivado's `place_design` and `route_design` command on the provided DCP
+     * path and return the `report_route_status` results. Note: this method does not
+     * preserve the routed output from Vivado.
+     *
+     * @param dcp       Path to DCP to route and report on.
+     * @param workdir   Directory to work within.
+     * @param encrypted Indicates whether DCP contains encrypted EDIF cells.
+     * @return The results of `report_route_status`.
+     */
+    public static ReportRouteStatusResult placeAndRouteDesignAndGetStatus(Path dcp, Path workdir, boolean encrypted) {
+        final Path outputLog = workdir.resolve("outputLog.log");
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(createTclDCPLoadCommand(dcp, encrypted));
+        sb.append(PLACE_DESIGN + "; ");
+        sb.append(ROUTE_DESIGN + "; ");
+        sb.append(REPORT_ROUTE_STATUS + "; ");
+
+        List<String> log = VivadoTools.runTcl(outputLog, sb.toString(), true);
+        return new ReportRouteStatusResult(log);
     }
 
     /**
@@ -433,5 +542,68 @@ public class VivadoTools {
             System.err.println("ERROR: " + e);
         }
         return Float.NaN;
+    }
+
+    /**
+     * Creates a utilization report and shapes report for a given synthesized DCP
+     * file.
+     * 
+     * @param design       The input DCP to measure and extract reports from.
+     * @param utilReport   The desired path to a utilization report from Vivado
+     *                     (report_utilization -file <utilReport>).
+     * @param shapesReport The desired shapes report.
+     */
+    public static void getUtilizationAndShapesReport(Path design, Path utilReport, Path shapesReport) {
+        final Path workDir = createTempVivadoToolsWorkDir();
+        final Path outputLog = workDir.resolve("outputLog.log");
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("open_checkpoint " + design.toString() + "\n");
+        sb.append("report_utilization -file " + utilReport.toString() + "\n");
+        sb.append("set_param place.debugShape " + shapesReport.toString() + "\n");
+        sb.append("place_design -directive Quick \n");
+        sb.append("set_param place.debugShape \"\"\n");
+
+        VivadoTools.runTcl(outputLog, sb.toString(), true);
+
+        FileTools.deleteFolder(workDir.toString());
+    }
+  
+    /**
+     * Open a DCP in Vivado and write a new DCP.
+     *
+     * @param dcp        Path to DCP to open in Vivado.
+     * @param outputName Name of the output design.
+     * @param workdir    Directory to work within.
+     * @param encrypted  Indicates whether DCP contains encrypted EDIF cells.
+     * @return Path to output dcp after round-trip.
+     */
+    public static Path roundTripDCPThruVivado(Path dcp, String outputName, Path workdir, boolean encrypted) {
+        final Path outputLog = workdir.resolve("outputLog.log");
+        Path outputDcp = workdir.resolve(outputName + ".dcp");
+        Path outputEdif = workdir.resolve(outputName + ".edf");
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(createTclDCPLoadCommand(dcp, encrypted));
+        sb.append("write_checkpoint ").append(outputDcp).append(" -force; ");
+        sb.append("write_edif ").append(outputEdif).append(" -force; ");
+
+        VivadoTools.runTcl(outputLog, sb.toString(), true);
+        return outputDcp;
+    }
+
+    /**
+     * Exports the design to Vivado and then writes a new DCP from Vivado, loads and returns it.
+     *
+     * @param design  The design to open in Vivado.
+     * @param workdir Directory to work within.
+     * @return True if the port exists in Vivado, false otherwise.
+     */
+    public static Design roundTripDCPThruVivado(Design design, Path workdir) {
+        boolean hasEncryptedCells = design.getNetlist().hasEncryptedCells();
+        Path dcp = workdir.resolve("roundTrip.dcp");
+        design.writeCheckpoint(dcp);
+        Path outputDcp = roundTripDCPThruVivado(dcp, "output", workdir, hasEncryptedCells);
+        return Design.readCheckpoint(outputDcp);
     }
 }

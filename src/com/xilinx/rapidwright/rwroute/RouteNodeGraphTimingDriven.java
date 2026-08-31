@@ -29,6 +29,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,7 +41,7 @@ import java.util.Set;
  */
 public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
     /** The instantiated delayEstimator to compute delays */
-    protected final DelayEstimatorBase delayEstimator;
+    protected final DelayEstimatorBase<InterconnectInfo> delayEstimator;
     /** A flag to indicate if the routing resource exclusion should disable exclusion of nodes cross RCLK */
     protected final boolean maskNodesCrossRCLK;
 
@@ -72,7 +73,7 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
 
     protected RouteNodeGraphTimingDriven(Design design,
                                          RWRouteConfig config,
-                                         DelayEstimatorBase delayEstimator) {
+                                         DelayEstimatorBase<InterconnectInfo> delayEstimator) {
         super(design, config);
         this.delayEstimator = delayEstimator;
         this.maskNodesCrossRCLK = config.isMaskNodesCrossRCLK();
@@ -95,6 +96,11 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
 
     private final Set<Integer> excludeAboveRclk;
     private final Set<Integer> excludeBelowRclk;
+
+    @Override
+    public DelayEstimatorBase<InterconnectInfo> getDelayEstimator() {
+        return delayEstimator;
+    }
 
     protected static class RouteNodeTimingDriven extends RouteNode {
 

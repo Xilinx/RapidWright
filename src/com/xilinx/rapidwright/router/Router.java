@@ -2006,7 +2006,7 @@ public class Router extends AbstractRouter {
 
             if (currNet.getSource() == null && !currNet.isStaticNet()) {
                 EDIFNet logNet = currNet.getLogicalNet();
-                if (logNet != null && logNet.getParentCell().getName().equals("IOBUF")) {
+                if (logNet != null && logNet.getSourcePortInsts(true).size() > 0) {
                     continue;
                 }
                 if (!supressWarningsErrors) MessageGenerator.briefError("WARNING: " + currNet.getName() + " does not have a source pin associated with it.");

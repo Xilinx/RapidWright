@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -26,6 +26,7 @@ package com.xilinx.rapidwright.examples;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.TimingEdge;
+import com.xilinx.rapidwright.timing.TimingGraph;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingVertex;
 import org.jgrapht.GraphPath;
@@ -51,15 +52,19 @@ public class ReportTimingExample {
         // Instantiate and populate the timing manager for the design
         t.stop().start("Create TimingManager");
         TimingManager tim = new TimingManager(design);
+        TimingGraph tg = tim.getTimingGraph();
 
         // Get and print out worst data path delay in design
         t.stop().start("Get Max Delay");
-        GraphPath<TimingVertex, TimingEdge> criticalPath = tim.getTimingGraph().getMaxDelayPath();
+        GraphPath<TimingVertex, TimingEdge> criticalPath = tg.getMaxDelayPath();
 
         // Print runtime summary
         t.stop().printSummary();
-        System.out.println("\nCritical path: "+ ((int)criticalPath.getWeight())+ " ps");
-        System.out.println("\nPath details:");
-        System.out.println(criticalPath.toString().replace(",", ",\n")+"\n");
+
+        tg.prettyPrintPathDelays(criticalPath);
+        // Previous simple example
+        // System.out.println("\nCritical path: "+ ((int)criticalPath.getWeight())+ " ps");
+        // System.out.println("\nPath details:");
+        // System.out.println(criticalPath.toString().replace(",", ",\n")+"\n");
     }
 }

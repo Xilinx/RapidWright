@@ -108,7 +108,7 @@ public class EDIFPort extends EDIFPropertyObject {
             }
         }
         if (colonIdx == -1 || leftBracket == -1) {
-            throw new RuntimeException("ERROR: Interpreting port " + getName() + ", couldn't identify indicies.");
+            throw new RuntimeException("ERROR: Interpreting port " + getName() + ", couldn't identify indices.");
         }
 
         int left = Integer.parseInt(name.substring(leftBracket+1, colonIdx));
@@ -234,6 +234,32 @@ public class EDIFPort extends EDIFPropertyObject {
     }
 
     /**
+     * Gets the internal port instance connected to this port at the specified
+     * index.
+     * 
+     * @param index Index of the bussed port instance to get.
+     * @return The EDIFPortInst connected to this port at the specified index, or
+     *         null if none exists.
+     */
+    public EDIFPortInst getInternalPortInstFromIndex(int index) {
+        String name = getPortInstNameFromPort(index);
+        EDIFNet net = getInternalNet(index);
+        return net == null ? null : net.getPortInst(null, name);
+    }
+
+    /**
+     * Gets the internal port instance connect to this port. Assumes this is a
+     * single bit port.
+     * 
+     * @return The EDIFPortInst connected to this port, or null if none exists.
+     */
+    public EDIFPortInst getInternalPortInst() {
+        assert (!isBus());
+        EDIFNet net = getInternalNet();
+        return net == null ? null : net.getPortInst(null, getBusName());
+    }
+
+    /**
      * Gets the internal port instance index from the named index for this port.
      * Given a bussed port 'bus[4:0]', the bus has an ordered list of named indices
      * [4, 3, 2, 1, 0]. If the named index is 'bus[1]', the port index is 3. When
@@ -274,7 +300,7 @@ public class EDIFPort extends EDIFPropertyObject {
         os.write(EXPORT_CONST_DIRECTION_START);
         os.write(direction.toByteArray());
         os.write(')');
-        if (getPropertiesMap().size() > 0) {
+        if (getPropertyCount() > 0) {
             os.write('\n');
             exportEDIFProperties(os, EXPORT_CONST_CHILD_INDENT, cache, stable);
             os.write(EXPORT_CONST_INDENT);
@@ -330,13 +356,33 @@ public class EDIFPort extends EDIFPropertyObject {
         return width > 1 || !getName().equals(busName);
     }
 
+    private static final int[] SINGLE_BIT_INDICES = new int[] { 0 };
+
+    /**
+     * @see #getBitBlastedIndicies()
+     * @deprecated Misspelling in name, to be removed in 2026.1.0
+     */
     public int[] getBitBlastedIndicies() {
-        int lastLeftBracket = getName().lastIndexOf('[');
-        if (getName().contains(":"))
-            return EDIFTools.bitBlastBus(getName().substring(lastLeftBracket));
-        if (getName().contains("["))
-            return new int[] {Integer.parseInt(getName().substring(lastLeftBracket,getName().length()-1))};
-        return null;
+        return getBitBlastedIndices();
+    }
+
+    /**
+     * Returns an array of all the integer indices of this port. If the port is a
+     * single bit it returns an array with a single entry of '0'. This is useful
+     * when needing to iterate over a port's PortInst objects.
+     * 
+     * @return The integer list of indices of this port, or {0} for a single bit
+     *         port.
+     */
+    public int[] getBitBlastedIndices() {
+        if (isBus()) {
+            int lastLeftBracket = getName().lastIndexOf('[');
+            assert(lastLeftBracket != -1);
+            return getName().indexOf(':', lastLeftBracket) != -1 ? 
+                EDIFTools.bitBlastBus(getName().substring(lastLeftBracket)) : 
+                new int[] { Integer.parseInt(getName().substring(lastLeftBracket, getName().length() - 1)) };
+        }
+        return SINGLE_BIT_INDICES;
     }
 
     public boolean isBusRangeEqual(EDIFPort otherPort) {

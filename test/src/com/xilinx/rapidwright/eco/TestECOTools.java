@@ -35,6 +35,8 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.AltPinMapping;
 import com.xilinx.rapidwright.design.Cell;
@@ -62,6 +64,8 @@ import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.edif.EDIFValueType;
 import com.xilinx.rapidwright.router.Router;
+import com.xilinx.rapidwright.rwroute.PartialRouter;
+import com.xilinx.rapidwright.rwroute.RWRoute;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.CodeGenerator;
 import com.xilinx.rapidwright.util.FileTools;
@@ -93,16 +97,25 @@ public class TestECOTools {
         deferredRemovals.clear();
 
 
-        // *** Internally routed net (output pin)
+        // *** Internally routed net (output pin inside a LUT6_2 macro)
         {
+            // LUT6/O is an output pin internal to the 'read_strobe_lut' LUT6_2 macro. Since macro
+            // internals are immutable, disconnectNet() lifts to the macro's external O6 port: the
+            // internal net "O6" is left untouched and the external O6 port is detached instead.
             EDIFHierPortInst ehpi = netlist.getHierPortInstFromName("processor/read_strobe_lut/LUT6/O");
             EDIFNet en = ehpi.getHierarchicalNet().getNet();
             int portInstsBefore = en.getPortInsts().size();
             Assertions.assertTrue(en.getPortInsts().contains(ehpi.getPortInst()));
+            EDIFHierPortInst extPort = netlist.getHierPortInstFromName("processor/read_strobe_lut/O6");
+            Assertions.assertNotNull(extPort.getNet());
 
             ECOTools.disconnectNet(design, Collections.singletonList(ehpi), deferredRemovals);
-            Assertions.assertFalse(en.getPortInsts().contains(ehpi.getPortInst()));
-            Assertions.assertEquals(portInstsBefore - 1, en.getPortInsts().size());
+
+            // Macro internals (the internal "O6" net wiring LUT6/O to the O6 port) are unchanged
+            Assertions.assertTrue(en.getPortInsts().contains(ehpi.getPortInst()));
+            Assertions.assertEquals(portInstsBefore, en.getPortInsts().size());
+            // The macro's external O6 port is detached from its external net
+            Assertions.assertNull(netlist.getHierPortInstFromName("processor/read_strobe_lut/O6").getNet());
 
             Assertions.assertEquals(0, deferredRemovals.size());
         }
@@ -191,6 +204,159 @@ public class TestECOTools {
         deferredRemovals.clear();
     }
 
+    /**
+     * Returns the internal leaf sink pins that the given external macro port bit fans out to.
+     * Used to exercise {@link ECOTools#disconnectNet}/{@link ECOTools#connectNet} on pins located
+     * inside a macro (where the operation must be lifted to the macro's external port).
+     */
+    private static List<EDIFHierPortInst> getMacroInternalSinks(EDIFNetlist netlist, String macroPath,
+                                                                String externalPortBit) {
+        EDIFHierCellInst macro = netlist.getHierCellInstFromName(macroPath);
+        EDIFNet internalNet = macro.getCellType().getInternalNet(externalPortBit);
+        List<EDIFHierPortInst> sinks = new ArrayList<>();
+        for (EDIFPortInst pi : internalNet.getPortInsts()) {
+            if (!pi.isTopLevelPort() && pi.isInput()) {
+                sinks.add(new EDIFHierPortInst(macro, pi));
+            }
+        }
+        return sinks;
+    }
+
+    /**
+     * Tests ECOTools.disconnectNet() on input pins located *inside* a macro (rather than on the
+     * macro's external port). Covers a 2-way fan-out macro (LUT6_2) and an 8-way fan-out macro with
+     * mixed internal cell types and port names (RAM32M), on both UltraScale+ and Versal. Verifies:
+     *  - all sibling fan-out pins must be included in the same invocation (else a RuntimeException
+     *    is thrown naming the missing pins),
+     *  - when all are included the operation is lifted to the macro's external port, and
+     *  - the macro's internal netlist is left untouched.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"picoblaze_ooc_X10Y235.dcp", "picoblaze_2022.2.dcp"})
+    public void testDisconnectNetMacroInternalInputPin(String dcp) {
+        // *** LUT6_2 macro (2-way fan-out: I0 -> {LUT6/I0, LUT5/I0}) ***
+        {
+            Design design = RapidWrightDCP.loadDCP(dcp);
+            EDIFNetlist netlist = design.getNetlist();
+            String base = "processor/stack_loop[4].upper_stack.stack_pointer_lut";
+            EDIFHierPortInst lut6I0 = netlist.getHierPortInstFromName(base + "/LUT6/I0");
+            EDIFHierPortInst lut5I0 = netlist.getHierPortInstFromName(base + "/LUT5/I0");
+            EDIFNet internalNet = lut6I0.getNet();
+            int internalPortInstsBefore = internalNet.getPortInsts().size();
+
+            // Disconnecting only one of the two sibling fan-out pins must fail, naming the other
+            RuntimeException ex = Assertions.assertThrows(RuntimeException.class,
+                    () -> ECOTools.disconnectNet(design, Collections.singletonList(lut6I0), new HashMap<>()));
+            Assertions.assertTrue(ex.getMessage().contains("LUT5/I0"), ex.getMessage());
+
+            // Including both sibling pins lifts to the macro's external I0 port and disconnects it
+            Map<Net, Set<SitePinInst>> deferredRemovals = new HashMap<>();
+            ECOTools.disconnectNet(design, Arrays.asList(lut6I0, lut5I0), deferredRemovals);
+
+            // The macro's external port is detached from its external net...
+            EDIFHierPortInst extPort = netlist.getHierPortInstFromName(base + "/I0");
+            Assertions.assertNull(extPort.getNet());
+            // ...but the macro's internal netlist is unchanged
+            Assertions.assertNotNull(lut6I0.getNet());
+            Assertions.assertEquals(internalPortInstsBefore, internalNet.getPortInsts().size());
+            // Both internal LUTs share one site pin, so exactly one SitePinInst is removed
+            Assertions.assertEquals(1, deferredRemovals.values().stream().mapToInt(Set::size).sum());
+        }
+
+        // *** RAM32M macro (8-way fan-out with mixed cell types / port names) ***
+        {
+            Design design = RapidWrightDCP.loadDCP(dcp);
+            EDIFNetlist netlist = design.getNetlist();
+            String base = "processor/upper_reg_banks";
+            List<EDIFHierPortInst> sinks = getMacroInternalSinks(netlist, base, "ADDRD[0]");
+            Assertions.assertEquals(8, sinks.size());
+            EDIFNet internalNet = sinks.get(0).getNet();
+            int internalPortInstsBefore = internalNet.getPortInsts().size();
+
+            // A strict subset must fail, naming the missing siblings
+            RuntimeException ex = Assertions.assertThrows(RuntimeException.class,
+                    () -> ECOTools.disconnectNet(design, sinks.subList(0, 4), new HashMap<>()));
+            Assertions.assertTrue(ex.getMessage().contains("/" + sinks.get(7).getPortInst().getName()),
+                    ex.getMessage());
+
+            // All eight siblings lifts to the macro's external ADDRD[0] port
+            ECOTools.disconnectNet(design, sinks, new HashMap<>());
+            EDIFHierPortInst extPort = netlist.getHierPortInstFromName(base + "/ADDRD[0]");
+            Assertions.assertNull(extPort.getNet());
+            // Macro internal netlist is unchanged
+            Assertions.assertEquals(internalPortInstsBefore, internalNet.getPortInsts().size());
+        }
+    }
+
+    /**
+     * Tests that ECOTools.connectNet() can connect input pins located *inside* a macro by lifting to
+     * the macro's external port. Disconnects a LUT6_2 fan-out (I0 -> {LUT6/I0, LUT5/I0}) and
+     * reconnects it to its original net by passing the internal leaf pins, on both UltraScale+ and
+     * Versal. (RAM32M is exercised by the disconnect test above; note that connectNet() on a placed
+     * RAM32M address pin hits a pre-existing limitation in DesignTools.getPortInstsFromSitePinInst()
+     * that is unrelated to macro handling -- it reproduces when connecting the macro's external port
+     * directly -- so it is intentionally not exercised here.)
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"picoblaze_ooc_X10Y235.dcp", "picoblaze_2022.2.dcp"})
+    public void testConnectNetMacroInternalInputPin(String dcp) {
+        Design design = RapidWrightDCP.loadDCP(dcp);
+        EDIFNetlist netlist = design.getNetlist();
+        String base = "processor/stack_loop[4].upper_stack.stack_pointer_lut";
+
+        EDIFHierNet origNet = netlist.getHierPortInstFromName(base + "/I0").getHierarchicalNet();
+        List<EDIFHierPortInst> sinks = getMacroInternalSinks(netlist, base, "I0");
+        Assertions.assertEquals(2, sinks.size());
+
+        Map<Net, Set<SitePinInst>> deferredRemovals = new HashMap<>();
+        ECOTools.disconnectNet(design, sinks, deferredRemovals);
+        Assertions.assertNull(netlist.getHierPortInstFromName(base + "/I0").getNet());
+
+        // Reconnect by passing the internal leaf pins; connectNet() lifts to the macro port
+        Map<EDIFHierNet, List<EDIFHierPortInst>> netToPortInsts = new HashMap<>();
+        netToPortInsts.put(origNet, new ArrayList<>(sinks));
+        ECOTools.connectNet(design, netToPortInsts, deferredRemovals);
+
+        // The macro's external I0 port is reconnected and both internal pins are reachable
+        EDIFHierPortInst extPort = netlist.getHierPortInstFromName(base + "/I0");
+        Assertions.assertNotNull(extPort.getNet());
+        Assertions.assertEquals(origNet.getNet(), extPort.getNet());
+        Set<String> leafPins = origNet.getLeafHierPortInsts(false, true).stream()
+                .map(EDIFHierPortInst::toString).collect(Collectors.toSet());
+        for (EDIFHierPortInst sink : sinks) {
+            Assertions.assertTrue(leafPins.contains(sink.toString()), sink.toString());
+        }
+    }
+
+    /**
+     * Tests ECOTools.disconnectNet() on an output pin located *inside* a macro. Uses a RAM32M
+     * internal output (RAMA/O -> external DOA[0]) on both UltraScale+ and Versal, verifying the
+     * operation is lifted to the macro's external output port and the macro internals are untouched.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"picoblaze_ooc_X10Y235.dcp", "picoblaze_2022.2.dcp"})
+    public void testDisconnectNetMacroInternalOutputPin(String dcp) {
+        Design design = RapidWrightDCP.loadDCP(dcp);
+        EDIFNetlist netlist = design.getNetlist();
+        String base = "processor/upper_reg_banks";
+
+        EDIFHierPortInst ramOut = netlist.getHierPortInstFromName(base + "/RAMA/O");
+        Assertions.assertTrue(ramOut.isOutput());
+        EDIFNet internalNet = ramOut.getNet();
+        int internalPortInstsBefore = internalNet.getPortInsts().size();
+        EDIFHierPortInst extPort = netlist.getHierPortInstFromName(base + "/DOA[0]");
+        Assertions.assertNotNull(extPort.getNet());
+
+        // No sibling requirement for an output; lifts to the macro's external DOA[0] port
+        ECOTools.disconnectNet(design, Collections.singletonList(ramOut), new HashMap<>());
+
+        Assertions.assertNull(netlist.getHierPortInstFromName(base + "/DOA[0]").getNet());
+        // Macro internal netlist (RAMA/O -> DOA[0]) is unchanged
+        Assertions.assertNotNull(ramOut.getNet());
+        Assertions.assertEquals(internalPortInstsBefore, internalNet.getPortInsts().size());
+    }
+
+    @SuppressWarnings("serial")
     @Test
     public void testConnectNetSwapSinks() {
         Design design = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
@@ -209,6 +375,8 @@ public class TestECOTools {
         }
         ECOTools.disconnectNet(design, disconnectPins, deferredRemovals);
         Assertions.assertEquals(14, deferredRemovals.size());
+        DesignTools.batchRemoveSitePins(deferredRemovals, true);
+        deferredRemovals.clear();
 
         // Re-connect those inputs to some other nets
         final Map<EDIFHierNet, List<EDIFHierPortInst>> netToPortInsts = new HashMap<>();
@@ -221,7 +389,7 @@ public class TestECOTools {
             List<EDIFHierPortInst> ehpiLeaves = ehpi.getInternalNet().getLeafHierPortInsts(false, true);
             Assertions.assertFalse(ehn.getLeafHierPortInsts(false, true).stream().anyMatch(ehpiLeaves::contains));
 
-            netToPortInsts.put(ehn, new ArrayList(){{ add(ehpi); }});
+            netToPortInsts.put(ehn, new ArrayList<EDIFHierPortInst>(){{ add(ehpi); }});
         }
         ECOTools.connectNet(design, netToPortInsts, deferredRemovals);
         Assertions.assertEquals(0, deferredRemovals.size());
@@ -257,6 +425,7 @@ public class TestECOTools {
         }
     }
 
+    @SuppressWarnings("serial")
     @Test
     public void testConnectNetSwapSource() {
         Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
@@ -297,8 +466,8 @@ public class TestECOTools {
 
         // Swap those output pins
         Map<EDIFHierNet, List<EDIFHierPortInst>> netToPortInsts = new HashMap<>();
-        netToPortInsts.put(disconnectedNets.get(0), new ArrayList() {{ add(disconnectPins.get(1)); }});
-        netToPortInsts.put(disconnectedNets.get(1), new ArrayList() {{ add(disconnectPins.get(0)); }});
+        netToPortInsts.put(disconnectedNets.get(0), new ArrayList<EDIFHierPortInst>() {{ add(disconnectPins.get(1)); }});
+        netToPortInsts.put(disconnectedNets.get(1), new ArrayList<EDIFHierPortInst>() {{ add(disconnectPins.get(0)); }});
 
         ECOTools.connectNet(design, netToPortInsts, deferredRemovals);
         Assertions.assertEquals(0, deferredRemovals.size());
@@ -441,6 +610,27 @@ public class TestECOTools {
                 cell0.getEDIFHierCellInst().getPortInst(pin).getHierarchicalNetName());
         Assertions.assertSame(/*spiA5*/ spiA2, cell0.getSitePinFromPortInst(ehpi.getPortInst(), null));
         Assertions.assertSame(targetNet, /*spiA5*/spiA2.getNet());
+    }
+
+    @Test
+    public void testConnectNetVersalLUTInput() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        Cell c = design.getCell("processor/upper_parity_lut");
+        String pin = "I2";
+        String siteWire = c.getSiteWireNameFromLogicalPin(pin);
+        SiteInst si = c.getSiteInst();
+        Net net = si.getNetFromSiteWire(siteWire);
+        EDIFHierPortInst portInst = c.getEDIFHierCellInst().getPortInst(pin);
+
+        ECOTools.disconnectNet(design, portInst);
+
+        Assertions.assertNull(si.getNetFromSiteWire(siteWire));
+        Assertions.assertNull(c.getEDIFHierCellInst().getPortInst(pin).getNet());
+
+        ECOTools.connectNet(design, c, "I2", net);
+
+        Assertions.assertEquals(net, si.getNetFromSiteWire(siteWire));
+        Assertions.assertEquals(net.getLogicalNet(), c.getEDIFHierCellInst().getPortInst(pin).getNet());
     }
 
     @Test
@@ -789,6 +979,7 @@ public class TestECOTools {
     /**
      * Generated with CodeGenerator.genCodeForTestSite()
      */
+    @SuppressWarnings("unused")
     public Design genTestDesign() {
         Design design = new Design("test", "xcku060-ffva1517-2-i");
         Device device = design.getDevice();
@@ -1071,4 +1262,88 @@ public class TestECOTools {
         VivadoToolsHelper.assertFullyRouted(d);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"xcvu19p", "xcvp1502"})
+    public void testDiscussion1245(String device) {
+        // Create a test design
+        Design test = new Design("test_design", device);
+
+        // Place two luts at 2 arbitrarily chosen sites
+        Cell lut_1 = test.createAndPlaceCell("lut_1", Unisim.LUT6, "SLICE_X148Y0/A6LUT");
+        LUTTools.configureLUT(lut_1, "O!=I1");
+
+        Cell lut_2 = test.createAndPlaceCell("lut_2", Unisim.LUT6, "SLICE_X148Y1/B6LUT");
+        LUTTools.configureLUT(lut_2, "O=I1");
+
+        // Create a net
+        Net net = test.createNet("test_net");
+
+        // Using ECOTools
+        ECOTools.connectNet(test, lut_1, "O", net);        // Source
+        ECOTools.connectNet(test, lut_2, "I1", net);       // Sinks
+
+        Assertions.assertEquals("[IN SLICE_X148Y1.B2]", PartialRouter.getUnroutedPins(test).toString());
+    }
+
+    @Test
+    public void testConnectNetWithoutSource() {
+        // Also taken from discussion:
+        // https://github.com/Xilinx/RapidWright/discussions/1245#discussioncomment-14044695
+
+        Design design = new Design("clock_gating_test", "vp1202");
+        EDIFCell top = design.getTopEDIFCell();
+
+        Net clk = design.createNet("clk");
+        clk.getLogicalNet().createPortInst(top.createPort("clk", EDIFDirection.INPUT, 1));
+
+        Net gate = design.createNet("gate");
+        gate.getLogicalNet().createPortInst(top.createPort("gate", EDIFDirection.INPUT, 1));
+
+        Cell clkIBUF = design.createAndPlaceCell(top, "clkIBUF", Unisim.IBUF, "IOB_X29Y0/IOB_M");
+        ECOTools.connectNet(design, clkIBUF, "I", clk);
+
+        Cell gateIBUF = design.createAndPlaceCell(top, "gateIBUF", Unisim.IBUF, "IOB_X29Y1/IOB_M");
+        ECOTools.connectNet(design, gateIBUF, "I", gate);
+
+        Net clkBUF = design.createNet("clkBUF");
+        ECOTools.connectNet(design, clkIBUF, "O", clkBUF);
+        Net gateBUF = design.createNet("gateBUF");
+        ECOTools.connectNet(design, gateIBUF, "O", gateBUF);
+
+        Cell lut = design.createAndPlaceCell("lut", Unisim.LUT2, "SLICE_X86Y67/C6LUT");
+        LUTTools.configureLUT(lut, "O=I1 & I0");
+        lut.fixCell(true);
+
+        Cell ff1 = design.createAndPlaceCell("ff1", Unisim.FDRE, "SLICE_X86Y67/CFF2");
+        ff1.fixCell(true);
+
+        Cell ff2 = design.createAndPlaceCell("ff2", Unisim.FDRE, "SLICE_X86Y67/DFF2");
+        ff2.fixCell(true);
+
+        Net gatedClk = design.createNet("gated_clk");
+
+        ECOTools.connectNet(design, lut, "O", gatedClk);
+        ECOTools.connectNet(design, lut, "I0", clkBUF);
+        ECOTools.connectNet(design, lut, "I1", gateBUF);
+        ECOTools.connectNet(design, ff1, "C", gatedClk);
+        ECOTools.connectNet(design, ff2, "C", gatedClk);
+
+        Net ff1Feedback = design.createNet("ff1_feedback");
+        Net ff2Feedback = design.createNet("ff2_feedback");
+        ECOTools.connectNet(design, ff1, "D", ff1Feedback);
+        ECOTools.connectNet(design, ff1, "Q", ff1Feedback);
+        ECOTools.connectNet(design, ff2, "D", ff2Feedback);
+        ECOTools.connectNet(design, ff2, "Q", ff2Feedback);
+
+        Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
+        ECOTools.connectNet(design, ff1, "CE", vcc);
+        ECOTools.connectNet(design, ff2, "CE", vcc);
+        ECOTools.connectNet(design, ff1, "R", gnd);
+        ECOTools.connectNet(design, ff2, "R", gnd);
+
+        RWRoute.routeDesignFullNonTimingDriven(design);
+
+        VivadoToolsHelper.assertFullyRouted(design);
+    }
 }

@@ -22,6 +22,7 @@
 
 package com.xilinx.rapidwright.eco;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
@@ -35,7 +36,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -86,6 +86,8 @@ public class TestECOPlacementHelper {
     public void testGetUnusedFlop() {
         Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
         Net clk = design.getNet("clk");
+        Net ce = design.getVccNet();
+        Net rst = design.getGndNet();
         DesignTools.createMissingSitePinInsts(design, clk);
         ECOPlacementHelper eph = new ECOPlacementHelper(design, null);
         int i = 0;
@@ -93,9 +95,12 @@ public class TestECOPlacementHelper {
             SiteInst si = design.getSiteInstFromSiteName("SLICE_X15Y239");
             List<BEL> bels = new ArrayList<>();
             BEL bel;
-            while ((bel = eph.getUnusedFlop(si, clk)) != null) {
+            while ((bel = eph.getUnusedFlop(si, clk, ce, rst)) != null) {
                 bels.add(bel);
-                design.createAndPlaceCell("cell" + (i++), Unisim.FDRE, si.getSiteName() + "/" + bel.getName());
+                Cell ff = design.createAndPlaceCell("cell" + (i++), Unisim.FDRE, si.getSiteName() + "/" + bel.getName());
+                clk.connect(ff, "C");
+                ce.connect(ff, "CE");
+                rst.connect(ff, "R");
             }
             // BFF, CFF, DFF not available due to PINBOUNCE blockage; all others occupied
             Assertions.assertEquals("[]", bels.toString());
@@ -104,9 +109,12 @@ public class TestECOPlacementHelper {
             SiteInst si = design.getSiteInstFromSiteName("SLICE_X15Y238");
             List<BEL> bels = new ArrayList<>();
             BEL bel;
-            while ((bel = eph.getUnusedFlop(si, clk)) != null) {
+            while ((bel = eph.getUnusedFlop(si, clk, ce, rst)) != null) {
                 bels.add(bel);
-                design.createAndPlaceCell("cell" + (i++), Unisim.FDRE, si.getSiteName() + "/" + bel.getName());
+                Cell ff = design.createAndPlaceCell("cell" + (i++), Unisim.FDRE, si.getSiteName() + "/" + bel.getName());
+                clk.connect(ff, "C");
+                ce.connect(ff, "CE");
+                rst.connect(ff, "R");
             }
             // AFF2, BFF2, CFF2, EFF2 not available due to PINBOUNCE blockage; all others occupied
             Assertions.assertEquals("[]", bels.toString());
@@ -115,9 +123,12 @@ public class TestECOPlacementHelper {
             SiteInst si = design.getSiteInstFromSiteName("SLICE_X14Y239");
             List<BEL> bels = new ArrayList<>();
             BEL bel;
-            while ((bel = eph.getUnusedFlop(si, clk)) != null) {
+            while ((bel = eph.getUnusedFlop(si, clk, ce, rst)) != null) {
                 bels.add(bel);
-                design.createAndPlaceCell("cell" + (i++), Unisim.FDRE, si.getSiteName() + "/" + bel.getName());
+                Cell ff = design.createAndPlaceCell("cell" + (i++), Unisim.FDRE, si.getSiteName() + "/" + bel.getName());
+                clk.connect(ff, "C");
+                ce.connect(ff, "CE");
+                rst.connect(ff, "R");
             }
             Assertions.assertEquals("[BFF(BEL), DFF(BEL), GFF(BEL), FFF(BEL), HFF(BEL)]", bels.toString());
         }
@@ -129,9 +140,12 @@ public class TestECOPlacementHelper {
 
             List<BEL> bels = new ArrayList<>();
             BEL bel;
-            while ((bel = eph.getUnusedFlop(si, clk)) != null) {
+            while ((bel = eph.getUnusedFlop(si, clk, ce, rst)) != null) {
                 bels.add(bel);
-                design.createAndPlaceCell("cell" + (i++), Unisim.FDRE, si.getSiteName() + "/" + bel.getName());
+                Cell ff = design.createAndPlaceCell("cell" + (i++), Unisim.FDRE, si.getSiteName() + "/" + bel.getName());
+                clk.connect(ff, "C");
+                ce.connect(ff, "CE");
+                rst.connect(ff, "R");
             }
             // FF2 is not blocked by PINBOUNCE, but SR is incompatible
             Assertions.assertEquals("[]", bels.toString());

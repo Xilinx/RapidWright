@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025, Advanced Micro Devices, Inc.
+ * Copyright (c) 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Advanced Micro Devices, Inc.
@@ -27,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Sat Jun 07 22:31:12 MDT 2025
+ * Generated on: Tue Jun 09 13:13:33 MDT 2026
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  *
  * Enumeration of SiteTypeEnum type for all valid devices within Vivado.
@@ -149,6 +149,8 @@ public enum SiteTypeEnum {
     DFE_A,
     DFE_B,
     DFE_C,
+    DFE_CFC_BOT,
+    DFE_CFC_TOP,
     DFE_D,
     DFE_E,
     DFE_F,
@@ -182,6 +184,8 @@ public enum SiteTypeEnum {
     GCLK_TEST_BUFE3,
     GCLK_TEST_RING,
     GLOBALSIG,
+    GTF_CHANNEL,
+    GTF_COMMON,
     GTHE2_CHANNEL,
     GTHE2_COMMON,
     GTHE3_CHANNEL,
@@ -269,11 +273,13 @@ public enum SiteTypeEnum {
     ISP2,
     KEY_CLEAR,
     LAGUNA,
+    LPDDRMC,
     MISR,
     MMCM,
     MMCME2_ADV,
     MMCME3_ADV,
     MMI,
+    MMI2,
     MRMAC,
     MTBF2,
     MTBF3,
@@ -316,6 +322,7 @@ public enum SiteTypeEnum {
     OUT_FIFO,
     PCIE40,
     PCIE40E4,
+    PCIE4CE,
     PCIE4CE4,
     PCIE50,
     PCIE_2_1,
@@ -332,6 +339,7 @@ public enum SiteTypeEnum {
     PLL,
     PLLE2_ADV,
     PLLE3_ADV,
+    PLLXP,
     PLL_SELECT_SITE,
     PMV,
     PMV2,
@@ -380,11 +388,18 @@ public enum SiteTypeEnum {
     X5PHIO_DCCIBUF,
     X5PHIO_HARD_INV,
     X5PHIO_XCVR,
+    X5PHY_HS,
+    X5PHY_LS,
+    X5PHY_PLL_SELECT,
     X5PLL,
     X5PLL_INTF,
     X5PLL_S2P,
     XADC,
     XIPHY_FEEDTHROUGH,
+    XP5IOB,
+    XP5IO_VREF,
+    XP5PIO_CMU_ANA,
+    XP5PIO_CMU_DIG_TOP,
     XPHY,
     XPIOB,
     XPIOLOGIC,

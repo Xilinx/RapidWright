@@ -86,7 +86,7 @@ public class TileColumnPattern extends ArrayList<TileTypeEnum> implements Compar
 
     /**
      * Creates a TileColumnPattern from an existing list of tile types and uses the start and end
-     * as indicies to get a sublist of filteredTypes.
+     * as indices to get a sublist of filteredTypes.
      * @param filteredTypes The list of tile types to turn into a pattern
      * @param start The start index to use to build a subList of filteredTypes
      * @param end The end index to use to build a subList of filteredTypes

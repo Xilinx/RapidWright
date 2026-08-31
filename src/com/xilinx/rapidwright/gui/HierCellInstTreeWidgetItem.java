@@ -36,6 +36,10 @@ public class HierCellInstTreeWidgetItem extends QTreeWidgetItem {
         super(parent);
     }
 
+    public HierCellInstTreeWidgetItem(NetlistTreeWidget netlistTreeWidget) {
+        super(netlistTreeWidget);
+    }
+
     public void setInst(EDIFHierCellInst inst) {
         this.inst = inst;
     }

@@ -43,6 +43,8 @@ public class TestCell {
             "xcvu3p,SLICE_X0Y0,CARRY8,DI[2],DI2,'[C1, C2, C3, C4, C5]'",
             "xcvu3p,SLICE_X1Y0,CARRY8,S[7],S7,'[H1, H2, H3, H4, H5, H6]'",  // SLICEM
             "xcvu3p,SLICE_X1Y0,CARRY8,DI[3],DI3,'[D1, D2, D3, D4, D5]'",
+            // Versal input pins
+            "xcvp1502,SLICE_X148Y0,B6LUT,I1,A1,'[B1]'",
 
             // Output pins (single logical pin has options to drive many site pins)
             "xcvu3p,SLICE_X0Y0,E6LUT,O,O6,'[E_O, EMUX]'",
@@ -63,9 +65,50 @@ public class TestCell {
         List<String> sitePinNames = cell.getAllCorrespondingSitePinNames(logicalPinName, considerLutRoutethru);
         Assertions.assertEquals(expectedSitePins, sitePinNames.toString());
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            "false,[G5]",
+            "true,'[G5, G1, G2, G3, G4, G6]'",
+    })
+    public void testGetAllCorrespondingSitePinNamesLUTRouteThru(boolean considerLutRoutethru, String expectedSitePins) {
+        Design d = new Design("testGetAllCorrespondingSitePinNamesLUTRouteThru", Device.KCU105);
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
+        Cell cell = d.createAndPlaceCell("f7mux", Unisim.MUXF7, si.getSiteName() + "/F7MUX_GH");
+
+        Net netS = d.createNet("netS");
+        Assertions.assertTrue(si.routeIntraSiteNet(netS, si.getBELPin("GX", "GX"),
+                si.getBELPin("F7MUX_GH", "S0")));
+        List<String> sitePinNames = cell.getAllCorrespondingSitePinNames("S", considerLutRoutethru);
+        Assertions.assertEquals("[GX]", sitePinNames.toString());
+
+        Net net1 = d.createNet("net1");
+        Assertions.assertTrue(si.routeIntraSiteNet(net1, si.getBELPin("G5", "G5"),
+                si.getBELPin("F7MUX_GH", "1")));
+        sitePinNames = cell.getAllCorrespondingSitePinNames("I1", considerLutRoutethru);
+        Assertions.assertEquals(expectedSitePins, sitePinNames.toString());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            // Versal input pins
+            "xcvp1502,SLICE_X148Y0,BFF,D,D,BX",
+    })
+    public void testGetCorrespondingSitePinName(String deviceName,
+                                                String siteName,
+                                                String belName,
+                                                String logicalPinName,
+                                                String physicalPinName,
+                                                String expectedSitePin) {
+        Device device = Device.getDevice(deviceName);
+        Cell cell = new Cell("cell", device.getSite(siteName).getBEL(belName));
+        cell.addPinMapping(physicalPinName, logicalPinName);
+        String sitePinName = cell.getCorrespondingSitePinName(logicalPinName);
+        Assertions.assertEquals(expectedSitePin, sitePinName);
+    }
     
     @Test
-    public void testGetCorrespondingSitePinName() {
+    public void testGetCorrespondingSitePinNameDualLut() {
         Device device = Device.getDevice("xcvu3p");
         Design design = new Design("testDesign", device.getName());
         Cell cell = design.createAndPlaceCell("testFF", Unisim.FDRE, "SLICE_X10Y10/GFF");

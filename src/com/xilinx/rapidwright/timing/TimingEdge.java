@@ -349,7 +349,9 @@ public class TimingEdge extends DefaultEdge {
 
     /**
      * Gets the physical "Net" object associated with this edge.
-     * @return Physical "Net" for this edge.
+     * @return Physical "Net" for this edge, or null when there is no net to associate: edges
+     *         representing a delay internal to a cell, and the edges to and from the super
+     *         source/sink that bound the graph.
      */
     public Net getNet() {
         return this.net;

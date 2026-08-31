@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,8 @@ import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.ClockRegion;
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
@@ -87,7 +90,7 @@ public class PartialRouter extends RWRoute {
     protected static class RouteNodeGraphPartialTimingDriven extends RouteNodeGraphTimingDriven {
         public RouteNodeGraphPartialTimingDriven(Design design,
                                                  RWRouteConfig config,
-                                                 DelayEstimatorBase delayEstimator) {
+                                                 DelayEstimatorBase<InterconnectInfo> delayEstimator) {
             super(design, config, delayEstimator);
         }
 
@@ -173,7 +176,8 @@ public class PartialRouter extends RWRoute {
     protected RouteNodeGraph createRouteNodeGraph() {
         if (config.isTimingDriven()) {
             /* An instantiated delay estimator that is used to calculate delay of routing resources */
-            DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+            DelayEstimatorBase<InterconnectInfo> estimator = new DelayEstimatorBase<InterconnectInfo>(
+                    design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
             return new RouteNodeGraphPartialTimingDriven(design, config, estimator);
         } else {
             return new RouteNodeGraphPartial(design, config);
@@ -183,7 +187,8 @@ public class PartialRouter extends RWRoute {
     @Override
     protected TimingManager createTimingManager(ClkRouteTiming clkTiming, Collection<Net> timingNets) {
         final boolean isPartialRouting = true;
-        return new TimingManager(design, routerTimer, config, clkTiming, timingNets, isPartialRouting);
+        return new TimingManager(design, routerTimer, config, clkTiming, timingNets, isPartialRouting,
+                routingGraph.getDelayEstimator());
     }
 
     @Override
@@ -206,6 +211,7 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected void routeGlobalClkNets() {
+        Map<Integer, Set<ClockRegion>> usedRoutingTracks = new HashMap<>();
         if (clkNets.isEmpty())
             return;
 
@@ -216,7 +222,7 @@ public class PartialRouter extends RWRoute {
             }
 
             if (!clk.hasPIPs()) {
-                super.routeGlobalClkNet(clk);
+                super.routeGlobalClkNet(clk, usedRoutingTracks);
             } else {
                 System.out.println("INFO: Routing " + clkPins.size() + " pins of clock " + clk + " (non timing-driven)");
                 Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(clk, node);
@@ -247,6 +253,10 @@ public class PartialRouter extends RWRoute {
             assert(sinkRnode.getType().isAnyExclusiveSink());
             preservedNet = routingGraph.getPreservedNet(sinkRnode);
             if (preservedNet != null && preservedNet != net) {
+                if (preservedNet.isStaticNet()) {
+                    System.err.println("ERROR: Unable to unpreserve " + preservedNet + " to allow " + connection.getSink().getSitePinName() + " to be reached. Expect unrouteable connection.");
+                    continue;
+                }
                 unpreserveNets.add(preservedNet);
             }
         }
@@ -474,6 +484,30 @@ public class PartialRouter extends RWRoute {
             numPreservedWire++;
             numPreservedRoutableNets++;
         }
+    }
+
+    protected boolean isExcludedPip(Node start, Node end) {
+        if (!routingGraph.isVersal) {
+            return false;
+        }
+
+        // Skip all PIPs downstream from a NODE_INTF_CTRL/NODE_IMUX (since these are the intents that
+        // RouterHelper.projectInputPinToINTNode() will terminate at)
+        // {NODE_INTF_CTRL,NODE_IMUX} -> NODE_PINFEED -> NODE_IRI -> NODE_IRI -> NODE_PINFEED (site pin)
+        IntentCode startIntent = start.getIntentCode();
+        if (startIntent == IntentCode.NODE_INTF_CTRL || startIntent == IntentCode.NODE_IMUX ||
+                startIntent == IntentCode.NODE_IRI) {
+            return true;
+        }
+
+        IntentCode endIntent = end.getIntentCode();
+        if (endIntent == IntentCode.NODE_IRI ||
+                // Skip NODE_OUTPUT -> NODE_INTF[24] since RouterHelper.projectOutputPinToINTNode()
+                // terminates at the latter
+                endIntent == IntentCode.NODE_INTF2 || endIntent == IntentCode.NODE_INTF4) {
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -727,11 +761,28 @@ public class PartialRouter extends RWRoute {
      * @param design The {@link Design} instance to be routed.
      * @param args An array of string arguments, can be null.
      * If null, the design will be routed in the full timing-driven routing mode with default a {@link RWRouteConfig} instance.
+     * The "--softPreserve" argument, if present, is consumed here (and not forwarded to {@link RWRouteConfig})
+     * to allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
      * For more options of the configuration, please refer to the {@link RWRouteConfig} class.
      * @return Routed design.
      */
     public static Design routeDesignWithUserDefinedArguments(Design design, String[] args) {
         boolean softPreserve = false;
+        if (args != null) {
+            // Splice out every occurrence, since RWRouteConfig would not recognize this argument.
+            // No copying occurs when absent (the common case)
+            for (int i = 0; i < args.length; i++) {
+                if (!args[i].equals("--softPreserve")) {
+                    continue;
+                }
+                softPreserve = true;
+                String[] filtered = new String[args.length - 1];
+                System.arraycopy(args, 0, filtered, 0, i);
+                System.arraycopy(args, i + 1, filtered, i, filtered.length - i);
+                args = filtered;
+                i--;
+            }
+        }
         List<SitePinInst> pinsToRoute = null;
 
         // Uses the default configuration if basic usage only.
@@ -854,7 +905,7 @@ public class PartialRouter extends RWRoute {
      */
     public static void main(String[] args) {
         if (args.length < 2) {
-            System.out.println("USAGE: <input.dcp> <output.dcp>");
+            System.out.println("USAGE: <input.dcp> <output.dcp> [--softPreserve]");
             return;
         }
         // Reads the output directory and set the output design checkpoint file name

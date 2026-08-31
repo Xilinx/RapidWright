@@ -109,6 +109,7 @@ public class EnumerateCellBelMapping {
     }
 
 
+    @SuppressWarnings("unchecked")
     private void checkSiteInvariance() throws RuntimeException {
         checkSizeInvariance();
 

@@ -73,6 +73,10 @@ public class Utils{
 
     public static Set<SiteTypeEnum> sliceDspBramUramTypes;
 
+    public static Set<SiteTypeEnum> psTypes;
+
+    public static Set<SiteTypeEnum> nocTypes;
+
     /**
      * Returns a SiteTypeEnum enum based on the given string. If such
      * an enum does not exist, it will return null.
@@ -182,6 +186,14 @@ public class Utils{
         return moduleSiteTypes.contains(type);
     }
 
+    public static boolean isPSSiteType(SiteTypeEnum type) {
+        return psTypes.contains(type);
+    }
+
+    public static boolean isNOCSiteType(SiteTypeEnum type) {
+        return nocTypes.contains(type);
+    }
+
     public static Set<TileTypeEnum> getIntTileTypes() {
         return interconnects;
     }
@@ -222,6 +234,14 @@ public class Utils{
         return moduleSiteTypes;
     }
 
+    public static Set<SiteTypeEnum> getPSTypes() {
+        return psTypes;
+    }
+
+    public static Set<SiteTypeEnum> getNOCTypes() {
+        return nocTypes;
+    }
+
     public static boolean isSLICE(SiteInst s) {
         return sliceTypes.contains(s.getSiteTypeEnum());
     }
@@ -246,11 +266,25 @@ public class Utils{
         return iobTypes.contains(s.getSiteTypeEnum());
     }
 
+    public static boolean isPS(SiteInst s) {
+        return psTypes.contains(s.getSiteTypeEnum());
+    }
+
     public static boolean isIOB(SiteTypeEnum s) {
         return iobTypes.contains(s);
     }
 
+    public static boolean isPS(SiteTypeEnum s) {
+        return psTypes.contains(s);
+    }
 
+    public static boolean isNOC(SiteInst s) {
+        return nocTypes.contains(s.getSiteTypeEnum());
+    }
+
+    public static boolean isNOC(SiteTypeEnum s) {
+        return nocTypes.contains(s);
+    }
 
     static{
         clbs = EnumSet.of(
@@ -327,9 +361,10 @@ public class Utils{
             TileTypeEnum.INT_L,
             //TileTypeEnum.INT_L_SLV,
             //TileTypeEnum.INT_L_SLV_FLY,
-            TileTypeEnum.INT_R
+            TileTypeEnum.INT_R,
             //TileTypeEnum.INT_R_SLV,
             //TileTypeEnum.INT_R_SLV_FLY,
+            TileTypeEnum.SLL                // Versal
         );
 
         urams = EnumSet.of(
@@ -358,7 +393,8 @@ public class Utils{
 
         lockedSiteTypes = EnumSet.of(
             SiteTypeEnum.CONFIG_SITE,
-            SiteTypeEnum.BUFG
+            SiteTypeEnum.BUFG,
+            SiteTypeEnum.BUFGCE 
         );
 
         sliceTypes = EnumSet.of(
@@ -435,6 +471,30 @@ public class Utils{
             // SiteTypeEnum.PS7
         );
         moduleSiteTypes.addAll(sliceDspBramUramTypes);
+
+        psTypes = EnumSet.noneOf(SiteTypeEnum.class);
+        psTypes.add(SiteTypeEnum.PS7);
+        psTypes.add(SiteTypeEnum.PS8);
+        psTypes.add(SiteTypeEnum.PS9);
+        psTypes.add(SiteTypeEnum.PS11);
+
+        nocTypes = EnumSet.of(
+            SiteTypeEnum.NOC_HBM_BLI_SCAN,
+            SiteTypeEnum.NOC_NCRB,
+            SiteTypeEnum.NOC_NCRB_SSIT,
+            SiteTypeEnum.NOC_NIDB,
+            SiteTypeEnum.NOC_NMU128,
+            SiteTypeEnum.NOC_NMU512,
+            SiteTypeEnum.NOC_NMU_HBM2E,
+            SiteTypeEnum.NOC_NPP_RPTR,
+            SiteTypeEnum.NOC_NPS4,
+            SiteTypeEnum.NOC_NPS5555,
+            SiteTypeEnum.NOC_NPS6,
+            SiteTypeEnum.NOC_NPS7575,
+            SiteTypeEnum.NOC_NPS_VNOC,
+            SiteTypeEnum.NOC_NSU128,
+            SiteTypeEnum.NOC_NSU512
+        );
     }
 
 }

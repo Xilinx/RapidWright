@@ -65,8 +65,8 @@ public class EDIFCellInst extends EDIFPropertyObject {
     /**
      * Copy constructor. Creates new objects except portInsts.
      * 
-     * @param inst   Prototype instance to copy
-     * @param parent The parent cell to which the new instance should belong.
+     * @param inst       Prototype instance to copy
+     * @param parentCell The parent cell to which the new instance should belong.
      */
     public EDIFCellInst(EDIFCellInst inst, EDIFCell parentCell) {
         super((EDIFPropertyObject)inst);
@@ -260,6 +260,13 @@ public class EDIFCellInst extends EDIFPropertyObject {
             if (port == null || port.getWidth() != origPort.getWidth()) {
                 port = cellType.getPort(origPort.getName());
             }
+            if (port == null) {
+                throw new RuntimeException("ERROR: Cannot remap port '" + origPort.getName()
+                        + "' from old cell type '" + origPort.getParentCell().getName()
+                        + "' to new cell type '" + cellType.getName()
+                        + "' on instance '" + getName()
+                        + "'. Port not found on new cell type.");
+            }
             portInst.setPort(port);
         }
     }
@@ -302,7 +309,7 @@ public class EDIFCellInst extends EDIFPropertyObject {
         os.write(cache.getLegalEDIFName(cellType.getName()));
         os.write(EXPORT_CONST_LIBRARYREF);
         os.write(cache.getLegalEDIFName(cellType.getLibrary().getName()));
-        if (getPropertiesMap().size() > 0) {
+        if (getPropertyCount() > 0) {
             os.write(EXPORT_CONST_CLOSE_WITH_PROPS);
             exportEDIFProperties(os,EXPORT_CONST_PROP_INDENT, cache, stable);
             os.write(EXPORT_CONST_CLOSE);

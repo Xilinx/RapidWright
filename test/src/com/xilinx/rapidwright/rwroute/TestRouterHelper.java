@@ -27,15 +27,20 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.TestDesignHelper;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.support.rwroute.RouterHelperSupport;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.util.Pair;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -47,6 +52,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -350,5 +356,90 @@ public class TestRouterHelper {
 
         List<Node> path = RouterHelper.findPathBetweenNodes(sourceNode, sinkNode);
         Assertions.assertTrue(path.size() > 2);
+    }
+
+    /**
+     * Checks that {@link RouterHelper#getSourceToSinkINTNodeDelays} accumulates delay by walking
+     * upstream from each sink, rather than in {@link Net#getPIPs()} order which
+     * {@link Net#setPIPs(Set)} leaves unspecified, and that it follows bidirectional PIPs in the
+     * direction that {@link PIP#isReversed()} gives rather than the direction the device declares.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            // Sink pin, the INT tile node it projects to, its expected delay, and whether to
+            // reverse the order that the net's PIPs are given in
+            "B3,INT_X54Y135/IMUX_W25,178,false",
+            "B3,INT_X54Y135/IMUX_W25,178,true",
+            "D5,INT_X54Y135/IMUX_W31,174,false",
+            "D5,INT_X54Y135/IMUX_W31,174,true",
+            "H3,INT_X54Y135/IMUX_W33,178,false",
+            "H3,INT_X54Y135/IMUX_W33,178,true",
+            // A1 is the only sink reached through the reversed PIP below; walking that PIP in the
+            // direction the device declares for it instead loses the two nodes ahead of it, and
+            // under-reports A1 as 204ps
+            "A1,INT_X54Y136/IMUX_W10,269,false",
+            "A1,INT_X54Y136/IMUX_W10,269,true"
+    })
+    public void testGetSourceToSinkINTNodeDelays(String sinkPinName, String sinkNodeName,
+                                                 short expectedDelay, boolean reversePipOrder) {
+        Design design = new Design("design", "xcvu3p");
+        Device device = design.getDevice();
+
+        // A net taken from a Vivado-routed design, listed here in topological order, that fans out
+        // to four sinks and that uses one bidirectional PIP in the reverse of the direction that
+        // the device declares for it
+        String[] pips = new String[]{
+                "INT_X54Y135/INT.LOGIC_OUTS_W30->>INT_NODE_IMUX_60_INT_OUT1",
+                "INT_X54Y135/INT.INT_NODE_IMUX_60_INT_OUT1->>BYPASS_W14",
+                "INT_X54Y135/INT.BYPASS_W14->>INT_NODE_IMUX_50_INT_OUT1",
+                "INT_X54Y135/INT.INT_NODE_IMUX_50_INT_OUT1->>BYPASS_W10",
+                "INT_X54Y135/INT.BYPASS_W10->>INT_NODE_IMUX_41_INT_OUT1",
+                "INT_X54Y135/INT.INT_NODE_IMUX_41_INT_OUT1->>IMUX_W25",
+                "INT_X54Y135/INT.BYPASS_W10->>INT_NODE_IMUX_41_INT_OUT0",
+                "INT_X54Y135/INT.INT_NODE_IMUX_41_INT_OUT0->>IMUX_W31",
+                "INT_X54Y135/INT.BYPASS_W10->>INT_NODE_IMUX_40_INT_OUT0",
+                "INT_X54Y135/INT.INT_NODE_IMUX_40_INT_OUT0->>IMUX_W33",
+                "INT_X54Y135/INT.INT_NODE_IMUX_50_INT_OUT0<<->>BYPASS_W14",
+                "INT_X54Y135/INT.INT_NODE_IMUX_50_INT_OUT0->>BOUNCE_W_13_FT0",
+                "INT_X54Y136/INT.BOUNCE_W_BLN_13_FT1->>INT_NODE_IMUX_62_INT_OUT0",
+                "INT_X54Y136/INT.INT_NODE_IMUX_62_INT_OUT0->>BYPASS_W5",
+                "INT_X54Y136/INT.BYPASS_W5->>INT_NODE_IMUX_48_INT_OUT0",
+                "INT_X54Y136/INT.INT_NODE_IMUX_48_INT_OUT0->>IMUX_W10"
+        };
+        if (reversePipOrder) {
+            // Any permutation must give the same result; reversing puts every PIP ahead of its driver
+            Collections.reverse(Arrays.asList(pips));
+        }
+        Net net = TestDesignHelper.createTestNet(design, "net", pips);
+
+        // PIP.toString() does not capture that a bidirectional PIP is used in reverse
+        for (PIP pip : net.getPIPs()) {
+            if (pip.toString().equals("INT_X54Y135/INT.INT_NODE_IMUX_50_INT_OUT0<<->>BYPASS_W14")) {
+                pip.setIsReversed(true);
+            }
+        }
+
+        SiteInst si135 = design.createSiteInst("SLICE_X84Y135");
+        SiteInst si136 = design.createSiteInst("SLICE_X84Y136");
+        net.createPin("EQ", si135);
+        for (String pinName : new String[]{"B3", "D5", "H3"}) {
+            net.createPin(pinName, si135);
+        }
+        net.createPin("A1", si136);
+
+        DelayEstimatorBase<InterconnectInfo> estimator = new DelayEstimatorBase<>(device, new InterconnectInfo(), false, 0);
+        Map<SitePinInst, Pair<Node,Short>> sinkNodeDelays = RouterHelper.getSourceToSinkINTNodeDelays(net, estimator);
+        Assertions.assertEquals(net.getSinkPins().size(), sinkNodeDelays.size());
+
+        Pair<Node,Short> nodeDelay = null;
+        for (Map.Entry<SitePinInst, Pair<Node,Short>> e : sinkNodeDelays.entrySet()) {
+            if (e.getKey().getName().equals(sinkPinName)) {
+                nodeDelay = e.getValue();
+                break;
+            }
+        }
+        Assertions.assertNotNull(nodeDelay);
+        Assertions.assertEquals(sinkNodeName, nodeDelay.getFirst().toString());
+        Assertions.assertEquals(expectedDelay, (short) nodeDelay.getSecond());
     }
 }

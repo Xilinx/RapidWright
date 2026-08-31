@@ -313,7 +313,7 @@ public class EDIFCell extends EDIFPropertyObject {
     /**
      * Given a port instance name (not including the name of the cell instance),
      * gets the associated port.
-     * 
+     *
      * @param portInstName
      * @return
      */
@@ -324,6 +324,40 @@ public class EDIFCell extends EDIFPropertyObject {
             port = ports.get(portInstName.substring(0, portInstName.lastIndexOf('[') + 1));
         }
         return port;
+    }
+
+    /**
+     * Rename port with name currName to newName.
+     *
+     * @param currName The current name of the port that will be renamed.
+     * @param newName The new name of the port after renaming.
+     */
+    public void renamePort(String currName, String newName) {
+        if (currName.equals(newName)) {
+            return;
+        }
+
+        EDIFPort port = getPortByPortInstName(currName);
+
+        if (port == null) {
+            throw new RuntimeException("Attempting to rename port " + currName
+                    + " that does not exist on cell " + getName());
+        }
+
+        EDIFPort newPort = new EDIFPort(newName, port.getDirection(), port.getWidth());
+        addPort(newPort);
+
+        for (int i : port.getBitBlastedIndices()) {
+            EDIFPortInst portInst = port.getInternalPortInstFromIndex(i);
+            if (portInst == null) {
+                continue;
+            }
+            EDIFNet net = removeInternalPortMapEntry(portInst.getFullName());
+            net.removePortInst(portInst);
+            net.createPortInst(newPort, newPort.isBus() ? i : -1);
+            addInternalPortMapEntry(newPort.getPortInstNameFromPort(i), net);
+        }
+        removePort(port);
     }
 
     public EDIFCellInst createCellInst(String name, EDIFCell parent) {
@@ -638,7 +672,7 @@ public class EDIFCell extends EDIFPropertyObject {
             }
             os.write(EXPORT_CONST_CONTENTS_END); // Contents end
         }
-        if (getPropertiesMap().size() > 0) {
+        if (getPropertyCount() > 0) {
             os.write('\n');
             exportEDIFProperties(os, EXPORT_CONST_PROP_INDENT, cache, stable);
         }
@@ -731,6 +765,25 @@ public class EDIFCell extends EDIFPropertyObject {
         }
     }
 
+    /**
+     * Trims the backing capacity of all {@link EDIFPortInstList} objects on the
+     * nets and cell instances of this cell down to their current size. The lists
+     * are built via incremental {@link java.util.ArrayList} insertion (which
+     * leaves unused capacity slack), so calling this after a netlist is fully
+     * loaded reclaims that slack. This is purely a memory optimization and does
+     * not change the contents of any list.
+     */
+    public void trimEDIFPortInstLists() {
+        for (EDIFNet net : getNets()) {
+            EDIFPortInstList list = net.getEDIFPortInstList();
+            if (list != null) list.trimToSize();
+        }
+        for (EDIFCellInst inst : getCellInsts()) {
+            EDIFPortInstList list = inst.getEDIFPortInstList();
+            if (list != null) list.trimToSize();
+        }
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -771,6 +824,34 @@ public class EDIFCell extends EDIFPropertyObject {
      */
     public boolean isUniquified() {
         return getNonHierInstantiationCount() <= 1;
+    }
+
+    /**
+     * Checks if this cell and the provided cell have the same set of ports.
+     * Port names that are the same except for starting with EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE ("[]") are
+     * considered equivalent for the purpose of cells having a matching set of ports.
+     *
+     * @param other The other cell to match against.
+     * @return True if the set of ports on both this cell and the other cell match
+     *         exactly. False otherwise.
+     */
+    public boolean matchesInterface(EDIFCell other) {
+        if (getPorts().size() != other.getPorts().size()) {
+            return false;
+        }
+        Map<String, EDIFPort> otherPorts = other.getPortMap();
+        for (EDIFPort port : getPorts()) {
+            EDIFPort otherPort = otherPorts.get(port.getBusName(true));
+            if (otherPort == null) {
+                otherPort = otherPorts.get(EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE
+                        + port.getBusName(true));
+            }
+            if (otherPort == null || port.getWidth() != otherPort.getWidth()
+                    || port.getDirection() != otherPort.getDirection()) {
+                return false;
+            }
+        }
+        return true;
     }
 }
 

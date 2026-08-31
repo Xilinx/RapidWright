@@ -141,6 +141,10 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
             }
         }
 
+        // Port instance lists are built via incremental ArrayList insertion, which
+        // leaves unused capacity slack. Trim it now that parsing is complete.
+        currNetlist.trimEDIFPortInstLists();
+
         return currNetlist;
     }
 

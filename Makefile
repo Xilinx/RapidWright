@@ -53,7 +53,24 @@ check_tabs:
 	fi
 
 
-pre_commit: check_headers check_tabs
+check_new_line:
+# check if there exists the new line at the end of the file
+	@ FILES_NO_NEWLINE=$$(git grep -I --name-only -- '.*' -- '*.java' | \
+	while read f; do \
+		[ "$$(tail -c1 "$$f" | wc -l)" -eq 0 ] && echo "$$f"; \
+	done); \
+	if [ ! -z "$$FILES_NO_NEWLINE" ]; then \
+		echo "These files are missing a newline at the end:"; \
+		echo ; \
+		echo "$$FILES_NO_NEWLINE" | sed 's/^/    /'; \
+		echo ; \
+		echo "Use make_check_new_line to automatically detect the new line at the end of file"; \
+		exit 1; \
+	fi
+
+
+
+pre_commit: check_headers check_tabs check_new_line
 
 enable_pre_commit_hook:
 	@ hook_file=$$(git rev-parse --git-path hooks/pre-commit) && \

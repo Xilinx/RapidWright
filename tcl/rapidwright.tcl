@@ -120,7 +120,17 @@ proc write_cache_impl { dcpFile implIdx } {
     exportTest $routedDcpFile
 }
 
-proc generate_metadata { dcpFile includePaths implIdx } {
+proc contains_encrypted_cells {} {
+    return [expr {
+        [llength [
+            get_cells -quiet -hierarchical \
+                -filter {IS_DU_WITHIN_ENVELOPE == 1}
+        ]] > 0
+    }]
+}
+
+
+proc generate_metadata { dcpFile includePaths implIdx { includeConnections "auto"} } {
     puts "Entering generate_metadata with $dcpFile"
     set tmp [string map {".dcp" ""} $dcpFile]
     set blockname [string range $tmp [string last "/" $tmp]+1 end]
@@ -144,6 +154,14 @@ proc generate_metadata { dcpFile includePaths implIdx } {
         puts $md "    name $clk "
         puts $md "    period [get_property PERIOD $clk]"
         puts $md "  end clock"
+    }
+    if {$includeConnections == "auto"} {
+      set includeConnections [contains_encrypted_cells]
+    }
+    if {$includeConnections == "true"} {
+        puts $md "  connections explicit"
+    } else {
+        puts $md "  connections implicit"
     }
     set inports [get_ports -filter { DIRECTION==IN }]
     set outports [get_ports -filter { DIRECTION==OUT }]
@@ -257,22 +275,25 @@ proc generate_metadata { dcpFile includePaths implIdx } {
                     }
                 }
             }
-            puts $md "    begin connections"
-            set cports [get_ports -quiet -of [get_nets -segments $netname]]
-            foreach cport $cports {
-                if {$cport != $port} {
-                    puts $md "      port $cport"
-                }
-            }
 
-            set cpins [get_pins -quiet -leaf -of [get_nets -segments $netname]]
-            foreach cpin $cpins {
-                set ccell [get_cells -of [get_pins $cpin]]
-                set loc [get_property -quiet LOC $ccell]
-                set sitePin [get_site_pins -quiet -of $cpin]
-                puts $md "      pin $cpin $loc $sitePin"
+            if {$includeConnections == "true"} {
+                puts $md "    begin connections"
+                set cports [get_ports -quiet -of [get_nets -segments $netname]]
+                foreach cport $cports {
+                    if {$cport != $port} {
+                        puts $md "      port $cport"
+                    }
+                }
+
+                set cpins [get_pins -quiet -leaf -of [get_nets -segments $netname]]
+                foreach cpin $cpins {
+                    set ccell [get_cells -of [get_pins $cpin]]
+                    set loc [get_property -quiet LOC $ccell]
+                    set sitePin [get_site_pins -quiet -of $cpin]
+                    puts $md "      pin $cpin $loc $sitePin"
+                }
+                puts $md "    end connections"
             }
-            puts $md "    end connections"
             puts $md "  end $inout"
         }
     }
@@ -773,22 +794,26 @@ proc write_cell_to_edif_recursive { cell fp cells_written } {
             }
         }
         puts $fp "       )"
-		set is_prim [get_property IS_PRIMITIVE $cell]
-		if {$is_prim == 0} {
-			current_instance $cell_name
-			set insts [get_cells]
-			puts $fp "       (contents"
-            foreach inst $insts {
+        set children [get_cells -hier -filter "PARENT==\"$cell_name\""]
+        if {[llength $children] != 0} {
+            puts $fp "       (contents"
+            foreach inst $children {
                 set inst_name [string map $replace_map [get_property NAME $inst]]
                 puts $fp "         (instance $inst_name (viewref netlist (cellref [get_property REF_NAME $inst] (libraryref hdi_primitives))))"
             }
-            foreach net [get_nets] {
+            foreach net [get_nets -hier -filter "PARENT_CELL==\"$cell_name\""] {
                 set net_name [string map $replace_map [get_property NAME $net]]
                 puts $fp "         (net $net_name (joined"
                 foreach pin [get_pins -of $net] {
                     set parent_cell_name [get_property PARENT_CELL $pin]
                     lset pin_replace_map 0 "$parent_cell_name/"
                     set pin_name [string map $pin_replace_map [get_property NAME $pin]]
+	            if { [get_property BUS_NAME $pin] != "" } {
+			set ref_pin_name [get_property REF_PIN_NAME $pin]
+			regexp {\[(\d+)\]} $ref_pin_name -> idx
+			set pin_idx [expr [get_property BUS_START $pin] - $idx] 
+		        set pin_name "(member [get_property BUS_NAME $pin] $pin_idx)"
+	            }
                     set instance ""
                     if { $parent_cell_name != $cell_name } {
                         set pin_inst_name [string map $replace_map $parent_cell_name]
@@ -801,7 +826,7 @@ proc write_cell_to_edif_recursive { cell fp cells_written } {
             }
             puts $fp "      )"
         }
-		current_instance
+        current_instance
         puts $fp "     )\n   )"
     }
     return $cells_written

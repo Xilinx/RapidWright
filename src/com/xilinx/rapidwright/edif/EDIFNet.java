@@ -35,6 +35,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import com.xilinx.rapidwright.design.Cell;
+import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.Unisim;
 
 /**
@@ -409,6 +410,29 @@ public class EDIFNet extends EDIFPropertyObject {
     }
 
     /**
+     * Checks if this net is a GND or VCC net and if so returns the appropriate
+     * NetType. If it is not a static net, it returns NetType.UNKNOWN.
+     * 
+     * @return The static source type or UNKNOWN if it is not a static net.
+     */
+    public NetType getPhysStaticSourceType() {
+        if (getName().equals(EDIFTools.LOGICAL_GND_NET_NAME))
+            return NetType.GND;
+        if (getName().equals(EDIFTools.LOGICAL_VCC_NET_NAME))
+            return NetType.VCC;
+        for (EDIFPortInst portInst : getSourcePortInsts(false)) {
+            String cellType = portInst.getCellInst().getCellType().getName();
+            if (cellType.equals(Unisim.GND.name())) {
+                return NetType.GND;
+            }
+            if (cellType.equals(Unisim.VCC.name())) {
+                return NetType.VCC;
+            }
+        }
+        return NetType.UNKNOWN;
+    }
+
+    /**
      * Checks if the net has all port instances (terminals) within the parent cell.
      * 
      * @return True if all port instances are internal to this net's parent cell,
@@ -441,7 +465,7 @@ public class EDIFNet extends EDIFPropertyObject {
             p.writeEDIFExport(os, EXPORT_CONST_PORT_INDENT, cache);
         }
         os.write(EXPORT_CONST_JOINED_END); // joined end
-        if (getPropertiesMap().size() > 0) {
+        if (getPropertyCount() > 0) {
             os.write('\n');
             exportEDIFProperties(os, EXPORT_CONST_PROP_INDENT, cache, stable);
         }

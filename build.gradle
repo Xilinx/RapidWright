@@ -3,10 +3,16 @@ buildscript {
     gradle.ext.rapidwrightDir = "."
 }
 
+import java.nio.file.DirectoryNotEmptyException
+import java.nio.file.Files
+import java.nio.file.LinkOption
+
 plugins {
     id 'java'
     id 'maven-publish'
     id 'signing'
+// JReleaser adds at least an extra 20 seconds to setup time
+//    id 'org.jreleaser' version '1.20.0' // Uncomment for release
 }
 
 apply from: 'common.gradle'
@@ -18,7 +24,6 @@ application {
 }
 
 def standaloneClassName = "com.xilinx.rapidwright.StandaloneEntrypoint"
-def preserveDir = ".preserveBin"
 
 def read_rapidwright_version() {
     def sw = new StringWriter()
@@ -28,6 +33,9 @@ def read_rapidwright_version() {
     return sw.toString().replace("RAPIDWRIGHT_VERSION: v", "").replace("-beta", "").trim() + ""
 }
 def rapidwright_version = project.hasProperty('override_rapidwright_version') ? override_rapidwright_version : read_rapidwright_version()
+
+group = 'com.xilinx.rapidwright'
+version = rapidwright_version
 
 // Skipping test-fixtures for publication, see https://github.com/Xilinx/RapidWright/issues/697
 components["java"].withVariantsFromConfiguration(configurations["testFixturesApiElements"]) { skip() }
@@ -40,7 +48,6 @@ dependencies {
 
 sourceSets {
   main {
-    java.destinationDirectory.fileValue(file('bin'))
     java {
       srcDirs = ['src']
     }
@@ -60,46 +67,93 @@ sourceSets {
   }
 }
 
-task preserveBin(type: Copy) {
-     from "bin/rapidwright", "bin/rapidwright.bat"
-     into preserveDir
+tasks.named('jar', Jar) {
+  archiveFileName = 'rapidwright.jar'
+}
+
+tasks.named('testJar', Jar) {
+  archiveFileName = 'rapidwright-tests.jar'
+}
+
+tasks.named('testFixturesJar', Jar) {
+  archiveFileName = 'rapidwright-test-fixtures.jar'
 }
 
 task copyJars(type: Copy) {
-    from configurations.api
+    from({
+        configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts.collect { it.file } .findAll { it.name != tasks.getByName("jar").archiveFile.get().asFile.name }
+	})
+	
     into 'jars'
-    //testFixturesImplementation contains the output jar, as well as an implicit dependency on the task.
-    //Filter to remove the jar itself, getFiles() to remove the implicit dependency
-    from configurations.testFixturesImplementation.filter { !tasks.getByName("jar").outputs.files.contains(it) } .getFiles()
+    from({
+        configurations.testFixturesRuntimeClasspath.resolvedConfiguration.resolvedArtifacts.collect { it.file } .findAll { it.name != tasks.getByName("jar").archiveFile.get().asFile.name }
+	})
     into 'jars'
 }
 compileJava.dependsOn(copyJars)
-compileJava.dependsOn(preserveBin)
 
-task cleanupScripts(type: Delete) {
-    delete preserveDir
+// External requirement: the compiled class files must be available under 'bin'.
+// Keep Gradle's compiler output in its default location, which the incremental
+// compiler can safely own, and expose its package directory at bin/com without
+// putting the tracked bin/rapidwright[.bat] launchers in the compiler's output.
+def binClasses = file('bin/com')
+def isWindows = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
+
+def removeBinClasses = {
+    def path = binClasses.toPath()
+    if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
+        return
+    }
+
+    try {
+        // Deletes a symbolic link or Windows junction without touching its target.
+        Files.delete(path)
+    } catch (DirectoryNotEmptyException ignored) {
+        // Migrate a real bin/com directory created by older builds.
+        delete binClasses
+    }
 }
 
-task restoreScripts(type: Copy) {
-    dependsOn(tasks.named("jar"))
-    dependsOn(tasks.named("compileTestFixturesJava"))
-    dependsOn(tasks.named("compileTestJava"))
-    from preserveDir
-    into 'bin'
-    finalizedBy(cleanupScripts)
-}
+task linkClassesToBin {
+    dependsOn(compileJava)
 
-run.dependsOn(restoreScripts)
+    doLast {
+        removeBinClasses()
+
+        def target = sourceSets.main.java.destinationDirectory.get().asFile.toPath().resolve('com')
+        if (isWindows) {
+            def process = new ProcessBuilder(
+                'cmd', '/c', 'mklink', '/J',
+                binClasses.absolutePath,
+                target.toAbsolutePath().toString()
+            ).inheritIO().start()
+            def exitCode = process.waitFor()
+            if (exitCode != 0) {
+                throw new GradleException("mklink /J failed with exit code ${exitCode}")
+            }
+        } else {
+            def link = binClasses.toPath()
+            Files.createSymbolicLink(link, link.parent.relativize(target))
+        }
+    }
+}
+compileJava.finalizedBy(linkClassesToBin)
+
+// Remove the link/junction before its target so clean leaves only the launchers.
+clean {
+    doFirst {
+        removeBinClasses()
+    }
+}
 
 task mainJar(type: Jar, dependsOn: classes) {
-    archiveBaseName = 'main'
+    archiveFileName = 'main.jar'
     from sourceSets.main.output include mainEntrypointClassName
     manifest {
         attributes 'Main-Class': mainEntrypointClassName
         attributes 'Class-Path': ([destinationDirectory.get().getAsFile().toPath().relativize(sourceSets.main.java.destinationDirectory.get().getAsFile().toPath()).toString() + File.separator]
-            + configurations.implementation.collect { destinationDirectory.get().getAsFile().toPath().relativize(projectDir.toPath()).resolve('jars').resolve(it.getName()) }).join(' ')
+            + configurations.runtimeClasspath.collect { destinationDirectory.get().getAsFile().toPath().relativize(projectDir.toPath()).resolve('jars').resolve(it.getName()) }).join(' ')
     }
-    finalizedBy(restoreScripts)
 }
 compileJava.finalizedBy(mainJar)
 
@@ -128,7 +182,7 @@ task sourceJar(type: Jar) {
 
 javadoc {
     source = sourceSets.main.allJava
-    classpath = configurations.implementation
+    classpath = configurations.runtimeClasspath
     options.addStringOption('Xdoclint:none', '-quiet')
 }
 
@@ -187,23 +241,29 @@ publishing {
     }
     repositories {
         maven {
-            credentials {
-                username = project.findProperty("ossrhUsername") ?: ""
-                password = project.findProperty("ossrhPassword") ?: ""
-            }
-            url = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+            url = layout.buildDirectory.dir('staging-deploy')
         }
     }
 }
 
-signing {
-    setRequired {
-        // signing is only required when publishing to maven central
-        gradle.taskGraph.allTasks.any { it.equals( publishMavenJavaPublicationToMavenRepository ) }
+/* Uncomment for release
+jreleaser {
+    signing {
+        active = "ALWAYS"
+        armored = true
     }
-    sign configurations.archives
-    sign publishing.publications.mavenJava
-}
+    deploy {
+        maven {
+            mavenCentral {
+                sonatype {
+                    active = 'ALWAYS'
+                    url = 'https://central.sonatype.com/api/v1/publisher'
+                    stagingRepository('build/staging-deploy')
+                }
+            }
+        }
+    }
+}*/
 
 task testPython(type:Test) {
   group = "verification"

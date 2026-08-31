@@ -105,7 +105,16 @@ public class PBlockRange {
         this.upperRight = upperRight;
     }
 
+    private static String getPrefixedCornerName(PBlockCorner corner) {
+        if (corner instanceof ClockRegion) {
+            return CLOCK_REGION_RANGE_STR+"_"+corner.getName();
+        }
+        return corner.getName();
+    }
     public String toString() {
+        if (isClockRegionRange()) {
+            return CLOCK_REGION_RANGE_STR + "_" + lowerLeft.getName() + ":" + CLOCK_REGION_RANGE_STR + "_" + upperRight.getName();
+        }
         return lowerLeft.getName() + ":" + upperRight.getName();
     }
 
@@ -213,9 +222,9 @@ public class PBlockRange {
         // We may need to expand column to include outward facing CLB/DSP/BRAM to INT tiles
         if (isSiteRange()) {
             Tile t = getLowerLeftSite().getIntTile();
-            if (t.getColumn() < colMin) colMin = t.getColumn();
+            if (t != null && t.getColumn() < colMin) colMin = t.getColumn();
             t = getUpperRightSite().getIntTile();
-            if (t.getColumn() > colMax) colMax = t.getColumn();
+            if (t != null && t.getColumn() > colMax) colMax = t.getColumn();
         }
 
         for (int col=colMin; col <= colMax; col++) {

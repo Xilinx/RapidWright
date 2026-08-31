@@ -304,6 +304,7 @@ public class CounterGenerator {
 
         if (verbose) t.stop().start("Route Design");
 
+        cntrDesign.flattenDesign();
         cntrDesign = RWRoute.routeDesignFullNonTimingDriven(cntrDesign);
 
         if (verbose) t.stop();

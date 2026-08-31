@@ -58,6 +58,11 @@ public class PBlock extends ArrayList<PBlockRange> {
     private PBlock parent;
 
     private boolean containRouting;
+
+    private boolean isSoft;
+
+    private boolean excludePlacement;
+    
     /** Set of all basic sites that can be referenced in a PBlock */
     private static HashSet<SiteTypeEnum> pblockTypes;
 
@@ -127,6 +132,14 @@ public class PBlock extends ArrayList<PBlockRange> {
         else slices.addAll(slicems == null ? Collections.emptyList() : slicems);
         PBlockRange sliceRange = createPBlockRange(dev, slices);
         if (sliceRange != null) add(sliceRange);
+
+        // IRI_QUADs are a special case
+        List<Site> iriQuadOdds = typeSets.remove(SiteTypeEnum.IRI_QUAD_ODD);
+        List<Site> iriQuadEvens = typeSets.remove(SiteTypeEnum.IRI_QUAD_EVEN);
+        if (iriQuadOdds == null) iriQuadOdds = iriQuadEvens == null ? Collections.emptyList() : iriQuadEvens;
+        else iriQuadOdds.addAll(iriQuadEvens == null ? Collections.emptyList() : iriQuadEvens);
+        PBlockRange iriQuadRange = createPBlockRange(dev, iriQuadOdds);
+        if (iriQuadRange != null) add(iriQuadRange);
         // Rest of site types
         for (Entry<SiteTypeEnum,ArrayList<Site>> e : typeSets.entrySet()) {
             add(createPBlockRange(dev, e.getValue()));
@@ -191,12 +204,17 @@ public class PBlock extends ArrayList<PBlockRange> {
         ArrayList<String> tcl = new ArrayList<>();
         tcl.add("create_pblock " + name + (parent != null ? " -parent " + parent.getName() : ""));
         for (PBlockRange p : this) {
-            tcl.add("resize_pblock "+ name +" -add " + p.toString());
+            tcl.add("resize_pblock [get_pblocks "+ name +"] -add " + p.toString());
         }
         if (containRouting()) {
-            tcl.add("set_property CONTAIN_ROUTING 1 [get_pblocks "+name+"]");
+            tcl.add("set_property " + PblockProperty.CONTAIN_ROUTING + " 1 [get_pblocks " + name + "]");
         }
-
+        if (isSoft()) {
+            tcl.add("set_property " + PblockProperty.IS_SOFT + " 1 [get_pblocks " + name + "]");
+        }
+        if (excludePlacement()) {
+            tcl.add("set_property " + PblockProperty.EXCLUDE_PLACEMENT + " 1 [get_pblocks " + name + "]");
+        }
         return tcl;
     }
 
@@ -419,100 +437,38 @@ public class PBlock extends ArrayList<PBlockRange> {
     /**
      * Attempts to move the pblock by an offset of tiles in the x and y directions.
      * @param dx The number of tiles to move the pblock in the x direction.
-     * @param dy The number of tiles to mvoe the pblock in the y direction.
+     * @param dy The number of tiles to move the pblock in the y direction.
      * @return True if the pblock ranges changed, false if no move was made.
      */
     public boolean movePBlock(int dx, int dy) {
         if (dx == 0 && dy == 0) return false;
-        Tile bl = getBottomLeftTile();
-        Tile tr = getTopRightTile();
-        Device d = tr.getDevice();
-        boolean hasMoved = false;
-        if (dx != 0) {
-            if (dx > 0) {
-                // moving to the right, check the columns to the right most tile
-                for (PBlockRange pbr : this) {
-                    int x = 0;
-                    Site right = pbr.getUpperRightSite().getNeighborSite(x, 0);
-                    int target = right.getTile().getColumn() + dx;
-                    while (right.getTile().getColumn() < target) {
-                        x++;
-                        right = pbr.getUpperRightSite().getNeighborSite(x, 0);
-                        if (right.getTile().getColumn() <= target) {
-                            hasMoved = true;
-                        }
-                    }
-                    if (hasMoved) {
-                        pbr.setUpperRight(right);
-                        Site otherCorner = pbr.getLowerLeftSite().getNeighborSite(x, 0);
-                        pbr.setLowerLeft(otherCorner);
-                    }
-                }
-            } else {
-                // moving to the left, check the columns to the left most tile
-                for (PBlockRange pbr : this) {
-                    int x = 0;
-                    Site left = pbr.getLowerLeftSite().getNeighborSite(x, 0);
-                    int target = left.getTile().getColumn() + dx;
-                    while (left.getTile().getColumn() > target) {
-                        x--;
-                        left = pbr.getLowerLeftSite().getNeighborSite(x, 0);
-                        if (left.getTile().getColumn() >= target) {
-                            hasMoved = true;
-                        }
-                    }
-                    if (hasMoved) {
-                        pbr.setLowerLeft(left);
-                        Site otherCorner = pbr.getUpperRightSite().getNeighborSite(x, 0);
-                        pbr.setUpperRight(otherCorner);
-                    }
-                }
-
+        List<PBlockRange> pBlockRanges = new ArrayList<>();
+        for (PBlockRange pbr : this) {
+            Tile left = pbr.getBottomLeftTile();
+            int siteIndex = pbr.getLowerLeftSite().getSiteIndexInTile();
+            Tile newLeft = left.getTileNeighbor(dx, -dy);
+            Site leftSite = pbr.getLowerLeftSite();
+            if (newLeft == null || leftSite.getCorrespondingSite(leftSite.getSiteTypeEnum(), newLeft) == null) {
+                return false;
             }
-        }
-        if (dy != 0) {
-            if (dy > 0) {
-                // moving down, check tiles below
-                for (PBlockRange pbr : this) {
-                    int y = 0;
-                    Site left = pbr.getLowerLeftSite().getNeighborSite(0, y);
-                    int target = left.getTile().getRow() + dy;
-                    while (left.getTile().getRow() < target) {
-                        y--;
-                        left = pbr.getLowerLeftSite().getNeighborSite(0, y);
-                        if (left.getTile().getRow() <= target) {
-                            hasMoved = true;
-                        }
-                    }
-                    if (hasMoved) {
-                        pbr.setLowerLeft(left);
-                        Site otherCorner = pbr.getUpperRightSite().getNeighborSite(0, y);
-                        pbr.setUpperRight(otherCorner);
-                    }
-                }
-            } else {
-                // moving up, check the rows above
-                for (PBlockRange pbr : this) {
-                    int y = 0;
-                    Site right = pbr.getUpperRightSite().getNeighborSite(0, y);
-                    int target = right.getTile().getRow() + dy;
-                    while (right.getTile().getRow() > target) {
-                        y++;
-                        right = pbr.getUpperRightSite().getNeighborSite(0, y);
-                        if (right.getTile().getRow() >= target) {
-                            hasMoved = true;
-                        }
-                    }
-                    if (hasMoved) {
-                        pbr.setUpperRight(right);
-                        Site otherCorner = pbr.getLowerLeftSite().getNeighborSite(0, y);
-                        pbr.setLowerLeft(otherCorner);
-                    }
-                }
-
+            Site newLeftSite = newLeft.getSites()[siteIndex];
+            Tile right = pbr.getTopRightTile();
+            Tile newRight = right.getTileNeighbor(dx, -dy);
+            Site rightSite = pbr.getUpperRightSite();
+            if (newRight == null || rightSite.getCorrespondingSite(rightSite.getSiteTypeEnum(), newRight) == null) {
+                return false;
             }
+            int upperRightSiteIndex = pbr.getUpperRightSite().getSiteIndexInTile();
+            Site otherCorner = newRight.getSites()[upperRightSiteIndex];
+            pBlockRanges.add(new PBlockRange(newLeftSite, otherCorner));
         }
-        return hasMoved;
+        int i = 0;
+        for (PBlockRange pbr : pBlockRanges) {
+            this.get(i).setLowerLeft(pbr.getLowerLeftSite());
+            this.get(i).setUpperRight(pbr.getUpperRightSite());
+            i++;
+        }
+        return true;
     }
 
     public static void main(String[] args) {
@@ -563,6 +519,22 @@ public class PBlock extends ArrayList<PBlockRange> {
 
     public void setContainRouting(boolean containRouting) {
         this.containRouting = containRouting;
+    }
+
+    public boolean isSoft() {
+        return isSoft;
+    }
+
+    public void setIsSoft(boolean isSoft) {
+        this.isSoft = isSoft;
+    }
+
+    public boolean excludePlacement() {
+        return excludePlacement;
+    }
+
+    public void setExcludePlacement(boolean excludePlacement) {
+        this.excludePlacement = excludePlacement;
     }
 
     /**

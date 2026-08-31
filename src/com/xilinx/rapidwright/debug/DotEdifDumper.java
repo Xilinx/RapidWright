@@ -63,7 +63,7 @@ public class DotEdifDumper extends DotGraphDumper<EDIFCellInst, EDIFPortInst, Pa
     protected Stream<Pair<EDIFPort,Integer>> getPortTemplates(EDIFCellInst edifCellInst) {
         return edifCellInst.getCellType().getPorts().stream().flatMap(p-> {
             if (p.isBus()) {
-                return Arrays.stream(p.getBitBlastedIndicies()).mapToObj(i -> new Pair<>(p, i));
+                return Arrays.stream(p.getBitBlastedIndices()).mapToObj(i -> new Pair<>(p, i));
             }
             return Stream.of(new Pair<>(p, 0));
         });

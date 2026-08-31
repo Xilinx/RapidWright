@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025, Advanced Micro Devices, Inc.
+ * Copyright (c) 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Advanced Micro Devices, Inc.
@@ -30,7 +30,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 
 /**
- * Generated on: Wed Jun 11 09:41:43 MDT 2025
+ * Generated on: Thu Jun 11 14:46:47 MDT 2026
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  *
  * Class used to uniquely represent a Xilinx part.
@@ -243,6 +243,7 @@ public class Part {
         ultraScalePlusTypes = new FamilyType[] {
                 FamilyType.AARTIXUPLUS,
                 FamilyType.ARTIXUPLUS,
+                FamilyType.ASPARTANUPLUS,
                 FamilyType.AZYNQUPLUS,
                 FamilyType.KINTEXUPLUS,
                 FamilyType.QKINTEXUPLUS,
@@ -274,6 +275,7 @@ public class Part {
                 FamilyType.VERSALPREMIUM,
                 FamilyType.VERSALPRIME,
                 FamilyType.VERSALPRIME2,
+                FamilyType.VERSALRF,
         };
         versal = new HashSet<FamilyType>(Arrays.asList(versalTypes));
     }

@@ -107,6 +107,7 @@ public class RegionBasedOverlapCache<PlacementT, ModuleInstT extends AbstractMod
         allTouchedRegionsMatch(mii,l->{l.add(mii); return true;});
     }
 
+    @SuppressWarnings("unchecked")
     public RegionBasedOverlapCache(Device device, List<? extends ModuleInstT> instances, int regionSize) {
         this.device = device;
         this.instances = instances;

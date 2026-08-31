@@ -24,6 +24,12 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -33,12 +39,6 @@ import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.RuntimeTracker;
-
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Class that extends {@link PartialRouter} with {@link CUFR}'s parallel capabilities.
@@ -71,7 +71,8 @@ public class PartialCUFR extends PartialRouter {
     }
 
     public static class RouteNodeGraphPartialCUFRTimingDriven extends RouteNodeGraphPartialTimingDriven {
-        public RouteNodeGraphPartialCUFRTimingDriven(Design design, RWRouteConfig config, DelayEstimatorBase delayEstimator) {
+        public RouteNodeGraphPartialCUFRTimingDriven(Design design, RWRouteConfig config,
+                DelayEstimatorBase<InterconnectInfo> delayEstimator) {
             super(design, config, delayEstimator);
         }
 
@@ -84,7 +85,8 @@ public class PartialCUFR extends PartialRouter {
     protected RouteNodeGraph createRouteNodeGraph() {
         if (config.isTimingDriven()) {
             /* An instantiated delay estimator that is used to calculate delay of routing resources */
-            DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+            DelayEstimatorBase<InterconnectInfo> estimator = new DelayEstimatorBase<InterconnectInfo>(
+                    design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
             return new RouteNodeGraphPartialCUFRTimingDriven(design, config, estimator);
         } else {
             return new RouteNodeGraphPartialCUFR(design, config);
