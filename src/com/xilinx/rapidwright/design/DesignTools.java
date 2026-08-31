@@ -946,6 +946,11 @@ public class DesignTools {
         inst.setCellType(cell.getTopEDIFCell());
         netlist.removeUnusedCellsFromAllWorkLibraries();
 
+        // Static source pins displaced by the incoming site instances. They cannot be removed as they
+        // are found since unrouting a static net walks its pins, so they are collected and taken off in
+        // one batch once every site instance is in
+        Map<Net, Set<SitePinInst>> deferredRemovals = new HashMap<>();
+
         // Add placement information
         // We need to prefix all cell and net names with the hierarchicalCellName as a prefix
         Net vcc = design.getVccNet();
@@ -963,7 +968,28 @@ public class DesignTools {
                     }
                 }
             }
+
+            // Nothing but a static source is expected to be sitting on a site the black box covers,
+            // since the site was given to the circuit by the placer on the strength of it being free
+            SiteInst existingSi = design.getSiteInstFromSite(si.getSite());
+            if (existingSi != null) {
+                if (!existingSi.getName().startsWith(SiteInst.STATIC_SOURCE)) {
+                    throw new RuntimeException("ERROR: Site overlap at " + existingSi.getSiteName() + " when populating blackbox '" + hierarchicalCellName + "'");
+                }
+                // Cell is only allowed to evict STATIC_SOURCEs -- but we have to unroute all
+                // static trees affected by its evicted output pins
+                // TODO: In the future, perhaps we can port the mutually exclusive parts
+                //       of the static source into the cell SiteInst?
+                for (SitePinInst spi : existingSi.getSitePinInsts()) {
+                    assert(spi.isOutPin());
+                    Net net = spi.getNet();
+                    assert(net.isStaticNet());
+                    deferredRemovals.computeIfAbsent(net, (p) -> new HashSet<>()).add(spi);
+                }
+            }
+
             design.addSiteInst(si);
+
             // Update GND/VCC site routing to point to destination design's GND/VCC nets
             for (String siteWire : si.getSiteWiresFromNet(vccCell)) {
                 BELPin pin = si.getSiteWirePins(siteWire)[0];
@@ -974,6 +1000,11 @@ public class DesignTools {
                 si.routeIntraSiteNet(gnd, pin, pin);
             }
         }
+
+        // Only the branches feeding the displaced pins come out; the rest of each static net is left
+        // alone. This has to happen before the routing below merges the circuit's own static pins in
+        boolean preserveOtherRoutes = true;
+        DesignTools.batchRemoveSitePins(deferredRemovals, preserveOtherRoutes);
 
         // Add routing information
         for (Net net : new ArrayList<>(cell.getNets())) {
