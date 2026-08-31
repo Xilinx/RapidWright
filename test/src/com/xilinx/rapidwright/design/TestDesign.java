@@ -788,7 +788,7 @@ public class TestDesign {
         Assertions.assertNotNull(orig);
         Assertions.assertSame(site, orig.getSite());
         // Placed, so that the copy can still answer this despite belonging to no design
-        Assertions.assertNotNull(orig.getSiteType());
+        Assertions.assertNotNull(orig.getSiteTypeEnum());
         Assertions.assertTrue(orig.getUsedSitePIPs().isEmpty());
         Assertions.assertTrue(orig.getCells().isEmpty());
 
@@ -838,7 +838,7 @@ public class TestDesign {
         SiteInst orig = design.getOriginalSiteInsts().get(si.getName());
         Assertions.assertNotNull(orig);
         Assertions.assertSame(si.getSite(), orig.getSite());
-        Assertions.assertNotNull(orig.getSiteType());
+        Assertions.assertNotNull(orig.getSiteTypeEnum());
         Assertions.assertTrue(orig.getUsedSitePIPs().isEmpty());
     }
 
