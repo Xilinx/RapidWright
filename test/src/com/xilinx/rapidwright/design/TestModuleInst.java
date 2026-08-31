@@ -290,8 +290,11 @@ public class TestModuleInst {
         inputPortName = inputPortName + "[" + index + "]";
         Assertions.assertEquals(net, mi2.getCellInst().getPortInst(inputPortName).getNet());
         // Check physical pins
+        Net outputNet = mi1.getCorrespondingNet(mi1.getPort("output_port_w[" + index + "]"));
         for (SitePinInst spi : mi2.getCorrespondingPins(mi2.getPort(inputPortName))) {
             Assertions.assertEquals(staticNet, spi.getNet());
+            // Check pin was removed from the net it was previously connected to
+            Assertions.assertFalse(outputNet.getPins().contains(spi));
         }
     }
 
