@@ -6,6 +6,9 @@ buildscript {
 import java.nio.file.DirectoryNotEmptyException
 import java.nio.file.Files
 import java.nio.file.LinkOption
+import java.util.stream.Collectors
+import javax.inject.Inject
+import org.gradle.process.ExecOperations
 
 plugins {
     id 'java'
@@ -201,10 +204,11 @@ task standaloneJar (type: Jar) {
     with jar
 }
 
-artifacts {
-    archives javadocJar
-    archives sourceJar
-    archives jar
+// The archives configuration is gone as of Gradle 10, so the jars hang off 'assemble' directly
+assemble {
+    dependsOn javadocJar
+    dependsOn sourceJar
+    dependsOn jar
 }
 
 publishing {
@@ -265,6 +269,14 @@ jreleaser {
     }
 }*/
 
+// Gradle 9 dropped Project.exec(), so the interpreter is launched through ExecOperations,
+// which has to be injected into a service object rather than read off the project
+interface PythonExec {
+    @Inject
+    ExecOperations getExecOperations()
+}
+def pythonExec = objects.newInstance(PythonExec)
+
 task testPython(type:Test) {
   group = "verification"
   description = "Runs the Python unit tests."
@@ -273,10 +285,11 @@ task testPython(type:Test) {
     filter.setFailOnNoMatchingTests(false)
   }
   doLast {
-    exec {
+    def junitXml = layout.buildDirectory.file('test-results/testPython/testPython.xml').get().asFile.path
+    pythonExec.execOperations.exec {
       environment 'CLASSPATH', sourceSets.main.runtimeClasspath.getAsPath()
       executable = 'python3'
-      args = ['-m', 'pytest', '--junitxml', '$buildDir/test-results/testPython/testPython.xml', '--rootdir', 'python/test']
+      args = ['-m', 'pytest', '--junitxml', junitXml, '--rootdir', 'python/test']
       // Enable verbose flag which prints out a pass/fail for every test
       args += ['-v']
       // Workaround from https://github.com/jpype-project/jpype/issues/842#issuecomment-847027355
