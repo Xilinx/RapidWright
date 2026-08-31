@@ -432,9 +432,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 (RouteNodeType.isAnyLocal(this.type) && type == RouteNodeType.LOCAL_RESERVED && visited == 0) ||
                 // Or promotions to EXCLUSIVE_SINK_NON_LOCAL from NON_LOCAL (by PartialRouter.determineRoutingTargets()
                 // for the begin node of a locked path to sinks, before any routing)
-                (this.type == RouteNodeType.NON_LOCAL.ordinal() && type == RouteNodeType.EXCLUSIVE_SINK_NON_LOCAL && visited == 0) ||
-                // Or demotion from LOCAL_{EAST,WEST} for a now-unpreserved PINFEED routethru to being INACCESSIBLE
-                ((this.type == RouteNodeType.LOCAL_EAST.ordinal() || this.type == RouteNodeType.LOCAL_WEST.ordinal()) && type == RouteNodeType.INACCESSIBLE && visited == 0)
+                (this.type == RouteNodeType.NON_LOCAL.ordinal() && type == RouteNodeType.EXCLUSIVE_SINK_NON_LOCAL && visited == 0)
         );
         this.type = (byte) type.ordinal();
     }
