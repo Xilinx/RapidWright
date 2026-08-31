@@ -29,6 +29,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -703,6 +704,29 @@ public class TestDesign {
         }
     }
 
+    /**
+     * Creates a placed SiteInst with some site routing on it, belonging to no Design yet.
+     */
+    private static SiteInst createPlacedSiteInst(String name, Site site) {
+        SiteInst si = new SiteInst(name, SiteTypeEnum.SLICEL);
+        si.place(site);
+        // Note: SiteInst.addCell() cannot be used here since it NPEs on a SiteInst
+        // belonging to neither a Design nor a Module
+        si.addSitePIP("FFMUXA1", "BYP");
+        Assertions.assertFalse(si.getUsedSitePIPs().isEmpty());
+        return si;
+    }
+
+    /**
+     * Routes the given Net up to the given site pin, returning the single PIP added.
+     */
+    private static PIP routeToSitePin(Net net, SiteInst si, String sitePinName) {
+        SitePinInst pin = net.createPin(sitePinName, si);
+        PIP pip = pin.getConnectedNode().getAllUphillPIPs().get(0);
+        net.addPIP(pip);
+        return pip;
+    }
+
     @Test
     public void testTrackSiteInstChanges() {
         Design design = new Design("testTrackSiteInstChanges", "xcvu3p");
@@ -713,12 +737,7 @@ public class TestDesign {
         Assertions.assertTrue(design.getModifiedSiteInsts().isEmpty());
 
         // A non-empty SiteInst added with Design.addSiteInst()
-        SiteInst si0 = new SiteInst("si0", SiteTypeEnum.SLICEL);
-        si0.place(device.getSite("SLICE_X0Y0"));
-        // Note: SiteInst.addCell() cannot be used here since it NPEs on a SiteInst
-        // belonging to neither a Design nor a Module
-        si0.addSitePIP("FFMUXA1", "BYP");
-        Assertions.assertFalse(si0.getUsedSitePIPs().isEmpty());
+        SiteInst si0 = createPlacedSiteInst("si0", device.getSite("SLICE_X0Y0"));
         design.addSiteInst(si0);
 
         // Design.createAndPlaceCell() places a new Cell onto a new SiteInst
@@ -741,13 +760,142 @@ public class TestDesign {
         // A non-empty Net added with Design.addNet()
         SiteInst si = design.createSiteInst("SLICE_X0Y0");
         Net net = new Net("net0");
-        SitePinInst pin = net.createPin("A1", si);
-        net.addPIP(pin.getConnectedNode().getAllUphillPIPs().get(0));
+        routeToSitePin(net, si, "A1");
         design.addNet(net);
 
         // Check that the Net above is tracked as modified
         Set<Net> nets = new HashSet<>(Collections.singletonList(net));
         nets.removeAll(design.getModifiedNets());
         Assertions.assertEquals(Collections.emptySet(), nets);
+    }
+
+    /**
+     * A SiteInst that is already placed, and already populated, by the time it joins a Design (see
+     * DesignTools.populateBlackBox()) holds nothing that is in the original bitstream, so what it
+     * is changing from is an empty site.
+     */
+    @Test
+    public void testAddSiteInstRecordsEmptyOriginal() {
+        Design design = new Design("testAddSiteInstRecordsEmptyOriginal", "xcvu3p");
+        design.setTrackSiteInstChanges(true);
+        design.setCopyingOriginalSiteInsts(true);
+
+        Site site = design.getDevice().getSite("SLICE_X0Y0");
+        SiteInst si = createPlacedSiteInst("si0", site);
+        design.addSiteInst(si);
+
+        SiteInst orig = design.getOriginalSiteInsts().get(si.getName());
+        Assertions.assertNotNull(orig);
+        Assertions.assertSame(site, orig.getSite());
+        // Placed, so that the copy can still answer this despite belonging to no design
+        Assertions.assertNotNull(orig.getSiteType());
+        Assertions.assertTrue(orig.getUsedSitePIPs().isEmpty());
+        Assertions.assertTrue(orig.getCells().isEmpty());
+
+        // SiteInst.setDesign(null)
+        Assertions.assertTrue(design.removeSiteInst(si));
+        Assertions.assertNull(design.getSiteInstFromSite(site));
+    }
+
+    /**
+     * A SiteInst arriving on an occupied site is changing from what it displaced, which is what the
+     * original bitstream holds for that site.
+     */
+    @Test
+    public void testAddSiteInstRecordsDisplacedOriginal() {
+        Design design = new Design("testAddSiteInstRecordsDisplacedOriginal", "xcvu3p");
+        Site site = design.getDevice().getSite("SLICE_X0Y0");
+
+        SiteInst si0 = createPlacedSiteInst("si0", site);
+        design.addSiteInst(si0);
+
+        // Only what si0 holds is in the original bitstream
+        design.setTrackSiteInstChanges(true);
+        design.setCopyingOriginalSiteInsts(true);
+
+        SiteInst si1 = createPlacedSiteInst("si1", site);
+        design.addSiteInst(si1);
+        Assertions.assertSame(si1, design.getSiteInstFromSite(site));
+
+        // Keyed by the displacing SiteInst, since that is the name the modified set presents it under
+        SiteInst orig = design.getOriginalSiteInsts().get(si1.getName());
+        Assertions.assertNotNull(orig);
+        Assertions.assertEquals(si0.getName(), orig.getName());
+        Assertions.assertSame(site, orig.getSite());
+        Assertions.assertEquals(si0.getUsedSitePIPs().toString(), orig.getUsedSitePIPs().toString());
+    }
+
+    @Test
+    public void testCreateSiteInstRecordsEmptyOriginal() {
+        Design design = new Design("testCreateSiteInstRecordsEmptyOriginal", "xcvu3p");
+        design.setTrackSiteInstChanges(true);
+        design.setCopyingOriginalSiteInsts(true);
+
+        // Places the SiteInst on a free site before adding it, so the site already maps to this
+        // very instance by the time it joins the design
+        SiteInst si = design.createSiteInst("SLICE_X0Y0");
+
+        SiteInst orig = design.getOriginalSiteInsts().get(si.getName());
+        Assertions.assertNotNull(orig);
+        Assertions.assertSame(si.getSite(), orig.getSite());
+        Assertions.assertNotNull(orig.getSiteType());
+        Assertions.assertTrue(orig.getUsedSitePIPs().isEmpty());
+    }
+
+    @Test
+    public void testAddNetRecordsDisplacedRouting() {
+        Design design = new Design("testAddNetRecordsDisplacedRouting", "xcvu3p");
+        SiteInst si = design.createSiteInst("SLICE_X0Y0");
+        Net net = design.createNet("net0");
+        PIP origPIP = routeToSitePin(net, si, "A1");
+
+        // Nothing is recorded until copying is turned on
+        Assertions.assertTrue(design.getOriginalNetRouting().isEmpty());
+        design.setTrackNetChanges(true);
+        design.setCopyingOriginalNetsRouting(true);
+
+        // The routing the original bitstream holds under this name is the one being displaced,
+        // not the one arriving
+        Net replacement = new Net(net.getName());
+        routeToSitePin(replacement, si, "H6");
+        design.addNet(replacement);
+
+        Assertions.assertSame(replacement, design.getNet(net.getName()));
+        Assertions.assertEquals(Collections.singletonList(origPIP),
+                design.getOriginalNetRouting().get(net.getName()));
+    }
+
+    @Test
+    public void testRemoveNetUnroutes() {
+        Design design = new Design("testRemoveNetUnroutes", "xcvu3p");
+        SiteInst si = design.createSiteInst("SLICE_X0Y0");
+        Net net = design.createNet("net0");
+        PIP pip = routeToSitePin(net, si, "A1");
+
+        design.setTrackNetChanges(true);
+        design.setCopyingOriginalNetsRouting(true);
+        Assertions.assertSame(net, design.removeNet(net));
+        Assertions.assertNull(design.getNet(net.getName()));
+
+        // Unrouted while still tracked, so that a consumer undoing the original routing and then
+        // applying the current routing is left with the net unrouted rather than still routed
+        List<PIP> origPIPs = design.getOriginalNetRouting().get(net.getName());
+        Assertions.assertEquals(Collections.singletonList(pip), origPIPs);
+        Assertions.assertTrue(net.getPIPs().isEmpty());
+    }
+
+    @Test
+    public void testNoTrackingWhenDisabled() {
+        Design design = new Design("testNoTrackingWhenDisabled", "xcvu3p");
+        SiteInst si = design.createSiteInst("SLICE_X0Y0");
+        Net net = design.createNet("net0");
+        routeToSitePin(net, si, "A1");
+        design.removeNet(net);
+        design.removeSiteInst(si);
+
+        Assertions.assertTrue(design.getModifiedSiteInsts().isEmpty());
+        Assertions.assertTrue(design.getOriginalSiteInsts().isEmpty());
+        Assertions.assertTrue(design.getModifiedNets().isEmpty());
+        Assertions.assertTrue(design.getOriginalNetRouting().isEmpty());
     }
 }
