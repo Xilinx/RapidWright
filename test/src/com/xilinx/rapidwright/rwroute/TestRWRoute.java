@@ -307,11 +307,11 @@ public class TestRWRoute {
         Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
         design.setTrackNetChanges(true);
 
-        int expectedNetsModified = 290;
+        Net Z_NET = design.createNet(Net.Z_NET);
+        int expectedNetsModified = 291;
         if (partial) {
             // Pseudo-randomly unroute at least one pin from each net
             Random random = new Random(0);
-            Net Z_NET = design.createNet(Net.Z_NET);
             for (Net net : design.getNets()) {
                 List<SitePinInst> sinkPins = net.getSinkPins();
                 if (sinkPins.isEmpty()) {
