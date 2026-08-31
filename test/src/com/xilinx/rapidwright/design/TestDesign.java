@@ -702,4 +702,52 @@ public class TestDesign {
             Assertions.assertTrue(rrs.routableNets > 0);
         }
     }
+
+    @Test
+    public void testTrackSiteInstChanges() {
+        Design design = new Design("testTrackSiteInstChanges", "xcvu3p");
+        Device device = design.getDevice();
+
+        design.setTrackSiteInstChanges(true);
+        Assertions.assertTrue(design.isTrackingSiteInstChanges());
+        Assertions.assertTrue(design.getModifiedSiteInsts().isEmpty());
+
+        // A non-empty SiteInst added with Design.addSiteInst()
+        SiteInst si0 = new SiteInst("si0", SiteTypeEnum.SLICEL);
+        si0.place(device.getSite("SLICE_X0Y0"));
+        // Note: SiteInst.addCell() cannot be used here since it NPEs on a SiteInst
+        // belonging to neither a Design nor a Module
+        si0.addSitePIP("FFMUXA1", "BYP");
+        Assertions.assertFalse(si0.getUsedSitePIPs().isEmpty());
+        design.addSiteInst(si0);
+
+        // Design.createAndPlaceCell() places a new Cell onto a new SiteInst
+        SiteInst si1 = design.createAndPlaceCell("ff", Unisim.FDRE, "SLICE_X1Y0/AFF").getSiteInst();
+
+        // Check that both SiteInsts above are tracked as modified
+        Set<SiteInst> siteInsts = new HashSet<>(Arrays.asList(si0, si1));
+        siteInsts.removeAll(design.getModifiedSiteInsts());
+        Assertions.assertEquals(Collections.emptySet(), siteInsts);
+    }
+
+    @Test
+    public void testTrackNetChanges() {
+        Design design = new Design("testTrackNetChanges", "xcvu3p");
+
+        design.setTrackNetChanges(true);
+        Assertions.assertTrue(design.isTrackingNetChanges());
+        Assertions.assertTrue(design.getModifiedNets().isEmpty());
+
+        // A non-empty Net added with Design.addNet()
+        SiteInst si = design.createSiteInst("SLICE_X0Y0");
+        Net net = new Net("net0");
+        SitePinInst pin = net.createPin("A1", si);
+        net.addPIP(pin.getConnectedNode().getAllUphillPIPs().get(0));
+        design.addNet(net);
+
+        // Check that the Net above is tracked as modified
+        Set<Net> nets = new HashSet<>(Collections.singletonList(net));
+        nets.removeAll(design.getModifiedNets());
+        Assertions.assertEquals(Collections.emptySet(), nets);
+    }
 }
