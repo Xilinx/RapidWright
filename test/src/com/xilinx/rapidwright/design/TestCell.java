@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, 2025-2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.design;
 
 
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.VivadoTools;
@@ -152,5 +153,24 @@ public class TestCell {
         if (FileTools.isVivadoOnPath()) {
             Assertions.assertEquals(0, VivadoTools.reportRouteStatus(d).netsWithRoutingErrors);
         }
+    }
+
+    @Test
+    public void testSetNameResetsLogicalInst() {
+        Design design = new Design("testSetNameResetsLogicalInst", Device.KCU105);
+        Cell cell = design.createAndPlaceCell("myFF", Unisim.FDRE, "SLICE_X32Y73/AFF");
+
+        // Cell.getEDIFHierCellInst() lazily resolves -- and caches -- the hierarchical
+        // logical cell instance matching the cell's current name
+        EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
+        Assertions.assertNotNull(ehci);
+        Assertions.assertEquals("myFF", ehci.getFullHierarchicalInstName());
+
+        Assertions.assertTrue(cell.updateName("myFF_renamed"));
+        Assertions.assertEquals("myFF_renamed", cell.getName());
+
+        // Renaming must invalidate that cache; since the netlist contains no logical
+        // cell instance by the new name, it must now resolve to null
+        Assertions.assertNull(cell.getEDIFHierCellInst());
     }
 }
