@@ -992,10 +992,14 @@ public class DesignTools {
         // Every crossing found below is merged in one pass at the end, once all of them are known
         Map<Net, EDIFHierNet> boundaryNets = new HashMap<>();
         Set<Net> modifiedNets = new HashSet<>();
+        Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
         for (Entry<String, Design> e : blackBoxes.entrySet()) {
             String hierarchicalCellName = e.getKey();
             EDIFCellInst inst = insts.get(hierarchicalCellName);
             Design cell = e.getValue();
+            Net vccCell = cell.getVccNet();
+            Net gndCell = cell.getGndNet();
 
             // Static source pins displaced by the incoming site instances. They cannot be removed as they
             // are found since unrouting a static net walks its pins, so they are collected and taken off in
@@ -1061,6 +1065,15 @@ public class DesignTools {
                 }
                 design.addSiteInst(si);
                 design.addModifiedSiteInst(si);
+                // Update GND/VCC site routing to point to destination design's GND/VCC nets
+                for (String siteWire : si.getSiteWiresFromNet(vccCell)) {
+                    BELPin pin = si.getSiteWirePins(siteWire)[0];
+                    si.routeIntraSiteNet(vcc, pin, pin);
+                }
+                for (String siteWire : si.getSiteWiresFromNet(gndCell)) {
+                    BELPin pin = si.getSiteWirePins(siteWire)[0];
+                    si.routeIntraSiteNet(gnd, pin, pin);
+                }
             }
             // Only the branches feeding the displaced pins come out; the rest of each static net is left
             // alone. This has to happen before the routing below merges the circuit's own static pins in
