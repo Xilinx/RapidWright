@@ -457,6 +457,65 @@ public class TestDesignTools {
         }
     }
 
+    @Test
+    public void testPopulateBlackBox() {
+        Design design = RapidWrightDCP.loadDCP("hwct.dcp");
+        Design cell = RapidWrightDCP.loadDCP("hwct_pr1.dcp");
+        String hierCellName = "hw_contract_pr1";
+        EDIFCellInst inst = design.getNetlist().getCellInstFromHierName(hierCellName);
+        Assertions.assertTrue(inst.isBlackBox());
+        Assertions.assertTrue(inst.getCellType().getCellInsts().isEmpty());
+
+        // The name each of the cell's nets is expected to arrive under, before any merging
+        Set<String> cellNets = new HashSet<>();
+        for (Net net : cell.getNets()) {
+            if (net.isStaticNet() || net.isUsedNet()) {
+                continue;
+            }
+            cellNets.add(hierCellName + EDIFTools.EDIF_HIER_SEP + net.getName());
+        }
+
+        // Each net's pin and PIP counts, so that what the call changed can be told apart afterwards
+        Map<String, String> before = new HashMap<>();
+        for (Net net : design.getNets()) {
+            before.put(net.getName(), net.getPins().size() + "/" + net.getPIPs().size());
+        }
+        Set<Net> modified = DesignTools.populateBlackBox(design,
+                Collections.singletonMap(hierCellName, cell), false);
+
+        Assertions.assertFalse(inst.getCellType().getCellInsts().isEmpty());
+        Assertions.assertFalse(modified.isEmpty());
+
+        // Every net reported must still be one the design holds: the merge deletes each alias it
+        // folds away, and a deleted net must not be named in the result
+        for (Net net : modified) {
+            Assertions.assertSame(net, design.getNet(net.getName()), net.getName());
+        }
+
+        // ... and the other half of the contract: nothing changed that went unreported
+        for (Net net : design.getNets()) {
+            if (modified.contains(net)) {
+                continue;
+            }
+            String was = before.get(net.getName());
+            Assertions.assertNotNull(was, net.getName() + " appeared without being reported");
+            Assertions.assertEquals(was, net.getPins().size() + "/" + net.getPIPs().size(),
+                    net.getName() + " changed without being reported");
+        }
+
+        // A net that crosses the boundary is merged onto its owner outside the cell and so loses its
+        // prefixed name, while one that does not keeps it -- both must happen, or the two halves of
+        // the check above could be passing vacuously
+        int merged = 0;
+        for (String netName : cellNets) {
+            if (design.getNet(netName) == null) {
+                merged++;
+            }
+        }
+        Assertions.assertTrue(merged > 0, "no boundary crossing was merged");
+        Assertions.assertTrue(merged < cellNets.size(), "every net was merged away");
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"DX", "D_I"})
     public void testGetTrimmablePIPsFromPins(String pinName) {
