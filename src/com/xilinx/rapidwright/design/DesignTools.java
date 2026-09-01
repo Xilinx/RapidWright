@@ -1157,7 +1157,9 @@ public class DesignTools {
             Net parentNet = parentNetType.isStaticNetType() ? design.getStaticNet(parentNetType)
                                                             : design.getNet(parentNetName.getHierarchicalNetName());
             if (parentNet == null) {
-                throw new RuntimeException("ERROR: Could not find net '" + parentNetName.getHierarchicalNetName() + "'");
+                // The owner is logical-only so far -- nothing physical has been attached to it yet.
+                // Create it so that the crossing has somewhere to be merged onto.
+                parentNet = design.createNet(parentNetName);
             }
             // The pins and site wires come across in the move below, so the PIPs are all that is left
             // to deal with -- and they have to be taken off the alias first, since the move also
