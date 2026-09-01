@@ -57,6 +57,9 @@ public class ParallelEDIFParser implements AutoCloseable{
     private final int maxThreads;
     protected final InputStreamSupplier inputStreamSupplier;
     protected final int maxTokenLength;
+
+    /** Whether the input is gzip-compressed, determined once by the caller. */
+    private final boolean gzipped;
     protected StringPool uniquifier = StringPool.concurrentPool();
 
     protected final EDIFReadLegalNameCache cache;
@@ -68,13 +71,20 @@ public class ParallelEDIFParser implements AutoCloseable{
     public static final int EDIF_GZIP_COMPRESSION_RATIO = 16;
 
     ParallelEDIFParser(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier,
-            int maxTokenLength, int maxThreads) {
+            int maxTokenLength, int maxThreads, boolean gzipped) {
         this.fileName = fileName;
         this.fileSize = fileSize;
         this.inputStreamSupplier = inputStreamSupplier;
         this.maxTokenLength = maxTokenLength;
         this.cache = EDIFReadLegalNameCache.createMultiThreaded();
         this.maxThreads = maxThreads;
+        this.gzipped = gzipped;
+    }
+
+    ParallelEDIFParser(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier,
+            int maxTokenLength, int maxThreads) {
+        this(fileName, fileSize, inputStreamSupplier, maxTokenLength, maxThreads,
+                EDIFTools.isGzipped(fileName));
     }
 
     public ParallelEDIFParser(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier) {
@@ -82,9 +92,19 @@ public class ParallelEDIFParser implements AutoCloseable{
                 Integer.MAX_VALUE);
     }
 
+    /**
+     * @param p        Path to the EDIF file to parse.
+     * @param fileSize Size of the file on disk, in bytes.
+     * @param gzipped  Whether the file is gzip-compressed. Accepting it here lets a
+     *                 caller that has already determined this avoid a second check.
+     */
+    public ParallelEDIFParser(Path p, long fileSize, boolean gzipped) {
+        this(p, fileSize, () -> EDIFTools.openEDIFInputStream(p),
+                EDIFTokenizer.DEFAULT_MAX_TOKEN_LENGTH, Integer.MAX_VALUE, gzipped);
+    }
+
     public ParallelEDIFParser(Path p, long fileSize) {
-        this(p, fileSize, InputStreamSupplier.fromPath(p,
-                p.toString().endsWith(".gz") && Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK));
+        this(p, fileSize, EDIFTools.isGzipped(p));
     }
 
     public ParallelEDIFParser(Path p) throws IOException {
@@ -105,9 +125,8 @@ public class ParallelEDIFParser implements AutoCloseable{
 
     protected void initializeWorkers() throws IOException {
         workers.clear();
-        boolean isGzipped = fileName.toString().endsWith(".gz");
-        int threads = calcThreads(fileSize, maxThreads, isGzipped);
-        long offsetPerThread = (isGzipped ? (fileSize * EDIF_GZIP_COMPRESSION_RATIO) : fileSize)
+        int threads = calcThreads(fileSize, maxThreads, gzipped);
+        long offsetPerThread = (gzipped ? (fileSize * EDIF_GZIP_COMPRESSION_RATIO) : fileSize)
                 / threads;
         for (int i=0;i<threads;i++) {
             ParallelEDIFParserWorker worker = makeWorker(i*offsetPerThread);
