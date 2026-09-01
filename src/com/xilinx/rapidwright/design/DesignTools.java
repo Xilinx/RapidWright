@@ -928,106 +928,145 @@ public class DesignTools {
      */
     public static void populateBlackBox(Design design, String hierarchicalCellName, Design cell,
             boolean keepBoundaryRouting) {
+        populateBlackBox(design, Collections.singletonMap(hierarchicalCellName, cell),
+                keepBoundaryRouting);
+    }
+
+    /**
+     * NOTE: This method is not fully tested. Populates a set of black boxes in a netlist with the
+     * provided designs, as {@link #populateBlackBox(Design, String, Design, boolean)} does for a
+     * single one. Filling them together is not just a convenience: every logical netlist change is
+     * made before any physical one, so the parent net map is built once, against a netlist in which
+     * every black box is already populated. Filling them one at a time instead asks that map about
+     * a design that is still part black box, and rebuilds it for each.
+     *
+     * @param design              The top level design
+     * @param blackBoxes          The 'guts' to be inserted, keyed by the hierarchical name of the
+     *                            black box in the design netlist that each belongs in.
+     * @param keepBoundaryRouting Preserves the routing on the boundaries of the black boxes.
+     */
+    public static void populateBlackBox(Design design, Map<String, Design> blackBoxes,
+            boolean keepBoundaryRouting) {
         EDIFNetlist netlist = design.getNetlist();
 
-        // Populate Logical Netlist into cell
-        EDIFCellInst inst = netlist.getCellInstFromHierName(hierarchicalCellName);
-        if (!inst.isBlackBox()) {
-            System.err.println("ERROR: The cell instance " + hierarchicalCellName + " is not a black box.");
-            return;
-        }
-        if (!inst.getCellType().hasCompatibleInterface(cell.getTopEDIFCell())) {
-            throw new RuntimeException(createInformativeCellInterfaceMismatchMessage(
-                    hierarchicalCellName, inst.getCellType(), cell.getTopEDIFCell()));
+        // Nothing is touched until every black box has been vetted, so that a bad one cannot leave
+        // the design with the others already half inserted
+        Map<String, EDIFCellInst> insts = new HashMap<>();
+        for (Entry<String, Design> e : blackBoxes.entrySet()) {
+            String hierarchicalCellName = e.getKey();
+            EDIFCellInst inst = netlist.getCellInstFromHierName(hierarchicalCellName);
+            if (!inst.isBlackBox()) {
+                System.err.println("ERROR: The cell instance " + hierarchicalCellName + " is not a black box.");
+                return;
+            }
+            if (!inst.getCellType().hasCompatibleInterface(e.getValue().getTopEDIFCell())) {
+                throw new RuntimeException(createInformativeCellInterfaceMismatchMessage(
+                        hierarchicalCellName, inst.getCellType(), e.getValue().getTopEDIFCell()));
+            }
+            insts.put(hierarchicalCellName, inst);
         }
 
-        inst.getCellType().getLibrary().removeCell(inst.getCellType());
-        netlist.migrateCellAndSubCells(cell.getTopEDIFCell(), true);
-        inst.setCellType(cell.getTopEDIFCell());
+        // Populate Logical Netlist into cells. This loop and the physical one below both walk
+        // blackBoxes rather than insts, so that the boxes are filled in whatever order the caller
+        // gave them in and not in the hash order of their names
+        for (Entry<String, Design> e : blackBoxes.entrySet()) {
+            EDIFCellInst inst = insts.get(e.getKey());
+            EDIFCell cellType = e.getValue().getTopEDIFCell();
+            inst.getCellType().getLibrary().removeCell(inst.getCellType());
+            netlist.migrateCellAndSubCells(cellType, true);
+            inst.setCellType(cellType);
+        }
         netlist.removeUnusedCellsFromAllWorkLibraries();
 
-        // Static source pins displaced by the incoming site instances. They cannot be removed as they
-        // are found since unrouting a static net walks its pins, so they are collected and taken off in
-        // one batch once every site instance is in
-        Map<Net, Set<SitePinInst>> deferredRemovals = new HashMap<>();
-
-        // Add placement information
-        // We need to prefix all cell and net names with the hierarchicalCellName as a prefix
-        Net vcc = design.getVccNet();
-        Net gnd = design.getGndNet();
-        Net vccCell = cell.getVccNet();
-        Net gndCell = cell.getGndNet();
-        for (SiteInst si : cell.getSiteInsts()) {
-            for (Cell c : new ArrayList<Cell>(si.getCells())) {
-                c.updateName(hierarchicalCellName + "/" + c.getName());
-                if (!c.isRoutethru())
-                    design.addCell(c);
-                else {
-                    for (Entry<String, AltPinMapping> p : c.getAltPinMappings().entrySet()) {
-                        p.getValue().setAltCellName(hierarchicalCellName + "/" + p.getValue().getAltCellName());
-                    }
-                }
-            }
-
-            // Nothing but a static source is expected to be sitting on a site the black box covers,
-            // since the site was given to the circuit by the placer on the strength of it being free
-            SiteInst existingSi = design.getSiteInstFromSite(si.getSite());
-            if (existingSi != null) {
-                if (!existingSi.getName().startsWith(SiteInst.STATIC_SOURCE)) {
-                    throw new RuntimeException("ERROR: Site overlap at " + existingSi.getSiteName() + " when populating blackbox '" + hierarchicalCellName + "'");
-                }
-                // Cell is only allowed to evict STATIC_SOURCEs -- but we have to unroute all
-                // static trees affected by its evicted output pins
-                // TODO: In the future, perhaps we can port the mutually exclusive parts
-                //       of the static source into the cell SiteInst?
-                for (SitePinInst spi : existingSi.getSitePinInsts()) {
-                    assert(spi.isOutPin());
-                    Net net = spi.getNet();
-                    assert(net.isStaticNet());
-                    deferredRemovals.computeIfAbsent(net, (p) -> new HashSet<>()).add(spi);
-                }
-            }
-
-            design.addSiteInst(si);
-
-            // Update GND/VCC site routing to point to destination design's GND/VCC nets
-            for (String siteWire : si.getSiteWiresFromNet(vccCell)) {
-                BELPin pin = si.getSiteWirePins(siteWire)[0];
-                si.routeIntraSiteNet(vcc, pin, pin);
-            }
-            for (String siteWire : si.getSiteWiresFromNet(gndCell)) {
-                BELPin pin = si.getSiteWirePins(siteWire)[0];
-                si.routeIntraSiteNet(gnd, pin, pin);
-            }
-        }
-
-        // Only the branches feeding the displaced pins come out; the rest of each static net is left
-        // alone. This has to happen before the routing below merges the circuit's own static pins in
-        boolean preserveOtherRoutes = true;
-        DesignTools.batchRemoveSitePins(deferredRemovals, preserveOtherRoutes);
-
-        // Add routing information
-        for (Net net : new ArrayList<>(cell.getNets())) {
-            if (net.getName().equals(Net.USED_NET)) continue;
-            if (net.isStaticNet()) {
-                Net staticNet = design.getStaticNet(net.getType());
-                staticNet.addPins((ArrayList<SitePinInst>)net.getPins());
-                HashSet<PIP> uniquePIPs = new HashSet<PIP>(net.getPIPs());
-                uniquePIPs.addAll(staticNet.getPIPs());
-                staticNet.setPIPs(uniquePIPs);
-            } else {
-                net.updateName(hierarchicalCellName + "/" + net.getName());
-                design.addNet(net);
-            }
-        }
-
-        // Rectify boundary nets
+        // The logical netlist is final from here on, so the cached parent net map -- which describes
+        // the black boxes as they were, empty -- can be dropped now
         netlist.resetParentNetMap();
 
-        postBlackBoxCleanup(hierarchicalCellName, design, keepBoundaryRouting);
+        Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
+        for (Entry<String, Design> e : blackBoxes.entrySet()) {
+            String hierarchicalCellName = e.getKey();
+            Design cell = e.getValue();
 
-        if (cell.getNetlist().hasEncryptedCells()) {
-            design.getNetlist().addEncryptedCells(cell.getNetlist().getEncryptedCells());
+            // Static source pins displaced by the incoming site instances. They cannot be removed as they
+            // are found since unrouting a static net walks its pins, so they are collected and taken off in
+            // one batch once every site instance is in
+            Map<Net, Set<SitePinInst>> deferredRemovals = new HashMap<>();
+
+            // Add placement information
+            // We need to prefix all cell and net names with the hierarchicalCellName as a prefix
+            Net vccCell = cell.getVccNet();
+            Net gndCell = cell.getGndNet();
+            for (SiteInst si : cell.getSiteInsts()) {
+                for (Cell c : new ArrayList<Cell>(si.getCells())) {
+                    c.updateName(hierarchicalCellName + "/" + c.getName());
+                    if (!c.isRoutethru())
+                        design.addCell(c);
+                    else {
+                        for (Entry<String, AltPinMapping> p : c.getAltPinMappings().entrySet()) {
+                            p.getValue().setAltCellName(hierarchicalCellName + "/" + p.getValue().getAltCellName());
+                        }
+                    }
+                }
+
+                // Nothing but a static source is expected to be sitting on a site the black box covers,
+                // since the site was given to the circuit by the placer on the strength of it being free
+                SiteInst existingSi = design.getSiteInstFromSite(si.getSite());
+                if (existingSi != null) {
+                    if (!existingSi.getName().startsWith(SiteInst.STATIC_SOURCE)) {
+                        throw new RuntimeException("ERROR: Site overlap at " + existingSi.getSiteName() + " when populating blackbox '" + hierarchicalCellName + "'");
+                    }
+                    // Cell is only allowed to evict STATIC_SOURCEs -- but we have to unroute all
+                    // static trees affected by its evicted output pins
+                    // TODO: In the future, perhaps we can port the mutually exclusive parts
+                    //       of the static source into the cell SiteInst?
+                    for (SitePinInst spi : existingSi.getSitePinInsts()) {
+                        assert(spi.isOutPin());
+                        Net net = spi.getNet();
+                        assert(net.isStaticNet());
+                        deferredRemovals.computeIfAbsent(net, (p) -> new HashSet<>()).add(spi);
+                    }
+                }
+
+                design.addSiteInst(si);
+
+                // Update GND/VCC site routing to point to destination design's GND/VCC nets
+                for (String siteWire : si.getSiteWiresFromNet(vccCell)) {
+                    BELPin pin = si.getSiteWirePins(siteWire)[0];
+                    si.routeIntraSiteNet(vcc, pin, pin);
+                }
+                for (String siteWire : si.getSiteWiresFromNet(gndCell)) {
+                    BELPin pin = si.getSiteWirePins(siteWire)[0];
+                    si.routeIntraSiteNet(gnd, pin, pin);
+                }
+            }
+
+            // Only the branches feeding the displaced pins come out; the rest of each static net is left
+            // alone. This has to happen before the routing below merges the circuit's own static pins in
+            boolean preserveOtherRoutes = true;
+            DesignTools.batchRemoveSitePins(deferredRemovals, preserveOtherRoutes);
+
+            // Add routing information
+            for (Net net : new ArrayList<>(cell.getNets())) {
+                if (net.getName().equals(Net.USED_NET)) continue;
+                if (net.isStaticNet()) {
+                    Net staticNet = design.getStaticNet(net.getType());
+                    staticNet.addPins((ArrayList<SitePinInst>)net.getPins());
+                    HashSet<PIP> uniquePIPs = new HashSet<PIP>(net.getPIPs());
+                    uniquePIPs.addAll(staticNet.getPIPs());
+                    staticNet.setPIPs(uniquePIPs);
+                } else {
+                    net.updateName(hierarchicalCellName + "/" + net.getName());
+                    design.addNet(net);
+                }
+            }
+
+            // Rectify boundary nets
+            postBlackBoxCleanup(hierarchicalCellName, design, keepBoundaryRouting);
+
+            if (cell.getNetlist().hasEncryptedCells()) {
+                design.getNetlist().addEncryptedCells(cell.getNetlist().getEncryptedCells());
+            }
         }
     }
 
