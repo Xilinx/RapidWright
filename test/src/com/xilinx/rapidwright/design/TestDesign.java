@@ -890,6 +890,28 @@ public class TestDesign {
     }
 
     @Test
+    public void testRemoveSiteInstRemovesSolePinNet() {
+        Design design = new Design("testRemoveSiteInstRemovesSolePinNet", "xcvu3p");
+        SiteInst si = design.createSiteInst("SLICE_X0Y0");
+        Net net = design.createNet("net0");
+        PIP pip = routeToSitePin(net, si, "A1");
+        SitePinInst pin = net.getPins().get(0);
+
+        design.setTrackNetChanges(true);
+        design.setCopyingOriginalNetsRouting(true);
+        Assertions.assertTrue(design.removeSiteInst(si));
+
+        // A net whose sole pin was on the removed site instance goes through removeNet() rather
+        // than straight out of the design's map, so it is detached and its removal recorded
+        Assertions.assertNull(design.getNet(net.getName()));
+        Assertions.assertNull(net.getDesign());
+        Assertions.assertNull(pin.getNet());
+        Assertions.assertTrue(design.getModifiedNets().contains(net));
+        Assertions.assertEquals(Collections.singletonList(pip),
+                design.getOriginalNetRouting().get(net.getName()));
+    }
+
+    @Test
     public void testNoTrackingWhenDisabled() {
         Design design = new Design("testNoTrackingWhenDisabled", "xcvu3p");
         SiteInst si = design.createSiteInst("SLICE_X0Y0");
