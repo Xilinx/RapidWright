@@ -3493,6 +3493,23 @@ public class DesignTools {
     }
 
     /**
+     * One net as classified by {@link #makePhysNetNamesConsistent(Design)}: the net that is to be
+     * merged away, together with either the parent Net it is to be merged into, when that is already
+     * known, or the name of the parent net to look up when the merge is applied.
+     */
+    private static class PhysNetMerge {
+        final Net net;
+        final Net parentPhysNet;
+        final String parentNetName;
+
+        PhysNetMerge(Net net, Net parentPhysNet, String parentNetName) {
+            this.net = net;
+            this.parentPhysNet = parentPhysNet;
+            this.parentNetName = parentNetName;
+        }
+    }
+
+    /**
      * Make all of a Design's physical Net objects consistent with its logical (EDIF) netlist.
      * Specifically, merge all sitewire and SitePinInst-s associated with physical Net-s that
      * are not the parent/canonical logical net into the parent Net, and delete all
@@ -3511,77 +3528,101 @@ public class DesignTools {
         int numJobs = Math.min(ParallelismTools.maxParallelism() * 100, numNets / 100);
         List<Net> designNets = new ArrayList<>(design.getNets());
         List<List<Net>> partitionedNets = Lists.partition(designNets, (int) Math.ceil((double) numNets / numJobs));
-        List<Future<?>> futures = new ArrayList<>();
+
+        // Only the classification runs in parallel. Each job keeps its results in its own list so
+        // that reading them back partition by partition reproduces designNets order exactly
+        List<List<PhysNetMerge>> partitionedMerges = new ArrayList<>(partitionedNets.size());
+        List<Future<?>> futures = new ArrayList<>(partitionedNets.size());
         for (List<Net> nets : partitionedNets) {
+            List<PhysNetMerge> merges = new ArrayList<>();
+            partitionedMerges.add(merges);
             Future<?> f = ParallelismTools.submit(() -> {
                 for (Net net : nets) {
-                    Net parentPhysNet = null;
                     if (net.isStaticNet()) {
+                        Net staticNet;
                         if (net.getType() == NetType.GND) {
-                            parentPhysNet = gndNet;
+                            staticNet = gndNet;
                         } else if (net.getType() == NetType.VCC) {
-                            parentPhysNet = vccNet;
+                            staticNet = vccNet;
                         } else {
                             throw new RuntimeException();
                         }
-                        if (parentPhysNet == net) {
-                            continue;
+                        if (staticNet != net) {
+                            merges.add(new PhysNetMerge(net, staticNet, null));
                         }
-                    } else {
-                        EDIFHierNet hierNet = net.getLogicalHierNet();
-                        if (hierNet == null) {
-                            // Likely an encrypted cell
-                            continue;
-                        }
-                        EDIFHierNet parentHierNet = netParentMap.get(hierNet);
-                        if (parentHierNet == null) {
-                            // System.out.println("WARNING: Couldn't find parent net for '" +
-                            //         hierNet.getHierarchicalNetName() + "'");
-                            continue;
-                        }
+                        continue;
+                    }
 
-                        // Check to make sure net is not improperly categorized
-                        EDIFNet srcNetAlias = parentHierNet.getNet();
-                        if (srcNetAlias.isGND()) {
-                            parentPhysNet = gndNet;
-                        } else if (srcNetAlias.isVCC()) {
+                    EDIFHierNet hierNet = net.getLogicalHierNet();
+                    if (hierNet == null) {
+                        // Likely an encrypted cell
+                        continue;
+                    }
+                    EDIFHierNet parentHierNet = netParentMap.get(hierNet);
+                    if (parentHierNet == null) {
+                        // System.out.println("WARNING: Couldn't find parent net for '" +
+                        //         hierNet.getHierarchicalNetName() + "'");
+                        continue;
+                    }
+
+                    // Check to make sure net is not improperly categorized
+                    Net parentPhysNet = null;
+                    EDIFNet srcNetAlias = parentHierNet.getNet();
+                    if (srcNetAlias.isGND()) {
+                        parentPhysNet = gndNet;
+                    } else if (srcNetAlias.isVCC()) {
+                        parentPhysNet = vccNet;
+                    }
+
+                    if (!hierNet.equals(parentHierNet)) {
+                        String parentNetName = parentHierNet.getNet().getName();
+                        // Assume that a net named <const1> or <const0> is always a VCC or GND net
+                        if (parentNetName.equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
                             parentPhysNet = vccNet;
-                        }
-
-                        if (!hierNet.equals(parentHierNet)) {
-                            String parentNetName = parentHierNet.getNet().getName();
-                            // Assume that a net named <const1> or <const0> is always a VCC or GND net
-                            if (parentNetName.equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
-                                parentPhysNet = vccNet;
-                            } else if (parentNetName.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
-                                parentPhysNet = gndNet;
-                            } else {
-                                parentPhysNet = design.getNet(parentHierNet.getHierarchicalNetName());
-                            }
-
-                            if (parentPhysNet == null) {
-                                synchronized (design) {
-                                    // Double check (inside this synchronized section) that no other thread has created
-                                    // the physical parent net since we fetched it above
-                                    parentPhysNet = design.getNet(parentHierNet.getHierarchicalNetName());
-                                    if (parentPhysNet == null && !net.rename(parentHierNet.getHierarchicalNetName())) {
-                                        System.out.println("WARNING: Failed to adjust physical net name " + net.getName());
-                                    }
-                                }
-                            }
+                        } else if (parentNetName.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
+                            parentPhysNet = gndNet;
+                        } else {
+                            // Which Net of this alias group survives depends on what has already
+                            // been merged, so the lookup has to wait until the merges are applied
+                            merges.add(new PhysNetMerge(net, null,
+                                    parentHierNet.getHierarchicalNetName()));
+                            continue;
                         }
                     }
 
                     if (parentPhysNet != null) {
-                        synchronized (design) {
-                            design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
-                        }
+                        merges.add(new PhysNetMerge(net, parentPhysNet, null));
                     }
                 }
             });
             futures.add(f);
         }
         ParallelismTools.join(futures);
+
+        // The merges themselves are applied on this thread, in designNets order. Applying them from
+        // the worker threads costs nothing less -- every one of them already had to take the Design's
+        // lock -- and it leaves both the surviving Net of an alias group and the order that group's
+        // pins are appended in decided by whichever thread happened to arrive first, which is enough
+        // to change the order RWRoute walks its connections in and so the routing it produces
+        for (List<PhysNetMerge> merges : partitionedMerges) {
+            for (PhysNetMerge merge : merges) {
+                Net parentPhysNet = merge.parentPhysNet;
+
+                if (parentPhysNet == null) {
+                    parentPhysNet = design.getNet(merge.parentNetName);
+
+                    // Nothing to merge into yet, so this net becomes the one everything else merges into
+                    if (parentPhysNet == null) {
+                        if (!merge.net.rename(merge.parentNetName)) {
+                            System.out.println("WARNING: Failed to adjust physical net name " + merge.net.getName());
+                        }
+                        continue;
+                    }
+                }
+
+                design.movePinsToNewNetDeleteOldNet(merge.net, parentPhysNet, true);
+            }
+        }
     }
 
     /**
