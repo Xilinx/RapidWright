@@ -29,9 +29,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.xilinx.rapidwright.util.Params;
 import com.xilinx.rapidwright.util.StringPool;
-import com.xilinx.rapidwright.util.function.InputStreamSupplier;
 
 public abstract class AbstractEDIFParserWorker {
 
@@ -92,8 +90,7 @@ public abstract class AbstractEDIFParserWorker {
     }
 
     public AbstractEDIFParserWorker(Path fileName, StringPool uniquifier, EDIFReadLegalNameCache cache) throws FileNotFoundException {
-        in = InputStreamSupplier.getInputStream(fileName,
-                fileName.toString().endsWith(".gz") && Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK);
+        in = EDIFTools.openEDIFInputStream(fileName);
         tokenizer = new EDIFTokenizer(fileName, in, uniquifier);
         this.cache = cache;
     }
