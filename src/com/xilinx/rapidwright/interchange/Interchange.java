@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.interchange;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -230,8 +231,14 @@ public class Interchange {
      * @throws IOException
      */
     public static void writeInterchangeFile(String fileName, MessageBuilder message) throws IOException {
+        WritableByteChannel wbc = getWritableByteChannel(fileName);
+        writeMessageToChannel(wbc, message);
+        wbc.close();
+    }
+    
+    public static WritableByteChannel getWritableByteChannel(String fileName)
+            throws FileNotFoundException, IOException {
         WritableByteChannel wbc = null;
-
         if (IS_GZIPPED) {
             GZIPOutputStream go = new GZIPOutputStream(new FileOutputStream(fileName));
             wbc = Channels.newChannel(go);
@@ -240,13 +247,15 @@ public class Interchange {
             FileOutputStream fo = new java.io.FileOutputStream(fileName);
             wbc = fo.getChannel();
         }
+        return wbc;
+    }
+
+    public static void writeMessageToChannel(WritableByteChannel wbc, MessageBuilder message) throws IOException { 
         if (IS_PACKED) {
             SerializePacked.writeToUnbuffered(wbc, message);
         } else {
             Serialize.write(wbc, message);
-        }
-
-        wbc.close();
+        }        
     }
 
     /**
@@ -257,6 +266,14 @@ public class Interchange {
      * @throws IOException
      */
     public static MessageReader readInterchangeFile(String fileName, ReaderOptions readOptions) throws IOException {
+        ReadableByteChannel channel = getReadableByteChannel(fileName);
+        MessageReader readMsg = readMessageFromChannel(channel, readOptions);
+
+        channel.close();
+        return readMsg;
+    }
+    
+    public static ReadableByteChannel getReadableByteChannel(String fileName) throws FileNotFoundException, IOException {
         ReadableByteChannel channel = null;
         if (IS_GZIPPED) {
             GZIPInputStream gis = new GZIPInputStream(new FileInputStream(fileName));
@@ -265,14 +282,17 @@ public class Interchange {
             FileInputStream fis = new java.io.FileInputStream(fileName);
             channel = fis.getChannel();
         }
+        return channel;
+    }
+
+    public static MessageReader readMessageFromChannel(ReadableByteChannel channel, ReaderOptions readOptions)
+            throws IOException {
         MessageReader readMsg = null;
         if (IS_PACKED) {
             readMsg = SerializePacked.readFromUnbuffered(channel, readOptions);
         } else {
             readMsg = Serialize.read(channel, readOptions);
         }
-
-        channel.close();
         return readMsg;
     }
 
