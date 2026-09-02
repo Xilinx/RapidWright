@@ -57,6 +57,7 @@ public class EDIFTokenizer implements AutoCloseable {
     protected int offset = 0;
     private int available = 0;
     private boolean sawEOF = false;
+    private boolean lastTokenWasQuoted = false;
 
     private boolean ensureRead(int startOffset, int endOffset) throws IOException {
         while (startOffset < endOffset) {
@@ -313,12 +314,15 @@ public class EDIFTokenizer implements AutoCloseable {
             while ((ch = readByte()) != 0) {
                 switch (ch) {
                     case '"':
+                        lastTokenWasQuoted = true;
                         return getQuotedToken(isShortLived);
                     case '(':
+                        lastTokenWasQuoted = false;
                         byteOffset++;
                         available--;
                         return "(";
                     case ')':
+                        lastTokenWasQuoted = false;
                         byteOffset++;
                         available--;
                         return ")";
@@ -331,6 +335,7 @@ public class EDIFTokenizer implements AutoCloseable {
                         available--;
                         break;
                     default:
+                        lastTokenWasQuoted = false;
                         return getUnquotedToken(isShortLived);
                 }
             }
@@ -340,6 +345,18 @@ public class EDIFTokenizer implements AutoCloseable {
             throw new UncheckedIOException("ERROR: IOException while reading EDIF file: "
                     + fileName, e);
         }
+    }
+
+    /**
+     * Reports whether the token most recently returned came from a quoted string.
+     * A quoted string is returned with its quotes stripped, so its text can be
+     * indistinguishable from a parenthesis token; callers that scan for balanced
+     * parentheses must consult this to avoid desynchronizing.
+     *
+     * @return True if the last token was quoted in the source, false otherwise.
+     */
+    public boolean wasLastTokenQuoted() {
+        return lastTokenWasQuoted;
     }
 
     public Path getFileName() {
