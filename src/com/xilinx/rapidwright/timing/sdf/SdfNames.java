@@ -76,16 +76,17 @@ public class SdfNames {
     }
 
     /**
-     * Applies Verilog-style backslash escaping the way Vivado does when writing an instance path,
-     * escaping every character that is not legal in a bare Verilog identifier.
+     * Applies Verilog-style backslash escaping the way Vivado does, escaping every character that
+     * is not legal in a bare Verilog identifier.
      *
-     * The hierarchy divider is not escaped, since a caller passes a full path whose slashes are
-     * separators. To escape a single path component, call this on that component alone.
+     * The hierarchy divider is left alone, since a caller passes a full path whose slashes are
+     * separators. This is the inverse of {@link #unescape(String)} and is what a caller writing an
+     * SDF from names taken out of a netlist needs.
      *
      * @param plain The unescaped name.
      * @return The escaped name, suitable for writing into an SDF file.
      */
-    public static String escapeInstancePath(String plain) {
+    static String escape(String plain) {
         StringBuilder sb = null;
         for (int i = 0; i < plain.length(); i++) {
             char c = plain.charAt(i);

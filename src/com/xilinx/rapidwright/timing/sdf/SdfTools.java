@@ -109,10 +109,14 @@ public class SdfTools {
         SdfAnnotator.ensureMacrosExpanded(design);
         // Build the graph without the estimator: its delays would only be overwritten, and on a
         // device with no shipped timing data building it would throw.
-        TimingManager tm = new TimingManager(design, false);
+        // Built unfinalized: annotation may add cell-internal arcs the graph did not have, and the
+        // super source and sink and the topological order can only be computed once the last arc is
+        // in place.
+        TimingManager tm = new TimingManager(design, false, true);
         SdfAnnotator annotator = new SdfAnnotator(design, sdf,
                 config == null ? new SdfAnnotationConfig() : config);
         SdfAnnotationReport report = annotator.annotate(tm.getTimingGraph());
+        tm.finalizeTimingGraph();
         if (reportOut != null && reportOut.length > 0) {
             reportOut[0] = report;
         }

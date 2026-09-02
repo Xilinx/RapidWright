@@ -25,10 +25,12 @@ import java.util.Objects;
 /**
  * One entry inside a {@link SdfCell}'s {@code (TIMINGCHECK ...)} block.
  *
- * Vivado emits four of SDF's timing checks: {@code SETUPHOLD}, {@code PERIOD}, {@code WIDTH} and,
- * for flip-flops with an asynchronous set or reset, {@code RECREM}. These are not annotated onto the {@code TimingGraph}, but they are retained
- * because they are the device-agnostic way to identify a cell's clock pin: a pin named as the
- * reference event of a {@code PERIOD} or as the second port of a {@code SETUPHOLD} is a clock. That
+ * Vivado emits four of SDF's timing checks: {@code SETUPHOLD}, {@code PERIOD}, {@code WIDTH}
+ * and, for flip-flops with an asynchronous set or reset, {@code RECREM}.
+ *
+ * These are not annotated onto the {@code TimingGraph}, but they are retained because they are the
+ * device-agnostic way to identify a cell's clock pin: a pin named as the reference event of a
+ * {@code PERIOD}, or as the second port of a {@code SETUPHOLD} or {@code RECREM}, is a clock. That
  * classification drives how an {@code IOPATH} out of a sequential cell is mapped.
  */
 public class SdfTimingCheck {
@@ -70,7 +72,7 @@ public class SdfTimingCheck {
      * @param kind Which timing check this is.
      * @param firstEdge Edge qualifier on the first port, or {@link SdfEdge#NONE}.
      * @param firstPort The first port name, escaped and verbatim.
-     * @param secondEdge Edge qualifier on the second port, or {@link SdfEdge#NONE} if there is none.
+     * @param secondEdge Edge qualifier on the second port, or {@link SdfEdge#NONE} if absent.
      * @param secondPort The second port name, or null for {@code PERIOD} and {@code WIDTH}.
      * @param firstValues The first delval list.
      * @param secondValues The second delval list, or null for single-value checks.
@@ -114,7 +116,7 @@ public class SdfTimingCheck {
     }
 
     /**
-     * @return Edge qualifier on the second port, or {@link SdfEdge#NONE} if there is no second port.
+     * @return Edge qualifier on the second port, or {@link SdfEdge#NONE} if there is none.
      */
     public SdfEdge getSecondEdge() {
         return secondEdge;
@@ -128,8 +130,8 @@ public class SdfTimingCheck {
     }
 
     /**
-     * @return The first delval list: the setup values for {@code SETUPHOLD}, or the period or width
-     *         for the single-value checks.
+     * @return The first delval list: the setup values for {@code SETUPHOLD}, or the period or
+     *         width for the single-value checks.
      */
     public SdfDelayValues getFirstValues() {
         return firstValues;
@@ -146,8 +148,8 @@ public class SdfTimingCheck {
      * Returns the pin this check identifies as a clock, if any.
      *
      * @return For {@code SETUPHOLD} and {@code RECREM} the second (reference) port; for
-     *         {@code PERIOD} the first port; null for {@code WIDTH}, which is also emitted for
-     *         non-clock pins such as resets.
+     *         {@code PERIOD} the first port; null for {@code WIDTH}, which is also written
+     *         for non-clock pins such as resets.
      */
     public String getClockPort() {
         switch (kind) {

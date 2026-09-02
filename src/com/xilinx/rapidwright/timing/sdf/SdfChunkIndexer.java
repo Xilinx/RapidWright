@@ -58,7 +58,7 @@ import com.xilinx.rapidwright.util.ParallelismTools;
  * Only one anchor per chunk is materialised, so memory stays proportional to the thread count
  * rather than to the tens of millions of anchors a large file contains.
  */
-public class SdfChunkIndexer {
+class SdfChunkIndexer {
 
     /** Bytes read at a time while scanning. */
     private static final int SCAN_BUFFER_SIZE = 1 << 20;

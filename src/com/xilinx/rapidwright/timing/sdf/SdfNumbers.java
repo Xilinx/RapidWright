@@ -30,10 +30,14 @@ package com.xilinx.rapidwright.timing.sdf;
  * {@code String.format} because a large SDF holds tens of millions of these values, and because
  * a float round-trip would not reproduce the input bytes.
  */
-public class SdfNumbers {
+class SdfNumbers {
 
-    /** Largest magnitude in tenths that {@link #parseTenths} accepts, leaving room for the sign. */
-    private static final int MAX_TENTHS = Integer.MAX_VALUE - 1;
+    /**
+     * Largest magnitude in tenths that can be stored. Only {@link SdfDelayValues#NEG_ZERO}, which
+     * is {@link Integer#MIN_VALUE}, is reserved, so the full positive range is available and its
+     * negation is still distinct from the sentinel.
+     */
+    private static final int MAX_TENTHS = Integer.MAX_VALUE;
 
     private SdfNumbers() {
     }
@@ -41,8 +45,8 @@ public class SdfNumbers {
     /**
      * Parses an SDF delay literal into tenths of the file's time unit.
      *
-     * Accepts an optional leading {@code -}, one or more integer digits, a mandatory {@code .} and
-     * one or more fractional digits. Vivado always writes exactly one fractional digit; additional
+     * Accepts an optional leading sign, one or more integer digits, a mandatory {@code .}, and one
+     * or more fractional digits. Vivado always writes exactly one fractional digit; additional
      * digits are accepted only if they are zero, since anything else could not be represented
      * exactly and must not be silently rounded.
      *
@@ -101,7 +105,13 @@ public class SdfNumbers {
                     + s.subSequence(from, to));
         }
 
-        if (i < to && s.charAt(i) == '.') {
+        if (i >= to || s.charAt(i) != '.') {
+            // Required, not optional: the writer always emits one fractional digit, so accepting
+            // "1" would mean writing back "1.0" and quietly breaking the round-trip guarantee.
+            throw new NumberFormatException("ERROR: SDF delay value has no fractional digit: "
+                    + s.subSequence(from, to));
+        }
+        {
             i++;
             int fracDigits = 0;
             while (i < to) {

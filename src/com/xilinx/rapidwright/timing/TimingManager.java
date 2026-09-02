@@ -94,6 +94,24 @@ public class TimingManager {
      * @param buildDelayModel False to skip delay estimation and build graph topology only.
      */
     public TimingManager(Design design, boolean buildDelayModel) {
+        this(design, buildDelayModel, false);
+    }
+
+    /**
+     * Creates the TimingManager, optionally without the delay estimator and optionally leaving the
+     * graph unfinalized.
+     *
+     * Pass true for {@code deferFinalize} when the caller intends to add arcs to the graph before
+     * using it, as annotating an SDF file does. Finalizing computes the super source and sink and
+     * the cached topological order, all of which depend on the graph's shape, so it has to happen
+     * after the last arc is added. The caller must call {@link #finalizeTimingGraph()} before
+     * querying arrival times, slacks or paths.
+     *
+     * @param design RapidWright Design object.
+     * @param buildDelayModel False to skip delay estimation and build graph topology only.
+     * @param deferFinalize True to leave the graph unfinalized for the caller to extend.
+     */
+    public TimingManager(Design design, boolean buildDelayModel, boolean deferFinalize) {
         this.design = design;
         timingModel = new TimingModel(design.getDevice());
         timingGraph = new TimingGraph(design);
@@ -106,7 +124,7 @@ public class TimingManager {
         device = design.getDevice();
         // No critical path breakdown is printed through this constructor, since it leaves verbose off
         estimator = null;
-        build(false, design.getNets(), buildDelayModel);
+        build(false, design.getNets(), buildDelayModel, deferFinalize);
     }
 
     public TimingManager(Design design,
@@ -461,6 +479,19 @@ public class TimingManager {
      */
     private boolean build(boolean isPartialRouting, Collection<Net> targetNets,
                           boolean buildDelayModel) {
+        return build(isPartialRouting, targetNets, buildDelayModel, false);
+    }
+
+    /**
+     * Builds the TimingModel and TimingGraph.
+     * @param isPartialRouting Whether only a subset of nets is being considered.
+     * @param targetNets The nets to build timing edges for.
+     * @param buildDelayModel False to skip the delay estimator and build graph topology only.
+     * @param deferFinalize True to leave the graph unfinalized for the caller to extend.
+     * @return Indication of successful completion.
+     */
+    private boolean build(boolean isPartialRouting, Collection<Net> targetNets,
+                          boolean buildDelayModel, boolean deferFinalize) {
         if (buildDelayModel) {
             if (routerTimer != null) routerTimer.createRuntimeTracker("build timing model", "Initialization").start();
             timingModel.build();
@@ -470,8 +501,8 @@ public class TimingManager {
         if (routerTimer != null) routerTimer.createRuntimeTracker("build timing graph", "Initialization").start();
         timingGraph.build(isPartialRouting, targetNets);
         if (routerTimer != null) routerTimer.getRuntimeTracker("build timing graph").stop();
-        
-        return postBuild();
+
+        return deferFinalize || postBuild();
     }
 
     private boolean postBuild() {
@@ -481,6 +512,21 @@ public class TimingManager {
         timingGraph.setOrderedTimingVertexLists();
         if (routerTimer != null) routerTimer.getRuntimeTracker("post graph build").stop();
         return true;
+    }
+
+    /**
+     * Recomputes the parts of the timing graph that depend on its shape: the super source and sink
+     * and the cached topological order.
+     *
+     * Call this after adding arcs to a graph built with {@code deferFinalize}, and again after any
+     * later change to the graph's topology. Changing delays alone does not need it. The operation
+     * is idempotent.
+     */
+    public void finalizeTimingGraph() {
+        if (routerTimer != null) routerTimer.createRuntimeTracker("post graph build", "Initialization").start();
+        timingGraph.removeClockCrossingPaths();
+        timingGraph.finalizeTopology();
+        if (routerTimer != null) routerTimer.getRuntimeTracker("post graph build").stop();
     }
 
     /**

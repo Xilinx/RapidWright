@@ -22,6 +22,7 @@ package com.xilinx.rapidwright.timing.sdf;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PushbackInputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,13 +39,16 @@ import java.util.zip.GZIPInputStream;
  * {@code 78 9c}, not the gzip magic {@code 1f 8b}, and {@code InputStreamSupplier} keys off the
  * {@code .gz} extension.
  */
-public class SdfInput {
+class SdfInput {
 
     /** First two bytes of every gzip stream. */
     private static final int GZIP_MAGIC_0 = 0x1f;
 
     /** Second byte of the gzip magic number. */
     private static final int GZIP_MAGIC_1 = 0x8b;
+
+    /** Bytes of magic number that identify a gzip stream. */
+    private static final int GZIP_MAGIC_LENGTH = 2;
 
     /**
      * Buffer size for the decompressor. A larger buffer than the default measurably speeds up
@@ -79,45 +83,36 @@ public class SdfInput {
      * @return A stream of the file's uncompressed bytes.
      */
     public static InputStream open(Path fileName) {
+        InputStream in = null;
         try {
-            InputStream in = Files.newInputStream(fileName);
-            if (isGzipped(fileName)) {
-                return new GZIPInputStream(in, GZIP_BUFFER_SIZE);
+            // Sniffed and consumed through one handle: opening the file a second time to test for
+            // gzip would double the I/O and, if the decompressor then failed to start, leak the
+            // first stream.
+            in = new PushbackInputStream(Files.newInputStream(fileName), GZIP_MAGIC_LENGTH);
+            byte[] magic = new byte[GZIP_MAGIC_LENGTH];
+            int read = 0;
+            while (read < GZIP_MAGIC_LENGTH) {
+                int n = in.read(magic, read, GZIP_MAGIC_LENGTH - read);
+                if (n < 0) {
+                    break;
+                }
+                read += n;
             }
-            return in;
+            boolean gzipped = read == GZIP_MAGIC_LENGTH
+                    && (magic[0] & 0xff) == GZIP_MAGIC_0 && (magic[1] & 0xff) == GZIP_MAGIC_1;
+            if (read > 0) {
+                ((PushbackInputStream) in).unread(magic, 0, read);
+            }
+            return gzipped ? new GZIPInputStream(in, GZIP_BUFFER_SIZE) : in;
         } catch (IOException e) {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException suppressed) {
+                    e.addSuppressed(suppressed);
+                }
+            }
             throw new UncheckedIOException("ERROR: Couldn't read file : " + fileName, e);
         }
-    }
-
-    /**
-     * Returns the length of an SDF file's uncompressed content.
-     *
-     * For a plain file this is the file size. For a gzipped file the size must be measured by
-     * decompressing, since the gzip trailer's length field is only 32 bits and so is unreliable for
-     * the large files this parser targets.
-     *
-     * @param fileName The file to measure.
-     * @return The number of uncompressed bytes.
-     */
-    public static long getUncompressedSize(Path fileName) {
-        if (!isGzipped(fileName)) {
-            try {
-                return Files.size(fileName);
-            } catch (IOException e) {
-                throw new UncheckedIOException("ERROR: Couldn't read file : " + fileName, e);
-            }
-        }
-        long total = 0;
-        byte[] buffer = new byte[GZIP_BUFFER_SIZE];
-        try (InputStream in = open(fileName)) {
-            int read;
-            while ((read = in.read(buffer)) != -1) {
-                total += read;
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException("ERROR: Couldn't read file : " + fileName, e);
-        }
-        return total;
     }
 }

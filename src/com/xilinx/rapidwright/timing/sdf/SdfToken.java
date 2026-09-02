@@ -29,7 +29,7 @@ import java.util.Objects;
  * hands the token that begins one worker's chunk to the preceding worker as a stop marker, and that
  * handshake is only sound if two tokens with the same text at different positions compare unequal.
  */
-public class SdfToken {
+class SdfToken {
 
     /** The token text, with any backslash escapes preserved. */
     public final String text;

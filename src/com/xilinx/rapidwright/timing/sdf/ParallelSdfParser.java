@@ -217,6 +217,7 @@ public class ParallelSdfParser {
         int closingChunks = 0;
         SdfCell pendingTopCell = null;
         List<SdfDelayEntry> pendingEntries = null;
+        long pendingEndByteOffset = -1;
 
         for (SdfChunk chunk : chunks) {
             if (chunk.getStartByteOffset() <= previousOffset) {
@@ -231,6 +232,9 @@ public class ParallelSdfParser {
                             "a chunk continues a cell that no earlier chunk started");
                 }
                 pendingEntries.addAll(chunk.getFragmentEntries());
+                if (chunk.getCompletedCellEndByteOffset() >= 0) {
+                    pendingEndByteOffset = chunk.getCompletedCellEndByteOffset();
+                }
             }
 
             for (SdfCell cell : chunk.getCells()) {
@@ -257,7 +261,7 @@ public class ParallelSdfParser {
         }
 
         if (pendingTopCell != null) {
-            file.addCell(completeCell(pendingTopCell, pendingEntries));
+            file.addCell(completeCell(pendingTopCell, pendingEntries, pendingEndByteOffset));
         }
 
         if (closingChunks != 1) {
@@ -273,14 +277,17 @@ public class ParallelSdfParser {
     /**
      * Rebuilds a cell that was split across chunks, with its full entry list.
      *
-     * @param head The cell as the starting chunk saw it.
+     * @param head The cell as the starting chunk saw it, whose end offset is only the boundary at
+     *             which that chunk stopped.
      * @param entries The complete entry list, in file order.
+     * @param endByteOffset Where the cell actually ended, or -1 if no chunk reported it.
      * @return The completed cell.
      */
-    private static SdfCell completeCell(SdfCell head, List<SdfDelayEntry> entries) {
+    private static SdfCell completeCell(SdfCell head, List<SdfDelayEntry> entries,
+            long endByteOffset) {
         return new SdfCell(head.getCellType(), head.getInstance(), head.getStyle(),
                 head.hasDelay(), head.hasTimingCheck(), head.getPathPulsePercent(),
                 entries, head.getTimingChecks(), head.getStartByteOffset(),
-                head.getEndByteOffset(), head.getLineNumber());
+                endByteOffset >= 0 ? endByteOffset : head.getEndByteOffset(), head.getLineNumber());
     }
 }

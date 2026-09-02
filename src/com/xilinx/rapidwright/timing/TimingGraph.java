@@ -295,6 +295,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
      * Creates and Sets the lists of ordered TimingVertices
      */
     public void setOrderedTimingVertexLists() {
+        // Cleared first so this can be called again after the graph changes. Without this, a second
+        // call appends a whole extra traversal and every vertex is visited twice by the arrival and
+        // required time passes.
+        orderedTimingVertices.clear();
         TopologicalOrderIterator<TimingVertex, TimingEdge> orderIterator = new TopologicalOrderIterator<>(this);
         while (orderIterator.hasNext()) {
             TimingVertex v = orderIterator.next();
@@ -786,6 +790,44 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         }
     }
     
+    /**
+     * Removes the artificial super source and super sink, together with every edge to and from
+     * them, leaving only the real timing arcs.
+     */
+    public void removeSuperGraphPaths() {
+        if (superSource != null && containsVertex(superSource)) {
+            removeVertex(superSource);
+        }
+        if (superSink != null && containsVertex(superSink)) {
+            removeVertex(superSink);
+        }
+        safeVertexCheck.remove("superSource");
+        safeVertexCheck.remove("superSink");
+        superSource = null;
+        superSink = null;
+    }
+
+    /**
+     * Recomputes everything that depends on the graph's shape: the super source and sink, the
+     * cached topological orders, and the cached path set.
+     *
+     * Call this after adding or removing vertices or edges on a graph that has already been built.
+     * Delays alone do not require it, but topology does: a vertex that gains an incoming edge is no
+     * longer a source, so its super-source edge has to go, and a stale topological order silently
+     * produces wrong arrival and required times even when every individual edge delay is correct.
+     *
+     * The method is idempotent, so calling it on an already-consistent graph is safe; it costs one
+     * traversal of the graph.
+     */
+    public void finalizeTopology() {
+        // Torn down and rebuilt rather than topped up: buildSuperGraphPaths() only ever adds edges,
+        // so on its own it cannot retract a super-source edge that a newly added arc invalidated.
+        removeSuperGraphPaths();
+        graphPathHashSet = null;
+        buildSuperGraphPaths();
+        setOrderedTimingVertexLists();
+    }
+
     private List<GraphPath<TimingVertex, TimingEdge>> buildGraphPaths(int n) {
         graphPathHashSet = new LinkedHashSet<>();
         Set<TimingVertex> sources = new LinkedHashSet<>();
@@ -1883,16 +1925,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
      */
     public TimingVertex getTimingVertex(String name) {
         return safeVertexCheck.get(name);
-    }
-
-    /**
-     * Returns the vertex with the given name, creating it if it does not yet exist.
-     *
-     * @param name The full hierarchical pin name.
-     * @return The existing or newly created vertex.
-     */
-    public TimingVertex createTimingVertex(String name) {
-        return newTimingVertex(name);
     }
 
     /**

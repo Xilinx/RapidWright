@@ -232,7 +232,7 @@ public class SdfParser implements AutoCloseable {
      * @param stopOffset Where the next chunk begins, or {@link Long#MAX_VALUE} for the last chunk.
      * @return The chunk's contribution to the file.
      */
-    public SdfChunk parseChunk(SdfChunkIndexer.Anchor start, long stopOffset) {
+    SdfChunk parseChunk(SdfChunkIndexer.Anchor start, long stopOffset) {
         this.stopByteOffset = stopOffset;
         SdfChunk chunk = new SdfChunk(start.byteOffset);
 
@@ -308,6 +308,9 @@ public class SdfParser implements AutoCloseable {
                 expectToken(SdfKeywords.RIGHT_PAREN);
                 expectToken(SdfKeywords.RIGHT_PAREN);
                 expectToken(SdfKeywords.RIGHT_PAREN);
+                // Record where the cell itself ends, before the DELAYFILE close, so the merged
+                // cell can report its true extent rather than the chunk boundary it was split at.
+                chunk.setCompletedCellEndByteOffset(tokenizer.getByteOffset());
                 expectToken(SdfKeywords.RIGHT_PAREN);
                 chunk.setSawDelayFileClose(true);
                 checkNothingFollows();
@@ -790,30 +793,5 @@ public class SdfParser implements AutoCloseable {
     @Override
     public void close() throws IOException {
         tokenizer.close();
-    }
-
-    /**
-     * Parses an SDF file and, when a second argument is given, writes it back out.
-     *
-     * With two arguments this is a round-trip check: the output should be byte-for-byte identical
-     * to the input for any file Vivado produced.
-     *
-     * @param args Input SDF file, and optionally an output file.
-     */
-    public static void main(String[] args) {
-        if (args.length < 1 || args.length > 2) {
-            System.out.println("USAGE: <input.sdf> [output.sdf]");
-            return;
-        }
-        CodePerfTracker t = new CodePerfTracker("Read/Write SDF", true);
-        Path input = java.nio.file.Paths.get(args[0]);
-        SdfFile sdf = parse(input, t);
-        System.out.println("Parsed " + sdf);
-        if (args.length > 1) {
-            t.start("Write SDF");
-            SdfWriter.write(sdf, java.nio.file.Paths.get(args[1]));
-            t.stop();
-        }
-        t.printSummary();
     }
 }

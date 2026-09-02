@@ -34,7 +34,7 @@ import java.util.List;
  * {@link #getFragmentEntries()}. {@link ParallelSdfParser} concatenates them in chunk order, which
  * restores the original entry order without needing to sort.
  */
-public class SdfChunk {
+class SdfChunk {
 
     private final long startByteOffset;
 
@@ -47,6 +47,13 @@ public class SdfChunk {
     private List<SdfDelayEntry> fragmentEntries = Collections.emptyList();
 
     private boolean sawDelayFileClose;
+
+    /**
+     * Byte offset one past the end of the cell this chunk finished, when it closed one that an
+     * earlier chunk had started. Carried so that the reassembled cell reports where it really
+     * ended rather than where the chunk that began it happened to stop.
+     */
+    private long completedCellEndByteOffset = -1;
 
     /**
      * @param startByteOffset Byte offset at which this chunk begins.
@@ -132,6 +139,20 @@ public class SdfChunk {
      */
     public void setSawDelayFileClose(boolean sawDelayFileClose) {
         this.sawDelayFileClose = sawDelayFileClose;
+    }
+
+    /**
+     * @return Byte offset one past the end of the cell this chunk closed, or -1 if it closed none.
+     */
+    public long getCompletedCellEndByteOffset() {
+        return completedCellEndByteOffset;
+    }
+
+    /**
+     * @param offset Byte offset one past the end of the cell this chunk closed.
+     */
+    public void setCompletedCellEndByteOffset(long offset) {
+        this.completedCellEndByteOffset = offset;
     }
 
     @Override

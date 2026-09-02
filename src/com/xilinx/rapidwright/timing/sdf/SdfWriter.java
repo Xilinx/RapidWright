@@ -189,7 +189,12 @@ public class SdfWriter {
             writeHeader(sdf, out);
 
             List<SdfCell> cells = sdf.getCells();
-            if (ParallelismTools.getParallel() && cells.size() > CELLS_PER_CHUNK) {
+            // Worth parallelising on either axis. A top-heavy file can have only a handful of leaf
+            // cells while its top-level cell holds millions of interconnects, so judging by cell
+            // count alone would render the bulk of such a file on one thread.
+            boolean worthParallelising = cells.size() > CELLS_PER_CHUNK
+                    || maxEntryCount(cells) > ENTRIES_PER_CHUNK;
+            if (ParallelismTools.getParallel() && worthParallelising) {
                 writeCellsParallel(cells, out);
             } else {
                 // Written straight to the stream rather than buffered whole: a large design's SDF
@@ -269,6 +274,18 @@ public class SdfWriter {
         while (!pending.isEmpty()) {
             out.write(ParallelismTools.get(pending.removeFirst()));
         }
+    }
+
+    /**
+     * @param cells The cells to inspect.
+     * @return The largest number of delay entries held by any one cell.
+     */
+    private static int maxEntryCount(List<SdfCell> cells) {
+        int max = 0;
+        for (SdfCell cell : cells) {
+            max = Math.max(max, cell.getDelayEntries().size());
+        }
+        return max;
     }
 
     /** The destination and scratch space handed to a single render task. */
@@ -518,22 +535,5 @@ public class SdfWriter {
             }
             out.write(')');
         }
-    }
-
-    /**
-     * Renders a single cell to a byte array. Used by the round-trip verifier to compare a
-     * re-rendered cell against the bytes it was parsed from.
-     *
-     * @param cell The cell to render.
-     * @return The rendered bytes.
-     */
-    public static byte[] renderCell(SdfCell cell) {
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream(256);
-        try {
-            writeCell(cell, buffer, new Scratch());
-        } catch (IOException e) {
-            throw new UncheckedIOException("ERROR: IOException while rendering SDF cell", e);
-        }
-        return buffer.toByteArray();
     }
 }

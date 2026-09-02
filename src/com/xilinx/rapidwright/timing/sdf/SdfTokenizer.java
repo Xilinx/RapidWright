@@ -56,7 +56,7 @@ import com.xilinx.rapidwright.util.StringPool;
  * {@link #nextTenths()}, never through a {@code String} or {@code Float}. A large SDF holds tens of
  * millions of these, and a float round-trip would not reproduce the input bytes.
  */
-public class SdfTokenizer implements AutoCloseable {
+class SdfTokenizer implements AutoCloseable {
 
     /** Buffer sizing, matching the EDIF tokenizer's default of 4 MiB per token. */
     public static final int DEFAULT_MAX_TOKEN_LENGTH = 8192 * 16 * 32;
@@ -539,7 +539,12 @@ public class SdfTokenizer implements AutoCloseable {
                         "delay value out of range");
             }
 
-            if ((char) buffer[offset] == '.') {
+            if ((char) buffer[offset] != '.') {
+                // Required, not optional; see SdfNumbers.parseTenths for why.
+                throw new SdfParseException(fileName, lineNumber, startByteOffset,
+                        "delay value has no fractional digit");
+            }
+            {
                 skipInBuffer(1);
                 int fracDigits = 0;
                 while (true) {

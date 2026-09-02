@@ -308,6 +308,56 @@ public class TestSdfParser {
         Assertions.assertEquals(3, e.getLineNumber());
     }
 
+    /**
+     * Cross-checks the tokenizer's hand-rolled number reader against the straightforward one in
+     * {@link SdfNumbers}.
+     *
+     * The tokenizer parses delay values straight out of its ring buffer for speed, duplicating
+     * logic that {@link SdfNumbers#parseTenths(String)} expresses plainly. Two implementations of
+     * the same thing are only safe while something holds them to each other, which is this test's
+     * job.
+     */
+    @Test
+    public void testTokenizerNumbersAgreeWithReferenceParser(@TempDir Path tempDir) {
+        String[] literals = {
+                "0.0", "-0.0", "1.0", "-1.0", "0.5", "9.9", "10.0", "99.9", "100.0",
+                "5602.1", "-36.0", "214748364.7", "-214748364.7",   // the representable extremes
+        };
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("(DELAYFILE \n(SDFVERSION \"3.0\" )\n(TIMESCALE 1ps)\n")
+          .append("(CELL \n  (CELLTYPE \"LUT6\")\n  (INSTANCE lut)\n")
+          .append("  (DELAY \n    (ABSOLUTE \n");
+        for (String literal : literals) {
+            sb.append("      (IOPATH I0 O (").append(literal).append(':').append(literal)
+              .append(':').append(literal).append("))\n");
+        }
+        sb.append("    )\n  )\n)\n)\n");
+
+        Path input = SdfTestFiles.write(tempDir, "numbers.sdf", sb.toString());
+        SdfFile sdf = SdfParser.parse(input);
+        List<SdfDelayEntry> entries = sdf.getCells().get(0).getDelayEntries();
+        Assertions.assertEquals(literals.length, entries.size());
+
+        for (int i = 0; i < literals.length; i++) {
+            int expected = SdfNumbers.parseTenths(literals[i]);
+            int actual = entries.get(i).getValues().getTenths(0, SdfDelayValues.MIN);
+            Assertions.assertEquals(expected, actual,
+                    "tokenizer and reference parser disagree on '" + literals[i] + "'");
+        }
+    }
+
+    @Test
+    public void testReferenceParserRejectsTheSameThingsTheTokenizerDoes() {
+        // Malformed or unrepresentable literals must be refused rather than rounded, in both.
+        String[] bad = {"", "1", "1.", ".5", "1.25", "abc", "1.0x", "--1.0", "99999999999.9"};
+        for (String literal : bad) {
+            Assertions.assertThrows(NumberFormatException.class,
+                    () -> SdfNumbers.parseTenths(literal),
+                    "should have rejected '" + literal + "'");
+        }
+    }
+
     @Test
     public void testRejectsComments(@TempDir Path tempDir) {
         // Vivado never writes comments. Accepting them silently would mean the round-trip

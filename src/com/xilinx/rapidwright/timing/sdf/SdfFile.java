@@ -22,7 +22,6 @@ package com.xilinx.rapidwright.timing.sdf;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -270,13 +269,6 @@ public class SdfFile {
             }
         }
         return result;
-    }
-
-    /**
-     * @return An unmodifiable view of the cells, in file order.
-     */
-    public List<SdfCell> getCellsUnmodifiable() {
-        return Collections.unmodifiableList(cells);
     }
 
     @Override

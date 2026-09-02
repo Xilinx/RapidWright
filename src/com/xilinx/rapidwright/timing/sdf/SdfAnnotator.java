@@ -84,23 +84,28 @@ public class SdfAnnotator {
 
     private TimingGraph graph;
 
-    /** Edges that received any delay, tracked by identity to avoid relying on equals. */
-    private Map<TimingEdge, Boolean> annotatedEdges;
-
     /**
-     * Edges whose net delay specifically has been set.
+     * Edges whose net delay has been set, by identity rather than by equality.
      *
-     * Tracked separately from {@link #annotatedEdges} because a sequential arc writes the logic
-     * delay of the very edges an INTERCONNECT later writes the net delay of; using one set for both
-     * would report every such edge as a duplicate.
+     * Net and logic coverage are tracked separately and deliberately so. A net edge leaving a
+     * flip-flop carries both a net delay from an INTERCONNECT and a logic delay from that flop's
+     * clock-to-output arc. With a single set, an applied clock-to-output arc would mark the edge
+     * covered and hide a missing INTERCONNECT, or the reverse, so coverage would read 100% while
+     * half of an edge's delay was still zero.
      */
-    private Map<TimingEdge, Boolean> netAnnotatedEdges;
+    private Set<TimingEdge> netAnnotatedEdges;
+
+    /** Edges whose logic delay has been set, by identity. */
+    private Set<TimingEdge> logicAnnotatedEdges;
 
     /**
      * Edges that have already received a control-input-to-output arc, so that a second such arc
      * into the same output keeps the worst value rather than simply overwriting.
      */
-    private Map<TimingEdge, Boolean> sequentialArcEdges;
+    private Set<TimingEdge> sequentialArcEdges;
+
+    /** Vertices and edges this annotation added, which means the graph's shape changed. */
+    private int createdEdges;
 
     /**
      * @param design The design the SDF was written from.
@@ -126,6 +131,13 @@ public class SdfAnnotator {
     /**
      * Applies every delay in the SDF to the graph.
      *
+     * An IOPATH may describe an arc the graph has no edge for, so annotating can change the
+     * graph's shape. When that happens on a graph that was already finalized, the super source and
+     * sink and the cached topological order are recomputed here, since both depend on the shape and
+     * a stale order yields wrong arrival and required times even when every edge delay is right. A
+     * caller that built the graph with {@code deferFinalize} should call
+     * {@link com.xilinx.rapidwright.timing.TimingManager#finalizeTimingGraph()} afterwards instead.
+     *
      * @param timingGraph The graph to annotate, already built.
      * @return What happened, including everything that could not be applied.
      */
@@ -133,9 +145,10 @@ public class SdfAnnotator {
         this.graph = timingGraph;
         this.report = new SdfAnnotationReport(config.getSampleLimit());
         this.report.setSdfSource(sdf.getSource());
-        this.annotatedEdges = new IdentityHashMap<>();
-        this.netAnnotatedEdges = new IdentityHashMap<>();
-        this.sequentialArcEdges = new IdentityHashMap<>();
+        this.netAnnotatedEdges = Collections.newSetFromMap(new IdentityHashMap<>());
+        this.logicAnnotatedEdges = Collections.newSetFromMap(new IdentityHashMap<>());
+        this.sequentialArcEdges = Collections.newSetFromMap(new IdentityHashMap<>());
+        this.createdEdges = 0;
 
         long entries = 0;
         for (SdfCell cell : sdf.getCells()) {
@@ -143,8 +156,17 @@ public class SdfAnnotator {
         }
         report.setSdfEntryCount(entries);
 
+        // Whether the graph had already been finalized when we were handed it. If so and we go on
+        // to change its shape, the super source and sink and the cached topological order it
+        // computed are now stale and have to be redone.
+        boolean wasFinalized = timingGraph.superSource != null;
+
         for (SdfCell cell : sdf.getCells()) {
             annotateCell(cell);
+        }
+
+        if (createdEdges > 0 && wasFinalized) {
+            timingGraph.finalizeTopology();
         }
 
         recordUnannotatedEdges();
@@ -314,6 +336,7 @@ public class SdfAnnotator {
                         continue;
                     }
                     created = true;
+                    createdEdges++;
                 }
                 setLogicDelay(edge, delay);
                 applied = true;
@@ -348,7 +371,7 @@ public class SdfAnnotator {
         }
         boolean applied = false;
         for (TimingEdge edge : outgoing) {
-            if (sequentialArcEdges.containsKey(edge)) {
+            if (sequentialArcEdges.contains(edge)) {
                 // A second arc into the same output, such as a reset-to-output alongside a
                 // clock-to-output. Keep the worst, since the edge can hold only one.
                 if (delay <= edge.getLogicDelay()) {
@@ -357,7 +380,7 @@ public class SdfAnnotator {
                 }
             }
             setLogicDelay(edge, delay);
-            sequentialArcEdges.put(edge, Boolean.TRUE);
+            sequentialArcEdges.add(edge);
             applied = true;
         }
         return applied;
@@ -390,7 +413,7 @@ public class SdfAnnotator {
             report.record(SdfAnnotationReport.Reason.EDGE_MISSING_SKIPPED, describe(entry));
             return;
         }
-        if (netAnnotatedEdges.containsKey(edge)) {
+        if (netAnnotatedEdges.contains(edge)) {
             // jgrapht permits only one edge per vertex pair, so a second entry for the same pair
             // has to be merged rather than added. Keeping the larger value is the safe choice for
             // setup analysis.
@@ -543,23 +566,33 @@ public class SdfAnnotator {
             return null;
         }
 
+        // RISE and FALL name specific slots of the delay value list: slot 0 is the rising-output
+        // transition and slot 1 the falling one. When the requested slot is absent the entry simply
+        // does not describe that transition -- a tri-state IOPATH may carry only the
+        // high-impedance transitions -- and any other slot would be a different transition
+        // masquerading as the requested one. Rather than substitute one silently, fall back to the
+        // worst present value, which is at least conservative, and say so.
+        int requestedSlot = -1;
+        if (config.getTransition() == SdfAnnotationConfig.Transition.RISE) {
+            requestedSlot = 0;
+        } else if (config.getTransition() == SdfAnnotationConfig.Transition.FALL) {
+            requestedSlot = 1;
+        }
+
         double picked;
-        switch (config.getTransition()) {
-            case RISE:
-                picked = values.isPresent(0) ? values.getValue(0, component)
-                        : values.getValue(firstPresent, component);
-                break;
-            case FALL:
-                picked = values.size() > 1 && values.isPresent(1)
-                        ? values.getValue(1, component)
-                        : values.getValue(firstPresent, component);
-                break;
-            case AVERAGE:
-                picked = sum / count;
-                break;
-            default:
+        if (requestedSlot >= 0) {
+            if (requestedSlot < values.size() && values.isPresent(requestedSlot)) {
+                picked = values.getValue(requestedSlot, component);
+            } else {
+                report.record(SdfAnnotationReport.Reason.REQUESTED_TRANSITION_ABSENT,
+                        describe(entry) + " [no " + config.getTransition()
+                        + " value; using the worst of the " + count + " present]");
                 picked = worst;
-                break;
+            }
+        } else if (config.getTransition() == SdfAnnotationConfig.Transition.AVERAGE) {
+            picked = sum / count;
+        } else {
+            picked = worst;
         }
 
         // The SDF stores tenths of its own TIMESCALE unit; the timing graph works in picoseconds.
@@ -585,9 +618,9 @@ public class SdfAnnotator {
     // ------------------------------------------------------------------------------------------
 
     private void setLogicDelay(TimingEdge edge, float delayPs) {
+        // TimingEdge.setLogicDelay already recomputes the total and syncs the graph's edge weight.
         edge.setLogicDelay(delayPs);
-        graph.setEdgeWeight(edge, edge.getDelay());
-        annotatedEdges.put(edge, Boolean.TRUE);
+        logicAnnotatedEdges.add(edge);
     }
 
     private void setNetDelay(TimingEdge edge, float delayPs) {
@@ -597,28 +630,41 @@ public class SdfAnnotator {
         // intra-site figure alongside it would make the breakdown inconsistent.
         edge.setIntraSiteDelay(0f);
         edge.setNetDelay(delayPs);
-        graph.setEdgeWeight(edge, edge.getDelay());
-        annotatedEdges.put(edge, Boolean.TRUE);
-        netAnnotatedEdges.put(edge, Boolean.TRUE);
+        netAnnotatedEdges.add(edge);
     }
 
     /**
-     * Counts, and samples, every edge no SDF entry touched.
+     * Counts, and samples, every delay component of the graph that no SDF entry supplied.
      *
-     * This is the most important number in the report. An unmatched SDF entry is only unused data,
-     * but an unannotated edge still carries a delay that did not come from the SDF, and silently
+     * These are the most important numbers in the report. An unmatched SDF entry is only unused
+     * data, but a graph edge whose delay did not come from the SDF still has one, and silently
      * corrupts every path through it.
+     *
+     * Components are counted separately rather than per edge. An edge is not one number: a net edge
+     * leaving a flip-flop holds a net delay from an INTERCONNECT <i>and</i> a logic delay from that
+     * flop's clock-to-output arc. Treating the edge as covered as soon as either arrived would
+     * let a missing INTERCONNECT hide behind a present clock-to-output arc, reporting full
+     * coverage over a graph half of whose delay was still zero.
      */
     private void recordUnannotatedEdges() {
-        Set<TimingEdge> edges = graph.edgeSet();
         TimingVertex superSource = graph.superSource;
         TimingVertex superSink = graph.superSink;
 
-        List<String> unannotated = new ArrayList<>();
-        long count = 0;
         long annotatable = 0;
         long annotated = 0;
-        for (TimingEdge edge : edges) {
+        long netRequired = 0;
+        long netAnnotated = 0;
+        long logicRequired = 0;
+        long logicAnnotated = 0;
+
+        List<String> missingNet = new ArrayList<>();
+        List<String> missingLogic = new ArrayList<>();
+        List<String> missingClockArc = new ArrayList<>();
+        long missingNetCount = 0;
+        long missingLogicCount = 0;
+        long missingClockArcCount = 0;
+
+        for (TimingEdge edge : graph.edgeSet()) {
             // The artificial edges into and out of the super source and sink are zero by
             // construction, so they are neither annotatable nor missing. Counting them would
             // understate coverage by a large and meaningless margin.
@@ -629,22 +675,88 @@ public class SdfAnnotator {
                 continue;
             }
             annotatable++;
-            if (annotatedEdges.containsKey(edge)) {
+            boolean hasNet = netAnnotatedEdges.contains(edge);
+            boolean hasLogic = logicAnnotatedEdges.contains(edge);
+            if (hasNet || hasLogic) {
                 annotated++;
-                continue;
             }
-            count++;
-            if (unannotated.size() < config.getSampleLimit()) {
-                unannotated.add(edge.getSrc() + " -> " + edge.getDst()
-                        + " (delay still " + edge.getDelay() + " ps)");
+
+            if (isNetEdge(edge)) {
+                // A routed net segment: its net delay must come from an INTERCONNECT.
+                netRequired++;
+                if (hasNet) {
+                    netAnnotated++;
+                } else {
+                    missingNetCount++;
+                    if (missingNet.size() < config.getSampleLimit()) {
+                        missingNet.add(describeEdge(edge, "net"));
+                    }
+                }
+                // A net edge leaving a sequential output additionally carries that cell's
+                // clock-to-output delay, because the graph has no clock arc to put it on.
+                if (edge.getSrc() != null && edge.getSrc().getFlopOutput()) {
+                    logicRequired++;
+                    if (hasLogic) {
+                        logicAnnotated++;
+                    } else {
+                        missingClockArcCount++;
+                        if (missingClockArc.size() < config.getSampleLimit()) {
+                            missingClockArc.add(describeEdge(edge, "clock-to-output"));
+                        }
+                    }
+                }
+            } else {
+                // A cell-internal arc: its logic delay must come from an IOPATH.
+                logicRequired++;
+                if (hasLogic) {
+                    logicAnnotated++;
+                } else {
+                    missingLogicCount++;
+                    if (missingLogic.size() < config.getSampleLimit()) {
+                        missingLogic.add(describeEdge(edge, "logic"));
+                    }
+                }
             }
         }
+
         report.setGraphEdgeCount(annotatable);
         report.setGraphEdgesAnnotated(annotated);
-        // Recorded in one pass so the count is exact while the samples stay bounded.
-        for (int i = 0; i < count; i++) {
-            report.record(SdfAnnotationReport.Reason.TIMING_GRAPH_EDGE_NOT_ANNOTATED,
-                    i < unannotated.size() ? unannotated.get(i) : null);
+        report.setNetDelayCounts(netRequired, netAnnotated);
+        report.setLogicDelayCounts(logicRequired, logicAnnotated);
+
+        recordMany(SdfAnnotationReport.Reason.EDGE_MISSING_NET_DELAY, missingNetCount, missingNet);
+        recordMany(SdfAnnotationReport.Reason.EDGE_MISSING_LOGIC_DELAY, missingLogicCount,
+                missingLogic);
+        recordMany(SdfAnnotationReport.Reason.FLOP_OUTPUT_MISSING_CLOCK_ARC, missingClockArcCount,
+                missingClockArc);
+    }
+
+    /**
+     * @param edge The edge to classify.
+     * @return True if the edge stands for a routed net segment rather than a cell-internal arc.
+     *         Cell-internal arcs are created with no net, which is how the rest of the timing code
+     *         tells the two apart.
+     */
+    private static boolean isNetEdge(TimingEdge edge) {
+        return edge.getNet() != null || edge.getEdifNet() != null;
+    }
+
+    private static String describeEdge(TimingEdge edge, String component) {
+        return edge.getSrc() + " -> " + edge.getDst() + " (" + component + " delay still "
+                + (component.equals("net") ? edge.getNetDelay() : edge.getLogicDelay()) + " ps)";
+    }
+
+    /**
+     * Records a category the exact number of times it occurred while keeping only the collected
+     * samples, so the count stays accurate and memory stays bounded.
+     *
+     * @param reason The category.
+     * @param count How many times it occurred.
+     * @param samples The samples collected, at most the configured limit.
+     */
+    private void recordMany(SdfAnnotationReport.Reason reason, long count, List<String> samples) {
+        for (long i = 0; i < count; i++) {
+            report.record(reason, i < samples.size() ? samples.get((int) i) : null);
         }
     }
 

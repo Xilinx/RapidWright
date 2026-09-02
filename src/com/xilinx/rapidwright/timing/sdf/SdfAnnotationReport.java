@@ -42,9 +42,11 @@ import java.util.Map;
  * carrying stale or zero delays on some edges. This report exists so that never happens quietly.
  *
  * Coverage is tracked in <b>both directions</b>, and the second is the one that matters most. An
- * unmatched SDF entry is merely data that was not used. A timing graph edge that no SDF entry
- * touched still has a delay -- zero, or whatever the estimator put there -- and every path through
- * it is wrong. That is counted as {@link Reason#TIMING_GRAPH_EDGE_NOT_ANNOTATED}.
+ * unmatched SDF entry is merely data that was not used. A graph delay that no SDF entry supplied
+ * still has a value -- zero, or whatever the estimator put there -- and every path through it is
+ * wrong. Those are counted per component as {@link Reason#EDGE_MISSING_NET_DELAY},
+ * {@link Reason#EDGE_MISSING_LOGIC_DELAY} and {@link Reason#FLOP_OUTPUT_MISSING_CLOCK_ARC}, since
+ * one edge can need both a net delay and a clock-to-output delay and either can go missing alone.
  */
 public class SdfAnnotationReport {
 
@@ -107,8 +109,24 @@ public class SdfAnnotationReport {
         /** Every delay value in a list was absent, so the entry carried no usable number. */
         EMPTY_DELVAL_LIST,
 
-        /** A graph edge no SDF entry touched, which therefore still holds a stale delay. */
-        TIMING_GRAPH_EDGE_NOT_ANNOTATED
+        /**
+         * The configured transition was not among the delay values present, so the worst present
+         * value was used instead. A tri-state arc describing only its high-impedance transitions
+         * does this when RISE or FALL is asked for.
+         */
+        REQUESTED_TRANSITION_ABSENT,
+
+        /** A routed net segment whose net delay no INTERCONNECT supplied; it is still stale. */
+        EDGE_MISSING_NET_DELAY,
+
+        /** A cell-internal arc whose logic delay no IOPATH supplied; it is still stale. */
+        EDGE_MISSING_LOGIC_DELAY,
+
+        /**
+         * A net edge leaving a sequential output that received no clock-to-output delay, so the
+         * paths through it understate their arrival time by that cell's clock-to-output time.
+         */
+        FLOP_OUTPUT_MISSING_CLOCK_ARC
     }
 
     private final Map<Reason, long[]> counts = new EnumMap<>(Reason.class);
@@ -122,6 +140,14 @@ public class SdfAnnotationReport {
     private long graphEdgeCount;
 
     private long graphEdgesAnnotated;
+
+    private long netDelaysRequired;
+
+    private long netDelaysAnnotated;
+
+    private long logicDelaysRequired;
+
+    private long logicDelaysAnnotated;
 
     private Path sdfSource;
 
@@ -237,6 +263,67 @@ public class SdfAnnotationReport {
     }
 
     /**
+     * @param required Net delays the graph needs, one per routed net segment.
+     * @param annotated How many of those the SDF supplied.
+     */
+    public void setNetDelayCounts(long required, long annotated) {
+        this.netDelaysRequired = required;
+        this.netDelaysAnnotated = annotated;
+    }
+
+    /**
+     * @param required Logic delays the graph needs: one per cell-internal arc, plus one per net
+     *                 edge leaving a sequential output for its clock-to-output time.
+     * @param annotated How many of those the SDF supplied.
+     */
+    public void setLogicDelayCounts(long required, long annotated) {
+        this.logicDelaysRequired = required;
+        this.logicDelaysAnnotated = annotated;
+    }
+
+    /**
+     * @return Net delays the graph needs.
+     */
+    public long getNetDelaysRequired() {
+        return netDelaysRequired;
+    }
+
+    /**
+     * @return Net delays the SDF supplied.
+     */
+    public long getNetDelaysAnnotated() {
+        return netDelaysAnnotated;
+    }
+
+    /**
+     * @return Logic delays the graph needs.
+     */
+    public long getLogicDelaysRequired() {
+        return logicDelaysRequired;
+    }
+
+    /**
+     * @return Logic delays the SDF supplied.
+     */
+    public long getLogicDelaysAnnotated() {
+        return logicDelaysAnnotated;
+    }
+
+    /**
+     * @return The fraction of required net delays that were supplied, between 0 and 1.
+     */
+    public double getNetDelayCoverage() {
+        return netDelaysRequired == 0 ? 1.0 : (double) netDelaysAnnotated / netDelaysRequired;
+    }
+
+    /**
+     * @return The fraction of required logic delays that were supplied, between 0 and 1.
+     */
+    public double getLogicDelayCoverage() {
+        return logicDelaysRequired == 0 ? 1.0 : (double) logicDelaysAnnotated / logicDelaysRequired;
+    }
+
+    /**
      * @return Number of SDF entries that were successfully applied.
      */
     public long getAppliedEntryCount() {
@@ -252,9 +339,14 @@ public class SdfAnnotationReport {
     }
 
     /**
-     * @return The fraction of timing graph edges that received a delay, between 0 and 1. This is
-     *         the number to check before trusting an annotated graph: any shortfall means some
-     *         paths are computed from delays the SDF never supplied.
+     * Returns the fraction of edges that received at least one delay.
+     *
+     * Prefer {@link #getNetDelayCoverage()} and {@link #getLogicDelayCoverage()} when judging
+     * whether an annotated graph can be trusted. An edge is not a single number: a net edge leaving
+     * a flip-flop needs both a net delay and that flop's clock-to-output delay, and this figure
+     * counts it as covered once either has arrived.
+     *
+     * @return The fraction of timing graph edges that received a delay, between 0 and 1.
      */
     public double getGraphCoverage() {
         return graphEdgeCount == 0 ? 1.0 : (double) graphEdgesAnnotated / graphEdgeCount;
@@ -295,6 +387,9 @@ public class SdfAnnotationReport {
             case PIN_NOT_IN_TIMING_GRAPH:
             case DUPLICATE_ENTRY:
                 return true;
+            case REQUESTED_TRANSITION_ABSENT:
+                // Reported so the substitution is visible, but the value used is conservative.
+                return true;
             default:
                 return false;
         }
@@ -314,6 +409,10 @@ public class SdfAnnotationReport {
         out.printf("  Timing graph edges:     %,d%n", graphEdgeCount);
         out.printf("  Edges annotated:        %,d (%.2f%%)%n", graphEdgesAnnotated,
                 getGraphCoverage() * 100);
+        out.printf("  Net delays supplied:    %,d of %,d (%.2f%%)%n", netDelaysAnnotated,
+                netDelaysRequired, getNetDelayCoverage() * 100);
+        out.printf("  Logic delays supplied:  %,d of %,d (%.2f%%)%n", logicDelaysAnnotated,
+                logicDelaysRequired, getLogicDelayCoverage() * 100);
         out.println();
         for (Reason reason : Reason.values()) {
             long count = getCount(reason);
@@ -358,7 +457,8 @@ public class SdfAnnotationReport {
     @Override
     public String toString() {
         return "SdfAnnotationReport[applied=" + getAppliedEntryCount() + "/" + sdfEntryCount
-                + ", edges=" + graphEdgesAnnotated + "/" + graphEdgeCount
+                + ", net=" + netDelaysAnnotated + "/" + netDelaysRequired
+                + ", logic=" + logicDelaysAnnotated + "/" + logicDelaysRequired
                 + ", clean=" + isClean() + "]";
     }
 }
