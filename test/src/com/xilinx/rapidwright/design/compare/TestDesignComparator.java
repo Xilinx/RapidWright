@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2024-2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, AMD Research and Advanced Development.
@@ -81,7 +81,17 @@ public class TestDesignComparator {
 
         compareDesign(1, 1, DesignDiffType.DESIGN_PARTNAME, dc, gold, test2);
         
+        // Track from here on: an object leaving a design must be recorded against the design it
+        // is leaving, or a consumer undoing the original state never hears about the removal
+        test2.setTrackSiteInstChanges(true);
+        test2.setCopyingOriginalSiteInsts(true);
+        test2.setTrackNetChanges(true);
+        test2.setCopyingOriginalNetsRouting(true);
+
         test2.removeSiteInst(siteInst, true);
+
+        Assertions.assertTrue(test2.getModifiedSiteInsts().contains(siteInst));
+        Assertions.assertNotNull(test2.getOriginalSiteInsts().get(siteInst.getName()));
 
         compareDesign(2, 1, DesignDiffType.SITEINST_MISSING, dc, gold, test2);
         
@@ -160,6 +170,10 @@ public class TestDesignComparator {
 
         Assertions.assertTrue(net.hasPIPs());
         test2.removeNet(net);
+
+        // Recorded, and recorded rather than unrouted: the PIPs below are still there to copy
+        Assertions.assertTrue(test2.getModifiedNets().contains(net));
+        Assertions.assertEquals(net.getPIPs(), test2.getOriginalNetRouting().get(net.getName()));
 
         compareDesign(32, 1, DesignDiffType.NET_MISSING, dc, gold, test2);
 
