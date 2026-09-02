@@ -44,6 +44,7 @@ public class VivadoTools {
     public static final String ROUTE_DESIGN = "route_design";
     public static final String WRITE_CHECKPOINT = "write_checkpoint";
     public static final String WRITE_EDIF = "write_edif";
+    public static final String WRITE_SDF = "write_sdf";
 
     /**
      * method to search a vivado log for a specific key phrase
@@ -605,5 +606,57 @@ public class VivadoTools {
         design.writeCheckpoint(dcp);
         Path outputDcp = roundTripDCPThruVivado(dcp, "output", workdir, hasEncryptedCells);
         return Design.readCheckpoint(outputDcp);
+    }
+
+    /**
+     * Runs Vivado's {@code write_sdf} on a DCP to export its timing as a Standard Delay Format
+     * file, which {@code com.xilinx.rapidwright.timing.sdf.SdfTools} can then read.
+     *
+     * This is the supported way to get Vivado's actual delays into RapidWright: the DCP itself
+     * stores timing only in a proprietary binary form that RapidWright cannot read.
+     *
+     * @param dcp Path to the placed and routed DCP to open.
+     * @param sdfOutput Path to write the SDF to. Note that with {@code gzip} set this file will
+     *                  hold a gzip stream despite its name; the SDF reader detects that from the
+     *                  file's contents rather than its extension.
+     * @param processCorner {@code slow} or {@code fast}; Vivado defaults to {@code slow}.
+     * @param mode {@code timesim} or {@code sta}; Vivado defaults to {@code timesim}. The
+     *             {@code sta} variant omits the negative-edge timing checks.
+     * @param gzip Whether to compress the output.
+     * @param workdir Directory to run in.
+     * @param encrypted Indicates whether the DCP contains encrypted EDIF cells.
+     * @return The path the SDF was written to.
+     */
+    public static Path writeSdf(Path dcp, Path sdfOutput, String processCorner, String mode,
+            boolean gzip, Path workdir, boolean encrypted) {
+        final Path outputLog = workdir.resolve("outputLog.log");
+        StringBuilder sb = new StringBuilder();
+        sb.append(createTclDCPLoadCommand(dcp, encrypted));
+        sb.append(WRITE_SDF).append(" -force");
+        if (processCorner != null) {
+            sb.append(" -process_corner ").append(processCorner);
+        }
+        if (mode != null) {
+            sb.append(" -mode ").append(mode);
+        }
+        if (gzip) {
+            sb.append(" -gzip");
+        }
+        sb.append(" {").append(sdfOutput).append("}; ");
+        VivadoTools.runTcl(outputLog, sb.toString(), true);
+        return sdfOutput;
+    }
+
+    /**
+     * Runs Vivado's {@code write_sdf} on a DCP with Vivado's default options, which are the slow
+     * process corner and {@code timesim} mode.
+     *
+     * @param dcp Path to the placed and routed DCP to open.
+     * @param sdfOutput Path to write the SDF to.
+     * @param workdir Directory to run in.
+     * @return The path the SDF was written to.
+     */
+    public static Path writeSdf(Path dcp, Path sdfOutput, Path workdir) {
+        return writeSdf(dcp, sdfOutput, null, null, false, workdir, false);
     }
 }
