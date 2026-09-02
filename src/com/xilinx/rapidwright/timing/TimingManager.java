@@ -78,18 +78,37 @@ public class TimingManager {
      * @param design RapidWright Design object.
      */
     public TimingManager(Design design) {
+        this(design, true);
+    }
+
+    /**
+     * Creates the TimingManager, optionally without RapidWright's built-in delay estimator.
+     *
+     * Pass false for {@code buildDelayModel} to build the TimingGraph for its topology only, with
+     * every delay left at zero for an external source such as an SDF file to supply. That is the
+     * only way to get a TimingGraph for a device RapidWright ships no timing data for: the
+     * estimator reads {@code timing/&lt;series&gt;/intersite_delay_terms.txt}, which exists for
+     * UltraScale+ alone, so on Versal the normal constructor throws before the graph is built.
+     *
+     * @param design RapidWright Design object.
+     * @param buildDelayModel False to skip delay estimation and build graph topology only.
+     */
+    public TimingManager(Design design, boolean buildDelayModel) {
         this.design = design;
         timingModel = new TimingModel(design.getDevice());
         timingGraph = new TimingGraph(design);
         timingModel.setTimingManager(this);
         timingGraph.setTimingManager(this);
+        // The TimingModel is still attached even when it is not built, so that the graph's
+        // non-null check and the delay-breakdown printers continue to work.
         timingGraph.setTimingModel(timingModel);
+        timingGraph.setUseDelayModel(buildDelayModel);
         device = design.getDevice();
         // No critical path breakdown is printed through this constructor, since it leaves verbose off
         estimator = null;
-        build(false, design.getNets());
+        build(false, design.getNets(), buildDelayModel);
     }
-    
+
     public TimingManager(Design design,
                          RuntimeTrackerTree timer,
                          RWRouteConfig config,
@@ -430,10 +449,24 @@ public class TimingManager {
      * @return Indication of successful completion.
      */
     private boolean build(boolean isPartialRouting, Collection<Net> targetNets) {
-        if (routerTimer != null) routerTimer.createRuntimeTracker("build timing model", "Initialization").start();
-        timingModel.build();
-        if (routerTimer != null) routerTimer.getRuntimeTracker("build timing model").stop();
-        
+        return build(isPartialRouting, targetNets, true);
+    }
+
+    /**
+     * Builds the TimingModel and TimingGraph.
+     * @param isPartialRouting Whether only a subset of nets is being considered.
+     * @param targetNets The nets to build timing edges for.
+     * @param buildDelayModel False to skip the delay estimator and build graph topology only.
+     * @return Indication of successful completion.
+     */
+    private boolean build(boolean isPartialRouting, Collection<Net> targetNets,
+                          boolean buildDelayModel) {
+        if (buildDelayModel) {
+            if (routerTimer != null) routerTimer.createRuntimeTracker("build timing model", "Initialization").start();
+            timingModel.build();
+            if (routerTimer != null) routerTimer.getRuntimeTracker("build timing model").stop();
+        }
+
         if (routerTimer != null) routerTimer.createRuntimeTracker("build timing graph", "Initialization").start();
         timingGraph.build(isPartialRouting, targetNets);
         if (routerTimer != null) routerTimer.getRuntimeTracker("build timing graph").stop();

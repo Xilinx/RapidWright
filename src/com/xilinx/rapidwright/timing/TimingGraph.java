@@ -82,6 +82,16 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     private HashSet<GraphPath<TimingVertex, TimingEdge>> graphPathHashSet;
     HashMap<EDIFCellInst, String> hierCellInstMap;
     DelayModel intrasiteAndLogicDelayModel;
+    /**
+     * Whether to populate delays from RapidWright's built-in estimator while building the graph.
+     *
+     * When false the graph is built for its topology only: vertices and edges are created as usual
+     * but every delay is left at zero, to be supplied afterwards from an external source such as an
+     * SDF file. This is what makes the graph usable on devices RapidWright ships no timing data for
+     * -- notably Versal, where {@link TimingModel#build()} cannot even be run because there is no
+     * {@code timing/versal} directory.
+     */
+    private boolean useDelayModel = true;
     PrintStream graphVizPrintStream;
     HashMap<String, EDIFCellInst> myCellMap;
     Design design;
@@ -123,6 +133,11 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         ramTypes = new HashSet<>();
         ramTypes.add("RAMB18E2");
         ramTypes.add("RAMB36E2");
+        // Versal equivalents. Membership here decides whether a cell's output is treated as a flop
+        // output, which in turn drives super-source and super-sink selection, so omitting these
+        // would silently distort path enumeration on Versal designs.
+        ramTypes.add("RAMB18E5");
+        ramTypes.add("RAMB36E5");
     }
     
     /**
@@ -152,15 +167,23 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             throw new RuntimeException("Error: The TimingModel is not properly set for the "
                     + "TimingGraph prior to building.");
         }
-        String seriesName = design.getDevice().getSeries().name().toLowerCase();
-        intrasiteAndLogicDelayModel = DelayModelBuilder.getDelayModel(seriesName);
+        if (useDelayModel) {
+            String seriesName = design.getDevice().getSeries().name().toLowerCase();
+            intrasiteAndLogicDelayModel = DelayModelBuilder.getDelayModel(seriesName);
+        }
 
         if (routerTimer != null) routerTimer.createRuntimeTracker("determine logic dly", "build timing graph").start();
         myCellMap = design.getNetlist().generateCellInstMap();
-        if (!isPartialRouting) {
-            determineLogicDelaysFromEDIFCellInsts(myCellMap);
-        } else {
-            determineLogicDelaysFromEDIFCellInsts(generateCellMapOfNets(targetNets));
+        if (useDelayModel) {
+            // Every branch of this method consults intrasiteAndLogicDelayModel, so it is skipped
+            // entirely rather than guarded internally when there is no model. The logic delays it
+            // would have produced are supplied from outside instead; see
+            // com.xilinx.rapidwright.timing.sdf.SdfAnnotator.
+            if (!isPartialRouting) {
+                determineLogicDelaysFromEDIFCellInsts(myCellMap);
+            } else {
+                determineLogicDelaysFromEDIFCellInsts(generateCellMapOfNets(targetNets));
+            }
         }
         if (routerTimer != null) routerTimer.getRuntimeTracker("determine logic dly").stop();
         
@@ -731,7 +754,9 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 String cellName = cellPinName.substring(0, indexOfLastSlash);
                 EDIFCellInst mycellInst = myCellMap.get(cellName);
                 Cell cell = design.getCell(cellName);
-                if (cell != null && mycellInst.getCellType() != null) {
+                // mycellInst can be absent even when the physical cell is present, for instance
+                // when the pin belongs to a macro-expanded sub-cell that is not in the cell map.
+                if (cell != null && mycellInst != null && mycellInst.getCellType() != null) {
                     if (mycellInst.getCellType().getName().startsWith("RAMB")) {
                         if (shouldBRAMInputConnectToSuperSink(cell, cellPinName)) {
                             sinks.add(s1);
@@ -1616,7 +1641,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                    stringSources.put(fullName, null);
                    testSourceCell = cell;
                    if (isUnisimFlipFlopType(cell.getType())) {
-                       logicDelay = timingModel.LOGIC_FF_DELAY;
+                       logicDelay = useDelayModel ? timingModel.LOGIC_FF_DELAY : 0f;
                    } else if (isRamType(cell.getType())) {
                        updateLogicDelay = false;
                    }
@@ -1635,7 +1660,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 testSourceCell = cell;
                 source = cell.getBEL().getPin(physPinName);
                 if (isUnisimFlipFlopType(cell.getType())) {
-                    logicDelay = timingModel.LOGIC_FF_DELAY;
+                    logicDelay = useDelayModel ? timingModel.LOGIC_FF_DELAY : 0f;
                 } else if (isRamType(cell.getType())) {
                     updateLogicDelay = false;
                 }
@@ -1691,7 +1716,15 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 
             boolean forceUpdateEdge = false;
             float netDelay = 0f;
-            if (haveIntrasiteNet) {//LUT driving a FF is here
+            if (!useDelayModel) {
+                // Topology-only build: create the edge with zero delay for an external source to
+                // fill in. This must not fall through to the branches below, both because they
+                // would dereference a null delay model and because the intra-site branch bails out
+                // with "continue" when the model has no entry -- which would drop the edge
+                // altogether, and an edge the graph never created cannot be annotated later.
+                intraSiteDelay = 0f;
+                forceUpdateEdge = true;
+            } else if (haveIntrasiteNet) {//LUT driving a FF is here
                 String param2 = srcCell.getBELName()+"/"+ source.getName();
                 String param3 = null;
                 if (sink_belpins.get(D) == null) {
@@ -1812,6 +1845,74 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
      */
     public void setTimingModel(TimingModel tModel) {
         timingModel = tModel;
+    }
+
+    /**
+     * Sets whether {@link #build(boolean, Collection)} populates delays from RapidWright's built-in
+     * estimator.
+     *
+     * Pass false to build the graph for its topology alone, leaving every delay at zero for an
+     * external source such as an SDF file to fill in. This must be called before {@code build()}.
+     *
+     * This is the only way to obtain a TimingGraph for a device RapidWright ships no timing data
+     * for. On Versal, for instance, there is no {@code timing/versal} directory, so both
+     * {@link TimingModel#build()} and {@code DelayModelBuilder.getDelayModel()} throw.
+     *
+     * @param useDelayModel False to skip delay estimation and build topology only.
+     */
+    public void setUseDelayModel(boolean useDelayModel) {
+        this.useDelayModel = useDelayModel;
+    }
+
+    /**
+     * @return Whether this graph was built with delays from the built-in estimator.
+     */
+    public boolean getUseDelayModel() {
+        return useDelayModel;
+    }
+
+    /**
+     * Looks up a vertex by name.
+     *
+     * Vertex names are full hierarchical pin names, formatted exactly as
+     * {@link com.xilinx.rapidwright.edif.EDIFHierPortInst#toString()} produces them, which is what
+     * lets a name read out of an external file be matched against the graph directly.
+     *
+     * @param name The full hierarchical pin name.
+     * @return The vertex, or null if the graph has none with that name.
+     */
+    public TimingVertex getTimingVertex(String name) {
+        return safeVertexCheck.get(name);
+    }
+
+    /**
+     * Returns the vertex with the given name, creating it if it does not yet exist.
+     *
+     * @param name The full hierarchical pin name.
+     * @return The existing or newly created vertex.
+     */
+    public TimingVertex createTimingVertex(String name) {
+        return newTimingVertex(name);
+    }
+
+    /**
+     * Adds an edge representing a delay arc internal to a cell, replacing any existing edge between
+     * the two pins.
+     *
+     * The edge carries no physical or logical net, which is how the existing reporting code tells a
+     * cell-internal arc apart from a net arc.
+     *
+     * @param src Source pin vertex.
+     * @param dst Destination pin vertex.
+     * @return The new edge, or null if it could not be added.
+     */
+    public TimingEdge addLogicDelayEdge(TimingVertex src, TimingVertex dst) {
+        TimingEdge e = new TimingEdge(this, src, dst, null, null);
+        if (!safeAddEdge(src, dst, e)) {
+            return null;
+        }
+        setEdgeWeight(e, e.getDelay());
+        return e;
     }
 
     /**
