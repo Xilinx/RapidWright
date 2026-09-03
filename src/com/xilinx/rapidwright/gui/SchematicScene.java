@@ -33,6 +33,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.eclipse.elk.alg.layered.options.GreedySwitchType;
+import org.eclipse.elk.alg.layered.options.LayeredOptions;
 import org.eclipse.elk.core.IGraphLayoutEngine;
 import org.eclipse.elk.core.RecursiveGraphLayoutEngine;
 import org.eclipse.elk.core.math.ElkPadding;
@@ -54,6 +56,7 @@ import org.eclipse.elk.graph.ElkPort;
 import com.trolltech.qt.core.QPointF;
 import com.trolltech.qt.core.QRectF;
 import com.trolltech.qt.core.QSizeF;
+import com.trolltech.qt.core.Qt.ItemSelectionMode;
 import com.trolltech.qt.core.Qt.KeyboardModifier;
 import com.trolltech.qt.gui.QAbstractGraphicsShapeItem;
 import com.trolltech.qt.gui.QBrush;
@@ -103,15 +106,12 @@ public class SchematicScene extends QGraphicsScene {
 
     private static final QBrush BLACK_BRUSH = new QBrush(QColor.black);
     private static final QPen BLACK_PEN = new QPen(QColor.black);
-    private static final QPen CLICK_PEN = new QPen(new QColor(0, 0, 0, 0), 10);
-    private static final QBrush CLICK_BRUSH = new QBrush(new QColor(0, 0, 0, 0));
 
     private static QFontMetrics fm = new QFontMetrics(FONT);
     private static QBrush canvasBackgroundBrush = new QBrush(QColor.white);
     private static final QBrush PORT_BRUSH = new QBrush(QColor.white);
     private static final QPen PORT_PEN = BLACK_PEN;
     private static final QPen NET_PEN = new QPen(new QColor(91, 203, 75));
-    private static final QPen NET_CLICK_PEN = CLICK_PEN;
     private static final QPen SELECTED_PEN = new QPen(new QColor(0, 0, 255), 3);
 
     private static final QBrush CELL_BRUSH = new QBrush(new QColor(255, 255, 210));
@@ -148,7 +148,36 @@ public class SchematicScene extends QGraphicsScene {
     private static final double PIN_LINE_LENGTH = 10.0;
 
     private static final String HIER_BUTTON = "HIER_BUTTON";
-    private static final String CLICK = "CLICK";
+
+    /**
+     * Rather than drawing an invisible, thick copy of every clickable item just to make it easier
+     * to hit with the mouse, clicks are resolved by searching a small box around the cursor (see
+     * {@link #pickItem(QPointF)}). Since the item that should win a click is not always the item
+     * drawn on top (a leaf cell's pin labels are drawn over its rectangle, for example), each
+     * clickable item stores its own pick priority in this data slot--highest priority wins.
+     */
+    private static final int PICK_PRIORITY = 2;
+    /** Half the width/height, in scene units, of the box used to resolve a mouse click */
+    private static final double PICK_TOLERANCE = 5.0;
+
+    /**
+     * Data slot holding the pen a selectable item was drawn with, so that de-selecting it restores
+     * the right color (a hierarchical cell's border is not the same color as a leaf cell's).
+     */
+    private static final int UNSELECTED_PEN = 3;
+
+    private static final int PICK_BUTTON = 10;
+    private static final int PICK_CELL = 6;
+    private static final int PICK_NET = 5;
+    private static final int PICK_EXPANDED_CELL = 4;
+    private static final int PICK_PIN = 3;
+    private static final int PICK_TOP_PORT = 1;
+
+    /**
+     * Number of children above which an {@link ElkNode} gets the faster (but slightly lower
+     * quality) layout settings applied by {@link #applyLargeGraphElkProperties(ElkNode)}.
+     */
+    private static final int LARGE_GRAPH_NODE_THRESHOLD = 200;
 
     public SchematicScene(EDIFNetlist netlist) {
         super();
@@ -169,6 +198,26 @@ public class SchematicScene extends QGraphicsScene {
         root.setProperty(CoreOptions.SPACING_EDGE_NODE, EDGE_TO_NODE_SPACING);
     }
 
+    /**
+     * By default, ELK's layered algorithm runs a fairly exhaustive crossing minimization which
+     * becomes the dominant cost when drawing a large cell (measured at 38.5s for a cell with 8201
+     * instances). Reducing the number of layer sweeps and turning off the greedy switch heuristic
+     * brings that down to 15.6s at the cost of some additional edge crossings. This is only worth
+     * trading away on graphs large enough for the user to notice the delay, so smaller schematics
+     * keep the higher quality layout.
+     *
+     * @param node The node to check (recursively, along with its children).
+     */
+    private static void applyLargeGraphElkProperties(ElkNode node) {
+        if (node.getChildren().size() > LARGE_GRAPH_NODE_THRESHOLD) {
+            node.setProperty(LayeredOptions.THOROUGHNESS, 1);
+            node.setProperty(LayeredOptions.CROSSING_MINIMIZATION_GREEDY_SWITCH_TYPE, GreedySwitchType.OFF);
+        }
+        for (ElkNode child : node.getChildren()) {
+            applyLargeGraphElkProperties(child);
+        }
+    }
+
     public void drawCell(EDIFHierCellInst cellInst, boolean zoomFit) {
         clear();
         portInstMap.clear();
@@ -180,6 +229,7 @@ public class SchematicScene extends QGraphicsScene {
         elkRoot = createElkRoot(cellInst);
         populateCellContent(cellInst, elkRoot, "");
         elkNodeCellMap.put(elkRoot, cellInst);
+        applyLargeGraphElkProperties(elkRoot);
 
         IGraphLayoutEngine engine = new RecursiveGraphLayoutEngine();
         IElkProgressMonitor monitor = new BasicProgressMonitor();
@@ -206,6 +256,8 @@ public class SchematicScene extends QGraphicsScene {
                 QGraphicsPolygonItem port = addPolygon(portShape, PORT_PEN, PORT_BRUSH);
                 String lookup = NetlistTreeWidget.PORT_ID + hierPortInst.toString();
                 port.setData(0, lookup);
+                port.setData(PICK_PRIORITY, PICK_TOP_PORT);
+                port.setData(UNSELECTED_PEN, PORT_PEN);
                 port.setZValue(1);
                 String portInstName = hierPortInst.getPortInst().getName();
                 port.setToolTip(portInstName + (hierPortInst.isOutput() ? "(Output)" : "(Input)"));
@@ -262,23 +314,26 @@ public class SchematicScene extends QGraphicsScene {
             double y = yOffset + child.getY();
 
             QGraphicsRectItem rect = null;
-            QGraphicsRectItem clickRect = addRect(x, y, child.getWidth(), child.getHeight(), CLICK_PEN, CLICK_BRUSH);
-            ;
+            QPen rectPen = CELL_PEN;
+            int pickPriority = PICK_CELL;
             if (isLeaf) {
                 rect = addRect(x, y, child.getWidth(), child.getHeight(), CELL_PEN, CELL_BRUSH);
-                clickRect.setZValue(6);
             } else {
                 if (isExpanded) {
-                    rect = addRect(x, y, child.getWidth(), child.getHeight(), EXPANDED_HIER_CELL_PEN, EXPANDED_HIER_CELL_BRUSH);
-                    clickRect.setZValue(4);
+                    rectPen = EXPANDED_HIER_CELL_PEN;
+                    rect = addRect(x, y, child.getWidth(), child.getHeight(), rectPen, EXPANDED_HIER_CELL_BRUSH);
+                    // An expanded cell loses clicks to the nets crossing over it
+                    pickPriority = PICK_EXPANDED_CELL;
                 } else {
-                    rect = addRect(x, y, child.getWidth(), child.getHeight(), HIER_CELL_PEN, HIER_CELL_BRUSH);
-                    clickRect.setZValue(6);
+                    rectPen = HIER_CELL_PEN;
+                    rect = addRect(x, y, child.getWidth(), child.getHeight(), rectPen, HIER_CELL_BRUSH);
                 }
                 createHierButton(child, isExpanded, cellInstName, xOffset, yOffset);
             }
             String instLookup = NetlistTreeWidget.INST_ID + child.getIdentifier();
-            clickRect.setData(0, instLookup);
+            rect.setData(0, instLookup);
+            rect.setData(PICK_PRIORITY, pickPriority);
+            rect.setData(UNSELECTED_PEN, rectPen);
             lookupMap.computeIfAbsent(instLookup, l -> new ArrayList<>()).add(rect);
 
             ElkLabel instNameLabel = child.getLabels().get(0); // instance name
@@ -341,21 +396,16 @@ public class SchematicScene extends QGraphicsScene {
         pinLine.setZValue(2);
         String lookup = NetlistTreeWidget.PORT_ID + parentInst + "/" + port.getIdentifier();
         pinLine.setData(0, lookup);
+        pinLine.setData(PICK_PRIORITY, PICK_PIN);
+        pinLine.setData(UNSELECTED_PEN, BLACK_PEN);
         lookupMap.computeIfAbsent(lookup, l -> new ArrayList<>()).add(pinLine);
-        // Add a thick invisible area to make them easier to click on
-        QGraphicsLineItem clickLine = addLine(x1, y, x2, y, CLICK_PEN);
-        clickLine.setZValue(3);
-        clickLine.setData(0, lookup);
-        
+
         if (isExpanded) {
             // Draw inner pins
             x1 = cell.getX() + xOffset + (side == PortSide.EAST ? cell.getWidth() - PIN_LINE_LENGTH : 0);
             x2 = cell.getX() + xOffset + (side == PortSide.EAST ? cell.getWidth() : PIN_LINE_LENGTH);
             QGraphicsLineItem innerPinLine = addLine(x1, y, x2, y, BLACK_PEN);
             innerPinLine.setZValue(2);
-            // Add a thick invisible area to make them easier to click on
-            QGraphicsLineItem innerClickLine = addLine(x1, y, x2, y, CLICK_PEN);
-            innerClickLine.setZValue(2);
         }
     }
 
@@ -369,6 +419,7 @@ public class SchematicScene extends QGraphicsScene {
         QGraphicsPathItem button = addPath(path, BUTTON_PEN, BUTTON_BRUSH);
         String data = HIER_BUTTON + ": " + expandedCellName + " : " + (isExpanded ? "COLLAPSE" : "EXPAND");
         button.setData(0, data);
+        button.setData(PICK_PRIORITY, PICK_BUTTON);
         String tooltip = isExpanded ? "Collapse" : "Expand";
         button.setToolTip(tooltip);
         button.setZValue(10);
@@ -382,6 +433,7 @@ public class SchematicScene extends QGraphicsScene {
         buttonText.setPos(textX, textY);
         buttonText.setZValue(11);
         buttonText.setData(0, data);
+        buttonText.setData(PICK_PRIORITY, PICK_BUTTON);
         buttonText.setToolTip(tooltip);
 
         return button;
@@ -419,20 +471,24 @@ public class SchematicScene extends QGraphicsScene {
                 }
             }
 
-            double lastX = startX;
-            double lastY = startY;
+            // The whole edge is drawn as a single polyline item. Drawing each segment as its own
+            // item is what makes a large schematic expensive, both to create and (because Qt
+            // removes items from the scene one at a time) to tear down on the next draw.
+            QPainterPath path = new QPainterPath();
+            path.moveTo(startX, startY);
+            for (ElkBendPoint bp : s.getBendPoints()) {
+                path.lineTo(bp.getX() + xOffset, bp.getY() + yOffset);
+            }
+            path.lineTo(endX, endY);
+
             String id = e.getIdentifier();
             String lookup = NetlistTreeWidget.NET_ID + (id == null ? "" : id);
-            for (ElkBendPoint bp : s.getBendPoints()) {
-                double bpX = bp.getX() + xOffset;
-                double bpY = bp.getY() + yOffset;
-                drawSegment(lastX, lastY, bpX, bpY, lookup);
-                lastX = bpX;
-                lastY = bpY;
-            }
-
-            // Draw final segment
-            drawSegment(lastX, lastY, endX, endY, lookup);
+            QGraphicsPathItem net = addPath(path, NET_PEN);
+            net.setData(0, lookup);
+            net.setData(PICK_PRIORITY, PICK_NET);
+            net.setData(UNSELECTED_PEN, NET_PEN);
+            net.setZValue(0);
+            lookupMap.computeIfAbsent(lookup, l -> new ArrayList<>()).add(net);
         }
 
         for (ElkNode child : parent.getChildren()) {
@@ -440,18 +496,6 @@ public class SchematicScene extends QGraphicsScene {
                 renderEdges(child, child.getX() + xOffset, child.getY() + yOffset);
             }
         }
-    }
-
-    private void drawSegment(double lastX, double lastY, double endX, double endY, String lookup) {
-        QGraphicsLineItem line = addLine(lastX, lastY, endX, endY, NET_PEN);
-        line.setData(0, lookup);
-        line.setZValue(0);
-        lookupMap.computeIfAbsent(lookup, l -> new ArrayList<>()).add(line);
-        QGraphicsLineItem clickLine = addLine(lastX, lastY, endX, endY, NET_CLICK_PEN);
-        clickLine.setData(0, lookup);
-        clickLine.setData(1, CLICK);
-        clickLine.setZValue(5);
-        lookupMap.computeIfAbsent(lookup, l -> new ArrayList<>()).add(clickLine);
     }
 
     private QPointF getTopPortConnectionPoint(ElkNode port, boolean isOutput) {
@@ -693,9 +737,37 @@ public class SchematicScene extends QGraphicsScene {
         label.setDimensions(fm.width(label.getText()), fm.height());
     }
 
+    /**
+     * Finds the clickable item nearest the provided point. Items are searched within
+     * {@link #PICK_TOLERANCE} of the point so that thin items (nets and pins) don't have to be hit
+     * exactly, and the candidate with the highest {@link #PICK_PRIORITY} wins.
+     *
+     * @param pos The point clicked on, in scene coordinates.
+     * @return The item that should receive the click, or null if there isn't one.
+     */
+    private QGraphicsItemInterface pickItem(QPointF pos) {
+        QRectF box = new QRectF(pos.x() - PICK_TOLERANCE, pos.y() - PICK_TOLERANCE, 2 * PICK_TOLERANCE,
+                2 * PICK_TOLERANCE);
+        QGraphicsItemInterface picked = null;
+        int pickedPriority = Integer.MIN_VALUE;
+        // items() returns descending stacking order, so keeping the first item found at a given
+        // priority also keeps the top-most of any items that tie
+        for (QGraphicsItemInterface item : items(box, ItemSelectionMode.IntersectsItemShape)) {
+            Object priority = item.data(PICK_PRIORITY);
+            if (priority == null || item.data(0) == null) {
+                continue;
+            }
+            if ((Integer) priority > pickedPriority) {
+                pickedPriority = (Integer) priority;
+                picked = item;
+            }
+        }
+        return picked;
+    }
+
     public void mousePressEvent(QGraphicsSceneMouseEvent event) {
-        QGraphicsItemInterface item = itemAt(event.scenePos());
-        if (item != null && item.data(0) != null) {
+        QGraphicsItemInterface item = pickItem(event.scenePos());
+        if (item != null) {
             String data = item.data(0).toString();
             if (data.startsWith(HIER_BUTTON)) {
                 String[] parts = data.split(":");
@@ -755,22 +827,10 @@ public class SchematicScene extends QGraphicsScene {
         for (Object guiObject : guiObjects == null ? Collections.EMPTY_LIST : guiObjects) {
             if (guiObject instanceof QAbstractGraphicsShapeItem) {
                 QAbstractGraphicsShapeItem shape = (QAbstractGraphicsShapeItem) guiObject;
-                if (isSelected) {
-                    if (shape.data(1) == null || !shape.data(1).toString().equals(CLICK)) {
-                        shape.setPen(SELECTED_PEN);
-                    }
-                } else {
-                    if (lookup.startsWith("INST:")) {
-                        shape.setPen(CELL_PEN);
-                    } else if (lookup.startsWith(NetlistTreeWidget.PORT_ID)) {
-                        shape.setPen(PORT_PEN);
-                    }
-                }
+                shape.setPen(isSelected ? SELECTED_PEN : (QPen) shape.data(UNSELECTED_PEN));
             } else if (guiObject instanceof QGraphicsLineItem) {
                 QGraphicsLineItem line = (QGraphicsLineItem) guiObject;
-                if (line.data(1) == null || !line.data(1).toString().equals(CLICK)) {
-                    line.setPen(isSelected ? SELECTED_PEN : NET_PEN);
-                }
+                line.setPen(isSelected ? SELECTED_PEN : (QPen) line.data(UNSELECTED_PEN));
             }
 
         }
