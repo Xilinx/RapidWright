@@ -72,6 +72,7 @@ import com.trolltech.qt.gui.QGraphicsScene;
 import com.trolltech.qt.gui.QGraphicsSceneMouseEvent;
 import com.trolltech.qt.gui.QGraphicsSimpleTextItem;
 import com.trolltech.qt.gui.QPainterPath;
+import com.trolltech.qt.gui.QPainterPath_Element;
 import com.trolltech.qt.gui.QPen;
 import com.trolltech.qt.gui.QPolygonF;
 import com.xilinx.rapidwright.edif.EDIFCell;
@@ -750,6 +751,7 @@ public class SchematicScene extends QGraphicsScene {
                 2 * PICK_TOLERANCE);
         QGraphicsItemInterface picked = null;
         int pickedPriority = Integer.MIN_VALUE;
+        double pickedDistance = 0.0;
         // items() returns descending stacking order, so keeping the first item found at a given
         // priority also keeps the top-most of any items that tie
         for (QGraphicsItemInterface item : items(box, ItemSelectionMode.IntersectsItemShape)) {
@@ -757,12 +759,59 @@ public class SchematicScene extends QGraphicsScene {
             if (priority == null || item.data(0) == null) {
                 continue;
             }
-            if ((Integer) priority > pickedPriority) {
+            double distance = 0.0;
+            if ((Integer) priority == PICK_NET) {
+                // Qt hit tests a path item by filling its path, and an open polyline gets
+                // implicitly closed -- so the box test above reports a net as hit anywhere inside
+                // the area its route encloses, which can be most of the schematic. Measure the
+                // real distance to the wire instead, and among the nets that are actually within
+                // reach let the closest one win.
+                distance = distanceToRoute(((QGraphicsPathItem) item).path(), pos.x(), pos.y());
+                if (distance > PICK_TOLERANCE) {
+                    continue;
+                }
+            }
+            if ((Integer) priority > pickedPriority
+                    || ((Integer) priority == pickedPriority && distance < pickedDistance)) {
                 pickedPriority = (Integer) priority;
+                pickedDistance = distance;
                 picked = item;
             }
         }
         return picked;
+    }
+
+    /**
+     * Gets the shortest distance from a point to a net's route.
+     *
+     * @param route The net's route, as the polyline drawn for it.
+     * @param x     X coordinate of the point.
+     * @param y     Y coordinate of the point.
+     * @return The distance from the point to the nearest segment of the route.
+     */
+    private static double distanceToRoute(QPainterPath route, double x, double y) {
+        double closest = Double.MAX_VALUE;
+        int count = route.elementCount();
+        for (int i = 1; i < count; i++) {
+            QPainterPath_Element from = route.elementAt(i - 1);
+            QPainterPath_Element to = route.elementAt(i);
+            if (!to.isLineTo()) {
+                // Net routes are polylines, so anything else is a new sub path with no segment
+                continue;
+            }
+            closest = Math.min(closest, distanceToSegment(from.x(), from.y(), to.x(), to.y(), x, y));
+        }
+        return closest;
+    }
+
+    private static double distanceToSegment(double x1, double y1, double x2, double y2, double x, double y) {
+        double dx = x2 - x1;
+        double dy = y2 - y1;
+        double lengthSquared = dx * dx + dy * dy;
+        // Project the point onto the segment, clamping to its end points
+        double t = lengthSquared == 0.0 ? 0.0 : ((x - x1) * dx + (y - y1) * dy) / lengthSquared;
+        t = Math.max(0.0, Math.min(1.0, t));
+        return Math.hypot(x - (x1 + t * dx), y - (y1 + t * dy));
     }
 
     public void mousePressEvent(QGraphicsSceneMouseEvent event) {
