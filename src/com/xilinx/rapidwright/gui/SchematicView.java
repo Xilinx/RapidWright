@@ -39,6 +39,7 @@ import com.trolltech.qt.gui.QGraphicsView;
 import com.trolltech.qt.gui.QKeyEvent;
 import com.trolltech.qt.gui.QMenu;
 import com.trolltech.qt.gui.QMouseEvent;
+import com.trolltech.qt.gui.QResizeEvent;
 import com.trolltech.qt.gui.QWheelEvent;
 
 public class SchematicView extends QGraphicsView {
@@ -56,6 +57,26 @@ public class SchematicView extends QGraphicsView {
 
     public SchematicView(QGraphicsScene scene) {
         super(scene);
+    }
+
+    /**
+     * Tells the scene which part of it is on screen now. On a large schematic the scene only
+     * creates the items the view can see, so it has to be told whenever the view moves or resizes.
+     */
+    private void viewportChanged() {
+        if (scene() instanceof SchematicScene) {
+            ((SchematicScene) scene()).viewportChanged();
+        }
+    }
+
+    protected void scrollContentsBy(int dx, int dy) {
+        super.scrollContentsBy(dx, dy);
+        viewportChanged();
+    }
+
+    protected void resizeEvent(QResizeEvent event) {
+        super.resizeEvent(event);
+        viewportChanged();
     }
 
     /**
@@ -117,7 +138,9 @@ public class SchematicView extends QGraphicsView {
             if (!fileName.toLowerCase().endsWith(".svg")) {
                 fileName += ".svg";
             }
+            renderWholeScene();
             UiTools.saveAsSvg(scene(), new File(fileName));
+            viewportChanged();
         }
     }
 
@@ -131,7 +154,19 @@ public class SchematicView extends QGraphicsView {
             if (!fileName.toLowerCase().endsWith(".pdf")) {
                 fileName += ".pdf";
             }
+            renderWholeScene();
             UiTools.saveAsPdf(scene(), new File(fileName));
+            viewportChanged();
+        }
+    }
+
+    /**
+     * Makes sure every item exists before an export, since the scene may only be holding the items
+     * that are currently on screen.
+     */
+    private void renderWholeScene() {
+        if (scene() instanceof SchematicScene) {
+            ((SchematicScene) scene()).renderAll();
         }
     }
 
@@ -187,6 +222,7 @@ public class SchematicView extends QGraphicsView {
                 pointBeforeScale.y() - pointAfterScale.y());
         this.horizontalScrollBar().setValue((int) (this.horizontalScrollBar().value() + zoom * offset.x()));
         this.verticalScrollBar().setValue((int) (this.verticalScrollBar().value() + zoom * offset.y()));
+        viewportChanged();
     }
 
     /**
@@ -205,18 +241,21 @@ public class SchematicView extends QGraphicsView {
             if (this.matrix().m11() > zoomMin)
                 scale(1.0 / scaleFactor, 1.0 / scaleFactor);
         }
+        viewportChanged();
     }
 
     public void zoomIn() {
         // Zoom in (if not at limit)
         if (this.matrix().m11() < zoomMax)
             scale(scaleFactor, scaleFactor);
+        viewportChanged();
     }
 
     public void zoomOut() {
         // Zoom out (if not at limit)
         if (this.matrix().m11() > zoomMin)
             scale(1.0 / scaleFactor, 1.0 / scaleFactor);
+        viewportChanged();
     }
 
     public void zoomToFit() {
@@ -233,6 +272,7 @@ public class SchematicView extends QGraphicsView {
                 scale(zoomMin, zoomMin);
                 fitInView(sceneRect, AspectRatioMode.KeepAspectRatio);
             }
+            viewportChanged();
         }
     }
 }

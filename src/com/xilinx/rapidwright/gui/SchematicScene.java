@@ -71,6 +71,7 @@ import com.trolltech.qt.gui.QGraphicsRectItem;
 import com.trolltech.qt.gui.QGraphicsScene;
 import com.trolltech.qt.gui.QGraphicsSceneMouseEvent;
 import com.trolltech.qt.gui.QGraphicsSimpleTextItem;
+import com.trolltech.qt.gui.QGraphicsView;
 import com.trolltech.qt.gui.QPainterPath;
 import com.trolltech.qt.gui.QPainterPath_Element;
 import com.trolltech.qt.gui.QPen;
@@ -96,6 +97,18 @@ public class SchematicScene extends QGraphicsScene {
     private Map<ElkNode, EDIFHierPortInst> elkNodeTopPortMap = new HashMap<>();
     private Map<ElkNode, EDIFHierCellInst> elkNodeCellMap = new HashMap<>();
     private Map<String, List<Object>> lookupMap = new HashMap<>();
+    private Map<ElkPort, String> unroutedNets = new HashMap<>();
+
+    /** Region of the scene currently rendered, or null if nothing has been rendered yet */
+    private QRectF renderedRegion;
+    /** View zoom the current items were rendered for, which decides the level of detail */
+    private double renderedZoom = 1.0;
+    /** Set while rendering the whole schematic regardless of the view (used when exporting) */
+    private boolean renderEverything;
+    /** Rough number of items the whole schematic would need, from the laid out ELK graph */
+    private int estimatedItemCount;
+    /** Set while the view is being repositioned, so a move only causes one render, not one per step */
+    private boolean deferRendering;
     private Set<String> expandedCellInsts = new HashSet<>();
     private Set<String> selectedObjects = new HashSet<>();
 
@@ -114,6 +127,8 @@ public class SchematicScene extends QGraphicsScene {
     private static final QPen PORT_PEN = BLACK_PEN;
     private static final QPen NET_PEN = new QPen(new QColor(91, 203, 75));
     private static final QPen SELECTED_PEN = new QPen(new QColor(0, 0, 255), 3);
+    private static final QBrush SELECTED_BRUSH = new QBrush(new QColor(0, 0, 255));
+    private static final QBrush NET_BRUSH = new QBrush(new QColor(91, 203, 75));
 
     private static final QBrush CELL_BRUSH = new QBrush(new QColor(255, 255, 210));
     private static final QPen CELL_PEN = new QPen(QColor.black);
@@ -180,6 +195,31 @@ public class SchematicScene extends QGraphicsScene {
      */
     private static final int LARGE_GRAPH_NODE_THRESHOLD = 200;
 
+    /**
+     * Maximum number of connections a net may have before it is drawn as a name on each of its pins
+     * instead of being routed. A net that reaches most of the cell (a clock, a reset, VCC or GND)
+     * shows the reader very little, and it is what makes ELK's orthogonal edge routing--which is
+     * quadratic in the number of edges sharing a layer--dominate the runtime. Leaving clk and reset
+     * unrouted took edge routing on one design from 7.99s to 0.63s, because those two nets alone
+     * were tying the whole schematic into a single connected component.
+     */
+    private static final int MAX_ROUTED_FANOUT = 100;
+
+    /**
+     * Number of graphics items above which the scene switches to rendering only what the view can
+     * actually see. Below this it renders everything once, exactly as it always has, so ordinary
+     * schematics look identical and never pay for a re-render while panning.
+     */
+    private static final int VIEWPORT_RENDERING_THRESHOLD = 20000;
+    /** Zoom below which text is too small to read, so labels are not created */
+    private static final double MIN_LABEL_ZOOM = 0.4;
+    /** Zoom below which pin lines are a fraction of a pixel, so they are not created */
+    private static final double MIN_PIN_ZOOM = 0.25;
+    /** How much viewport-sized padding to render around the view, so small pans need no re-render */
+    private static final double VIEWPORT_MARGIN = 1.0;
+    /** Slack added when testing an object against the rendered region, to cover its outside labels */
+    private static final double CULL_MARGIN = 250.0;
+
     public SchematicScene(EDIFNetlist netlist) {
         super();
         this.netlist = netlist;
@@ -225,7 +265,9 @@ public class SchematicScene extends QGraphicsScene {
         elkNodeTopPortMap.clear();
         elkNodeCellMap.clear();
         lookupMap.clear();
+        unroutedNets.clear();
         selectedObjects.clear();
+        renderedRegion = null;
         this.currCellInst = cellInst;
         elkRoot = createElkRoot(cellInst);
         populateCellContent(cellInst, elkRoot, "");
@@ -236,23 +278,144 @@ public class SchematicScene extends QGraphicsScene {
         IElkProgressMonitor monitor = new BasicProgressMonitor();
         engine.layout(elkRoot, monitor);
 
-        renderSchematic();
+        estimatedItemCount = estimateItemCount(elkRoot);
+        double extraWidthBuffer = elkRoot.getWidth() * 0.25 + 100;
+        double extraHeightBuffer = elkRoot.getHeight() * 0.25 + 100;
+        setSceneRect(new QRectF(new QPointF(0, 0),
+                new QSizeF(elkRoot.getWidth() + extraWidthBuffer, elkRoot.getHeight() + extraHeightBuffer)));
+
+        // Let the view fit the new schematic first so that, on a large cell, the region rendered
+        // below is the one the user is about to be looking at. Fitting scrolls the view several
+        // times, so hold off rendering until it has settled.
         if (zoomFit) {
-            cellDrawn.emit();
+            deferRendering = true;
+            try {
+                cellDrawn.emit();
+            } finally {
+                deferRendering = false;
+            }
+        }
+        renderVisible();
+    }
+
+    /**
+     * Estimates how many graphics items drawing the whole schematic would take, matching what
+     * renderNode()/renderEdges() create: a rectangle and two labels per cell, a line and a label
+     * per pin, and one polyline per routed net.
+     *
+     * @param node Root of the laid out graph.
+     * @return The estimated item count.
+     */
+    private static int estimateItemCount(ElkNode node) {
+        int count = node.getContainedEdges().size();
+        for (ElkNode child : node.getChildren()) {
+            count += 3 + 2 * child.getPorts().size() + estimateItemCount(child);
+        }
+        return count;
+    }
+
+    /** Whether this schematic is big enough to be worth rendering a piece at a time */
+    private boolean isViewportRendered() {
+        return !renderEverything && estimatedItemCount > VIEWPORT_RENDERING_THRESHOLD && !views().isEmpty();
+    }
+
+    /**
+     * Called by {@link SchematicView} whenever the visible part of the scene changes. Re-renders
+     * only when the view has moved outside the region that was rendered, or zoomed far enough to
+     * change the level of detail, so that ordinary panning costs nothing.
+     */
+    public void viewportChanged() {
+        if (elkRoot != null && !deferRendering) {
+            renderVisible();
         }
     }
 
+    /**
+     * Renders the whole schematic at full detail no matter how the view is positioned. Used when
+     * exporting, where the output must contain everything rather than what happens to be on screen.
+     */
+    public void renderAll() {
+        renderEverything = true;
+        try {
+            renderedRegion = null;
+            renderVisible();
+        } finally {
+            renderEverything = false;
+        }
+    }
+
+    /** The part of the scene the view can currently see, or the whole scene if there is no view */
+    private QRectF visibleSceneRect() {
+        if (views().isEmpty()) {
+            return sceneRect();
+        }
+        QGraphicsView view = views().get(0);
+        return view.mapToScene(view.viewport().rect()).boundingRect();
+    }
+
+    private double currentZoom() {
+        return views().isEmpty() ? 1.0 : views().get(0).matrix().m11();
+    }
+
+    private void renderVisible() {
+        QRectF region;
+        double zoom;
+        if (isViewportRendered()) {
+            QRectF visible = visibleSceneRect();
+            zoom = currentZoom();
+            // Nothing to do while the view stays inside what is already drawn at this detail level
+            if (renderedRegion != null && renderedRegion.contains(visible)
+                    && detailLevel(zoom) == detailLevel(renderedZoom)) {
+                return;
+            }
+            double marginX = visible.width() * VIEWPORT_MARGIN;
+            double marginY = visible.height() * VIEWPORT_MARGIN;
+            region = new QRectF(visible.x() - marginX, visible.y() - marginY,
+                    visible.width() + 2 * marginX, visible.height() + 2 * marginY);
+        } else {
+            if (renderedRegion != null) {
+                return;
+            }
+            region = null;
+            zoom = 1.0;
+        }
+
+        clear();
+        lookupMap.clear();
+        renderedRegion = region;
+        renderedZoom = zoom;
+        renderSchematic();
+        // Items are recreated on every re-render, so the highlight has to be put back on
+        for (String selected : selectedObjects) {
+            updateSelectionHighlight(selected, true);
+        }
+    }
+
+    /** Coarse detail level for a zoom, so a re-render only happens when the level actually changes */
+    private static int detailLevel(double zoom) {
+        return (zoom >= MIN_LABEL_ZOOM ? 2 : 0) + (zoom >= MIN_PIN_ZOOM ? 1 : 0);
+    }
+
+    private boolean showLabels() {
+        return renderedRegion == null || renderedZoom >= MIN_LABEL_ZOOM;
+    }
+
+    private boolean showPins() {
+        return renderedRegion == null || renderedZoom >= MIN_PIN_ZOOM;
+    }
+
+    /** Whether an object at these scene coordinates is inside the region being rendered */
+    private boolean isRendered(double x, double y, double width, double height) {
+        return renderedRegion == null || renderedRegion.intersects(
+                new QRectF(x - CULL_MARGIN, y - CULL_MARGIN, width + 2 * CULL_MARGIN, height + 2 * CULL_MARGIN));
+    }
+
     public void renderSchematic() {
-        double extraWidthBuffer = elkRoot.getWidth() * 0.25 + 100;
-        double extraHeightBuffer = elkRoot.getHeight() * 0.25 + 100;
-        QSizeF size = new QSizeF(elkRoot.getWidth() + extraWidthBuffer, elkRoot.getHeight() + extraHeightBuffer);
-
-        setSceneRect(new QRectF(new QPointF(0, 0), size));
-
         // We create arrow-shaped top port ElkNodes to serve as targets for top ports
         for (ElkNode topPort : elkRoot.getChildren()) {
             EDIFHierPortInst hierPortInst = elkNodeTopPortMap.get(topPort);
-            if (hierPortInst != null) {
+            if (hierPortInst != null
+                    && isRendered(topPort.getX(), topPort.getY(), topPort.getWidth(), topPort.getHeight())) {
                 QPolygonF portShape = createPortShape(topPort, hierPortInst.isOutput());
                 QGraphicsPolygonItem port = addPolygon(portShape, PORT_PEN, PORT_BRUSH);
                 String lookup = NetlistTreeWidget.PORT_ID + hierPortInst.toString();
@@ -265,6 +428,9 @@ public class SchematicScene extends QGraphicsScene {
                 port.setAcceptsHoverEvents(true);
                 lookupMap.computeIfAbsent(lookup, l -> new ArrayList<>()).add(port);
 
+                if (!showLabels()) {
+                    continue;
+                }
                 QGraphicsSimpleTextItem portLabel = addSimpleText(portInstName);
                 portLabel.setBrush(BLACK_BRUSH);
                 portLabel.setFont(FONT);
@@ -314,6 +480,11 @@ public class SchematicScene extends QGraphicsScene {
             double x = xOffset + child.getX();
             double y = yOffset + child.getY();
 
+            if (!isRendered(x, y, child.getWidth(), child.getHeight())) {
+                // ELK keeps a node's children inside it, so skipping it skips its whole subtree
+                continue;
+            }
+
             QGraphicsRectItem rect = null;
             QPen rectPen = CELL_PEN;
             int pickPriority = PICK_CELL;
@@ -340,29 +511,22 @@ public class SchematicScene extends QGraphicsScene {
             ElkLabel instNameLabel = child.getLabels().get(0); // instance name
             ElkLabel cellTypeLabel = child.getLabels().get(1); // cell type
 
-            // Instance name centered above cell rectangle
-            QGraphicsSimpleTextItem instLabel = addSimpleText(instNameLabel.getText());
-            instLabel.setBrush(BLACK_BRUSH);
-            instLabel.setFont(FONT);
-            double instLabelX = x + (child.getWidth() - instLabel.boundingRect().width()) / 2.0;
-            double instLabelY = y - instLabel.boundingRect().height();
-            instLabel.setPos(instLabelX, instLabelY - LABEL_BUFFER);
-            instLabel.setZValue(5);
-
-            // Cell type centered below cell rectangle
-            QGraphicsSimpleTextItem cellLabel = addSimpleText(cellTypeLabel.getText());
-            cellLabel.setBrush(BLACK_BRUSH);
-            cellLabel.setFont(FONT);
-            double cellLabelX = x + (child.getWidth() - cellLabel.boundingRect().width()) / 2.0;
-            double cellLabelY = y + child.getHeight();
-            cellLabel.setPos(cellLabelX, cellLabelY + LABEL_BUFFER);
-            cellLabel.setZValue(5);
+            if (showLabels()) {
+                drawCellLabels(instNameLabel.getText(), cellTypeLabel.getText(), x, y, child.getWidth(),
+                        child.getHeight());
+            }
 
             for (ElkPort port : child.getPorts()) {
+                if (!showPins()) {
+                    break;
+                }
                 double yPort = y + port.getY() + port.getHeight() / 2.0;
                 PortSide side = port.getProperty(CoreOptions.PORT_SIDE);
                 drawPin(child, port, yPort, side, isExpanded, xOffset, child.getIdentifier());
-                                
+
+                if (!showLabels()) {
+                    continue;
+                }
                 QGraphicsSimpleTextItem pinLabel = addSimpleText(port.getIdentifier());
                 pinLabel.setBrush(BLACK_BRUSH);
                 pinLabel.setFont(FONT);
@@ -380,12 +544,76 @@ public class SchematicScene extends QGraphicsScene {
                     labelY = yPort - textHeight / 2.0;
                 }
                 pinLabel.setPos(labelX, labelY);
+
+                String unroutedNet = unroutedNets.get(port);
+                if (unroutedNet != null) {
+                    drawUnroutedNetName(unroutedNet, elkNodeCellMap.get(parent), x, yPort, side,
+                            child.getWidth());
+                }
             }
 
             if (child.getChildren().size() > 0) {
                 renderNode(child, x, y, prefix + relCellInstName + "/");
             }
         }
+    }
+
+    /**
+     * Draws a cell's instance name above it and its cell type below it.
+     *
+     * @param instName Name of the instance.
+     * @param cellName Name of the instance's cell type.
+     * @param x        X coordinate of the cell.
+     * @param y        Y coordinate of the cell.
+     * @param width    Width of the cell.
+     * @param height   Height of the cell.
+     */
+    private void drawCellLabels(String instName, String cellName, double x, double y, double width,
+            double height) {
+        QGraphicsSimpleTextItem instLabel = addSimpleText(instName);
+        instLabel.setBrush(BLACK_BRUSH);
+        instLabel.setFont(FONT);
+        instLabel.setPos(x + (width - instLabel.boundingRect().width()) / 2.0,
+                y - instLabel.boundingRect().height() - LABEL_BUFFER);
+        instLabel.setZValue(5);
+
+        QGraphicsSimpleTextItem cellLabel = addSimpleText(cellName);
+        cellLabel.setBrush(BLACK_BRUSH);
+        cellLabel.setFont(FONT);
+        cellLabel.setPos(x + (width - cellLabel.boundingRect().width()) / 2.0, y + height + LABEL_BUFFER);
+        cellLabel.setZValue(5);
+    }
+
+    /**
+     * Draws the name of a net that was not routed (see {@link #MAX_ROUTED_FANOUT}) just beyond the
+     * pin it connects to, so the connection is still readable. The label is registered under the
+     * net's usual lookup, so selecting the net in the tree browser highlights every pin it reaches.
+     *
+     * @param netName    Name of the unrouted net.
+     * @param parentInst The cell instance that owns the net.
+     * @param cellX      X coordinate of the cell the pin belongs to.
+     * @param pinY       Y coordinate of the pin.
+     * @param side       Side of the cell the pin is on.
+     * @param cellWidth  Width of the cell the pin belongs to.
+     */
+    private void drawUnroutedNetName(String netName, EDIFHierCellInst parentInst, double cellX, double pinY,
+            PortSide side, double cellWidth) {
+        QGraphicsSimpleTextItem netLabel = addSimpleText(netName);
+        netLabel.setBrush(NET_BRUSH);
+        netLabel.setFont(FONT);
+        netLabel.setZValue(5);
+        double textWidth = netLabel.boundingRect().width();
+        double textHeight = netLabel.boundingRect().height();
+        // Sits just past the end of the pin line, where the wire would otherwise have gone
+        double labelX = side == PortSide.EAST ? cellX + cellWidth + PIN_LINE_LENGTH + LABEL_BUFFER
+                : cellX - PIN_LINE_LENGTH - textWidth - LABEL_BUFFER;
+        netLabel.setPos(labelX, pinY - textHeight / 2.0);
+        netLabel.setToolTip(netName + " (not routed, too many connections)");
+
+        String lookup = NetlistTreeWidget.NET_ID + netId(parentInst, netName);
+        netLabel.setData(0, lookup);
+        netLabel.setData(PICK_PRIORITY, PICK_NET);
+        lookupMap.computeIfAbsent(lookup, l -> new ArrayList<>()).add(netLabel);
     }
 
     private void drawPin(ElkNode cell, ElkPort port, double y, PortSide side, boolean isExpanded, double xOffset, String parentInst) {
@@ -481,6 +709,11 @@ public class SchematicScene extends QGraphicsScene {
                 path.lineTo(bp.getX() + xOffset, bp.getY() + yOffset);
             }
             path.lineTo(endX, endY);
+
+            if (!isRendered(path.boundingRect().x(), path.boundingRect().y(), path.boundingRect().width(),
+                    path.boundingRect().height())) {
+                continue;
+            }
 
             String id = e.getIdentifier();
             String lookup = NetlistTreeWidget.NET_ID + (id == null ? "" : id);
@@ -653,6 +886,18 @@ public class SchematicScene extends QGraphicsScene {
                 }
             }
 
+            if ((long) drivers.size() * sinks.size() > MAX_ROUTED_FANOUT) {
+                // Too expensive to route and not worth reading (see MAX_ROUTED_FANOUT); the net
+                // name is drawn on each of its pins by renderNode() instead
+                for (EDIFHierPortInst p : drivers) {
+                    markUnroutedNet(p, net, prefix, instNodeMap, cellInst);
+                }
+                for (EDIFHierPortInst p : sinks) {
+                    markUnroutedNet(p, net, prefix, instNodeMap, cellInst);
+                }
+                continue;
+            }
+
             for (EDIFHierPortInst d : drivers) {
                 ElkPort driver = getOrCreateElkPort(d, prefix, instNodeMap, cellInst);
                 for (EDIFHierPortInst s : sinks) {
@@ -662,8 +907,7 @@ public class SchematicScene extends QGraphicsScene {
 
                     ElkEdge edge = ElkGraphFactory.eINSTANCE.createElkEdge();
                     edge.setContainingNode(parent);
-                    String id = cellInst.isTopLevelInst() ? net.getName() : (cellInst + "/" + net.getName());
-                    edge.setIdentifier(id);
+                    edge.setIdentifier(netId(cellInst, net.getName()));
                     edge.getSources().add(driver);
                     edge.getTargets().add(sink);
                     parent.getContainedEdges().add(edge);
@@ -685,6 +929,31 @@ public class SchematicScene extends QGraphicsScene {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Builds the identifier a net is known by within the cell being drawn. Shared by the routed
+     * edges and by the net names drawn on the pins of unrouted nets so both resolve to the same
+     * entry in {@link #lookupMap}.
+     *
+     * @param cellInst The cell instance the net belongs to.
+     * @param netName  Name of the net within that cell.
+     * @return The net's identifier.
+     */
+    private static String netId(EDIFHierCellInst cellInst, String netName) {
+        return cellInst.isTopLevelInst() ? netName : (cellInst + "/" + netName);
+    }
+
+    /**
+     * Records that a port is on a net which is not going to be routed, so that renderNode() can
+     * draw the net's name beside the pin.
+     */
+    private void markUnroutedNet(EDIFHierPortInst portInst, EDIFNet net, String prefix,
+            Map<EDIFHierCellInst, ElkNode> instNodeMap, EDIFHierCellInst cellInst) {
+        ElkPort port = getOrCreateElkPort(portInst, prefix, instNodeMap, cellInst);
+        if (port != null) {
+            unroutedNets.put(port, net.getName());
         }
     }
 
@@ -760,12 +1029,13 @@ public class SchematicScene extends QGraphicsScene {
                 continue;
             }
             double distance = 0.0;
-            if ((Integer) priority == PICK_NET) {
+            if ((Integer) priority == PICK_NET && item instanceof QGraphicsPathItem) {
                 // Qt hit tests a path item by filling its path, and an open polyline gets
                 // implicitly closed -- so the box test above reports a net as hit anywhere inside
                 // the area its route encloses, which can be most of the schematic. Measure the
                 // real distance to the wire instead, and among the nets that are actually within
-                // reach let the closest one win.
+                // reach let the closest one win. (An unrouted net is a text label rather than a
+                // path, and is hit tested normally.)
                 distance = distanceToRoute(((QGraphicsPathItem) item).path(), pos.x(), pos.y());
                 if (distance > PICK_TOLERANCE) {
                     continue;
@@ -867,14 +1137,89 @@ public class SchematicScene extends QGraphicsScene {
         if (clearPreviousSelections) {
             clearSelection();
         }
+        scrollTo(lookup);
         selectedObjects.remove(lookup);
         toggleSelection(lookup, !clearPreviousSelections);
+    }
+
+    /**
+     * Brings an object into view when it is not currently drawn. On a large schematic only the
+     * visible part of the scene has graphics items, so selecting something from the tree browser
+     * has to move the view to it (which makes it get rendered) before it can be highlighted.
+     *
+     * @param lookup The object to scroll to.
+     */
+    private void scrollTo(String lookup) {
+        if (elkRoot == null || lookupMap.containsKey(lookup) || views().isEmpty()) {
+            return;
+        }
+        QRectF bounds = findBounds(elkRoot, 0, 0, lookup);
+        if (bounds == null) {
+            return;
+        }
+        QGraphicsView view = views().get(0);
+        deferRendering = true;
+        try {
+            // Pins and labels only exist once zoomed in far enough to read them
+            if (currentZoom() < MIN_LABEL_ZOOM) {
+                view.resetMatrix();
+                view.scale(MIN_LABEL_ZOOM, MIN_LABEL_ZOOM);
+            }
+            view.centerOn(bounds.center());
+        } finally {
+            deferRendering = false;
+        }
+        renderVisible();
+    }
+
+    /**
+     * Searches the laid out graph for the object a lookup refers to, converting ELK's per parent
+     * coordinates into scene coordinates on the way down.
+     *
+     * @param parent  Node to search within.
+     * @param xOffset Scene X coordinate of parent.
+     * @param yOffset Scene Y coordinate of parent.
+     * @param lookup  The object being looked for.
+     * @return The object's bounds in scene coordinates, or null if it isn't in this subtree.
+     */
+    private QRectF findBounds(ElkNode parent, double xOffset, double yOffset, String lookup) {
+        for (ElkEdge edge : parent.getContainedEdges()) {
+            String id = edge.getIdentifier();
+            if (id != null && lookup.equals(NetlistTreeWidget.NET_ID + id) && !edge.getSections().isEmpty()) {
+                ElkEdgeSection section = edge.getSections().get(0);
+                return new QRectF(xOffset + section.getStartX(), yOffset + section.getStartY(), 1, 1);
+            }
+        }
+        for (ElkNode child : parent.getChildren()) {
+            double x = xOffset + child.getX();
+            double y = yOffset + child.getY();
+            if (lookup.equals(NetlistTreeWidget.INST_ID + child.getIdentifier())) {
+                return new QRectF(x, y, child.getWidth(), child.getHeight());
+            }
+            EDIFHierPortInst topPortInst = elkNodeTopPortMap.get(child);
+            if (topPortInst != null && lookup.equals(NetlistTreeWidget.PORT_ID + topPortInst.toString())) {
+                return new QRectF(x, y, child.getWidth(), child.getHeight());
+            }
+            for (ElkPort port : child.getPorts()) {
+                if (lookup.equals(NetlistTreeWidget.PORT_ID + child.getIdentifier() + "/" + port.getIdentifier())) {
+                    return new QRectF(x + port.getX(), y + port.getY(), port.getWidth(), port.getHeight());
+                }
+            }
+            QRectF found = findBounds(child, x, y, lookup);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
     }
 
     private void updateSelectionHighlight(String lookup, boolean isSelected) {
         List<Object> guiObjects = lookupMap.get(lookup);
         for (Object guiObject : guiObjects == null ? Collections.EMPTY_LIST : guiObjects) {
-            if (guiObject instanceof QAbstractGraphicsShapeItem) {
+            if (guiObject instanceof QGraphicsSimpleTextItem) {
+                // The net names drawn for unrouted nets are the only selectable text items
+                ((QGraphicsSimpleTextItem) guiObject).setBrush(isSelected ? SELECTED_BRUSH : NET_BRUSH);
+            } else if (guiObject instanceof QAbstractGraphicsShapeItem) {
                 QAbstractGraphicsShapeItem shape = (QAbstractGraphicsShapeItem) guiObject;
                 shape.setPen(isSelected ? SELECTED_PEN : (QPen) shape.data(UNSELECTED_PEN));
             } else if (guiObject instanceof QGraphicsLineItem) {
