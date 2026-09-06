@@ -48,15 +48,40 @@ public class SchematicView extends QGraphicsView {
     private QPoint lastPan;
     private static final int PAN_THRESHOLD = 5;
 
-    /** The maximum value to which we can zoom out */
+    /**
+     * The maximum value to which we can zoom out, for a schematic small enough that this still
+     * shows all of it. Large schematics are fitted at a much smaller zoom than this, so the real
+     * limit is worked out per schematic by {@link #minimumZoom()}.
+     */
     protected static double zoomMin = 0.05;
     /** The maximum value to which we can zoom in */
     protected static double zoomMax = 30;
     /** The rate at which we zoom */
     protected static double scaleFactor = 1.15;
+    /** How far beyond "the whole schematic just fits" zooming out is allowed to go */
+    private static final double ZOOM_OUT_PAST_FIT = 0.5;
 
     public SchematicView(QGraphicsScene scene) {
         super(scene);
+    }
+
+    /**
+     * The furthest the view may zoom out. A big schematic is fitted at a far smaller zoom than
+     * {@link #zoomMin} -- some are fitted below 0.001 -- so a fixed limit would let the user zoom
+     * in and then leave them unable to get back out far enough to see the whole cell again.
+     *
+     * @return The smallest allowed zoom for the schematic currently in the scene.
+     */
+    private double minimumZoom() {
+        QRectF sceneRect = scene() == null ? null : scene().sceneRect();
+        if (sceneRect == null || sceneRect.width() <= 0 || sceneRect.height() <= 0
+                || viewport().width() <= 0 || viewport().height() <= 0) {
+            return zoomMin;
+        }
+        double fit = Math.min(viewport().width() / sceneRect.width(),
+                viewport().height() / sceneRect.height());
+        // Never tighter than zoomMin, so small schematics keep behaving as they always have
+        return Math.min(zoomMin, fit * ZOOM_OUT_PAST_FIT);
     }
 
     /**
@@ -207,7 +232,7 @@ public class SchematicView extends QGraphicsView {
                 scale(scaleFactor, scaleFactor);
         } else {
             // Zoom out (if not at limit)
-            if (zoom > zoomMin)
+            if (zoom > minimumZoom())
                 scale(1.0 / scaleFactor, 1.0 / scaleFactor);
         }
 
@@ -245,7 +270,7 @@ public class SchematicView extends QGraphicsView {
                 scale(scaleFactor, scaleFactor);
         } else if (event.key() == Key.Key_Minus.value()) {
             // Zoom out (if not at limit)
-            if (this.matrix().m11() > zoomMin)
+            if (this.matrix().m11() > minimumZoom())
                 scale(1.0 / scaleFactor, 1.0 / scaleFactor);
         }
         viewportChanged();
@@ -260,7 +285,7 @@ public class SchematicView extends QGraphicsView {
 
     public void zoomOut() {
         // Zoom out (if not at limit)
-        if (this.matrix().m11() > zoomMin)
+        if (this.matrix().m11() > minimumZoom())
             scale(1.0 / scaleFactor, 1.0 / scaleFactor);
         viewportChanged();
     }
@@ -269,15 +294,12 @@ public class SchematicView extends QGraphicsView {
         QRectF sceneRect = scene().sceneRect();
         if (sceneRect != null) {
             fitInView(sceneRect, AspectRatioMode.KeepAspectRatio);
-            double zoom = this.matrix().m11();
-            if (zoom > zoomMax) {
+            if (this.matrix().m11() > zoomMax) {
+                // A very small schematic would otherwise be blown up past what is readable.
+                // Centre it rather than fitting again, which would undo the limit.
                 resetMatrix();
                 scale(zoomMax, zoomMax);
-                fitInView(sceneRect, AspectRatioMode.KeepAspectRatio);
-            } else if (zoom < zoomMin) {
-                resetMatrix();
-                scale(zoomMin, zoomMin);
-                fitInView(sceneRect, AspectRatioMode.KeepAspectRatio);
+                centerOn(sceneRect.center());
             }
             viewportChanged();
         }
