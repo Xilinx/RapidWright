@@ -232,6 +232,13 @@ public class SchematicView extends QGraphicsView {
      */
     public void keyPressEvent(QKeyEvent event) {
         double scaleFactor = 1.15;
+        if (event.key() == Key.Key_Escape.value()) {
+            // Give up on a schematic that is taking too long to lay out
+            if (scene() instanceof SchematicScene) {
+                ((SchematicScene) scene()).cancelLayout();
+            }
+            return;
+        }
         if (event.key() == Key.Key_Equal.value()) {
             // Zoom in (if not at limit)
             if (this.matrix().m11() < zoomMax)

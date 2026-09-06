@@ -28,8 +28,10 @@ import java.util.Map;
 import com.trolltech.qt.QThread;
 import com.trolltech.qt.core.QCoreApplication;
 import com.trolltech.qt.core.QModelIndex;
+import com.trolltech.qt.core.Qt.CursorShape;
 import com.trolltech.qt.core.Qt.DockWidgetArea;
 import com.trolltech.qt.gui.QApplication;
+import com.trolltech.qt.gui.QCursor;
 import com.trolltech.qt.gui.QDockWidget;
 import com.trolltech.qt.gui.QDockWidget.DockWidgetFeature;
 import com.trolltech.qt.gui.QMainWindow;
@@ -138,7 +140,28 @@ public class NetlistBrowser extends QMainWindow {
 
         schematicScene.objectSelected.connect(this, "selectFromSchematic(String)");
         schematicScene.cellDrawn.connect(schematicView, "zoomToFit()");
+        schematicScene.layoutStarted.connect(this, "schematicLayoutStarted(String)");
+        schematicScene.layoutFinished.connect(this, "schematicLayoutFinished()");
+        statusBar().showMessage(tr("Ready"));
         QCoreApplication.instance().aboutToQuit.connect(this, "cleanup()");
+    }
+
+    /**
+     * A schematic is being laid out in the background. The window stays usable while it runs, so
+     * just say what is happening and how to stop it.
+     *
+     * @param cellInstName Name of the cell instance being laid out.
+     */
+    public void schematicLayoutStarted(String cellInstName) {
+        String name = cellInstName == null || cellInstName.isEmpty() ? tr("top cell") : cellInstName;
+        statusBar().showMessage(tr("Laying out ") + name + tr("... press Esc to cancel"));
+        QApplication.setOverrideCursor(new QCursor(CursorShape.BusyCursor));
+    }
+
+    /** The background layout has finished or been cancelled. */
+    public void schematicLayoutFinished() {
+        QApplication.restoreOverrideCursor();
+        statusBar().showMessage(tr("Ready"), 2000);
     }
 
     public void selectNetlistItem(QModelIndex index) {

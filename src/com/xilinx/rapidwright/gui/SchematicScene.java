@@ -55,10 +55,12 @@ import org.eclipse.elk.graph.ElkPort;
 
 import com.trolltech.qt.core.QPointF;
 import com.trolltech.qt.core.QRectF;
+import com.trolltech.qt.core.QTimer;
 import com.trolltech.qt.core.QSizeF;
 import com.trolltech.qt.core.Qt.ItemSelectionMode;
 import com.trolltech.qt.core.Qt.KeyboardModifier;
 import com.trolltech.qt.gui.QAbstractGraphicsShapeItem;
+import com.trolltech.qt.gui.QApplication;
 import com.trolltech.qt.gui.QBrush;
 import com.trolltech.qt.gui.QColor;
 import com.trolltech.qt.gui.QFont;
@@ -109,11 +111,27 @@ public class SchematicScene extends QGraphicsScene {
     private int estimatedItemCount;
     /** Set while the view is being repositioned, so a move only causes one render, not one per step */
     private boolean deferRendering;
+    /** Set while a background layout is running, or after one was cancelled, to freeze the picture */
+    private boolean renderingSuspended;
+    /** Monitor of the layout currently running in the background, or null if none is */
+    private volatile CancellableProgressMonitor layoutMonitor;
+    /** Incremented per layout request, so a result that arrives after a newer one is discarded */
+    private long layoutGeneration;
+    /** False when everything is being rendered, so {@link #isRendered} can skip the bounds test */
+    private boolean culling;
+    /** {@link #renderedRegion} padded by {@link #CULL_MARGIN}, kept as doubles to avoid allocating */
+    private double cullMinX, cullMinY, cullMaxX, cullMaxY;
+    /** Coalesces the redraws of a pan or zoom gesture into one, see {@link #viewportChanged()} */
+    private QTimer viewportSettleTimer;
     private Set<String> expandedCellInsts = new HashSet<>();
     private Set<String> selectedObjects = new HashSet<>();
 
     public Signal1<String> objectSelected = new Signal1<>();
     public Signal0 cellDrawn = new Signal0();
+    /** Emitted with the cell's name when a background layout starts */
+    public Signal1<String> layoutStarted = new Signal1<>();
+    /** Emitted when a background layout finishes or is cancelled */
+    public Signal0 layoutFinished = new Signal0();
 
     private static QFont FONT = new QFont("Arial", 8);
     private static QFont BUTTON_TEXT_FONT = new QFont("Arial", 10, QFont.Weight.Bold.value());
@@ -219,6 +237,8 @@ public class SchematicScene extends QGraphicsScene {
     private static final double VIEWPORT_MARGIN = 1.0;
     /** Slack added when testing an object against the rendered region, to cover its outside labels */
     private static final double CULL_MARGIN = 250.0;
+    /** How long the view must stop moving before the visible region is redrawn, in milliseconds */
+    private static final int VIEWPORT_SETTLE_MS = 150;
 
     public SchematicScene(EDIFNetlist netlist) {
         super();
@@ -259,24 +279,96 @@ public class SchematicScene extends QGraphicsScene {
         }
     }
 
+    /**
+     * Draws a cell's schematic.
+     *
+     * Laying the graph out takes seconds on a large cell and, unlike building and rendering it,
+     * cannot be broken into small pieces -- ELK reports progress in bursts, with over 90% of a
+     * layout spent inside single steps longer than 100ms. Running it on the calling thread would
+     * therefore freeze the window for the whole layout, so it is handed to a worker instead. The
+     * previously drawn schematic stays on screen and the window stays alive until the new layout
+     * is ready; see {@link #cancelLayout()}.
+     *
+     * @param cellInst The cell instance to draw.
+     * @param zoomFit  Whether to zoom to fit the new schematic once it is drawn.
+     */
     public void drawCell(EDIFHierCellInst cellInst, boolean zoomFit) {
-        clear();
+        cancelLayout();
+
+        // Built here rather than on the worker because sizing labels needs the font metrics, and
+        // Qt's are only safe to use from the GUI thread
         portInstMap.clear();
         elkNodeTopPortMap.clear();
         elkNodeCellMap.clear();
-        lookupMap.clear();
         unroutedNets.clear();
-        selectedObjects.clear();
-        renderedRegion = null;
         this.currCellInst = cellInst;
         elkRoot = createElkRoot(cellInst);
         populateCellContent(cellInst, elkRoot, "");
         elkNodeCellMap.put(elkRoot, cellInst);
         applyLargeGraphElkProperties(elkRoot);
 
-        IGraphLayoutEngine engine = new RecursiveGraphLayoutEngine();
-        IElkProgressMonitor monitor = new BasicProgressMonitor();
-        engine.layout(elkRoot, monitor);
+        final ElkNode root = elkRoot;
+        if (views().isEmpty()) {
+            // Nothing is on screen to keep responsive (scripted use, or a test), so just do it
+            new RecursiveGraphLayoutEngine().layout(root, new BasicProgressMonitor());
+            finishDrawCell(zoomFit);
+            return;
+        }
+
+        // Hold the current picture still until the new one is ready
+        renderingSuspended = true;
+        final long generation = ++layoutGeneration;
+        final CancellableProgressMonitor monitor = new CancellableProgressMonitor();
+        layoutMonitor = monitor;
+        layoutStarted.emit(cellInst.toString());
+        Thread worker = new Thread(() -> {
+            try {
+                new RecursiveGraphLayoutEngine().layout(root, monitor);
+            } catch (Exception e) {
+                System.err.println("ERROR: Schematic layout of " + cellInst + " failed: " + e);
+                e.printStackTrace();
+            }
+            QApplication.invokeLater(() -> {
+                // A newer request (or a cancel) has superseded this one, so throw the result away
+                if (generation != layoutGeneration || monitor.isCanceled()) {
+                    return;
+                }
+                layoutMonitor = null;
+                renderingSuspended = false;
+                finishDrawCell(zoomFit);
+                layoutFinished.emit();
+            });
+        }, "schematic-layout");
+        worker.setDaemon(true);
+        worker.start();
+    }
+
+    /**
+     * Abandons a layout that is still running. ELK only checks for cancellation between steps, so
+     * the worker may keep going for a little while; its result is discarded either way. The
+     * schematic on screen is left alone but stops being redrawn as the view moves, until the next
+     * {@link #drawCell(EDIFHierCellInst, boolean)} replaces it.
+     */
+    public void cancelLayout() {
+        if (layoutMonitor != null) {
+            layoutMonitor.cancel();
+            layoutMonitor = null;
+            layoutGeneration++;
+            layoutFinished.emit();
+        }
+    }
+
+    /** Whether a schematic is currently being laid out in the background */
+    public boolean isLayoutInProgress() {
+        return layoutMonitor != null;
+    }
+
+    /** Puts the freshly laid out schematic on screen. Runs on the GUI thread. */
+    private void finishDrawCell(boolean zoomFit) {
+        clear();
+        lookupMap.clear();
+        selectedObjects.clear();
+        renderedRegion = null;
 
         estimatedItemCount = estimateItemCount(elkRoot);
         double extraWidthBuffer = elkRoot.getWidth() * 0.25 + 100;
@@ -296,6 +388,20 @@ public class SchematicScene extends QGraphicsScene {
             }
         }
         renderVisible();
+    }
+
+    /** An ELK progress monitor that lets the GUI thread abandon a layout it no longer wants */
+    private static class CancellableProgressMonitor extends BasicProgressMonitor {
+        private volatile boolean cancelled;
+
+        void cancel() {
+            cancelled = true;
+        }
+
+        @Override
+        public boolean isCanceled() {
+            return cancelled;
+        }
     }
 
     /**
@@ -320,14 +426,32 @@ public class SchematicScene extends QGraphicsScene {
     }
 
     /**
-     * Called by {@link SchematicView} whenever the visible part of the scene changes. Re-renders
-     * only when the view has moved outside the region that was rendered, or zoomed far enough to
-     * change the level of detail, so that ordinary panning costs nothing.
+     * Called by {@link SchematicView} whenever the visible part of the scene changes.
+     *
+     * A single turn of the mouse wheel makes the view scale and then scroll, so it reaches here
+     * more than once, and a gesture is many turns in quick succession. Redrawing on each one costs
+     * about a tenth of a second on a large schematic and makes zooming feel like it is dragging
+     * behind the mouse, so the redraw waits until the view stops moving. Qt keeps scaling the items
+     * already on screen in the meantime, so the picture stays live throughout.
      */
     public void viewportChanged() {
-        if (elkRoot != null && !deferRendering) {
-            renderVisible();
+        if (elkRoot == null || deferRendering || renderingSuspended) {
+            return;
         }
+        if (viewportSettleTimer == null) {
+            viewportSettleTimer = new QTimer(this);
+            viewportSettleTimer.setSingleShot(true);
+            viewportSettleTimer.timeout.connect(this, "renderSettledViewport()");
+        }
+        // start() on a running single shot timer restarts it, which is the debounce
+        viewportSettleTimer.start(VIEWPORT_SETTLE_MS);
+    }
+
+    /**
+     * Slot for {@link #viewportSettleTimer}; not meant to be called directly.
+     */
+    public void renderSettledViewport() {
+        renderVisible();
     }
 
     /**
@@ -335,6 +459,9 @@ public class SchematicScene extends QGraphicsScene {
      * exporting, where the output must contain everything rather than what happens to be on screen.
      */
     public void renderAll() {
+        if (renderingSuspended) {
+            return;
+        }
         renderEverything = true;
         try {
             renderedRegion = null;
@@ -358,6 +485,12 @@ public class SchematicScene extends QGraphicsScene {
     }
 
     private void renderVisible() {
+        if (renderingSuspended) {
+            return;
+        }
+        if (viewportSettleTimer != null) {
+            viewportSettleTimer.stop();
+        }
         QRectF region;
         double zoom;
         if (isViewportRendered()) {
@@ -384,6 +517,7 @@ public class SchematicScene extends QGraphicsScene {
         lookupMap.clear();
         renderedRegion = region;
         renderedZoom = zoom;
+        setCullBounds(region);
         renderSchematic();
         // Items are recreated on every re-render, so the highlight has to be put back on
         for (String selected : selectedObjects) {
@@ -404,10 +538,23 @@ public class SchematicScene extends QGraphicsScene {
         return renderedRegion == null || renderedZoom >= MIN_PIN_ZOOM;
     }
 
+    /** Sets up the bounds {@link #isRendered} tests against, already padded by {@link #CULL_MARGIN} */
+    private void setCullBounds(QRectF region) {
+        culling = region != null;
+        if (culling) {
+            cullMinX = region.x() - CULL_MARGIN;
+            cullMinY = region.y() - CULL_MARGIN;
+            cullMaxX = region.x() + region.width() + CULL_MARGIN;
+            cullMaxY = region.y() + region.height() + CULL_MARGIN;
+        }
+    }
+
     /** Whether an object at these scene coordinates is inside the region being rendered */
     private boolean isRendered(double x, double y, double width, double height) {
-        return renderedRegion == null || renderedRegion.intersects(
-                new QRectF(x - CULL_MARGIN, y - CULL_MARGIN, width + 2 * CULL_MARGIN, height + 2 * CULL_MARGIN));
+        // Deliberately plain arithmetic: this runs for every node and every edge in the graph on
+        // every render, so building a QRectF here to ask Qt would cost more than the render itself
+        return !culling
+                || (x <= cullMaxX && x + width >= cullMinX && y <= cullMaxY && y + height >= cullMinY);
     }
 
     public void renderSchematic() {
@@ -700,6 +847,24 @@ public class SchematicScene extends QGraphicsScene {
                 }
             }
 
+            // Work out where the route runs before touching Qt: most edges are off screen, and
+            // building a QPainterPath for one only to throw it away is what makes rendering slow
+            double minX = Math.min(startX, endX);
+            double maxX = Math.max(startX, endX);
+            double minY = Math.min(startY, endY);
+            double maxY = Math.max(startY, endY);
+            for (ElkBendPoint bp : s.getBendPoints()) {
+                double bendX = bp.getX() + xOffset;
+                double bendY = bp.getY() + yOffset;
+                minX = Math.min(minX, bendX);
+                maxX = Math.max(maxX, bendX);
+                minY = Math.min(minY, bendY);
+                maxY = Math.max(maxY, bendY);
+            }
+            if (!isRendered(minX, minY, maxX - minX, maxY - minY)) {
+                continue;
+            }
+
             // The whole edge is drawn as a single polyline item. Drawing each segment as its own
             // item is what makes a large schematic expensive, both to create and (because Qt
             // removes items from the scene one at a time) to tear down on the next draw.
@@ -709,11 +874,6 @@ public class SchematicScene extends QGraphicsScene {
                 path.lineTo(bp.getX() + xOffset, bp.getY() + yOffset);
             }
             path.lineTo(endX, endY);
-
-            if (!isRendered(path.boundingRect().x(), path.boundingRect().y(), path.boundingRect().width(),
-                    path.boundingRect().height())) {
-                continue;
-            }
 
             String id = e.getIdentifier();
             String lookup = NetlistTreeWidget.NET_ID + (id == null ? "" : id);
@@ -1150,7 +1310,7 @@ public class SchematicScene extends QGraphicsScene {
      * @param lookup The object to scroll to.
      */
     private void scrollTo(String lookup) {
-        if (elkRoot == null || lookupMap.containsKey(lookup) || views().isEmpty()) {
+        if (elkRoot == null || renderingSuspended || lookupMap.containsKey(lookup) || views().isEmpty()) {
             return;
         }
         QRectF bounds = findBounds(elkRoot, 0, 0, lookup);
