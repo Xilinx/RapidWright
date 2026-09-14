@@ -30,6 +30,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 
+import com.xilinx.rapidwright.util.Params;
 import com.xilinx.rapidwright.util.StringPool;
 
 /**
@@ -51,7 +52,7 @@ public class EDIFTokenizer implements AutoCloseable {
     protected final int maxTokenLength;
     protected final int bufferAddressMask;
 
-    public static final int DEFAULT_MAX_TOKEN_LENGTH = 8192*16*32;
+    public static final int DEFAULT_MAX_TOKEN_LENGTH = Params.RW_EDIF_MAX_TOKEN_LENGTH;
 
 
     protected int offset = 0;
