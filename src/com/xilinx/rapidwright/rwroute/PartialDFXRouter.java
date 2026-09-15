@@ -27,6 +27,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.PartitionPin;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 import java.util.Arrays;
@@ -60,6 +61,38 @@ public class PartialDFXRouter extends PartialRouter {
 
     public PartialDFXRouter(Design design, RWRouteConfig config, Collection<SitePinInst> pinsToRoute) {
         this(design, config, pinsToRoute, /* softPreserve */ false);
+    }
+
+    /**
+     * Creates a RouteNode for both nodes of every fixed arc, locks the driven node, and sets its
+     * previous pointer to the driver.
+     * Walks this net's PIPs rather than its node trees, and prunes nothing: the locked path that
+     * determineRoutingTargets() traces from a partition pin back to the net's source rnode need
+     * not lie between a projected source and sink -- nor need it hang off a node tree at all,
+     * since NetTools.getNodeTrees() roots only at output pins and static ties, and a net entering
+     * this region is driven from outside it.
+     */
+    @Override
+    protected void setPrevOnFixedArcs(Net net) {
+        for (PIP pip : net.getPIPs()) {
+            if (!pip.isPIPFixed()) {
+                continue;
+            }
+            Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
+            Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
+
+            // Do not include arcs that the router wouldn't explore
+            // e.g. those that leave the INT tile, since we project pins to their INT tile
+            if (RouteNodeGraph.isExcludedTile(end)) {
+                continue;
+            }
+
+            RouteNode rstart = routingGraph.getOrCreate(start);
+            RouteNode rend = routingGraph.getOrCreate(end);
+            rend.setArcLocked(true);
+            assert(rend.getPrev() == null);
+            rend.setPrev(rstart);
+        }
     }
 
     @Override
