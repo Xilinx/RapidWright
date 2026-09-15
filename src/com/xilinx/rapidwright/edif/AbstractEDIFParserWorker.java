@@ -199,7 +199,14 @@ public abstract class AbstractEDIFParserWorker {
         expect(RIGHT_PAREN, getNextToken(true));
 
         expect(LEFT_PAREN, getNextToken(true));
-        expect(VIEW, getNextToken(true));
+        // EDIF permits cell-level properties ahead of the view
+        String viewOrProperty = getNextToken(true);
+        while (PROPERTY.equalsIgnoreCase(viewOrProperty)) {
+            parseProperty(cell, viewOrProperty); // Consumes through the property's ')'
+            expect(LEFT_PAREN, getNextToken(true));
+            viewOrProperty = getNextToken(true);
+        }
+        expect(VIEW, viewOrProperty);
         cell.setView(parseEDIFNameObject(new EDIFName()));
         expect(LEFT_PAREN, getNextToken(true));
         expect(VIEWTYPE, getNextToken(true));

@@ -177,4 +177,31 @@ public class TestEDIFParserGrammar {
         Assertions.assertEquals(1, netlist.getComments().size());
         Assertions.assertEquals("a retained comment", netlist.getComments().get(0));
     }
+
+    /** Places cell-level entries between the top cell's (cellType ...) and its (view ...). */
+    protected static String topCellBody(String body) {
+        return simple().replace("(cell top (cellType GENERIC)\n",
+                "(cell top (cellType GENERIC)\n" + body);
+    }
+
+    /** The grammar allows (property ...) at cell level, ahead of the view. */
+    @Test
+    public void testCellPropertyBeforeView(@TempDir Path dir) throws IOException {
+        EDIFNetlist netlist = parse(dir, "cellprop.edf", topCellBody(
+                "      (PROPERTY PROP1 (string \"value1\") (owner \"xilinx\"))\n"
+                        + "      (property PROP2 (integer 7))\n"));
+        assertWellFormed(netlist);
+        EDIFCell top = netlist.getDesign().getTopCell();
+        Assertions.assertEquals(2, top.getPropertyCount());
+        Assertions.assertEquals("value1", top.getProperty("PROP1").getValue());
+        Assertions.assertEquals("xilinx", top.getProperty("PROP1").getOwner());
+        Assertions.assertEquals("7", top.getProperty("PROP2").getValue());
+    }
+
+    /** Accepting properties there must not become accepting anything. */
+    @Test
+    public void testUnknownCellEntryBeforeViewRejected(@TempDir Path dir) {
+        Assertions.assertThrows(EDIFParseException.class,
+                () -> parse(dir, "bogus.edf", topCellBody("      (bogus B (string \"v\"))\n")));
+    }
 }
