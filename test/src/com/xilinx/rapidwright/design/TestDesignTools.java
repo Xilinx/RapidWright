@@ -434,8 +434,7 @@ public class TestDesignTools {
         for (Net net : design.getNets()) {
             before.put(net.getName(), net.getPins().size() + "/" + net.getPIPs().size());
         }
-        Set<Net> modified = DesignTools.populateBlackBox(design,
-                Collections.singletonMap(hierCellName, cell), false);
+        Set<Net> modified = DesignTools.populateBlackBox(design, hierCellName, cell, false);
 
         Assertions.assertFalse(inst.getCellType().getCellInsts().isEmpty());
         Assertions.assertFalse(modified.isEmpty());
