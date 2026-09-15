@@ -910,10 +910,10 @@ public class DesignTools {
      * @param design               The top level design
      * @param hierarchicalCellName Name of the black box in the design netlist.
      * @param cell                 The 'guts' to be inserted into the black box
-     * 
+     * @return Every net this touched, as {@link #populateBlackBox(Design, Map, boolean)} describes.
      */
-    public static void populateBlackBox(Design design, String hierarchicalCellName, Design cell) {
-        populateBlackBox(design, hierarchicalCellName, cell, false);
+    public static Set<Net> populateBlackBox(Design design, String hierarchicalCellName, Design cell) {
+        return populateBlackBox(design, hierarchicalCellName, cell, false);
     }
 
     /**
@@ -926,10 +926,11 @@ public class DesignTools {
      * @param cell                 The 'guts' to be inserted into the black box
      * @param keepBoundaryRouting  Preserves the routing on the boundaries of the
      *                             black box.
+     * @return Every net this touched, as {@link #populateBlackBox(Design, Map, boolean)} describes.
      */
-    public static void populateBlackBox(Design design, String hierarchicalCellName, Design cell,
+    public static Set<Net> populateBlackBox(Design design, String hierarchicalCellName, Design cell,
             boolean keepBoundaryRouting) {
-        populateBlackBox(design, Collections.singletonMap(hierarchicalCellName, cell),
+        return populateBlackBox(design, Collections.singletonMap(hierarchicalCellName, cell),
                 keepBoundaryRouting);
     }
 
@@ -940,15 +941,28 @@ public class DesignTools {
      * made before any physical one, so the parent net map is built once, against a netlist in which
      * every black box is already populated. Filling them one at a time instead asks that map about
      * a design that is still part black box, and rebuilds it for each.
+     * <p>
+     * Only the nets crossing a black box boundary are rectified. An alias sitting wholly inside or
+     * wholly outside a box is left alone, so a caller that needs every physical net in the design
+     * named after its source must call {@link #makePhysNetNamesConsistent(Design)} itself.
+     * <p>
+     * Every entry is vetted before anything is modified, but there is no rollback once insertion has
+     * begun: a failure part way through -- a site overlap, say -- leaves the boxes filled so far in
+     * place, and the logical netlist of all of them already swapped in.
      *
      * @param design              The top level design
      * @param blackBoxes          The 'guts' to be inserted, keyed by the hierarchical name of the
-     *                            black box in the design netlist that each belongs in.
+     *                            black box in the design netlist that each belongs in. A given
+     *                            Design may appear only once, since its contents are moved into the
+     *                            top level design rather than copied.
      * @param keepBoundaryRouting Preserves the routing on the boundaries of the black boxes.
-     * @return Every net this touched: the ones the filled cells brought in with them, the owners the
-     *         boundary crossings were merged onto, and the static nets that took a circuit's static
-     *         routing or gave up a displaced source pin. No net outside this set was altered, so a
-     *         caller that means to route the result can start from these rather than have
+     * @return Every net this touched that the design still holds: the ones the filled cells brought
+     *         in with them, the owners the boundary crossings were merged onto, and the static nets
+     *         that took a circuit's static routing or gave up a displaced source pin. A net merged
+     *         away is deleted from the design and so is deliberately absent -- including a net that
+     *         predates this call, which is what a crossing the cell drives is, since its owner is
+     *         the net inside the box. No net outside this set was altered, so a caller that means to
+     *         route the result can start from these rather than have
      *         {@link com.xilinx.rapidwright.rwroute.PartialRouter} rediscover them by walking every
      *         net in the design.
      */
@@ -956,24 +970,34 @@ public class DesignTools {
             boolean keepBoundaryRouting) {
         EDIFNetlist netlist = design.getNetlist();
 
-        // Nothing is touched until every black box has been vetted, so that a bad one cannot leave
-        // the design with the others already half inserted
+        // Every entry is vetted before anything is modified, so that bad input cannot leave the
+        // design with the other boxes already inserted
         Map<String, EDIFCellInst> insts = new HashMap<>();
+        Map<Design, String> firstUseOf = new IdentityHashMap<>();
         for (Entry<String, Design> e : blackBoxes.entrySet()) {
             String hierarchicalCellName = e.getKey();
+            Design cell = e.getValue();
             EDIFCellInst inst = netlist.getCellInstFromHierName(hierarchicalCellName);
             if (!inst.isBlackBox()) {
-                System.err.println("ERROR: The cell instance " + hierarchicalCellName + " is not a black box.");
-                return Collections.emptySet();
+                throw new RuntimeException("ERROR: The cell instance " + hierarchicalCellName
+                        + " is not a black box.");
             }
-            if (!inst.getCellType().hasCompatibleInterface(e.getValue().getTopEDIFCell())) {
+            if (!inst.getCellType().hasCompatibleInterface(cell.getTopEDIFCell())) {
                 throw new RuntimeException(createInformativeCellInterfaceMismatchMessage(
-                        hierarchicalCellName, inst.getCellType(), e.getValue().getTopEDIFCell()));
+                        hierarchicalCellName, inst.getCellType(), cell.getTopEDIFCell()));
+            }
+            // A Design's cells and site instances are moved into the top level design rather than
+            // copied, so a second box given the same Design would be handed content that the first
+            // has already taken and renamed
+            String firstUse = firstUseOf.put(cell, hierarchicalCellName);
+            if (firstUse != null) {
+                throw new RuntimeException("ERROR: The same Design was provided for black boxes '"
+                        + firstUse + "' and '" + hierarchicalCellName + "'.");
             }
             insts.put(hierarchicalCellName, inst);
         }
 
-        // Populate Logical Netlist into cells. This loop and the physical one below both walk
+        // Populate Logical Netlist into cells. This loop and the physical ones below all walk
         // blackBoxes rather than insts, so that the boxes are filled in whatever order the caller
         // gave them in and not in the hash order of their names
         for (Entry<String, Design> e : blackBoxes.entrySet()) {
@@ -991,22 +1015,19 @@ public class DesignTools {
 
         Net vcc = design.getVccNet();
         Net gnd = design.getGndNet();
-
-        // Every crossing found below is merged in one pass at the end, once all of them are known
-        Map<Net, EDIFHierNet> boundaryNets = new HashMap<>();
         Set<Net> modifiedNets = new HashSet<>();
+
+        // Static source pins displaced by the incoming site instances. They cannot be removed as they
+        // are found since unrouting a static net walks its pins, so they are collected and taken off
+        // in one batch once every site instance of every box is in. Trimming them per box instead
+        // would, from the second box on, compute against static routing an earlier box had merged in
+        Map<Net, Set<SitePinInst>> deferredRemovals = new HashMap<>();
+
+        // Add placement information
+        // We need to prefix all cell and net names with the hierarchicalCellName as a prefix
         for (Entry<String, Design> e : blackBoxes.entrySet()) {
             String hierarchicalCellName = e.getKey();
-            EDIFCellInst inst = insts.get(hierarchicalCellName);
             Design cell = e.getValue();
-
-            // Static source pins displaced by the incoming site instances. They cannot be removed as they
-            // are found since unrouting a static net walks its pins, so they are collected and taken off in
-            // one batch once every site instance is in
-            Map<Net, Set<SitePinInst>> deferredRemovals = new HashMap<>();
-
-            // Add placement information
-            // We need to prefix all cell and net names with the hierarchicalCellName as a prefix
             Net vccCell = cell.getVccNet();
             Net gndCell = cell.getGndNet();
             for (SiteInst si : cell.getSiteInsts()) {
@@ -1052,14 +1073,22 @@ public class DesignTools {
                     si.routeIntraSiteNet(gnd, pin, pin);
                 }
             }
+        }
 
-            // Only the branches feeding the displaced pins come out; the rest of each static net is left
-            // alone. This has to happen before the routing below merges the circuit's own static pins in
-            boolean preserveOtherRoutes = true;
-            DesignTools.batchRemoveSitePins(deferredRemovals, preserveOtherRoutes);
-            modifiedNets.addAll(deferredRemovals.keySet());
+        // Only the branches feeding the displaced pins come out; the rest of each static net is left
+        // alone. This has to happen before the routing below merges the circuits' own static pins in
+        boolean preserveOtherRoutes = true;
+        DesignTools.batchRemoveSitePins(deferredRemovals, preserveOtherRoutes);
+        modifiedNets.addAll(deferredRemovals.keySet());
 
-            // Add routing information
+        // Add routing information. Every crossing found is merged in one pass at the end, once all
+        // of them are known
+        Set<Net> boundaryNets = new HashSet<>();
+        for (Entry<String, Design> e : blackBoxes.entrySet()) {
+            String hierarchicalCellName = e.getKey();
+            EDIFCellInst inst = insts.get(hierarchicalCellName);
+            Design cell = e.getValue();
+
             final String cellPrefix = hierarchicalCellName + EDIFTools.EDIF_HIER_SEP;
             for (Net net : new ArrayList<>(cell.getNets())) {
                 if (net.getName().equals(Net.USED_NET)) continue;
@@ -1074,8 +1103,9 @@ public class DesignTools {
                     net.updateName(cellPrefix + net.getName());
                     design.addNet(net);
                     modifiedNets.add(net);
-                    EDIFHierNet parentNet = getBoundaryOwner(netlist, net, cellPrefix);
-                    if (parentNet != null) boundaryNets.put(net, parentNet);
+                    if (isBoundaryCrossing(netlist, net, cellPrefix, keepBoundaryRouting)) {
+                        boundaryNets.add(net);
+                    }
                 }
             }
 
@@ -1092,8 +1122,9 @@ public class DesignTools {
                 Net net = design.getNet(parentCellName.isEmpty() ? outerNet.getName()
                         : parentCellName + EDIFTools.EDIF_HIER_SEP + outerNet.getName());
                 if (net == null) continue;
-                EDIFHierNet parentNet = getBoundaryOwner(netlist, net, cellPrefix);
-                if (parentNet != null) boundaryNets.put(net, parentNet);
+                if (isBoundaryCrossing(netlist, net, cellPrefix, keepBoundaryRouting)) {
+                    boundaryNets.add(net);
+                }
             }
 
             if (cell.getNetlist().hasEncryptedCells()) {
@@ -1108,30 +1139,40 @@ public class DesignTools {
 
     /**
      * Identifies whether a physical net crosses the boundary of a black box that has just been
-     * populated, and if so returns the net that owns it.
+     * populated, and so needs merging onto the net that owns it.
      *
-     * @param netlist    The design's netlist, whose parent net map says which net owns which.
-     * @param net        The physical net to test. Its name is what gets looked up, rather than
-     *                   getLogicalHierNet(): a net that arrived with the cell still carries the
-     *                   hierarchy it had inside, which the shell's netlist knows nothing about.
-     * @param cellPrefix The black box's hierarchical name and a separator. The separator matters --
-     *                   without it a cell 'foo1' would also claim the nets of 'foo10'.
-     * @return The owning net, or null if this net owns itself, holds nothing worth moving, or sits on
-     *         the same side of the boundary as its owner.
+     * @param netlist             The design's netlist, whose parent net map says which net owns
+     *                            which.
+     * @param net                 The physical net to test. Its name is what gets looked up, rather
+     *                            than getLogicalHierNet(): a net that arrived with the cell still
+     *                            carries the hierarchy it had inside, which the shell's netlist
+     *                            knows nothing about.
+     * @param cellPrefix          The black box's hierarchical name and a separator. The separator
+     *                            matters -- without it a cell 'foo1' would also claim the nets of
+     *                            'foo10'.
+     * @param keepBoundaryRouting Whether the caller is preserving boundary routing, which decides
+     *                            whether a crossing with nothing on it is worth reporting.
+     * @return True if this net crosses the boundary. False if it owns itself, holds nothing worth
+     *         moving, or sits on the same side of the boundary as its owner.
      */
-    private static EDIFHierNet getBoundaryOwner(EDIFNetlist netlist, Net net, String cellPrefix) {
-        // A net with no physical presence has nothing to move, so it is not worth asking about
-        if (net.getPins().isEmpty() && net.getSiteInsts().isEmpty()) return null;
+    private static boolean isBoundaryCrossing(EDIFNetlist netlist, Net net, String cellPrefix,
+            boolean keepBoundaryRouting) {
+        // A net with no physical presence has nothing to move, so it is not worth asking about --
+        // unless the boundary routing is being discarded, since merging is also what unroutes the
+        // owner, and an owner left routed into the region the black box now occupies conflicts with
+        // the circuit just placed there
+        if (keepBoundaryRouting && net.getPins().isEmpty() && net.getSiteInsts().isEmpty()) {
+            return false;
+        }
         EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
-        if (hierNet == null) return null;
+        if (hierNet == null) return false;
         EDIFHierNet parentNet = netlist.getParentNetMap().get(hierNet);
-        if (parentNet == null || parentNet.equals(hierNet)) return null;
+        if (parentNet == null || parentNet.equals(hierNet)) return false;
         // An alias sitting on the same side as its owner -- both within the cell, or both without --
-        // is a purely internal one, and it is expected that makePhysNetNamesConsistent() will
-        // reconcile those prior to routing
-        if (net.getName().startsWith(cellPrefix)
-                == parentNet.getHierarchicalNetName().startsWith(cellPrefix)) return null;
-        return parentNet;
+        // is a purely internal one, and is left alone here. populateBlackBox() does not reconcile
+        // those; its caller is expected to call makePhysNetNamesConsistent() if it needs them
+        return net.getName().startsWith(cellPrefix)
+                != parentNet.getHierarchicalNetName().startsWith(cellPrefix);
     }
 
     /**
@@ -1141,39 +1182,46 @@ public class DesignTools {
      * @param design              The current design.
      * @param keepBoundaryRouting Preserves the routing on the boundaries of the
      *                            black box.
-     * @param boundaryNets        The nets crossing the boundary, mapped to the net that owns each --
-     *                            as identified by {@link #getBoundaryOwner}.
-     * @param modifiedNets        Updated in place: each merged-away alias is removed and the net it was
-     *                            merged onto is added, so the set never names a deleted net.
+     * @param boundaryNets        The nets crossing the boundary, as identified by
+     *                            {@link #isBoundaryCrossing}.
+     * @param modifiedNets        Updated in place: whichever net ends up holding a crossing's pins is
+     *                            added, and an alias deleted in favour of its owner is taken out, so
+     *                            the set never names a net the design no longer has.
      */
     private static void postBlackBoxCleanup(Design design, boolean keepBoundaryRouting,
-            Map<Net, EDIFHierNet> boundaryNets, Set<Net> modifiedNets) {
-        for (Entry<Net, EDIFHierNet> e : boundaryNets.entrySet()) {
-            Net alias = e.getKey();
-            EDIFHierNet parentNetName = e.getValue();
-            // A crossing owned by the logical <const0>/<const1> net has no physical net of that name:
-            // its pins belong on the design's GND/VCC net
-            NetType parentNetType = NetType.getNetTypeFromNetName(parentNetName.getHierarchicalNetName());
-            Net parentNet = parentNetType.isStaticNetType() ? design.getStaticNet(parentNetType)
-                                                            : design.getNet(parentNetName.getHierarchicalNetName());
-            if (parentNet == null) {
-                // The owner is logical-only so far -- nothing physical has been attached to it yet.
-                // Create it so that the crossing has somewhere to be merged onto.
-                parentNet = design.createNet(parentNetName);
+            Set<Net> boundaryNets, Set<Net> modifiedNets) {
+        for (Net alias : boundaryNets) {
+            // The merge below drops the alias' routing, so take it off the net rather than copying
+            // it. An empty list left in its place costs nothing and keeps the alias usable, which it
+            // has to be in the case where the merge renames it instead of deleting it
+            List<PIP> aliasPIPs = null;
+            if (keepBoundaryRouting && !alias.getPIPs().isEmpty()) {
+                aliasPIPs = alias.getPIPs();
+                alias.setPIPs(new ArrayList<>());
             }
-            // The pins and site wires come across in the move below, so the PIPs are all that is left
-            // to deal with -- and they have to be taken off the alias first, since the move also
-            // removes it from the design
-            if (keepBoundaryRouting) {
-                for (PIP p : alias.getPIPs()) {
-                    parentNet.addPIP(p);
+            // A Net hashes on its name, and the merge may rename this one rather than delete it, so
+            // it cannot be left in the set across the call
+            modifiedNets.remove(alias);
+            Net parentNet = makePhysNetNameConsistent(design, alias);
+            // A null answer means the alias kept its pins and was renamed after its source, so it is
+            // the net that was modified; otherwise it has been deleted in favour of the one returned
+            Net holder = parentNet != null ? parentNet : alias;
+            if (!keepBoundaryRouting) {
+                // Unrouted here rather than by the merge, so that this happens in the renaming case
+                // too, and after the pins have arrived so that they are marked unrouted as well
+                holder.unroute();
+            } else if (aliasPIPs != null) {
+                // Handed straight over when there is nothing to merge with -- which is always so for
+                // a rename, since holder is then the alias whose list was just emptied
+                if (holder.getPIPs().isEmpty()) {
+                    holder.setPIPs(aliasPIPs);
+                } else {
+                    for (PIP p : aliasPIPs) {
+                        holder.addPIP(p);
+                    }
                 }
             }
-            design.movePinsToNewNetDeleteOldNet(alias, parentNet, keepBoundaryRouting);
-            // The alias is gone from the design now, and it only ever reached modifiedNets because the
-            // circuit that owned it was migrated in earlier in this same call
-            modifiedNets.remove(alias);
-            modifiedNets.add(parentNet);
+            modifiedNets.add(holder);
         }
     }
 
