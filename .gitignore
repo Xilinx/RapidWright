@@ -12,3 +12,4 @@
 /designs/
 interchange/schema/capnp/java.capnp
 *.orig
+.codex
