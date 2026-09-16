@@ -156,8 +156,8 @@ public class TestCell {
     }
 
     @Test
-    public void testSetNameResetsLogicalInst() {
-        Design design = new Design("testSetNameResetsLogicalInst", Device.KCU105);
+    public void testUpdateNameResetsLogicalInst() {
+        Design design = new Design("testUpdateNameResetsLogicalInst", Device.KCU105);
         Cell cell = design.createAndPlaceCell("myFF", Unisim.FDRE, "SLICE_X32Y73/AFF");
 
         // Cell.getEDIFHierCellInst() lazily resolves -- and caches -- the hierarchical
