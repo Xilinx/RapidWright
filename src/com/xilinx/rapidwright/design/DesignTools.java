@@ -1032,7 +1032,19 @@ public class DesignTools {
             Net gndCell = cell.getGndNet();
             for (SiteInst si : cell.getSiteInsts()) {
                 for (Cell c : new ArrayList<Cell>(si.getCells())) {
-                    c.updateName(hierarchicalCellName + "/" + c.getName());
+                    // Cell caches its EDIFHierCellInst, and that cache is an array of EDIFCellInst
+                    // references rooted at the top instance of whichever netlist built it - here the
+                    // circuit's own, which is not the top instance of the netlist being merged into.
+                    // updateName() re-keys the design's cell map but leaves that cache alone, so drop
+                    // it and let the getter rebuild it lazily once the merge is complete. Only when the
+                    // rename actually happened: updateName() returns false without renaming if the new
+                    // name is taken, and the old cache is still the right one in that case.
+                    // TODO: belongs in Cell.updateName() in the API lib, which is where the cache is
+                    // invalidated by the rename. Doing it there would also cover ECOTools, which renames
+                    // cells the same way in two places and has the same stale cache.
+                    // Expected to be obsoleted when PR #1409 is merged.
+                    if (c.updateName(hierarchicalCellName + "/" + c.getName()))
+                        c.setEDIFHierCellInst(null);
                     if (!c.isRoutethru())
                         design.addCell(c);
                     else {
@@ -1059,9 +1071,27 @@ public class DesignTools {
                         assert(net.isStaticNet());
                         deferredRemovals.computeIfAbsent(net, (p) -> new HashSet<>()).add(spi);
                     }
+                } else {
+                    assert(!design.isSiteUsed(si.getSite()));
+                    // Expected to be obsoleted when PR #1411 is merged.
+                    if (design.isCopyingOriginalSiteInsts()) {
+                        // Create an empty SiteInst to indicate it was blank to begin with
+                        existingSi = new SiteInst(si.getName(), si.getSiteTypeEnum());
+                        // place() only registers a site instance with a design when it already has one,
+                        // which this does not, so it stays a detached record of how the site used to be
+                        existingSi.place(si.getSite());
+                    }
+                }
+                // What the site is changing from, so that everything the incoming site instance holds
+                // counts as a difference and gets written into the bitstream.
+                // Expected to be obsoleted when PR #1411 is merged.
+                if (design.isCopyingOriginalSiteInsts() && existingSi != null) {
+                    design.getOriginalSiteInsts().put(si.getName(), existingSi);
                 }
 
                 design.addSiteInst(si);
+                // Expected to be obsoleted when PR #1411 is merged.
+                design.addModifiedSiteInst(si);
 
                 // Update GND/VCC site routing to point to destination design's GND/VCC nets
                 for (String siteWire : si.getSiteWiresFromNet(vccCell)) {
@@ -1100,8 +1130,12 @@ public class DesignTools {
                     staticNet.setPIPs(uniquePIPs);
                     modifiedNets.add(staticNet);
                 } else {
-                    net.updateName(cellPrefix + net.getName());
+                    // rename() rather than updateName(): it drops the net's stale EDIFHierNet
+                    // cache and marks the net modified, both of which updateName() omits. It acts
+                    // on whichever design currently owns the net, so addNet() has to come first for
+                    // that to be the shell rather than the circuit the net arrived from.
                     design.addNet(net);
+                    net.rename(cellPrefix + net.getName());
                     modifiedNets.add(net);
                     if (isBoundaryCrossing(netlist, net, cellPrefix, keepBoundaryRouting)) {
                         boundaryNets.add(net);
