@@ -265,6 +265,31 @@ public class TestNet {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"updateName", "setName", "rename"})
+    public void testNameChangeInvalidatesLogicalHierNet(String method) {
+        Design design = new Design("top", Device.KCU105);
+        Net net = design.createNet("net");
+        Assertions.assertNotNull(net.getLogicalHierNet());
+
+        switch (method) {
+        case "updateName":
+            Assertions.assertTrue(net.updateName("newNet"));
+            break;
+        case "setName":
+            net.setName("newNet");
+            break;
+        case "rename":
+            Assertions.assertTrue(net.rename("newNet"));
+            break;
+        default:
+            throw new RuntimeException("Unexpected method: " + method);
+        }
+
+        Assertions.assertEquals("newNet", net.getName());
+        Assertions.assertNull(net.getLogicalHierNet());
+    }
+
     @Test
     public void testCreatePinDuplicate() {
         Design d = new Design("testCreatePinDuplicate", Device.AWS_F1);
