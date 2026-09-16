@@ -54,6 +54,7 @@ import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
@@ -467,6 +468,95 @@ public class TestDesignTools {
         }
         Assertions.assertTrue(merged > 0, "no boundary crossing was merged");
         Assertions.assertTrue(merged < cellNets.size(), "every net was merged away");
+    }
+
+    /**
+     * The bookkeeping populateBlackBox() owes the design beyond the placement and routing itself:
+     * the hierarchy each merged cell and net resolves to, and the record of what changed that an
+     * incremental bitstream is written from. None of it is visible in the design's placement or
+     * routing, and all of it is wrong in a way that only shows up at write_bitstream time.
+     */
+    @Test
+    public void testPopulateBlackBoxBookkeeping() {
+        Design design = RapidWrightDCP.loadDCP("hwct.dcp");
+        Design cell = RapidWrightDCP.loadDCP("hwct_pr1.dcp");
+        String hierCellName = "hw_contract_pr1";
+        String cellPrefix = hierCellName + EDIFTools.EDIF_HIER_SEP;
+
+        // Only a design that is tracking its original site instances snapshots them, so ask for it
+        design.setCopyingOriginalSiteInsts(true);
+
+        // The site instances the cell brings with it, captured before the call moves them across
+        Set<SiteInst> incoming = new HashSet<>(cell.getSiteInsts());
+        Assertions.assertFalse(incoming.isEmpty());
+
+        // Cell and Net both resolve their place in the hierarchy lazily and keep the answer. Ask
+        // every one of them for it now, while they still belong to the circuit, so that they cross
+        // over holding the circuit's hierarchy rather than nothing at all -- which is the state any
+        // caller that has so much as inspected the circuit hands populateBlackBox, and the only
+        // state in which a cache left behind by the merge can be told apart from an empty one
+        for (SiteInst si : incoming) {
+            for (Cell c : si.getCells()) {
+                c.getEDIFHierCellInst();
+            }
+        }
+        for (Net net : cell.getNets()) {
+            net.getLogicalHierNet();
+        }
+
+        Set<Net> modified = DesignTools.populateBlackBox(design, hierCellName, cell, false);
+
+        EDIFNetlist netlist = design.getNetlist();
+
+        // Every merged cell must resolve through the netlist it now lives in. Cell caches this
+        // lazily, so a cell that arrived with the cache already populated would still be holding
+        // the cell instances of the circuit's own netlist
+        int cellsChecked = 0;
+        for (Cell c : design.getCells()) {
+            if (!c.getName().startsWith(cellPrefix)) {
+                continue;
+            }
+            Assertions.assertEquals(netlist.getHierCellInstFromName(c.getName()),
+                    c.getEDIFHierCellInst(), c.getName());
+            cellsChecked++;
+        }
+        Assertions.assertTrue(cellsChecked > 0, "no cell was merged in");
+
+        // ... and the same for every net that kept its prefixed name, which Net also caches lazily
+        int netsChecked = 0;
+        for (Net net : modified) {
+            if (!net.getName().startsWith(cellPrefix)) {
+                continue;
+            }
+            EDIFHierNet hierNet = net.getLogicalHierNet();
+            if (hierNet != null) {
+                Assertions.assertEquals(netlist.getHierNetFromName(net.getName()), hierNet,
+                        net.getName());
+            }
+            // A net the merge brought in is a change to the design, and an incremental write of it
+            // has no other way to know that
+            Assertions.assertTrue(design.getModifiedNets().contains(net), net.getName());
+            netsChecked++;
+        }
+        Assertions.assertTrue(netsChecked > 0, "no net kept its prefixed name");
+
+        // Likewise for the site instances: all of them are new to this design
+        for (SiteInst si : incoming) {
+            Assertions.assertTrue(design.getModifiedSiteInsts().contains(si), si.getName());
+        }
+
+        // What each of those sites is changing from, so that everything the incoming site instance
+        // holds counts as a difference. The sites were free, so the snapshots are blank -- barring
+        // a static source, which is the one thing a black box is allowed to evict
+        Map<String, SiteInst> originals = design.getOriginalSiteInsts();
+        for (SiteInst si : incoming) {
+            SiteInst original = originals.get(si.getName());
+            Assertions.assertNotNull(original, si.getName());
+            Assertions.assertSame(si.getSite(), original.getSite());
+            if (!original.getName().startsWith(SiteInst.STATIC_SOURCE)) {
+                Assertions.assertTrue(original.getCells().isEmpty(), si.getName());
+            }
+        }
     }
 
     @ParameterizedTest
