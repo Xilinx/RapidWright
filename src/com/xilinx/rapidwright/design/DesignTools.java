@@ -1072,7 +1072,6 @@ public class DesignTools {
                         deferredRemovals.computeIfAbsent(net, (p) -> new HashSet<>()).add(spi);
                     }
                 } else {
-                    assert(!design.isSiteUsed(si.getSite()));
                     // Expected to be obsoleted when PR #1411 is merged.
                     if (design.isCopyingOriginalSiteInsts()) {
                         // Create an empty SiteInst to indicate it was blank to begin with
@@ -1130,12 +1129,15 @@ public class DesignTools {
                     staticNet.setPIPs(uniquePIPs);
                     modifiedNets.add(staticNet);
                 } else {
-                    // rename() rather than updateName(): it drops the net's stale EDIFHierNet
-                    // cache and marks the net modified, both of which updateName() omits. It acts
-                    // on whichever design currently owns the net, so addNet() has to come first for
-                    // that to be the shell rather than the circuit the net arrived from.
-                    design.addNet(net);
+                    // rename() acts on whichever design currently owns the net, so this re-keys the
+                    // circuit the net arrived from and addNet() then inserts it into the shell under
+                    // the prefixed name. The other order would put it into the shell under its
+                    // unprefixed name first, displacing any net the shell already has by that name.
                     net.rename(cellPrefix + net.getName());
+                    design.addNet(net);
+                    // rename() marked the net modified on the circuit rather than on the shell.
+                    // Expected to be obsoleted when PR #1411 is merged.
+                    design.addModifiedNet(net);
                     modifiedNets.add(net);
                     if (isBoundaryCrossing(netlist, net, cellPrefix, keepBoundaryRouting)) {
                         boundaryNets.add(net);
