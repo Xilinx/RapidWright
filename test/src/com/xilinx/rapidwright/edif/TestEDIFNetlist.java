@@ -660,4 +660,24 @@ class TestEDIFNetlist {
             Assertions.assertEquals("[ob/P/O]", netlist.getPhysicalPins("ob/O").toString());
         }
     }
+
+    @Test
+    public void testExpandMacroUnisimsWithoutPartName() {
+        EDIFNetlist netlist = new EDIFNetlist("test");
+        netlist.setDesign(new EDIFDesign("top"));
+        // A netlist whose design carries no PART property has nothing to expand
+        // against, and must report that rather than dereferencing a null part name
+        Assertions.assertFalse(netlist.expandMacroUnisims());
+    }
+
+    @Test
+    public void testExpandMacroUnisimsWithUnknownPartName() {
+        EDIFNetlist netlist = new EDIFNetlist("test");
+        EDIFDesign design = new EDIFDesign("top");
+        netlist.setDesign(design);
+        design.addProperty(EDIFTools.EDIF_PART_PROP, "xcNotARealPart");
+        // PartNameTools.getPart() throws for an unidentifiable part; the documented
+        // contract here is to return false instead
+        Assertions.assertFalse(netlist.expandMacroUnisims());
+    }
 }

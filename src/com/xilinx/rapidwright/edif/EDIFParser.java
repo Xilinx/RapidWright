@@ -152,8 +152,11 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
         EDIFLibrary library = parseEdifLibraryHead();
 
         String currToken;
+        // Cell references name their library by its legal EDIF name, which differs
+        // from getName() whenever the library carries a (rename ...)
+        String libraryLegalName = cache.getLegalEDIFName(library);
         while (LEFT_PAREN.equals(currToken = getNextToken(true))) {
-            final EDIFCell cell = parseEDIFCell(library.getName(), getNextToken(true));
+            final EDIFCell cell = parseEDIFCell(libraryLegalName, getNextToken(true));
             library.addCellRenameDuplicates(cell, cache.getEDIFRename(cell));
         }
         expect(RIGHT_PAREN, currToken);

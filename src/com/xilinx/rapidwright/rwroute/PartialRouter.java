@@ -24,7 +24,6 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -33,7 +32,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -44,7 +42,6 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.ClockRegion;
-import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
@@ -369,19 +366,32 @@ public class PartialRouter extends RWRoute {
     }
 
     /**
+     * Recovers those arcs of a net's routing that Vivado has fixed in place, ahead of
+     * setPrevBetweenProjectedPins(). Does nothing by default, since only PartialDFXRouter makes
+     * use of such arcs.
+     * @param net The net to examine.
+     */
+    protected void setPrevOnFixedArcs(Net net) {
+    }
+
+    /**
      * Recovers those arcs of a net's routing that lie between the nodes its connections were
      * projected onto. Each subtree of the net's routing is walked from its root; the walk only
      * begins collecting once a source node (that of any connection, or the net's alternate
-     * source) is encountered, and it terminates at every sink node (that of any connection, or
-     * any of its alternate sinks). Arcs outside that span -- those of the projection tails at
-     * either end, and those of any branch continuing beyond a sink -- are of no use to the
-     * router, since assignNodesToConnections() recovers both tails separately.
+     * source) is encountered, and an arc is only collected if a sink node (that of any
+     * connection, or any of its alternate sinks) lies at or below it. Arcs outside that span --
+     * those of the projection tails at either end, and those of any branch reaching no sink --
+     * are of no use to the router, since assignNodesToConnections() recovers both tails
+     * separately.
      * Each such arc has a RouteNode created for both of its nodes, and the previous pointer of
      * the driven node set to the driver.
-     * @param net The net in question.
-     * @param netWrapper The wrapper holding that net's connections.
+     * @param netWrapper The wrapper holding the net's connections.
      */
-    private void setPrevBetweenProjectedPins(Net net, NetWrapper netWrapper) {
+    private void setPrevBetweenProjectedPins(NetWrapper netWrapper) {
+        Net net = netWrapper.getNet();
+        // Recover the arcs Vivado has fixed in place first, since the walk below must not
+        // overwrite the previous pointers they carry
+        setPrevOnFixedArcs(net);
         // The nodes at which the walk becomes active, and those at which it terminates
         Set<Node> sourceNodes = new HashSet<>();
         Set<Node> sinkNodes = new HashSet<>();
@@ -393,55 +403,68 @@ public class PartialRouter extends RWRoute {
             sinkNodes.add(connection.getSinkRnode());
             sinkNodes.addAll(connection.getAltSinkRnodes());
         }
-        SitePinInst altSource = net.getAlternateSource();
-        if (altSource != null) {
-            // NetWrapper.getOrCreateAlternateSource() is only called when the primary source
-            // cannot be projected, so no Connection need refer to this node even when the net
-            // is in fact routed from it
-            sourceNodes.add(altSource.getConnectedNode());
-        }
 
+        SitePinInst altSource = net.getAlternateSource();
+        Node altSourceNode = (altSource != null) ? altSource.getConnectedNode() : null;
+        for (NetTools.NodeTree root : NetTools.getNodeTrees(net)) {
+            if (root.equals(altSourceNode) && !root.fanouts.isEmpty()) {
+                // Part of this net is routed from its alternate source, so activate the walk
+                // there -- but at the node that source projects onto, not at the pin node itself:
+                // the arcs of that projection tail are no part of any connection, and a prev
+                // pointer on the projected node would send saveRouting()'s backtracking (which
+                // stops only at a null prev, not at the connection's source) past that source.
+                if (netWrapper.getOrCreateAlternateSource(routingGraph) != null) {
+                    // Must precede the walk of this very subtree, since on architectures where an
+                    // output pin projects onto its own node this node is that very root
+                    sourceNodes.add(netWrapper.getAltSourceRnode());
+                }
+            }
+
+            setPrevOnPathsToSinks(root, sourceNodes.contains(root), sourceNodes, sinkNodes);
+        }
+    }
+
+    /**
+     * Recursively sets the previous pointer on every arc of the given subtree that lies on a path
+     * down to a sink node, once the walk has been activated by a source node.
+     * @param node Root of the subtree to descend.
+     * @param active True if a source node has already been reached at or above this node.
+     * @param sourceNodes The nodes at which the walk becomes active.
+     * @param sinkNodes The nodes at which the walk terminates.
+     * @return True if this node is a sink, or if a sink lies below it.
+     */
+    private boolean setPrevOnPathsToSinks(NetTools.NodeTree node,
+                                          boolean active,
+                                          Set<Node> sourceNodes,
+                                          Set<Node> sinkNodes) {
         // PartialRouter assumes that nets are not multiply driven, so this routing is a forest:
         // every node is reached exactly once and no visited set is necessary
-        Queue<NetTools.NodeTree> queue = new ArrayDeque<>();
-        Queue<Boolean> activeQueue = new ArrayDeque<>();
-        for (NetTools.NodeTree root : NetTools.getNodeTrees(net)) {
-            queue.add(root);
-            activeQueue.add(sourceNodes.contains(root));
-        }
+        boolean onPathToSink = sinkNodes.contains(node);
+        for (NetTools.NodeTree fanout : node.fanouts) {
+            assert(!fanout.multiplyDriven);
+            // A source activates the walk on arrival, so that the arcs below it are collected
+            boolean fanoutActive = active || sourceNodes.contains(fanout);
+            boolean fanoutOnPathToSink = setPrevOnPathsToSinks(fanout, fanoutActive, sourceNodes, sinkNodes);
+            onPathToSink |= fanoutOnPathToSink;
 
-        while (!queue.isEmpty()) {
-            NetTools.NodeTree node = queue.remove();
-            boolean active = activeQueue.remove();
-            if (active && node.fanouts.isEmpty() && sinkNodes.contains(node)) {
-                // Nothing beyond a sink belongs to any connection -- unless the routing carries
-                // on through it, which a NODE_PINBOUNCE sink does when the net bounces off the
-                // pin to reach another sink below it. Stopping there would leave every node on
-                // that continuation without a prev pointer, so finishRouteConnection() could not
-                // recover the branch and the connection would be re-routed into its own
-                // preserved sink node
-                continue;
-            }
-            for (NetTools.NodeTree fanout : node.fanouts) {
-                assert(!fanout.multiplyDriven);
-                // A source activates the walk on arrival, so that the arcs below it are collected
-                boolean fanoutActive = active || sourceNodes.contains(fanout);
-                if (active) {
-                    RouteNode rstart = routingGraph.getOrCreate(node);
-                    RouteNode rend = routingGraph.getOrCreate(fanout);
-                    // TODO: Propagate PIP.isPIPFixed() onto rend.setArcLocked(true) here. Doing so
-                    //       needs the PIP behind this arc, which the tree walk does not carry; no
-                    //       net in the designs of interest has any fixed PIP (RapidWright never
-                    //       sets that flag when reading a DCP -- only Net.lockRouting(),
-                    //       DesignTools.lockRouting() and DesignTools.copyImplementation() do),
-                    //       so nothing depends on it today.
+            // Note that a sink is not necessarily a leaf -- routing carries on through a
+            // NODE_PINBOUNCE sink when the net bounces off that pin to reach another sink below
+            // it, and every node on that continuation needs a prev pointer too, or
+            // finishRouteConnection() could not recover the branch and the connection would be
+            // re-routed into its own preserved sink node
+            if (active && fanoutOnPathToSink) {
+                RouteNode rstart = routingGraph.getOrCreate(node);
+                RouteNode rend = routingGraph.getOrCreate(fanout);
+                if (rend.isArcLocked()) {
+                    // setPrevOnFixedArcs() got here first, and must agree
+                    assert(rend.getPrev() == rstart);
+                } else {
                     assert(rend.getPrev() == null);
                     rend.setPrev(rstart);
                 }
-                queue.add(fanout);
-                activeQueue.add(fanoutActive);
             }
         }
+        return onPathToSink;
     }
 
     @Override
@@ -465,7 +488,7 @@ public class PartialRouter extends RWRoute {
                 //      finishRouteConnection()
                 // (b) RouteNode.setChildren() will know to only allow this incoming
                 //     arc on these nodes
-                setPrevBetweenProjectedPins(net, netWrapper);
+                setPrevBetweenProjectedPins(netWrapper);
 
                 // Use the prev pointers to attempt to recover routing for all indirect connections
                 for (Connection connection : netWrapper.getConnections()) {
@@ -484,30 +507,6 @@ public class PartialRouter extends RWRoute {
             numPreservedWire++;
             numPreservedRoutableNets++;
         }
-    }
-
-    protected boolean isExcludedPip(Node start, Node end) {
-        if (!routingGraph.isVersal) {
-            return false;
-        }
-
-        // Skip all PIPs downstream from a NODE_INTF_CTRL/NODE_IMUX (since these are the intents that
-        // RouterHelper.projectInputPinToINTNode() will terminate at)
-        // {NODE_INTF_CTRL,NODE_IMUX} -> NODE_PINFEED -> NODE_IRI -> NODE_IRI -> NODE_PINFEED (site pin)
-        IntentCode startIntent = start.getIntentCode();
-        if (startIntent == IntentCode.NODE_INTF_CTRL || startIntent == IntentCode.NODE_IMUX ||
-                startIntent == IntentCode.NODE_IRI) {
-            return true;
-        }
-
-        IntentCode endIntent = end.getIntentCode();
-        if (endIntent == IntentCode.NODE_IRI ||
-                // Skip NODE_OUTPUT -> NODE_INTF[24] since RouterHelper.projectOutputPinToINTNode()
-                // terminates at the latter
-                endIntent == IntentCode.NODE_INTF2 || endIntent == IntentCode.NODE_INTF4) {
-            return true;
-        }
-        return false;
     }
 
     @Override
@@ -637,10 +636,8 @@ public class PartialRouter extends RWRoute {
                 Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
                 Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
 
-                RouteNode rend = routingGraph.getNode(end);
                 if (pip.isPIPFixed()) {
                     // Do not unpreserve locked nodes
-                    assert(rend == null || rend.isArcLocked());
                     continue;
                 }
 
@@ -652,12 +649,10 @@ public class PartialRouter extends RWRoute {
                 boolean endPreserved = routingGraph.unpreserve(end);
                 assert(endAdded == endPreserved);
 
-                // Check the prev pointer is consistent with PIP, where one was set
-                // FIXME: This was a strong invariant when a prev pointer was set for every PIP of
-                //        the net, but setPrevBetweenProjectedPins() only sets one for the arcs
-                //        inside the projected source-to-sink span. A RouteNode existing for an
-                //        out-of-span node -- created by another net's walk -- carries a prev that
-                //        has nothing to do with this PIP, so this would misfire under -ea
+                // Check the prev pointer is consistent with PIP, for those arcs inside the
+                // projected source-to-sink span that setPrevBetweenProjectedPins() set one for;
+                // no RouteNode exists for the nodes outside it
+                RouteNode rend = routingGraph.getNode(end);
                 assert(rend == null || rend.getPrev() == routingGraph.getNode(start));
             }
         } else {
@@ -688,7 +683,7 @@ public class PartialRouter extends RWRoute {
             // Only those nodes between the projected source and sink nodes of this net's
             // connections are of use to the router, so create just those and set their previous
             // pointer according to the PIP
-            setPrevBetweenProjectedPins(net, netWrapper);
+            setPrevBetweenProjectedPins(netWrapper);
 
             // Try and use prev pointers to recover the routing for each connection
             for (Connection connection : netWrapper.getConnections()) {

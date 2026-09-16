@@ -313,10 +313,16 @@ public class MetadataParser {
                     expect(NETNAME, tokens[1]);
                     currPortNet = m.getNet(tokens[2]);
                     if (currPortNet==null) {
+                        // The physical net is named after the parent (canonical) net of this
+                        // alias.  Nets without a driver (such as an unused output port) have no
+                        // parent, fall back onto the name provided by the metadata in that case.
                         String parentNetName = m.getNetlist().getParentNetName(tokens[2]);
-                        currPortNet = m.getNet(parentNetName);
-                        if (currPortNet==null) {
-                            currPortNet = new Net(parentNetName);
+                        String netName = parentNetName != null ? parentNetName : tokens[2];
+                        currPortNet = m.getNet(netName);
+                        if (currPortNet==null && implicitConnections) {
+                            // Only implicit connections need a Net to group the ports by, don't
+                            // burden modules with explicit connections with empty nets.
+                            currPortNet = new Net(netName);
                             m.addNet(currPortNet);
                         }
                     }
@@ -488,7 +494,9 @@ public class MetadataParser {
         if (!port.isOutPort()) {
             return;
         }
-        if (!port.getSitePinInsts().isEmpty() || port.getType() == PortType.GROUND || port.getType() == PortType.POWER) {
+        if (!port.getSitePinInsts().isEmpty() || port.getType() == PortType.GROUND || port.getType() == PortType.POWER
+                || port.getType() == PortType.UNCONNECTED) {
+            // An unconnected port is not expected to have a source
             return;
         }
         //Any input among passthru ports?

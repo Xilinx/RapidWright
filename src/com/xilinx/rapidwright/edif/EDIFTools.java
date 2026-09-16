@@ -25,6 +25,7 @@
  */
 package com.xilinx.rapidwright.edif;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,6 +50,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.zip.GZIPInputStream;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -62,6 +64,7 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Params;
+import com.xilinx.rapidwright.util.function.InputStreamSupplier;
 
 
 /**
@@ -949,11 +952,88 @@ public class EDIFTools {
         return loadEDIFFile(fileName, Integer.MAX_VALUE);
     }
 
+    /** Magic bytes that begin every gzip stream. */
+    private static final byte[] GZIP_MAGIC = { (byte) 0x1f, (byte) 0x8b };
+
+    /**
+     * Checks whether the provided file is gzip-compressed, either by its '.gz'
+     * extension or by inspecting its magic bytes. Some tools emit gzipped EDIF
+     * without the conventional extension.
+     *
+     * @param fileName Path to the file to check.
+     * @return True if the file is gzip-compressed, false otherwise.
+     */
+    public static boolean isGzipped(Path fileName) {
+        if (fileName.toString().endsWith(".gz")) {
+            return true;
+        }
+        try (InputStream in = Files.newInputStream(fileName)) {
+            return startsWithGzipMagic(in);
+        } catch (IOException e) {
+            throw new UncheckedIOException("ERROR: Couldn't read file: " + fileName, e);
+        }
+    }
+
+    /**
+     * Reads the leading magic bytes of a stream to determine whether it is
+     * gzip-compressed. A stream that supports mark/reset is rewound, leaving those
+     * bytes available to the caller.
+     *
+     * @param in The stream to inspect.
+     * @return True if the stream begins with the gzip magic bytes, false otherwise.
+     */
+    private static boolean startsWithGzipMagic(InputStream in) throws IOException {
+        boolean rewindable = in.markSupported();
+        if (rewindable) {
+            in.mark(GZIP_MAGIC.length);
+        }
+        byte[] magic = new byte[GZIP_MAGIC.length];
+        int read = 0;
+        int count;
+        while (read < magic.length && (count = in.read(magic, read, magic.length - read)) >= 0) {
+            read += count;
+        }
+        if (rewindable) {
+            in.reset();
+        }
+        return read == magic.length && Arrays.equals(magic, GZIP_MAGIC);
+    }
+
+    /**
+     * Opens an InputStream over an EDIF file, transparently decompressing it when
+     * gzipped, whether or not it carries a '.gz' extension.
+     *
+     * @param fileName Path to the EDIF file from which to get an InputStream.
+     * @return An InputStream of the (decompressed) EDIF contents.
+     */
+    public static InputStream openEDIFInputStream(Path fileName) {
+        boolean nameEndsWithGz = fileName.toString().endsWith(".gz");
+        InputStream in = InputStreamSupplier.getInputStream(fileName,
+                nameEndsWithGz && Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK);
+        if (nameEndsWithGz) {
+            // getInputStream() has already decompressed this. The decompress-to-disk
+            // option is keyed on the extension, so it never applies below.
+            return in;
+        }
+        // Detect gzip on the stream that is already open, so the file is neither
+        // re-opened nor read twice
+        try {
+            in = new BufferedInputStream(in);
+            return startsWithGzipMagic(in) ? new GZIPInputStream(in) : in;
+        } catch (IOException e) {
+            FileTools.close(in);
+            throw new UncheckedIOException("ERROR: Couldn't read file: " + fileName, e);
+        }
+    }
+
     public static EDIFNetlist loadEDIFFile(Path fileName, int maxThreads) {
         try {
             final long size = Files.size(fileName);
-            if (ParallelEDIFParser.calcThreads(size, maxThreads, fileName.toString().endsWith(".gz")) > 1) {
-                try (ParallelEDIFParser p = new ParallelEDIFParser(fileName)) {
+            // Determined once here and threaded through, so the parser does not
+            // re-open the file to ask the same question
+            final boolean gzipped = isGzipped(fileName);
+            if (ParallelEDIFParser.calcThreads(size, maxThreads, gzipped) > 1) {
+                try (ParallelEDIFParser p = new ParallelEDIFParser(fileName, size, gzipped)) {
                     return p.parseEDIFNetlist();
                 }
             } else {

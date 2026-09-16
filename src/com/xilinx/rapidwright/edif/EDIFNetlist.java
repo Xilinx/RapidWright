@@ -1805,8 +1805,16 @@ public class EDIFNetlist extends EDIFName {
      *         otherwise.
      */
     public boolean expandMacroUnisims() {
-        Part part = PartNameTools.getPart(EDIFTools.getPartName(this));
-        if (part == null) {
+        String partName = EDIFTools.getPartName(this);
+        if (partName == null) {
+            return false;
+        }
+        Part part;
+        try {
+            part = PartNameTools.getPart(partName);
+        } catch (RuntimeException e) {
+            // getPart() throws rather than returning null for a part it cannot
+            // identify, which this method reports as a failure to expand
             return false;
         }
         expandMacroUnisims(part.getSeries());

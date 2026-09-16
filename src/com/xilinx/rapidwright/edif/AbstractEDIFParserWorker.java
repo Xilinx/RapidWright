@@ -29,9 +29,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.xilinx.rapidwright.util.Params;
 import com.xilinx.rapidwright.util.StringPool;
-import com.xilinx.rapidwright.util.function.InputStreamSupplier;
 
 public abstract class AbstractEDIFParserWorker {
 
@@ -48,6 +46,7 @@ public abstract class AbstractEDIFParserWorker {
     public static final String STATUS = "status";
     public static final String WRITTEN = "written";
     public static final String TIMESTAMP = "timestamp";
+    public static final String AUTHOR = "author";
     public static final String PROGRAM = "program";
     public static final String VERSION = "version";
     public static final String COMMENT = "comment";
@@ -92,10 +91,31 @@ public abstract class AbstractEDIFParserWorker {
     }
 
     public AbstractEDIFParserWorker(Path fileName, StringPool uniquifier, EDIFReadLegalNameCache cache) throws FileNotFoundException {
-        in = InputStreamSupplier.getInputStream(fileName,
-                fileName.toString().endsWith(".gz") && Params.RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK);
+        in = EDIFTools.openEDIFInputStream(fileName);
         tokenizer = new EDIFTokenizer(fileName, in, uniquifier);
         this.cache = cache;
+    }
+
+    /**
+     * Consumes the remainder of the construct currently being parsed, through its
+     * matching closing parenthesis. The construct's opening parenthesis and keyword
+     * are assumed to have already been consumed.
+     */
+    protected void skipConstruct() {
+        int depth = 1;
+        while (depth > 0) {
+            String token = requireToken(tokenizer.getOptionalNextTokenString(true));
+            // A quoted string is returned without its quotes, so its text can equal
+            // "(" or ")" without being a parenthesis
+            if (tokenizer.wasLastTokenQuoted()) {
+                continue;
+            }
+            if (LEFT_PAREN.equals(token)) {
+                depth++;
+            } else if (RIGHT_PAREN.equals(token)) {
+                depth--;
+            }
+        }
     }
 
     private static <T> T requireToken(T t) {
@@ -179,7 +199,14 @@ public abstract class AbstractEDIFParserWorker {
         expect(RIGHT_PAREN, getNextToken(true));
 
         expect(LEFT_PAREN, getNextToken(true));
-        expect(VIEW, getNextToken(true));
+        // EDIF permits cell-level properties ahead of the view
+        String viewOrProperty = getNextToken(true);
+        while (PROPERTY.equalsIgnoreCase(viewOrProperty)) {
+            parseProperty(cell, viewOrProperty); // Consumes through the property's ')'
+            expect(LEFT_PAREN, getNextToken(true));
+            viewOrProperty = getNextToken(true);
+        }
+        expect(VIEW, viewOrProperty);
         cell.setView(parseEDIFNameObject(new EDIFName()));
         expect(LEFT_PAREN, getNextToken(true));
         expect(VIEWTYPE, getNextToken(true));
@@ -234,30 +261,41 @@ public abstract class AbstractEDIFParserWorker {
         int min = Integer.parseInt(getNextToken(true));
         int sec = Integer.parseInt(getNextToken(true));
         expect(RIGHT_PAREN, getNextToken(true));
-        expect(LEFT_PAREN, getNextToken(true));
-        expect(PROGRAM, getNextToken(true));
-        String progName = getNextToken(true);
-        expect(LEFT_PAREN, getNextToken(true));
-        expect(VERSION, getNextToken(true));
-        String ver = getNextToken(true);
-        expect(RIGHT_PAREN, getNextToken(true));
-        expect(RIGHT_PAREN, getNextToken(true));
 
         String currToken;
         while (LEFT_PAREN.equals(currToken = getNextToken(true))) {
-            String commentOrMetax = getNextToken(true);
-            if (commentOrMetax.equals(COMMENT)) {
+            String writtenEntry = getNextToken(true);
+            if (writtenEntry.equals(PROGRAM)) {
+                getNextToken(true); // Program name, unused
+                // program ::= (program programName {version | comment | userData}),
+                // so any number of sub-entries may follow, in any order
+                String programEntry;
+                while (LEFT_PAREN.equals(programEntry = getNextToken(true))) {
+                    if (VERSION.equals(getNextToken(true))) {
+                        getNextToken(true); // Version string, unused
+                        expect(RIGHT_PAREN, getNextToken(true));
+                    } else {
+                        // A comment or userData entry, neither of which is modelled
+                        skipConstruct();
+                    }
+                }
+                expect(RIGHT_PAREN, programEntry); // Program end
+                continue;
+            } else if (writtenEntry.equals(AUTHOR)) {
+                getNextToken(true); // Author name, unused
+            } else if (writtenEntry.equals(COMMENT)) {
                 currNetlist.addComment(getNextToken(false));
-            } else if (commentOrMetax.equals(METAX)) {
+            } else if (writtenEntry.equals(METAX)) {
                 String key = getNextToken(false);
                 EDIFPropertyValue value = parsePropertyValue();
                 currNetlist.addMetax(key,value);
-            } else if (commentOrMetax.equals(PROPERTY)) {
+            } else if (writtenEntry.equals(PROPERTY)) {
                 // Discard this property for now
-                parseProperty(new EDIFPropertyObject(), commentOrMetax);
+                parseProperty(new EDIFPropertyObject(), writtenEntry);
                 continue;
             } else {
-                expect(COMMENT + "|" + METAX + "|" + PROPERTY, commentOrMetax);
+                expect(PROGRAM + "|" + AUTHOR + "|" + COMMENT + "|" + METAX + "|" + PROPERTY,
+                        writtenEntry);
             }
             expect(RIGHT_PAREN, getNextToken(true));
         }
