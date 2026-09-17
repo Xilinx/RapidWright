@@ -327,7 +327,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         assert(Utils.isClocking(getTile().getTileTypeEnum()));
                         break;
                     default:
-                        throw new RuntimeException(ic.toString());
+                        throw new RuntimeException("ERROR: Unexpected IntentCode: " + ic + " for " + super.toString());
                 }
                 break;
             default:
