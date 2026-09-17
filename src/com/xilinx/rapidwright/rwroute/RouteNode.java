@@ -31,6 +31,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.RuntimeTracker;
+import com.xilinx.rapidwright.util.Utils;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -312,6 +313,18 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         assert(length == 0 ||
                                // Feedthrough nodes to reach tiles immediately above/below
                                (length == 1 && getWireName().matches("OUT_[NESW]NODE_[EW]_\\d+")));
+                        break;
+                    // These nodes can appear as a result of the Vivado high-fanout net optimization that
+                    // routes-thru leaf clock buffers; currently, they can only appear on preserved
+                    // portions of partially-routed nets
+                    case NODE_GLOBAL_LEAF:
+                    case NODE_GLOBAL_HDISTR:
+                    case NODE_PINFEED: // BUFCE_{LEAF,ROW_FSR}.CE routethru input
+                        // Assume this block is only reached for a preserved net -- it's not straightforward
+                        // to assert this since this net has not yet been preserved (and may even do asynchronously)
+                        // nor is the prev pointer set yet
+                        assert(RouteNodeGraph.isExcludedTile(this));
+                        assert(Utils.isClocking(getTile().getTileTypeEnum()));
                         break;
                     default:
                         throw new RuntimeException(ic.toString());
