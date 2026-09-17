@@ -28,12 +28,14 @@ import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
@@ -905,9 +907,14 @@ public class TestRWRoute {
                 "INT_X6Y90/INT.INT_NODE_IMUX_61_INT_OUT1->>BOUNCE_W_13_FT0"
         });
         net.createPin("EQ2", si);
-        SitePinInst dstSpi = net.createPin("F_I", si);
+        SitePinInst routedSpi = net.createPin("F_I", si);
 
-        assertPartialRouterPreservesRouting(design, net, dstSpi);
+        // An additional, unrouted sink so that the router must also expand (and thus
+        // exercise the routing graph) rather than only recover the existing routing
+        SiteInst unroutedSi = design.createSiteInst("SLICE_X9Y92");
+        SitePinInst unroutedSpi = net.createPin("A1", unroutedSi);
+
+        assertPartialRouterAugmentsRouting(design, net, Arrays.asList(routedSpi, unroutedSpi));
     }
 
     /**
@@ -947,30 +954,41 @@ public class TestRWRoute {
                 "INT_X24Y148/INT.INODE_W_BLS_9_FT0->>BOUNCE_W_15_FT0"
         });
         net.createPin("EQ", srcSi);
-        SitePinInst dstSpi = net.createPin("H_I", dstSi);
+        SitePinInst routedSpi = net.createPin("H_I", dstSi);
 
-        assertPartialRouterPreservesRouting(design, net, dstSpi);
+        // An additional, unrouted sink so that the router must also expand (and thus
+        // exercise the routing graph) rather than only recover the existing routing
+        SiteInst unroutedSi = design.createSiteInst("SLICE_X37Y151");
+        SitePinInst unroutedSpi = net.createPin("A1", unroutedSi);
+
+        assertPartialRouterAugmentsRouting(design, net, Arrays.asList(routedSpi, unroutedSpi));
     }
 
     /**
-     * Asks PartialRouter to route the one sink of an already fully-routed net, and checks
-     * that it hands back exactly the routing it was given.
+     * Asks PartialRouter to route the given sinks of a net that is already routed to all
+     * but the last of them, and checks that the routing it hands back is a strict superset
+     * of the routing it was given: every existing PIP must be preserved, and new PIPs must
+     * have been added to reach the unrouted sink.
      * @param design The design holding the net.
-     * @param net The fully-routed net.
-     * @param dstSpi The net's sink pin, to be presented to the router as needing routing.
+     * @param net The partially-routed net.
+     * @param dstSpis The net's sink pins, to be presented to the router as needing routing;
+     *                all but the last are expected to be already routed.
      */
-    private void assertPartialRouterPreservesRouting(Design design, Net net, SitePinInst dstSpi) {
+    private void assertPartialRouterAugmentsRouting(Design design, Net net, List<SitePinInst> dstSpis) {
         List<PIP> expectedPIPs = new ArrayList<>(net.getPIPs());
         Assertions.assertFalse(expectedPIPs.isEmpty());
 
         // Presenting an already-routed sink is what makes PartialRouter walk the existing
-        // routing and build a RouteNode for every node on it
-        PartialRouter.routeDesignPartialNonTimingDriven(design, Collections.singletonList(dstSpi));
+        // routing and build a RouteNode for every node on it; presenting an unrouted sink
+        // alongside it forces the router to also expand through the routing graph
+        PartialRouter.routeDesignPartialNonTimingDriven(design, dstSpis);
 
-        Assertions.assertTrue(dstSpi.isRouted());
+        for (SitePinInst dstSpi : dstSpis) {
+            Assertions.assertTrue(dstSpi.isRouted());
+        }
         // The router is free to hand the routing back in a different order
-        List<PIP> actualPIPs = net.getPIPs();
-        Assertions.assertEquals(expectedPIPs.size(), actualPIPs.size());
-        Assertions.assertEquals(new HashSet<>(expectedPIPs), new HashSet<>(actualPIPs));
+        Set<PIP> actualPIPs = new HashSet<>(net.getPIPs());
+        Assertions.assertTrue(actualPIPs.containsAll(expectedPIPs));
+        Assertions.assertTrue(actualPIPs.size() > expectedPIPs.size());
     }
 }
