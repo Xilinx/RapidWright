@@ -28,14 +28,12 @@ import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
@@ -900,7 +898,7 @@ public class TestRWRoute {
                 "INT_X6Y90/INT.LOGIC_OUTS_W7->INT_NODE_SDQ_55_INT_OUT1",
                 "INT_X6Y90/INT.INT_NODE_SDQ_55_INT_OUT1->>SS1_W_BEG2",
                 "RCLK_INT_L_X6Y89/RCLK_INT_L.SOUTHBUSOUT_FT0_27->>INT_NODE_IMUX_13_INT_OUT0",
-                "RCLK_INT_L_X6Y89/RCLK_INT_L.INT_NODE_IMUX_13_INT_OUT0->>CLK_LEAF_SITES_30_CE_INT",     // NODE_PINFEED
+                "RCLK_INT_L_X6Y89/RCLK_INT_L.INT_NODE_IMUX_13_INT_OUT0->>CLK_LEAF_SITES_30_CE_INT",     // NODE_PINFEED (BUFCE_LEAF.CE_INT)
                 "RCLK_INT_L_X6Y89/RCLK_INT_L.CLK_LEAF_SITES_30_CE_INT->>CLK_LEAF_SITES_30_CLK_LEAF",    // NODE_GLOBAL_LEAF
                 "INT_X6Y90/INT.GCLK_B_0_15->>INT_NODE_GLOBAL_12_INT_OUT0",
                 "INT_X6Y90/INT.INT_NODE_GLOBAL_12_INT_OUT0->>INT_NODE_IMUX_61_INT_OUT1",
@@ -908,13 +906,14 @@ public class TestRWRoute {
         });
         net.createPin("EQ2", si);
         SitePinInst routedSpi = net.createPin("F_I", si);
+        routedSpi.setRouted(true);
 
         // An additional, unrouted sink so that the router must also expand (and thus
         // exercise the routing graph) rather than only recover the existing routing
         SiteInst unroutedSi = design.createSiteInst("SLICE_X9Y92");
         SitePinInst unroutedSpi = net.createPin("A1", unroutedSi);
 
-        assertPartialRouterAugmentsRouting(design, net, Arrays.asList(routedSpi, unroutedSpi));
+        assertPartialRouterAugmentsRouting(design, net, routedSpi, unroutedSpi);
     }
 
     /**
@@ -940,11 +939,11 @@ public class TestRWRoute {
                 "INT_X23Y149/INT.EE1_E_END7->INT_NODE_SDQ_93_INT_OUT0",
                 "INT_X23Y149/INT.INT_NODE_SDQ_93_INT_OUT0->>NN1_W_BEG7",
                 "RCLK_INT_L_X23Y149/RCLK_INT_L.NORTHBUSOUT_FT0_28->>INT_NODE_IMUX_23_INT_OUT1",
-                "RCLK_INT_L_X23Y149/RCLK_INT_L.INT_NODE_IMUX_23_INT_OUT1->>INT_RCLK_TO_CLK_LEFT_0_0",   // NODE_GLOBAL_HDISTR
-                "RCLK_BRAM_INTF_L_X23Y149/RCLK_BRAM_INTF_L.CLK_BUFCE_ROW_FSR_0_CE_PRE_OPTINV->>CLK_BUFCE_ROW_FSR_0_CLK_OUT",
-                "RCLK_BRAM_INTF_L_X23Y149/RCLK_BRAM_INTF_L.CLK_BUFCE_ROW_FSR_0_CLK_OUT->>CLK_TEST_BUF_SITE_1_CLK_IN",
-                "RCLK_INT_L_X24Y149/RCLK_INT_L.CLK_HDISTR_FT0_7->>CLK_LEAF_SITES_15_CLK_IN",
-                "RCLK_INT_L_X24Y149/RCLK_INT_L.CLK_LEAF_SITES_15_CLK_IN->>CLK_LEAF_SITES_15_CLK_LEAF",
+                "RCLK_INT_L_X23Y149/RCLK_INT_L.INT_NODE_IMUX_23_INT_OUT1->>INT_RCLK_TO_CLK_LEFT_0_0",                           // NODE_PINFEED (BUFCE_ROW_FSR.CE_PRE_OPTINV)
+                "RCLK_BRAM_INTF_L_X23Y149/RCLK_BRAM_INTF_L.CLK_BUFCE_ROW_FSR_0_CE_PRE_OPTINV->>CLK_BUFCE_ROW_FSR_0_CLK_OUT",    // NODE_GLOBAL_HDISTR
+                "RCLK_BRAM_INTF_L_X23Y149/RCLK_BRAM_INTF_L.CLK_BUFCE_ROW_FSR_0_CLK_OUT->>CLK_TEST_BUF_SITE_1_CLK_IN",           // NODE_GLOBAL_HDISTR
+                "RCLK_INT_L_X24Y149/RCLK_INT_L.CLK_HDISTR_FT0_7->>CLK_LEAF_SITES_15_CLK_IN",                                    // INTENT_DEFAULT (BUFCE_LEAF.CLK_IN)
+                "RCLK_INT_L_X24Y149/RCLK_INT_L.CLK_LEAF_SITES_15_CLK_IN->>CLK_LEAF_SITES_15_CLK_LEAF",                          // NODE_GLOBAL_LEAF
                 "INT_X24Y149/INT.GCLK_B_0_9->>INT_NODE_GLOBAL_13_INT_OUT0",
                 "INT_X24Y149/INT.INT_NODE_GLOBAL_13_INT_OUT0->>INT_NODE_IMUX_62_INT_OUT1",
                 "INT_X24Y149/INT.INT_NODE_IMUX_62_INT_OUT1->>BYPASS_W1",
@@ -955,40 +954,52 @@ public class TestRWRoute {
         });
         net.createPin("EQ", srcSi);
         SitePinInst routedSpi = net.createPin("H_I", dstSi);
+        routedSpi.setRouted(true);
 
         // An additional, unrouted sink so that the router must also expand (and thus
         // exercise the routing graph) rather than only recover the existing routing
         SiteInst unroutedSi = design.createSiteInst("SLICE_X37Y151");
         SitePinInst unroutedSpi = net.createPin("A1", unroutedSi);
 
-        assertPartialRouterAugmentsRouting(design, net, Arrays.asList(routedSpi, unroutedSpi));
+        assertPartialRouterAugmentsRouting(design, net, routedSpi, unroutedSpi);
     }
 
     /**
-     * Asks PartialRouter to route the given sinks of a net that is already routed to all
-     * but the last of them, and checks that the routing it hands back is a strict superset
-     * of the routing it was given: every existing PIP must be preserved, and new PIPs must
-     * have been added to reach the unrouted sink.
+     * Asks PartialRouter to route the unrouted sink of an otherwise already-routed net, and
+     * checks that the routing it hands back is a strict superset of the routing it was
+     * given: every existing PIP must be preserved -- thus the clock buffer routethru that
+     * the already-routed sink is reached through -- and new PIPs must have been added to
+     * reach the unrouted sink.
      * @param design The design holding the net.
      * @param net The partially-routed net.
-     * @param dstSpis The net's sink pins, to be presented to the router as needing routing;
-     *                all but the last are expected to be already routed.
+     * @param routedSpi The net's already-routed sink pin, not given to the router.
+     * @param unroutedSpi The net's unrouted sink pin; the only pin given to the router.
      */
-    private void assertPartialRouterAugmentsRouting(Design design, Net net, List<SitePinInst> dstSpis) {
+    private void assertPartialRouterAugmentsRouting(Design design, Net net, SitePinInst routedSpi,
+                                                    SitePinInst unroutedSpi) {
         List<PIP> expectedPIPs = new ArrayList<>(net.getPIPs());
         Assertions.assertFalse(expectedPIPs.isEmpty());
+        Assertions.assertTrue(routedSpi.isRouted());
+        Assertions.assertFalse(unroutedSpi.isRouted());
 
-        // Presenting an already-routed sink is what makes PartialRouter walk the existing
-        // routing and build a RouteNode for every node on it; presenting an unrouted sink
-        // alongside it forces the router to also expand through the routing graph
-        PartialRouter.routeDesignPartialNonTimingDriven(design, dstSpis);
+        PartialRouter.routeDesignPartialNonTimingDriven(design, Collections.singletonList(unroutedSpi));
 
-        for (SitePinInst dstSpi : dstSpis) {
-            Assertions.assertTrue(dstSpi.isRouted());
+        for (SitePinInst spi : net.getSinkPins()) {
+            Assertions.assertTrue(spi.isRouted());
         }
         // The router is free to hand the routing back in a different order
-        Set<PIP> actualPIPs = new HashSet<>(net.getPIPs());
-        Assertions.assertTrue(actualPIPs.containsAll(expectedPIPs));
+        List<PIP> actualPIPs = net.getPIPs();
+        Assertions.assertTrue(new HashSet<>(actualPIPs).containsAll(expectedPIPs));
         Assertions.assertTrue(actualPIPs.size() > expectedPIPs.size());
+
+        // Note that the newly-routed sink is not expected to share this net's routing through
+        // the clock buffer, no matter where it is placed. The buffer's output node (a
+        // NODE_GLOBAL_LEAF, or a NODE_GLOBAL_HDISTR for the row distribution buffer) spans the
+        // full height/width that it distributes to -- e.g. RCLK_INT_L_X6Y89's
+        // CLK_LEAF_SITES_30_CLK_LEAF ends at INT_X6Y119, the top of its clock region -- and
+        // RouteNode.isInConnectionBoundingBox() tests the end tile coordinate, which thus lies
+        // far outside the bounding box of any connection that a sink near the buffer could
+        // create. Reaching the buffer is not necessary here: this test only requires that such
+        // routing be preserved, not extended.
     }
 }
