@@ -1088,6 +1088,21 @@ public class DesignTools {
                     design.getOriginalSiteInsts().put(si.getName(), existingSi);
                 }
 
+                // A design holds its site instances by name as well as by site, and addSiteInst()
+                // overwrites a same-named entry without complaint.  A site instance carries the name
+                // of whatever built it, which for a circuit straight out of a placer is the module
+                // instance it came from, so two circuits built from the same source name theirs
+                // identically though they sit on opposite ends of the fabric.  Left alone the second
+                // box's entry lands on the first's and the first comes back with its contents gone,
+                // so say so here rather than let the merge quietly lose a box
+                SiteInst clobbered = design.getSiteInst(si.getName());
+                if (clobbered != null) {
+                    throw new RuntimeException("ERROR: Site instance name collision when populating"
+                            + " blackbox '" + hierarchicalCellName + "': incoming SiteInst '"
+                            + si.getName() + "' at " + si.getSiteName()
+                            + " collides with existing SiteInst '" + clobbered.getName() + "' at "
+                            + clobbered.getSiteName());
+                }
                 design.addSiteInst(si);
                 // Expected to be obsoleted when PR #1411 is merged.
                 design.addModifiedSiteInst(si);
