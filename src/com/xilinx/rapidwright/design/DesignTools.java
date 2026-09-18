@@ -2350,71 +2350,61 @@ public class DesignTools {
         }
 
         if (walkSiteWires) {
-            newPins.addAll(createMissingSitePinInstsFromSiteWires(net));
-        }
-
-        return newPins;
-    }
-
-    /**
-     * Creates any missing SitePinInsts for this net by walking the site wires it occupies, rather than
-     * its logical pins.  This is the only description left of a connection whose Cell cannot be found --
-     * a pin inside encrypted IP, or under a black box -- since there is nothing to ask for its physical
-     * pin mapping.
-     * Called by {@link #createMissingSitePinInsts(Design, Net)} for exactly those nets that need it, so
-     * it does not normally need to be called directly.
-     * @param net The net to create missing site pin insts for.
-     * @return The list of pins that were created or an empty list if none were created.
-     */
-    public static List<SitePinInst> createMissingSitePinInstsFromSiteWires(Net net) {
-        List<SitePinInst> newPins = new ArrayList<>();
-        for (SiteInst siteInst : net.getSiteInsts()) {
-            int siteWireCount = siteInst.getSite().getSiteWireCount();
-            for (int siteWire : siteInst.getSiteWireIndicesFromNet(net)) {
-                if (siteWire >= siteWireCount) {
-                    // Some sites (e.g. HPIOB, HDIOB, HPIOBDIFFINBUF) are indexed by a checkpoint beyond
-                    // what the device model holds for them; SiteInst.getSiteWirePins() would throw
-                    continue;
-                }
-                for (BELPin pin : siteInst.getSiteWirePins(siteWire)) {
-                    if (!pin.isSitePort()) {
+            // Walk the site wires this net occupies rather than its logical pins.  A site pin and the
+            // site wire behind it go by the same name, and the wire is the only description left of a
+            // connection whose Cell cannot be found, since there is nothing to ask for a physical pin
+            // mapping
+            for (SiteInst siteInst : net.getSiteInsts()) {
+                int siteWireCount = siteInst.getSite().getSiteWireCount();
+                for (int siteWire : siteInst.getSiteWireIndicesFromNet(net)) {
+                    if (siteWire >= siteWireCount) {
+                        // The indices reported here are not indices into the site's site wire array: on
+                        // some site types (e.g. HPIOB, HDIOB, HPIOBDIFFINBUF) they run past the end of it,
+                        // where SiteInst.getSiteWirePins() throws at exactly the count and reports no pins
+                        // above it.  Such a site wire has no site pin to create here either way
                         continue;
                     }
-
-                    String pinName = pin.getName();
-                    SitePinInst currPin;
-                    synchronized(siteInst) {
-                        currPin = siteInst.getSitePinInst(pinName);
-                    }
-                    if (currPin != null) {
-                        // SitePinInst already exists
-                        continue;
-                    }
-
-                    if (pin.isInput()) {
-                        // Input BELPin means output site port; check that this site port is driven
-                        // by a cell, rather than coming from an input site port
-                        boolean foundOutputPin = false;
-                        for (BELPin connectedBELPin : getConnectedBELPins(pin, siteInst)) {
-                            if (connectedBELPin.isInput()) {
-                                continue;
-                            }
-                            foundOutputPin = true;
-                            break;
-                        }
-                        if (!foundOutputPin) {
+                    for (BELPin pin : siteInst.getSiteWirePins(siteWire)) {
+                        if (!pin.isSitePort()) {
                             continue;
                         }
-                    }
 
-                    synchronized (siteInst) {
-                        currPin = new SitePinInst(pinName, siteInst);
+                        String pinName = pin.getName();
+                        SitePinInst currPin;
+                        synchronized(siteInst) {
+                            currPin = siteInst.getSitePinInst(pinName);
+                        }
+                        if (currPin != null) {
+                            // SitePinInst already exists
+                            continue;
+                        }
+
+                        if (pin.isInput()) {
+                            // Input BELPin means output site port; check that this site port is driven
+                            // by a cell, rather than coming from an input site port
+                            boolean foundOutputPin = false;
+                            for (BELPin connectedBELPin : getConnectedBELPins(pin, siteInst)) {
+                                if (connectedBELPin.isInput()) {
+                                    continue;
+                                }
+                                foundOutputPin = true;
+                                break;
+                            }
+                            if (!foundOutputPin) {
+                                continue;
+                            }
+                        }
+
+                        synchronized (siteInst) {
+                            currPin = new SitePinInst(pinName, siteInst);
+                        }
+                        net.addPin(currPin);
+                        newPins.add(currPin);
                     }
-                    net.addPin(currPin);
-                    newPins.add(currPin);
                 }
             }
         }
+
         return newPins;
     }
 
