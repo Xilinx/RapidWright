@@ -2285,14 +2285,19 @@ public class DesignTools {
             walkSiteWires = false;
 
             for (EDIFHierPortInst p :  physPins) {
+                EDIFCell ec = p.getCellType();
+                assert(ec.isLeafCellOrBlackBox());
+                if (!ec.isPrimitive()) {
+                    walkSiteWires = true;
+                    continue;
+                }
+                if (ec.isVCCSource() || ec.isGNDSource()) {
+                    continue;
+                }
                 Cell c = design.getCell(p.getFullHierarchicalInstName());
                 if (c == null) {
-                    // A static source primitive never has a Cell behind it; that is not a gap in the
-                    // physical description, so it must not ask for the site wires to be walked
-                    if (!p.getCellType().isStaticSource()) {
-                        walkSiteWires = true;
-                    }
-                    continue;
+                    throw new RuntimeException("ERROR: No Cell found for primitive pin " + p
+                            + " on net " + net.getName() + ".");
                 }
                 BEL bel = c.getBEL();
                 if (bel == null) continue;
