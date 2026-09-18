@@ -2266,6 +2266,11 @@ public class DesignTools {
         EDIFNetlist netlist = design.getNetlist();
         List<EDIFHierPortInst> physPins = netlist.getPhysicalPins(net);
         List<SitePinInst> newPins = new ArrayList<>();
+        // A net the netlist knows nothing about, or one with a physical pin that has no Cell behind
+        // it -- a pin inside encrypted IP, or under a black box -- is one the logical walk below can
+        // say nothing about, so its site wires have to be walked instead
+        boolean walkSiteWires;
+
         if (physPins == null) {
             // Assert that this physical net is a parent logical net
             EDIFHierNet hierNet;
@@ -2275,21 +2280,102 @@ public class DesignTools {
 
             // Likely net inside encrypted IP, let's see if we can infer anything from existing
             // physical description
+            walkSiteWires = true;
+        } else {
+            walkSiteWires = false;
+
+            for (EDIFHierPortInst p :  physPins) {
+                EDIFCell ec = p.getCellType();
+                assert(ec.isLeafCellOrBlackBox());
+                if (!ec.isPrimitive()) {
+                    walkSiteWires = true;
+                    continue;
+                }
+                if (ec.isVCCSource() || ec.isGNDSource()) {
+                    continue;
+                }
+                Cell c = design.getCell(p.getFullHierarchicalInstName());
+                if (c == null) {
+                    // A logical leaf cell that hasn't had its physical Cell object created yet (and is thus unplaced)
+                    continue;
+                }
+                BEL bel = c.getBEL();
+                if (bel == null) continue;
+                String logicalPinName = p.getPortInst().getName();
+                Set<String> physPinMappings;
+                // Need to synchronize on the cell since its internally cached logical-to-physical map is computed lazily
+                synchronized (c) {
+                    physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
+                }
+                // BRAMs can have two (or more) physical pin mappings for a logical pin
+                if (physPinMappings != null) {
+                    SiteInst si = c.getSiteInst();
+                    for (String physPin : physPinMappings) {
+                        BELPin belPin = bel.getPin(physPin);
+                        // Use the net attached to the phys pin
+                        // This call (a read operation) does not need to be synchronized since it is assumed that this thread
+                        // is the only one that performs (i.e. modifies) intra-site routing for this net (or its aliases)
+                        Net siteWireNet = si.getNetFromSiteWire(belPin.getSiteWireName());
+                        if (siteWireNet == null) {
+                            if (isVersal && net.isStaticNet() && bel.isLUT()) {
+                                siteWireNet = net;
+                                synchronized (si) {
+                                    si.routeIntraSiteNet(net, belPin, belPin);
+                                }
+                            } else {
+                                continue;
+                            }
+                        }
+                        if (siteWireNet != net && !siteWireNet.isStaticNet()) {
+                            EDIFHierNet hierNet = null;
+                            assert((hierNet = net.getLogicalHierNet()) == null || hierNet.equals(netlist.getParentNet(hierNet)));
+                            if (hierNet != null) {
+                                EDIFHierNet siteWireHierNet = null;
+                                assert((siteWireHierNet = siteWireNet.getLogicalHierNet()) == null || siteWireHierNet.equals(netlist.getParentNet(siteWireHierNet)));
+                                assert(hierNet.equals(siteWireHierNet) || (isNetDrivenByMBUFGCE(hierNet) && isNetDrivenByMBUFGCE(siteWireHierNet)));
+                            }
+                        }
+                        // Similarly, this call (a read operation) does not need to be synchronized since it is assumed that
+                        // this thread is the only one that performs (i.e. modifies) intra-site routing for this net
+                        String sitePinName = getRoutedSitePinFromPhysicalPin(c, siteWireNet, physPin);
+                        if (sitePinName == null) continue;
+                        SitePinInst newPin = createSitePinInst(net, si, sitePinName);
+                        if (newPin != null) {
+                            newPins.add(newPin);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (walkSiteWires) {
+            // Walk the site wires this net occupies rather than its logical pins.  A site pin and the
+            // site wire behind it go by the same name, and the wire is the only description left of a
+            // connection whose Cell cannot be found, since there is nothing to ask for a physical pin
+            // mapping
             for (SiteInst siteInst : net.getSiteInsts()) {
+                int siteWireCount = siteInst.getSite().getSiteWireCount();
                 for (int siteWire : siteInst.getSiteWireIndicesFromNet(net)) {
+                    if (siteWire >= siteWireCount) {
+                        // The indices reported here are not indices into the site's site wire array: on
+                        // some site types (e.g. HPIOB, HDIOB, HPIOBDIFFINBUF) they run past the end of it,
+                        // where SiteInst.getSiteWirePins() throws at exactly the count and reports no pins
+                        // above it.  Such a site wire has no site pin to create here either way
+                        // Tracked by https://github.com/Xilinx/RapidWright/pull/1428
+                        continue;
+                    }
                     for (BELPin pin : siteInst.getSiteWirePins(siteWire)) {
                         if (!pin.isSitePort()) {
                             continue;
                         }
 
                         String pinName = pin.getName();
-                        SitePinInst currPin;
-                        synchronized(siteInst) {
-                            currPin = siteInst.getSitePinInst(pinName);
-                        }
-                        if (currPin != null) {
-                            // SitePinInst already exists
-                            continue;
+                        synchronized (siteInst) {
+                            if (siteInst.getSitePinInst(pinName) != null) {
+                                // SitePinInst already exists; checked again by createSitePinInst()
+                                // below, but doing so here avoids the search that follows
+                                continue;
+                            }
                         }
 
                         if (pin.isInput()) {
@@ -2308,79 +2394,41 @@ public class DesignTools {
                             }
                         }
 
-                        synchronized (siteInst) {
-                            currPin = new SitePinInst(pinName, siteInst);
+                        SitePinInst currPin = createSitePinInst(net, siteInst, pinName);
+                        if (currPin != null) {
+                            newPins.add(currPin);
                         }
-                        net.addPin(currPin);
-                        newPins.add(currPin);
-                    }
-                }
-            }
-
-            return newPins;
-        }
-
-        for (EDIFHierPortInst p :  physPins) {
-            Cell c = design.getCell(p.getFullHierarchicalInstName());
-            if (c == null) continue;
-            BEL bel = c.getBEL();
-            if (bel == null) continue;
-            String logicalPinName = p.getPortInst().getName();
-            Set<String> physPinMappings;
-            // Need to synchronize on the cell since its internally cached logical-to-physical map is computed lazily
-            synchronized (c) {
-                physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
-            }
-            // BRAMs can have two (or more) physical pin mappings for a logical pin
-            if (physPinMappings != null) {
-                SiteInst si = c.getSiteInst();
-                for (String physPin : physPinMappings) {
-                    BELPin belPin = bel.getPin(physPin);
-                    // Use the net attached to the phys pin
-                    // This call (a read operation) does not need to be synchronized since it is assumed that this thread
-                    // is the only one that performs (i.e. modifies) intra-site routing for this net (or its aliases)
-                    Net siteWireNet = si.getNetFromSiteWire(belPin.getSiteWireName());
-                    if (siteWireNet == null) {
-                        if (isVersal && net.isStaticNet() && bel.isLUT()) {
-                            siteWireNet = net;
-                            synchronized (si) {
-                                si.routeIntraSiteNet(net, belPin, belPin);
-                            }
-                        } else {
-                            continue;
-                        }
-                    }
-                    if (siteWireNet != net && !siteWireNet.isStaticNet()) {
-                        EDIFHierNet hierNet = null;
-                        assert((hierNet = net.getLogicalHierNet()) == null || hierNet.equals(netlist.getParentNet(hierNet)));
-                        if (hierNet != null) {
-                            EDIFHierNet siteWireHierNet = null;
-                            assert((siteWireHierNet = siteWireNet.getLogicalHierNet()) == null || siteWireHierNet.equals(netlist.getParentNet(siteWireHierNet)));
-                            assert(hierNet.equals(siteWireHierNet) || (isNetDrivenByMBUFGCE(hierNet) && isNetDrivenByMBUFGCE(siteWireHierNet)));
-                        }
-                    }
-                    SitePinInst newPin;
-                    // Similarly, this call (a read operation) does not need to be synchronized since it is assumed that
-                    // this thread is the only one that performs (i.e. modifies) intra-site routing for this net
-                    String sitePinName = getRoutedSitePinFromPhysicalPin(c, siteWireNet, physPin);
-                    if (sitePinName == null) continue;
-                    synchronized (si) {
-                        newPin = si.getSitePinInst(sitePinName);
-                        if (newPin != null) continue;
-                        if (sitePinName.equals("IO") && Utils.isIOB(si)) {
-                            // Do not create a SitePinInst for the "IO" input site pin of any IOB site,
-                            // since the sitewire it drives is assumed to be driven by the IO PAD.
-                            continue;
-                        }
-                        newPin = net.createPin(sitePinName, si);
-                    }
-                    if (newPin != null) {
-                        newPins.add(newPin);
                     }
                 }
             }
         }
+
         return newPins;
+    }
+
+    /**
+     * Creates a SitePinInst on the given net, unless the site pin already has one or is one that no
+     * SitePinInst is to be created for.  Both descriptions a net can be discovered through --
+     * logical pins and site wires -- create their pins here, so that they agree on what is created.
+     * @param net The net to create the pin on.
+     * @param siteInst The site instance the pin belongs to.
+     * @param sitePinName The name of the site pin.
+     * @return The new pin, or null if none was created.
+     */
+    private static SitePinInst createSitePinInst(Net net, SiteInst siteInst, String sitePinName) {
+        if (Utils.isIOB(siteInst) && sitePinName.equals("IO")) {
+            // Do not create a SitePinInst for the "IO" input site pin of any IOB site,
+            // since the sitewire it drives is assumed to be driven by the IO PAD.
+            return null;
+        }
+        // Net.createPin() throws if the site instance already has a pin of this name, so the check
+        // and the creation must be held under the one lock
+        synchronized (siteInst) {
+            if (siteInst.getSitePinInst(sitePinName) != null) {
+                return null;
+            }
+            return net.createPin(sitePinName, siteInst);
+        }
     }
 
     private static boolean isNetDrivenByMBUFGCE(EDIFHierNet net) {
