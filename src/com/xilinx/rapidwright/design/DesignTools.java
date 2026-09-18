@@ -2287,7 +2287,11 @@ public class DesignTools {
             for (EDIFHierPortInst p :  physPins) {
                 Cell c = design.getCell(p.getFullHierarchicalInstName());
                 if (c == null) {
-                    walkSiteWires = true;
+                    // A static source primitive never has a Cell behind it; that is not a gap in the
+                    // physical description, so it must not ask for the site wires to be walked
+                    if (!p.getCellType().isStaticSource()) {
+                        walkSiteWires = true;
+                    }
                     continue;
                 }
                 BEL bel = c.getBEL();
@@ -2326,21 +2330,11 @@ public class DesignTools {
                                 assert(hierNet.equals(siteWireHierNet) || (isNetDrivenByMBUFGCE(hierNet) && isNetDrivenByMBUFGCE(siteWireHierNet)));
                             }
                         }
-                        SitePinInst newPin;
                         // Similarly, this call (a read operation) does not need to be synchronized since it is assumed that
                         // this thread is the only one that performs (i.e. modifies) intra-site routing for this net
                         String sitePinName = getRoutedSitePinFromPhysicalPin(c, siteWireNet, physPin);
                         if (sitePinName == null) continue;
-                        synchronized (si) {
-                            newPin = si.getSitePinInst(sitePinName);
-                            if (newPin != null) continue;
-                            if (sitePinName.equals("IO") && Utils.isIOB(si)) {
-                                // Do not create a SitePinInst for the "IO" input site pin of any IOB site,
-                                // since the sitewire it drives is assumed to be driven by the IO PAD.
-                                continue;
-                            }
-                            newPin = net.createPin(sitePinName, si);
-                        }
+                        SitePinInst newPin = createSitePinInst(net, si, sitePinName);
                         if (newPin != null) {
                             newPins.add(newPin);
                         }
@@ -2362,6 +2356,7 @@ public class DesignTools {
                         // some site types (e.g. HPIOB, HDIOB, HPIOBDIFFINBUF) they run past the end of it,
                         // where SiteInst.getSiteWirePins() throws at exactly the count and reports no pins
                         // above it.  Such a site wire has no site pin to create here either way
+                        // Tracked by https://github.com/Xilinx/RapidWright/pull/1428
                         continue;
                     }
                     for (BELPin pin : siteInst.getSiteWirePins(siteWire)) {
@@ -2370,13 +2365,12 @@ public class DesignTools {
                         }
 
                         String pinName = pin.getName();
-                        SitePinInst currPin;
-                        synchronized(siteInst) {
-                            currPin = siteInst.getSitePinInst(pinName);
-                        }
-                        if (currPin != null) {
-                            // SitePinInst already exists
-                            continue;
+                        synchronized (siteInst) {
+                            if (siteInst.getSitePinInst(pinName) != null) {
+                                // SitePinInst already exists; checked again by createSitePinInst()
+                                // below, but doing so here avoids the search that follows
+                                continue;
+                            }
                         }
 
                         if (pin.isInput()) {
@@ -2395,17 +2389,41 @@ public class DesignTools {
                             }
                         }
 
-                        synchronized (siteInst) {
-                            currPin = new SitePinInst(pinName, siteInst);
+                        SitePinInst currPin = createSitePinInst(net, siteInst, pinName);
+                        if (currPin != null) {
+                            newPins.add(currPin);
                         }
-                        net.addPin(currPin);
-                        newPins.add(currPin);
                     }
                 }
             }
         }
 
         return newPins;
+    }
+
+    /**
+     * Creates a SitePinInst on the given net, unless the site pin already has one or is one that no
+     * SitePinInst is to be created for.  Both descriptions a net can be discovered through --
+     * logical pins and site wires -- create their pins here, so that they agree on what is created.
+     * @param net The net to create the pin on.
+     * @param siteInst The site instance the pin belongs to.
+     * @param sitePinName The name of the site pin.
+     * @return The new pin, or null if none was created.
+     */
+    private static SitePinInst createSitePinInst(Net net, SiteInst siteInst, String sitePinName) {
+        if (Utils.isIOB(siteInst) && sitePinName.equals("IO")) {
+            // Do not create a SitePinInst for the "IO" input site pin of any IOB site,
+            // since the sitewire it drives is assumed to be driven by the IO PAD.
+            return null;
+        }
+        // Net.createPin() throws if the site instance already has a pin of this name, so the check
+        // and the creation must be held under the one lock
+        synchronized (siteInst) {
+            if (siteInst.getSitePinInst(sitePinName) != null) {
+                return null;
+            }
+            return net.createPin(sitePinName, siteInst);
+        }
     }
 
     private static boolean isNetDrivenByMBUFGCE(EDIFHierNet net) {

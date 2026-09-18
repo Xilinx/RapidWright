@@ -310,7 +310,7 @@ public class TestDesignTools {
      * discovered by walking the site wires the net occupies.
      */
     @Test
-    public void testCreateMissingSitePinInstsBlackBoxSink() {
+    public void testCreateMissingSitePinInstsWithSomeBlackBoxSinks() {
         Device device = Device.getDevice("xcvu3p");
         Design design = new Design("testDesign", device.getName());
         EDIFNetlist netlist = design.getNetlist();
