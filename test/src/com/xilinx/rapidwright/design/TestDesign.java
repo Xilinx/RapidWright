@@ -702,4 +702,27 @@ public class TestDesign {
             Assertions.assertTrue(rrs.routableNets > 0);
         }
     }
+
+    @Test
+    public void testCreateSiteInstDuplicate() {
+        Design d = new Design("testAddSiteInstDuplicate", "xcvu3p");
+        SiteInst si1 = d.createSiteInst(d.getDevice().getSite("SLICE_X0Y0"));
+
+        RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                () -> d.createSiteInst(si1.getSiteName()));
+        Assertions.assertEquals("ERROR: Failed to create site instance for site " + si1.getSiteName(),
+                e.getMessage());
+    }
+
+    @Test
+    public void testAddSiteInstDuplicate() {
+        Design d = new Design("testAddSiteInstDuplicate", "xcvu3p");
+        SiteInst si1 = d.createSiteInst("SLICE_X0Y0");
+        SiteInst si2 = new SiteInst(si1.getName(), si1.getSiteTypeEnum());
+
+        RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                () -> d.addSiteInst(si2));
+        Assertions.assertEquals("ERROR: This design already contains a SiteInst named '" + si1.getSiteName() + "'",
+                e.getMessage());
+    }
 }
