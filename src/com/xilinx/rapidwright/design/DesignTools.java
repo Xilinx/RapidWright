@@ -2296,8 +2296,8 @@ public class DesignTools {
                 }
                 Cell c = design.getCell(p.getFullHierarchicalInstName());
                 if (c == null) {
-                    throw new RuntimeException("ERROR: No Cell found for primitive pin " + p
-                            + " on net " + net.getName() + ".");
+                    // A logical leaf cell that hasn't had its physical Cell object created yet (and is thus unplaced)
+                    continue;
                 }
                 BEL bel = c.getBEL();
                 if (bel == null) continue;
