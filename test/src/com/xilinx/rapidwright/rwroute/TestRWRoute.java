@@ -30,6 +30,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -65,6 +66,7 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.CodeGenerator;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
 import com.xilinx.rapidwright.util.VivadoTools;
@@ -862,5 +864,142 @@ public class TestRWRoute {
         // is now reserved for signalSpi
         Assertions.assertFalse(gndSpi.isRouted());
         Assertions.assertFalse(gndNet.hasPIPs());
+    }
+
+    /**
+     * Checks that PartialRouter preserves a signal net that Vivado's high-fanout net
+     * optimization has routed through a leaf clock buffer (BUFCE_LEAF). Such a net leaves
+     * the interconnect for the RCLK_INT_L tile, passes through the buffer's CE input
+     * (NODE_PINFEED) onto its clock output (NODE_GLOBAL_LEAF), and re-enters the
+     * interconnect on a GCLK node.
+     *
+     * This covers the NODE_PINFEED and NODE_GLOBAL_LEAF cases of
+     * RouteNode.setBaseCost(); see testPartialRouterPreservesNodeGlobalHdistr() for the
+     * third.
+     *
+     * RCLK tiles are excluded from the routing graph, so nodes inside them exist only to
+     * carry the previous pointers of an already-routed net. Without the excluded-tile early
+     * return in RouteNodeInfo.getType(), the NODE_PINFEED node falls through to an
+     * eastWestWires lookup that has no entry for RCLK_INT_L and throws a
+     * NullPointerException; without those two intent codes in RouteNode.setBaseCost(), the
+     * same nodes hit its default case and throw
+     * "ERROR: Unexpected IntentCode: NODE_PINFEED"/"NODE_GLOBAL_LEAF".
+     *
+     * The net below is taken verbatim from a real routed design.
+     */
+    @Test
+    public void testPartialRouterPreservesNodeGlobalLeaf() {
+        Design design = new Design("top", "xczu3eg");
+
+        // Source and sink are both on this site: the net loops out through the leaf
+        // clock buffer and back into the same SLICE
+        SiteInst si = design.createSiteInst("SLICE_X9Y90");
+        Net net = CodeGenerator.createTestNet(design, "net", new String[]{
+                "INT_X6Y90/INT.LOGIC_OUTS_W7->INT_NODE_SDQ_55_INT_OUT1",
+                "INT_X6Y90/INT.INT_NODE_SDQ_55_INT_OUT1->>SS1_W_BEG2",
+                "RCLK_INT_L_X6Y89/RCLK_INT_L.SOUTHBUSOUT_FT0_27->>INT_NODE_IMUX_13_INT_OUT0",
+                "RCLK_INT_L_X6Y89/RCLK_INT_L.INT_NODE_IMUX_13_INT_OUT0->>CLK_LEAF_SITES_30_CE_INT",     // NODE_PINFEED (BUFCE_LEAF.CE_INT)
+                "RCLK_INT_L_X6Y89/RCLK_INT_L.CLK_LEAF_SITES_30_CE_INT->>CLK_LEAF_SITES_30_CLK_LEAF",    // NODE_GLOBAL_LEAF
+                "INT_X6Y90/INT.GCLK_B_0_15->>INT_NODE_GLOBAL_12_INT_OUT0",
+                "INT_X6Y90/INT.INT_NODE_GLOBAL_12_INT_OUT0->>INT_NODE_IMUX_61_INT_OUT1",
+                "INT_X6Y90/INT.INT_NODE_IMUX_61_INT_OUT1->>BOUNCE_W_13_FT0"
+        });
+        net.createPin("EQ2", si);
+        SitePinInst routedSpi = net.createPin("F_I", si);
+        routedSpi.setRouted(true);
+
+        // An additional, unrouted sink so that the router must also expand (and thus
+        // exercise the routing graph) rather than only recover the existing routing
+        SiteInst unroutedSi = design.createSiteInst("SLICE_X9Y92");
+        SitePinInst unroutedSpi = net.createPin("A1", unroutedSi);
+
+        assertPartialRouterAugmentsRouting(design, net, routedSpi, unroutedSpi);
+    }
+
+    /**
+     * As testPartialRouterPreservesNodeGlobalLeaf(), but for a net that Vivado has
+     * additionally routed through a horizontal distribution buffer (BUFCE_ROW_FSR), whose
+     * output node is a NODE_GLOBAL_HDISTR in RCLK_BRAM_INTF_L. This net crosses all three
+     * of the intent codes that RouteNode.setBaseCost() has to accept on preserved routing,
+     * and is the only one of the two to reach NODE_GLOBAL_HDISTR.
+     *
+     * The net below is the source-to-sink path of one connection of a real routed net.
+     */
+    @Test
+    public void testPartialRouterPreservesNodeGlobalHdistr() {
+        Design design = new Design("top", "xczu3eg");
+
+        SiteInst srcSi = design.createSiteInst("SLICE_X36Y149");
+        SiteInst dstSi = design.createSiteInst("SLICE_X37Y148");
+        Net net = CodeGenerator.createTestNet(design, "net", new String[]{
+                "INT_X23Y149/INT.LOGIC_OUTS_E30->SDQNODE_E_93_FT0",
+                "INT_X23Y150/INT.SDQNODE_E_BLN_93_FT1->>WW2_E_BEG0",
+                "INT_X22Y149/INT.WW2_E_BLS_0_FT0->INT_NODE_SDQ_47_INT_OUT0",
+                "INT_X22Y149/INT.INT_NODE_SDQ_47_INT_OUT0->>EE1_E_BEG7",
+                "INT_X23Y149/INT.EE1_E_END7->INT_NODE_SDQ_93_INT_OUT0",
+                "INT_X23Y149/INT.INT_NODE_SDQ_93_INT_OUT0->>NN1_W_BEG7",
+                "RCLK_INT_L_X23Y149/RCLK_INT_L.NORTHBUSOUT_FT0_28->>INT_NODE_IMUX_23_INT_OUT1",
+                "RCLK_INT_L_X23Y149/RCLK_INT_L.INT_NODE_IMUX_23_INT_OUT1->>INT_RCLK_TO_CLK_LEFT_0_0",                           // NODE_PINFEED (BUFCE_ROW_FSR.CE_PRE_OPTINV)
+                "RCLK_BRAM_INTF_L_X23Y149/RCLK_BRAM_INTF_L.CLK_BUFCE_ROW_FSR_0_CE_PRE_OPTINV->>CLK_BUFCE_ROW_FSR_0_CLK_OUT",    // NODE_GLOBAL_HDISTR
+                "RCLK_BRAM_INTF_L_X23Y149/RCLK_BRAM_INTF_L.CLK_BUFCE_ROW_FSR_0_CLK_OUT->>CLK_TEST_BUF_SITE_1_CLK_IN",           // NODE_GLOBAL_HDISTR
+                "RCLK_INT_L_X24Y149/RCLK_INT_L.CLK_HDISTR_FT0_7->>CLK_LEAF_SITES_15_CLK_IN",                                    // INTENT_DEFAULT (BUFCE_LEAF.CLK_IN)
+                "RCLK_INT_L_X24Y149/RCLK_INT_L.CLK_LEAF_SITES_15_CLK_IN->>CLK_LEAF_SITES_15_CLK_LEAF",                          // NODE_GLOBAL_LEAF
+                "INT_X24Y149/INT.GCLK_B_0_9->>INT_NODE_GLOBAL_13_INT_OUT0",
+                "INT_X24Y149/INT.INT_NODE_GLOBAL_13_INT_OUT0->>INT_NODE_IMUX_62_INT_OUT1",
+                "INT_X24Y149/INT.INT_NODE_IMUX_62_INT_OUT1->>BYPASS_W1",
+                "INT_X24Y149/INT.BYPASS_W1->>INT_NODE_IMUX_38_INT_OUT0",
+                "INT_X24Y149/INT.INT_NODE_IMUX_38_INT_OUT0->>BYPASS_W6",
+                "INT_X24Y149/INT.BYPASS_W6->>INODE_W_9_FT1",
+                "INT_X24Y148/INT.INODE_W_BLS_9_FT0->>BOUNCE_W_15_FT0"
+        });
+        net.createPin("EQ", srcSi);
+        SitePinInst routedSpi = net.createPin("H_I", dstSi);
+        routedSpi.setRouted(true);
+
+        // An additional, unrouted sink so that the router must also expand (and thus
+        // exercise the routing graph) rather than only recover the existing routing
+        SiteInst unroutedSi = design.createSiteInst("SLICE_X37Y151");
+        SitePinInst unroutedSpi = net.createPin("A1", unroutedSi);
+
+        assertPartialRouterAugmentsRouting(design, net, routedSpi, unroutedSpi);
+    }
+
+    /**
+     * Asks PartialRouter to route the unrouted sink of an otherwise already-routed net, and
+     * checks that the routing it hands back is a strict superset of the routing it was
+     * given: every existing PIP must be preserved -- thus the clock buffer routethru that
+     * the already-routed sink is reached through -- and new PIPs must have been added to
+     * reach the unrouted sink.
+     * @param design The design holding the net.
+     * @param net The partially-routed net.
+     * @param routedSpi The net's already-routed sink pin, not given to the router.
+     * @param unroutedSpi The net's unrouted sink pin; the only pin given to the router.
+     */
+    private void assertPartialRouterAugmentsRouting(Design design, Net net, SitePinInst routedSpi,
+                                                    SitePinInst unroutedSpi) {
+        List<PIP> expectedPIPs = new ArrayList<>(net.getPIPs());
+        Assertions.assertFalse(expectedPIPs.isEmpty());
+        Assertions.assertTrue(routedSpi.isRouted());
+        Assertions.assertFalse(unroutedSpi.isRouted());
+
+        PartialRouter.routeDesignPartialNonTimingDriven(design, Collections.singletonList(unroutedSpi));
+
+        for (SitePinInst spi : net.getSinkPins()) {
+            Assertions.assertTrue(spi.isRouted());
+        }
+        // The router is free to hand the routing back in a different order
+        List<PIP> actualPIPs = net.getPIPs();
+        Assertions.assertTrue(new HashSet<>(actualPIPs).containsAll(expectedPIPs));
+        Assertions.assertTrue(actualPIPs.size() > expectedPIPs.size());
+
+        // Note that the newly-routed sink is not expected to share this net's routing through
+        // the clock buffer, no matter where it is placed. The buffer's output node (a
+        // NODE_GLOBAL_LEAF, or a NODE_GLOBAL_HDISTR for the row distribution buffer) spans the
+        // full height/width that it distributes to -- e.g. RCLK_INT_L_X6Y89's
+        // CLK_LEAF_SITES_30_CLK_LEAF ends at INT_X6Y119, the top of its clock region -- and
+        // RouteNode.isInConnectionBoundingBox() tests the end tile coordinate, which thus lies
+        // far outside the bounding box of any connection that a sink near the buffer could
+        // create. Reaching the buffer is not necessary here: this test only requires that such
+        // routing be preserved, not extended.
     }
 }

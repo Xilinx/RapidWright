@@ -193,7 +193,10 @@ public class RouteNodeInfo {
                 return RouteNodeType.LOCAL_BOTH;
 
             case NODE_PINFEED:
-                if (routingGraph.isVersal) {
+                if (routingGraph.isVersal ||
+                        // For BUFCE_{LEAF,ROW_FSR}.CE inputs appearing on already-routed (preserved) nets
+                        // as a route-thru from Vivado's high fanout net optimization
+                        Utils.isClocking(tileTypeEnum)) {
                     return RouteNodeType.LOCAL_BOTH;
                 }
 
