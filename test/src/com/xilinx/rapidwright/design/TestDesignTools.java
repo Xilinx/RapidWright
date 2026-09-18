@@ -29,6 +29,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -56,6 +57,7 @@ import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -557,6 +559,57 @@ public class TestDesignTools {
                 Assertions.assertTrue(original.getCells().isEmpty(), si.getName());
             }
         }
+    }
+
+    /**
+     * A circuit to be merged into a black box carries whatever names its builder gave it, and a
+     * site instance's name need bear no relation to the site it sits on. Two circuits built from
+     * the same source therefore arrive holding identical site instance names though they sit on
+     * opposite ends of the fabric, and a design holds its site instances by name as well as by
+     * site. The second box's would displace the first's and take its contents with it, so the
+     * merge must refuse rather than quietly lose a box.
+     */
+    @Test
+    public void testPopulateBlackBoxesWithCollidingSiteInstNames() {
+        final String part = "xcvu3p";
+        final String portName = "clk";
+        // A name both circuits' site instances carry, belonging to neither of the sites they are
+        // placed on, since a site instance's name is whatever its builder chose
+        final String collidingSiteInstName = "SLICE_X50Y50";
+
+        Design design = new Design("top", part);
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFLibrary work = design.getNetlist().getWorkLibrary();
+
+        Map<String, Design> blackBoxes = new LinkedHashMap<>();
+        for (String siteName : Arrays.asList("SLICE_X0Y0", "SLICE_X0Y100")) {
+            String boxName = "bb" + blackBoxes.size();
+
+            // A black box carrying the one port its circuit offers, so that nothing but the site
+            // instance names is under test
+            EDIFCell bbType = new EDIFCell(work, boxName + "_type");
+            bbType.createPort(portName, EDIFDirection.INPUT, 1);
+            EDIFCellInst bb = top.createChildCellInst(boxName, bbType);
+            bb.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+
+            // ... and the one flip flop circuit to fill it with
+            Design circuit = new Design(boxName + "_guts", part);
+            circuit.getTopEDIFCell().createPort(portName, EDIFDirection.INPUT, 1);
+            Cell ff = circuit.createAndPlaceCell("ff", Unisim.FDRE, siteName + "/AFF");
+            Assertions.assertTrue(circuit.renameSiteInst(ff.getSiteInst(), collidingSiteInstName));
+
+            blackBoxes.put(boxName, circuit);
+        }
+
+        RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                () -> DesignTools.populateBlackBox(design, blackBoxes, false));
+
+        // Both site instances are named, with the site each sits on, since the message is all that
+        // points back at the assembly that produced the collision
+        Assertions.assertEquals("ERROR: Site instance name collision when populating blackbox"
+                + " 'bb1': incoming SiteInst '" + collidingSiteInstName + "' at SLICE_X0Y100"
+                + " collides with existing SiteInst '" + collidingSiteInstName + "' at SLICE_X0Y0",
+                e.getMessage());
     }
 
     @ParameterizedTest
