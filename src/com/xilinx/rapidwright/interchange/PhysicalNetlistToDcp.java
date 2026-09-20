@@ -36,7 +36,7 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 public class PhysicalNetlistToDcp {
 
-    private static final String MAKE_DCP_OUT_OF_CONTEXT = "--out_of_context";
+    public static final String MAKE_DCP_OUT_OF_CONTEXT = "--out_of_context";
 
     public static void main(String[] args) throws IOException {
         if (args.length != 4 && args.length != 5) {
