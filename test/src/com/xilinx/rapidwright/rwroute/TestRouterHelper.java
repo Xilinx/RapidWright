@@ -359,8 +359,8 @@ public class TestRouterHelper {
     }
 
     /**
-     * Checks that {@link RouterHelper#getSourceToSinkINTNodeDelays} accumulates delay by walking
-     * upstream from each sink, rather than in {@link Net#getPIPs()} order which
+     * Checks that {@link RouterHelper#getSourceToSinkINTNodeDelays} accumulates delay in
+     * source-to-sink order, rather than in {@link Net#getPIPs()} order which
      * {@link Net#setPIPs(Set)} leaves unspecified, and that it follows bidirectional PIPs in the
      * direction that {@link PIP#isReversed()} gives rather than the direction the device declares.
      */
@@ -441,5 +441,52 @@ public class TestRouterHelper {
         Assertions.assertNotNull(nodeDelay);
         Assertions.assertEquals(sinkNodeName, nodeDelay.getFirst().toString());
         Assertions.assertEquals(expectedDelay, (short) nodeDelay.getSecond());
+    }
+
+    /**
+     * Sinks without a complete source-to-sink path on a partially routed net are omitted
+     * so that callers can estimate their delays.
+     */
+    @Test
+    public void testGetSourceToSinkINTNodeDelaysOnPartiallyRoutedNet() {
+        Design design = new Design("partially_routed_net", "xcvu3p");
+        Device device = design.getDevice();
+        Net net = design.createNet("net");
+        SitePinInst source = net.createPin("EQ", design.createSiteInst("SLICE_X84Y135"));
+        SitePinInst sink = net.createPin("A1", design.createSiteInst("SLICE_X84Y136"));
+        PIP sinkPip = device.getPIP("INT_X54Y136/INT.INT_NODE_IMUX_48_INT_OUT0->>IMUX_W10");
+        net.setPIPs(Collections.singletonList(sinkPip));
+
+        // This partially routed net has a PIP reaching the sink but no path from the source.
+        Assertions.assertEquals(sink.getConnectedNode(), sinkPip.getEndNode());
+        Assertions.assertNotEquals(source.getConnectedNode(), sinkPip.getStartNode());
+
+        DelayEstimatorBase<InterconnectInfo> estimator =
+                new DelayEstimatorBase<>(device, new InterconnectInfo(), false, 0);
+        Map<SitePinInst, Pair<Node, Short>> sinkNodeDelays =
+                RouterHelper.getSourceToSinkINTNodeDelays(net, estimator);
+        Assertions.assertFalse(sinkNodeDelays.containsKey(sink),
+                "An unreachable sink on a partially routed net must not have a routed delay");
+    }
+
+    /**
+     * A constant source has no route delay that this model describes, so rather than return one
+     * (the sink pinfeed delay, which is all that a static net's routing would accumulate) a static
+     * net is rejected outright.
+     */
+    @Test
+    public void testGetSourceToSinkINTNodeDelaysRejectsStaticNet() {
+        Design design = new Design("static_sink_delay", "xcvu3p");
+        Net net = design.getVccNet();
+        SiteInst site = design.createSiteInst("SLICE_X84Y136");
+        net.createPin("A1", site);
+        net.setPIPs(Collections.singletonList(design.getDevice().getPIP("INT_X54Y136/INT.VCC_WIRE->>IMUX_W10")));
+
+        DelayEstimatorBase<InterconnectInfo> estimator =
+                new DelayEstimatorBase<>(design.getDevice(), new InterconnectInfo(), false, 0);
+        RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                () -> RouterHelper.getSourceToSinkINTNodeDelays(net, estimator));
+        Assertions.assertEquals("ERROR: Cannot compute route delays of static net " + net.getName(),
+                e.getMessage());
     }
 }

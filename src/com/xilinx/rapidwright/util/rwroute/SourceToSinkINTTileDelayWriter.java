@@ -67,6 +67,9 @@ public class SourceToSinkINTTileDelayWriter {
         } else if (!net.hasPIPs()) {
             System.err.println("ERROR: No PIPs found of net " + net.getName());
             return;
+        } else if (net.isStaticNet()) {
+            System.err.println("ERROR: No route delays to report for static net " + net.getName());
+            return;
         }
 
         Map<SitePinInst, Pair<Node,Short>> sourceToSinkINTDelays = RouterHelper.getSourceToSinkINTNodeDelays(net, estimator);
