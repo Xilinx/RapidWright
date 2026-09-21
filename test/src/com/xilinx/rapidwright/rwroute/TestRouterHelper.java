@@ -489,4 +489,45 @@ public class TestRouterHelper {
         Assertions.assertEquals("ERROR: Cannot compute route delays of static net " + net.getName(),
                 e.getMessage());
     }
+
+    /**
+     * A direct connection (e.g. COUT -> CIN) projects onto no INT tile node, so the sink's own
+     * node stands in for one and no route delay is accumulated. When its PIP is present the sink
+     * is reached and reported with a zero delay; when it is absent the sink is unreached and
+     * omitted, leaving a caller free to estimate a delay for it.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testGetSourceToSinkINTNodeDelaysOnDirectConnection(boolean routed) {
+        Design design = new Design("direct_connection", "xcvu3p");
+        Device device = design.getDevice();
+        Net net = design.createNet("carry");
+        SitePinInst source = net.createPin("COUT", design.createSiteInst("SLICE_X84Y135"));
+        SitePinInst sink = net.createPin("CIN", design.createSiteInst("SLICE_X84Y136"));
+        PIP directPip = device.getPIP("CLEM_X54Y136/CLEM.CLE_CLE_M_SITE_0_CIN->CLE_CLE_M_SITE_0_CIN_PIN");
+        Assertions.assertEquals(source.getConnectedNode(), directPip.getStartNode());
+        Assertions.assertEquals(sink.getConnectedNode(), directPip.getEndNode());
+        // A direct connection is exactly one that does not project onto an INT tile node
+        Assertions.assertNull(RouterHelper.projectInputPinToINTNode(sink));
+        if (routed) {
+            net.setPIPs(Collections.singletonList(directPip));
+        }
+
+        DelayEstimatorBase<InterconnectInfo> estimator =
+                new DelayEstimatorBase<>(device, new InterconnectInfo(), false, 0);
+        Map<SitePinInst, Pair<Node, Short>> sinkNodeDelays =
+                RouterHelper.getSourceToSinkINTNodeDelays(net, estimator);
+
+        Pair<Node, Short> sinkNodeDelay = sinkNodeDelays.get(sink);
+        if (routed) {
+            Assertions.assertNotNull(sinkNodeDelay,
+                    "A routed direct connection must be reported as reached");
+            // No INT tile node is walked through, so the sink node stands in for its INT node
+            Assertions.assertEquals(sink.getConnectedNode(), sinkNodeDelay.getFirst());
+            Assertions.assertEquals((short) 0, sinkNodeDelay.getSecond().shortValue());
+        } else {
+            Assertions.assertNull(sinkNodeDelay,
+                    "An unrouted direct connection must not have a routed delay");
+        }
+    }
 }
