@@ -48,6 +48,10 @@ jobs:
       - name: Test
         run: ./gradlew -PlimitToSingleProc=${{ matrix.single_threaded }} test 
 
+      - name: Run Examples
+        if: matrix.single_threaded == 'multi-threaded'
+        run: ./gradlew runExamples
+
       - name: Archive Java Test Report
         uses: actions/upload-artifact@v4
         if: always() && matrix.os == 'ubuntu-latest'
