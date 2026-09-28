@@ -1012,7 +1012,9 @@ public class RouteNodeGraph {
                                         TileTypeEnum.INTF_LOCF_TL_TILE, TileTypeEnum.INTF_LOCF_BL_TILE, TileTypeEnum.INTF_ROCF_TL_TILE, TileTypeEnum.INTF_ROCF_BL_TILE,
                                       TileTypeEnum.CLE_BC_CORE, TileTypeEnum.SLL)
                        .contains(childTileType)) ||
-                (isVersal && parentRnode.getIntentCode() == IntentCode.NODE_SLL_OUTPUT && childRnode.getIntentCode() == IntentCode.NODE_PINFEED && Utils.isCLB(childTileType))
+                (isVersal && Utils.isCLB(childTileType) && parentRnode.getIntentCode() == IntentCode.NODE_SLL_OUTPUT && childRnode.getIntentCode() == IntentCode.NODE_PINFEED) ||
+                // Allow NODE_PINFEEDs in RCLK tiles that are preserved (belonging to a partially routed net)
+                (Utils.isClocking(childTileType) && childRnode.getIntentCode() == IntentCode.NODE_PINFEED && isPreserved(childRnode))
         );
 
         if (lutRoutethru && !type.leadsToLaguna()) {
