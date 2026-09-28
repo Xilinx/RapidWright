@@ -795,9 +795,7 @@ public class RouteNodeGraph {
                 if (childRnode != null) {
                     assert(childRnode.getType().isAnyExclusiveSink() ||
                            childRnode.getType().isLocalLeadingToLaguna() ||
-                           ((lutRoutethru || lutPinSwapping) && childRnode.getType().isAnyLocal()) ||
-                           // This is a routethru node used on a now-unpreserved net
-                           (!lutRoutethru && childRnode.getType() == RouteNodeType.INACCESSIBLE));
+                           ((lutRoutethru || lutPinSwapping) && childRnode.getType().isAnyLocal()));
                 } else if (!lutRoutethru) {
                     // child does not already exist in our routing graph, meaning it's not a used site pin
                     // in our design, but it could be a IMUX that leads to a Laguna
@@ -1014,7 +1012,9 @@ public class RouteNodeGraph {
                                         TileTypeEnum.INTF_LOCF_TL_TILE, TileTypeEnum.INTF_LOCF_BL_TILE, TileTypeEnum.INTF_ROCF_TL_TILE, TileTypeEnum.INTF_ROCF_BL_TILE,
                                       TileTypeEnum.CLE_BC_CORE, TileTypeEnum.SLL)
                        .contains(childTileType)) ||
-                (isVersal && parentRnode.getIntentCode() == IntentCode.NODE_SLL_OUTPUT && childRnode.getIntentCode() == IntentCode.NODE_PINFEED && Utils.isCLB(childTileType))
+                (isVersal && Utils.isCLB(childTileType) && parentRnode.getIntentCode() == IntentCode.NODE_SLL_OUTPUT && childRnode.getIntentCode() == IntentCode.NODE_PINFEED) ||
+                // Allow NODE_PINFEEDs in RCLK tiles that are preserved (belonging to a partially routed net)
+                (Utils.isClocking(childTileType) && childRnode.getIntentCode() == IntentCode.NODE_PINFEED && isPreserved(childRnode))
         );
 
         if (lutRoutethru && !type.leadsToLaguna()) {
