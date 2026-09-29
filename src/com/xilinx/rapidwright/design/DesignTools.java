@@ -2354,7 +2354,7 @@ public class DesignTools {
             // connection whose Cell cannot be found, since there is nothing to ask for a physical pin
             // mapping
             for (SiteInst siteInst : net.getSiteInsts()) {
-                int siteWireCount = siteInst.getSite().getSiteWireCount();
+                int siteWireCount = siteInst.getSiteWires().length;
                 for (int siteWire : siteInst.getSiteWireIndicesFromNet(net)) {
                     if (siteWire >= siteWireCount) {
                         // The indices reported here are not indices into the site's site wire array: on
