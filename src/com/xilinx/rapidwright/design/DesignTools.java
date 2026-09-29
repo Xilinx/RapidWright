@@ -946,6 +946,12 @@ public class DesignTools {
      * wholly outside a box is left alone, so a caller that needs every physical net in the design
      * named after its source must call {@link #makePhysNetNamesConsistent(Design)} itself.
      * <p>
+     * Conversely, the design must arrive with every physical net that connects to a black box named
+     * after its source, where a black box output counts as the source of the net attached to it.
+     * {@link #makeBlackBox(Design, EDIFHierCellInst)} leaves them so, given a design that was named
+     * consistently to begin with. This is not checked: crossings are found by name, so a net held
+     * under any other alias is missed, and its signal left split across two physical nets.
+     * <p>
      * Every entry is vetted before anything is modified, but there is no rollback once insertion has
      * begun: a failure part way through -- a site overlap, say -- leaves the boxes filled so far in
      * place, and the logical netlist of all of them already swapped in.
