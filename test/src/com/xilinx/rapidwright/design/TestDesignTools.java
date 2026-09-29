@@ -51,6 +51,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
@@ -301,6 +302,52 @@ public class TestDesignTools {
         DesignTools.createMissingSitePinInsts(design, net);
 
         Assertions.assertTrue(net.getPins().isEmpty());
+    }
+
+    /**
+     * A net whose logical pins are known, but where one of those pins has no Cell behind it
+     * (here, under a black box; equally, inside encrypted IP) must still have that pin
+     * discovered by walking the site wires the net occupies.
+     */
+    @Test
+    public void testCreateMissingSitePinInstsWithSomeBlackBoxSinks() {
+        Device device = Device.getDevice("xcvu3p");
+        Design design = new Design("testDesign", device.getName());
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell topCell = netlist.getTopCell();
+
+        // Source is an ordinary placed cell that both netlist and design know about
+        Cell lut = design.createAndPlaceCell("lut", Unisim.LUT1, "SLICE_X0Y0/A6LUT");
+
+        // Sink is inside a black box: the netlist knows of the pin, but no Cell backs it
+        EDIFCell bbCell = new EDIFCell(netlist.getWorkLibrary(), "bbCellType");
+        bbCell.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCellInst bb = bbCell.createCellInst("bb", topCell);
+
+        EDIFNet edifNet = topCell.createNet("net");
+        edifNet.createPortInst("O", lut.getEDIFCellInst());
+        edifNet.createPortInst("I", bb);
+
+        Net net = design.createNet(edifNet.getName());
+
+        // Intra-site routing at the source, as a placed DCP would have it
+        SiteInst srcSiteInst = lut.getSiteInst();
+        srcSiteInst.routeIntraSiteNet(net, lut.getBEL().getPin("O6"), srcSiteInst.getBELPin("A_O", "A_O"));
+
+        // ... and at the sink inside the black box, where no Cell remains to describe it
+        SiteInst sinkSiteInst = design.createSiteInst(device.getSite("SLICE_X1Y0"));
+        BELPin a1 = sinkSiteInst.getBELPin("A1", "A1");
+        sinkSiteInst.routeIntraSiteNet(net, a1, a1);
+
+        // The netlist does know both pins; it is the black box pin's Cell that is missing
+        Assertions.assertEquals(2, netlist.getPhysicalPins(net).size());
+        Assertions.assertNotNull(design.getCell("lut"));
+        Assertions.assertNull(design.getCell("bb"));
+
+        List<SitePinInst> newPins = DesignTools.createMissingSitePinInsts(design, net);
+        Assertions.assertEquals("[OUT SLICE_X0Y0.A_O, IN SLICE_X1Y0.A1]", newPins.toString());
+        // The site wire walk must not duplicate the pin the logical walk already created
+        Assertions.assertEquals(2, net.getPins().size());
     }
 
     @Test
