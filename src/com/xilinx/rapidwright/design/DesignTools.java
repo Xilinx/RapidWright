@@ -999,11 +999,14 @@ public class DesignTools {
 
         // Populate Logical Netlist into cells. This loop and the physical ones below all walk
         // blackBoxes rather than insts, so that the boxes are filled in whatever order the caller
-        // gave them in and not in the hash order of their names
+        // gave them in and not in the hash order of their names. The placeholder cells are left in
+        // their libraries here, since one may be shared with another black box -- in this batch or
+        // not -- and removing it would orphan that box's cell type. Any placeholder left unused is
+        // removed below, at the cost of a filling whose name clashes with a placeholder still in
+        // place being uniquified by migrateCellAndSubCells()
         for (Entry<String, Design> e : blackBoxes.entrySet()) {
             EDIFCellInst inst = insts.get(e.getKey());
             EDIFCell cellType = e.getValue().getTopEDIFCell();
-            inst.getCellType().getLibrary().removeCell(inst.getCellType());
             netlist.migrateCellAndSubCells(cellType, true);
             inst.setCellType(cellType);
         }
