@@ -1212,7 +1212,8 @@ public class DesignTools {
         // unless the boundary routing is being discarded, since merging is also what unroutes the
         // owner, and an owner left routed into the region the black box now occupies conflicts with
         // the circuit just placed there
-        if (keepBoundaryRouting && net.getPins().isEmpty() && net.getSiteInsts().isEmpty()) {
+        if (keepBoundaryRouting && net.getPins().isEmpty() && net.getSiteInsts().isEmpty()
+                && !net.hasPIPs()) {
             return false;
         }
         EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
