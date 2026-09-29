@@ -974,6 +974,12 @@ public class DesignTools {
      */
     public static Set<Net> populateBlackBox(Design design, Map<String, Design> blackBoxes,
             boolean keepBoundaryRouting) {
+        // Nothing to fill, so return before the unused cell cleanup and static net lookups below,
+        // which would otherwise still modify the design
+        if (blackBoxes.isEmpty()) {
+            return Collections.emptySet();
+        }
+
         EDIFNetlist netlist = design.getNetlist();
 
         // Every entry is vetted before anything is modified, so that bad input cannot leave the
