@@ -107,6 +107,7 @@ import com.xilinx.rapidwright.tests.CheckAccuracyUsingGnlDesigns;
 import com.xilinx.rapidwright.tests.DeviceLoader;
 import com.xilinx.rapidwright.tests.PinMapTester;
 import com.xilinx.rapidwright.tests.ReportDevicePerformance;
+import com.xilinx.rapidwright.timing.sdf.SdfTools;
 import com.xilinx.rapidwright.util.BrowseDevice;
 import com.xilinx.rapidwright.util.CompareRouteStatusReports;
 import com.xilinx.rapidwright.util.DesignImplementationDiff;
@@ -221,6 +222,7 @@ public class MainEntrypoint {
         addFunction("RoutingHeatMap", RoutingHeatMap::main);
         addFunction("RunSATRouterExample", RunSATRouterExample::main);
         addFunction("RWRoute", RWRoute::main);
+        addFunction("SdfTools", SdfTools::main);
         addFunction("SLRCrosserGenerator", SLRCrosserGenerator::main);
         addFunction("SmallestEnclosingCircle", SmallestEnclosingCircle::main);
         addFunction("StampPlacement", StampPlacement::main);
