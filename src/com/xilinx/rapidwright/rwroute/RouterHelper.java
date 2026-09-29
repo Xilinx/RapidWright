@@ -548,19 +548,52 @@ public class RouterHelper {
     }
 
     /**
-     * Gets a map containing net delay for each sink pin paired with an INT tile node of a routed net.
-     * The delay to each sink is accumulated by walking upstream from it to the start of the net's
-     * routing; the net is assumed to be loop-free, and this walk does not terminate on one that is not.
-     * @param net The target routed net.
+     * Gets the route delay to each sink of a net that the net's routing reaches, which may itself
+     * be partially routed.
+     * A sink is reached when the net's PIPs give a complete path from an output pin to the sink's
+     * projected INT tile node -- or, for a direct connection that projects onto no such node
+     * (e.g. COUT -> CIN), to the sink's own node. Sinks that are not reached are omitted, so that
+     * a caller can tell one not routed to yet from one whose delay is genuinely zero.
+     * Delay is charged no further than that node: its pinfeed delay is carried by the node itself,
+     * and any interface PIP beyond it is outside this model, so how the sink is reached from it
+     * does not change the delay.
+     * Delays are accumulated source-first over the routing trees from {@link NetTools#getNodeTrees(Net)}.
+     * The net's routing is assumed to be loop-free and not multiply-driven.
+     * @param net The target net; it may be partially routed, but it must not be static since a
+     *            constant source has no route delay that this model describes.
      * @param estimator An instantiation of DelayEstimatorBase.
-     * @return The map containing net delay for each sink pin paired with an INT tile node of a routed net.
+     * @return Reached sinks mapped to their sink INT node and route delay.
+     * @throws RuntimeException If the net is static.
      */
     public static Map<SitePinInst, Pair<Node,Short>> getSourceToSinkINTNodeDelays(Net net, DelayEstimatorBase estimator) {
-        // Net.getPIPs() is in no particular order, so accumulating delay by walking it would use
-        // an upstream delay that is not yet final. Walk upstream from each sink instead, using a
-        // map that also gives bidirectional PIPs the direction PIP.isReversed() indicates.
-        Map<Node, Node> nodeToDriver = NetTools.getNodeToDriver(net);
+        if (net.isStaticNet()) {
+            throw new RuntimeException("ERROR: Cannot compute route delays of static net " + net.getName());
+        }
+
+        // NetTools supplies only source-rooted trees and handles reversed PIPs. Accumulate
+        // delays in source-to-sink order so each driver's delay is known before its fanouts.
         Map<Node, Integer> delayMap = new HashMap<>();
+        Queue<NetTools.NodeTree> queue = new ArrayDeque<>();
+        for (NetTools.NodeTree root : NetTools.getNodeTrees(net)) {
+            delayMap.put(root, 0);
+            queue.add(root);
+        }
+        while (!queue.isEmpty()) {
+            NetTools.NodeTree driver = queue.remove();
+            int driverDelay = delayMap.get(driver);
+            for (NetTools.NodeTree node : driver.fanouts) {
+                if (delayMap.containsKey(node)) {
+                    continue;
+                }
+                int delay = driverDelay;
+                if (node.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
+                    delay += computeNodeDelay(estimator, node)
+                            + DelayEstimatorBase.getExtraDelay(node, DelayEstimatorBase.isLong(driver));
+                }
+                delayMap.put(node, delay);
+                queue.add(node);
+            }
+        }
 
         Map<SitePinInst, Pair<Node,Short>> sinkNodeDelays = new HashMap<>();
         for (SitePinInst sink : net.getSinkPins()) {
@@ -574,37 +607,12 @@ public class RouterHelper {
                 }
             }
 
-            // Walk upstream until a node of already known delay, or the start of this net's
-            // routing, is reached
-            List<Node> upstreamNodes = new ArrayList<>();
-            Node curr = sinkNode;
-            Integer knownDelay;
-            while ((knownDelay = delayMap.get(curr)) == null) {
-                Node driver = nodeToDriver.get(curr);
-                if (driver == null) {
-                    // No PIP arrives at this node: either it is the node of the net's source pin,
-                    // or it is where the routing to a sink not routed to yet gives out (e.g. on a
-                    // placed-only design), in which case no route delay has been accumulated
-                    break;
-                }
-                upstreamNodes.add(curr);
-                curr = driver;
+            Integer delay = delayMap.get(sinkNode);
+            if (delay == null) {
+                // The net's routing does not reach this sink, so it has no route delay to recover
+                continue;
             }
-
-            // Then accumulate back downstream from there, memoizing every node walked through so
-            // that nodes shared by more than one sink of this net are only visited once
-            int delay = (knownDelay == null) ? 0 : knownDelay;
-            for (int i = upstreamNodes.size() - 1; i >= 0; i--) {
-                Node downhill = upstreamNodes.get(i);
-                if (downhill.getTile().getTileTypeEnum() == TileTypeEnum.INT) {//device independent?
-                    delay += computeNodeDelay(estimator, downhill)
-                            + DelayEstimatorBase.getExtraDelay(downhill, DelayEstimatorBase.isLong(curr));
-                }
-                delayMap.put(downhill, delay);
-                curr = downhill;
-            }
-
-            sinkNodeDelays.put(sink, new Pair<>(sinkNode,(short) delay));
+            sinkNodeDelays.put(sink, new Pair<>(sinkNode, delay.shortValue()));
         }
 
         return sinkNodeDelays;

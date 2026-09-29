@@ -1975,6 +1975,10 @@ public class FileTools {
         return getOSName().startsWith("Windows");
     }
 
+    public static boolean isLinux() {
+        return getOSName().startsWith("Linux");
+    }
+
     public static void unzipFile(String zipFileName, String destDirectory) {
         File destDir = new File(destDirectory);
         byte[] buffer = new byte[1024*16];
