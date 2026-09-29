@@ -145,14 +145,15 @@ public class TimingAndWirelengthReport{
                 RouterHelper.getSourceToSinkINTNodeDelays(netWrapper.getNet(), estimator);
 
         for (Connection connection : netWrapper.getConnections()) {
-            if (connection.isDirect()) {
+            if (connection.isDirect() || connection.getTimingEdges() == null) {
                 continue;
             }
+
+            // On a partially routed net, a sink that the net's routing does not reach is omitted
+            // from the map and so has no accumulated delay to recover; charge it zero, as was the
+            // case before unreached sinks were distinguished from ones of genuinely zero delay.
             Pair<Node,Short> sinkINTNodeDelay = sourceToSinkINTNodeDelays.get(connection.getSink());
-            short connectionDelay = sinkINTNodeDelay.getSecond();
-            if (connection.getTimingEdges() == null) {
-                continue;
-            }
+            short connectionDelay = (sinkINTNodeDelay != null) ? sinkINTNodeDelay.getSecond() : 0;
             connection.setTimingEdgesDelay(connectionDelay);
         }
     }
