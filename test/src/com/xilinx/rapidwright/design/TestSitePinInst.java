@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, 2025-2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -25,6 +25,8 @@
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
@@ -99,6 +101,40 @@ public class TestSitePinInst {
         mi.getPort(portName);
 
         Assertions.assertTrue(n.removePin(spi));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "FMUX,true,true,D6",
+            "FMUX,false,false,D6",
+            "FMUX,true,false,D6",
+            "FMUX,true,false,D5",
+            "FMUX,true,false,",
+            "FMUX,false,true,CY",
+            "FMUX,false,true,",
+            "F_O,false,true,F7F8"
+    })
+    public void testSetRoutedTracksSiteInstChanges(String pinName, boolean initialRouted, boolean routed, String sitePIPPin) {
+        Design d = new Design("testSetRoutedTracksSiteInstChanges", Device.AWS_F1);
+        SiteInst si = d.createSiteInst("SLICE_X32Y73");
+
+        Net net = d.createNet("net");
+        SitePinInst spi = net.createPin(pinName, si);
+        spi.setRouted(initialRouted);
+
+        if (sitePIPPin != null) {
+            si.addSitePIP("OUTMUXF", sitePIPPin);
+        }
+
+        d.setTrackingChanges(true);
+        Assertions.assertTrue(d.getModifiedSiteInsts().isEmpty());
+
+        // Only when the OUTMUXF SitePIP is set does flipping the routed state
+        // of the FMUX pin need to be tracked as a SiteInst modification
+        spi.setRouted(routed);
+
+        Assertions.assertEquals(initialRouted != routed && sitePIPPin != null && pinName.endsWith("MUX"),
+                d.getModifiedSiteInsts().contains(si));
     }
 
 }
