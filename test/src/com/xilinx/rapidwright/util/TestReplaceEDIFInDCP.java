@@ -35,22 +35,27 @@ public class TestReplaceEDIFInDCP {
 
     @Test
     public void testReplaceEDIFInDCP(@TempDir Path tempDir) {
+        boolean origAutoGenerate = Design.isAutoGenerateReadableEdif();
         Design.setAutoGenerateReadableEdif(false);
-        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
-        String unreadable = "picoblaze_ooc_X10Y235_unreadable_edif";
-        Path readableEDIF = tempDir.resolve(unreadable + ".edf");
-        design.getNetlist().exportEDIF(readableEDIF.toString());
-        Path unreadableDCP = RapidWrightDCP.getPath(unreadable + ".dcp");
-        Path readableDCP = tempDir.resolve("picoblaze_ooc_X10Y235.dcp");
+        try {
+            Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+            String unreadable = "picoblaze_ooc_X10Y235_unreadable_edif";
+            Path readableEDIF = tempDir.resolve(unreadable + ".edf");
+            design.getNetlist().exportEDIF(readableEDIF.toString());
+            Path unreadableDCP = RapidWrightDCP.getPath(unreadable + ".dcp");
+            Path readableDCP = tempDir.resolve("picoblaze_ooc_X10Y235.dcp");
 
-        // Replace for new DCP
-        ReplaceEDIFInDCP.main(new String[] { unreadableDCP.toString(), readableEDIF.toString(), readableDCP.toString() });
-        Design.readCheckpoint(readableDCP);
+            // Replace for new DCP
+            ReplaceEDIFInDCP.main(new String[] { unreadableDCP.toString(), readableEDIF.toString(), readableDCP.toString() });
+            Design.readCheckpoint(readableDCP);
 
-        // Replace in-place
-        Path unreadableDCPCopy = tempDir.resolve(unreadableDCP.getFileName());
-        FileTools.copyFile(unreadableDCP.toString(), unreadableDCPCopy.toString());
-        ReplaceEDIFInDCP.main(new String[] { unreadableDCPCopy.toString(), readableEDIF.toString() });
-        Design.readCheckpoint(unreadableDCPCopy);
+            // Replace in-place
+            Path unreadableDCPCopy = tempDir.resolve(unreadableDCP.getFileName());
+            FileTools.copyFile(unreadableDCP.toString(), unreadableDCPCopy.toString());
+            ReplaceEDIFInDCP.main(new String[] { unreadableDCPCopy.toString(), readableEDIF.toString() });
+            Design.readCheckpoint(unreadableDCPCopy);
+        } finally {
+            Design.setAutoGenerateReadableEdif(origAutoGenerate);
+        }
     }
 }
