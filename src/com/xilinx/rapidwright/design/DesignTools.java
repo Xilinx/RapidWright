@@ -940,8 +940,9 @@ public class DesignTools {
      * every black box is already populated. Filling them one at a time instead asks that map about
      * a design that is still part black box, and rebuilds it for each.
      * <p>
-     * Only the nets crossing a black box boundary are rectified. An alias sitting wholly inside or
-     * wholly outside a box is left alone, so a caller that needs every physical net in the design
+     * Only the nets a black box touches are rectified: those that arrived with it and those on its
+     * outputs, each merged onto the net that now owns it if that is some other net. An alias
+     * elsewhere in the design is left alone, so a caller that needs every physical net in the design
      * named after its source must call {@link #makePhysNetNamesConsistent(Design)} itself.
      * <p>
      * Conversely, the design must arrive with every physical net that connects to a black box named
@@ -1152,7 +1153,7 @@ public class DesignTools {
                     // Expected to be obsoleted when PR #1411 is merged.
                     design.addModifiedNet(net);
                     modifiedNets.add(net);
-                    if (isBoundaryCrossing(netlist, net, cellPrefix, keepBoundaryRouting)) {
+                    if (getMergeableOwner(netlist, net, keepBoundaryRouting) != null) {
                         boundaryNets.add(net);
                     }
                 }
@@ -1171,10 +1172,9 @@ public class DesignTools {
                 Net net = design.getNet(parentCellName.isEmpty() ? outerNet.getName()
                         : parentCellName + EDIFTools.EDIF_HIER_SEP + outerNet.getName());
                 if (net == null) continue;
-                // Not isBoundaryCrossing(): its owner is usually inside the cell now, but a circuit
-                // that passes an input straight through to this port makes the owner the shell's net
-                // on that input, which is outside just as this one is. Either way this net was owned
-                // by the black box port, so any owner other than itself means it is to be merged
+                // Its owner is usually inside the cell now, but a circuit that passes an input
+                // straight through to this port makes the owner the shell's net on that input, which
+                // is outside just as this one is. Either way it is to be merged
                 if (getMergeableOwner(netlist, net, keepBoundaryRouting) != null) {
                     boundaryNets.add(net);
                 }
@@ -1191,42 +1191,18 @@ public class DesignTools {
     }
 
     /**
-     * Identifies whether a physical net crosses the boundary of a black box that has just been
-     * populated, and so needs merging onto the net that owns it.
-     *
-     * @param netlist             The design's netlist, whose parent net map says which net owns
-     *                            which.
-     * @param net                 The physical net to test. Its name is what gets looked up, rather
-     *                            than getLogicalHierNet(): a net that arrived with the cell still
-     *                            carries the hierarchy it had inside, which the shell's netlist
-     *                            knows nothing about.
-     * @param cellPrefix          The black box's hierarchical name and a separator. The separator
-     *                            matters -- without it a cell 'foo1' would also claim the nets of
-     *                            'foo10'.
-     * @param keepBoundaryRouting Whether the caller is preserving boundary routing, which decides
-     *                            whether a crossing with nothing on it is worth reporting.
-     * @return True if this net crosses the boundary. False if it owns itself, holds nothing worth
-     *         moving, or sits on the same side of the boundary as its owner.
-     */
-    private static boolean isBoundaryCrossing(EDIFNetlist netlist, Net net, String cellPrefix,
-            boolean keepBoundaryRouting) {
-        EDIFHierNet parentNet = getMergeableOwner(netlist, net, keepBoundaryRouting);
-        if (parentNet == null) return false;
-        // An alias sitting on the same side as its owner -- both within the cell, or both without --
-        // is a purely internal one, and is left alone here. populateBlackBox() does not reconcile
-        // those; its caller is expected to call makePhysNetNamesConsistent() if it needs them
-        return net.getName().startsWith(cellPrefix)
-                != parentNet.getHierarchicalNetName().startsWith(cellPrefix);
-    }
-
-    /**
      * Finds the net that owns a physical net, now that the black boxes are populated, if that is
-     * some other net and this one holds anything worth merging onto it.
+     * some other net and this one holds anything worth merging onto it. Which side of a black box
+     * boundary either net sits on does not matter: a circuit's input fed from its own output has
+     * both inside, and a circuit that passes an input straight through to an output has both
+     * outside, and each must still be merged.
      *
      * @param netlist             The design's netlist, whose parent net map says which net owns
      *                            which.
-     * @param net                 The physical net to look up, by name, as
-     *                            {@link #isBoundaryCrossing} describes.
+     * @param net                 The physical net to look up. Its name is what gets looked up,
+     *                            rather than getLogicalHierNet(): a net that arrived with the cell
+     *                            still carries the hierarchy it had inside, which the shell's
+     *                            netlist knows nothing about.
      * @param keepBoundaryRouting Whether the caller is preserving boundary routing, which decides
      *                            whether a net with nothing on it is worth merging.
      * @return The owner, or null if the net owns itself, has no owner, or holds nothing worth
@@ -1256,8 +1232,7 @@ public class DesignTools {
      * @param design              The current design.
      * @param keepBoundaryRouting Preserves the routing on the boundaries of the
      *                            black box.
-     * @param boundaryNets        The nets crossing the boundary, as identified by
-     *                            {@link #isBoundaryCrossing}.
+     * @param boundaryNets        The nets to merge, as identified by {@link #getMergeableOwner}.
      * @param modifiedNets        Updated in place: whichever net ends up holding a crossing's pins is
      *                            added, and an alias deleted in favour of its owner is taken out, so
      *                            the set never names a net the design no longer has.

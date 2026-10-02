@@ -662,6 +662,51 @@ public class TestDesignTools {
         }
     }
 
+    /**
+     * A shell that feeds a black box output straight back into one of its inputs makes the circuit's
+     * net on that input an alias of the one on that output. Both are inside the black box, but they
+     * must still be merged: otherwise the input's sinks are left on a net with no source.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testPopulateBlackBoxFeedback(boolean keepBoundaryRouting) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell topCell = netlist.getTopCell();
+
+        EDIFCell bbCell = new EDIFCell(netlist.getWorkLibrary(), "bbCellType");
+        bbCell.createPort("I", EDIFDirection.INPUT, 1);
+        bbCell.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFCellInst bb = bbCell.createCellInst("bb", topCell);
+        bb.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+
+        EDIFNet loop = topCell.createNet("loop");
+        loop.createPortInst("O", bb);
+        loop.createPortInst("I", bb);
+
+        // The circuit: a LUT driving O from I
+        Design cell = new Design("cell", "xcvu3p");
+        EDIFCell cellTop = cell.getNetlist().getTopCell();
+        Cell lut = cell.createAndPlaceCell("lut", Unisim.LUT1, "SLICE_X0Y0/A6LUT");
+        EDIFNet i = cellTop.createNet("i");
+        i.createPortInst(cellTop.createPort("I", EDIFDirection.INPUT, 1));
+        i.createPortInst("I0", lut.getEDIFCellInst());
+        EDIFNet o = cellTop.createNet("o");
+        o.createPortInst("O", lut.getEDIFCellInst());
+        o.createPortInst(cellTop.createPort("O", EDIFDirection.OUTPUT, 1));
+        Net oNet = cell.createNet("o");
+        oNet.createPin("A_O", lut.getSiteInst());
+        Net iNet = cell.createNet("i");
+        SitePinInst sinkPin = iNet.createPin("A1", lut.getSiteInst());
+
+        DesignTools.populateBlackBox(design, "bb", cell, keepBoundaryRouting);
+
+        Assertions.assertEquals("bb/o",
+                netlist.getParentNet(netlist.getHierNetFromName("bb/i")).getHierarchicalNetName());
+        Assertions.assertSame(oNet, sinkPin.getNet());
+        Assertions.assertNull(design.getNet("bb/i"));
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"DX", "D_I"})
     public void testGetTrimmablePIPsFromPins(String pinName) {
