@@ -684,6 +684,12 @@ public class TestDesignTools {
         loop.createPortInst("O", bb);
         loop.createPortInst("I", bb);
 
+        // The shell's net on the loop, holding a stretch of routing so that it is worth merging
+        // whether or not that routing is kept
+        Net loopNet = design.createNet("loop");
+        PIP pip = design.getDevice().getTile("INT_X0Y0").getPIPs().get(0);
+        loopNet.addPIP(pip);
+
         // The circuit: a LUT driving O from I
         Design cell = new Design("cell", "xcvu3p");
         EDIFCell cellTop = cell.getNetlist().getTopCell();
@@ -699,12 +705,23 @@ public class TestDesignTools {
         Net iNet = cell.createNet("i");
         SitePinInst sinkPin = iNet.createPin("A1", lut.getSiteInst());
 
-        DesignTools.populateBlackBox(design, "bb", cell, keepBoundaryRouting);
+        Set<Net> modified = DesignTools.populateBlackBox(design, "bb", cell, keepBoundaryRouting);
 
         Assertions.assertEquals("bb/o",
                 netlist.getParentNet(netlist.getHierNetFromName("bb/i")).getHierarchicalNetName());
         Assertions.assertSame(oNet, sinkPin.getNet());
         Assertions.assertNull(design.getNet("bb/i"));
+
+        // The shell's net is merged onto the same owner, taking its routing only if that is kept
+        Assertions.assertEquals("bb/o",
+                netlist.getParentNet(netlist.getHierNetFromName("loop")).getHierarchicalNetName());
+        Assertions.assertNull(design.getNet("loop"));
+        Assertions.assertEquals(keepBoundaryRouting, oNet.getPIPs().contains(pip));
+
+        Assertions.assertTrue(modified.contains(oNet));
+        for (Net net : modified) {
+            Assertions.assertSame(net, design.getNet(net.getName()), net.getName());
+        }
     }
 
     @ParameterizedTest

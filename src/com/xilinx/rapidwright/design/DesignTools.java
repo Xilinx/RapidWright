@@ -962,12 +962,13 @@ public class DesignTools {
      *                            top level design rather than copied.
      * @param keepBoundaryRouting Preserves the routing on the boundaries of the black boxes.
      * @return Every net this touched that the design still holds: the ones the filled cells brought
-     *         in with them, the owners the boundary crossings were merged onto, and the static nets
-     *         that took a circuit's static routing or gave up a displaced source pin. A net merged
-     *         away is deleted from the design and so is deliberately absent -- including a net that
-     *         predates this call, which is what a crossing the cell drives is, since its owner is
-     *         the net inside the box. No net outside this set was altered, so a caller that means to
-     *         route the result can start from these rather than have
+     *         in with them, the owners the aliases among those and the nets on the boxes' outputs
+     *         were merged onto, and the static nets that took a circuit's static routing or gave up
+     *         a displaced source pin. A net merged away is deleted from the design and so is
+     *         deliberately absent -- including a net that predates this call, which is what a net
+     *         on a box output is, since its owner is now whatever drives that output through the
+     *         box. No net outside this set was altered, so a caller that means to route the result
+     *         can start from these rather than have
      *         {@link com.xilinx.rapidwright.rwroute.PartialRouter} rediscover them by walking every
      *         net in the design.
      */
@@ -1124,7 +1125,7 @@ public class DesignTools {
         DesignTools.batchRemoveSitePins(deferredRemovals, preserveOtherRoutes);
         modifiedNets.addAll(deferredRemovals.keySet());
 
-        // Add routing information. Every crossing found is merged in one pass at the end, once all
+        // Add routing information. Every alias found is merged in one pass at the end, once all
         // of them are known
         Set<Net> boundaryNets = new HashSet<>();
         for (Entry<String, Design> e : blackBoxes.entrySet()) {
@@ -1159,10 +1160,11 @@ public class DesignTools {
                 }
             }
 
-            // The nets above cover every crossing the shell drives, because the physical net follows the
-            // cell in. A crossing the cell drives is the other way round: the alias is the shell-side net,
-            // which never moved, so nothing above has seen it. Only a port the cell drives can be in that
-            // position, and its net sits in the cell enclosing the black box
+            // The nets above cover every alias the circuit brought in, because the physical net
+            // follows the cell in. A net on a black box output is the other way round: the alias is
+            // the shell-side net, which never moved, so nothing above has seen it. Only an output
+            // can be in that position, since it was the black box port that owned the net, and its
+            // net sits in the cell enclosing the black box
             String parentCellName = hierarchicalCellName.substring(0,
                     Math.max(hierarchicalCellName.lastIndexOf(EDIFTools.EDIF_HIER_SEP), 0));
             for (EDIFPortInst portInst : inst.getPortInsts()) {
@@ -1185,7 +1187,7 @@ public class DesignTools {
             }
         }
 
-        // Rectify boundary nets
+        // Merge the aliases found above onto their owners
         postBlackBoxCleanup(design, keepBoundaryRouting, boundaryNets, modifiedNets);
         return modifiedNets;
     }
@@ -1226,14 +1228,15 @@ public class DesignTools {
     }
 
     /**
-     * Merges the nets crossing the boundary of a black box that has just been populated onto the nets
-     * that own them, so that every physical net is once again named after its source.
+     * Merges the aliases that populating black boxes has left behind -- among the nets the circuits
+     * brought in and the nets on the boxes' outputs -- onto the nets that own them, so that every
+     * such physical net is once again named after its source.
      *
      * @param design              The current design.
      * @param keepBoundaryRouting Preserves the routing on the boundaries of the
      *                            black box.
      * @param boundaryNets        The nets to merge, as identified by {@link #getMergeableOwner}.
-     * @param modifiedNets        Updated in place: whichever net ends up holding a crossing's pins is
+     * @param modifiedNets        Updated in place: whichever net ends up holding an alias' pins is
      *                            added, and an alias deleted in favour of its owner is taken out, so
      *                            the set never names a net the design no longer has.
      */
