@@ -903,9 +903,8 @@ public class DesignTools {
     }
 
     /**
-     * NOTE: This method is not fully tested. Populates a black box in a netlist
-     * with the provided design. This method most closely resembles the Vivado
-     * command {@code read_checkpoint -cell <cell name> <DCP Name>}
+     * Populates a black box in a netlist with the provided design.
+     * This method most closely resembles the Vivado command {@code read_checkpoint -cell <cell name> <DCP Name>}
      * 
      * @param design               The top level design
      * @param hierarchicalCellName Name of the black box in the design netlist.
@@ -917,9 +916,8 @@ public class DesignTools {
     }
 
     /**
-     * NOTE: This method is not fully tested. Populates a black box in a netlist
-     * with the provided design. This method most closely resembles the Vivado
-     * command {@code read_checkpoint -cell <cell name> <DCP Name>}
+     * Populates a black box in a netlist with the provided design.
+     * This method most closely resembles the Vivado command {@code read_checkpoint -cell <cell name> <DCP Name>}
      * 
      * @param design               The top level design
      * @param hierarchicalCellName Name of the black box in the design netlist.
@@ -935,8 +933,8 @@ public class DesignTools {
     }
 
     /**
-     * NOTE: This method is not fully tested. Populates a set of black boxes in a netlist with the
-     * provided designs, as {@link #populateBlackBox(Design, String, Design, boolean)} does for a
+     * Populates a set of black boxes in a netlist with the provided designs,
+     * as {@link #populateBlackBox(Design, String, Design, boolean)} does for a
      * single one. Filling them together is not just a convenience: every logical netlist change is
      * made before any physical one, so the parent net map is built once, against a netlist in which
      * every black box is already populated. Filling them one at a time instead asks that map about
