@@ -1171,7 +1171,11 @@ public class DesignTools {
                 Net net = design.getNet(parentCellName.isEmpty() ? outerNet.getName()
                         : parentCellName + EDIFTools.EDIF_HIER_SEP + outerNet.getName());
                 if (net == null) continue;
-                if (isBoundaryCrossing(netlist, net, cellPrefix, keepBoundaryRouting)) {
+                // Not isBoundaryCrossing(): its owner is usually inside the cell now, but a circuit
+                // that passes an input straight through to this port makes the owner the shell's net
+                // on that input, which is outside just as this one is. Either way this net was owned
+                // by the black box port, so any owner other than itself means it is to be merged
+                if (getMergeableOwner(netlist, net, keepBoundaryRouting) != null) {
                     boundaryNets.add(net);
                 }
             }
@@ -1206,23 +1210,43 @@ public class DesignTools {
      */
     private static boolean isBoundaryCrossing(EDIFNetlist netlist, Net net, String cellPrefix,
             boolean keepBoundaryRouting) {
+        EDIFHierNet parentNet = getMergeableOwner(netlist, net, keepBoundaryRouting);
+        if (parentNet == null) return false;
+        // An alias sitting on the same side as its owner -- both within the cell, or both without --
+        // is a purely internal one, and is left alone here. populateBlackBox() does not reconcile
+        // those; its caller is expected to call makePhysNetNamesConsistent() if it needs them
+        return net.getName().startsWith(cellPrefix)
+                != parentNet.getHierarchicalNetName().startsWith(cellPrefix);
+    }
+
+    /**
+     * Finds the net that owns a physical net, now that the black boxes are populated, if that is
+     * some other net and this one holds anything worth merging onto it.
+     *
+     * @param netlist             The design's netlist, whose parent net map says which net owns
+     *                            which.
+     * @param net                 The physical net to look up, by name, as
+     *                            {@link #isBoundaryCrossing} describes.
+     * @param keepBoundaryRouting Whether the caller is preserving boundary routing, which decides
+     *                            whether a net with nothing on it is worth merging.
+     * @return The owner, or null if the net owns itself, has no owner, or holds nothing worth
+     *         moving.
+     */
+    private static EDIFHierNet getMergeableOwner(EDIFNetlist netlist, Net net,
+            boolean keepBoundaryRouting) {
         // A net with no physical presence has nothing to move, so it is not worth asking about --
         // unless the boundary routing is being discarded, since merging is also what unroutes the
         // owner, and an owner left routed into the region the black box now occupies conflicts with
         // the circuit just placed there
         if (keepBoundaryRouting && net.getPins().isEmpty() && net.getSiteInsts().isEmpty()
                 && !net.hasPIPs()) {
-            return false;
+            return null;
         }
         EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
-        if (hierNet == null) return false;
+        if (hierNet == null) return null;
         EDIFHierNet parentNet = netlist.getParentNetMap().get(hierNet);
-        if (parentNet == null || parentNet.equals(hierNet)) return false;
-        // An alias sitting on the same side as its owner -- both within the cell, or both without --
-        // is a purely internal one, and is left alone here. populateBlackBox() does not reconcile
-        // those; its caller is expected to call makePhysNetNamesConsistent() if it needs them
-        return net.getName().startsWith(cellPrefix)
-                != parentNet.getHierarchicalNetName().startsWith(cellPrefix);
+        if (parentNet == null || parentNet.equals(hierNet)) return null;
+        return parentNet;
     }
 
     /**

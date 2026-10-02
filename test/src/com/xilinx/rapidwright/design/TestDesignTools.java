@@ -605,6 +605,63 @@ public class TestDesignTools {
         }
     }
 
+    /**
+     * A circuit that connects an input straight through to an output makes the shell's net on that
+     * output an alias of the one on that input. Both sit outside the black box, so they are not told
+     * apart by which side of the boundary they are on, but they must still be merged: otherwise the
+     * output's sinks are left on a net with no source.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testPopulateBlackBoxPassThrough(boolean keepBoundaryRouting) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell topCell = netlist.getTopCell();
+
+        Cell src = design.createAndPlaceCell("src", Unisim.LUT1, "SLICE_X0Y0/A6LUT");
+        Cell snk = design.createAndPlaceCell("snk", Unisim.LUT1, "SLICE_X2Y0/A6LUT");
+
+        EDIFCell bbCell = new EDIFCell(netlist.getWorkLibrary(), "bbCellType");
+        bbCell.createPort("I", EDIFDirection.INPUT, 1);
+        bbCell.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFCellInst bb = bbCell.createCellInst("bb", topCell);
+        bb.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+
+        EDIFNet in = topCell.createNet("in");
+        in.createPortInst("O", src.getEDIFCellInst());
+        in.createPortInst("I", bb);
+        EDIFNet out = topCell.createNet("out");
+        out.createPortInst("O", bb);
+        out.createPortInst("I0", snk.getEDIFCellInst());
+
+        Net inNet = design.createNet("in");
+        inNet.createPin("A_O", src.getSiteInst());
+        Net outNet = design.createNet("out");
+        SitePinInst sinkPin = outNet.createPin("A1", snk.getSiteInst());
+
+        // Each net is already named after its source -- the black box output, in the case of 'out'
+        DesignTools.makePhysNetNamesConsistent(design);
+        Assertions.assertSame(outNet, design.getNet("out"));
+
+        // The circuit: nothing but a wire from I to O
+        Design cell = new Design("cell", "xcvu3p");
+        EDIFCell cellTop = cell.getNetlist().getTopCell();
+        EDIFNet wire = cellTop.createNet("wire");
+        wire.createPortInst(cellTop.createPort("I", EDIFDirection.INPUT, 1));
+        wire.createPortInst(cellTop.createPort("O", EDIFDirection.OUTPUT, 1));
+
+        Set<Net> modified = DesignTools.populateBlackBox(design, "bb", cell, keepBoundaryRouting);
+
+        Assertions.assertEquals("in",
+                netlist.getParentNet(netlist.getHierNetFromName("out")).getHierarchicalNetName());
+        Assertions.assertSame(inNet, sinkPin.getNet());
+        Assertions.assertNull(design.getNet("out"));
+        Assertions.assertTrue(modified.contains(inNet));
+        for (Net net : modified) {
+            Assertions.assertSame(net, design.getNet(net.getName()), net.getName());
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"DX", "D_I"})
     public void testGetTrimmablePIPsFromPins(String pinName) {
