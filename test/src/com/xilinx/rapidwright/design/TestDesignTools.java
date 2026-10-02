@@ -640,8 +640,10 @@ public class TestDesignTools {
         SitePinInst sinkPin = outNet.createPin("A1", snk.getSiteInst());
 
         // Each net is already named after its source -- the black box output, in the case of 'out'
-        DesignTools.makePhysNetNamesConsistent(design);
-        Assertions.assertSame(outNet, design.getNet("out"));
+        Assertions.assertEquals("in",
+                netlist.getParentNet(netlist.getHierNetFromName("in")).getHierarchicalNetName());
+        Assertions.assertEquals("out",
+                netlist.getParentNet(netlist.getHierNetFromName("out")).getHierarchicalNetName());
 
         // The circuit: nothing but a wire from I to O
         Design cell = new Design("cell", "xcvu3p");
