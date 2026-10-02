@@ -58,6 +58,7 @@ import com.xilinx.rapidwright.edif.EDIFParser;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.edif.compare.EDIFNetlistComparator;
+import com.xilinx.rapidwright.edif.validate.NetlistValidator;
 import com.xilinx.rapidwright.examples.AddSubGenerator;
 import com.xilinx.rapidwright.examples.CopyMMCMCell;
 import com.xilinx.rapidwright.examples.CountRoutedNets;
@@ -189,6 +190,7 @@ public class MainEntrypoint {
         addFunction("MultGenerator", MultGenerator::main);
         addFunction("NetlistBrowser", NetlistBrowser::main);
         addFunction("NetlistClockDetection", NetlistClockDetection::main);
+        addFunction("NetlistValidator", NetlistValidator::main);
         addFunction("PartPrinter", PartPrinter::main);
         addFunction("PartTileBrowser", PartTileBrowser::main);
         addFunction("PartialCUFR", PartialCUFR::main);
