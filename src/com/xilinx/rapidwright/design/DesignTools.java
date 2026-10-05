@@ -960,12 +960,15 @@ public class DesignTools {
      *                            black box in the design netlist that each belongs in. A given
      *                            Design may appear only once, since its contents are moved into the
      *                            top level design rather than copied.
-     * @param keepBoundaryRouting Preserves the routing on the boundaries of the black boxes.
+     * @param keepBoundaryRouting Preserves the routing on the boundaries of the black boxes. If
+     *                            false, the net owning each black box port's net is unrouted in its
+     *                            entirety, whether or not the circuit uses that port -- so a port
+     *                            tied to a constant unroutes the design's whole GND or VCC net.
      * @return Every net this touched that the design still holds: the ones the filled cells brought
      *         in with them, the owners the aliases among those and the nets on the boxes' outputs
-     *         were merged onto, the nets on the boxes' ports whose boundary routing was discarded,
-     *         and the static nets that took a circuit's static routing or gave up a displaced
-     *         source pin. A net merged away is deleted from the design and so is
+     *         were merged onto, the owners of the nets on the boxes' ports whose routing was
+     *         discarded, and the static nets that took a circuit's static routing or gave up a
+     *         displaced source pin. A net merged away is deleted from the design and so is
      *         deliberately absent -- including a net that predates this call, which is what a net
      *         on a box output is, since its owner is now whatever drives that output through the
      *         box. No net outside this set was altered, so a caller that means to route the result
@@ -985,12 +988,13 @@ public class DesignTools {
 
         // Every entry is vetted before anything is modified, so that bad input cannot leave the
         // design with the other boxes already inserted
-        Map<String, EDIFCellInst> insts = new HashMap<>();
+        Map<String, EDIFHierCellInst> insts = new HashMap<>();
         Map<Design, String> firstUseOf = new IdentityHashMap<>();
         for (Entry<String, Design> e : blackBoxes.entrySet()) {
             String hierarchicalCellName = e.getKey();
             Design cell = e.getValue();
-            EDIFCellInst inst = netlist.getCellInstFromHierName(hierarchicalCellName);
+            EDIFHierCellInst hierInst = netlist.getHierCellInstFromName(hierarchicalCellName);
+            EDIFCellInst inst = hierInst.getInst();
             if (!inst.isBlackBox()) {
                 throw new RuntimeException("ERROR: The cell instance " + hierarchicalCellName
                         + " is not a black box.");
@@ -1007,7 +1011,7 @@ public class DesignTools {
                 throw new RuntimeException("ERROR: The same Design was provided for black boxes '"
                         + firstUse + "' and '" + hierarchicalCellName + "'.");
             }
-            insts.put(hierarchicalCellName, inst);
+            insts.put(hierarchicalCellName, hierInst);
         }
 
         // Populate Logical Netlist into cells. This loop and the physical ones below all walk
@@ -1018,7 +1022,7 @@ public class DesignTools {
         // removed below, at the cost of a filling whose name clashes with a placeholder still in
         // place being uniquified by migrateCellAndSubCells()
         for (Entry<String, Design> e : blackBoxes.entrySet()) {
-            EDIFCellInst inst = insts.get(e.getKey());
+            EDIFCellInst inst = insts.get(e.getKey()).getInst();
             EDIFCell cellType = e.getValue().getTopEDIFCell();
             netlist.migrateCellAndSubCells(cellType, true);
             inst.setCellType(cellType);
@@ -1129,10 +1133,11 @@ public class DesignTools {
         // Add routing information. Every alias found is merged in one pass at the end, once all
         // of them are known
         Set<Net> boundaryNets = new HashSet<>();
+        // The nets whose boundary routing is to be discarded, by the logical net that owns each
         Set<EDIFHierNet> ownersToUnroute = new HashSet<>();
         for (Entry<String, Design> e : blackBoxes.entrySet()) {
             String hierarchicalCellName = e.getKey();
-            EDIFCellInst inst = insts.get(hierarchicalCellName);
+            EDIFHierCellInst hierInst = insts.get(hierarchicalCellName);
             Design cell = e.getValue();
 
             final String cellPrefix = hierarchicalCellName + EDIFTools.EDIF_HIER_SEP;
@@ -1168,24 +1173,21 @@ public class DesignTools {
             // can be in that position, since it was the black box port that owned the net, and its
             // net sits in the cell enclosing the black box. Discarding the boundary routing, on the
             // other hand, applies to the net on every port
-            EDIFHierCellInst parentInst =
-                    netlist.getHierCellInstFromName(hierarchicalCellName).getParent();
-            String parentCellName = parentInst.getFullHierarchicalInstName();
-            for (EDIFPortInst portInst : inst.getPortInsts()) {
+            EDIFHierCellInst parentInst = hierInst.getParent();
+            for (EDIFPortInst portInst : hierInst.getInst().getPortInsts()) {
                 EDIFNet outerNet = portInst.getNet();
                 if (outerNet == null) continue;
+                EDIFHierNet hierNet = new EDIFHierNet(parentInst, outerNet);
                 if (!keepBoundaryRouting) {
                     // A port the circuit leaves unused brings in no physical net to merge, but its
-                    // shell routing must still be discarded. Its owner can be in an ancestor, or in
-                    // another box whose physical nets have not been inserted yet. An output the
-                    // circuit does not drive has no owner at all, so it is the net itself that goes
-                    EDIFHierNet hierNet = new EDIFHierNet(parentInst, outerNet);
+                    // shell routing must still be discarded. Its owner can be in an ancestor. An
+                    // output the circuit does not drive either owns itself or has no owner at all,
+                    // and in that last case it is the net itself whose routing goes
                     EDIFHierNet owner = netlist.getParentNet(hierNet);
                     ownersToUnroute.add(owner != null ? owner : hierNet);
                 }
                 if (portInst.getDirection() == EDIFDirection.INPUT) continue;
-                Net net = design.getNet(parentCellName.isEmpty() ? outerNet.getName()
-                        : parentCellName + EDIFTools.EDIF_HIER_SEP + outerNet.getName());
+                Net net = design.getNet(hierNet.getHierarchicalNetName());
                 if (net == null) continue;
                 // Its owner is usually inside the cell now, but a circuit that passes an input
                 // straight through to this port makes the owner the shell's net on that input, which
@@ -1203,15 +1205,22 @@ public class DesignTools {
         // Merge the aliases found above onto their owners
         postBlackBoxCleanup(design, keepBoundaryRouting, boundaryNets, modifiedNets);
 
-        // Resolve these after every box is inserted and aliases have been merged, so that
-        // only the surviving physical owners are unrouted and reported.
+        // Only now, with every box inserted and every alias merged, is each owner's physical net
+        // known by its final name and holding every pin it is going to. Owners are resolved to
+        // their nets before any is unrouted, since several can share one -- every logical constant
+        // resolves to the design's static net -- and unrouting walks every pin of the net again
+        Set<Net> netsToUnroute = Collections.newSetFromMap(new IdentityHashMap<>());
         for (EDIFHierNet owner : ownersToUnroute) {
-            Net net = owner.getNet().isGND() ? gnd : owner.getNet().isVCC() ? vcc
+            EDIFNet logicalNet = owner.getNet();
+            Net net = logicalNet.isGND() ? gnd : logicalNet.isVCC() ? vcc
                     : design.getNet(owner.getHierarchicalNetName());
             if (net != null) {
-                net.unroute();
-                modifiedNets.add(net);
+                netsToUnroute.add(net);
             }
+        }
+        for (Net net : netsToUnroute) {
+            net.unroute();
+            modifiedNets.add(net);
         }
         return modifiedNets;
     }
