@@ -665,6 +665,88 @@ public class TestDesignTools {
     }
 
     /**
+     * An unused input has no physical net in the replacement, but its shell routing must still
+     * respect keepBoundaryRouting. The physical owner can be above the box's enclosing cell,
+     * and a logical constant's name need not be the canonical physical static-net name.
+     */
+    @ParameterizedTest
+    @CsvSource({
+        "false, false, WIRE", "true, false, WIRE",
+        "false, true, WIRE", "true, true, WIRE",
+        "false, false, GND", "true, false, GND",
+        "false, true, GND", "true, true, GND",
+        "false, false, VCC", "true, false, VCC",
+        "false, true, VCC", "true, true, VCC"
+    })
+    public void testPopulateBlackBoxUnusedInput(boolean keepBoundaryRouting, boolean nested,
+            NetType type) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet owner;
+        Net physical;
+        if (type == NetType.WIRE) {
+            Cell src = design.createAndPlaceCell("src", Unisim.LUT1, "SLICE_X0Y0/A6LUT");
+            owner = top.createNet("inputOwner");
+            owner.createPortInst("O", src.getEDIFCellInst());
+            physical = design.createNet("inputOwner");
+            physical.createPin("A_O", src.getSiteInst());
+        } else {
+            owner = EDIFTools.getStaticNet(type, top, netlist, "inputOwner");
+            physical = design.getStaticNet(type);
+        }
+
+        Cell sink = design.createAndPlaceCell("sink", Unisim.LUT1, "SLICE_X2Y0/A6LUT");
+        owner.createPortInst("I0", sink.getEDIFCellInst());
+        SitePinInst sinkPin = physical.createPin("A1", sink.getSiteInst());
+        PIP pip = design.getDevice().getTile("INT_X0Y0").getPIPs().get(0);
+        physical.addPIP(pip);
+        sinkPin.setRouted(true);
+        Net unrelated = design.createNet("unrelated");
+        PIP unrelatedPIP = design.getDevice().getTile("INT_X0Y0").getPIPs().get(1);
+        unrelated.addPIP(unrelatedPIP);
+
+        EDIFCell parent = top;
+        EDIFNet connection = owner;
+        String boxName = "bb";
+        if (nested) {
+            parent = new EDIFCell(netlist.getWorkLibrary(), "outerType");
+            parent.createPort("I", EDIFDirection.INPUT, 1);
+            EDIFCellInst outer = parent.createCellInst("outer", top);
+            owner.createPortInst("I", outer);
+            connection = parent.createNet("inputAlias");
+            connection.createPortInst(parent.getPort("I"));
+            boxName = "outer/bb";
+        }
+        EDIFCell boxType = new EDIFCell(netlist.getWorkLibrary(), "bbType");
+        boxType.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCellInst box = boxType.createCellInst("bb", parent);
+        box.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+        connection.createPortInst("I", box);
+
+        EDIFHierCellInst parentInst = netlist.getHierCellInstFromName(boxName).getParent();
+        Assertions.assertEquals(owner,
+                netlist.getParentNet(new EDIFHierNet(parentInst, connection)).getNet());
+
+        Design replacement = new Design("replacement", "xcvu3p");
+        replacement.getTopEDIFCell().createPort("I", EDIFDirection.INPUT, 1);
+        Set<Net> modified = DesignTools.populateBlackBox(design, boxName, replacement,
+                keepBoundaryRouting);
+
+        Assertions.assertEquals(keepBoundaryRouting ? Collections.singletonList(pip)
+                : Collections.emptyList(), physical.getPIPs());
+        Assertions.assertEquals(keepBoundaryRouting, sinkPin.isRouted());
+        if (!keepBoundaryRouting) {
+            Assertions.assertTrue(modified.contains(physical));
+        }
+        for (Net net : modified) {
+            Assertions.assertSame(net, design.getNet(net.getName()));
+        }
+        Assertions.assertEquals(Collections.singletonList(unrelatedPIP), unrelated.getPIPs());
+        Assertions.assertFalse(modified.contains(unrelated));
+    }
+
+    /**
      * A shell that feeds a black box output straight back into one of its inputs makes the circuit's
      * net on that input an alias of the one on that output. Both are inside the black box, but they
      * must still be merged: otherwise the input's sinks are left on a net with no source.
