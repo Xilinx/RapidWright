@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -37,6 +37,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.tools.LUTTools;
@@ -44,6 +45,7 @@ import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
@@ -538,5 +540,49 @@ public class TestSiteInst {
             SitePinInst spi2 = new SitePinInst(isOutPin, pinName, null);
             si.addPin(spi2);
         });
+    }
+
+    /**
+     * The site wire indices {@link SiteInst#getSiteWireIndicesFromNet(Net)} reports must be true
+     * indices into the site's site wire array: they must stay below
+     * {@link Site#getSiteWireCount()}, and they must round trip through
+     * {@link Site#getSiteWireName(int)} back to the site wire names that
+     * {@link SiteInst#getSiteWiresFromNet(Net)} reports.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "IOB_X2Y130,HPIOB_M,IO",
+            "IOB_X2Y131,HPIOB_S,IO",
+            "IOB_X2Y155,HPIOB_SNGL,IO",
+            "IOB_X0Y130,HDIOB_M,IO",
+            "IOB_X0Y131,HDIOB_S,IO"
+    })
+    public void testGetSiteWireIndicesFromNetRoundTripsWithinSiteWireCount(String siteName,
+            SiteTypeEnum siteType, String siteWireName) {
+        Design design = new Design("top", "xczu3eg");
+        Site site = design.getDevice().getSite(siteName);
+        Assertions.assertEquals(siteType, site.getSiteTypeEnum());
+
+        // The expected index is derived from the site wire name, never hardcoded
+        Integer expectedIndex = site.getSiteWireIndex(siteWireName);
+        Assertions.assertNotNull(expectedIndex);
+
+        SiteInst si = design.createSiteInst(site);
+        Net net = design.createNet("net");
+        net.createPin(siteWireName, si);
+
+        // By name, the net sits on exactly the site wire it was put on
+        Assertions.assertEquals(Arrays.asList(siteWireName), si.getSiteWiresFromNet(net));
+
+        List<Integer> siteWireIndices = si.getSiteWireIndicesFromNet(net);
+        Assertions.assertEquals(1, siteWireIndices.size());
+        int siteWireIndex = siteWireIndices.get(0);
+
+        // That index must not exceed the site's site wire count ...
+        Assertions.assertTrue(siteWireIndex < site.getSiteWireCount());
+
+        // ... and must round trip name -> index -> name
+        Assertions.assertEquals(expectedIndex.intValue(), siteWireIndex);
+        Assertions.assertEquals(siteWireName, site.getSiteWireName(siteWireIndex));
     }
 }
