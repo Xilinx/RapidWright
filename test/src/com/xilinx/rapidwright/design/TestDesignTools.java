@@ -671,12 +671,18 @@ public class TestDesignTools {
      */
     @ParameterizedTest
     @CsvSource({
-        "false, false, WIRE", "true, false, WIRE",
-        "false, true, WIRE", "true, true, WIRE",
-        "false, false, GND", "true, false, GND",
-        "false, true, GND", "true, true, GND",
-        "false, false, VCC", "true, false, VCC",
-        "false, true, VCC", "true, true, VCC"
+        "false, false, WIRE",
+        "true, false, WIRE",
+        "false, true, WIRE",
+        "true, true, WIRE",
+        "false, false, GND",
+        "true, false, GND",
+        "false, true, GND",
+        "true, true, GND",
+        "false, false, VCC",
+        "true, false, VCC",
+        "false, true, VCC",
+        "true, true, VCC"
     })
     public void testPopulateBlackBoxUnusedInput(boolean keepBoundaryRouting, boolean nested,
             NetType type) {
@@ -744,6 +750,64 @@ public class TestDesignTools {
         }
         Assertions.assertEquals(Collections.singletonList(unrelatedPIP), unrelated.getPIPs());
         Assertions.assertFalse(modified.contains(unrelated));
+    }
+
+    /**
+     * An output the replacement does not drive brings in no physical net to merge, but its shell
+     * routing must still respect keepBoundaryRouting. A replacement that is nothing but ports is
+     * still a leaf to the parent net map, so the net owns itself; one with contents leaves the net
+     * with no owner at all. Both must be handled.
+     */
+    @ParameterizedTest
+    @CsvSource({
+        "false, false",
+        "true, false",
+        "false, true",
+        "true, true"
+    })
+    public void testPopulateBlackBoxUndrivenOutput(boolean keepBoundaryRouting,
+            boolean hasContents) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+
+        Cell sink = design.createAndPlaceCell("sink", Unisim.LUT1, "SLICE_X2Y0/A6LUT");
+        EDIFCell boxType = new EDIFCell(netlist.getWorkLibrary(), "bbType");
+        boxType.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFCellInst box = boxType.createCellInst("bb", top);
+        box.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+        EDIFNet out = top.createNet("out");
+        out.createPortInst("O", box);
+        out.createPortInst("I0", sink.getEDIFCellInst());
+
+        Net outNet = design.createNet("out");
+        SitePinInst sinkPin = outNet.createPin("A1", sink.getSiteInst());
+        PIP pip = design.getDevice().getTile("INT_X0Y0").getPIPs().get(0);
+        outNet.addPIP(pip);
+        sinkPin.setRouted(true);
+
+        Design replacement = new Design("replacement", "xcvu3p");
+        replacement.getTopEDIFCell().createPort("O", EDIFDirection.OUTPUT, 1);
+        if (hasContents) {
+            replacement.getTopEDIFCell().createNet("unconnected");
+        }
+        Set<Net> modified = DesignTools.populateBlackBox(design, "bb", replacement,
+                keepBoundaryRouting);
+
+        EDIFHierNet parent = netlist.getParentNet(netlist.getHierNetFromName("out"));
+        if (hasContents) {
+            Assertions.assertNull(parent);
+        } else {
+            Assertions.assertEquals("out", parent.getHierarchicalNetName());
+        }
+        Assertions.assertSame(outNet, design.getNet("out"));
+        Assertions.assertEquals(keepBoundaryRouting ? Collections.singletonList(pip)
+                : Collections.emptyList(), outNet.getPIPs());
+        Assertions.assertEquals(keepBoundaryRouting, sinkPin.isRouted());
+        Assertions.assertEquals(!keepBoundaryRouting, modified.contains(outNet));
+        for (Net net : modified) {
+            Assertions.assertSame(net, design.getNet(net.getName()), net.getName());
+        }
     }
 
     /**
