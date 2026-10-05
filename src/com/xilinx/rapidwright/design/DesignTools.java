@@ -941,9 +941,10 @@ public class DesignTools {
      * a design that is still part black box, and rebuilds it for each.
      * <p>
      * Only the nets a black box touches are rectified: those that arrived with it and those on its
-     * outputs, each merged onto the net that now owns it if that is some other net. An alias
-     * elsewhere in the design is left alone, so a caller that needs every physical net in the design
-     * named after its source must call {@link #makePhysNetNamesConsistent(Design)} itself.
+     * outputs, each merged onto the net that now owns it if that is some other net and it holds
+     * anything to move. An empty alias, or one elsewhere in the design, is left alone, so a caller
+     * that needs every physical net in the design named after its source must call
+     * {@link #makePhysNetNamesConsistent(Design)} itself.
      * <p>
      * Conversely, the design must arrive with every physical net that connects to a black box named
      * after its source, where a black box output counts as the source of the net attached to it.
@@ -1161,7 +1162,7 @@ public class DesignTools {
                     // Expected to be obsoleted when PR #1411 is merged.
                     design.addModifiedNet(net);
                     modifiedNets.add(net);
-                    if (getMergeableOwner(netlist, net, keepBoundaryRouting) != null) {
+                    if (getMergeableOwner(netlist, net) != null) {
                         boundaryNets.add(net);
                     }
                 }
@@ -1192,7 +1193,7 @@ public class DesignTools {
                 // Its owner is usually inside the cell now, but a circuit that passes an input
                 // straight through to this port makes the owner the shell's net on that input, which
                 // is outside just as this one is. Either way it is to be merged
-                if (getMergeableOwner(netlist, net, keepBoundaryRouting) != null) {
+                if (getMergeableOwner(netlist, net) != null) {
                     boundaryNets.add(net);
                 }
             }
@@ -1203,12 +1204,13 @@ public class DesignTools {
         }
 
         // Merge the aliases found above onto their owners
-        postBlackBoxCleanup(design, keepBoundaryRouting, boundaryNets, modifiedNets);
+        postBlackBoxCleanup(design, boundaryNets, modifiedNets);
 
-        // Only now, with every box inserted and every alias merged, is each owner's physical net
-        // known by its final name and holding every pin it is going to. Owners are resolved to
-        // their nets before any is unrouted, since several can share one -- every logical constant
-        // resolves to the design's static net -- and unrouting walks every pin of the net again
+        // This is the one place boundary routing is discarded. Only now, with every box inserted
+        // and every alias merged, is each owner's physical net known by its final name and holding
+        // every pin and PIP it is going to. Owners are resolved to their nets before any is
+        // unrouted, since several can share one -- every logical constant resolves to the design's
+        // static net -- and unrouting walks every pin of the net again
         Set<Net> netsToUnroute = Collections.newSetFromMap(new IdentityHashMap<>());
         for (EDIFHierNet owner : ownersToUnroute) {
             EDIFNet logicalNet = owner.getNet();
@@ -1238,19 +1240,14 @@ public class DesignTools {
      *                            rather than getLogicalHierNet(): a net that arrived with the cell
      *                            still carries the hierarchy it had inside, which the shell's
      *                            netlist knows nothing about.
-     * @param keepBoundaryRouting Whether the caller is preserving boundary routing, which decides
-     *                            whether a net with nothing on it is worth merging.
      * @return The owner, or null if the net owns itself, has no owner, or holds nothing worth
      *         moving.
      */
-    private static EDIFHierNet getMergeableOwner(EDIFNetlist netlist, Net net,
-            boolean keepBoundaryRouting) {
-        // A net with no physical presence has nothing to move, so it is not worth asking about --
-        // unless the boundary routing is being discarded, since merging is also what unroutes the
-        // owner, and an owner left routed into the region the black box now occupies conflicts with
-        // the circuit just placed there
-        if (keepBoundaryRouting && net.getPins().isEmpty() && net.getSiteInsts().isEmpty()
-                && !net.hasPIPs()) {
+    private static EDIFHierNet getMergeableOwner(EDIFNetlist netlist, Net net) {
+        // A net with no physical presence has nothing to move, so it is not worth asking about.
+        // That holds even when the boundary routing is being discarded, since the owner of the net
+        // on every black box port is unrouted separately, merged onto or not
+        if (net.getPins().isEmpty() && net.getSiteInsts().isEmpty() && !net.hasPIPs()) {
             return null;
         }
         EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
@@ -1263,24 +1260,24 @@ public class DesignTools {
     /**
      * Merges the aliases that populating black boxes has left behind -- among the nets the circuits
      * brought in and the nets on the boxes' outputs -- onto the nets that own them, so that every
-     * such physical net is once again named after its source.
+     * such physical net is once again named after its source. Every alias' routing goes with it,
+     * so that each pin keeps the routing it is marked as having; whether that routing is then kept
+     * is for the caller to decide.
      *
      * @param design              The current design.
-     * @param keepBoundaryRouting Preserves the routing on the boundaries of the
-     *                            black box.
      * @param boundaryNets        The nets to merge, as identified by {@link #getMergeableOwner}.
      * @param modifiedNets        Updated in place: whichever net ends up holding an alias' pins is
      *                            added, and an alias deleted in favour of its owner is taken out, so
      *                            the set never names a net the design no longer has.
      */
-    private static void postBlackBoxCleanup(Design design, boolean keepBoundaryRouting,
-            Set<Net> boundaryNets, Set<Net> modifiedNets) {
+    private static void postBlackBoxCleanup(Design design, Set<Net> boundaryNets,
+            Set<Net> modifiedNets) {
         for (Net alias : boundaryNets) {
             // The merge below drops the alias' routing, so take it off the net rather than copying
             // it. An empty list left in its place costs nothing and keeps the alias usable, which it
             // has to be in the case where the merge renames it instead of deleting it
             List<PIP> aliasPIPs = null;
-            if (keepBoundaryRouting && !alias.getPIPs().isEmpty()) {
+            if (!alias.getPIPs().isEmpty()) {
                 aliasPIPs = alias.getPIPs();
                 alias.setPIPs(new ArrayList<>());
             }
@@ -1291,11 +1288,7 @@ public class DesignTools {
             // A null answer means the alias kept its pins and was renamed after its source, so it is
             // the net that was modified; otherwise it has been deleted in favour of the one returned
             Net holder = parentNet != null ? parentNet : alias;
-            if (!keepBoundaryRouting) {
-                // Unrouted here rather than by the merge, so that this happens in the renaming case
-                // too, and after the pins have arrived so that they are marked unrouted as well
-                holder.unroute();
-            } else if (aliasPIPs != null) {
+            if (aliasPIPs != null) {
                 // Handed straight over when there is nothing to merge with -- which is always so for
                 // a rename, since holder is then the alias whose list was just emptied
                 if (holder.getPIPs().isEmpty()) {
