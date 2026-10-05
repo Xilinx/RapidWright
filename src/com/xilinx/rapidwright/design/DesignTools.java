@@ -1055,19 +1055,7 @@ public class DesignTools {
             Net gndCell = cell.getGndNet();
             for (SiteInst si : cell.getSiteInsts()) {
                 for (Cell c : new ArrayList<Cell>(si.getCells())) {
-                    // Cell caches its EDIFHierCellInst, and that cache is an array of EDIFCellInst
-                    // references rooted at the top instance of whichever netlist built it - here the
-                    // circuit's own, which is not the top instance of the netlist being merged into.
-                    // updateName() re-keys the design's cell map but leaves that cache alone, so drop
-                    // it and let the getter rebuild it lazily once the merge is complete. Only when the
-                    // rename actually happened: updateName() returns false without renaming if the new
-                    // name is taken, and the old cache is still the right one in that case.
-                    // TODO: belongs in Cell.updateName() in the API lib, which is where the cache is
-                    // invalidated by the rename. Doing it there would also cover ECOTools, which renames
-                    // cells the same way in two places and has the same stale cache.
-                    // Expected to be obsoleted when PR #1409 is merged.
-                    if (c.updateName(hierarchicalCellName + "/" + c.getName()))
-                        c.setEDIFHierCellInst(null);
+                    c.updateName(hierarchicalCellName + "/" + c.getName());
                     if (!c.isRoutethru())
                         design.addCell(c);
                     else {
@@ -1094,26 +1082,9 @@ public class DesignTools {
                         assert(net.isStaticNet());
                         deferredRemovals.computeIfAbsent(net, (p) -> new HashSet<>()).add(spi);
                     }
-                } else {
-                    // Expected to be obsoleted when PR #1411 is merged.
-                    if (design.isCopyingOriginalSiteInsts()) {
-                        // Create an empty SiteInst to indicate it was blank to begin with
-                        existingSi = new SiteInst(si.getName(), si.getSiteTypeEnum());
-                        // place() only registers a site instance with a design when it already has one,
-                        // which this does not, so it stays a detached record of how the site used to be
-                        existingSi.place(si.getSite());
-                    }
-                }
-                // What the site is changing from, so that everything the incoming site instance holds
-                // counts as a difference and gets written into the bitstream.
-                // Expected to be obsoleted when PR #1411 is merged.
-                if (design.isCopyingOriginalSiteInsts() && existingSi != null) {
-                    design.getOriginalSiteInsts().put(si.getName(), existingSi);
                 }
 
                 design.addSiteInst(si);
-                // Expected to be obsoleted when PR #1411 is merged.
-                design.addModifiedSiteInst(si);
 
                 // Update GND/VCC site routing to point to destination design's GND/VCC nets
                 for (String siteWire : si.getSiteWiresFromNet(vccCell)) {
@@ -1161,9 +1132,6 @@ public class DesignTools {
                     // unprefixed name first, displacing any net the shell already has by that name.
                     net.rename(cellPrefix + net.getName());
                     design.addNet(net);
-                    // rename() marked the net modified on the circuit rather than on the shell.
-                    // Expected to be obsoleted when PR #1411 is merged.
-                    design.addModifiedNet(net);
                     modifiedNets.add(net);
                     // Only a net on one of the box's own ports can be on its boundary. One deeper
                     // inside belongs to the circuit alone, whatever it is named, and is left as is

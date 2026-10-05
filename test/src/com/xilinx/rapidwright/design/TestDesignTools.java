@@ -528,7 +528,9 @@ public class TestDesignTools {
         String hierCellName = "hw_contract_pr1";
         String cellPrefix = hierCellName + EDIFTools.EDIF_HIER_SEP;
 
-        // Only a design that is tracking its original site instances snapshots them, so ask for it
+        // Only a design that is tracking its changes records them, and only one that is also
+        // copying its original site instances snapshots those, so ask for both
+        design.setTrackingChanges(true);
         design.setCopyingOriginalSiteInsts(true);
 
         // The site instances the cell brings with it, captured before the call moves them across
