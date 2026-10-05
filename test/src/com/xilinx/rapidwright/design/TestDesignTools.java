@@ -690,8 +690,9 @@ public class TestDesignTools {
 
     /**
      * An unused input has no physical net in the replacement, but its shell routing must still
-     * respect keepBoundaryRouting. The physical owner can be above the box's enclosing cell,
-     * and a logical constant's name need not be the canonical physical static-net name.
+     * respect keepBoundaryRouting. The physical owner can be above the box's enclosing cell. An
+     * input merely tied to a constant, on the other hand, must leave the design's GND or VCC net
+     * alone, whatever its logical name.
      */
     @ParameterizedTest
     @CsvSource({
@@ -763,11 +764,13 @@ public class TestDesignTools {
         Set<Net> modified = DesignTools.populateBlackBox(design, boxName, replacement,
                 keepBoundaryRouting);
 
-        Assertions.assertEquals(keepBoundaryRouting ? Collections.singletonList(pip)
-                : Collections.emptyList(), physical.getPIPs());
-        Assertions.assertEquals(keepBoundaryRouting, sinkPin.isRouted());
-        if (!keepBoundaryRouting) {
-            Assertions.assertTrue(modified.contains(physical));
+        boolean discarded = !keepBoundaryRouting && type == NetType.WIRE;
+        Assertions.assertEquals(discarded ? Collections.emptyList()
+                : Collections.singletonList(pip), physical.getPIPs());
+        Assertions.assertEquals(!discarded, sinkPin.isRouted());
+        // The design's static nets are reported regardless, since they take the circuit's own
+        if (type == NetType.WIRE) {
+            Assertions.assertEquals(discarded, modified.contains(physical));
         }
         assertAllNetsLive(design, modified);
         Assertions.assertEquals(Collections.singletonList(unrelatedPIP), unrelated.getPIPs());
@@ -877,9 +880,11 @@ public class TestDesignTools {
         Map<String, Design> blackBoxes = new LinkedHashMap<>();
         if (drivenFirst) {
             blackBoxes.put("b", circuitB);
+            blackBoxes.put("a", circuitA);
+        } else {
+            blackBoxes.put("a", circuitA);
+            blackBoxes.put("b", circuitB);
         }
-        blackBoxes.put("a", circuitA);
-        blackBoxes.put("b", circuitB);
         Set<Net> modified = DesignTools.populateBlackBox(design, blackBoxes, keepBoundaryRouting);
 
         Assertions.assertEquals("a/o",
