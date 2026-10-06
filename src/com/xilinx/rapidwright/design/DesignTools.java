@@ -1200,10 +1200,6 @@ public class DesignTools {
                 if (net.isStaticNet()) {
                     Net staticNet = design.getStaticNet(net.getType());
                     staticNet.addPins(net.getPins());
-                    // TEMPORARY WORKAROUND: as in mergeOntoNet(), a pin move alone leaves the
-                    // destination unmarked. setPIPs() below marks it whenever the circuit brought
-                    // routing with it, but not when it brought only pins
-                    markModified(design, staticNet);
                     HashSet<PIP> uniquePIPs = new HashSet<>(net.getPIPs());
                     uniquePIPs.addAll(staticNet.getPIPs());
                     staticNet.setPIPs(uniquePIPs);
@@ -1243,9 +1239,6 @@ public class DesignTools {
                 // Nothing to move, so the net is simply removed rather than left behind as an
                 // alias of its parent
                 design.removeNet(net);
-                // TEMPORARY WORKAROUND: the design has stopped holding this net, but the change
-                // tracking still has it
-                untrackRemovedNet(design, net);
                 continue;
             }
             if (target == null) {
@@ -1345,51 +1338,8 @@ public class DesignTools {
         // added one by one rather than the list handed over, which would leave the deleted net and
         // the target sharing it
         design.movePinsToNewNetDeleteOldNet(net, target, true);
-        // TEMPORARY WORKAROUND: moving pins onto a net does not mark it as modified -- only a
-        // change to its routing does -- so a target that keeps its own routing and merely gains
-        // the merged net's pins is left unmarked. With boundary routing preserved that is the
-        // common case: the clock gains hundreds of pins and not one PIP. Mark it here, so that
-        // getModifiedNets() holds every net this touched rather than only those whose PIPs moved.
-        // The fix belongs in whatever marks a Net modified, which should count a pin move too.
-        markModified(design, target);
         for (PIP p : net.getPIPs()) {
             target.addPIP(p);
-        }
-
-        // TEMPORARY WORKAROUND: the design has stopped holding this net, but the change tracking
-        // still has it. This cannot be done any earlier: taking its pins above marks it again
-        untrackRemovedNet(design, net);
-    }
-
-    /**
-     * TEMPORARY WORKAROUND: takes a net the design has stopped holding out of the change tracking,
-     * putting what it was routed with into the original state on the way.
-     *
-     * Without this, getModifiedNets() holds nets getNets() does not, and whoever walks the modified
-     * set -- an incremental bitstream writer, for one -- reads a net that no longer exists. The
-     * routing has to be kept, rather than simply dropped, or those PIPs are left turned on with
-     * nothing owning them. Deleting a net leaves its PIPs where they are, so they can still be read
-     * here. putIfAbsent keeps an earlier snapshot, which is the truer original.
-     *
-     * The fix belongs in whatever deletes a Net, which should move it to the original state itself.
-     */
-    private static void untrackRemovedNet(Design design, Net net) {
-        if (!design.isTrackingNetChanges()) {
-            return;
-        }
-        if (design.isCopyingOriginalNetsRouting() && !net.getPIPs().isEmpty()) {
-            design.getOriginalNetRouting().putIfAbsent(net.getName(), new ArrayList<>(net.getPIPs()));
-        }
-        design.getModifiedNets().remove(net);
-    }
-
-    /**
-     * TEMPORARY WORKAROUND: marks a net as modified, for a change that the design's own change
-     * tracking does not notice. See the call sites.
-     */
-    private static void markModified(Design design, Net net) {
-        if (design.isTrackingNetChanges()) {
-            design.addModifiedNet(net);
         }
     }
 
