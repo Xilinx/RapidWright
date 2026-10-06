@@ -949,9 +949,10 @@ public class DesignTools {
      * <p>
      * Only the physical nets on a signal that crosses a black box port are touched. Those on each
      * such signal, from whichever side, are merged onto the one named after the signal's source
-     * once the boxes are filled. A net with nothing on it, and every other net in the design, is
-     * left alone. The design's parent net map is dropped, since the netlist has changed, and left
-     * for whichever caller next needs it to rebuild.
+     * once the boxes are filled -- or, having nothing on them to move, simply removed. A signal
+     * that nothing drives has no source to name a net after, so its nets are left where they are,
+     * as is every net in the design not on such a signal. The design's parent net map is dropped,
+     * since the netlist has changed, and left for whichever caller next needs it to rebuild.
      * <p>
      * Every entry is vetted before anything is modified, but there is no rollback once insertion has
      * begun: a failure part way through -- a site overlap, say -- leaves the boxes filled so far in
@@ -971,11 +972,12 @@ public class DesignTools {
      * @return Every net this touched that the design still holds: the ones the filled cells brought
      *         in with them, the net each signal crossing a black box port ends up on wherever
      *         something was merged onto it or its routing discarded, and the static nets that took
-     *         a circuit's static routing or gave up a displaced source pin. A net merged away is
-     *         deleted from the design and so is deliberately absent -- including one that predates
-     *         this call, such as the design's net on a black box output, whose source is now inside
-     *         the box. No net outside this set was altered, so a caller that means to route the
-     *         result can start from these rather than have
+     *         a circuit's static routing or gave up a displaced source pin. Each is named after its
+     *         source, so is its own parent net, but for one on a signal that nothing drives, which
+     *         has none. A net merged away is deleted from the design and so is deliberately absent
+     *         -- including one that predates this call, such as the design's net on a black box
+     *         output, whose source is now inside the box. No net outside this set was altered, so a
+     *         caller that means to route the result can start from these rather than have
      *         {@link com.xilinx.rapidwright.rwroute.PartialRouter} rediscover them by walking every
      *         net in the design.
      */
@@ -1240,14 +1242,19 @@ public class DesignTools {
             String parent = resolveParent(portParents, undriven, name);
             Net net = design.getNet(name);
             Net target = parent != null ? design.getNet(parent) : null;
-            // A net with no physical presence has nothing to move, and is left alone
-            boolean toMerge = parent != null && !parent.equals(name) && net != null
-                    && hasPhysicalPresence(net);
+            boolean toMerge = parent != null && !parent.equals(name) && net != null;
             if (!keepBoundaryRouting) {
                 unrouteSignalNet(net, modifiedNets);
                 unrouteSignalNet(target, modifiedNets);
             }
             if (!toMerge) continue;
+            if (!hasPhysicalPresence(net)) {
+                // Nothing to move, so the net is simply removed rather than left behind as an
+                // alias of its parent
+                modifiedNets.remove(net);
+                design.removeNet(net);
+                continue;
+            }
             if (target == null) {
                 // The parent has no physical net yet, so this one becomes it
                 modifiedNets.remove(net);

@@ -742,15 +742,25 @@ public class TestDesignTools {
     /**
      * Calls populateBlackBox(), then asserts what holds for every call: that it left the design's
      * parent net map unbuilt, since it drops the map once it has changed the netlist and must not
-     * build it again; and that every net it reports is one the design still holds, since a merge
-     * deletes the net it merges away, and a deleted net must not be named in the result.
+     * build it again; that every net it reports is one the design still holds, since a merge
+     * deletes the net it merges away, and a deleted net must not be named in the result; and that
+     * every net it reports is named after its source, so is its own parent net, but for one on a
+     * signal that nothing drives, which has none.
      */
     private static Set<Net> populateBlackBox(Design design, Map<String, Design> blackBoxes,
             boolean keepBoundaryRouting) {
         Set<Net> modified = DesignTools.populateBlackBox(design, blackBoxes, keepBoundaryRouting);
-        Assertions.assertFalse(design.getNetlist().isParentNetMapBuilt());
+        EDIFNetlist netlist = design.getNetlist();
+        Assertions.assertFalse(netlist.isParentNetMapBuilt());
+        // Checked only now, since asking for a parent builds the map
         for (Net net : modified) {
             Assertions.assertSame(net, design.getNet(net.getName()), net.getName());
+            if (net.isStaticNet()) continue;
+            EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
+            Assertions.assertNotNull(hierNet, net.getName());
+            EDIFHierNet parent = netlist.getParentNet(hierNet);
+            Assertions.assertTrue(parent == null || parent.equals(hierNet),
+                    net.getName() + " is an alias of " + parent);
         }
         return modified;
     }
@@ -821,8 +831,13 @@ public class TestDesignTools {
         EDIFNet wire = circuitTop.createNet("wire");
         wire.createPortInst(circuitTop.getPort("I"));
         wire.createPortInst(circuitTop.getPort("O"));
+        // ... held as a physical net with nothing on it
+        circuit.createNet("wire");
 
         Set<Net> modified = populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
+
+        // That empty net, with nothing to move, is not left behind as an alias of 'in'
+        Assertions.assertNull(design.getNet("bb/wire"));
 
         // The output's sinks move onto the input's net. If the routing is kept, the output's goes
         // with them, joining the input's own; if not, neither is left
