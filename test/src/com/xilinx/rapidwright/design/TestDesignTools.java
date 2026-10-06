@@ -607,6 +607,75 @@ public class TestDesignTools {
     }
 
     /**
+     * A black box may evict a static source from a site it wants, and populateBlackBox() installs
+     * the circuit's own site instance there in its place. The evicted one is then gone from the
+     * design, but the change tracking marked it on the way out -- its pins were taken -- so it is
+     * left in getModifiedSiteInsts() alongside the live site instance that replaced it.
+     *
+     * Two entries for one site mean two writers of that site's configuration bits, and which of
+     * them lands last depends on the iteration order of the modified set. That order changes as the
+     * set grows and rehashes, so the bitstream a design produces can turn on how many unrelated
+     * sites happen to be marked -- which is how this was found: one bit in one slice flipped when
+     * the modified set crossed 6144 entries.
+     */
+    @Test
+    public void testPopulateBlackBoxUntracksEvictedSiteInsts() {
+        Design design = RapidWrightDCP.loadDCP("hwct.dcp");
+        Design cell = RapidWrightDCP.loadDCP("hwct_pr1.dcp");
+        String hierCellName = "hw_contract_pr1";
+
+        // Stand a static source on a site the circuit is about to take, as a static router leaves
+        // one on a site it found free. This pair of checkpoints does not collide on its own, so
+        // the one case populateBlackBox() is allowed to evict has to be set up here
+        Site contested = null;
+        for (SiteInst incoming : cell.getSiteInsts()) {
+            if (design.getSiteInstFromSite(incoming.getSite()) == null) {
+                contested = incoming.getSite();
+                break;
+            }
+        }
+        Assertions.assertNotNull(contested);
+
+        design.setTrackingChanges(true);
+        design.setCopyingOriginalSiteInsts(true);
+
+        SiteInst evicted = design.createSiteInst(
+                SiteInst.STATIC_SOURCE + "_" + contested.getName(),
+                contested.getSiteTypeEnum(), contested);
+        Assertions.assertSame(evicted, design.getSiteInstFromSite(contested));
+
+        // Creating it under tracking is what puts it in the modified set in the first place
+        Assertions.assertTrue(design.getModifiedSiteInsts().contains(evicted));
+
+        Set<SiteInst> toBeEvicted = new HashSet<>();
+        toBeEvicted.add(evicted);
+
+        DesignTools.populateBlackBox(design, hierCellName, cell, false);
+
+        // Nothing the design has stopped holding may still be tracked as modified
+        Set<SiteInst> live = new HashSet<>(design.getSiteInsts());
+        for (SiteInst si : design.getModifiedSiteInsts()) {
+            Assertions.assertTrue(live.contains(si),
+                    "modified site instance is no longer in the design: " + si.getName());
+        }
+
+        // ... and specifically, not the ones that were evicted
+        Map<String, SiteInst> originals = design.getOriginalSiteInsts();
+        for (SiteInst gone : toBeEvicted) {
+            Assertions.assertFalse(design.getModifiedSiteInsts().contains(gone), gone.getName());
+            Assertions.assertNotSame(gone, originals.get(gone.getName()));
+        }
+
+        // The invariant that actually matters to whoever walks the modified set: one entry per site
+        Map<Site, SiteInst> bySite = new HashMap<>();
+        for (SiteInst si : design.getModifiedSiteInsts()) {
+            SiteInst clash = bySite.put(si.getSite(), si);
+            Assertions.assertNull(clash, "two modified site instances on " + si.getSiteName()
+                    + ": " + si.getName() + " and " + (clash == null ? "" : clash.getName()));
+        }
+    }
+
+    /**
      * Creates a black box instance in the given cell, with a single-bit port for each direction
      * given, named 'I' for an input and 'O' for an output.
      */
