@@ -774,13 +774,16 @@ public class TestDesignTools {
     }
 
     /**
-     * Asserts that a net's routing was kept -- it holds just the PIP it was routed with, and its
-     * sink pin is still marked routed -- or else discarded, leaving neither.
+     * Asserts that a net's routing was kept -- it holds just the PIPs it was routed with, in order,
+     * and its sink pin is still marked routed -- or else discarded, leaving neither.
      */
-    private static void assertRouting(boolean kept, Net net, PIP pip, SitePinInst sink) {
-        Assertions.assertEquals(kept ? Collections.singletonList(pip) : Collections.emptyList(),
-                net.getPIPs());
+    private static void assertRouting(boolean kept, Net net, List<PIP> pips, SitePinInst sink) {
+        Assertions.assertEquals(kept ? pips : Collections.emptyList(), net.getPIPs());
         Assertions.assertEquals(kept, sink.isRouted());
+    }
+
+    private static void assertRouting(boolean kept, Net net, PIP pip, SitePinInst sink) {
+        assertRouting(kept, net, Collections.singletonList(pip), sink);
     }
 
     /**
@@ -801,6 +804,7 @@ public class TestDesignTools {
         in.createPortInst("I", bb);
         Net inNet = design.createNet("in");
         addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+        PIP inPIP = addTestRouting(inNet, 1);
         EDIFNet out = top.createNet("out");
         out.createPortInst("O", bb);
         Net outNet = design.createNet("out");
@@ -820,11 +824,12 @@ public class TestDesignTools {
 
         Set<Net> modified = populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
 
-        // The output's sinks move onto the input's net, along with its routing if that is kept
+        // The output's sinks move onto the input's net. If the routing is kept, the output's goes
+        // with them, joining the input's own; if not, neither is left
         assertParentNet(netlist, "out", "in");
         Assertions.assertSame(inNet, sinkPin.getNet());
         Assertions.assertNull(design.getNet("out"));
-        assertRouting(keepBoundaryRouting, inNet, pip, sinkPin);
+        assertRouting(keepBoundaryRouting, inNet, Arrays.asList(inPIP, pip), sinkPin);
         Assertions.assertTrue(modified.contains(inNet));
         assertAllNetsLive(design, modified);
     }
@@ -984,6 +989,7 @@ public class TestDesignTools {
         o.createPortInst(aTop.getPort("O"));
         Net oNet = circuitA.createNet("o");
         addSourceLUT(circuitA, aTop, "lut", "SLICE_X0Y0", o, oNet);
+        PIP oPIP = addTestRouting(oNet, 1);
 
         // The circuit for 'b': an input it does not use
         Design circuitB = createCircuit("b", EDIFDirection.INPUT);
@@ -998,10 +1004,12 @@ public class TestDesignTools {
         }
         Set<Net> modified = populateBlackBox(design, blackBoxes, keepBoundaryRouting);
 
+        // The shell's net is merged onto the circuit's. If the routing is kept, the shell's goes
+        // with it, joining the circuit's own; if not, neither is left
         assertParentNet(netlist, "ab", "a/o");
         Assertions.assertNull(design.getNet("ab"));
         Assertions.assertSame(oNet, sinkPin.getNet());
-        assertRouting(keepBoundaryRouting, oNet, pip, sinkPin);
+        assertRouting(keepBoundaryRouting, oNet, Arrays.asList(oPIP, pip), sinkPin);
         Assertions.assertTrue(modified.contains(oNet));
         assertAllNetsLive(design, modified);
     }
