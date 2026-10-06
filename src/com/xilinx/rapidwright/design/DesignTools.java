@@ -1045,6 +1045,7 @@ public class DesignTools {
         // in one batch once every site instance of every box is in. Trimming them per box instead
         // would, from the second box on, compute against static routing an earlier box had merged in
         Map<Net, Set<SitePinInst>> deferredRemovals = new HashMap<>();
+        List<SiteInst> evictedSiteInsts = new ArrayList<>();
 
         // Add placement information
         // We need to prefix all cell and net names with the hierarchicalCellName as a prefix
@@ -1082,6 +1083,11 @@ public class DesignTools {
                         assert(net.isStaticNet());
                         deferredRemovals.computeIfAbsent(net, (p) -> new HashSet<>()).add(spi);
                     }
+
+                    // TEMPORARY WORKAROUND, part 1 of 2: remember what addSiteInst() below is
+                    // about to displace. It cannot be untracked here, because batchRemoveSitePins()
+                    // at the end of this method takes its pins and marks it again
+                    evictedSiteInsts.add(existingSi);
                 }
 
                 design.addSiteInst(si);
@@ -1103,6 +1109,20 @@ public class DesignTools {
         boolean preserveOtherRoutes = true;
         DesignTools.batchRemoveSitePins(deferredRemovals, preserveOtherRoutes);
         modifiedNets.addAll(deferredRemovals.keySet());
+
+        // TEMPORARY WORKAROUND, part 2 of 2. addSiteInst() displaced each of these from the design,
+        // but left it in the change tracking - which marked it again just above, as its pins were
+        // taken. It is then a SiteInst that getModifiedSiteInsts() holds and getSiteInsts() does
+        // not, so whoever walks the modified set - BitGenerator, for one - reads a site the design
+        // no longer owns, alongside the live SiteInst for that same site. Two entries for one site
+        // means two writers of its configuration bits, and which one lands last depends on the
+        // iteration order of the modified set, which changes as the set grows and rehashes.
+        // The proper fix belongs in Design.addSiteInst(), which should treat displacing an
+        // existing SiteInst as a tracked removal, so that no caller has to remember to do this.
+        for (SiteInst evicted : evictedSiteInsts) {
+            design.getModifiedSiteInsts().remove(evicted);
+            design.getOriginalSiteInsts().remove(evicted.getName());
+        }
 
         // Add routing information. Every alias found is merged in one pass at the end, once all
         // of them are known
