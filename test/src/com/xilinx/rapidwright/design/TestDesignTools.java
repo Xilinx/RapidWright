@@ -482,7 +482,7 @@ public class TestDesignTools {
         for (Net net : design.getNets()) {
             before.put(net.getName(), net.getPins().size() + "/" + net.getPIPs().size());
         }
-        Set<Net> modified = DesignTools.populateBlackBox(design, hierCellName, cell, false);
+        Set<Net> modified = populateBlackBox(design, hierCellName, cell, false);
 
         Assertions.assertFalse(inst.getCellType().getCellInsts().isEmpty());
         Assertions.assertFalse(modified.isEmpty());
@@ -551,7 +551,7 @@ public class TestDesignTools {
             net.getLogicalHierNet();
         }
 
-        Set<Net> modified = DesignTools.populateBlackBox(design, hierCellName, cell, false);
+        Set<Net> modified = populateBlackBox(design, hierCellName, cell, false);
 
         EDIFNetlist netlist = design.getNetlist();
 
@@ -699,6 +699,23 @@ public class TestDesignTools {
     }
 
     /**
+     * Calls populateBlackBox(), then asserts that it left the design's parent net map unbuilt: it
+     * drops the map once it has changed the netlist, and must not build it again.
+     */
+    private static Set<Net> populateBlackBox(Design design, Map<String, Design> blackBoxes,
+            boolean keepBoundaryRouting) {
+        Set<Net> modified = DesignTools.populateBlackBox(design, blackBoxes, keepBoundaryRouting);
+        Assertions.assertFalse(design.getNetlist().isParentNetMapBuilt());
+        return modified;
+    }
+
+    private static Set<Net> populateBlackBox(Design design, String hierarchicalCellName,
+            Design cell, boolean keepBoundaryRouting) {
+        return populateBlackBox(design, Collections.singletonMap(hierarchicalCellName, cell),
+                keepBoundaryRouting);
+    }
+
+    /**
      * Asserts that every net populateBlackBox() reported is one the design still holds.
      */
     private static void assertAllNetsLive(Design design, Set<Net> modified) {
@@ -749,7 +766,7 @@ public class TestDesignTools {
         wire.createPortInst(cellTop.createPort("I", EDIFDirection.INPUT, 1));
         wire.createPortInst(cellTop.createPort("O", EDIFDirection.OUTPUT, 1));
 
-        Set<Net> modified = DesignTools.populateBlackBox(design, "bb", cell, keepBoundaryRouting);
+        Set<Net> modified = populateBlackBox(design, "bb", cell, keepBoundaryRouting);
 
         Assertions.assertEquals("in",
                 netlist.getParentNet(netlist.getHierNetFromName("out")).getHierarchicalNetName());
@@ -832,7 +849,7 @@ public class TestDesignTools {
 
         Design replacement = new Design("replacement", "xcvu3p");
         replacement.getTopEDIFCell().createPort("I", EDIFDirection.INPUT, 1);
-        Set<Net> modified = DesignTools.populateBlackBox(design, boxName, replacement,
+        Set<Net> modified = populateBlackBox(design, boxName, replacement,
                 keepBoundaryRouting);
 
         boolean discarded = !keepBoundaryRouting && type == NetType.WIRE;
@@ -884,7 +901,7 @@ public class TestDesignTools {
         if (hasContents) {
             replacement.getTopEDIFCell().createNet("unconnected");
         }
-        Set<Net> modified = DesignTools.populateBlackBox(design, "bb", replacement,
+        Set<Net> modified = populateBlackBox(design, "bb", replacement,
                 keepBoundaryRouting);
 
         EDIFHierNet parent = netlist.getParentNet(netlist.getHierNetFromName("out"));
@@ -956,7 +973,7 @@ public class TestDesignTools {
             blackBoxes.put("a", circuitA);
             blackBoxes.put("b", circuitB);
         }
-        Set<Net> modified = DesignTools.populateBlackBox(design, blackBoxes, keepBoundaryRouting);
+        Set<Net> modified = populateBlackBox(design, blackBoxes, keepBoundaryRouting);
 
         Assertions.assertEquals("a/o",
                 netlist.getParentNet(netlist.getHierNetFromName("ab")).getHierarchicalNetName());
@@ -966,6 +983,104 @@ public class TestDesignTools {
         Assertions.assertEquals(keepBoundaryRouting, sinkPin.isRouted());
         Assertions.assertTrue(modified.contains(oNet));
         assertAllNetsLive(design, modified);
+    }
+
+    /**
+     * A replacement may hold the physical net on one of its ports under an alias deeper in its own
+     * hierarchy, rather than under the port's net. populateBlackBox() requires its inputs to have
+     * been made consistent, which renames such a net after its source; once that is done, the net
+     * must be merged onto the shell's net on the port. An alias inside the replacement that never
+     * reaches a port, on the other hand, must be left with its pins and routing.
+     * <pre>
+     *  shell             | bb (the replacement)   | bb/child
+     *  ------------------+------------------------+----------------------------------------
+     *  src.O             |                        |
+     *    [shellInput] ---+-> I -- (in) -----------+-> I -- [inputAlias] ----> lut.I0
+     *                    |                        |
+     *                    | internalSrc.O          |
+     *                    |   -- (internal) -------+-> J -- [internalAlias] -> internalSnk.I0
+     *
+     *  [net] is held as a physical net, (net) is logical only. Making the replacement consistent
+     *  renames [inputAlias] and [internalAlias] after (in) and (internal); the first must then end
+     *  up merged onto [shellInput], and the second keep its pins and routing.
+     * </pre>
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testPopulateBlackBoxPortNetNamedInChild(boolean keepBoundaryRouting) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+
+        // The shell: a LUT driving the black box's input on 'shellInput'
+        Cell src = design.createAndPlaceCell("src", Unisim.LUT1, "SLICE_X0Y0/A6LUT");
+        EDIFCellInst bb = createBlackBox(top, "bb", EDIFDirection.INPUT);
+        EDIFNet shellInput = top.createNet("shellInput");
+        shellInput.createPortInst("O", src.getEDIFCellInst());
+        shellInput.createPortInst("I", bb);
+        Net shellNet = design.createNet("shellInput");
+        shellNet.createPin("A_O", src.getSiteInst());
+
+        // The replacement: its input I reaches a LUT inside 'child' through child.I, as
+        // child/inputAlias. Separately, a LUT at its top level drives one inside 'child' through
+        // child.J, as child/internalAlias, which never goes near a port of the replacement
+        Design cell = new Design("cell", "xcvu3p");
+        EDIFNetlist cellNetlist = cell.getNetlist();
+        EDIFCell cellTop = cell.getTopEDIFCell();
+        EDIFCell childType = new EDIFCell(cellNetlist.getWorkLibrary(), "childType");
+        childType.createPort("I", EDIFDirection.INPUT, 1);
+        childType.createPort("J", EDIFDirection.INPUT, 1);
+        EDIFCellInst child = childType.createCellInst("child", cellTop);
+
+        EDIFNet in = cellTop.createNet("in");
+        in.createPortInst(cellTop.createPort("I", EDIFDirection.INPUT, 1));
+        in.createPortInst("I", child);
+        Cell lut = cell.createAndPlaceCell(childType, "child/lut", Unisim.LUT1, "SLICE_X2Y0/A6LUT");
+        EDIFNet inputAlias = childType.createNet("inputAlias");
+        inputAlias.createPortInst(childType.getPort("I"));
+        inputAlias.createPortInst("I0", lut.getEDIFCellInst());
+
+        Cell internalSrc = cell.createAndPlaceCell("internalSrc", Unisim.LUT1,
+                "SLICE_X4Y0/A6LUT");
+        Cell internalSnk = cell.createAndPlaceCell(childType, "child/internalSnk", Unisim.LUT1,
+                "SLICE_X6Y0/A6LUT");
+        EDIFNet internal = cellTop.createNet("internal");
+        internal.createPortInst("O", internalSrc.getEDIFCellInst());
+        internal.createPortInst("J", child);
+        EDIFNet internalAlias = childType.createNet("internalAlias");
+        internalAlias.createPortInst(childType.getPort("J"));
+        internalAlias.createPortInst("I0", internalSnk.getEDIFCellInst());
+
+        // Each sink's physical net is named after the alias inside 'child', not after its source
+        Net aliasNet = cell.createNet("child/inputAlias");
+        SitePinInst sinkPin = aliasNet.createPin("A1", lut.getSiteInst());
+        Net internalAliasNet = cell.createNet("child/internalAlias");
+        SitePinInst internalSinkPin = internalAliasNet.createPin("A1", internalSnk.getSiteInst());
+        PIP internalPIP = getTestPIP(design, 0);
+        internalAliasNet.addPIP(internalPIP);
+        Assertions.assertEquals("in", cellNetlist.getParentNet(
+                cellNetlist.getHierNetFromName("child/inputAlias")).getHierarchicalNetName());
+
+        // As populateBlackBox() requires
+        DesignTools.makePhysNetNamesConsistent(cell);
+        Assertions.assertEquals("in", aliasNet.getName());
+        Assertions.assertEquals("internal", internalAliasNet.getName());
+
+        Set<Net> modified = populateBlackBox(design, "bb", cell, keepBoundaryRouting);
+
+        // The net on the port is merged onto the shell's net
+        Assertions.assertEquals("shellInput", netlist.getParentNet(
+                netlist.getHierNetFromName("bb/child/inputAlias")).getHierarchicalNetName());
+        Assertions.assertSame(shellNet, sinkPin.getNet());
+        Assertions.assertNull(design.getNet("bb/in"));
+        Assertions.assertTrue(modified.contains(shellNet));
+        assertAllNetsLive(design, modified);
+
+        // The net that never reaches a port keeps its pins and routing
+        Assertions.assertSame(internalAliasNet, design.getNet("bb/internal"));
+        Assertions.assertEquals(Collections.singletonList(internalSinkPin),
+                internalAliasNet.getPins());
+        Assertions.assertEquals(Collections.singletonList(internalPIP), internalAliasNet.getPIPs());
     }
 
     /**
@@ -1006,7 +1121,7 @@ public class TestDesignTools {
         Net iNet = cell.createNet("i");
         SitePinInst sinkPin = iNet.createPin("A1", lut.getSiteInst());
 
-        Set<Net> modified = DesignTools.populateBlackBox(design, "bb", cell, keepBoundaryRouting);
+        Set<Net> modified = populateBlackBox(design, "bb", cell, keepBoundaryRouting);
 
         Assertions.assertEquals("bb/o",
                 netlist.getParentNet(netlist.getHierNetFromName("bb/i")).getHierarchicalNetName());

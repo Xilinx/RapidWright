@@ -42,6 +42,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -74,7 +75,6 @@ import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.eco.ECOTools;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
-import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
@@ -935,22 +935,23 @@ public class DesignTools {
     /**
      * Populates a set of black boxes in a netlist with the provided designs,
      * as {@link #populateBlackBox(Design, String, Design, boolean)} does for a
-     * single one. Filling them together is not just a convenience: every logical netlist change is
-     * made before any physical one, so the parent net map is built once, against a netlist in which
-     * every black box is already populated. Filling them one at a time instead asks that map about
-     * a design that is still part black box, and rebuilds it for each.
+     * single one. Filling them together is not just a convenience: every black box port is resolved
+     * before the netlist changes, in the parent net maps the inputs arrive with, and no parent net
+     * map is built after that. Filling them one at a time instead has each call after the first
+     * rebuild the design's map, which the call before it had to drop.
      * <p>
-     * Only the nets on a black box's ports are rectified -- those the circuit brought in, and the
-     * shell's on its outputs -- each merged onto the net that now owns it if that is some other net
-     * and it holds anything to move. An empty alias, or one anywhere else in the design, including
-     * deeper inside a circuit, is left alone, so a caller that needs every physical net in the
-     * design named after its source must call {@link #makePhysNetNamesConsistent(Design)} itself.
+     * {@code design} and every Design in {@code blackBoxes} must arrive having had
+     * {@link #makePhysNetNamesConsistent(Design)} run on them, with nothing changed since. That
+     * leaves every physical net named after its source -- in the design, a black box output counts
+     * as the source of the net attached to it -- and each netlist's parent net map built, which is
+     * what lets both sides of every port be found by name. This is not checked: a physical net held
+     * under any other name is missed, and its signal left split across two physical nets.
      * <p>
-     * Conversely, the design must arrive with every physical net that connects to a black box named
-     * after its source, where a black box output counts as the source of the net attached to it.
-     * {@link #makeBlackBox(Design, EDIFHierCellInst)} leaves them so, given a design that was named
-     * consistently to begin with. This is not checked: crossings are found by name, so a net held
-     * under any other alias is missed, and its signal left split across two physical nets.
+     * Only the physical nets on a signal that crosses a black box port are touched. Those on each
+     * such signal, from whichever side, are merged onto the one named after the signal's source
+     * once the boxes are filled. A net with nothing on it, and every other net in the design, is
+     * left alone. The design's parent net map is dropped, since the netlist has changed, and left
+     * for whichever caller next needs it to rebuild.
      * <p>
      * Every entry is vetted before anything is modified, but there is no rollback once insertion has
      * begun: a failure part way through -- a site overlap, say -- leaves the boxes filled so far in
@@ -962,20 +963,19 @@ public class DesignTools {
      *                            Design may appear only once, since its contents are moved into the
      *                            top level design rather than copied.
      * @param keepBoundaryRouting Preserves the routing on the boundaries of the black boxes. If
-     *                            false, the net owning each black box port's net is unrouted in its
-     *                            entirety, whether or not the circuit uses that port. The exception
-     *                            is a port tied to a constant: the design's GND or VCC net is
-     *                            unrouted, in its entirety, only if a net on that port is merged
-     *                            onto it, and not for a port the circuit leaves unused.
+     *                            false, the net each signal crossing a black box port ends up on
+     *                            is unrouted in its entirety, whether or not the circuit uses that
+     *                            port. The exception is a port tied to a constant: the design's
+     *                            GND or VCC net is unrouted, in its entirety, only if a net on that
+     *                            port is merged onto it, and not for a port merely tied to it.
      * @return Every net this touched that the design still holds: the ones the filled cells brought
-     *         in with them, the owners the aliases among those and the nets on the boxes' outputs
-     *         were merged onto, the owners of the nets on the boxes' ports whose routing was
-     *         discarded, and the static nets that took a circuit's static routing or gave up a
-     *         displaced source pin. A net merged away is deleted from the design and so is
-     *         deliberately absent -- including a net that predates this call, which is what a net
-     *         on a box output is, since its owner is now whatever drives that output through the
-     *         box. No net outside this set was altered, so a caller that means to route the result
-     *         can start from these rather than have
+     *         in with them, the net each signal crossing a black box port ends up on wherever
+     *         something was merged onto it or its routing discarded, and the static nets that took
+     *         a circuit's static routing or gave up a displaced source pin. A net merged away is
+     *         deleted from the design and so is deliberately absent -- including one that predates
+     *         this call, such as the design's net on a black box output, whose source is now inside
+     *         the box. No net outside this set was altered, so a caller that means to route the
+     *         result can start from these rather than have
      *         {@link com.xilinx.rapidwright.rwroute.PartialRouter} rediscover them by walking every
      *         net in the design.
      */
@@ -1017,6 +1017,45 @@ public class DesignTools {
             insts.put(hierarchicalCellName, hierInst);
         }
 
+        // Both sides of every black box port are looked up now, in the parent net maps of the shell
+        // and of each circuit, while those still describe them: nothing after the logical merge
+        // below builds a parent net map. Each side is recorded by the name of the net that owns it,
+        // which the inputs having been made consistent is also the name of its physical net, and a
+        // circuit's as it will be once prefixed. An owner that only stands in for a source -- a
+        // shell net driven by the black box itself, a circuit net driven only by one of its ports,
+        // or a net driven by nothing -- is noted as such, so that the real source of each signal
+        // can be told apart once the two sides are joined
+        List<String[]> portLinks = new ArrayList<>();
+        Set<String> notSources = new HashSet<>();
+        for (Entry<String, Design> e : blackBoxes.entrySet()) {
+            String cellPrefix = e.getKey() + EDIFTools.EDIF_HIER_SEP;
+            EDIFHierCellInst hierInst = insts.get(e.getKey());
+            EDIFNetlist cellNetlist = e.getValue().getNetlist();
+            for (EDIFPortInst portInst : hierInst.getInst().getPortInsts()) {
+                String shellName = null;
+                EDIFNet outerNet = portInst.getNet();
+                if (outerNet != null) {
+                    EDIFHierNet outer = new EDIFHierNet(hierInst.getParent(), outerNet);
+                    EDIFHierNet owner = netlist.getParentNet(outer);
+                    shellName = getOwnerName(owner != null ? owner : outer, "");
+                    if (owner == null || portInst.isOutput()) {
+                        notSources.add(shellName);
+                    }
+                }
+                String innerName = null;
+                EDIFNet innerNet = cellNetlist.getTopCell().getInternalNet(portInst.getName());
+                if (innerNet != null) {
+                    EDIFHierNet inner = new EDIFHierNet(cellNetlist.getTopHierCellInst(), innerNet);
+                    EDIFHierNet owner = cellNetlist.getParentNet(inner);
+                    innerName = getOwnerName(owner != null ? owner : inner, cellPrefix);
+                    if (owner == null || owner.getNet().getSourcePortInsts(false).isEmpty()) {
+                        notSources.add(innerName);
+                    }
+                }
+                portLinks.add(new String[]{shellName, innerName});
+            }
+        }
+
         // Populate Logical Netlist into cells. This loop and the physical ones below all walk
         // blackBoxes rather than insts, so that the boxes are filled in whatever order the caller
         // gave them in and not in the hash order of their names. The placeholder cells are left in
@@ -1033,7 +1072,8 @@ public class DesignTools {
         netlist.removeUnusedCellsFromAllWorkLibraries();
 
         // The logical netlist is final from here on, so the cached parent net map -- which describes
-        // the black boxes as they were, empty -- can be dropped now
+        // the black boxes as they were, empty -- can be dropped now. Nothing below builds it again:
+        // every owner needed was recorded above, and a caller that wants the map pays for it
         netlist.resetParentNetMap();
 
         Net vcc = design.getVccNet();
@@ -1124,15 +1164,9 @@ public class DesignTools {
             design.getOriginalSiteInsts().remove(evicted.getName());
         }
 
-        // Add routing information. Every alias found is merged in one pass at the end, once all
-        // of them are known
-        Set<Net> boundaryNets = new HashSet<>();
-        // The nets whose boundary routing is to be discarded, by the logical net that owns each,
-        // and whether a boundary net is to be merged onto it
-        Map<EDIFHierNet, Boolean> ownersToUnroute = new HashMap<>();
+        // Add routing information
         for (Entry<String, Design> e : blackBoxes.entrySet()) {
             String hierarchicalCellName = e.getKey();
-            EDIFHierCellInst hierInst = insts.get(hierarchicalCellName);
             Design cell = e.getValue();
 
             final String cellPrefix = hierarchicalCellName + EDIFTools.EDIF_HIER_SEP;
@@ -1153,54 +1187,6 @@ public class DesignTools {
                     net.rename(cellPrefix + net.getName());
                     design.addNet(net);
                     modifiedNets.add(net);
-                    // Only a net on one of the box's own ports can be on its boundary. One deeper
-                    // inside belongs to the circuit alone, whatever it is named, and is left as is
-                    EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
-                    if (hierNet == null || !hierNet.getHierarchicalInst().equals(hierInst)
-                            || hierNet.getNet().getTopLevelPortInst() == null) {
-                        continue;
-                    }
-                    EDIFHierNet owner = getMergeableOwner(netlist, net, hierNet);
-                    if (owner != null) {
-                        boundaryNets.add(net);
-                        if (!keepBoundaryRouting) {
-                            ownersToUnroute.put(owner, true);
-                        }
-                    }
-                }
-            }
-
-            // The nets above cover every alias the circuit brought in, because the physical net
-            // follows the cell in. A net on a black box output is the other way round: the alias is
-            // the shell-side net, which never moved, so nothing above has seen it. Only an output
-            // can be in that position, since it was the black box port that owned the net, and its
-            // net sits in the cell enclosing the black box. Discarding the boundary routing, on the
-            // other hand, applies to the net on every port
-            EDIFHierCellInst parentInst = hierInst.getParent();
-            for (EDIFPortInst portInst : hierInst.getInst().getPortInsts()) {
-                EDIFNet outerNet = portInst.getNet();
-                if (outerNet == null) continue;
-                EDIFHierNet hierNet = new EDIFHierNet(parentInst, outerNet);
-                if (!keepBoundaryRouting) {
-                    // A port the circuit leaves unused brings in no physical net to merge, but its
-                    // shell routing must still be discarded. Its owner can be in an ancestor. An
-                    // output the circuit does not drive either owns itself or has no owner at all,
-                    // and in that last case it is the net itself whose routing goes
-                    EDIFHierNet owner = netlist.getParentNet(hierNet);
-                    ownersToUnroute.putIfAbsent(owner != null ? owner : hierNet, false);
-                }
-                if (portInst.getDirection() == EDIFDirection.INPUT) continue;
-                Net net = design.getNet(hierNet.getHierarchicalNetName());
-                if (net == null) continue;
-                // Its owner is usually inside the cell now, but a circuit that passes an input
-                // straight through to this port makes the owner the shell's net on that input, which
-                // is outside just as this one is. Either way it is to be merged
-                EDIFHierNet owner = getMergeableOwner(netlist, net, hierNet);
-                if (owner != null) {
-                    boundaryNets.add(net);
-                    if (!keepBoundaryRouting) {
-                        ownersToUnroute.put(owner, true);
-                    }
                 }
             }
 
@@ -1209,100 +1195,150 @@ public class DesignTools {
             }
         }
 
-        // Merge the aliases found above onto their owners
-        postBlackBoxCleanup(design, keepBoundaryRouting, boundaryNets, modifiedNets);
+        // The two sides of a port carry one signal from now on, and a signal can cross several
+        // ports -- straight through a circuit, back into the box that drives it, or from one box
+        // in this batch into another -- so the sides are joined into signals across every port
+        Map<String, String> joined = new HashMap<>();
+        for (String[] link : portLinks) {
+            if (link[0] != null && link[1] != null) {
+                String shellRoot = findJoinedRoot(joined, link[0]);
+                String innerRoot = findJoinedRoot(joined, link[1]);
+                if (!shellRoot.equals(innerRoot)) {
+                    joined.put(shellRoot, innerRoot);
+                }
+            }
+        }
+        // Signals are disjoint, so the order they are dealt with in does not matter. The order of
+        // the names within one does: where the source has no physical net yet, or there is no
+        // source, the first name holding a net is the one kept, and keeping them in the order first
+        // seen -- each port's shell side before its circuit side -- makes that the shell's net
+        Map<String, Set<String>> signals = new HashMap<>();
+        for (String[] link : portLinks) {
+            for (String name : link) {
+                if (name != null) {
+                    String root = findJoinedRoot(joined, name);
+                    signals.computeIfAbsent(root, k -> new LinkedHashSet<>()).add(name);
+                }
+            }
+        }
 
-        // Boundary routing is discarded only now, with every box inserted and every alias merged,
-        // since only now is each owner's physical net known by its final name and holding every
-        // pin it is going to. A constant owner resolves to the design's whole GND or VCC net, so it
-        // is unrouted only if a boundary net was merged onto it, and not for a port merely tied to
-        // it. Several owners can resolve to the same net, so each net is unrouted just once
-        Set<Net> unrouted = Collections.newSetFromMap(new IdentityHashMap<>());
-        for (Entry<EDIFHierNet, Boolean> e : ownersToUnroute.entrySet()) {
-            EDIFHierNet owner = e.getKey();
-            NetType type = owner.getNet().getPhysStaticSourceType();
-            if (type != NetType.UNKNOWN && !e.getValue()) continue;
-            Net net = type == NetType.GND ? gnd : type == NetType.VCC ? vcc
-                    : design.getNet(owner.getHierarchicalNetName());
-            if (net != null && unrouted.add(net)) {
-                net.unroute();
-                modifiedNets.add(net);
+        // Each signal's physical nets are merged onto the one named after its real source. With
+        // the boundary routing discarded, the result is then unrouted -- except for the design's
+        // GND or VCC net, which is unrouted, in its entirety, only if something was merged onto it:
+        // a port merely tied to a constant is not reason enough
+        for (Set<String> names : signals.values()) {
+            String owner = null;
+            for (String name : names) {
+                if (notSources.contains(name)) continue;
+                if (owner != null) {
+                    throw new RuntimeException("ERROR: The signal on a black box port is driven by"
+                            + " both '" + owner + "' and '" + name + "'.");
+                }
+                owner = name;
+            }
+            Net target = owner != null ? design.getNet(owner) : null;
+            boolean changed = false;
+            boolean merged = false;
+            for (String name : names) {
+                Net net = design.getNet(name);
+                if (net == null || net == target) continue;
+                // A net with no physical presence has nothing to move, and is left alone
+                if (net.getPins().isEmpty() && net.getSiteInsts().isEmpty() && !net.hasPIPs()) {
+                    continue;
+                }
+                if (target == null) {
+                    // The source has no physical net yet, so this one becomes it -- or, if the
+                    // signal has no source at all, simply holds on to the rest
+                    if (owner != null) {
+                        modifiedNets.remove(net);
+                        net.rename(owner);
+                        changed = true;
+                    }
+                    target = net;
+                    continue;
+                }
+                mergeOntoNet(design, net, target, keepBoundaryRouting, modifiedNets);
+                changed = merged = true;
+            }
+            if (target == null) continue;
+            if (!keepBoundaryRouting && (merged || !target.isStaticNet())) {
+                target.unroute();
+                changed = true;
+            }
+            if (changed) {
+                modifiedNets.add(target);
             }
         }
         return modifiedNets;
     }
 
     /**
-     * Finds the net that owns a physical net, now that the black boxes are populated, if that is
-     * some other net and this one holds anything worth merging onto it. Which side of a black box
-     * boundary either net sits on does not matter: a circuit's input fed from its own output has
-     * both inside, and a circuit that passes an input straight through to an output has both
-     * outside, and each must still be merged.
+     * Gets the name of the physical net that a logical net is held under, the design being
+     * consistently named: that of the design's GND or VCC net for a constant, and otherwise that of
+     * the logical net itself.
      *
-     * @param netlist The design's netlist, whose parent net map says which net owns which.
-     * @param net     The physical net.
-     * @param hierNet The logical net that the physical one is named after. It is looked up by the
-     *                physical net's name rather than by getLogicalHierNet(): a net that arrived
-     *                with the cell still carries the hierarchy it had inside, which the shell's
-     *                netlist knows nothing about.
-     * @return The owner, or null if the net owns itself, has no owner, or holds nothing worth
-     *         moving.
+     * @param net    The logical net, the owner of whatever signal it is on.
+     * @param prefix Prepended to a name that is not a constant's, for a circuit's net that is to be
+     *               moved into a black box.
+     * @return The physical net's name.
      */
-    private static EDIFHierNet getMergeableOwner(EDIFNetlist netlist, Net net,
-            EDIFHierNet hierNet) {
-        // A net with no physical presence has nothing to move, so it is not worth asking about
-        if (net.getPins().isEmpty() && net.getSiteInsts().isEmpty() && !net.hasPIPs()) {
-            return null;
-        }
-        EDIFHierNet parentNet = netlist.getParentNetMap().get(hierNet);
-        if (parentNet == null || parentNet.equals(hierNet)) return null;
-        return parentNet;
+    private static String getOwnerName(EDIFHierNet net, String prefix) {
+        NetType type = net.getNet().getPhysStaticSourceType();
+        if (type == NetType.GND) return Net.GND_NET;
+        if (type == NetType.VCC) return Net.VCC_NET;
+        return prefix + net.getHierarchicalNetName();
     }
 
     /**
-     * Merges the aliases that populating black boxes has left behind -- among the nets the circuits
-     * brought in and the nets on the boxes' outputs -- onto the nets that own them, so that every
-     * such physical net is once again named after its source. Unrouting is left to the caller.
+     * Finds which signal a net name has been joined into, by following the links to the name that
+     * stands for it, and shortens the path along the way.
+     *
+     * @param joined The links from each name to another on the same signal.
+     * @param name   The name to look up.
+     * @return The name that stands for the whole signal.
+     */
+    private static String findJoinedRoot(Map<String, String> joined, String name) {
+        String root = name;
+        for (String next = joined.get(root); next != null; next = joined.get(root)) {
+            root = next;
+        }
+        while (!name.equals(root)) {
+            name = joined.put(name, root);
+        }
+        return root;
+    }
+
+    /**
+     * Merges one physical net onto another on the same signal, deleting it. The merge itself only
+     * moves pins and site routing, so the net's PIPs are moved across here if they are to be kept.
      *
      * @param design              The current design.
-     * @param keepBoundaryRouting Whether each alias' routing is to go with it. If not, it is
-     *                            dropped, since the caller unroutes every net an alias is merged
-     *                            onto in any case.
-     * @param boundaryNets        The nets to merge, as identified by {@link #getMergeableOwner}.
-     * @param modifiedNets        Updated in place: whichever net ends up holding an alias' pins is
-     *                            added, and an alias deleted in favour of its owner is taken out, so
-     *                            the set never names a net the design no longer has.
+     * @param net                 The net to merge away.
+     * @param target              The net to merge it onto.
+     * @param keepBoundaryRouting Whether the net's PIPs are to go with it. If not, they are
+     *                            dropped, since the caller then unroutes the target in any case.
+     * @param modifiedNets        Updated in place: the net is taken out, so that the set never
+     *                            names a net the design no longer has.
      */
-    private static void postBlackBoxCleanup(Design design, boolean keepBoundaryRouting,
-            Set<Net> boundaryNets, Set<Net> modifiedNets) {
-        for (Net alias : boundaryNets) {
-            // The merge below drops the alias' routing, so take it off the net rather than copying
-            // it. An empty list left in its place costs nothing and keeps the alias usable, which it
-            // has to be in the case where the merge renames it instead of deleting it
-            List<PIP> aliasPIPs = null;
-            if (keepBoundaryRouting && !alias.getPIPs().isEmpty()) {
-                aliasPIPs = alias.getPIPs();
-                alias.setPIPs(new ArrayList<>());
-            }
-            // A Net hashes on its name, and the merge may rename this one rather than delete it, so
-            // it cannot be left in the set across the call
-            modifiedNets.remove(alias);
-            Net parentNet = makePhysNetNameConsistent(design, alias);
-            // A null answer means the alias kept its pins and was renamed after its source, so it is
-            // the net that was modified; otherwise it has been deleted in favour of the one returned
-            Net holder = parentNet != null ? parentNet : alias;
-            if (aliasPIPs != null) {
-                // Handed straight over when there is nothing to merge with -- which is always so for
-                // a rename, since holder is then the alias whose list was just emptied
-                if (holder.getPIPs().isEmpty()) {
-                    holder.setPIPs(aliasPIPs);
-                } else {
-                    for (PIP p : aliasPIPs) {
-                        holder.addPIP(p);
-                    }
+    private static void mergeOntoNet(Design design, Net net, Net target,
+            boolean keepBoundaryRouting, Set<Net> modifiedNets) {
+        // Taken off the net rather than referred to, in case deleting the net clears its list
+        List<PIP> pips = null;
+        if (keepBoundaryRouting && net.hasPIPs()) {
+            pips = net.getPIPs();
+            net.setPIPs(new ArrayList<>());
+        }
+        modifiedNets.remove(net);
+        design.movePinsToNewNetDeleteOldNet(net, target, true);
+        if (pips != null) {
+            // Handed straight over when there is nothing to add to
+            if (target.getPIPs().isEmpty()) {
+                target.setPIPs(pips);
+            } else {
+                for (PIP p : pips) {
+                    target.addPIP(p);
                 }
             }
-            modifiedNets.add(holder);
         }
     }
 
