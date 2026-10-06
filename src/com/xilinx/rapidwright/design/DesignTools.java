@@ -955,6 +955,11 @@ public class DesignTools {
      * Every entry is vetted before anything is modified, but there is no rollback once insertion has
      * begun: a failure part way through -- a site overlap, say -- leaves the boxes filled so far in
      * place, and the logical netlist of all of them already swapped in.
+     * <p>
+     * A design that is tracking its changes records every net this touches, so a caller that means
+     * to route the result can start from {@link Design#getModifiedNets()} rather than have
+     * {@link com.xilinx.rapidwright.rwroute.PartialRouter} rediscover them by walking every net in
+     * the design. No net outside that record is altered here.
      *
      * @param design              The top level design
      * @param blackBoxes          The 'guts' to be inserted, keyed by the hierarchical name of the
@@ -967,10 +972,6 @@ public class DesignTools {
      *                            port. The exception is a port tied to a constant: the design's
      *                            GND or VCC net is unrouted, in its entirety, only if a net on that
      *                            port is merged onto it, and not for a port merely tied to it.
-     * A design that is tracking its changes records every net this touches, so a caller that means
-     * to route the result can start from {@link Design#getModifiedNets()} rather than have
-     * {@link com.xilinx.rapidwright.rwroute.PartialRouter} rediscover them by walking every net in
-     * the design. No net outside that record is altered here.
      */
     public static void populateBlackBox(Design design, Map<String, Design> blackBoxes,
             boolean keepBoundaryRouting) {
