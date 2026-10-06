@@ -993,6 +993,7 @@ public class DesignTools {
         // design with the other boxes already inserted
         Map<String, EDIFHierCellInst> insts = new HashMap<>();
         Map<Design, String> firstUseOf = new IdentityHashMap<>();
+        Map<EDIFCellInst, String> firstFillOf = new IdentityHashMap<>();
         for (Entry<String, Design> e : blackBoxes.entrySet()) {
             String hierarchicalCellName = e.getKey();
             Design cell = e.getValue();
@@ -1017,6 +1018,13 @@ public class DesignTools {
             if (firstUse != null) {
                 throw new RuntimeException("ERROR: The same Design was provided for black boxes '"
                         + firstUse + "' and '" + hierarchicalCellName + "'.");
+            }
+            // In a netlist that is not uniquified, two hierarchical names can lead to the same cell
+            // instance, and filling it for one would fill it for the other as well
+            String firstFill = firstFillOf.put(inst, hierarchicalCellName);
+            if (firstFill != null) {
+                throw new RuntimeException("ERROR: Black boxes '" + firstFill + "' and '"
+                        + hierarchicalCellName + "' are the same cell instance.");
             }
             insts.put(hierarchicalCellName, hierInst);
         }

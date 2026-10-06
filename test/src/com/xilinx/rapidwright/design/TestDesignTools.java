@@ -1154,6 +1154,28 @@ public class TestDesignTools {
         assertAllNetsLive(design, modified);
     }
 
+    /**
+     * In a netlist that is not uniquified, two hierarchical names can lead to the same black box
+     * instance, which cannot be filled with two different circuits.
+     */
+    @Test
+    public void testPopulateBlackBoxSameInstanceTwice() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell parentType = new EDIFCell(netlist.getWorkLibrary(), "parentType");
+        createBlackBox(parentType, "bb", EDIFDirection.INPUT);
+        parentType.createCellInst("u0", design.getTopEDIFCell());
+        parentType.createCellInst("u1", design.getTopEDIFCell());
+
+        Map<String, Design> blackBoxes = new LinkedHashMap<>();
+        blackBoxes.put("u0/bb", createCircuit("c0", EDIFDirection.INPUT));
+        blackBoxes.put("u1/bb", createCircuit("c1", EDIFDirection.INPUT));
+        RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                () -> DesignTools.populateBlackBox(design, blackBoxes, false));
+        Assertions.assertEquals("ERROR: Black boxes 'u0/bb' and 'u1/bb' are the same cell"
+                + " instance.", e.getMessage());
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"DX", "D_I"})
     public void testGetTrimmablePIPsFromPins(String pinName) {
