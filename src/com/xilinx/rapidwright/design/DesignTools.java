@@ -1211,6 +1211,10 @@ public class DesignTools {
                 if (net.isStaticNet()) {
                     Net staticNet = design.getStaticNet(net.getType());
                     staticNet.addPins(net.getPins());
+                    // TEMPORARY WORKAROUND: as in mergeOntoNet(), a pin move alone leaves the
+                    // destination unmarked. setPIPs() below marks it whenever the circuit brought
+                    // routing with it, but not when it brought only pins
+                    markModified(design, staticNet);
                     HashSet<PIP> uniquePIPs = new HashSet<>(net.getPIPs());
                     uniquePIPs.addAll(staticNet.getPIPs());
                     staticNet.setPIPs(uniquePIPs);
@@ -1361,8 +1365,25 @@ public class DesignTools {
         // added one by one rather than the list handed over, which would leave the deleted net and
         // the target sharing it
         design.movePinsToNewNetDeleteOldNet(net, target, true);
+        // TEMPORARY WORKAROUND: moving pins onto a net does not mark it as modified -- only a
+        // change to its routing does -- so a target that keeps its own routing and merely gains
+        // the merged net's pins is left unmarked. With boundary routing preserved that is the
+        // common case: the clock gains hundreds of pins and not one PIP. Mark it here, so that
+        // getModifiedNets() holds every net this touched rather than only those whose PIPs moved.
+        // The fix belongs in whatever marks a Net modified, which should count a pin move too.
+        markModified(design, target);
         for (PIP p : net.getPIPs()) {
             target.addPIP(p);
+        }
+    }
+
+    /**
+     * TEMPORARY WORKAROUND: marks a net as modified, for a change that the design's own change
+     * tracking does not notice. See the call sites.
+     */
+    private static void markModified(Design design, Net net) {
+        if (design.isTrackingNetChanges()) {
+            design.addModifiedNet(net);
         }
     }
 
