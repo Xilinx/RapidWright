@@ -462,19 +462,19 @@ public class TestDesignTools {
     @Test
     public void testPopulateBlackBox() {
         Design design = RapidWrightDCP.loadDCP("hwct.dcp");
-        Design cell = RapidWrightDCP.loadDCP("hwct_pr1.dcp");
+        Design circuit = RapidWrightDCP.loadDCP("hwct_pr1.dcp");
         String hierCellName = "hw_contract_pr1";
         EDIFCellInst inst = design.getNetlist().getCellInstFromHierName(hierCellName);
         Assertions.assertTrue(inst.isBlackBox());
         Assertions.assertTrue(inst.getCellType().getCellInsts().isEmpty());
 
-        // The name each of the cell's nets is expected to arrive under, before any merging
-        Set<String> cellNets = new HashSet<>();
-        for (Net net : cell.getNets()) {
+        // The name each of the circuit's nets is expected to arrive under, before any merging
+        Set<String> circuitNets = new HashSet<>();
+        for (Net net : circuit.getNets()) {
             if (net.isStaticNet() || net.isUsedNet()) {
                 continue;
             }
-            cellNets.add(hierCellName + EDIFTools.EDIF_HIER_SEP + net.getName());
+            circuitNets.add(hierCellName + EDIFTools.EDIF_HIER_SEP + net.getName());
         }
 
         // Each net's pin and PIP counts, so that what the call changed can be told apart afterwards
@@ -482,16 +482,12 @@ public class TestDesignTools {
         for (Net net : design.getNets()) {
             before.put(net.getName(), net.getPins().size() + "/" + net.getPIPs().size());
         }
-        Set<Net> modified = populateBlackBox(design, hierCellName, cell, false);
+        Set<Net> modified = populateBlackBox(design, hierCellName, circuit, false);
 
         Assertions.assertFalse(inst.getCellType().getCellInsts().isEmpty());
-        Assertions.assertFalse(modified.isEmpty());
 
-        // Every net reported must still be one the design holds: the merge deletes each alias it
-        // folds away, and a deleted net must not be named in the result
-        assertAllNetsLive(design, modified);
-
-        // ... and the other half of the contract: nothing changed that went unreported
+        // The wrapper checks that every net reported is still in the design. The other half of the
+        // contract is that nothing changed that went unreported
         for (Net net : design.getNets()) {
             if (modified.contains(net)) {
                 continue;
@@ -506,25 +502,25 @@ public class TestDesignTools {
         // and so loses its prefixed name, while the others keep theirs -- both must happen, or the
         // two halves of the check above could be passing vacuously
         int merged = 0;
-        for (String netName : cellNets) {
+        for (String netName : circuitNets) {
             if (design.getNet(netName) == null) {
                 merged++;
             }
         }
         Assertions.assertTrue(merged > 0, "no boundary crossing was merged");
-        Assertions.assertTrue(merged < cellNets.size(), "every net was merged away");
+        Assertions.assertTrue(merged < circuitNets.size(), "every net was merged away");
     }
 
     /**
      * The bookkeeping populateBlackBox() owes the design beyond the placement and routing itself:
      * the hierarchy each merged cell and net resolves to, and the record of what changed that an
      * incremental bitstream is written from. None of it is visible in the design's placement or
-     * routing, and all of it is wrong in a way that only shows up at write_bitstream time.
+     * routing, and any of it being wrong shows up only at write_bitstream time.
      */
     @Test
     public void testPopulateBlackBoxBookkeeping() {
         Design design = RapidWrightDCP.loadDCP("hwct.dcp");
-        Design cell = RapidWrightDCP.loadDCP("hwct_pr1.dcp");
+        Design circuit = RapidWrightDCP.loadDCP("hwct_pr1.dcp");
         String hierCellName = "hw_contract_pr1";
         String cellPrefix = hierCellName + EDIFTools.EDIF_HIER_SEP;
 
@@ -533,8 +529,8 @@ public class TestDesignTools {
         design.setTrackingChanges(true);
         design.setCopyingOriginalSiteInsts(true);
 
-        // The site instances the cell brings with it, captured before the call moves them across
-        Set<SiteInst> incoming = new HashSet<>(cell.getSiteInsts());
+        // The site instances the circuit brings, captured before the call moves them across
+        Set<SiteInst> incoming = new HashSet<>(circuit.getSiteInsts());
         Assertions.assertFalse(incoming.isEmpty());
 
         // Cell and Net both resolve their place in the hierarchy lazily and keep the answer. Ask
@@ -547,11 +543,11 @@ public class TestDesignTools {
                 c.getEDIFHierCellInst();
             }
         }
-        for (Net net : cell.getNets()) {
+        for (Net net : circuit.getNets()) {
             net.getLogicalHierNet();
         }
 
-        populateBlackBox(design, hierCellName, cell, false);
+        populateBlackBox(design, hierCellName, circuit, false);
 
         EDIFNetlist netlist = design.getNetlist();
 
@@ -588,25 +584,24 @@ public class TestDesignTools {
 
         // Likewise for the site instances: all of them are new to this design. Each also needs what
         // its site is changing from, so that everything it holds counts as a difference. The sites
-        // were free, so the snapshots are blank -- barring a static source, which is the one thing
-        // a black box is allowed to evict
+        // were free -- this pair of checkpoints leaves no static source in the way -- so the
+        // snapshots are blank
         Map<String, SiteInst> originals = design.getOriginalSiteInsts();
         for (SiteInst si : incoming) {
             Assertions.assertTrue(design.getModifiedSiteInsts().contains(si), si.getName());
             SiteInst original = originals.get(si.getName());
             Assertions.assertNotNull(original, si.getName());
             Assertions.assertSame(si.getSite(), original.getSite());
-            if (!original.getName().startsWith(SiteInst.STATIC_SOURCE)) {
-                Assertions.assertTrue(original.getCells().isEmpty(), si.getName());
-            }
+            Assertions.assertTrue(original.getCells().isEmpty(), si.getName());
         }
     }
 
     /**
      * A black box may evict a static source from a site it wants, and populateBlackBox() installs
      * the circuit's own site instance there in its place. The evicted one is then gone from the
-     * design, but the change tracking marked it on the way out -- its pins were taken -- so it is
-     * left in getModifiedSiteInsts() alongside the live site instance that replaced it.
+     * design, but taking its pins marks it in the change tracking on the way out, so it would be
+     * left in getModifiedSiteInsts() alongside the live site instance that replaced it, were
+     * populateBlackBox() not to untrack it.
      *
      * Two entries for one site mean two writers of that site's configuration bits, and which of
      * them lands last depends on the iteration order of the modified set. That order changes as the
@@ -617,14 +612,14 @@ public class TestDesignTools {
     @Test
     public void testPopulateBlackBoxUntracksEvictedSiteInsts() {
         Design design = RapidWrightDCP.loadDCP("hwct.dcp");
-        Design cell = RapidWrightDCP.loadDCP("hwct_pr1.dcp");
+        Design circuit = RapidWrightDCP.loadDCP("hwct_pr1.dcp");
         String hierCellName = "hw_contract_pr1";
 
         // Stand a static source on a site the circuit is about to take, as a static router leaves
         // one on a site it found free. This pair of checkpoints does not collide on its own, so
         // the one case populateBlackBox() is allowed to evict has to be set up here
         Site contested = null;
-        for (SiteInst incoming : cell.getSiteInsts()) {
+        for (SiteInst incoming : circuit.getSiteInsts()) {
             if (design.getSiteInstFromSite(incoming.getSite()) == null) {
                 contested = incoming.getSite();
                 break;
@@ -640,27 +635,32 @@ public class TestDesignTools {
                 contested.getSiteTypeEnum(), contested);
         Assertions.assertSame(evicted, design.getSiteInstFromSite(contested));
 
+        // A static source drives GND out of the site, and taking that pin away is what marks it in
+        // the change tracking again, as it goes
+        String outPin = null;
+        for (int i = 0; i < contested.getSitePinCount() && outPin == null; i++) {
+            if (contested.isOutputPin(i)) {
+                outPin = contested.getPinName(i);
+            }
+        }
+        Assertions.assertNotNull(outPin);
+        design.getGndNet().createPin(outPin, evicted);
+
         // Creating it under tracking is what puts it in the modified set in the first place
         Assertions.assertTrue(design.getModifiedSiteInsts().contains(evicted));
 
-        Set<SiteInst> toBeEvicted = new HashSet<>();
-        toBeEvicted.add(evicted);
+        populateBlackBox(design, hierCellName, circuit, false);
 
-        DesignTools.populateBlackBox(design, hierCellName, cell, false);
-
-        // Nothing the design has stopped holding may still be tracked as modified
+        // It has left the design, and nothing the design has stopped holding may still be tracked
+        // as modified, nor its original kept
+        Assertions.assertNotSame(evicted, design.getSiteInstFromSite(contested));
         Set<SiteInst> live = new HashSet<>(design.getSiteInsts());
         for (SiteInst si : design.getModifiedSiteInsts()) {
             Assertions.assertTrue(live.contains(si),
                     "modified site instance is no longer in the design: " + si.getName());
         }
-
-        // ... and specifically, not the ones that were evicted
-        Map<String, SiteInst> originals = design.getOriginalSiteInsts();
-        for (SiteInst gone : toBeEvicted) {
-            Assertions.assertFalse(design.getModifiedSiteInsts().contains(gone), gone.getName());
-            Assertions.assertNotSame(gone, originals.get(gone.getName()));
-        }
+        Assertions.assertFalse(design.getModifiedSiteInsts().contains(evicted));
+        Assertions.assertNull(design.getOriginalSiteInsts().get(evicted.getName()));
 
         // The invariant that actually matters to whoever walks the modified set: one entry per site
         Map<Site, SiteInst> bySite = new HashMap<>();
@@ -740,13 +740,18 @@ public class TestDesignTools {
     }
 
     /**
-     * Calls populateBlackBox(), then asserts that it left the design's parent net map unbuilt: it
-     * drops the map once it has changed the netlist, and must not build it again.
+     * Calls populateBlackBox(), then asserts what holds for every call: that it left the design's
+     * parent net map unbuilt, since it drops the map once it has changed the netlist and must not
+     * build it again; and that every net it reports is one the design still holds, since a merge
+     * deletes the net it merges away, and a deleted net must not be named in the result.
      */
     private static Set<Net> populateBlackBox(Design design, Map<String, Design> blackBoxes,
             boolean keepBoundaryRouting) {
         Set<Net> modified = DesignTools.populateBlackBox(design, blackBoxes, keepBoundaryRouting);
         Assertions.assertFalse(design.getNetlist().isParentNetMapBuilt());
+        for (Net net : modified) {
+            Assertions.assertSame(net, design.getNet(net.getName()), net.getName());
+        }
         return modified;
     }
 
@@ -754,15 +759,6 @@ public class TestDesignTools {
             Design cell, boolean keepBoundaryRouting) {
         return populateBlackBox(design, Collections.singletonMap(hierarchicalCellName, cell),
                 keepBoundaryRouting);
-    }
-
-    /**
-     * Asserts that every net populateBlackBox() reported is one the design still holds.
-     */
-    private static void assertAllNetsLive(Design design, Set<Net> modified) {
-        for (Net net : modified) {
-            Assertions.assertSame(net, design.getNet(net.getName()), net.getName());
-        }
     }
 
     /**
@@ -774,16 +770,20 @@ public class TestDesignTools {
     }
 
     /**
-     * Asserts that a net's routing was kept -- it holds just the PIPs it was routed with, in order,
-     * and its sink pin is still marked routed -- or else discarded, leaving neither.
+     * Asserts that a net's routing was kept -- it holds exactly the given PIPs, in the order a
+     * merge leaves them, and any sink pins given are still marked routed -- or else discarded,
+     * leaving neither.
      */
-    private static void assertRouting(boolean kept, Net net, List<PIP> pips, SitePinInst sink) {
+    private static void assertRouting(boolean kept, Net net, List<PIP> pips,
+            SitePinInst... sinks) {
         Assertions.assertEquals(kept ? pips : Collections.emptyList(), net.getPIPs());
-        Assertions.assertEquals(kept, sink.isRouted());
+        for (SitePinInst sink : sinks) {
+            Assertions.assertEquals(kept, sink.isRouted());
+        }
     }
 
-    private static void assertRouting(boolean kept, Net net, PIP pip, SitePinInst sink) {
-        assertRouting(kept, net, Collections.singletonList(pip), sink);
+    private static void assertRouting(boolean kept, Net net, PIP pip, SitePinInst... sinks) {
+        assertRouting(kept, net, Collections.singletonList(pip), sinks);
     }
 
     /**
@@ -808,8 +808,8 @@ public class TestDesignTools {
         EDIFNet out = top.createNet("out");
         out.createPortInst("O", bb);
         Net outNet = design.createNet("out");
-        SitePinInst sinkPin = addSinkLUT(design, top, "snk", "SLICE_X2Y0", out, outNet);
-        PIP pip = addTestRouting(outNet, 0, sinkPin);
+        SitePinInst sinkPin = addSinkLUT(design, top, "sink", "SLICE_X2Y0", out, outNet);
+        PIP outPIP = addTestRouting(outNet, 0, sinkPin);
 
         // Each net is already named after its source -- the black box output, in the case of 'out'
         assertParentNet(netlist, "in", "in");
@@ -829,9 +829,8 @@ public class TestDesignTools {
         assertParentNet(netlist, "out", "in");
         Assertions.assertSame(inNet, sinkPin.getNet());
         Assertions.assertNull(design.getNet("out"));
-        assertRouting(keepBoundaryRouting, inNet, Arrays.asList(inPIP, pip), sinkPin);
+        assertRouting(keepBoundaryRouting, inNet, Arrays.asList(inPIP, outPIP), sinkPin);
         Assertions.assertTrue(modified.contains(inNet));
-        assertAllNetsLive(design, modified);
     }
 
     /**
@@ -907,8 +906,7 @@ public class TestDesignTools {
         if (type == NetType.WIRE) {
             Assertions.assertEquals(discarded, modified.contains(physical));
         }
-        assertAllNetsLive(design, modified);
-        Assertions.assertEquals(Collections.singletonList(unrelatedPIP), unrelated.getPIPs());
+        assertRouting(true, unrelated, unrelatedPIP);
         Assertions.assertFalse(modified.contains(unrelated));
     }
 
@@ -943,16 +941,14 @@ public class TestDesignTools {
         }
         Set<Net> modified = populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
 
-        EDIFHierNet parent = netlist.getParentNet(netlist.getHierNetFromName("out"));
         if (hasContents) {
-            Assertions.assertNull(parent);
+            Assertions.assertNull(netlist.getParentNet(netlist.getHierNetFromName("out")));
         } else {
-            Assertions.assertEquals("out", parent.getHierarchicalNetName());
+            assertParentNet(netlist, "out", "out");
         }
         Assertions.assertSame(outNet, design.getNet("out"));
         assertRouting(keepBoundaryRouting, outNet, pip, sinkPin);
         Assertions.assertEquals(!keepBoundaryRouting, modified.contains(outNet));
-        assertAllNetsLive(design, modified);
     }
 
     /**
@@ -980,7 +976,7 @@ public class TestDesignTools {
         ab.createPortInst("I", createBlackBox(top, "b", EDIFDirection.INPUT));
         Net abNet = design.createNet("ab");
         SitePinInst sinkPin = addSinkLUT(design, top, "sink", "SLICE_X2Y0", ab, abNet);
-        PIP pip = addTestRouting(abNet, 0, sinkPin);
+        PIP abPIP = addTestRouting(abNet, 0, sinkPin);
 
         // The circuit for 'a': a LUT driving O
         Design circuitA = createCircuit("a", EDIFDirection.OUTPUT);
@@ -1009,9 +1005,8 @@ public class TestDesignTools {
         assertParentNet(netlist, "ab", "a/o");
         Assertions.assertNull(design.getNet("ab"));
         Assertions.assertSame(oNet, sinkPin.getNet());
-        assertRouting(keepBoundaryRouting, oNet, Arrays.asList(oPIP, pip), sinkPin);
+        assertRouting(keepBoundaryRouting, oNet, Arrays.asList(oPIP, abPIP), sinkPin);
         Assertions.assertTrue(modified.contains(oNet));
-        assertAllNetsLive(design, modified);
     }
 
     /**
@@ -1071,10 +1066,10 @@ public class TestDesignTools {
         internalAlias.createPortInst(childType.getPort("J"));
 
         // Each sink's physical net is named after the alias inside 'child', not after its source
-        Net aliasNet = circuit.createNet("child/inputAlias");
+        Net inputAliasNet = circuit.createNet("child/inputAlias");
         SitePinInst sinkPin = addSinkLUT(circuit, childType, "child/lut", "SLICE_X2Y0", inputAlias,
-                aliasNet);
-        PIP pip = addTestRouting(aliasNet, 1, sinkPin);
+                inputAliasNet);
+        PIP inputAliasPIP = addTestRouting(inputAliasNet, 1, sinkPin);
         Net internalAliasNet = circuit.createNet("child/internalAlias");
         SitePinInst internalSinkPin = addSinkLUT(circuit, childType, "child/internalSnk",
                 "SLICE_X6Y0", internalAlias, internalAliasNet);
@@ -1083,7 +1078,7 @@ public class TestDesignTools {
 
         // As populateBlackBox() requires
         DesignTools.makePhysNetNamesConsistent(circuit);
-        Assertions.assertEquals("in", aliasNet.getName());
+        Assertions.assertEquals("in", inputAliasNet.getName());
         Assertions.assertEquals("internal", internalAliasNet.getName());
 
         Set<Net> modified = populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
@@ -1092,9 +1087,8 @@ public class TestDesignTools {
         assertParentNet(netlist, "bb/child/inputAlias", "shellInput");
         Assertions.assertSame(shellNet, sinkPin.getNet());
         Assertions.assertNull(design.getNet("bb/in"));
-        assertRouting(keepBoundaryRouting, shellNet, pip, sinkPin);
+        assertRouting(keepBoundaryRouting, shellNet, inputAliasPIP, sinkPin);
         Assertions.assertTrue(modified.contains(shellNet));
-        assertAllNetsLive(design, modified);
 
         // The net that never reaches a port keeps its pins and routing
         Assertions.assertSame(internalAliasNet, design.getNet("bb/internal"));
@@ -1124,7 +1118,7 @@ public class TestDesignTools {
         // The shell's net on the loop, holding a stretch of routing so that it is worth merging
         // whether or not that routing is kept
         Net loopNet = design.createNet("loop");
-        PIP pip = addTestRouting(loopNet, 0);
+        PIP loopPIP = addTestRouting(loopNet, 0);
 
         // The circuit: one LUT driving O, and another reading I
         Design circuit = createCircuit("circuit", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
@@ -1136,7 +1130,7 @@ public class TestDesignTools {
         EDIFNet i = circuitTop.createNet("i");
         i.createPortInst(circuitTop.getPort("I"));
         Net iNet = circuit.createNet("i");
-        SitePinInst sinkPin = addSinkLUT(circuit, circuitTop, "snk", "SLICE_X2Y0", i, iNet);
+        SitePinInst sinkPin = addSinkLUT(circuit, circuitTop, "sink", "SLICE_X2Y0", i, iNet);
 
         Set<Net> modified = populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
 
@@ -1147,11 +1141,9 @@ public class TestDesignTools {
         // The shell's net is merged onto the same owner, taking its routing only if that is kept
         assertParentNet(netlist, "loop", "bb/o");
         Assertions.assertNull(design.getNet("loop"));
-        Assertions.assertEquals(keepBoundaryRouting ? Collections.singletonList(pip)
-                : Collections.emptyList(), oNet.getPIPs());
+        assertRouting(keepBoundaryRouting, oNet, loopPIP);
 
         Assertions.assertTrue(modified.contains(oNet));
-        assertAllNetsLive(design, modified);
     }
 
     /**
