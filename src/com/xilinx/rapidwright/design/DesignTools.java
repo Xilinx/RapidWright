@@ -42,7 +42,6 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -1208,24 +1207,20 @@ public class DesignTools {
                 }
             }
         }
-        // Signals are disjoint, so the order they are dealt with in does not matter. The order of
-        // the names within one does: where the source has no physical net yet, or there is no
-        // source, the first name holding a net is the one kept, and keeping them in the order first
-        // seen -- each port's shell side before its circuit side -- makes that the shell's net
         Map<String, Set<String>> signals = new HashMap<>();
         for (String[] link : portLinks) {
             for (String name : link) {
                 if (name != null) {
                     String root = findJoinedRoot(joined, name);
-                    signals.computeIfAbsent(root, k -> new LinkedHashSet<>()).add(name);
+                    signals.computeIfAbsent(root, k -> new HashSet<>()).add(name);
                 }
             }
         }
 
-        // Each signal's physical nets are merged onto the one named after its real source. With
-        // the boundary routing discarded, the result is then unrouted -- except for the design's
-        // GND or VCC net, which is unrouted, in its entirety, only if something was merged onto it:
-        // a port merely tied to a constant is not reason enough
+        // Each signal's physical nets are merged onto the one named after its source. With the
+        // boundary routing discarded, the result is then unrouted -- except for the design's GND
+        // or VCC net, which is unrouted, in its entirety, only if something was merged onto it: a
+        // port merely tied to a constant is not reason enough
         for (Set<String> names : signals.values()) {
             String owner = null;
             for (String name : names) {
@@ -1236,25 +1231,34 @@ public class DesignTools {
                 }
                 owner = name;
             }
-            Net target = owner != null ? design.getNet(owner) : null;
+            if (owner == null) {
+                // With no source there is nothing to name the signal after, so nothing is merged;
+                // its nets are only unrouted, if the boundary routing is being discarded
+                if (!keepBoundaryRouting) {
+                    for (String name : names) {
+                        Net net = design.getNet(name);
+                        if (net != null && hasPhysicalPresence(net)) {
+                            net.unroute();
+                            modifiedNets.add(net);
+                        }
+                    }
+                }
+                continue;
+            }
+            Net target = design.getNet(owner);
             boolean changed = false;
             boolean merged = false;
             for (String name : names) {
                 Net net = design.getNet(name);
-                if (net == null || net == target) continue;
                 // A net with no physical presence has nothing to move, and is left alone
-                if (net.getPins().isEmpty() && net.getSiteInsts().isEmpty() && !net.hasPIPs()) {
-                    continue;
-                }
+                if (net == null || net == target || !hasPhysicalPresence(net)) continue;
                 if (target == null) {
-                    // The source has no physical net yet, so this one becomes it -- or, if the
-                    // signal has no source at all, simply holds on to the rest
-                    if (owner != null) {
-                        modifiedNets.remove(net);
-                        net.rename(owner);
-                        changed = true;
-                    }
+                    // The source has no physical net yet, so this one becomes it. Whichever is
+                    // picked, the others are then merged onto it, with the same result
+                    modifiedNets.remove(net);
+                    net.rename(owner);
                     target = net;
+                    changed = true;
                     continue;
                 }
                 mergeOntoNet(design, net, target, keepBoundaryRouting, modifiedNets);
@@ -1270,6 +1274,14 @@ public class DesignTools {
             }
         }
         return modifiedNets;
+    }
+
+    /**
+     * @param net A physical net.
+     * @return True if it has any pins, site routing or PIPs, false if there is nothing on it.
+     */
+    private static boolean hasPhysicalPresence(Net net) {
+        return !net.getPins().isEmpty() || !net.getSiteInsts().isEmpty() || net.hasPIPs();
     }
 
     /**
