@@ -1257,6 +1257,9 @@ public class DesignTools {
                 // alias of its parent
                 modifiedNets.remove(net);
                 design.removeNet(net);
+                // TEMPORARY WORKAROUND: the design has stopped holding this net, but the change
+                // tracking still has it
+                untrackRemovedNet(design, net);
                 continue;
             }
             if (target == null) {
@@ -1375,6 +1378,32 @@ public class DesignTools {
         for (PIP p : net.getPIPs()) {
             target.addPIP(p);
         }
+
+        // TEMPORARY WORKAROUND: the design has stopped holding this net, but the change tracking
+        // still has it. This cannot be done any earlier: taking its pins above marks it again
+        untrackRemovedNet(design, net);
+    }
+
+    /**
+     * TEMPORARY WORKAROUND: takes a net the design has stopped holding out of the change tracking,
+     * putting what it was routed with into the original state on the way.
+     *
+     * Without this, getModifiedNets() holds nets getNets() does not, and whoever walks the modified
+     * set -- an incremental bitstream writer, for one -- reads a net that no longer exists. The
+     * routing has to be kept, rather than simply dropped, or those PIPs are left turned on with
+     * nothing owning them. Deleting a net leaves its PIPs where they are, so they can still be read
+     * here. putIfAbsent keeps an earlier snapshot, which is the truer original.
+     *
+     * The fix belongs in whatever deletes a Net, which should move it to the original state itself.
+     */
+    private static void untrackRemovedNet(Design design, Net net) {
+        if (!design.isTrackingNetChanges()) {
+            return;
+        }
+        if (design.isCopyingOriginalNetsRouting() && !net.getPIPs().isEmpty()) {
+            design.getOriginalNetRouting().putIfAbsent(net.getName(), new ArrayList<>(net.getPIPs()));
+        }
+        design.getModifiedNets().remove(net);
     }
 
     /**
