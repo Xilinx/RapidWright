@@ -939,12 +939,13 @@ public class DesignTools {
      * map is built after that. Filling them one at a time instead has each call after the first
      * rebuild the design's map, which the call before it had to drop.
      * <p>
-     * {@code design} and every Design in {@code blackBoxes} must arrive having had
-     * {@link #makePhysNetNamesConsistent(Design)} run on them, with nothing changed since. That
-     * leaves every physical net named after its source -- in the design, a black box output counts
-     * as the source of the net attached to it -- and each netlist's parent net map built, which is
-     * what lets both sides of every port be found by name. This is not checked: a physical net held
-     * under any other name is missed, and its signal left split across two physical nets.
+     * {@code design} and every Design in {@code blackBoxes} must arrive with every physical net
+     * named after its source -- in the design, a black box output counts as the source of the net
+     * attached to it -- as {@link #makePhysNetNamesConsistent(Design)} leaves them, and as an
+     * earlier call to this method leaves the design. That is what lets both sides of every port be
+     * found by name, in each netlist's parent net map, which is built first if it is not already.
+     * This is not checked: a physical net held under any other name is missed, and its signal left
+     * split across two physical nets.
      * <p>
      * Only the physical nets on a signal that crosses a black box port are touched. Those on each
      * such signal, from whichever side, are merged onto the one named after the signal's source
@@ -1018,40 +1019,61 @@ public class DesignTools {
 
         // Both sides of every black box port are looked up now, in the parent net maps of the shell
         // and of each circuit, while those still describe them: nothing after the logical merge
-        // below builds a parent net map. Each side is recorded by the name of the net that owns it,
-        // which the inputs having been made consistent is also the name of its physical net, and a
-        // circuit's as it will be once prefixed. An owner that only stands in for a source -- a
-        // shell net driven by the black box itself, a circuit net driven only by one of its ports,
-        // or a net driven by nothing -- is noted as such, so that the real source of each signal
-        // can be told apart once the two sides are joined
-        List<String[]> portLinks = new ArrayList<>();
-        Set<String> notSources = new HashSet<>();
+        // below builds a parent net map. Each side is recorded by the name of the net that owns
+        // it, which is also the name of its physical net since the inputs are named consistently,
+        // a circuit's being prefixed as it will be once moved in. A port then links the side that
+        // cannot hold the signal's source to the side that may: for an output, the shell's net to
+        // the circuit's, and for an input the other way round. Following those links from any name
+        // leads to the source, across however many ports a signal crosses -- straight through a
+        // circuit, back into the box that drives it, or from one box in this batch into another
+        Map<String, String> towardSource = new HashMap<>();
+        // Names that a chain of links can end on although nothing drives them
+        Set<String> undriven = new HashSet<>();
+        // Every name found on a port, in order
+        List<String> portNames = new ArrayList<>();
+        // An owner can be reached through many ports, and naming it means scanning its pins
+        Map<EDIFHierNet, String> ownerNames = new HashMap<>();
         for (Entry<String, Design> e : blackBoxes.entrySet()) {
             String cellPrefix = e.getKey() + EDIFTools.EDIF_HIER_SEP;
             EDIFHierCellInst hierInst = insts.get(e.getKey());
             EDIFNetlist cellNetlist = e.getValue().getNetlist();
             for (EDIFPortInst portInst : hierInst.getInst().getPortInsts()) {
-                String shellName = null;
+                // A port the shell leaves unconnected carries nothing across the boundary
                 EDIFNet outerNet = portInst.getNet();
-                if (outerNet != null) {
-                    EDIFHierNet outer = new EDIFHierNet(hierInst.getParent(), outerNet);
-                    EDIFHierNet owner = netlist.getParentNet(outer);
-                    shellName = getOwnerName(owner != null ? owner : outer, "");
-                    if (owner == null || portInst.isOutput()) {
-                        notSources.add(shellName);
-                    }
-                }
-                String innerName = null;
+                if (outerNet == null) continue;
+                EDIFHierNet outer = new EDIFHierNet(hierInst.getParent(), outerNet);
+                EDIFHierNet shellOwner = netlist.getParentNet(outer);
+                String shellName = shellOwner != null
+                        ? ownerNames.computeIfAbsent(shellOwner, o -> getOwnerName(o, ""))
+                        : outer.getHierarchicalNetName();
+                portNames.add(shellName);
                 EDIFNet innerNet = cellNetlist.getTopCell().getInternalNet(portInst.getName());
-                if (innerNet != null) {
-                    EDIFHierNet inner = new EDIFHierNet(cellNetlist.getTopHierCellInst(), innerNet);
-                    EDIFHierNet owner = cellNetlist.getParentNet(inner);
-                    innerName = getOwnerName(owner != null ? owner : inner, cellPrefix);
-                    if (owner == null || owner.getNet().getSourcePortInsts(false).isEmpty()) {
-                        notSources.add(innerName);
-                    }
+                if (shellOwner == null || (innerNet == null && portInst.isOutput())) {
+                    undriven.add(shellName);
                 }
-                portLinks.add(new String[]{shellName, innerName});
+                if (innerNet == null) continue;
+                EDIFHierNet inner = new EDIFHierNet(cellNetlist.getTopHierCellInst(), innerNet);
+                EDIFHierNet innerOwner = cellNetlist.getParentNet(inner);
+                String innerName = innerOwner != null
+                        ? ownerNames.computeIfAbsent(innerOwner, o -> getOwnerName(o, cellPrefix))
+                        : cellPrefix + inner.getHierarchicalNetName();
+                portNames.add(innerName);
+                if (innerOwner == null) {
+                    undriven.add(innerName);
+                }
+                // An inout has no direction to go by, so it is the circuit that drives it if
+                // anything inside it does
+                boolean circuitDrives = portInst.isOutput() || (!portInst.isInput()
+                        && innerOwner != null
+                        && !innerOwner.getNet().getSourcePortInsts(false).isEmpty());
+                String from = circuitDrives ? shellName : innerName;
+                String to = circuitDrives ? innerName : shellName;
+                String previous = towardSource.put(from, to);
+                if (isStaticNetName(from) || (previous != null && !previous.equals(to))) {
+                    throw new RuntimeException("ERROR: The signal on black box port '" + e.getKey()
+                            + EDIFTools.EDIF_HIER_SEP + portInst.getName() + "' has more than one"
+                            + " source.");
+                }
             }
         }
 
@@ -1131,7 +1153,10 @@ public class DesignTools {
 
                 design.addSiteInst(si);
 
-                // Update GND/VCC site routing to point to destination design's GND/VCC nets
+                // Update GND/VCC site routing to point to destination design's GND/VCC nets. The
+                // circuit's static nets have the same names as the design's, which matters: were
+                // they to differ, routeIntraSiteNet() would rebuild the parent net map, to resolve
+                // the name of the net it is displacing
                 for (String siteWire : si.getSiteWiresFromNet(vccCell)) {
                     BELPin pin = si.getSiteWirePins(siteWire)[0];
                     si.routeIntraSiteNet(vcc, pin, pin);
@@ -1183,7 +1208,7 @@ public class DesignTools {
                     // circuit the net arrived from and addNet() then inserts it into the shell under
                     // the prefixed name. The other order would put it into the shell under its
                     // unprefixed name first, displacing any net the shell already has by that name.
-                    net.rename(cellPrefix + net.getName());
+                    renameNet(net, cellPrefix + net.getName());
                     design.addNet(net);
                     modifiedNets.add(net);
                 }
@@ -1194,83 +1219,44 @@ public class DesignTools {
             }
         }
 
-        // The two sides of a port carry one signal from now on, and a signal can cross several
-        // ports -- straight through a circuit, back into the box that drives it, or from one box
-        // in this batch into another -- so the sides are joined into signals across every port
-        Map<String, String> joined = new HashMap<>();
-        for (String[] link : portLinks) {
-            if (link[0] != null && link[1] != null) {
-                String shellRoot = findJoinedRoot(joined, link[0]);
-                String innerRoot = findJoinedRoot(joined, link[1]);
-                if (!shellRoot.equals(innerRoot)) {
-                    joined.put(shellRoot, innerRoot);
-                }
-            }
-        }
-        Map<String, Set<String>> signals = new HashMap<>();
-        for (String[] link : portLinks) {
-            for (String name : link) {
-                if (name != null) {
-                    String root = findJoinedRoot(joined, name);
-                    signals.computeIfAbsent(root, k -> new HashSet<>()).add(name);
-                }
-            }
-        }
-
-        // Each signal's physical nets are merged onto the one named after its source. With the
-        // boundary routing discarded, the result is then unrouted -- except for the design's GND
-        // or VCC net, which is unrouted, in its entirety, only if something was merged onto it: a
-        // port merely tied to a constant is not reason enough
-        for (Set<String> names : signals.values()) {
-            String owner = null;
-            for (String name : names) {
-                if (notSources.contains(name)) continue;
-                if (owner != null) {
-                    throw new RuntimeException("ERROR: The signal on a black box port is driven by"
-                            + " both '" + owner + "' and '" + name + "'.");
-                }
-                owner = name;
-            }
-            if (owner == null) {
-                // With no source there is nothing to name the signal after, so nothing is merged;
-                // its nets are only unrouted, if the boundary routing is being discarded
-                if (!keepBoundaryRouting) {
-                    for (String name : names) {
-                        Net net = design.getNet(name);
-                        if (net != null && hasPhysicalPresence(net)) {
-                            net.unroute();
-                            modifiedNets.add(net);
-                        }
-                    }
-                }
+        // Each net linked towards a source is merged onto the source's physical net, whatever lies
+        // between them; one with no source is left where it is. The links are dealt with in any
+        // order, since each is merged straight onto the end of its chain
+        Set<String> mergedOnto = new HashSet<>();
+        for (Entry<String, String> link : towardSource.entrySet()) {
+            String source = findSource(towardSource, undriven, link.getKey());
+            if (source == null) continue;
+            Net net = design.getNet(link.getKey());
+            // A net with no physical presence has nothing to move, and is left alone
+            if (net == null || !hasPhysicalPresence(net)) continue;
+            Net target = design.getNet(source);
+            if (target == null) {
+                // The source has no physical net yet, so this one becomes it
+                modifiedNets.remove(net);
+                renameNet(net, source);
+                modifiedNets.add(net);
                 continue;
             }
-            Net target = design.getNet(owner);
-            boolean changed = false;
-            boolean merged = false;
-            for (String name : names) {
-                Net net = design.getNet(name);
-                // A net with no physical presence has nothing to move, and is left alone
-                if (net == null || net == target || !hasPhysicalPresence(net)) continue;
-                if (target == null) {
-                    // The source has no physical net yet, so this one becomes it. Whichever is
-                    // picked, the others are then merged onto it, with the same result
-                    modifiedNets.remove(net);
-                    net.rename(owner);
-                    target = net;
-                    changed = true;
-                    continue;
+            mergeOntoNet(design, net, target, keepBoundaryRouting, modifiedNets);
+            mergedOnto.add(source);
+            modifiedNets.add(target);
+        }
+
+        // With the boundary routing discarded, the net each port's signal ends up on is unrouted
+        // -- or, for a signal with no source, each of its nets. The exception is the design's GND
+        // or VCC net, which is unrouted, in its entirety, only if something was merged onto it: a
+        // port merely tied to a constant is not reason enough
+        if (!keepBoundaryRouting) {
+            Set<Net> unrouted = Collections.newSetFromMap(new IdentityHashMap<>());
+            for (String name : portNames) {
+                String source = findSource(towardSource, undriven, name);
+                Net net = design.getNet(source != null ? source : name);
+                if (net == null || !hasPhysicalPresence(net)) continue;
+                if (net.isStaticNet() && !mergedOnto.contains(source)) continue;
+                if (unrouted.add(net)) {
+                    net.unroute();
+                    modifiedNets.add(net);
                 }
-                mergeOntoNet(design, net, target, keepBoundaryRouting, modifiedNets);
-                changed = merged = true;
-            }
-            if (target == null) continue;
-            if (!keepBoundaryRouting && (merged || !target.isStaticNet())) {
-                target.unroute();
-                changed = true;
-            }
-            if (changed) {
-                modifiedNets.add(target);
             }
         }
         return modifiedNets;
@@ -1302,22 +1288,34 @@ public class DesignTools {
     }
 
     /**
-     * Finds which signal a net name has been joined into, by following the links to the name that
-     * stands for it, and shortens the path along the way.
+     * Follows the links from a net name towards the source of its signal.
      *
-     * @param joined The links from each name to another on the same signal.
-     * @param name   The name to look up.
-     * @return The name that stands for the whole signal.
+     * @param towardSource The link from each name that cannot hold its signal's source to one that
+     *                     may.
+     * @param undriven     The names a chain of links can end on although nothing drives them.
+     * @param name         The name to start from.
+     * @return The name of the signal's source, or null if it has none -- including if the links
+     *         lead round in a loop.
      */
-    private static String findJoinedRoot(Map<String, String> joined, String name) {
-        String root = name;
-        for (String next = joined.get(root); next != null; next = joined.get(root)) {
-            root = next;
+    private static String findSource(Map<String, String> towardSource, Set<String> undriven,
+            String name) {
+        Set<String> visited = new HashSet<>();
+        for (String next = towardSource.get(name); next != null; next = towardSource.get(name)) {
+            if (!visited.add(name)) return null;
+            name = next;
         }
-        while (!name.equals(root)) {
-            name = joined.put(name, root);
+        return undriven.contains(name) ? null : name;
+    }
+
+    private static boolean isStaticNetName(String name) {
+        return name.equals(Net.GND_NET) || name.equals(Net.VCC_NET);
+    }
+
+    private static void renameNet(Net net, String name) {
+        if (!net.rename(name)) {
+            throw new RuntimeException("ERROR: Failed to rename net '" + net.getName() + "' to '"
+                    + name + "'.");
         }
-        return root;
     }
 
     /**
@@ -1334,20 +1332,15 @@ public class DesignTools {
      */
     private static void mergeOntoNet(Design design, Net net, Net target,
             boolean keepBoundaryRouting, Set<Net> modifiedNets) {
-        // Taken off the net rather than referred to, in case deleting the net clears its list
-        List<PIP> pips = null;
-        if (keepBoundaryRouting && net.hasPIPs()) {
-            pips = net.getPIPs();
-            net.setPIPs(new ArrayList<>());
-        }
         modifiedNets.remove(net);
+        // Deleting the net leaves its PIPs where they are, so they can be read afterwards
         design.movePinsToNewNetDeleteOldNet(net, target, true);
-        if (pips != null) {
+        if (keepBoundaryRouting && net.hasPIPs()) {
             // Handed straight over when there is nothing to add to
             if (target.getPIPs().isEmpty()) {
-                target.setPIPs(pips);
+                target.setPIPs(net.getPIPs());
             } else {
-                for (PIP p : pips) {
+                for (PIP p : net.getPIPs()) {
                     target.addPIP(p);
                 }
             }
