@@ -62,8 +62,7 @@ public enum RouteNodeType {
     /**
      * Denotes {@link RouteNode} objects that should be treated as being inaccessible and
      * never queued for exploration during routing. Typically, these are routing nodes that
-     * have already been created but later discovered to not be needed (e.g. is a dead-end node),
-     * or from a routethru on an unpreserved net.
+     * have already been created but later discovered to not be needed (e.g. is a dead-end node).
      */
     INACCESSIBLE;
 

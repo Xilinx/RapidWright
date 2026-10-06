@@ -66,10 +66,15 @@ public class TestDCPLoad {
         // Soft link DCP from a temporary directory to prevent parallel testing issues
         Path tmpPath = Files.createSymbolicLink(tempDir.resolve(dcpPath.getFileName()), dcpPath.toAbsolutePath());
 
+        boolean origAutoGenerate = Design.isAutoGenerateReadableEdif();
         Design.setAutoGenerateReadableEdif (false);
-        Assertions.assertThrows(RuntimeException.class, () -> {
-            Design.readCheckpoint(tmpPath, CodePerfTracker.SILENT);
-        });
+        try {
+            Assertions.assertThrows(RuntimeException.class, () -> {
+                Design.readCheckpoint(tmpPath, CodePerfTracker.SILENT);
+            });
+        } finally {
+            Design.setAutoGenerateReadableEdif(origAutoGenerate);
+        }
     }
 
     @Test

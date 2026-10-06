@@ -5,7 +5,7 @@ on:
   pull_request:
 
 env:
-  RAPIDWRIGHT_VERSION: v2026.1.0-beta
+  RAPIDWRIGHT_VERSION: v2026.1.1-beta
 
 
 jobs:
@@ -47,6 +47,10 @@ jobs:
 
       - name: Test
         run: ./gradlew -PlimitToSingleProc=${{ matrix.single_threaded }} test 
+
+      - name: Run Examples
+        if: matrix.single_threaded == 'multi-threaded'
+        run: ./gradlew runExamples
 
       - name: Archive Java Test Report
         uses: actions/upload-artifact@v4

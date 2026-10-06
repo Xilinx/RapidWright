@@ -192,12 +192,13 @@ task javadocJar(type: Jar) {
 }
 
 task standaloneJar (type: Jar) {
-    duplicatesStrategy = DuplicatesStrategy.WARN
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     manifest {
         attributes 'Main-Class': standaloneClassName
     }
     archiveBaseName = 'rapidwright-'+rapidwright_version+'-standalone-' + os.charAt(0) + 'in64'
-    from { configurations.implementation.collect { it.isDirectory() ? it : zipTree(it) } }
+    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
     with jar
 }
 

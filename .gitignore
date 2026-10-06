@@ -13,3 +13,4 @@
 interchange/schema/capnp/java.capnp
 *.orig
 .codex
+.claude

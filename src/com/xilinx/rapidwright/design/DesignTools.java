@@ -2266,6 +2266,11 @@ public class DesignTools {
         EDIFNetlist netlist = design.getNetlist();
         List<EDIFHierPortInst> physPins = netlist.getPhysicalPins(net);
         List<SitePinInst> newPins = new ArrayList<>();
+        // A net the netlist knows nothing about, or one with a physical pin that has no Cell behind
+        // it -- a pin inside encrypted IP, or under a black box -- is one the logical walk below can
+        // say nothing about, so its site wires have to be walked instead
+        boolean walkSiteWires;
+
         if (physPins == null) {
             // Assert that this physical net is a parent logical net
             EDIFHierNet hierNet;
@@ -2275,21 +2280,102 @@ public class DesignTools {
 
             // Likely net inside encrypted IP, let's see if we can infer anything from existing
             // physical description
+            walkSiteWires = true;
+        } else {
+            walkSiteWires = false;
+
+            for (EDIFHierPortInst p :  physPins) {
+                EDIFCell ec = p.getCellType();
+                assert(ec.isLeafCellOrBlackBox());
+                if (!ec.isPrimitive()) {
+                    walkSiteWires = true;
+                    continue;
+                }
+                if (ec.isVCCSource() || ec.isGNDSource()) {
+                    continue;
+                }
+                Cell c = design.getCell(p.getFullHierarchicalInstName());
+                if (c == null) {
+                    // A logical leaf cell that hasn't had its physical Cell object created yet (and is thus unplaced)
+                    continue;
+                }
+                BEL bel = c.getBEL();
+                if (bel == null) continue;
+                String logicalPinName = p.getPortInst().getName();
+                Set<String> physPinMappings;
+                // Need to synchronize on the cell since its internally cached logical-to-physical map is computed lazily
+                synchronized (c) {
+                    physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
+                }
+                // BRAMs can have two (or more) physical pin mappings for a logical pin
+                if (physPinMappings != null) {
+                    SiteInst si = c.getSiteInst();
+                    for (String physPin : physPinMappings) {
+                        BELPin belPin = bel.getPin(physPin);
+                        // Use the net attached to the phys pin
+                        // This call (a read operation) does not need to be synchronized since it is assumed that this thread
+                        // is the only one that performs (i.e. modifies) intra-site routing for this net (or its aliases)
+                        Net siteWireNet = si.getNetFromSiteWire(belPin.getSiteWireName());
+                        if (siteWireNet == null) {
+                            if (isVersal && net.isStaticNet() && bel.isLUT()) {
+                                siteWireNet = net;
+                                synchronized (si) {
+                                    si.routeIntraSiteNet(net, belPin, belPin);
+                                }
+                            } else {
+                                continue;
+                            }
+                        }
+                        if (siteWireNet != net && !siteWireNet.isStaticNet()) {
+                            EDIFHierNet hierNet = null;
+                            assert((hierNet = net.getLogicalHierNet()) == null || hierNet.equals(netlist.getParentNet(hierNet)));
+                            if (hierNet != null) {
+                                EDIFHierNet siteWireHierNet = null;
+                                assert((siteWireHierNet = siteWireNet.getLogicalHierNet()) == null || siteWireHierNet.equals(netlist.getParentNet(siteWireHierNet)));
+                                assert(hierNet.equals(siteWireHierNet) || (isNetDrivenByMBUFGCE(hierNet) && isNetDrivenByMBUFGCE(siteWireHierNet)));
+                            }
+                        }
+                        // Similarly, this call (a read operation) does not need to be synchronized since it is assumed that
+                        // this thread is the only one that performs (i.e. modifies) intra-site routing for this net
+                        String sitePinName = getRoutedSitePinFromPhysicalPin(c, siteWireNet, physPin);
+                        if (sitePinName == null) continue;
+                        SitePinInst newPin = createSitePinInst(net, si, sitePinName);
+                        if (newPin != null) {
+                            newPins.add(newPin);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (walkSiteWires) {
+            // Walk the site wires this net occupies rather than its logical pins.  A site pin and the
+            // site wire behind it go by the same name, and the wire is the only description left of a
+            // connection whose Cell cannot be found, since there is nothing to ask for a physical pin
+            // mapping
             for (SiteInst siteInst : net.getSiteInsts()) {
+                int siteWireCount = siteInst.getSiteWires().length;
                 for (int siteWire : siteInst.getSiteWireIndicesFromNet(net)) {
+                    if (siteWire >= siteWireCount) {
+                        // The indices reported here are not indices into the site's site wire array: on
+                        // some site types (e.g. HPIOB, HDIOB, HPIOBDIFFINBUF) they run past the end of it,
+                        // where SiteInst.getSiteWirePins() throws at exactly the count and reports no pins
+                        // above it.  Such a site wire has no site pin to create here either way
+                        // Tracked by https://github.com/Xilinx/RapidWright/pull/1428
+                        continue;
+                    }
                     for (BELPin pin : siteInst.getSiteWirePins(siteWire)) {
                         if (!pin.isSitePort()) {
                             continue;
                         }
 
                         String pinName = pin.getName();
-                        SitePinInst currPin;
-                        synchronized(siteInst) {
-                            currPin = siteInst.getSitePinInst(pinName);
-                        }
-                        if (currPin != null) {
-                            // SitePinInst already exists
-                            continue;
+                        synchronized (siteInst) {
+                            if (siteInst.getSitePinInst(pinName) != null) {
+                                // SitePinInst already exists; checked again by createSitePinInst()
+                                // below, but doing so here avoids the search that follows
+                                continue;
+                            }
                         }
 
                         if (pin.isInput()) {
@@ -2308,79 +2394,41 @@ public class DesignTools {
                             }
                         }
 
-                        synchronized (siteInst) {
-                            currPin = new SitePinInst(pinName, siteInst);
+                        SitePinInst currPin = createSitePinInst(net, siteInst, pinName);
+                        if (currPin != null) {
+                            newPins.add(currPin);
                         }
-                        net.addPin(currPin);
-                        newPins.add(currPin);
-                    }
-                }
-            }
-
-            return newPins;
-        }
-
-        for (EDIFHierPortInst p :  physPins) {
-            Cell c = design.getCell(p.getFullHierarchicalInstName());
-            if (c == null) continue;
-            BEL bel = c.getBEL();
-            if (bel == null) continue;
-            String logicalPinName = p.getPortInst().getName();
-            Set<String> physPinMappings;
-            // Need to synchronize on the cell since its internally cached logical-to-physical map is computed lazily
-            synchronized (c) {
-                physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
-            }
-            // BRAMs can have two (or more) physical pin mappings for a logical pin
-            if (physPinMappings != null) {
-                SiteInst si = c.getSiteInst();
-                for (String physPin : physPinMappings) {
-                    BELPin belPin = bel.getPin(physPin);
-                    // Use the net attached to the phys pin
-                    // This call (a read operation) does not need to be synchronized since it is assumed that this thread
-                    // is the only one that performs (i.e. modifies) intra-site routing for this net (or its aliases)
-                    Net siteWireNet = si.getNetFromSiteWire(belPin.getSiteWireName());
-                    if (siteWireNet == null) {
-                        if (isVersal && net.isStaticNet() && bel.isLUT()) {
-                            siteWireNet = net;
-                            synchronized (si) {
-                                si.routeIntraSiteNet(net, belPin, belPin);
-                            }
-                        } else {
-                            continue;
-                        }
-                    }
-                    if (siteWireNet != net && !siteWireNet.isStaticNet()) {
-                        EDIFHierNet hierNet = null;
-                        assert((hierNet = net.getLogicalHierNet()) == null || hierNet.equals(netlist.getParentNet(hierNet)));
-                        if (hierNet != null) {
-                            EDIFHierNet siteWireHierNet = null;
-                            assert((siteWireHierNet = siteWireNet.getLogicalHierNet()) == null || siteWireHierNet.equals(netlist.getParentNet(siteWireHierNet)));
-                            assert(hierNet.equals(siteWireHierNet) || (isNetDrivenByMBUFGCE(hierNet) && isNetDrivenByMBUFGCE(siteWireHierNet)));
-                        }
-                    }
-                    SitePinInst newPin;
-                    // Similarly, this call (a read operation) does not need to be synchronized since it is assumed that
-                    // this thread is the only one that performs (i.e. modifies) intra-site routing for this net
-                    String sitePinName = getRoutedSitePinFromPhysicalPin(c, siteWireNet, physPin);
-                    if (sitePinName == null) continue;
-                    synchronized (si) {
-                        newPin = si.getSitePinInst(sitePinName);
-                        if (newPin != null) continue;
-                        if (sitePinName.equals("IO") && Utils.isIOB(si)) {
-                            // Do not create a SitePinInst for the "IO" input site pin of any IOB site,
-                            // since the sitewire it drives is assumed to be driven by the IO PAD.
-                            continue;
-                        }
-                        newPin = net.createPin(sitePinName, si);
-                    }
-                    if (newPin != null) {
-                        newPins.add(newPin);
                     }
                 }
             }
         }
+
         return newPins;
+    }
+
+    /**
+     * Creates a SitePinInst on the given net, unless the site pin already has one or is one that no
+     * SitePinInst is to be created for.  Both descriptions a net can be discovered through --
+     * logical pins and site wires -- create their pins here, so that they agree on what is created.
+     * @param net The net to create the pin on.
+     * @param siteInst The site instance the pin belongs to.
+     * @param sitePinName The name of the site pin.
+     * @return The new pin, or null if none was created.
+     */
+    private static SitePinInst createSitePinInst(Net net, SiteInst siteInst, String sitePinName) {
+        if (Utils.isIOB(siteInst) && sitePinName.equals("IO")) {
+            // Do not create a SitePinInst for the "IO" input site pin of any IOB site,
+            // since the sitewire it drives is assumed to be driven by the IO PAD.
+            return null;
+        }
+        // Net.createPin() throws if the site instance already has a pin of this name, so the check
+        // and the creation must be held under the one lock
+        synchronized (siteInst) {
+            if (siteInst.getSitePinInst(sitePinName) != null) {
+                return null;
+            }
+            return net.createPin(sitePinName, siteInst);
+        }
     }
 
     private static boolean isNetDrivenByMBUFGCE(EDIFHierNet net) {
@@ -3391,6 +3439,23 @@ public class DesignTools {
     }
 
     /**
+     * One net as classified by {@link #makePhysNetNamesConsistent(Design)}: the net that is to be
+     * merged away, together with either the parent Net it is to be merged into, when that is already
+     * known, or the name of the parent net to look up when the merge is applied.
+     */
+    private static class PhysNetMerge {
+        final Net net;
+        final Net parentPhysNet;
+        final String parentNetName;
+
+        PhysNetMerge(Net net, Net parentPhysNet, String parentNetName) {
+            this.net = net;
+            this.parentPhysNet = parentPhysNet;
+            this.parentNetName = parentNetName;
+        }
+    }
+
+    /**
      * Make all of a Design's physical Net objects consistent with its logical (EDIF) netlist.
      * Specifically, merge all sitewire and SitePinInst-s associated with physical Net-s that
      * are not the parent/canonical logical net into the parent Net, and delete all
@@ -3409,77 +3474,101 @@ public class DesignTools {
         int numJobs = Math.min(ParallelismTools.maxParallelism() * 100, numNets / 100);
         List<Net> designNets = new ArrayList<>(design.getNets());
         List<List<Net>> partitionedNets = Lists.partition(designNets, (int) Math.ceil((double) numNets / numJobs));
-        List<Future<?>> futures = new ArrayList<>();
+
+        // Only the classification runs in parallel. Each job keeps its results in its own list so
+        // that reading them back partition by partition reproduces designNets order exactly
+        List<List<PhysNetMerge>> partitionedMerges = new ArrayList<>(partitionedNets.size());
+        List<Future<?>> futures = new ArrayList<>(partitionedNets.size());
         for (List<Net> nets : partitionedNets) {
+            List<PhysNetMerge> merges = new ArrayList<>();
+            partitionedMerges.add(merges);
             Future<?> f = ParallelismTools.submit(() -> {
                 for (Net net : nets) {
-                    Net parentPhysNet = null;
                     if (net.isStaticNet()) {
+                        Net staticNet;
                         if (net.getType() == NetType.GND) {
-                            parentPhysNet = gndNet;
+                            staticNet = gndNet;
                         } else if (net.getType() == NetType.VCC) {
-                            parentPhysNet = vccNet;
+                            staticNet = vccNet;
                         } else {
                             throw new RuntimeException();
                         }
-                        if (parentPhysNet == net) {
-                            continue;
+                        if (staticNet != net) {
+                            merges.add(new PhysNetMerge(net, staticNet, null));
                         }
-                    } else {
-                        EDIFHierNet hierNet = net.getLogicalHierNet();
-                        if (hierNet == null) {
-                            // Likely an encrypted cell
-                            continue;
-                        }
-                        EDIFHierNet parentHierNet = netParentMap.get(hierNet);
-                        if (parentHierNet == null) {
-                            // System.out.println("WARNING: Couldn't find parent net for '" +
-                            //         hierNet.getHierarchicalNetName() + "'");
-                            continue;
-                        }
+                        continue;
+                    }
 
-                        // Check to make sure net is not improperly categorized
-                        EDIFNet srcNetAlias = parentHierNet.getNet();
-                        if (srcNetAlias.isGND()) {
-                            parentPhysNet = gndNet;
-                        } else if (srcNetAlias.isVCC()) {
+                    EDIFHierNet hierNet = net.getLogicalHierNet();
+                    if (hierNet == null) {
+                        // Likely an encrypted cell
+                        continue;
+                    }
+                    EDIFHierNet parentHierNet = netParentMap.get(hierNet);
+                    if (parentHierNet == null) {
+                        // System.out.println("WARNING: Couldn't find parent net for '" +
+                        //         hierNet.getHierarchicalNetName() + "'");
+                        continue;
+                    }
+
+                    // Check to make sure net is not improperly categorized
+                    Net parentPhysNet = null;
+                    EDIFNet srcNetAlias = parentHierNet.getNet();
+                    if (srcNetAlias.isGND()) {
+                        parentPhysNet = gndNet;
+                    } else if (srcNetAlias.isVCC()) {
+                        parentPhysNet = vccNet;
+                    }
+
+                    if (!hierNet.equals(parentHierNet)) {
+                        String parentNetName = parentHierNet.getNet().getName();
+                        // Assume that a net named <const1> or <const0> is always a VCC or GND net
+                        if (parentNetName.equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
                             parentPhysNet = vccNet;
-                        }
-
-                        if (!hierNet.equals(parentHierNet)) {
-                            String parentNetName = parentHierNet.getNet().getName();
-                            // Assume that a net named <const1> or <const0> is always a VCC or GND net
-                            if (parentNetName.equals(EDIFTools.LOGICAL_VCC_NET_NAME)) {
-                                parentPhysNet = vccNet;
-                            } else if (parentNetName.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
-                                parentPhysNet = gndNet;
-                            } else {
-                                parentPhysNet = design.getNet(parentHierNet.getHierarchicalNetName());
-                            }
-
-                            if (parentPhysNet == null) {
-                                synchronized (design) {
-                                    // Double check (inside this synchronized section) that no other thread has created
-                                    // the physical parent net since we fetched it above
-                                    parentPhysNet = design.getNet(parentHierNet.getHierarchicalNetName());
-                                    if (parentPhysNet == null && !net.rename(parentHierNet.getHierarchicalNetName())) {
-                                        System.out.println("WARNING: Failed to adjust physical net name " + net.getName());
-                                    }
-                                }
-                            }
+                        } else if (parentNetName.equals(EDIFTools.LOGICAL_GND_NET_NAME)) {
+                            parentPhysNet = gndNet;
+                        } else {
+                            // Which Net of this alias group survives depends on what has already
+                            // been merged, so the lookup has to wait until the merges are applied
+                            merges.add(new PhysNetMerge(net, null,
+                                    parentHierNet.getHierarchicalNetName()));
+                            continue;
                         }
                     }
 
                     if (parentPhysNet != null) {
-                        synchronized (design) {
-                            design.movePinsToNewNetDeleteOldNet(net, parentPhysNet, true);
-                        }
+                        merges.add(new PhysNetMerge(net, parentPhysNet, null));
                     }
                 }
             });
             futures.add(f);
         }
         ParallelismTools.join(futures);
+
+        // The merges themselves are applied on this thread, in designNets order. Applying them from
+        // the worker threads costs nothing less -- every one of them already had to take the Design's
+        // lock -- and it leaves both the surviving Net of an alias group and the order that group's
+        // pins are appended in decided by whichever thread happened to arrive first, which is enough
+        // to change the order RWRoute walks its connections in and so the routing it produces
+        for (List<PhysNetMerge> merges : partitionedMerges) {
+            for (PhysNetMerge merge : merges) {
+                Net parentPhysNet = merge.parentPhysNet;
+
+                if (parentPhysNet == null) {
+                    parentPhysNet = design.getNet(merge.parentNetName);
+
+                    // Nothing to merge into yet, so this net becomes the one everything else merges into
+                    if (parentPhysNet == null) {
+                        if (!merge.net.rename(merge.parentNetName)) {
+                            System.out.println("WARNING: Failed to adjust physical net name " + merge.net.getName());
+                        }
+                        continue;
+                    }
+                }
+
+                design.movePinsToNewNetDeleteOldNet(merge.net, parentPhysNet, true);
+            }
+        }
     }
 
     /**

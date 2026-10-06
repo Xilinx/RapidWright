@@ -56,6 +56,14 @@ public class Params {
     public static String RW_DCP_EDIF_EXTRACT_THRESHOLD_BYTES_NAME = "RW_DCP_EDIF_EXTRACT_THRESHOLD_BYTES";
 
     /**
+    * Max EDIF token size in bytes for {@link com.xilinx.rapidwright.edif.EDIFTokenizer}
+    * Must be a power of two. Set via environment variable or JVM system property.
+    * {@value #RW_EDIF_MAX_TOKEN_LENGTH_NAME}
+    */
+    public static String RW_EDIF_MAX_TOKEN_LENGTH_NAME = "RW_EDIF_MAX_TOKEN_LENGTH";
+    public static int RW_EDIF_DEFAULT_MAX_TOKEN_LENGTH = 8192 * 16 * 32;
+
+    /**
      * Flag to have RapidWright decompress gzipped EDIF files to disk prior to
      * parsing. This is a tradeoff where pre-decompression improves runtime over the
      * default method which is to decompress in memory. The disadvantage is that
@@ -106,6 +114,15 @@ public class Params {
      */
     public static long RW_DCP_EDIF_EXTRACT_THRESHOLD_BYTES =
             getParamOrDefaultLongSetting(RW_DCP_EDIF_EXTRACT_THRESHOLD_BYTES_NAME, -1L);
+
+
+    /**
+     * Configured max EDIF token length; falls back to {@link #RW_EDIF_DEFAULT_MAX_TOKEN_LENGTH}
+     * if unset or invalid (not a power of two).
+     */
+    public static int RW_EDIF_MAX_TOKEN_LENGTH = validatedEdifMaxTokenLength(
+        getParamOrDefaultIntSetting(RW_EDIF_MAX_TOKEN_LENGTH_NAME, RW_EDIF_DEFAULT_MAX_TOKEN_LENGTH),
+        RW_EDIF_DEFAULT_MAX_TOKEN_LENGTH);
 
     /**
      * Checks if the named RapidWright parameter is set via an environment variable
@@ -218,4 +235,13 @@ public class Params {
         return setValue == null ? defaultValue : setValue;
     }
 
+    private static int validatedEdifMaxTokenLength(int value, int defaultValue) {
+        if (value <= 0 || (value & (value - 1)) != 0) {
+            System.err.println("WARNING: " + RW_EDIF_MAX_TOKEN_LENGTH_NAME
+                + " must be a positive power of two (" + value + ") using default "
+                + defaultValue);
+            return defaultValue;
+        }
+        return value;
+    }
 }
