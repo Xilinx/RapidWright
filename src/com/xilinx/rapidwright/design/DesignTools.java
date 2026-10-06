@@ -941,11 +941,11 @@ public class DesignTools {
      * <p>
      * {@code design} and every Design in {@code blackBoxes} must arrive with every physical net
      * named after its source -- in the design, a black box output counts as the source of the net
-     * attached to it -- as {@link #makePhysNetNamesConsistent(Design)} leaves them, and as an
-     * earlier call to this method leaves the design. That is what lets both sides of every port be
-     * found by name, in each netlist's parent net map, which is built first if it is not already.
-     * This is not checked: a physical net held under any other name is missed, and its signal left
-     * split across two physical nets.
+     * attached to it. Calling {@link #makePhysNetNamesConsistent(Design)} on each beforehand
+     * ensures this, as does an earlier call to this method for the design. That is what lets both
+     * sides of every port be found by name, in each netlist's parent net map, which is built first
+     * if it is not already. This is not checked: a physical net held under any other name is
+     * missed, and its signal left split across two physical nets.
      * <p>
      * Only the physical nets on a signal that crosses a black box port are touched. Those on each
      * such signal, from whichever side, are merged onto the one named after the signal's source
@@ -1034,8 +1034,8 @@ public class DesignTools {
         Map<String, String> portParents = new HashMap<>();
         // Parents that nothing drives
         Set<String> undriven = new HashSet<>();
-        // Every name found on a port, in order
-        List<String> portNames = new ArrayList<>();
+        // Every name found on a port, each once however many ports it is on
+        Set<String> portNames = new HashSet<>();
         for (Entry<String, Design> e : blackBoxes.entrySet()) {
             String cellPrefix = e.getKey() + EDIFTools.EDIF_HIER_SEP;
             EDIFHierCellInst hierInst = insts.get(e.getKey());
@@ -1312,9 +1312,11 @@ public class DesignTools {
      */
     private static String resolveParent(Map<String, String> portParents, Set<String> undriven,
             String name) {
-        Set<String> visited = new HashSet<>();
+        // A chain that does not loop takes at most one step per link, so one that takes more has
+        // come round to a name it already passed
+        int steps = 0;
         for (String next = portParents.get(name); next != null; next = portParents.get(name)) {
-            if (!visited.add(name)) return null;
+            if (++steps > portParents.size()) return null;
             name = next;
         }
         return undriven.contains(name) ? null : name;
@@ -1340,17 +1342,12 @@ public class DesignTools {
      */
     private static void mergeOntoNet(Design design, Net net, Net target, Set<Net> modifiedNets) {
         modifiedNets.remove(net);
-        // Deleting the net leaves its PIPs where they are, so they can be read afterwards
+        // Deleting the net leaves its PIPs where they are, so they can be read afterwards. They are
+        // added one by one rather than the list handed over, which would leave the deleted net and
+        // the target sharing it
         design.movePinsToNewNetDeleteOldNet(net, target, true);
-        if (net.hasPIPs()) {
-            // Handed straight over when there is nothing to add to
-            if (target.getPIPs().isEmpty()) {
-                target.setPIPs(net.getPIPs());
-            } else {
-                for (PIP p : net.getPIPs()) {
-                    target.addPIP(p);
-                }
-            }
+        for (PIP p : net.getPIPs()) {
+            target.addPIP(p);
         }
     }
 
