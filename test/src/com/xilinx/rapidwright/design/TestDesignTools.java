@@ -740,16 +740,19 @@ public class TestDesignTools {
     }
 
     /**
-     * Calls populateBlackBox(), then asserts what holds for every call: that it left the design's
-     * parent net map unbuilt, since it drops the map once it has changed the netlist and must not
-     * build it again; that every net it reports is one the design still holds, since a merge
-     * deletes the net it merges away, and a deleted net must not be named in the result; and that
-     * every net it reports is named after its source, so is its own parent net, but for one on a
-     * signal that nothing drives, which has none.
+     * Calls populateBlackBox() with the design tracking its changes, and hands back what that
+     * recorded -- the call reports nothing itself. Then asserts what holds for every call: that it
+     * left the design's parent net map unbuilt, since it drops the map once it has changed the
+     * netlist and must not build it again; that every net recorded is one the design still holds,
+     * since a merge deletes the net it merges away, and a deleted net must not be left in the
+     * record; and that every net recorded is named after its source, so is its own parent net, but
+     * for one on a signal that nothing drives, which has none.
      */
     private static Set<Net> populateBlackBox(Design design, Map<String, Design> blackBoxes,
             boolean keepBoundaryRouting) {
-        Set<Net> modified = DesignTools.populateBlackBox(design, blackBoxes, keepBoundaryRouting);
+        design.setTrackingChanges(true);
+        DesignTools.populateBlackBox(design, blackBoxes, keepBoundaryRouting);
+        Set<Net> modified = design.getModifiedNets();
         EDIFNetlist netlist = design.getNetlist();
         Assertions.assertFalse(netlist.isParentNetMapBuilt());
         // Checked only now, since asking for a parent builds the map
