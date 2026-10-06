@@ -1032,8 +1032,6 @@ public class DesignTools {
         Set<String> undriven = new HashSet<>();
         // Every name found on a port, in order
         List<String> portNames = new ArrayList<>();
-        // An owner can be reached through many ports, and naming it means scanning its pins
-        Map<EDIFHierNet, String> ownerNames = new HashMap<>();
         for (Entry<String, Design> e : blackBoxes.entrySet()) {
             String cellPrefix = e.getKey() + EDIFTools.EDIF_HIER_SEP;
             EDIFHierCellInst hierInst = insts.get(e.getKey());
@@ -1044,8 +1042,7 @@ public class DesignTools {
                 if (outerNet == null) continue;
                 EDIFHierNet outer = new EDIFHierNet(hierInst.getParent(), outerNet);
                 EDIFHierNet shellOwner = netlist.getParentNet(outer);
-                String shellName = shellOwner != null
-                        ? ownerNames.computeIfAbsent(shellOwner, o -> getOwnerName(o, ""))
+                String shellName = shellOwner != null ? getOwnerName(shellOwner, "")
                         : outer.getHierarchicalNetName();
                 portNames.add(shellName);
                 EDIFNet innerNet = cellNetlist.getTopCell().getInternalNet(portInst.getName());
@@ -1055,8 +1052,7 @@ public class DesignTools {
                 if (innerNet == null) continue;
                 EDIFHierNet inner = new EDIFHierNet(cellNetlist.getTopHierCellInst(), innerNet);
                 EDIFHierNet innerOwner = cellNetlist.getParentNet(inner);
-                String innerName = innerOwner != null
-                        ? ownerNames.computeIfAbsent(innerOwner, o -> getOwnerName(o, cellPrefix))
+                String innerName = innerOwner != null ? getOwnerName(innerOwner, cellPrefix)
                         : cellPrefix + inner.getHierarchicalNetName();
                 portNames.add(innerName);
                 if (innerOwner == null) {
