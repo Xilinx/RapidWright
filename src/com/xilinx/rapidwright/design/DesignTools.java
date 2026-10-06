@@ -997,6 +997,10 @@ public class DesignTools {
             String hierarchicalCellName = e.getKey();
             Design cell = e.getValue();
             EDIFHierCellInst hierInst = netlist.getHierCellInstFromName(hierarchicalCellName);
+            if (hierInst == null) {
+                throw new RuntimeException("ERROR: The cell instance " + hierarchicalCellName
+                        + " does not exist.");
+            }
             EDIFCellInst inst = hierInst.getInst();
             if (!inst.isBlackBox()) {
                 throw new RuntimeException("ERROR: The cell instance " + hierarchicalCellName
