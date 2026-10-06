@@ -1019,15 +1019,16 @@ public class DesignTools {
 
         // Both sides of every black box port are looked up now, in the parent net maps of the shell
         // and of each circuit, while those still describe them: nothing after the logical merge
-        // below builds a parent net map. Each side is recorded by the name of the net that owns
-        // it, which is also the name of its physical net since the inputs are named consistently,
-        // a circuit's being prefixed as it will be once moved in. A port then links the side that
-        // cannot hold the signal's source to the side that may: for an output, the shell's net to
-        // the circuit's, and for an input the other way round. Following those links from any name
-        // leads to the source, across however many ports a signal crosses -- straight through a
-        // circuit, back into the box that drives it, or from one box in this batch into another
-        Map<String, String> towardSource = new HashMap<>();
-        // Names that a chain of links can end on although nothing drives them
+        // below builds a parent net map. Each side is recorded by the name of its parent net,
+        // which is also the name of its physical net since the inputs are named consistently, a
+        // circuit's being prefixed as it will be once moved in. The parent that matters is found on
+        // the side that drives the port -- the shell's for an input, the circuit's for an output --
+        // and is recorded as the parent of the net on the other side. Where that parent is only
+        // another black box port in this batch -- for a signal straight through a circuit, back
+        // into the box that drives it, or from one box into another -- it is resolved further,
+        // through that port's own entry, once every port has been looked up
+        Map<String, String> portParents = new HashMap<>();
+        // Parents that nothing drives
         Set<String> undriven = new HashSet<>();
         // Every name found on a port, in order
         List<String> portNames = new ArrayList<>();
@@ -1068,7 +1069,7 @@ public class DesignTools {
                         && !innerOwner.getNet().getSourcePortInsts(false).isEmpty());
                 String from = circuitDrives ? shellName : innerName;
                 String to = circuitDrives ? innerName : shellName;
-                String previous = towardSource.put(from, to);
+                String previous = portParents.put(from, to);
                 if (isStaticNetName(from) || (previous != null && !previous.equals(to))) {
                     throw new RuntimeException("ERROR: The signal on black box port '" + e.getKey()
                             + EDIFTools.EDIF_HIER_SEP + portInst.getName() + "' has more than one"
@@ -1219,40 +1220,40 @@ public class DesignTools {
             }
         }
 
-        // Each net linked towards a source is merged onto the source's physical net, whatever lies
-        // between them; one with no source is left where it is. The links are dealt with in any
-        // order, since each is merged straight onto the end of its chain
+        // Each net on a port is merged onto its parent's physical net, resolved through any black
+        // box ports in between; one whose parent nothing drives is left where it is. The nets are
+        // dealt with in any order, since each is merged straight onto its resolved parent
         Set<String> mergedOnto = new HashSet<>();
-        for (Entry<String, String> link : towardSource.entrySet()) {
-            String source = findSource(towardSource, undriven, link.getKey());
-            if (source == null) continue;
-            Net net = design.getNet(link.getKey());
+        for (String name : portParents.keySet()) {
+            String parent = resolveParent(portParents, undriven, name);
+            if (parent == null) continue;
+            Net net = design.getNet(name);
             // A net with no physical presence has nothing to move, and is left alone
             if (net == null || !hasPhysicalPresence(net)) continue;
-            Net target = design.getNet(source);
+            Net target = design.getNet(parent);
             if (target == null) {
-                // The source has no physical net yet, so this one becomes it
+                // The parent has no physical net yet, so this one becomes it
                 modifiedNets.remove(net);
-                renameNet(net, source);
+                renameNet(net, parent);
                 modifiedNets.add(net);
                 continue;
             }
             mergeOntoNet(design, net, target, keepBoundaryRouting, modifiedNets);
-            mergedOnto.add(source);
+            mergedOnto.add(parent);
             modifiedNets.add(target);
         }
 
         // With the boundary routing discarded, the net each port's signal ends up on is unrouted
-        // -- or, for a signal with no source, each of its nets. The exception is the design's GND
+        // -- or, for a signal nothing drives, each of its nets. The exception is the design's GND
         // or VCC net, which is unrouted, in its entirety, only if something was merged onto it: a
         // port merely tied to a constant is not reason enough
         if (!keepBoundaryRouting) {
             Set<Net> unrouted = Collections.newSetFromMap(new IdentityHashMap<>());
             for (String name : portNames) {
-                String source = findSource(towardSource, undriven, name);
-                Net net = design.getNet(source != null ? source : name);
+                String parent = resolveParent(portParents, undriven, name);
+                Net net = design.getNet(parent != null ? parent : name);
                 if (net == null || !hasPhysicalPresence(net)) continue;
-                if (net.isStaticNet() && !mergedOnto.contains(source)) continue;
+                if (net.isStaticNet() && !mergedOnto.contains(parent)) continue;
                 if (unrouted.add(net)) {
                     net.unroute();
                     modifiedNets.add(net);
@@ -1288,19 +1289,24 @@ public class DesignTools {
     }
 
     /**
-     * Follows the links from a net name towards the source of its signal.
+     * Resolves the parent of a net on a black box port, now that the black boxes are filled. Each
+     * port's parent was found in the parent net map of the side that drives it, and is usually the
+     * answer. It is not where that parent is only the net on another black box port in this batch,
+     * since that map treated the box as a leaf and its port as the source: then that port's own
+     * parent is taken instead, and so on, iteratively, until a parent is not on such a port. This
+     * consults no parent net map and walks no netlist, taking one step per port the signal
+     * crosses.
      *
-     * @param towardSource The link from each name that cannot hold its signal's source to one that
-     *                     may.
-     * @param undriven     The names a chain of links can end on although nothing drives them.
-     * @param name         The name to start from.
-     * @return The name of the signal's source, or null if it has none -- including if the links
-     *         lead round in a loop.
+     * @param portParents The parent each port found for the net on its other side, by name.
+     * @param undriven    Parents that nothing drives.
+     * @param name        The net's name.
+     * @return The name of the resolved parent, or null if nothing drives it -- including if the
+     *         parents lead round in a loop.
      */
-    private static String findSource(Map<String, String> towardSource, Set<String> undriven,
+    private static String resolveParent(Map<String, String> portParents, Set<String> undriven,
             String name) {
         Set<String> visited = new HashSet<>();
-        for (String next = towardSource.get(name); next != null; next = towardSource.get(name)) {
+        for (String next = portParents.get(name); next != null; next = portParents.get(name)) {
             if (!visited.add(name)) return null;
             name = next;
         }
