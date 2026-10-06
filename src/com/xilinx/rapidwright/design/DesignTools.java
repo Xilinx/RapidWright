@@ -1118,7 +1118,7 @@ public class DesignTools {
             Net vccCell = cell.getVccNet();
             Net gndCell = cell.getGndNet();
             for (SiteInst si : cell.getSiteInsts()) {
-                for (Cell c : new ArrayList<Cell>(si.getCells())) {
+                for (Cell c : new ArrayList<>(si.getCells())) {
                     c.updateName(hierarchicalCellName + "/" + c.getName());
                     if (!c.isRoutethru())
                         design.addCell(c);
@@ -1200,8 +1200,8 @@ public class DesignTools {
                 if (net.getName().equals(Net.USED_NET)) continue;
                 if (net.isStaticNet()) {
                     Net staticNet = design.getStaticNet(net.getType());
-                    staticNet.addPins((ArrayList<SitePinInst>)net.getPins());
-                    HashSet<PIP> uniquePIPs = new HashSet<PIP>(net.getPIPs());
+                    staticNet.addPins(net.getPins());
+                    HashSet<PIP> uniquePIPs = new HashSet<>(net.getPIPs());
                     uniquePIPs.addAll(staticNet.getPIPs());
                     staticNet.setPIPs(uniquePIPs);
                     modifiedNets.add(staticNet);
@@ -1222,16 +1222,24 @@ public class DesignTools {
         }
 
         // Each net on a port is merged onto its parent's physical net, resolved through any black
-        // box ports in between; one whose parent nothing drives is left where it is. The nets are
-        // dealt with in any order, since each is merged straight onto its resolved parent
-        Set<String> mergedOnto = new HashSet<>();
-        for (String name : portParents.keySet()) {
+        // box ports in between; one whose parent nothing drives is left where it is. With the
+        // boundary routing discarded, every net on these signals -- parent or not -- is unrouted
+        // as soon as it is reached, before anything is merged onto it or it onto anything, so that
+        // no routing is left to carry across. The design's GND or VCC net is the exception: it is
+        // unrouted, in its entirety, only when something is merged onto it, a port merely tied to
+        // a constant not being reason enough
+        for (String name : portNames) {
             String parent = resolveParent(portParents, undriven, name);
-            if (parent == null) continue;
             Net net = design.getNet(name);
+            Net target = parent != null ? design.getNet(parent) : null;
             // A net with no physical presence has nothing to move, and is left alone
-            if (net == null || !hasPhysicalPresence(net)) continue;
-            Net target = design.getNet(parent);
+            boolean toMerge = parent != null && !parent.equals(name) && net != null
+                    && hasPhysicalPresence(net);
+            if (!keepBoundaryRouting) {
+                unrouteSignalNet(net, modifiedNets);
+                unrouteSignalNet(target, modifiedNets);
+            }
+            if (!toMerge) continue;
             if (target == null) {
                 // The parent has no physical net yet, so this one becomes it
                 modifiedNets.remove(net);
@@ -1239,29 +1247,27 @@ public class DesignTools {
                 modifiedNets.add(net);
                 continue;
             }
-            mergeOntoNet(design, net, target, keepBoundaryRouting, modifiedNets);
-            mergedOnto.add(parent);
+            if (!keepBoundaryRouting && target.isStaticNet()) {
+                target.unroute();
+            }
+            mergeOntoNet(design, net, target, modifiedNets);
             modifiedNets.add(target);
         }
-
-        // With the boundary routing discarded, the net each port's signal ends up on is unrouted
-        // -- or, for a signal nothing drives, each of its nets. The exception is the design's GND
-        // or VCC net, which is unrouted, in its entirety, only if something was merged onto it: a
-        // port merely tied to a constant is not reason enough
-        if (!keepBoundaryRouting) {
-            Set<Net> unrouted = Collections.newSetFromMap(new IdentityHashMap<>());
-            for (String name : portNames) {
-                String parent = resolveParent(portParents, undriven, name);
-                Net net = design.getNet(parent != null ? parent : name);
-                if (net == null || !hasPhysicalPresence(net)) continue;
-                if (net.isStaticNet() && !mergedOnto.contains(parent)) continue;
-                if (unrouted.add(net)) {
-                    net.unroute();
-                    modifiedNets.add(net);
-                }
-            }
-        }
         return modifiedNets;
+    }
+
+    /**
+     * Unroutes a net on a signal crossing a black box port, unless it is the design's GND or VCC
+     * net or has nothing on it. A net reached through several ports is unrouted each time, which
+     * costs no more than walking its pins again.
+     *
+     * @param net          The net, or null.
+     * @param modifiedNets Updated in place: the net is added if it is unrouted.
+     */
+    private static void unrouteSignalNet(Net net, Set<Net> modifiedNets) {
+        if (net == null || net.isStaticNet() || !hasPhysicalPresence(net)) return;
+        net.unroute();
+        modifiedNets.add(net);
     }
 
     /**
@@ -1323,22 +1329,20 @@ public class DesignTools {
 
     /**
      * Merges one physical net onto another on the same signal, deleting it. The merge itself only
-     * moves pins and site routing, so the net's PIPs are moved across here if they are to be kept.
+     * moves pins and site routing, so the net's PIPs, if it still has any, are moved across here.
+     * Where routing is to be discarded, the caller unroutes the net first, leaving none.
      *
-     * @param design              The current design.
-     * @param net                 The net to merge away.
-     * @param target              The net to merge it onto.
-     * @param keepBoundaryRouting Whether the net's PIPs are to go with it. If not, they are
-     *                            dropped, since the caller then unroutes the target in any case.
-     * @param modifiedNets        Updated in place: the net is taken out, so that the set never
-     *                            names a net the design no longer has.
+     * @param design       The current design.
+     * @param net          The net to merge away.
+     * @param target       The net to merge it onto.
+     * @param modifiedNets Updated in place: the net is taken out, so that the set never names a
+     *                     net the design no longer has.
      */
-    private static void mergeOntoNet(Design design, Net net, Net target,
-            boolean keepBoundaryRouting, Set<Net> modifiedNets) {
+    private static void mergeOntoNet(Design design, Net net, Net target, Set<Net> modifiedNets) {
         modifiedNets.remove(net);
         // Deleting the net leaves its PIPs where they are, so they can be read afterwards
         design.movePinsToNewNetDeleteOldNet(net, target, true);
-        if (keepBoundaryRouting && net.hasPIPs()) {
+        if (net.hasPIPs()) {
             // Handed straight over when there is nothing to add to
             if (target.getPIPs().isEmpty()) {
                 target.setPIPs(net.getPIPs());
