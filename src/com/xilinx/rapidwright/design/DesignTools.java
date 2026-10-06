@@ -1066,7 +1066,8 @@ public class DesignTools {
                 String from = circuitDrives ? shellName : innerName;
                 String to = circuitDrives ? innerName : shellName;
                 String previous = portParents.put(from, to);
-                if (isStaticNetName(from) || (previous != null && !previous.equals(to))) {
+                if (NetType.getNetTypeFromNetName(from).isStaticNetType()
+                        || (previous != null && !previous.equals(to))) {
                     throw new RuntimeException("ERROR: The signal on black box port '" + e.getKey()
                             + EDIFTools.EDIF_HIER_SEP + portInst.getName() + "' has more than one"
                             + " source.");
@@ -1307,10 +1308,6 @@ public class DesignTools {
             name = next;
         }
         return undriven.contains(name) ? null : name;
-    }
-
-    private static boolean isStaticNetName(String name) {
-        return name.equals(Net.GND_NET) || name.equals(Net.VCC_NET);
     }
 
     private static void renameNet(Net net, String name) {
