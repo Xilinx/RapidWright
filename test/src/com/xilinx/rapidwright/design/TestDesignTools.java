@@ -672,6 +672,111 @@ public class TestDesignTools {
     }
 
     /**
+     * A net that a circuit's pins are merged onto, while it keeps its own routing, gains pins and
+     * not one PIP. Only a change to a net's routing marks it, so nothing records that the net
+     * changed -- yet an incremental bitstream has to route those new pins, and has no other way to
+     * learn of them. The design clock is the extreme case: it gains hundreds of pins, and its
+     * thousands of PIPs are untouched.
+     */
+    @Test
+    public void testPopulateBlackBoxMarksNetsThatOnlyGainPins() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+
+        EDIFCellInst bb = createBlackBox(top, "bb", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", bb);
+        Net inNet = design.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+        PIP inPIP = addTestRouting(inNet, 1);
+
+        // The net on the box's output carries a sink and no routing of its own, so merging it onto
+        // the input's net moves a pin across and not one PIP
+        EDIFNet out = top.createNet("out");
+        out.createPortInst("O", bb);
+        Net outNet = design.createNet("out");
+        SitePinInst sinkPin = addSinkLUT(design, top, "sink", "SLICE_X2Y0", out, outNet);
+        Assertions.assertTrue(outNet.getPIPs().isEmpty());
+
+        design.setTrackingChanges(true);
+        design.setCopyingOriginalNetsRouting(true);
+
+        int pinsBefore = inNet.getPins().size();
+
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet wire = circuitTop.createNet("wire");
+        wire.createPortInst(circuitTop.getPort("I"));
+        wire.createPortInst(circuitTop.getPort("O"));
+        circuit.createNet("wire");
+
+        populateBlackBox(design, "bb", circuit, true);
+
+        // The sink moved across, and the input's own routing is all the routing there is
+        Assertions.assertSame(inNet, sinkPin.getNet());
+        Assertions.assertTrue(inNet.getPins().size() > pinsBefore);
+        Assertions.assertEquals(Arrays.asList(inPIP), inNet.getPIPs());
+
+        Assertions.assertTrue(design.getModifiedNets().contains(inNet),
+                "the net gained a pin and no PIP, and is not recorded as modified");
+    }
+
+    /**
+     * A net merged onto another is deleted from the design, but the change tracking keeps it, so
+     * getModifiedNets() ends up holding nets getNets() does not. Whoever walks the modified set --
+     * an incremental bitstream writer, for one -- then reads a net that no longer exists. What it
+     * was routed with belongs in the original state, so that those PIPs are still turned off.
+     */
+    @Test
+    public void testPopulateBlackBoxUntracksMergedAwayNets() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+
+        EDIFCellInst bb = createBlackBox(top, "bb", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", bb);
+        Net inNet = design.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+        addTestRouting(inNet, 1);
+
+        // Routed, so that what it was routed with has somewhere to go once it is deleted
+        EDIFNet out = top.createNet("out");
+        out.createPortInst("O", bb);
+        Net outNet = design.createNet("out");
+        SitePinInst sinkPin = addSinkLUT(design, top, "sink", "SLICE_X2Y0", out, outNet);
+        PIP outPIP = addTestRouting(outNet, 0, sinkPin);
+
+        design.setTrackingChanges(true);
+        design.setCopyingOriginalNetsRouting(true);
+
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet wire = circuitTop.createNet("wire");
+        wire.createPortInst(circuitTop.getPort("I"));
+        wire.createPortInst(circuitTop.getPort("O"));
+        circuit.createNet("wire");
+
+        populateBlackBox(design, "bb", circuit, true);
+
+        // 'out' was merged onto 'in', so the design has stopped holding it
+        Assertions.assertNull(design.getNet("out"));
+
+        Assertions.assertFalse(design.getModifiedNets().contains(outNet),
+                "a net the design no longer holds is still recorded as modified");
+
+        for (Net net : design.getModifiedNets()) {
+            Assertions.assertSame(net, design.getNet(net.getName()),
+                    "modified net is no longer the one the design holds: " + net.getName());
+        }
+
+        // What it was routed with has to be in the original state, or an incremental bitstream
+        // leaves those PIPs turned on with nothing owning them
+        List<PIP> original = design.getOriginalNetRouting().get("out");
+        Assertions.assertNotNull(original, "the deleted net's routing is not in the original state");
+        Assertions.assertTrue(original.contains(outPIP), original.toString());
+    }
+
+    /**
      * Creates a black box instance in the given cell, with a single-bit port for each direction
      * given, named 'I' for an input and 'O' for an output.
      */
