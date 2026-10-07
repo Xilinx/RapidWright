@@ -1528,6 +1528,15 @@ public class EDIFNetlist extends EDIFName {
         physicalVccPins = null;
     }
 
+    /**
+     * Checks whether the parent net map is currently built, without building it. It is built lazily
+     * by {@link #getParentNetMap()} and dropped by {@link #resetParentNetMap()}.
+     * @return True if the parent net map is built, false otherwise.
+     */
+    public boolean isParentNetMapBuilt() {
+        return parentNetMap != null;
+    }
+
     private void generateParentNetMap() {
         long start = 0;
         if (DEBUG) {

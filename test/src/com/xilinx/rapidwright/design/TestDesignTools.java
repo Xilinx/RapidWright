@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -29,6 +29,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -54,6 +55,7 @@ import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
@@ -455,6 +457,730 @@ public class TestDesignTools {
         for (String cellName : allOtherCells) {
             Assertions.assertNotNull(design.getCell(cellName));
         }
+    }
+
+    @Test
+    public void testPopulateBlackBox() {
+        Design design = RapidWrightDCP.loadDCP("hwct.dcp");
+        Design circuit = RapidWrightDCP.loadDCP("hwct_pr1.dcp");
+        String hierCellName = "hw_contract_pr1";
+        EDIFCellInst inst = design.getNetlist().getCellInstFromHierName(hierCellName);
+        Assertions.assertTrue(inst.isBlackBox());
+        Assertions.assertTrue(inst.getCellType().getCellInsts().isEmpty());
+
+        // The name each of the circuit's nets is expected to arrive under, before any merging
+        Set<String> circuitNets = new HashSet<>();
+        for (Net net : circuit.getNets()) {
+            if (net.isStaticNet() || net.isUsedNet()) {
+                continue;
+            }
+            circuitNets.add(hierCellName + EDIFTools.EDIF_HIER_SEP + net.getName());
+        }
+
+        // Each net's pin and PIP counts, so that what the call changed can be told apart afterwards
+        Map<String, String> before = new HashMap<>();
+        for (Net net : design.getNets()) {
+            before.put(net.getName(), net.getPins().size() + "/" + net.getPIPs().size());
+        }
+        Set<Net> modified = populateBlackBox(design, hierCellName, circuit, false);
+
+        Assertions.assertFalse(inst.getCellType().getCellInsts().isEmpty());
+
+        // The wrapper checks that every net reported is still in the design. The other half of the
+        // contract is that nothing changed that went unreported
+        for (Net net : design.getNets()) {
+            if (modified.contains(net)) {
+                continue;
+            }
+            String was = before.get(net.getName());
+            Assertions.assertNotNull(was, net.getName() + " appeared without being reported");
+            Assertions.assertEquals(was, net.getPins().size() + "/" + net.getPIPs().size(),
+                    net.getName() + " changed without being reported");
+        }
+
+        // A net the circuit brought in on one of its inputs is merged onto the shell's net there,
+        // and so loses its prefixed name, while the others keep theirs -- both must happen, or the
+        // two halves of the check above could be passing vacuously
+        int merged = 0;
+        for (String netName : circuitNets) {
+            if (design.getNet(netName) == null) {
+                merged++;
+            }
+        }
+        Assertions.assertTrue(merged > 0, "no boundary crossing was merged");
+        Assertions.assertTrue(merged < circuitNets.size(), "every net was merged away");
+    }
+
+    /**
+     * The bookkeeping populateBlackBox() owes the design beyond the placement and routing itself:
+     * the hierarchy each merged cell and net resolves to, and the record of what changed that an
+     * incremental bitstream is written from. None of it is visible in the design's placement or
+     * routing, and any of it being wrong shows up only at write_bitstream time.
+     */
+    @Test
+    public void testPopulateBlackBoxBookkeeping() {
+        Design design = RapidWrightDCP.loadDCP("hwct.dcp");
+        Design circuit = RapidWrightDCP.loadDCP("hwct_pr1.dcp");
+        String hierCellName = "hw_contract_pr1";
+        String cellPrefix = hierCellName + EDIFTools.EDIF_HIER_SEP;
+
+        // Only a design that is tracking its changes records them, and only one that is also
+        // copying its original site instances snapshots those, so ask for both
+        design.setTrackingChanges(true);
+        design.setCopyingOriginalSiteInsts(true);
+
+        // The site instances the circuit brings, captured before the call moves them across
+        Set<SiteInst> incoming = new HashSet<>(circuit.getSiteInsts());
+        Assertions.assertFalse(incoming.isEmpty());
+
+        // Cell and Net both resolve their place in the hierarchy lazily and keep the answer. Ask
+        // every one of them for it now, while they still belong to the circuit, so that they cross
+        // over holding the circuit's hierarchy rather than nothing at all -- which is the state any
+        // caller that has so much as inspected the circuit hands populateBlackBox, and the only
+        // state in which a cache left behind by the merge can be told apart from an empty one
+        for (SiteInst si : incoming) {
+            for (Cell c : si.getCells()) {
+                c.getEDIFHierCellInst();
+            }
+        }
+        for (Net net : circuit.getNets()) {
+            net.getLogicalHierNet();
+        }
+
+        populateBlackBox(design, hierCellName, circuit, false);
+
+        EDIFNetlist netlist = design.getNetlist();
+
+        // Every merged cell must resolve through the netlist it now lives in. Cell caches this
+        // lazily, so a cell that arrived with the cache already populated would still be holding
+        // the cell instances of the circuit's own netlist
+        int cellsChecked = 0;
+        for (Cell c : design.getCells()) {
+            if (!c.getName().startsWith(cellPrefix)) {
+                continue;
+            }
+            Assertions.assertEquals(netlist.getHierCellInstFromName(c.getName()),
+                    c.getEDIFHierCellInst(), c.getName());
+            cellsChecked++;
+        }
+        Assertions.assertTrue(cellsChecked > 0, "no cell was merged in");
+
+        // ... and the same for every net that kept its prefixed name, which Net also caches lazily
+        int netsChecked = 0;
+        for (Net net : design.getNets()) {
+            if (!net.getName().startsWith(cellPrefix)) {
+                continue;
+            }
+            EDIFHierNet hierNet = net.getLogicalHierNet();
+            Assertions.assertNotNull(hierNet, net.getName());
+            Assertions.assertEquals(netlist.getHierNetFromName(net.getName()), hierNet,
+                    net.getName());
+            // A net the merge brought in is a change to the design, and an incremental write of it
+            // has no other way to know that
+            Assertions.assertTrue(design.getModifiedNets().contains(net), net.getName());
+            netsChecked++;
+        }
+        Assertions.assertTrue(netsChecked > 0, "no net kept its prefixed name");
+
+        // Likewise for the site instances: all of them are new to this design. Each also needs what
+        // its site is changing from, so that everything it holds counts as a difference. The sites
+        // were free -- this pair of checkpoints leaves no static source in the way -- so the
+        // snapshots are blank
+        Map<String, SiteInst> originals = design.getOriginalSiteInsts();
+        for (SiteInst si : incoming) {
+            Assertions.assertTrue(design.getModifiedSiteInsts().contains(si), si.getName());
+            SiteInst original = originals.get(si.getName());
+            Assertions.assertNotNull(original, si.getName());
+            Assertions.assertSame(si.getSite(), original.getSite());
+            Assertions.assertTrue(original.getCells().isEmpty(), si.getName());
+        }
+    }
+
+    /**
+     * A black box may evict a static source from a site it wants, and populateBlackBox() installs
+     * the circuit's own site instance there in its place. The evicted one is then gone from the
+     * design, but taking its pins marks it in the change tracking on the way out, so it would be
+     * left in getModifiedSiteInsts() alongside the live site instance that replaced it, were
+     * populateBlackBox() not to untrack it.
+     *
+     * Two entries for one site mean two writers of that site's configuration bits, and which of
+     * them lands last depends on the iteration order of the modified set. That order changes as the
+     * set grows and rehashes, so the bitstream a design produces can turn on how many unrelated
+     * sites happen to be marked -- which is how this was found: one bit in one slice flipped when
+     * the modified set crossed 6144 entries.
+     */
+    @Test
+    public void testPopulateBlackBoxUntracksEvictedSiteInsts() {
+        Design design = RapidWrightDCP.loadDCP("hwct.dcp");
+        Design circuit = RapidWrightDCP.loadDCP("hwct_pr1.dcp");
+        String hierCellName = "hw_contract_pr1";
+
+        // Stand a static source on a site the circuit is about to take, as a static router leaves
+        // one on a site it found free. This pair of checkpoints does not collide on its own, so
+        // the one case populateBlackBox() is allowed to evict has to be set up here
+        Site contested = null;
+        for (SiteInst incoming : circuit.getSiteInsts()) {
+            if (design.getSiteInstFromSite(incoming.getSite()) == null) {
+                contested = incoming.getSite();
+                break;
+            }
+        }
+        Assertions.assertNotNull(contested);
+
+        design.setTrackingChanges(true);
+        design.setCopyingOriginalSiteInsts(true);
+
+        SiteInst evicted = design.createSiteInst(
+                SiteInst.STATIC_SOURCE + "_" + contested.getName(),
+                contested.getSiteTypeEnum(), contested);
+        Assertions.assertSame(evicted, design.getSiteInstFromSite(contested));
+
+        // A static source drives GND out of the site, and taking that pin away is what marks it in
+        // the change tracking again, as it goes
+        String outPin = null;
+        for (int i = 0; i < contested.getSitePinCount() && outPin == null; i++) {
+            if (contested.isOutputPin(i)) {
+                outPin = contested.getPinName(i);
+            }
+        }
+        Assertions.assertNotNull(outPin);
+        design.getGndNet().createPin(outPin, evicted);
+
+        // Creating it under tracking is what puts it in the modified set in the first place
+        Assertions.assertTrue(design.getModifiedSiteInsts().contains(evicted));
+
+        populateBlackBox(design, hierCellName, circuit, false);
+
+        // It has left the design, and nothing the design has stopped holding may still be tracked
+        // as modified, nor its original kept
+        Assertions.assertNotSame(evicted, design.getSiteInstFromSite(contested));
+        Set<SiteInst> live = new HashSet<>(design.getSiteInsts());
+        for (SiteInst si : design.getModifiedSiteInsts()) {
+            Assertions.assertTrue(live.contains(si),
+                    "modified site instance is no longer in the design: " + si.getName());
+        }
+        Assertions.assertFalse(design.getModifiedSiteInsts().contains(evicted));
+        Assertions.assertNull(design.getOriginalSiteInsts().get(evicted.getName()));
+
+        // The invariant that actually matters to whoever walks the modified set: one entry per site
+        Map<Site, SiteInst> bySite = new HashMap<>();
+        for (SiteInst si : design.getModifiedSiteInsts()) {
+            SiteInst clash = bySite.put(si.getSite(), si);
+            Assertions.assertNull(clash, "two modified site instances on " + si.getSiteName()
+                    + ": " + si.getName() + " and " + (clash == null ? "" : clash.getName()));
+        }
+    }
+
+    /**
+     * Creates a black box instance in the given cell, with a single-bit port for each direction
+     * given, named 'I' for an input and 'O' for an output.
+     */
+    private static EDIFCellInst createBlackBox(EDIFCell parent, String name,
+            EDIFDirection... directions) {
+        EDIFCell type = new EDIFCell(parent.getLibrary(), name + "Type");
+        for (EDIFDirection direction : directions) {
+            type.createPort(direction == EDIFDirection.INPUT ? "I" : "O", direction, 1);
+        }
+        EDIFCellInst inst = type.createCellInst(name, parent);
+        inst.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+        return inst;
+    }
+
+    /**
+     * Creates a circuit to fill a black box with: an empty design whose top cell has its ports
+     * named as {@link #createBlackBox} names them.
+     */
+    private static Design createCircuit(String name, EDIFDirection... directions) {
+        Design circuit = new Design(name, "xcvu3p");
+        EDIFCell top = circuit.getTopEDIFCell();
+        for (EDIFDirection direction : directions) {
+            top.createPort(direction == EDIFDirection.INPUT ? "I" : "O", direction, 1);
+        }
+        return circuit;
+    }
+
+    /**
+     * Places a LUT in the given cell that drives a net, logically and, if a physical net is given,
+     * physically.
+     */
+    private static void addSourceLUT(Design design, EDIFCell parent, String name, String site,
+            EDIFNet logical, Net physical) {
+        Cell lut = design.createAndPlaceCell(parent, name, Unisim.LUT1, site + "/A6LUT");
+        logical.createPortInst("O", lut.getEDIFCellInst());
+        if (physical != null) {
+            physical.createPin("A_O", lut.getSiteInst());
+        }
+    }
+
+    /**
+     * Places a LUT in the given cell that reads a net, logically and physically.
+     *
+     * @return The LUT's input pin on the physical net.
+     */
+    private static SitePinInst addSinkLUT(Design design, EDIFCell parent, String name, String site,
+            EDIFNet logical, Net physical) {
+        Cell lut = design.createAndPlaceCell(parent, name, Unisim.LUT1, site + "/A6LUT");
+        logical.createPortInst("I0", lut.getEDIFCellInst());
+        return physical.createPin("A1", lut.getSiteInst());
+    }
+
+    /**
+     * Routes a net as far as a test needs: gives it a PIP -- any will do, so long as different
+     * indices give different ones -- and marks the given sink pins routed.
+     *
+     * @return The PIP.
+     */
+    private static PIP addTestRouting(Net net, int index, SitePinInst... sinks) {
+        PIP pip = net.getDesign().getDevice().getTile("INT_X0Y0").getPIPs().get(index);
+        net.addPIP(pip);
+        for (SitePinInst sink : sinks) {
+            sink.setRouted(true);
+        }
+        return pip;
+    }
+
+    /**
+     * Calls populateBlackBox(), then asserts what holds for every call: that it left the design's
+     * parent net map unbuilt, since it drops the map once it has changed the netlist and must not
+     * build it again; that every net it reports is one the design still holds, since a merge
+     * deletes the net it merges away, and a deleted net must not be named in the result; and that
+     * every net it reports is named after its source, so is its own parent net, but for one on a
+     * signal that nothing drives, which has none.
+     */
+    private static Set<Net> populateBlackBox(Design design, Map<String, Design> blackBoxes,
+            boolean keepBoundaryRouting) {
+        Set<Net> modified = DesignTools.populateBlackBox(design, blackBoxes, keepBoundaryRouting);
+        EDIFNetlist netlist = design.getNetlist();
+        Assertions.assertFalse(netlist.isParentNetMapBuilt());
+        // Checked only now, since asking for a parent builds the map
+        for (Net net : modified) {
+            Assertions.assertSame(net, design.getNet(net.getName()), net.getName());
+            if (net.isStaticNet()) continue;
+            EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
+            Assertions.assertNotNull(hierNet, net.getName());
+            EDIFHierNet parent = netlist.getParentNet(hierNet);
+            Assertions.assertTrue(parent == null || parent.equals(hierNet),
+                    net.getName() + " is an alias of " + parent);
+        }
+        return modified;
+    }
+
+    private static Set<Net> populateBlackBox(Design design, String hierarchicalCellName,
+            Design cell, boolean keepBoundaryRouting) {
+        return populateBlackBox(design, Collections.singletonMap(hierarchicalCellName, cell),
+                keepBoundaryRouting);
+    }
+
+    /**
+     * Asserts the name of the net that owns a logical net.
+     */
+    private static void assertParentNet(EDIFNetlist netlist, String net, String parent) {
+        Assertions.assertEquals(parent,
+                netlist.getParentNet(netlist.getHierNetFromName(net)).getHierarchicalNetName());
+    }
+
+    /**
+     * Asserts that a net's routing was kept -- it holds exactly the given PIPs, in the order a
+     * merge leaves them, and any sink pins given are still marked routed -- or else discarded,
+     * leaving neither.
+     */
+    private static void assertRouting(boolean kept, Net net, List<PIP> pips,
+            SitePinInst... sinks) {
+        Assertions.assertEquals(kept ? pips : Collections.emptyList(), net.getPIPs());
+        for (SitePinInst sink : sinks) {
+            Assertions.assertEquals(kept, sink.isRouted());
+        }
+    }
+
+    private static void assertRouting(boolean kept, Net net, PIP pip, SitePinInst... sinks) {
+        assertRouting(kept, net, Collections.singletonList(pip), sinks);
+    }
+
+    /**
+     * A circuit that connects an input straight through to an output makes the shell's net on
+     * that output an alias of the one on that input. Both sit outside the black box, so they are
+     * not told apart by which side of the boundary they are on, but they must still be merged:
+     * otherwise the output's sinks are left on a net with no source.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testPopulateBlackBoxPassThrough(boolean keepBoundaryRouting) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+
+        EDIFCellInst bb = createBlackBox(top, "bb", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", bb);
+        Net inNet = design.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+        PIP inPIP = addTestRouting(inNet, 1);
+        EDIFNet out = top.createNet("out");
+        out.createPortInst("O", bb);
+        Net outNet = design.createNet("out");
+        SitePinInst sinkPin = addSinkLUT(design, top, "sink", "SLICE_X2Y0", out, outNet);
+        PIP outPIP = addTestRouting(outNet, 0, sinkPin);
+
+        // Each net is already named after its source -- the black box output, in the case of 'out'
+        assertParentNet(netlist, "in", "in");
+        assertParentNet(netlist, "out", "out");
+
+        // The circuit: nothing but a wire from I to O
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet wire = circuitTop.createNet("wire");
+        wire.createPortInst(circuitTop.getPort("I"));
+        wire.createPortInst(circuitTop.getPort("O"));
+        // ... held as a physical net with nothing on it
+        circuit.createNet("wire");
+
+        Set<Net> modified = populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
+
+        // That empty net, with nothing to move, is not left behind as an alias of 'in'
+        Assertions.assertNull(design.getNet("bb/wire"));
+
+        // The output's sinks move onto the input's net. If the routing is kept, the output's goes
+        // with them, joining the input's own; if not, neither is left
+        assertParentNet(netlist, "out", "in");
+        Assertions.assertSame(inNet, sinkPin.getNet());
+        Assertions.assertNull(design.getNet("out"));
+        assertRouting(keepBoundaryRouting, inNet, Arrays.asList(inPIP, outPIP), sinkPin);
+        Assertions.assertTrue(modified.contains(inNet));
+    }
+
+    /**
+     * An unused input has no physical net in the circuit, but its shell routing must still respect
+     * keepBoundaryRouting. The physical owner can be above the box's enclosing cell. An input
+     * merely tied to a constant, on the other hand, must leave the design's GND or VCC net alone,
+     * whatever its logical name.
+     */
+    @ParameterizedTest
+    @CsvSource({
+        "false, false, WIRE",
+        "true, false, WIRE",
+        "false, true, WIRE",
+        "true, true, WIRE",
+        "false, false, GND",
+        "true, false, GND",
+        "false, true, GND",
+        "true, true, GND",
+        "false, false, VCC",
+        "true, false, VCC",
+        "false, true, VCC",
+        "true, true, VCC"
+    })
+    public void testPopulateBlackBoxUnusedInput(boolean keepBoundaryRouting, boolean nested,
+            NetType type) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet owner;
+        Net physical;
+        if (type == NetType.WIRE) {
+            owner = top.createNet("inputOwner");
+            physical = design.createNet("inputOwner");
+            addSourceLUT(design, top, "src", "SLICE_X0Y0", owner, physical);
+        } else {
+            owner = EDIFTools.getStaticNet(type, top, netlist, "inputOwner");
+            physical = design.getStaticNet(type);
+        }
+        SitePinInst sinkPin = addSinkLUT(design, top, "sink", "SLICE_X2Y0", owner, physical);
+        PIP pip = addTestRouting(physical, 0, sinkPin);
+        Net unrelated = design.createNet("unrelated");
+        PIP unrelatedPIP = addTestRouting(unrelated, 1);
+
+        EDIFCell parent = top;
+        EDIFNet connection = owner;
+        String boxName = "bb";
+        if (nested) {
+            parent = new EDIFCell(netlist.getWorkLibrary(), "outerType");
+            parent.createPort("I", EDIFDirection.INPUT, 1);
+            EDIFCellInst outer = parent.createCellInst("outer", top);
+            owner.createPortInst("I", outer);
+            connection = parent.createNet("inputAlias");
+            connection.createPortInst(parent.getPort("I"));
+            boxName = "outer/bb";
+        }
+        EDIFCellInst box = createBlackBox(parent, "bb", EDIFDirection.INPUT);
+        connection.createPortInst("I", box);
+
+        if (nested) {
+            // The box's input reaches its owner only through the enclosing cell's port
+            EDIFHierCellInst parentInst = netlist.getHierCellInstFromName(boxName).getParent();
+            Assertions.assertEquals(owner,
+                    netlist.getParentNet(new EDIFHierNet(parentInst, connection)).getNet());
+        }
+
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT);
+        Set<Net> modified = populateBlackBox(design, boxName, circuit, keepBoundaryRouting);
+
+        boolean discarded = !keepBoundaryRouting && type == NetType.WIRE;
+        assertRouting(!discarded, physical, pip, sinkPin);
+        // Only a signal net is checked for being reported, the design's static nets being liable to
+        // be reported for other reasons
+        if (type == NetType.WIRE) {
+            Assertions.assertEquals(discarded, modified.contains(physical));
+        }
+        assertRouting(true, unrelated, unrelatedPIP);
+        Assertions.assertFalse(modified.contains(unrelated));
+    }
+
+    /**
+     * An output the circuit does not drive brings in no physical net to merge, but its shell
+     * routing must still respect keepBoundaryRouting. A circuit that is nothing but ports is still
+     * a leaf to the parent net map, so the net owns itself; one with contents leaves the net with
+     * no owner at all. Both must be handled.
+     */
+    @ParameterizedTest
+    @CsvSource({
+        "false, false",
+        "true, false",
+        "false, true",
+        "true, true"
+    })
+    public void testPopulateBlackBoxUndrivenOutput(boolean keepBoundaryRouting,
+            boolean hasContents) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+
+        EDIFNet out = top.createNet("out");
+        out.createPortInst("O", createBlackBox(top, "bb", EDIFDirection.OUTPUT));
+        Net outNet = design.createNet("out");
+        SitePinInst sinkPin = addSinkLUT(design, top, "sink", "SLICE_X2Y0", out, outNet);
+        PIP pip = addTestRouting(outNet, 0, sinkPin);
+
+        Design circuit = createCircuit("circuit", EDIFDirection.OUTPUT);
+        if (hasContents) {
+            circuit.getTopEDIFCell().createNet("unconnected");
+        }
+        Set<Net> modified = populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
+
+        if (hasContents) {
+            Assertions.assertNull(netlist.getParentNet(netlist.getHierNetFromName("out")));
+        } else {
+            assertParentNet(netlist, "out", "out");
+        }
+        Assertions.assertSame(outNet, design.getNet("out"));
+        assertRouting(keepBoundaryRouting, outNet, pip, sinkPin);
+        Assertions.assertEquals(!keepBoundaryRouting, modified.contains(outNet));
+    }
+
+    /**
+     * A black box input driven from another black box in the same batch has its owner inside that
+     * other box, whose physical nets may not have been inserted yet when this box's ports are seen.
+     * Whichever order the boxes are filled in, the shell's net between them must end up merged onto
+     * that owner, and its routing kept or discarded as asked.
+     */
+    @ParameterizedTest
+    @CsvSource({
+        "false, false",
+        "true, false",
+        "false, true",
+        "true, true"
+    })
+    public void testPopulateBlackBoxBatchOwnerInOtherBox(boolean keepBoundaryRouting,
+            boolean drivenFirst) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+
+        // Box 'a' drives box 'b', whose input is unused, and a sink outside both
+        EDIFNet ab = top.createNet("ab");
+        ab.createPortInst("O", createBlackBox(top, "a", EDIFDirection.OUTPUT));
+        ab.createPortInst("I", createBlackBox(top, "b", EDIFDirection.INPUT));
+        Net abNet = design.createNet("ab");
+        SitePinInst sinkPin = addSinkLUT(design, top, "sink", "SLICE_X2Y0", ab, abNet);
+        PIP abPIP = addTestRouting(abNet, 0, sinkPin);
+
+        // The circuit for 'a': a LUT driving O
+        Design circuitA = createCircuit("a", EDIFDirection.OUTPUT);
+        EDIFCell aTop = circuitA.getTopEDIFCell();
+        EDIFNet o = aTop.createNet("o");
+        o.createPortInst(aTop.getPort("O"));
+        Net oNet = circuitA.createNet("o");
+        addSourceLUT(circuitA, aTop, "lut", "SLICE_X0Y0", o, oNet);
+        PIP oPIP = addTestRouting(oNet, 1);
+
+        // The circuit for 'b': an input it does not use
+        Design circuitB = createCircuit("b", EDIFDirection.INPUT);
+
+        Map<String, Design> blackBoxes = new LinkedHashMap<>();
+        if (drivenFirst) {
+            blackBoxes.put("b", circuitB);
+            blackBoxes.put("a", circuitA);
+        } else {
+            blackBoxes.put("a", circuitA);
+            blackBoxes.put("b", circuitB);
+        }
+        Set<Net> modified = populateBlackBox(design, blackBoxes, keepBoundaryRouting);
+
+        // The shell's net is merged onto the circuit's. If the routing is kept, the shell's goes
+        // with it, joining the circuit's own; if not, neither is left
+        assertParentNet(netlist, "ab", "a/o");
+        Assertions.assertNull(design.getNet("ab"));
+        Assertions.assertSame(oNet, sinkPin.getNet());
+        assertRouting(keepBoundaryRouting, oNet, Arrays.asList(oPIP, abPIP), sinkPin);
+        Assertions.assertTrue(modified.contains(oNet));
+    }
+
+    /**
+     * A circuit may hold the physical net on one of its ports under an alias deeper in its own
+     * hierarchy, rather than under the port's net. populateBlackBox() requires its inputs to have
+     * been made consistent, which renames such a net after its source; once that is done, the net
+     * must be merged onto the shell's net on the port. An alias inside the circuit that never
+     * reaches a port, on the other hand, must be left with its pins and routing.
+     * <pre>
+     *  shell             | bb (the circuit)       | bb/child
+     *  ------------------+------------------------+----------------------------------------
+     *  src.O             |                        |
+     *    [shellInput] ---+-> I -- (in) -----------+-> I -- [inputAlias] ----> lut.I0
+     *                    |                        |
+     *                    | internalSrc.O          |
+     *                    |   -- (internal) -------+-> J -- [internalAlias] -> internalSnk.I0
+     *
+     *  [net] is held as a physical net, (net) is logical only. Making the circuit consistent
+     *  renames [inputAlias] and [internalAlias] after (in) and (internal); the first must then end
+     *  up merged onto [shellInput], and the second keep its pins and routing.
+     * </pre>
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testPopulateBlackBoxPortNetNamedInChild(boolean keepBoundaryRouting) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+
+        // The shell: a LUT driving the black box's input on 'shellInput'
+        EDIFNet shellInput = top.createNet("shellInput");
+        shellInput.createPortInst("I", createBlackBox(top, "bb", EDIFDirection.INPUT));
+        Net shellNet = design.createNet("shellInput");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", shellInput, shellNet);
+
+        // The circuit: its input I reaches a LUT inside 'child' through child.I, as
+        // child/inputAlias. Separately, a LUT at its top level drives one inside 'child' through
+        // child.J, as child/internalAlias, which never goes near a port of the circuit
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT);
+        EDIFNetlist circuitNetlist = circuit.getNetlist();
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFCell childType = new EDIFCell(circuitNetlist.getWorkLibrary(), "childType");
+        childType.createPort("I", EDIFDirection.INPUT, 1);
+        childType.createPort("J", EDIFDirection.INPUT, 1);
+        EDIFCellInst child = childType.createCellInst("child", circuitTop);
+
+        EDIFNet in = circuitTop.createNet("in");
+        in.createPortInst(circuitTop.getPort("I"));
+        in.createPortInst("I", child);
+        EDIFNet inputAlias = childType.createNet("inputAlias");
+        inputAlias.createPortInst(childType.getPort("I"));
+
+        EDIFNet internal = circuitTop.createNet("internal");
+        internal.createPortInst("J", child);
+        addSourceLUT(circuit, circuitTop, "internalSrc", "SLICE_X4Y0", internal, null);
+        EDIFNet internalAlias = childType.createNet("internalAlias");
+        internalAlias.createPortInst(childType.getPort("J"));
+
+        // Each sink's physical net is named after the alias inside 'child', not after its source
+        Net inputAliasNet = circuit.createNet("child/inputAlias");
+        SitePinInst sinkPin = addSinkLUT(circuit, childType, "child/lut", "SLICE_X2Y0", inputAlias,
+                inputAliasNet);
+        PIP inputAliasPIP = addTestRouting(inputAliasNet, 1, sinkPin);
+        Net internalAliasNet = circuit.createNet("child/internalAlias");
+        SitePinInst internalSinkPin = addSinkLUT(circuit, childType, "child/internalSnk",
+                "SLICE_X6Y0", internalAlias, internalAliasNet);
+        PIP internalPIP = addTestRouting(internalAliasNet, 0, internalSinkPin);
+        assertParentNet(circuitNetlist, "child/inputAlias", "in");
+
+        // As populateBlackBox() requires
+        DesignTools.makePhysNetNamesConsistent(circuit);
+        Assertions.assertEquals("in", inputAliasNet.getName());
+        Assertions.assertEquals("internal", internalAliasNet.getName());
+
+        Set<Net> modified = populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
+
+        // The net on the port is merged onto the shell's net, along with its routing if kept
+        assertParentNet(netlist, "bb/child/inputAlias", "shellInput");
+        Assertions.assertSame(shellNet, sinkPin.getNet());
+        Assertions.assertNull(design.getNet("bb/in"));
+        assertRouting(keepBoundaryRouting, shellNet, inputAliasPIP, sinkPin);
+        Assertions.assertTrue(modified.contains(shellNet));
+
+        // The net that never reaches a port keeps its pins and routing
+        Assertions.assertSame(internalAliasNet, design.getNet("bb/internal"));
+        Assertions.assertEquals(Collections.singletonList(internalSinkPin),
+                internalAliasNet.getPins());
+        assertRouting(true, internalAliasNet, internalPIP, internalSinkPin);
+    }
+
+    /**
+     * A shell that feeds a black box output straight back into one of its inputs makes the
+     * circuit's net on that input an alias of the one on that output. Both are inside the black
+     * box, but they must still be merged: otherwise the input's sinks are left on a net with no
+     * source.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testPopulateBlackBoxFeedback(boolean keepBoundaryRouting) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+
+        EDIFCellInst bb = createBlackBox(top, "bb", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
+        EDIFNet loop = top.createNet("loop");
+        loop.createPortInst("O", bb);
+        loop.createPortInst("I", bb);
+
+        // The shell's net on the loop, holding a stretch of routing so that it is worth merging
+        // whether or not that routing is kept
+        Net loopNet = design.createNet("loop");
+        PIP loopPIP = addTestRouting(loopNet, 0);
+
+        // The circuit: one LUT driving O, and another reading I
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet o = circuitTop.createNet("o");
+        o.createPortInst(circuitTop.getPort("O"));
+        Net oNet = circuit.createNet("o");
+        addSourceLUT(circuit, circuitTop, "src", "SLICE_X0Y0", o, oNet);
+        EDIFNet i = circuitTop.createNet("i");
+        i.createPortInst(circuitTop.getPort("I"));
+        Net iNet = circuit.createNet("i");
+        SitePinInst sinkPin = addSinkLUT(circuit, circuitTop, "sink", "SLICE_X2Y0", i, iNet);
+
+        Set<Net> modified = populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
+
+        assertParentNet(netlist, "bb/i", "bb/o");
+        Assertions.assertSame(oNet, sinkPin.getNet());
+        Assertions.assertNull(design.getNet("bb/i"));
+
+        // The shell's net is merged onto the same owner, taking its routing only if that is kept
+        assertParentNet(netlist, "loop", "bb/o");
+        Assertions.assertNull(design.getNet("loop"));
+        assertRouting(keepBoundaryRouting, oNet, loopPIP);
+
+        Assertions.assertTrue(modified.contains(oNet));
+    }
+
+    /**
+     * In a netlist that is not uniquified, two hierarchical names can lead to the same black box
+     * instance, which cannot be filled with two different circuits.
+     */
+    @Test
+    public void testPopulateBlackBoxSameInstanceTwice() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell parentType = new EDIFCell(netlist.getWorkLibrary(), "parentType");
+        createBlackBox(parentType, "bb", EDIFDirection.INPUT);
+        parentType.createCellInst("u0", design.getTopEDIFCell());
+        parentType.createCellInst("u1", design.getTopEDIFCell());
+
+        Map<String, Design> blackBoxes = new LinkedHashMap<>();
+        blackBoxes.put("u0/bb", createCircuit("c0", EDIFDirection.INPUT));
+        blackBoxes.put("u1/bb", createCircuit("c1", EDIFDirection.INPUT));
+        RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                () -> DesignTools.populateBlackBox(design, blackBoxes, false));
+        Assertions.assertEquals("ERROR: Black boxes 'u0/bb' and 'u1/bb' are the same cell"
+                + " instance.", e.getMessage());
     }
 
     @ParameterizedTest
