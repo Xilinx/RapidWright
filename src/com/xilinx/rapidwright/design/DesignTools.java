@@ -1110,7 +1110,6 @@ public class DesignTools {
         // in one batch once every site instance of every box is in. Trimming them per box instead
         // would, from the second box on, compute against static routing an earlier box had merged in
         Map<Net, Set<SitePinInst>> deferredRemovals = new HashMap<>();
-        List<SiteInst> evictedSiteInsts = new ArrayList<>();
 
         // Add placement information
         // We need to prefix all cell and net names with the hierarchicalCellName as a prefix
@@ -1144,15 +1143,12 @@ public class DesignTools {
                     //       of the static source into the cell SiteInst?
                     for (SitePinInst spi : existingSi.getSitePinInsts()) {
                         assert(spi.isOutPin());
-                        Net net = spi.getNet();
-                        assert(net.isStaticNet());
-                        deferredRemovals.computeIfAbsent(net, (p) -> new HashSet<>()).add(spi);
+                        assert(spi.getNet().isStaticNet());
                     }
-
-                    // TEMPORARY WORKAROUND, part 1 of 2: remember what addSiteInst() below is
-                    // about to displace. It cannot be untracked here, because batchRemoveSitePins()
-                    // at the end of this method takes its pins and marks it again
-                    evictedSiteInsts.add(existingSi);
+                    // Its pins are collected into deferredRemovals rather than taken now. Removing
+                    // it hands what the site held originally on to the site instance added below
+                    boolean keepSitePinRouting = false;
+                    design.removeSiteInst(existingSi, keepSitePinRouting, deferredRemovals);
                 }
 
                 design.addSiteInst(si);
@@ -1176,20 +1172,6 @@ public class DesignTools {
         // alone. This has to happen before the routing below merges the circuits' own static pins in
         boolean preserveOtherRoutes = true;
         DesignTools.batchRemoveSitePins(deferredRemovals, preserveOtherRoutes);
-
-        // TEMPORARY WORKAROUND, part 2 of 2. addSiteInst() displaced each of these from the design,
-        // but left it in the change tracking - which marked it again just above, as its pins were
-        // taken. It is then a SiteInst that getModifiedSiteInsts() holds and getSiteInsts() does
-        // not, so whoever walks the modified set - BitGenerator, for one - reads a site the design
-        // no longer owns, alongside the live SiteInst for that same site. Two entries for one site
-        // means two writers of its configuration bits, and which one lands last depends on the
-        // iteration order of the modified set, which changes as the set grows and rehashes.
-        // The proper fix belongs in Design.addSiteInst(), which should treat displacing an
-        // existing SiteInst as a tracked removal, so that no caller has to remember to do this.
-        for (SiteInst evicted : evictedSiteInsts) {
-            design.getModifiedSiteInsts().remove(evicted);
-            design.getOriginalSiteInsts().remove(evicted.getName());
-        }
 
         // Add routing information
         for (Entry<String, Design> e : blackBoxes.entrySet()) {
