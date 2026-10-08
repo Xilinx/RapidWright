@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.util;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.Iterator;
@@ -117,13 +118,7 @@ public class ParallelismTools {
      */
     public static <T> Future<T> submit(Callable<T> task) {
         if (!getParallel()) {
-            try {
-                return CompletableFuture.completedFuture(task.call());
-            } catch (Exception e) {
-                CompletableFuture<T> f = new CompletableFuture<>();
-                f.completeExceptionally(e);
-                return f;
-            }
+            return callNow(task);
         }
         // Submit a FutureTask (rather than a ForkJoinTask) so that runIfUnclaimed()
         // can run it on any thread that has not yet been beaten to it
@@ -138,19 +133,27 @@ public class ParallelismTools {
      * @return A Future object used only to determine task completion.
      */
     public static Future<?> submit(Runnable task) {
-        if (!getParallel()) {
-            try {
-                task.run();
-                return CompletableFuture.completedFuture(null);
-            } catch (Exception e) {
-                CompletableFuture<?> f = new CompletableFuture<>();
-                f.completeExceptionally(e);
-                return f;
-            }
+        return submit(() -> {
+            task.run();
+            return null;
+        });
+    }
+
+    /**
+     * Run a task-with-return-value immediately on the current thread.
+     * @param task Task to be performed.
+     * @param <T> Type returned by task.
+     * @return A completed Future object holding the value returned by task, or the
+     *         exception it threw.
+     */
+    private static <T> CompletableFuture<T> callNow(Callable<T> task) {
+        CompletableFuture<T> f = new CompletableFuture<>();
+        try {
+            f.complete(task.call());
+        } catch (Exception e) {
+            f.completeExceptionally(e);
         }
-        FutureTask<?> future = new FutureTask<>(task, null);
-        pool.execute(future);
-        return future;
+        return f;
     }
 
     /**
@@ -221,13 +224,7 @@ public class ParallelismTools {
             }
         }
 
-        CompletableFuture<T> f = new CompletableFuture<>();
-        try {
-            f.complete(tasks[0].call());
-        } catch (Exception e) {
-            f.completeExceptionally(e);
-        }
-        futures.addFirst(f);
+        futures.addFirst(callNow(tasks[0]));
 
         return futures;
     }
@@ -318,15 +315,47 @@ public class ParallelismTools {
     }
 
     /**
+     * Whether a parallel operation over the given number of items should give each item its
+     * own task, rather than use a parallel stream. A parallel stream divides its items into
+     * roughly four pieces per pool thread, so with fewer items than that each piece is a
+     * single item anyway, and distributing those pieces relies on idle threads stealing them
+     * in time (if one is not stolen before the thread that split it off finishes its own
+     * item, that thread runs it too). Giving each item its own task instead makes all of
+     * them immediately available to any idle pool thread.
+     * @param numItems Number of items.
+     * @return True if each item should be submitted as its own task.
+     */
+    private static boolean oneTaskPerItem(int numItems) {
+        return numItems < 4 * maxParallelism();
+    }
+
+    /**
+     * Create one task per item, applying the given function to that item.
+     * @param items The items.
+     * @param task The function to apply to each item.
+     * @param <T> Item type.
+     * @param <R> Type returned by the function.
+     * @return An array of tasks, in the collection's iteration order.
+     */
+    @SuppressWarnings("unchecked")
+    private static <T,R> Callable<R>[] toCallables(Collection<T> items, Function<T,R> task) {
+        return items.stream()
+                .map(i -> (Callable<R>)() -> task.apply(i))
+                .toArray(value -> (Callable<R>[])new Callable[value]); //Can't create generic arrays, so we need to cast
+    }
+
+    /**
      * Run the specified task on all items, blocking until all have been completed.
-     * When parallel processing is enabled, this uses a parallel stream: the calling thread
-     * splits the items (using the collection's own Spliterator) into roughly four pieces
-     * per thread of the common ForkJoinPool, which are distributed by work stealing, and
-     * the calling thread also participates.
-     * If the task throws for any item, that exception is rethrown (if thrown on another
-     * thread, as a new exception of the same type with the original as its cause, where
-     * possible); in that case, the task may not have been run for other items, or may
-     * still be running.
+     * When parallel processing is enabled: if there are fewer than four items per
+     * {@link #maxParallelism()} thread, each item is submitted as its own task (as
+     * {@link #invokeAll(Callable[])} does); otherwise a parallel stream is used, where the
+     * calling thread splits the items (using the collection's own Spliterator) into roughly
+     * four pieces per thread of the common ForkJoinPool, which are distributed by work
+     * stealing, and the calling thread also participates.
+     * If the task throws for any item, that exception is rethrown (for a parallel stream,
+     * if thrown on another thread, as a new exception of the same type with the original as
+     * its cause, where possible); in that case, the task may not have been run for other
+     * items, or may still be running.
      * @param items the items to call the task with
      * @param task the task that should be executed for all items
      * @param <T> item type
@@ -338,51 +367,30 @@ public class ParallelismTools {
             }
             return;
         }
+        if (oneTaskPerItem(items.size())) {
+            invokeAll(toCallables(items, i -> {
+                task.accept(i);
+                return null;
+            }));
+            return;
+        }
         items.parallelStream().forEach(task);
     }
 
     /**
      * Given a list of tasks-without-return-value, block until all tasks
-     * have been completed.
+     * have been completed. Equivalent to
+     * {@link #invokeAllRunnable(Collection, Consumer)} with each task as an item.
      * @param tasks List of tasks-without-return-value.
      */
     public static void invokeAll(@NotNull Runnable... tasks) {
-        if (tasks.length == 0) {
-            return;
-        }
-        if (!getParallel()) {
-            for (Runnable task : tasks) {
-                task.run();
-            }
-            return;
-        }
-
-        List<Future<?>> futures = new ArrayList<>(tasks.length);
-
-        // Submit all but the last
-        for (int i = 0; i < tasks.length - 1; i++) {
-            futures.add(submit(tasks[i]));
-        }
-
-        // Invoke the last
-        tasks[tasks.length - 1].run();
-
-        // Now walk backwards and try and steal those not done
-        ListIterator<Future<?>> it = futures.listIterator(futures.size());
-        while (it.hasPrevious()) {
-            runIfUnclaimed(it.previous());
-        }
-
-        // Now block
-        it = futures.listIterator(0);
-        while (it.hasNext()) {
-            getUnwrapped(it.next());
-        }
+        invokeAllRunnable(Arrays.asList(tasks), Runnable::run);
     }
 
     /**
      * Run the specified task on all items, blocking until all have been completed.
-     * When parallel processing is enabled, this uses a parallel stream, as described for
+     * When parallel processing is enabled, each item is either submitted as its own task or
+     * processed using a parallel stream, as described for
      * {@link #invokeAllRunnable(Collection, Consumer)}, including how exceptions are rethrown.
      * @param items the items to call the task with
      * @param task the task that should be executed for all items
@@ -399,12 +407,27 @@ public class ParallelismTools {
             }
             return results;
         }
+        if (oneTaskPerItem(items.size())) {
+            // invokeAll() has already waited for all of these to complete
+            final List<Future<R>> futures = invokeAll(toCallables(items, task));
+            final List<R> results = new ArrayList<>(futures.size());
+            for (Future<R> future : futures) {
+                results.add(getUnwrapped(future));
+            }
+            return results;
+        }
         return items.parallelStream().map(task).collect(Collectors.toList());
     }
 
     /**
      * Given a list of tasks-with-return-value, block until all tasks
-     * have been completed.
+     * have been completed: all but the last are submitted to the thread pool,
+     * the last is executed by the current thread, which then steals any that
+     * have not yet been claimed (see {@link #join(List)}).
+     * If any task threw an exception, the first (in order) is rethrown as
+     * described in {@link #getUnwrapped(Future)}; when parallel processing is
+     * disabled, all tasks are executed in order on the current thread before
+     * this happens.
      * @param tasks List of tasks-with-return-value.
      * @param <T> Type returned by all tasks.
      * @return A list of Future objects used to hold returned data.
@@ -416,43 +439,17 @@ public class ParallelismTools {
             return futures;
         }
 
-        if (!getParallel()) {
-            for (Callable<T> task : tasks) {
-                CompletableFuture<T> f = new CompletableFuture<>();
-                try {
-                    f.complete(task.call());
-                } catch (Exception e) {
-                    f.completeExceptionally(e);
-                }
-                futures.add(f);
-            }
-        } else {
-            // Submit all but the last
-            for (int i = 0; i < tasks.length - 1; i++) {
-                futures.add(submit(tasks[i]));
-            }
-
-            // Invoke the last
-            CompletableFuture<T> f = new CompletableFuture<>();
-            try {
-                f.complete(tasks[tasks.length - 1].call());
-            } catch (Exception e) {
-                f.completeExceptionally(e);
-            }
-            futures.add(f);
-
-            // Now walk backwards and try and steal those not done
-            ListIterator<Future<T>> it = futures.listIterator(futures.size() - 1 /* skip just-inserted */);
-            while (it.hasPrevious()) {
-                runIfUnclaimed(it.previous());
-            }
-
-            // Now block
-            it = futures.listIterator(0);
-            while (it.hasNext()) {
-                getUnwrapped(it.next());
-            }
+        // Submit all but the last (when parallel processing is disabled, submit()
+        // executes each immediately on this thread)
+        for (int i = 0; i < tasks.length - 1; i++) {
+            futures.add(submit(tasks[i]));
         }
+
+        // Invoke the last
+        futures.add(callNow(tasks[tasks.length - 1]));
+
+        // Steal those not yet claimed and wait for the rest
+        join(futures);
 
         return futures;
     }
