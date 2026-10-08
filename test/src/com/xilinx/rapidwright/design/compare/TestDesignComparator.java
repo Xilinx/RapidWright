@@ -34,6 +34,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.support.ChangeTrackingAssertions;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 /**
@@ -171,9 +172,11 @@ public class TestDesignComparator {
         Assertions.assertTrue(net.hasPIPs());
         test2.removeNet(net);
 
-        // Recorded, and recorded rather than unrouted: the PIPs below are still there to copy
-        Assertions.assertTrue(test2.getModifiedNets().contains(net));
+        // Its routing is recorded as original, and recorded rather than unrouted: the PIPs below
+        // are still there to copy. It is not left as modified, since the design no longer holds it
+        Assertions.assertFalse(test2.getModifiedNets().contains(net));
         Assertions.assertEquals(net.getPIPs(), test2.getOriginalNetRouting().get(net.getName()));
+        ChangeTrackingAssertions.assertModifiedNetsAreInDesign(test2);
 
         compareDesign(32, 1, DesignDiffType.NET_MISSING, dc, gold, test2);
 
@@ -182,6 +185,8 @@ public class TestDesignComparator {
             extra.addPIP(p);
         }
         test2.addNet(extra);
+        Assertions.assertTrue(test2.getModifiedNets().contains(extra));
+        ChangeTrackingAssertions.assertModifiedNetsAreInDesign(test2);
 
         compareDesign(33, 1, DesignDiffType.NET_EXTRA, dc, gold, test2);
 
