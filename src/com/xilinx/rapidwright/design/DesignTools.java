@@ -958,10 +958,15 @@ public class DesignTools {
      * <p>
      * Nets are only recorded if tracking is enabled on the design before this is called, with
      * {@link Design#setTrackNetChanges(boolean)} or {@link Design#setTrackingChanges(boolean)}.
-     * Every net this touches is then recorded, and no net outside that record is altered here, so a
-     * caller that needs to operate on the result can start from {@link Design#getModifiedNets()}.
-     * That record is cumulative: it also holds any net recorded by earlier operations, until
-     * emptied with {@link Design#clearTrackedChanges()}.
+     * Every net this touches that the design still holds is then recorded, so a caller that needs
+     * to operate on the result can start from {@link Design#getModifiedNets()}. That record is
+     * cumulative: it also holds any net recorded by earlier operations, until emptied with
+     * {@link Design#clearTrackedChanges()}. A net merged away is removed from the design instead,
+     * so is not in that record; when copying originals, its routing is in
+     * {@link Design#getOriginalNetRouting()}. No other net is altered here. Likewise, a static
+     * source evicted from a site a black box's circuit is placed onto is removed, so is not in
+     * {@link Design#getModifiedSiteInsts()}: the site instance that takes its site is, and changes
+     * from the original recorded for that site in {@link Design#getOriginalSiteInsts()}.
      *
      * @param design              The top level design
      * @param blackBoxes          The 'guts' to be inserted, keyed by the hierarchical name of the
