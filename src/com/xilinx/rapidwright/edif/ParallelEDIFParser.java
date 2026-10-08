@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -152,15 +151,17 @@ public class ParallelEDIFParser implements AutoCloseable{
         numberOfThreads = workers.size();
 
         t.stop().start("Parse First Token");
-        final List<Future<ParallelEDIFParserWorker>> futures = ParallelismTools.invokeAll(workers, w -> !w.parseFirstToken() ? w : null);
-        final List<ParallelEDIFParserWorker> failedWorkers = futures.stream()
-                .map(ParallelismTools::get)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+        // For each worker: the worker itself if it failed, else null
+        final List<ParallelEDIFParserWorker> failedOrNull = ParallelismTools.invokeAll(workers,
+                w -> !w.parseFirstToken() ? w : null);
 
-        if (!failedWorkers.isEmpty() && !Device.QUIET_MESSAGE) {
-            for (ParallelEDIFParserWorker failedWorker : failedWorkers) {
-                if (failedWorker.parseException!=null) {
+        for (ParallelEDIFParserWorker failedWorker : failedOrNull) {
+            if (failedWorker == null) {
+                continue;
+            }
+
+            if (!Device.QUIET_MESSAGE) {
+                if (failedWorker.parseException != null) {
                     String message = failedWorker.parseException.getMessage();
                     if (failedWorker.parseException instanceof TokenTooLongException) {
                         //Message contains a hint to a constant that the user should adjust.
@@ -172,11 +173,10 @@ public class ParallelEDIFParser implements AutoCloseable{
                     System.err.println("Removing "+failedWorker+", it started past the last cell.");
                 }
             }
-        }
-        for (ParallelEDIFParserWorker failedWorker : failedWorkers) {
+
             failedWorker.close();
         }
-        workers.removeAll(failedWorkers);
+        workers.removeAll(failedOrNull);
 
         //Propagate parse limit to neighbours
         for (int i = 1; i < workers.size(); i++) {
