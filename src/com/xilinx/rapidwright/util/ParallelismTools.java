@@ -160,13 +160,13 @@ public class ParallelismTools {
 
     /**
      * Block until the task behind the given Future is complete.
-     * If necessary, steal the task from the job queue for immediate execution
-     * on the current thread.
+     * If the task has not yet been claimed by another thread, steal it for
+     * immediate execution on the current thread.
      * @param future Future representing previously submitted task.
      * @return Value returned by task.
      */
     public static <T> T get(Future<T> future) {
-        trySteal(future);
+        runIfUnclaimed(future);
 
         try {
             return future.get();
@@ -209,10 +209,10 @@ public class ParallelismTools {
     /**
      * For a given Deque of Futures, block until the first is complete and
      * remove it from the deque.
-     * First, try and steal the task from the queue and execute it on this
-     * thread. If this is not possible (indicating another thread may
-     * already be working on it) then use this thread productively by trying
-     * to steal the next task to work on.
+     * First, try and steal the task and execute it on this thread. If this
+     * is not possible (indicating another thread has already claimed it)
+     * then use this thread productively by stealing subsequent unclaimed
+     * tasks to work on until the first is complete.
      * @param futures A Deque of Future objects corresponding to previously
      *                submitted tasks.
      * @param <T> Type returned by all tasks.
@@ -230,13 +230,13 @@ public class ParallelismTools {
                 }
             }
         } else {
-            // Try and remove it from the queue to invoke it, unless already done
-            if (!trySteal(first)) {
+            // Try and invoke it on this thread, unless already done or claimed
+            if (!runIfUnclaimed(first)) {
                 // Not done: another thread must be running it already,
                 // so steal whatever is next until it's done
                 Iterator<Future<T>> it = futures.iterator();
                 while (!first.isDone() && it.hasNext()) {
-                    trySteal(it.next());
+                    runIfUnclaimed(it.next());
                 }
             }
         }
@@ -250,8 +250,8 @@ public class ParallelismTools {
 
     /**
      * For a given List of Futures, block until all are complete.
-     * The list is walked in reverse order and tasks are stolen from the
-     * queue so that they may be completed using the current thread.
+     * The list is walked in reverse order and tasks not yet claimed are
+     * stolen so that they may be completed using the current thread.
      * @param futures A List of Future objects corresponding to previously
      *                submitted tasks.
      * @param <T> Type returned by all tasks.
@@ -261,7 +261,7 @@ public class ParallelismTools {
             // Walk backwards and try and steal those not done
             ListIterator<? extends Future<? extends T>> it = futures.listIterator(futures.size());
             while (it.hasPrevious()) {
-                trySteal(it.previous());
+                runIfUnclaimed(it.previous());
             }
         }
 
@@ -271,15 +271,30 @@ public class ParallelismTools {
         }
     }
 
-    private static <T> boolean trySteal(Future<T> future) {
-        boolean doneOrStolen = future.isDone();
-        if (!doneOrStolen && (future instanceof Runnable)) {
-            doneOrStolen = pool.remove((Runnable) future);
-            if (doneOrStolen) {
-                ((Runnable) future).run();
-            }
+    /**
+     * Run a previously submitted task on the current thread, rather than wait
+     * for a pool worker to get to it, unless it is already done or another
+     * thread has already claimed it.
+     * Callers steal from the back of the pool's FIFO queue (by walking their
+     * futures newest first), the opposite end from where pool workers take tasks,
+     * so as not to contend with them for the same tasks -- just as a ForkJoinPool
+     * thief works the opposite end of a deque from its owner.
+     * The task is run without removing it from the queue: FutureTask.run() does
+     * nothing if another thread has already claimed the task, so the pool worker
+     * that eventually dequeues it finds it already done. Dequeuing such a task is
+     * an overhead, but far less than ThreadPoolExecutor.remove(), which scans the
+     * queue from front to back (blocking pool workers while it does so) and is
+     * thus quadratic over a whole invokeAll().
+     * @param future Future representing a previously submitted task.
+     * @param <T> Type returned by task.
+     * @return True if the task is done (whether run by this thread or another),
+     *         false if it is not (e.g. another thread is still running it).
+     */
+    private static <T> boolean runIfUnclaimed(Future<T> future) {
+        if (!future.isDone() && (future instanceof Runnable)) {
+            ((Runnable) future).run();
         }
-        return doneOrStolen;
+        return future.isDone();
     }
 
     /**
@@ -324,7 +339,7 @@ public class ParallelismTools {
         // Now walk backwards and try and steal those not done
         ListIterator<Future<?>> it = futures.listIterator(futures.size());
         while (it.hasPrevious()) {
-            trySteal(it.previous());
+            runIfUnclaimed(it.previous());
         }
 
         // Now block
@@ -393,7 +408,7 @@ public class ParallelismTools {
             // Now walk backwards and try and steal those not done
             ListIterator<Future<T>> it = futures.listIterator(futures.size() - 1 /* skip just-inserted */);
             while (it.hasPrevious()) {
-                trySteal(it.previous());
+                runIfUnclaimed(it.previous());
             }
 
             // Now block
