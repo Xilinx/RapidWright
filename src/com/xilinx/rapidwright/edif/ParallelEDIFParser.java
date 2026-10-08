@@ -297,6 +297,8 @@ public class ParallelEDIFParser implements AutoCloseable{
                             linkPortInstData.name(uniquifier);
                             linkPortInstData.add();
                         }
+                        // add() appends without sorting; sort once all of this parent cell's port insts are added
+                        ParallelEDIFParserWorker.sortPortInstLists(list);
                     }
                 });
         t.stop().start("Trim PortInst Lists");
