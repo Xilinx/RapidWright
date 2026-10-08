@@ -292,19 +292,6 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
         }
     }
 
-    public void linkSmallPorts(Map<EDIFCell, Collection<LinkPortInstData>> largeCellMap) {
-        for (List<LinkPortInstData> data : linkPortInstData) {
-            for (LinkPortInstData d : data) {
-                final EDIFCell cell = d.mapPortCell();
-                if (cell.getPorts().size() < PORT_LOOKUP_MAP_THRESHOLD) {
-                    d.portInst.setPort(cell.getPortByLegalName(d.portInst.getName(), cache));
-                } else {
-                    largeCellMap.computeIfAbsent(cell, x-> new ConcurrentLinkedQueue<>()).add(d);
-                }
-            }
-        }
-    }
-
 
     public static class CellReferenceData {
         public final Consumer<EDIFCell> cellSetter;
@@ -355,6 +342,21 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
 
         public EDIFCell mapPortCell() {
             return lookupPortCell(parentCell, portInst);
+        }
+
+        /**
+         * Link the port inst to its port if its cell has few ports; otherwise, add it to the given map to be
+         * linked later with {@link #enterPort(EDIFPortCache)}, using a port lookup map for that cell.
+         * @param largeCellMap Port insts to be linked later, by the cell with the port. Must be thread-safe, as
+         *                     port insts may be linked in parallel.
+         */
+        public void linkSmallPort(Map<EDIFCell, Collection<LinkPortInstData>> largeCellMap) {
+            final EDIFCell cell = mapPortCell();
+            if (cell.getPorts().size() < PORT_LOOKUP_MAP_THRESHOLD) {
+                portInst.setPort(cell.getPortByLegalName(portInst.getName(), cache));
+            } else {
+                largeCellMap.computeIfAbsent(cell, x-> new ConcurrentLinkedQueue<>()).add(this);
+            }
         }
 
         public void enterPort(EDIFPortCache edifPortCache) {

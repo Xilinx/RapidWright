@@ -269,11 +269,19 @@ public class ParallelEDIFParser implements AutoCloseable{
         final Map<String, EDIFLibrary> librariesByLegalName = netlist.getLibraries().stream()
                 .collect(Collectors.toMap(cache::getLegalEDIFName, Function.identity()));
         Map<EDIFCell, Collection<ParallelEDIFParserWorker.LinkPortInstData>> byPortCell = new ConcurrentHashMap<>();
+        // Workers (byte ranges) need not take equally long, so each also splits its work with nested
+        // forEach()s, whose pieces can be stolen by threads that have finished their own worker. Each apply()
+        // sets a different cell instance's type, and each port inst is linked independently (byPortCell is
+        // thread-safe), so their order does not matter; the first forEach() returns before the second looks up
+        // those cell instances' types.
         ParallelismTools.forEach(workers, w-> {
-            for (ParallelEDIFParserWorker.CellReferenceData cellReferenceData : w.linkCellReference) {
-                cellReferenceData.apply(librariesByLegalName, cellsByLegalName);
-            }
-            w.linkSmallPorts(byPortCell);
+            ParallelismTools.forEach(w.linkCellReference,
+                    cellReferenceData -> cellReferenceData.apply(librariesByLegalName, cellsByLegalName));
+            ParallelismTools.forEach(w.linkPortInstData, list -> {
+                for (ParallelEDIFParserWorker.LinkPortInstData linkPortInstData : list) {
+                    linkPortInstData.linkSmallPort(byPortCell);
+                }
+            });
         });
 
         t.stop().start("Link Large Port Cells");
@@ -290,17 +298,18 @@ public class ParallelEDIFParser implements AutoCloseable{
         //When adding the port insts, we have to make sure that we don't split a parent cell's port instances
         // between threads.
         //That could lead to ConcurrentModificationExceptions
+        // Each list in linkPortInstData holds all port insts of one parent cell (a cell is parsed by one worker,
+        // in one go), so as above, each worker splits its work with a nested forEach() over these lists, while
+        // each list is still processed sequentially.
         ParallelismTools.forEach(workers,
-                w-> {
-                    for (List<ParallelEDIFParserWorker.LinkPortInstData> list : w.linkPortInstData) {
-                        for (ParallelEDIFParserWorker.LinkPortInstData linkPortInstData : list) {
-                            linkPortInstData.name(uniquifier);
-                            linkPortInstData.add();
-                        }
-                        // add() appends without sorting; sort once all of this parent cell's port insts are added
-                        ParallelEDIFParserWorker.sortPortInstLists(list);
+                w-> ParallelismTools.forEach(w.linkPortInstData, list -> {
+                    for (ParallelEDIFParserWorker.LinkPortInstData linkPortInstData : list) {
+                        linkPortInstData.name(uniquifier);
+                        linkPortInstData.add();
                     }
-                });
+                    // add() appends without sorting; sort once all of this parent cell's port insts are added
+                    ParallelEDIFParserWorker.sortPortInstLists(list);
+                }));
         t.stop().start("Trim PortInst Lists");
         // Port instance lists are built via incremental ArrayList insertion, which
         // leaves unused capacity slack. Trim it now that all insertions are done.
