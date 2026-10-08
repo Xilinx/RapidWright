@@ -157,16 +157,40 @@ public class ParallelismTools {
      * Block until the task behind the given Future is complete.
      * If the task has not yet been claimed by another thread, steal it for
      * immediate execution on the current thread.
+     * If the task threw an exception, it is rethrown as described in
+     * {@link #getUnwrapped(Future)}.
      * @param future Future representing previously submitted task.
      * @param <T> Type returned by task.
      * @return Value returned by task.
      */
     public static <T> T get(Future<T> future) {
         runIfUnclaimed(future);
+        return getUnwrapped(future);
+    }
 
+    /**
+     * Block until the given Future is complete, and return its value.
+     * If its task threw an unchecked exception (or error), that is rethrown as-is
+     * rather than wrapped in an ExecutionException; a checked exception, which
+     * cannot be rethrown as-is, is wrapped in a RuntimeException. If the wait is
+     * interrupted, the InterruptedException is wrapped in a RuntimeException.
+     * @param future Future representing previously submitted task.
+     * @param <T> Type returned by task.
+     * @return Value returned by task.
+     */
+    private static <T> T getUnwrapped(Future<T> future) {
         try {
             return future.get();
-        } catch (InterruptedException | ExecutionException e) {
+        } catch (ExecutionException e) {
+            final Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException) {
+                throw (RuntimeException) cause;
+            }
+            if (cause instanceof Error) {
+                throw (Error) cause;
+            }
+            throw new RuntimeException(cause != null ? cause : e);
+        } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
@@ -239,11 +263,7 @@ public class ParallelismTools {
             }
         }
 
-        try {
-            return first.get();
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
-        }
+        return getUnwrapped(first);
     }
 
     /**
@@ -352,11 +372,7 @@ public class ParallelismTools {
         // Now block
         it = futures.listIterator(0);
         while (it.hasNext()) {
-            try {
-                it.next().get();
-            } catch (InterruptedException | ExecutionException e) {
-                throw new RuntimeException(e);
-            }
+            getUnwrapped(it.next());
         }
     }
 
@@ -432,11 +448,7 @@ public class ParallelismTools {
             // Now block
             it = futures.listIterator(0);
             while (it.hasNext()) {
-                try {
-                    it.next().get();
-                } catch (InterruptedException | ExecutionException e) {
-                    throw new RuntimeException(e);
-                }
+                getUnwrapped(it.next());
             }
         }
 
