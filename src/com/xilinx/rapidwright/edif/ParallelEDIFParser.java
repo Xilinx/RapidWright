@@ -306,7 +306,15 @@ public class ParallelEDIFParser implements AutoCloseable{
         for (EDIFLibrary lib : netlist.getLibraries()) {
             allCells.addAll(lib.getCells());
         }
-        ParallelismTools.invokeAllRunnable(allCells, EDIFCell::trimEDIFPortInstLists);
+        // Batch the cells rather than submitting one task per cell: ParallelismTools.invokeAll()
+        // steals unfinished tasks back with LinkedBlockingQueue.remove(), a linear scan, so one
+        // task per cell is quadratic in the cell count (hours on ~2M cell definitions).
+        final int batchSize = Math.max(1, allCells.size() / 256);
+        List<List<EDIFCell>> batches = new ArrayList<>();
+        for (int i = 0; i < allCells.size(); i += batchSize) {
+            batches.add(allCells.subList(i, Math.min(allCells.size(), i + batchSize)));
+        }
+        ParallelismTools.invokeAllRunnable(batches, b -> b.forEach(EDIFCell::trimEDIFPortInstLists));
         t.stop();
     }
 
