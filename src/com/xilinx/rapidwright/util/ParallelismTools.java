@@ -33,14 +33,10 @@ import java.util.ListIterator;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RunnableFuture;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -58,15 +54,14 @@ import org.jetbrains.annotations.NotNull;
 public class ParallelismTools {
     /**
      * Name of the environment variable to disable parallel processing, set RW_PARALLEL=0 (or
-     * RW_PARALLEL=false, case insensitive) to disable
+     * RW_PARALLEL=false, case insensitive) to disable. Otherwise (if unset, or set to any
+     * other value) parallel processing is enabled only if {@link #maxParallelism()} &gt; 1.
      */
     public static final String RW_PARALLEL = "RW_PARALLEL";
 
-    private static final AtomicInteger threadId = new AtomicInteger(0);
-
-    /** A fixed-size thread pool with as many threads as there are processors
-     * minus one, fed by a single task queue */
-    private static final ThreadPoolExecutor pool;
+    /** The JVM-wide common ForkJoinPool (by default, as many threads as there are
+     * processors minus one), or null if parallel processing was disabled at startup */
+    private static final ForkJoinPool pool;
 
     private static boolean parallel;
 
@@ -74,36 +69,21 @@ public class ParallelismTools {
         final int maxParallelism = maxParallelism();
         final String value = System.getenv(RW_PARALLEL);
 
-        if (value == null) {
-            // Enable parallelism by default only if maxParallelism > 1
-            parallel = (maxParallelism > 1);
+        if (value != null && (value.equals("0") || value.equalsIgnoreCase("false"))) {
+            parallel = false;
         } else {
-            parallel = !(value.equals("0") || value.equalsIgnoreCase("false"));
+            // Otherwise enable parallelism only if maxParallelism > 1
+            parallel = (maxParallelism > 1);
         }
 
-        if (parallel) {
-            pool = new ThreadPoolExecutor(
-                    maxParallelism - 1,
-                    maxParallelism - 1,
-                    0, TimeUnit.MILLISECONDS,
-                    new LinkedBlockingQueue<>(),
-                    (r) -> {
-                        Thread t = Executors.defaultThreadFactory().newThread(r);
-                        t.setDaemon(true);
-                        t.setName("RapidWright-ParallelismTools-Worker-" + threadId.getAndIncrement());
-                        return t;
-                    });
-            pool.prestartAllCoreThreads();
-        } else {
-            pool = null;
-        }
+        pool = parallel ? ForkJoinPool.commonPool() : null;
     }
 
     /**
      * Global setter to control parallel processing.
      * Has no effect (other than printing a warning) if {@link #maxParallelism()} is 1,
      * or if enabling parallel processing when it was disabled at startup by the
-     * {@link #RW_PARALLEL} environment variable (since no thread pool was created).
+     * {@link #RW_PARALLEL} environment variable.
      * @param parallel Enable parallel processing.
      */
     public static void setParallel(boolean parallel) {
@@ -118,9 +98,6 @@ public class ParallelismTools {
             return;
         }
         ParallelismTools.parallel = parallel;
-        if (parallel) {
-            pool.prestartAllCoreThreads();
-        }
     }
 
     /**
@@ -147,7 +124,11 @@ public class ParallelismTools {
                 return f;
             }
         }
-        return pool.submit(task);
+        // Submit a FutureTask (rather than a ForkJoinTask) so that runIfUnclaimed()
+        // can run it on any thread that has not yet been beaten to it
+        FutureTask<T> future = new FutureTask<>(task);
+        pool.execute(future);
+        return future;
     }
 
     /**
@@ -166,7 +147,9 @@ public class ParallelismTools {
                 return f;
             }
         }
-        return  pool.submit(task);
+        FutureTask<?> future = new FutureTask<>(task, null);
+        pool.execute(future);
+        return future;
     }
 
     /**
@@ -289,16 +272,14 @@ public class ParallelismTools {
      * Run a previously submitted task on the current thread, rather than wait
      * for a pool worker to get to it, unless it is already done or another
      * thread has already claimed it.
-     * Callers steal from the back of the pool's FIFO queue (by walking their
-     * futures newest first), the opposite end from where pool workers take tasks,
-     * so as not to contend with them for the same tasks -- just as a ForkJoinPool
-     * thief works the opposite end of a deque from its owner.
-     * The task is run without removing it from the queue: FutureTask.run() does
-     * nothing if another thread has already claimed the task, so the pool worker
-     * that eventually dequeues it finds it already done. Dequeuing such a task is
-     * an overhead, but far less than ThreadPoolExecutor.remove(), which scans the
-     * queue from front to back (blocking pool workers while it does so) and is
-     * thus quadratic over a whole invokeAll().
+     * Callers steal by walking their futures newest first, whereas pool workers
+     * take (and steal) the oldest queued tasks first, so as not to contend with
+     * them for the same tasks.
+     * The task is run without removing it from the pool's queue (which
+     * ForkJoinPool does not support for tasks given to execute()): FutureTask.run()
+     * does nothing if another thread has already claimed the task, so the pool
+     * worker that eventually dequeues it finds it already done, which costs it
+     * very little.
      * @param future Future representing a previously submitted task.
      * @param <T> Type returned by task.
      * @return True if the task is done (whether run by this thread or another),
@@ -445,7 +426,7 @@ public class ParallelismTools {
     /**
      * Adapt a task-with-return value into a RunnableFuture object that implements
      * the Future interface to be executed by the current thread (as opposed to
-     * submitting it to thread pool queue).
+     * submitting it to the thread pool).
      * The task is not run by this method; the caller must run() the returned object.
      * @param task Task with return value.
      * @param <T> Type returned by task.
