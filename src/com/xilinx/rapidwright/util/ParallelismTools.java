@@ -39,6 +39,7 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -293,16 +294,27 @@ public class ParallelismTools {
     }
 
     /**
-     * Run the specified task on all items
+     * Run the specified task on all items, blocking until all have been completed.
+     * When parallel processing is enabled, this uses a parallel stream: the calling thread
+     * splits the items (using the collection's own Spliterator) into roughly four pieces
+     * per thread of the common ForkJoinPool, which are distributed by work stealing, and
+     * the calling thread also participates.
+     * If the task throws for any item, that exception is rethrown (if thrown on another
+     * thread, as a new exception of the same type with the original as its cause, where
+     * possible); in that case, the task may not have been run for other items, or may
+     * still be running.
      * @param items the items to call the task with
      * @param task the task that should be executed for all items
      * @param <T> item type
      */
     public static <T> void invokeAllRunnable(Collection<T> items, Consumer<T> task) {
-        final Runnable[] runnables = items.stream()
-                .map(i -> (Runnable)() -> task.accept(i))
-                .toArray(Runnable[]::new);
-        invokeAll(runnables);
+        if (!getParallel()) {
+            for (T item : items) {
+                task.accept(item);
+            }
+            return;
+        }
+        items.parallelStream().forEach(task);
     }
 
     /**
@@ -349,19 +361,27 @@ public class ParallelismTools {
     }
 
     /**
-     * Run the specified task on all items, blocking until all have been completed
+     * Run the specified task on all items, blocking until all have been completed.
+     * When parallel processing is enabled, this uses a parallel stream, as described for
+     * {@link #invokeAllRunnable(Collection, Consumer)}, including how exceptions are rethrown.
      * @param items the items to call the task with
      * @param task the task that should be executed for all items
      * @param <T> item type
      * @param <R> type returned by the task
-     * @return A list of Future objects holding the value returned for each item (in order)
+     * @return A list of Future objects holding the value returned for each item, in the
+     *         collection's encounter order (its iteration order, if the collection is ordered)
      */
     public static <T,R> List<Future<R>> invokeAll(Collection<T> items, Function<T,R> task) {
-        @SuppressWarnings("unchecked")
-        final Callable<R>[] callables = items.stream()
-                .map(i -> (Callable<R>)() -> task.apply(i))
-                .toArray(value -> (Callable<R>[])new Callable[value]); //Can't create generic arrays, so we need to cast
-        return invokeAll(callables);
+        if (!getParallel()) {
+            @SuppressWarnings("unchecked")
+            final Callable<R>[] callables = items.stream()
+                    .map(i -> (Callable<R>)() -> task.apply(i))
+                    .toArray(value -> (Callable<R>[])new Callable[value]); //Can't create generic arrays, so we need to cast
+            return invokeAll(callables);
+        }
+        return items.parallelStream()
+                .map(i -> (Future<R>) CompletableFuture.completedFuture(task.apply(i)))
+                .collect(Collectors.toList());
     }
 
     /**
