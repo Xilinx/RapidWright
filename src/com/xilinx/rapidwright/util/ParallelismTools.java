@@ -360,7 +360,7 @@ public class ParallelismTools {
      * @param task the task that should be executed for all items
      * @param <T> item type
      */
-    public static <T> void invokeAllRunnable(Collection<T> items, Consumer<T> task) {
+    public static <T> void forEach(Collection<T> items, Consumer<T> task) {
         if (!getParallel()) {
             for (T item : items) {
                 task.accept(item);
@@ -378,20 +378,29 @@ public class ParallelismTools {
     }
 
     /**
+     * @see #forEach(Collection, Consumer)
+     * @deprecated Renamed to {@link #forEach(Collection, Consumer)}
+     */
+    @Deprecated
+    public static <T> void invokeAllRunnable(Collection<T> items, Consumer<T> task) {
+        forEach(items, task);
+    }
+
+    /**
      * Given a list of tasks-without-return-value, block until all tasks
      * have been completed. Equivalent to
-     * {@link #invokeAllRunnable(Collection, Consumer)} with each task as an item.
+     * {@link #forEach(Collection, Consumer)} with each task as an item.
      * @param tasks List of tasks-without-return-value.
      */
     public static void invokeAll(@NotNull Runnable... tasks) {
-        invokeAllRunnable(Arrays.asList(tasks), Runnable::run);
+        forEach(Arrays.asList(tasks), Runnable::run);
     }
 
     /**
      * Run the specified task on all items, blocking until all have been completed.
      * When parallel processing is enabled, each item is either submitted as its own task or
      * processed using a parallel stream, as described for
-     * {@link #invokeAllRunnable(Collection, Consumer)}, including how exceptions are rethrown.
+     * {@link #forEach(Collection, Consumer)}, including how exceptions are rethrown.
      * @param items the items to call the task with
      * @param task the task that should be executed for all items
      * @param <T> item type
