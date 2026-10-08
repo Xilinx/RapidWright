@@ -960,7 +960,10 @@ public class DesignTools {
      * a caller that needs to operate on the result can start from {@link Design#getModifiedNets()}.
      * A net merged away is removed from the design instead, so is not in that record; when copying
      * originals, its routing is in {@link Design#getOriginalNetRouting()}. No other net is altered
-     * here.
+     * here. Likewise, a static source evicted from a site a black box's circuit is placed onto is
+     * removed, so is not in {@link Design#getModifiedSiteInsts()}: the site instance that takes
+     * its site is, and changes from the original recorded for that site in
+     * {@link Design#getOriginalSiteInsts()}.
      *
      * @param design              The top level design
      * @param blackBoxes          The 'guts' to be inserted, keyed by the hierarchical name of the
