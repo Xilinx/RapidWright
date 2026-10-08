@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -385,11 +385,37 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
             portInst.setName(uniquifier.uniquifyName(portInstName));
         }
 
+        /**
+         * Add the port inst to its cell inst (if any) and net. To avoid a binary search (and shifting the
+         * list) for every port inst, this appends without keeping their port inst lists sorted: once all port
+         * insts of the parent cell have been added, {@link #sortPortInstLists(List)} must be called on them.
+         */
         public void add() {
             if (portInst.getCellInst() != null) {
-                portInst.getCellInst().addPortInst(portInst);
+                portInst.getCellInst().addPortInst(portInst, true);
             }
-            net.addPortInst(portInst);
+            net.addPortInst(portInst, true);
+        }
+    }
+
+    /**
+     * Sort the port inst lists of all nets and cell insts of a parent cell, once all of its port insts have
+     * been added with {@link LinkPortInstData#add()}.
+     * @param parentCellLinks The parent cell's port insts, i.e. one of the lists in {@link #linkPortInstData}.
+     */
+    public static void sortPortInstLists(List<LinkPortInstData> parentCellLinks) {
+        final EDIFCell parentCell = parentCellLinks.get(0).parentCell;
+        for (EDIFNet net : parentCell.getNets()) {
+            EDIFPortInstList list = net.getEDIFPortInstList();
+            if (list != null) {
+                list.reSortList();
+            }
+        }
+        for (EDIFCellInst inst : parentCell.getCellInsts()) {
+            EDIFPortInstList list = inst.getEDIFPortInstList();
+            if (list != null) {
+                list.reSortList();
+            }
         }
     }
 
