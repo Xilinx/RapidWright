@@ -51,11 +51,14 @@ import org.jetbrains.annotations.NotNull;
  *
  * A class that abstracts away single-threaded and multi-threaded execution.
  * Single-threaded mode means that all tasks submitted will be executed
- * immediately (on the submitting thread).
+ * immediately (on the submitting thread), except for the tasks after the
+ * first given to {@link #invokeFirstSubmitRest(Callable[])}, which are
+ * deferred until {@link #joinFirst(Deque)} is called on them.
  */
 public class ParallelismTools {
     /**
-     * Name of the environment variable to disable parallel processing, set RW_PARALLEL=0 to disable
+     * Name of the environment variable to disable parallel processing, set RW_PARALLEL=0 (or
+     * RW_PARALLEL=false, case insensitive) to disable
      */
     public static final String RW_PARALLEL = "RW_PARALLEL";
 
@@ -98,12 +101,20 @@ public class ParallelismTools {
 
     /**
      * Global setter to control parallel processing.
+     * Has no effect (other than printing a warning) if {@link #maxParallelism()} is 1,
+     * or if enabling parallel processing when it was disabled at startup by the
+     * {@link #RW_PARALLEL} environment variable (since no thread pool was created).
      * @param parallel Enable parallel processing.
      */
     public static void setParallel(boolean parallel) {
         final int maxParallelism = maxParallelism();
         if (maxParallelism == 1) {
             System.out.println("WARNING: Parallel execution unsupported since maxParallelism() == 1.");
+            return;
+        }
+        if (parallel && pool == null) {
+            System.out.println("WARNING: Parallel execution unsupported since it was disabled at startup by "
+                    + RW_PARALLEL + "=" + System.getenv(RW_PARALLEL) + ".");
             return;
         }
         ParallelismTools.parallel = parallel;
@@ -163,6 +174,7 @@ public class ParallelismTools {
      * If the task has not yet been claimed by another thread, steal it for
      * immediate execution on the current thread.
      * @param future Future representing previously submitted task.
+     * @param <T> Type returned by task.
      * @return Value returned by task.
      */
     public static <T> T get(Future<T> future) {
@@ -179,6 +191,8 @@ public class ParallelismTools {
      * For a given list of value-returning-tasks, first submit all but the first task to
      * the thread pool to be executed in parallel, then execute that first task with the
      * current thread.
+     * In single-threaded mode, all but the first task are not executed here but are
+     * deferred until they are passed to {@link #joinFirst(Deque)}.
      * @param tasks List of tasks to be executed.
      * @param <T> Type returned by all tasks.
      * @return A Deque of Future objects corresponding to each task (in order).
@@ -354,10 +368,12 @@ public class ParallelismTools {
     }
 
     /**
-     * Run the specified task on all items
+     * Run the specified task on all items, blocking until all have been completed
      * @param items the items to call the task with
      * @param task the task that should be executed for all items
      * @param <T> item type
+     * @param <R> type returned by the task
+     * @return A list of Future objects holding the value returned for each item (in order)
      */
     public static <T,R> List<Future<R>> invokeAll(Collection<T> items, Function<T,R> task) {
         @SuppressWarnings("unchecked")
@@ -366,6 +382,7 @@ public class ParallelismTools {
                 .toArray(value -> (Callable<R>[])new Callable[value]); //Can't create generic arrays, so we need to cast
         return invokeAll(callables);
     }
+
     /**
      * Given a list of tasks-with-return-value, block until all tasks
      * have been completed.
@@ -429,9 +446,10 @@ public class ParallelismTools {
      * Adapt a task-with-return value into a RunnableFuture object that implements
      * the Future interface to be executed by the current thread (as opposed to
      * submitting it to thread pool queue).
+     * The task is not run by this method; the caller must run() the returned object.
      * @param task Task with return value.
      * @param <T> Type returned by task.
-     * @return A RunnableFuture object representing the task.
+     * @return A RunnableFuture object representing the (not yet started) task.
      */
     public static <T> RunnableFuture<T> adapt(Callable<T> task) {
         return new FutureTask<>(task);
