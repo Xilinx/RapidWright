@@ -28,6 +28,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -771,6 +772,7 @@ public class TestDesign {
         Set<SiteInst> siteInsts = new HashSet<>(Arrays.asList(si0, si1));
         siteInsts.removeAll(design.getModifiedSiteInsts());
         Assertions.assertEquals(Collections.emptySet(), siteInsts);
+        ChangeTrackingAssertions.assertModifiedAreInDesign(design);
     }
 
     @Test
@@ -809,45 +811,199 @@ public class TestDesign {
         SiteInst si = createPlacedSiteInst("si0", site);
         design.addSiteInst(si);
 
-        SiteInst orig = design.getOriginalSiteInsts().get(si.getName());
-        Assertions.assertNotNull(orig);
-        Assertions.assertSame(site, orig.getSite());
-        // Placed, so that the copy can still answer this despite belonging to no design
-        Assertions.assertNotNull(orig.getSiteTypeEnum());
-        Assertions.assertTrue(orig.getUsedSitePIPs().isEmpty());
-        Assertions.assertTrue(orig.getCells().isEmpty());
+        Assertions.assertSame(Design.EMPTY_ORIGINAL_SITE_INST,
+                design.getOriginalSiteInsts().get(site.getName()));
+        ChangeTrackingAssertions.assertModifiedAreInDesign(design);
 
-        // SiteInst.setDesign(null)
+        // Removing it again leaves it out of the modified set, but keeps the empty site as the
+        // original, rather than recording what it held on the way out
         Assertions.assertTrue(design.removeSiteInst(si));
         Assertions.assertNull(design.getSiteInstFromSite(site));
+        Assertions.assertFalse(design.getModifiedSiteInsts().contains(si));
+        Assertions.assertSame(Design.EMPTY_ORIGINAL_SITE_INST,
+                design.getOriginalSiteInsts().get(site.getName()));
+        ChangeTrackingAssertions.assertModifiedAreInDesign(design);
     }
 
     /**
-     * A SiteInst arriving on an occupied site is changing from what it displaced, which is what the
-     * original bitstream holds for that site.
+     * A SiteInst may not be added onto a site another SiteInst occupies: that one has to be
+     * removed first. The design is left as it was.
      */
     @Test
-    public void testAddSiteInstRecordsDisplacedOriginal() {
-        Design design = new Design("testAddSiteInstRecordsDisplacedOriginal", "xcvu3p");
+    public void testAddSiteInstOnOccupiedSiteThrows() {
+        Design design = new Design("testAddSiteInstOnOccupiedSiteThrows", "xcvu3p");
         Site site = design.getDevice().getSite("SLICE_X0Y0");
-
         SiteInst si0 = createPlacedSiteInst("si0", site);
         design.addSiteInst(si0);
+
+        design.setTrackSiteInstChanges(true);
+        design.setCopyingOriginalSiteInsts(true);
+
+        SiteInst si1 = createPlacedSiteInst("si1", site);
+        RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                () -> design.addSiteInst(si1));
+        Assertions.assertEquals("ERROR: Site " + site.getName() + " is already occupied by"
+                + " SiteInst 'si0', which must be removed first.", e.getMessage());
+
+        Assertions.assertSame(si0, design.getSiteInstFromSite(site));
+        Assertions.assertNull(design.getSiteInst(si1.getName()));
+        Assertions.assertNull(si1.getDesign());
+        Assertions.assertTrue(design.getModifiedSiteInsts().isEmpty());
+        Assertions.assertTrue(design.getOriginalSiteInsts().isEmpty());
+    }
+
+    /**
+     * A removed SiteInst no longer belongs to the design, so is not left in the modified set. What
+     * its site held originally is recorded, before anything is taken off it.
+     */
+    @Test
+    public void testRemoveSiteInstRecordsOriginal() {
+        Design design = new Design("testRemoveSiteInstRecordsOriginal", "xcvu3p");
+        Site site = design.getDevice().getSite("SLICE_X0Y0");
+        SiteInst si = createPlacedSiteInst("si0", site);
+        design.addSiteInst(si);
+        // On a net with another pin, so that removing si takes this pin off the net rather than
+        // removing the net
+        Net net = design.createNet("net0");
+        routeToSitePin(net, si, "A1");
+        routeToSitePin(net, design.createSiteInst("SLICE_X1Y0"), "A1");
+        SitePinInst pin = si.getSitePinInst("A1");
+        String siteWire = pin.getSiteWireName();
+        Assertions.assertSame(net, si.getNetFromSiteWire(siteWire));
+
+        // Only what si holds is in the original bitstream
+        design.setTrackingChanges(true);
+        design.setCopyingOriginalSiteInsts(true);
+        String sitePIPs = si.getUsedSitePIPs().toString();
+
+        Assertions.assertTrue(design.removeSiteInst(si));
+        Assertions.assertNull(si.getDesign());
+        Assertions.assertNull(design.getSiteInst(si.getName()));
+        Assertions.assertNull(design.getSiteInstFromSite(site));
+        Assertions.assertFalse(design.getModifiedSiteInsts().contains(si));
+
+        // Its pin was taken off the net, unrouting the site wire...
+        Assertions.assertNull(pin.getNet());
+        Assertions.assertNull(si.getNetFromSiteWire(siteWire));
+
+        // ... but the original was recorded ahead of that, under the name of the site
+        SiteInst orig = design.getOriginalSiteInsts().get(site.getName());
+        Assertions.assertNotNull(orig);
+        Assertions.assertSame(site, orig.getSite());
+        Assertions.assertEquals(sitePIPs, orig.getUsedSitePIPs().toString());
+        Assertions.assertNotNull(orig.getSitePinInst("A1"));
+        Assertions.assertEquals(net, orig.getNetFromSiteWire(siteWire));
+        ChangeTrackingAssertions.assertModifiedAreInDesign(design);
+    }
+
+    /**
+     * Without copying originals, a removal still does not leave the SiteInst in the modified set.
+     */
+    @Test
+    public void testRemoveSiteInstWithoutCopyingOriginals() {
+        Design design = new Design("testRemoveSiteInstWithoutCopyingOriginals", "xcvu3p");
+        design.setTrackSiteInstChanges(true);
+
+        SiteInst si0 = design.createSiteInst("SLICE_X0Y0");
+        Assertions.assertTrue(design.getModifiedSiteInsts().contains(si0));
+        Assertions.assertTrue(design.removeSiteInst(si0));
+        Assertions.assertFalse(design.getModifiedSiteInsts().contains(si0));
+
+        SiteInst si1 = createPlacedSiteInst("si1", si0.getSite());
+        design.addSiteInst(si1);
+        Assertions.assertTrue(design.getModifiedSiteInsts().contains(si1));
+        Assertions.assertTrue(design.getOriginalSiteInsts().isEmpty());
+        ChangeTrackingAssertions.assertModifiedAreInDesign(design);
+    }
+
+    /**
+     * A SiteInst added onto a site that a removal vacated is changing from what the site held
+     * before tracking began, however many times the site has changed hands since: the one original
+     * recorded for the site, as the first SiteInst was removed.
+     */
+    @ParameterizedTest
+    @ValueSource(ints = {1, 2})
+    public void testAddSiteInstInheritsOriginalOfVacatedSite(int handOvers) {
+        Design design = new Design("testAddSiteInstInheritsOriginalOfVacatedSite", "xcvu3p");
+        Site site = design.getDevice().getSite("SLICE_X0Y0");
+        SiteInst si0 = createPlacedSiteInst("si0", site);
+        design.addSiteInst(si0);
+        String sitePIPs = si0.getUsedSitePIPs().toString();
 
         // Only what si0 holds is in the original bitstream
         design.setTrackSiteInstChanges(true);
         design.setCopyingOriginalSiteInsts(true);
 
-        SiteInst si1 = createPlacedSiteInst("si1", site);
-        design.addSiteInst(si1);
-        Assertions.assertSame(si1, design.getSiteInstFromSite(site));
+        SiteInst current = si0;
+        for (int i = 1; i <= handOvers; i++) {
+            Assertions.assertTrue(design.removeSiteInst(current));
+            // Unlike si0, so that the original cannot be mistaken for what is on the site now
+            current = new SiteInst("si" + i, SiteTypeEnum.SLICEL);
+            current.place(site);
+            current.addSitePIP("FFMUXB1", "BYP");
+            design.addSiteInst(current);
+        }
+        Assertions.assertSame(current, design.getSiteInstFromSite(site));
 
-        // Keyed by the displacing SiteInst, since that is the name the modified set presents it under
-        SiteInst orig = design.getOriginalSiteInsts().get(si1.getName());
-        Assertions.assertNotNull(orig);
+        // Keyed by site, so the site has the one original, recorded from si0 as it was removed
+        Assertions.assertEquals(Collections.singleton(site.getName()),
+                design.getOriginalSiteInsts().keySet());
+        SiteInst orig = design.getOriginalSiteInsts().get(site.getName());
         Assertions.assertEquals(si0.getName(), orig.getName());
         Assertions.assertSame(site, orig.getSite());
-        Assertions.assertEquals(si0.getUsedSitePIPs().toString(), orig.getUsedSitePIPs().toString());
+        Assertions.assertEquals(sitePIPs, orig.getUsedSitePIPs().toString());
+        Assertions.assertEquals(Collections.singleton(current), design.getModifiedSiteInsts());
+        ChangeTrackingAssertions.assertModifiedAreInDesign(design);
+    }
+
+    /**
+     * What DesignTools.populateBlackBox() does to a static source standing on a site its circuit
+     * is placed onto: removes it, deferring its pins for a batch removal, and adds the circuit's
+     * SiteInst in its place. The static source must not be left in the modified set, nor be put
+     * back as its pins are taken; otherwise whoever walks the modified set (e.g. BitGenerator)
+     * sees two SiteInsts for the one site, and so two writers of its configuration bits, with
+     * which one lands last depending on the iteration order of that set.
+     */
+    @Test
+    public void testRemoveSiteInstUntracksEvictedStaticSource() {
+        Design design = new Design("testRemoveSiteInstUntracksEvictedStaticSource", "xcvu3p");
+        design.setTrackingChanges(true);
+        design.setCopyingOriginalSiteInsts(true);
+
+        // Created under tracking, as a static router leaves one on a site it found free, so it is
+        // in the modified set before it is ever evicted
+        Site site = design.getDevice().getSite("SLICE_X0Y0");
+        SiteInst evicted = design.createSiteInst(SiteInst.STATIC_SOURCE + "_" + site.getName(),
+                SiteTypeEnum.SLICEL, site);
+        design.getVccNet().createPin("A_O", evicted);
+        Assertions.assertTrue(design.getModifiedSiteInsts().contains(evicted));
+
+        Map<Net, Set<SitePinInst>> deferredRemovals = new HashMap<>();
+        Assertions.assertTrue(design.removeSiteInst(evicted, false, deferredRemovals));
+        Assertions.assertEquals(1, deferredRemovals.get(design.getVccNet()).size());
+        Assertions.assertFalse(design.getModifiedSiteInsts().contains(evicted));
+        Assertions.assertFalse(design.getSiteInsts().contains(evicted));
+        Assertions.assertNull(evicted.getDesign());
+
+        SiteInst arriving = new SiteInst("arriving", SiteTypeEnum.SLICEL);
+        arriving.place(site);
+        arriving.addSitePIP("FFMUXA1", "BYP");
+        design.addSiteInst(arriving);
+        Assertions.assertSame(arriving, design.getSiteInstFromSite(site));
+
+        // Taking its pins afterwards must not put it back
+        DesignTools.batchRemoveSitePins(deferredRemovals, true);
+        Assertions.assertTrue(evicted.getSitePinInsts().isEmpty());
+        Assertions.assertFalse(design.getModifiedSiteInsts().contains(evicted));
+        Assertions.assertTrue(design.getModifiedSiteInsts().contains(arriving));
+
+        // The static source arrived after tracking began, so the site was empty in the original
+        // bitstream: that is what the arriving SiteInst changes from, and the site's only original
+        Assertions.assertEquals(Collections.singleton(site.getName()),
+                design.getOriginalSiteInsts().keySet());
+        Assertions.assertSame(Design.EMPTY_ORIGINAL_SITE_INST,
+                design.getOriginalSiteInsts().get(arriving.getSiteName()));
+        ChangeTrackingAssertions.assertModifiedAreInDesign(design);
     }
 
     @Test
@@ -860,11 +1016,140 @@ public class TestDesign {
         // very instance by the time it joins the design
         SiteInst si = design.createSiteInst("SLICE_X0Y0");
 
-        SiteInst orig = design.getOriginalSiteInsts().get(si.getName());
-        Assertions.assertNotNull(orig);
-        Assertions.assertSame(si.getSite(), orig.getSite());
-        Assertions.assertNotNull(orig.getSiteTypeEnum());
-        Assertions.assertTrue(orig.getUsedSitePIPs().isEmpty());
+        Assertions.assertSame(Design.EMPTY_ORIGINAL_SITE_INST,
+                design.getOriginalSiteInsts().get(si.getSiteName()));
+        ChangeTrackingAssertions.assertModifiedAreInDesign(design);
+    }
+
+    /**
+     * Placing a SiteInst changes both the site it leaves and the site it takes, and each keeps what
+     * it held before as its original. Here si0 moves from one site to another, and si1, filled while
+     * unplaced as Design.createModuleInst() fills a ModuleInst's SiteInsts, is then placed onto a
+     * third: none of what it holds is in the original bitstream, so that site's original is empty.
+     */
+    @Test
+    public void testPlaceSiteInstRecordsOriginals() {
+        Design design = new Design("testPlaceSiteInstRecordsOriginals", "xcvu3p");
+        Device device = design.getDevice();
+        Site from = device.getSite("SLICE_X0Y0");
+        Site to = device.getSite("SLICE_X1Y0");
+        Site third = device.getSite("SLICE_X2Y0");
+        SiteInst si0 = createPlacedSiteInst("si0", from);
+        design.addSiteInst(si0);
+        String sitePIPs = si0.getUsedSitePIPs().toString();
+
+        design.setTrackSiteInstChanges(true);
+        design.setCopyingOriginalSiteInsts(true);
+
+        si0.place(to);
+        Assertions.assertTrue(design.getModifiedSiteInsts().contains(si0));
+        Map<String, SiteInst> originals = design.getOriginalSiteInsts();
+        Assertions.assertEquals(sitePIPs, originals.get(from.getName()).getUsedSitePIPs().toString());
+        Assertions.assertSame(Design.EMPTY_ORIGINAL_SITE_INST, originals.get(to.getName()));
+
+        SiteInst si1 = new SiteInst("si1", SiteTypeEnum.SLICEL);
+        design.addSiteInst(si1);
+        si1.addSitePIP("FFMUXA1", "BYP");
+        si1.place(third);
+        Assertions.assertSame(Design.EMPTY_ORIGINAL_SITE_INST, originals.get(third.getName()));
+        ChangeTrackingAssertions.assertModifiedAreInDesign(design);
+    }
+
+    /**
+     * Unplacing a SiteInst is a change to it and to the site it leaves, which keeps what it held as
+     * its original. SiteInsts are hashed by name, so renaming a modified one must keep it modified
+     * under its new name, as Net.rename() does for a net.
+     */
+    @Test
+    public void testUnPlaceAndRenameSiteInst() {
+        Design design = new Design("testUnPlaceAndRenameSiteInst", "xcvu3p");
+        Site site = design.getDevice().getSite("SLICE_X0Y0");
+        SiteInst si = createPlacedSiteInst("si0", site);
+        design.addSiteInst(si);
+        String sitePIPs = si.getUsedSitePIPs().toString();
+
+        design.setTrackSiteInstChanges(true);
+        design.setCopyingOriginalSiteInsts(true);
+
+        si.unPlace();
+        Assertions.assertTrue(design.getModifiedSiteInsts().contains(si));
+        Assertions.assertEquals(sitePIPs,
+                design.getOriginalSiteInsts().get(site.getName()).getUsedSitePIPs().toString());
+
+        Assertions.assertTrue(design.renameSiteInst(si, "si1"));
+        Assertions.assertTrue(design.getModifiedSiteInsts().contains(si));
+        ChangeTrackingAssertions.assertModifiedAreInDesign(design);
+    }
+
+    /**
+     * Clearing the used sites vacates each, which keeps what it held as its original. The SiteInsts
+     * keep their sites, so are not marked modified: one that was would be written to a site found
+     * vacated.
+     */
+    @Test
+    public void testClearUsedSitesRecordsOriginals() {
+        Design design = new Design("testClearUsedSitesRecordsOriginals", "xcvu3p");
+        Site site = design.getDevice().getSite("SLICE_X0Y0");
+        SiteInst si = createPlacedSiteInst("si0", site);
+        design.addSiteInst(si);
+        String sitePIPs = si.getUsedSitePIPs().toString();
+
+        design.setTrackSiteInstChanges(true);
+        design.setCopyingOriginalSiteInsts(true);
+
+        design.clearUsedSites();
+        Assertions.assertTrue(design.getModifiedSiteInsts().isEmpty());
+        Assertions.assertEquals(sitePIPs,
+                design.getOriginalSiteInsts().get(site.getName()).getUsedSitePIPs().toString());
+    }
+
+    /**
+     * Unplacing a design vacates every site, each of which keeps what it held as the original,
+     * while leaving no SiteInst it no longer holds among the modified, not even one marked again as
+     * its pins are taken off its nets.
+     */
+    @Test
+    public void testUnplaceDesignRecordsOriginals() {
+        Design design = new Design("testUnplaceDesignRecordsOriginals", "xcvu3p");
+        Site site = design.getDevice().getSite("SLICE_X0Y0");
+        SiteInst si = createPlacedSiteInst("si0", site);
+        design.addSiteInst(si);
+        routeToSitePin(design.createNet("net0"), si, "A1");
+        String sitePIPs = si.getUsedSitePIPs().toString();
+
+        design.setTrackSiteInstChanges(true);
+        design.setCopyingOriginalSiteInsts(true);
+
+        design.unplaceDesign();
+        Assertions.assertTrue(design.getModifiedSiteInsts().isEmpty());
+        Assertions.assertEquals(sitePIPs,
+                design.getOriginalSiteInsts().get(site.getName()).getUsedSitePIPs().toString());
+        ChangeTrackingAssertions.assertModifiedAreInDesign(design);
+    }
+
+    /**
+     * A SiteInst leaving a design by any route, not only removeSiteInst() --
+     * Module.disconnectDesign() detaches SiteInsts with setDesign(null), say -- is not left among
+     * that design's modified SiteInsts, and leaves what it held behind there as its site's original.
+     */
+    @Test
+    public void testSetDesignLeavesOriginalBehind() {
+        Design design = new Design("testSetDesignLeavesOriginalBehind", "xcvu3p");
+        Site site = design.getDevice().getSite("SLICE_X0Y0");
+        SiteInst si = createPlacedSiteInst("si0", site);
+        design.addSiteInst(si);
+        String sitePIPs = si.getUsedSitePIPs().toString();
+
+        design.setTrackSiteInstChanges(true);
+        design.setCopyingOriginalSiteInsts(true);
+        si.addSitePIP("FFMUXB1", "BYP");
+        Assertions.assertTrue(design.getModifiedSiteInsts().contains(si));
+
+        si.setDesign(null);
+
+        Assertions.assertFalse(design.getModifiedSiteInsts().contains(si));
+        Assertions.assertEquals(sitePIPs,
+                design.getOriginalSiteInsts().get(site.getName()).getUsedSitePIPs().toString());
     }
 
     /**
@@ -1029,8 +1314,9 @@ public class TestDesign {
         PIP pip = routeToSitePin(net, si, "A1");
         SitePinInst pin = net.getPins().get(0);
 
-        design.setTrackNetChanges(true);
+        design.setTrackingChanges(true);
         design.setCopyingOriginalNetsRouting(true);
+        design.setCopyingOriginalSiteInsts(true);
         Assertions.assertTrue(design.removeSiteInst(si));
 
         // A net whose sole pin was on the removed site instance goes through removeNet() rather
@@ -1042,7 +1328,11 @@ public class TestDesign {
         Assertions.assertFalse(design.getModifiedNets().contains(net));
         Assertions.assertEquals(Collections.singletonList(pip),
                 design.getOriginalNetRouting().get(net.getName()));
-        ChangeTrackingAssertions.assertModifiedNetsAreInDesign(design);
+
+        // ... and likewise the site instance itself
+        Assertions.assertFalse(design.getModifiedSiteInsts().contains(si));
+        Assertions.assertNotNull(design.getOriginalSiteInsts().get(si.getSiteName()));
+        ChangeTrackingAssertions.assertModifiedAreInDesign(design);
     }
 
     /**
