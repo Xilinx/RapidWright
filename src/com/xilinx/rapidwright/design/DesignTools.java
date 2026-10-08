@@ -956,9 +956,11 @@ public class DesignTools {
      * begun: a failure part way through -- a site overlap, say -- leaves the boxes filled so far in
      * place, and the logical netlist of all of them already swapped in.
      * <p>
-     * A design that is tracking its changes records every net this touches, so a caller that needs
-     * to operate on the result can start from {@link Design#getModifiedNets()}. No net outside
-     * that record is altered here.
+     * A design that is tracking its changes records every net this touches that it still holds, so
+     * a caller that needs to operate on the result can start from {@link Design#getModifiedNets()}.
+     * A net merged away is removed from the design instead, so is not in that record; when copying
+     * originals, its routing is in {@link Design#getOriginalNetRouting()}. No other net is altered
+     * here.
      *
      * @param design              The top level design
      * @param blackBoxes          The 'guts' to be inserted, keyed by the hierarchical name of the
