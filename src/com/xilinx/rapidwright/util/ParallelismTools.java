@@ -171,9 +171,11 @@ public class ParallelismTools {
     /**
      * Block until the given Future is complete, and return its value.
      * If its task threw an unchecked exception (or error), that is rethrown as-is
-     * rather than wrapped in an ExecutionException; a checked exception, which
-     * cannot be rethrown as-is, is wrapped in a RuntimeException. If the wait is
-     * interrupted, the InterruptedException is wrapped in a RuntimeException.
+     * rather than wrapped in an ExecutionException, with a suppressed exception
+     * added to it recording the stack of the rethrowing thread (since the task may
+     * have run on another thread); a checked exception, which cannot be rethrown
+     * as-is, is wrapped in a RuntimeException. If the wait is interrupted, the
+     * InterruptedException is wrapped in a RuntimeException.
      * @param future Future representing previously submitted task.
      * @param <T> Type returned by task.
      * @return Value returned by task.
@@ -183,10 +185,12 @@ public class ParallelismTools {
             return future.get();
         } catch (ExecutionException e) {
             final Throwable cause = e.getCause();
-            if (cause instanceof RuntimeException) {
-                throw (RuntimeException) cause;
-            }
-            if (cause instanceof Error) {
+            if (cause instanceof RuntimeException || cause instanceof Error) {
+                cause.addSuppressed(new Exception("Task exception rethrown by thread \""
+                        + Thread.currentThread().getName() + "\""));
+                if (cause instanceof RuntimeException) {
+                    throw (RuntimeException) cause;
+                }
                 throw (Error) cause;
             }
             throw new RuntimeException(cause != null ? cause : e);
@@ -384,20 +388,18 @@ public class ParallelismTools {
      * @param task the task that should be executed for all items
      * @param <T> item type
      * @param <R> type returned by the task
-     * @return A list of Future objects holding the value returned for each item, in the
-     *         collection's encounter order (its iteration order, if the collection is ordered)
+     * @return A list of the values returned for each item, in the collection's encounter
+     *         order (its iteration order, if the collection is ordered)
      */
-    public static <T,R> List<Future<R>> invokeAll(Collection<T> items, Function<T,R> task) {
+    public static <T,R> List<R> invokeAll(Collection<T> items, Function<T,R> task) {
         if (!getParallel()) {
-            @SuppressWarnings("unchecked")
-            final Callable<R>[] callables = items.stream()
-                    .map(i -> (Callable<R>)() -> task.apply(i))
-                    .toArray(value -> (Callable<R>[])new Callable[value]); //Can't create generic arrays, so we need to cast
-            return invokeAll(callables);
+            final List<R> results = new ArrayList<>(items.size());
+            for (T item : items) {
+                results.add(task.apply(item));
+            }
+            return results;
         }
-        return items.parallelStream()
-                .map(i -> (Future<R>) CompletableFuture.completedFuture(task.apply(i)))
-                .collect(Collectors.toList());
+        return items.parallelStream().map(task).collect(Collectors.toList());
     }
 
     /**
