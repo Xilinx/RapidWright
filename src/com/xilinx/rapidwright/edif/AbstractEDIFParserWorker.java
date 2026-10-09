@@ -172,9 +172,23 @@ public abstract class AbstractEDIFParserWorker {
     }
 
     /**
-     * Parse the name of an object that may be referenced by its EDIF identifier while parsing (a library or cell),
-     * recording its rename (if any) in the cache so that such references can be resolved. Ports' renames are
-     * recorded by {@link #parseEDIFPort()} and cell instances' renames are only needed within their parent cell.
+     * Record the rename (EDIF identifier) of a cell that {@link #parseEDIFCell(String, String)} has just named, if
+     * it was renamed: by default in the cache, so that references to the cell by its EDIF identifier can be
+     * resolved.
+     * @param cell The cell.
+     * @param rename The cell's EDIF identifier if it was renamed, else null.
+     */
+    protected void setCellRename(EDIFCell cell, String rename) {
+        if (rename != null) {
+            cache.setRename(cell, rename);
+        }
+    }
+
+    /**
+     * Parse the name of an object that may be referenced by its EDIF identifier while parsing (a library),
+     * recording its rename (if any) in the cache so that such references can be resolved. Cells' renames are
+     * recorded by {@link #setCellRename(EDIFCell, String)}, ports' renames by {@link #parseEDIFPort()}, and cell
+     * instances' renames are only needed within their parent cell.
      * @param o The object being named.
      * @return The object.
      */
@@ -233,7 +247,8 @@ public abstract class AbstractEDIFParserWorker {
 
     protected EDIFCell parseEDIFCell(String libraryLegalName, String cellToken) {
         expect(CELL, cellToken);
-        EDIFCell cell = parseEDIFNameObject(new EDIFCell());
+        EDIFCell cell = new EDIFCell();
+        setCellRename(cell, parseEDIFName(cell));
         cell = updateEDIFRefCellMap(libraryLegalName, cell);
         Map<String, EDIFCellInst> instanceLookup = new HashMap<>();
         cellHasRenamedPorts = false;
