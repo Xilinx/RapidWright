@@ -797,6 +797,83 @@ public class TestDesignTools {
     }
 
     /**
+     * A black box port to a device pin can be an inout that the circuit filling it has resolved to
+     * an input or output, which Vivado accepts. The circuit's directions must then decide which
+     * side drives each port.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testPopulateBlackBoxResolvedInouts(boolean keepBoundaryRouting) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+
+        EDIFCell bbType = new EDIFCell(top.getLibrary(), "bbType");
+        bbType.createPort("I", EDIFDirection.INOUT, 1);
+        bbType.createPort("O", EDIFDirection.INOUT, 1);
+        EDIFCellInst bb = bbType.createCellInst("bb", top);
+        bb.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", bb);
+        Net inNet = design.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+        EDIFNet out = top.createNet("out");
+        out.createPortInst("O", bb);
+        Net outNet = design.createNet("out");
+        SitePinInst sinkPin = addSinkLUT(design, top, "sink", "SLICE_X2Y0", out, outNet);
+
+        // The circuit: a LUT from I to O
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet circuitIn = circuitTop.createNet("I");
+        circuitIn.createPortInst(circuitTop.getPort("I"));
+        Net circuitInNet = circuit.createNet("I");
+        SitePinInst lutIn = addSinkLUT(circuit, circuitTop, "lut", "SLICE_X1Y0", circuitIn, circuitInNet);
+        EDIFNet circuitOut = circuitTop.createNet("lut_O");
+        circuitOut.createPortInst(circuitTop.getPort("O"));
+        circuitOut.createPortInst("O", circuitTop.getCellInst("lut"));
+        Net circuitOutNet = circuit.createNet("lut_O");
+        SitePinInst lutOut = circuitOutNet.createPin("A_O", lutIn.getSiteInst());
+
+        populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
+
+        Assertions.assertEquals(EDIFDirection.INPUT, bb.getPortInst("I").getDirection());
+        Assertions.assertEquals(EDIFDirection.OUTPUT, bb.getPortInst("O").getDirection());
+        // The shell drives the input and the circuit the output
+        Assertions.assertSame(inNet, lutIn.getNet());
+        Assertions.assertSame(design.getNet("bb/lut_O"), lutOut.getNet());
+        Assertions.assertSame(lutOut.getNet(), sinkPin.getNet());
+        Assertions.assertNull(design.getNet("out"));
+        assertParentNet(netlist, "out", "bb/lut_O");
+    }
+
+    @Test
+    public void testPopulateBlackBoxInterfaceMismatch() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        createBlackBox(top, "bb", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
+
+        // A circuit's output cannot fill a black box's input, while an inout is only accepted on
+        // the black box's side
+        Design circuit = createCircuit("circuit", EDIFDirection.OUTPUT);
+        circuit.getTopEDIFCell().createPort("I", EDIFDirection.INOUT, 1);
+        RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                () -> DesignTools.populateBlackBox(design, "bb", circuit));
+        Assertions.assertTrue(e.getMessage().contains("different port signature"), e.getMessage());
+        Assertions.assertTrue(e.getMessage().contains("port I mismatch"), e.getMessage());
+        Assertions.assertFalse(e.getMessage().contains("port O mismatch"), e.getMessage());
+
+        // Ports that are missing on either side are each listed
+        Design other = createCircuit("other", EDIFDirection.INPUT);
+        other.getTopEDIFCell().createPort("X", EDIFDirection.OUTPUT, 1);
+        e = Assertions.assertThrows(RuntimeException.class,
+                () -> DesignTools.populateBlackBox(design, "bb", other));
+        Assertions.assertTrue(e.getMessage().contains("port X doesn't exist on bbType"), e.getMessage());
+        Assertions.assertTrue(e.getMessage().contains("port O is missing on other"), e.getMessage());
+        Assertions.assertFalse(e.getMessage().contains("port I "), e.getMessage());
+    }
+
+    /**
      * A circuit that connects an input straight through to an output makes the shell's net on
      * that output an alias of the one on that input. Both sit outside the black box, so they are
      * not told apart by which side of the boundary they are on, but they must still be merged:

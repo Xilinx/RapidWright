@@ -602,6 +602,19 @@ public class EDIFCell extends EDIFPropertyObject {
      * @return True if the ports on each cell match each other, false otherwise.
      */
     public boolean hasCompatibleInterface(EDIFCell cell) {
+        return hasCompatibleInterface(cell, false);
+    }
+
+    /**
+     * Checks if all the port on the provided cell match and are equal to the ports on this cell.
+     * @param cell The other cell to check against.
+     * @param allowResolvedInouts If true, an inout port on this cell also matches an input or output
+     *                            port on the other cell, as when a black box with inout ports is to be
+     *                            filled by a cell whose port directions were resolved (Vivado accepts
+     *                            this when populating a black box).
+     * @return True if the ports on each cell match each other, false otherwise.
+     */
+    public boolean hasCompatibleInterface(EDIFCell cell, boolean allowResolvedInouts) {
         Map<String,EDIFPort> portMap = new HashMap<>(ports);
         if (portMap.size() != cell.getPortMap().size()) return false;
 
@@ -615,9 +628,22 @@ public class EDIFCell extends EDIFPropertyObject {
             }
             if (!Objects.equals(port.getName(), match.getName())) return false;
             if (!Objects.equals(port.getWidth(), match.getWidth())) return false;
-            if (!Objects.equals(port.getDirection(), match.getDirection())) return false;
+            if (!isCompatibleDirection(match, port, allowResolvedInouts)) return false;
         }
         return portMap.isEmpty();
+    }
+
+    /**
+     * Checks if a port's direction matches that of the corresponding port on another cell.
+     * @param port A port on the cell being checked, such as a black box.
+     * @param other The corresponding port on the other cell.
+     * @param allowResolvedInouts If true, port being an inout also matches other being an input or
+     *                            output.
+     * @return True if the directions match.
+     */
+    public static boolean isCompatibleDirection(EDIFPort port, EDIFPort other, boolean allowResolvedInouts) {
+        if (Objects.equals(port.getDirection(), other.getDirection())) return true;
+        return allowResolvedInouts && port.getDirection() == EDIFDirection.INOUT;
     }
 
     /**
