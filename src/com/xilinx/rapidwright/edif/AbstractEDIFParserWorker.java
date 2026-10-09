@@ -33,26 +33,30 @@ import com.xilinx.rapidwright.util.StringPool;
 
 public abstract class AbstractEDIFParserWorker {
 
-
+    /*
+     * Keywords, in the case that Vivado and RapidWright write them (e.g. edifLevel, timeStamp), so that
+     * EDIFTokenizer.KEYWORDS, which a token must match exactly, can use these constants. Parsing compares some of them
+     * ignoring case (see expect()).
+     */
     public static final String LEFT_PAREN = "(";
     public static final String RIGHT_PAREN = ")";
     public static final String EDIF = "edif";
     public static final String RENAME = "rename";
     public static final String EDIFVERSION = "edifversion";
-    public static final String EDIFLEVEL = "ediflevel";
+    public static final String EDIFLEVEL = "edifLevel";
     public static final String EXTERNAL = "external";
     public static final String KEYWORDMAP = "keywordmap";
     public static final String KEYWORDLEVEL = "keywordlevel";
     public static final String STATUS = "status";
     public static final String WRITTEN = "written";
-    public static final String TIMESTAMP = "timestamp";
+    public static final String TIMESTAMP = "timeStamp";
     public static final String AUTHOR = "author";
     public static final String PROGRAM = "program";
     public static final String VERSION = "version";
     public static final String COMMENT = "comment";
-    public static final String LIBRARY = "library";
+    public static final String LIBRARY = "Library";
     public static final String TECHNOLOGY = "technology";
-    public static final String NUMBERDEFINITION = "numberdefinition";
+    public static final String NUMBERDEFINITION = "numberDefinition";
     public static final String CELL = "cell";
     public static final String CELLTYPE = "celltype";
     public static final String VIEW = "view";
