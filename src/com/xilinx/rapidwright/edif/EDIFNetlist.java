@@ -815,16 +815,36 @@ public class EDIFNetlist extends EDIFName {
      * is always first.
      */
     public List<EDIFLibrary> getLibrariesInExportOrder() {
+        return getLibrariesInExportOrder(false);
+    }
+
+    /**
+     * Get Libraries in export order so that any cell instance appearing in a library will only
+     * refer to cells in its own library or previous libraries in the list.  This is a pre-requisite
+     * for export to a file.
+     * @param stable If true, libraries that do not depend on each other are ordered by name rather
+     * than by the order in which they were added to the netlist.
+     * @return List of all libraries in the netlist sorted for valid export, HDIPrimitives library
+     * is always first.
+     */
+    public List<EDIFLibrary> getLibrariesInExportOrder(boolean stable) {
         Set<EDIFLibrary> toExport = new LinkedHashSet<EDIFLibrary>();
         // Assume HDI Primitives are always first as they should not refer to any previous libraries
         toExport.add(getHDIPrimitivesLibrary());
 
-        Map<String, HashSet<EDIFLibrary>> deps = new HashMap<String, HashSet<EDIFLibrary>>();
-        for (EDIFLibrary lib : getLibraries()) {
+        Map<String, HashSet<EDIFLibrary>> deps = new LinkedHashMap<String, HashSet<EDIFLibrary>>();
+        for (EDIFLibrary lib : EDIFTools.sortIfStable(getLibraries(), stable)) {
             if (lib.isHDIPrimitivesLibrary()) continue;
-            HashSet<EDIFLibrary> externalRefs =
-                    new HashSet<EDIFLibrary>(lib.getExternallyReferencedLibraries());
-            externalRefs.remove(getHDIPrimitivesLibrary());
+            HashSet<EDIFLibrary> externalRefs = new HashSet<EDIFLibrary>();
+            for (EDIFLibrary ref : lib.getExternallyReferencedLibraries()) {
+                // A cell can refer to a library that is not in this netlist (such as one of
+                // Design.getPrimitivesLibrary()'s cells), which no library here can satisfy, so
+                // only the libraries in this netlist are waited for
+                EDIFLibrary netlistLib = getLibrary(ref.getName());
+                if (netlistLib != null && netlistLib != lib && !netlistLib.isHDIPrimitivesLibrary()) {
+                    externalRefs.add(netlistLib);
+                }
+            }
 
             if (externalRefs.isEmpty()) {
                 toExport.add(lib);
@@ -909,14 +929,8 @@ public class EDIFNetlist extends EDIFName {
             }
             os.write(EXPORT_CONST_DOUBLE_CLOSE);
 
-            List<EDIFLibrary> librariesToWrite = new ArrayList<>();
-            librariesToWrite.add(getHDIPrimitivesLibrary());
-            for (EDIFLibrary lib : EDIFTools.sortIfStable(getLibrariesMap().values(), stable)) {
-                if (lib.isHDIPrimitivesLibrary()) {
-                    continue;
-                }
-                librariesToWrite.add(lib);
-            }
+            // Cells can only be instantiated after their library has been written
+            List<EDIFLibrary> librariesToWrite = getLibrariesInExportOrder(stable);
 
             if (dos != null) {
                 Deque<Future<ParallelDCPInput>> streamFutures = new ArrayDeque<>();

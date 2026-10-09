@@ -23,6 +23,8 @@
 
 package com.xilinx.rapidwright.edif;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
@@ -430,6 +432,47 @@ class TestEDIFNetlist {
         } else {
             Assertions.assertEquals(dstLibrary.getCells().size(), 1);
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testExportEDIFLibraryOrder(boolean stable, @TempDir Path path) throws IOException {
+        final EDIFNetlist origNetlist = EDIFTools.createNewNetlist("test");
+        EDIFCell top = origNetlist.getTopCell();
+
+        // A library added after the work library (and sorting after it by name), holding a cell
+        // instantiated by the work library's top cell, as when cells are merged in from another netlist
+        EDIFLibrary otherLib = origNetlist.addLibrary(new EDIFLibrary("z_lib"));
+        EDIFCell sub = new EDIFCell(otherLib, "sub");
+        EDIFPort subPort = sub.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCellInst subInst = top.createChildCellInst("sub_inst", sub);
+        EDIFPort topPort = top.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFNet net = top.createNet("I");
+        net.createPortInst(topPort);
+        net.createPortInst(subPort, subInst);
+
+        // A library that nothing depends upon, added last
+        EDIFLibrary unusedLib = origNetlist.addLibrary(new EDIFLibrary("a_lib"));
+        new EDIFCell(unusedLib, "unused");
+
+        Path tempFile = path.resolve("test.edf");
+        origNetlist.exportEDIF(tempFile, stable);
+
+        // A cell's library must be written before any instance of it
+        String edif = new String(Files.readAllBytes(tempFile));
+        int otherLibIdx = edif.indexOf("(Library z_lib");
+        int workLibIdx = edif.indexOf("(Library " + EDIFTools.EDIF_LIBRARY_WORK_NAME);
+        int unusedLibIdx = edif.indexOf("(Library a_lib");
+        Assertions.assertTrue(otherLibIdx >= 0 && workLibIdx >= 0 && unusedLibIdx >= 0);
+        Assertions.assertTrue(otherLibIdx < workLibIdx);
+        if (stable) {
+            // Libraries without dependencies between them are written in name order
+            Assertions.assertTrue(unusedLibIdx < otherLibIdx);
+        }
+
+        EDIFNetlist testNetlist = EDIFTools.readEdifFile(tempFile);
+        EDIFNetlistComparator comparer = new EDIFNetlistComparator();
+        Assertions.assertEquals(0, comparer.compareNetlists(origNetlist, testNetlist));
     }
 
     @Test
