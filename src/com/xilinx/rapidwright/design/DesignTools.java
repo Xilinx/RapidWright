@@ -956,9 +956,12 @@ public class DesignTools {
      * begun: a failure part way through -- a site overlap, say -- leaves the boxes filled so far in
      * place, and the logical netlist of all of them already swapped in.
      * <p>
-     * A design that is tracking its changes records every net this touches, so a caller that needs
-     * to operate on the result can start from {@link Design#getModifiedNets()}. No net outside
-     * that record is altered here.
+     * Nets are only recorded if tracking is enabled on the design before this is called, with
+     * {@link Design#setTrackNetChanges(boolean)} or {@link Design#setTrackingChanges(boolean)}.
+     * Every net this touches is then recorded, and no net outside that record is altered here, so a
+     * caller that needs to operate on the result can start from {@link Design#getModifiedNets()}.
+     * That record is cumulative: it also holds any net recorded by earlier operations, until
+     * emptied with {@link Design#clearTrackedChanges()}.
      *
      * @param design              The top level design
      * @param blackBoxes          The 'guts' to be inserted, keyed by the hierarchical name of the
