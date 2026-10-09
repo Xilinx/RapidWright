@@ -55,7 +55,10 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
 
 
     public EDIFParser(Path fileName) throws FileNotFoundException {
-        super(fileName, StringPool.singleThreadedPool());
+        // Without reading the file (as EDIFTools.isGzipped() would), so that a missing file still
+        // throws FileNotFoundException below
+        super(fileName, StringPool.singleThreadedPool(ParallelEDIFParser.estimatePooledStrings(
+                fileName.toFile().length(), fileName.toString().endsWith(".gz"))));
     }
 
     public EDIFParser(String fileName) throws FileNotFoundException {

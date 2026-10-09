@@ -60,13 +60,34 @@ public class ParallelEDIFParser implements AutoCloseable{
 
     /** Whether the input is gzip-compressed, determined once by the caller. */
     private final boolean gzipped;
-    protected StringPool uniquifier = StringPool.concurrentPool();
+    protected final StringPool uniquifier;
 
     /**
      * Estimated ratio of EDIF to gzipped EDIF file size, used in calculating the
      * number of thread workers for parallel EDIF parsing
      */
     public static final int EDIF_GZIP_COMPRESSION_RATIO = 16;
+
+    /**
+     * Estimated number of bytes of (uncompressed) EDIF per distinct String in the pool, used to size the pool so
+     * that it rarely has to grow while being filled. Pooled Strings per KB of EDIF varied from 0.38 to 14.2 in 14
+     * EDIFs, and from 0.38 to 1.5 in those larger than 100 MB (e.g. 1.11 for a 14.1 GB EDIF and 1.48 for a 38.6 GB
+     * EDIF, whose 55.6M Strings otherwise doubled the pool's table about 23 times). One String per KB avoids all
+     * but the last doubling for such EDIFs, while sizing the pool for at most about 2.6 times as many Strings as
+     * the sparsest of them needs.
+     */
+    private static final int EDIF_BYTES_PER_POOLED_STRING = 1024;
+
+    /**
+     * Estimate the number of distinct Strings that parsing an EDIF file will pool, to size the pool.
+     * @param fileSize Size of the file on disk, in bytes.
+     * @param gzipped Whether the file is gzip-compressed.
+     * @return The estimated number of pooled Strings.
+     */
+    static int estimatePooledStrings(long fileSize, boolean gzipped) {
+        final long edifBytes = gzipped ? fileSize * EDIF_GZIP_COMPRESSION_RATIO : fileSize;
+        return (int) Math.min(Math.max(edifBytes, 0) / EDIF_BYTES_PER_POOLED_STRING, Integer.MAX_VALUE);
+    }
 
     ParallelEDIFParser(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier,
             int maxTokenLength, int maxThreads, boolean gzipped) {
@@ -76,6 +97,7 @@ public class ParallelEDIFParser implements AutoCloseable{
         this.maxTokenLength = maxTokenLength;
         this.maxThreads = maxThreads;
         this.gzipped = gzipped;
+        this.uniquifier = StringPool.concurrentPool(estimatePooledStrings(fileSize, gzipped));
     }
 
     ParallelEDIFParser(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier,
