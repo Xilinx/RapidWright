@@ -35,6 +35,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
@@ -352,10 +353,10 @@ public class ParallelismTools {
      * calling thread splits the items (using the collection's own Spliterator) into roughly
      * four pieces per thread of the common ForkJoinPool, which are distributed by work
      * stealing, and the calling thread also participates.
-     * If the task throws for any item, that exception is rethrown (for a parallel stream,
-     * if thrown on another thread, as a new exception of the same type with the original as
-     * its cause, where possible); in that case, the task may not have been run for other
-     * items, or may still be running.
+     * If the task throws for any item, that exception is rethrown (if thrown on another
+     * thread, as a new exception of the same type with the original as its cause, where
+     * possible); in that case, the task may not have been run for other items, or may still
+     * be running.
      * @param items the items to call the task with
      * @param task the task that should be executed for all items
      * @param <T> item type
@@ -430,13 +431,20 @@ public class ParallelismTools {
 
     /**
      * Given a list of tasks-with-return-value, block until all tasks
-     * have been completed: all but the last are submitted to the thread pool,
-     * the last is executed by the current thread, which then steals any that
-     * have not yet been claimed (see {@link #join(List)}).
-     * If any task threw an exception, the first (in order) is rethrown as
-     * described in {@link #getUnwrapped(Future)}; when parallel processing is
-     * disabled, all tasks are executed in order on the current thread before
-     * this happens.
+     * have been completed, using {@link ForkJoinTask#invokeAll(Collection)}: all
+     * but the first are forked (to the current thread's own queue, if it is a
+     * thread of the pool, otherwise to the common pool), the first is executed
+     * by the current thread, which then helps until the others are done, by
+     * executing any not yet taken by another thread and helping those that
+     * did. Unlike blocking on a {@link FutureTask}, a pool thread that must
+     * wait lets the pool compensate with another thread.
+     * If any task throws an exception, one of them (not necessarily the first in
+     * order) is rethrown: if thrown on another thread, as a new exception of the
+     * same type with the original as its cause, where possible, and a checked
+     * exception wrapped in a RuntimeException. In that case, the other tasks may
+     * have been cancelled or not run. When parallel processing is disabled, all
+     * tasks are executed in order on the current thread, and then the first
+     * exception (in order) is rethrown as described in {@link #getUnwrapped(Future)}.
      * @param tasks List of tasks-with-return-value.
      * @param <T> Type returned by all tasks.
      * @return A list of Future objects used to hold returned data.
@@ -444,22 +452,20 @@ public class ParallelismTools {
     @SafeVarargs
     public static <T> List<Future<T>> invokeAll(Callable<T>... tasks) {
         List<Future<T>> futures = new ArrayList<>(tasks.length);
-        if (tasks.length == 0) {
+        if (!getParallel()) {
+            for (Callable<T> task : tasks) {
+                futures.add(callNow(task));
+            }
+            join(futures);
             return futures;
         }
 
-        // Submit all but the last (when parallel processing is disabled, submit()
-        // executes each immediately on this thread)
-        for (int i = 0; i < tasks.length - 1; i++) {
-            futures.add(submit(tasks[i]));
+        final List<ForkJoinTask<T>> forkJoinTasks = new ArrayList<>(tasks.length);
+        for (Callable<T> task : tasks) {
+            forkJoinTasks.add(ForkJoinTask.adapt(task));
         }
-
-        // Invoke the last
-        futures.add(callNow(tasks[tasks.length - 1]));
-
-        // Steal those not yet claimed and wait for the rest
-        join(futures);
-
+        ForkJoinTask.invokeAll(forkJoinTasks);
+        futures.addAll(forkJoinTasks);
         return futures;
     }
 
