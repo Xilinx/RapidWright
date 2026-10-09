@@ -24,6 +24,8 @@
 package com.xilinx.rapidwright.edif;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -507,6 +509,131 @@ class TestEDIFNetlist {
         EDIFNetlist testNetlist = EDIFTools.readEdifFile(tempFile);
         EDIFNetlistComparator comparer = new EDIFNetlistComparator();
         Assertions.assertEquals(0, comparer.compareNetlists(origNetlist, testNetlist));
+    }
+
+    @Test
+    public void testFindParentNet() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+        List<EDIFHierNet> nets = new ArrayList<>();
+        List<EDIFHierCellInst> insts = new ArrayList<>(netlist.getAllDescendants("", null, false));
+        insts.add(netlist.getTopHierCellInst());
+        for (EDIFHierCellInst inst : insts) {
+            for (EDIFNet net : inst.getCellType().getNets()) {
+                nets.add(inst.getNet(net.getName()));
+            }
+        }
+
+        // Without the parent net map, which it must not build
+        netlist.resetParentNetMap();
+        Map<EDIFHierNet, EDIFHierNet> found = new HashMap<>();
+        for (EDIFHierNet net : nets) {
+            found.put(net, netlist.findParentNet(net));
+        }
+        Assertions.assertFalse(netlist.isParentNetMapBuilt());
+
+        // Nor change the physical pins recorded so far
+        EDIFHierNet seed = nets.stream().map(found::get).filter(n -> n != null).findFirst().get();
+        netlist.getNetAliases(seed);
+        Map<EDIFHierNet, List<EDIFHierPortInst>> physicalNetPins = new HashMap<>(netlist.getPhysicalNetPinMap());
+        List<EDIFHierPortInst> physicalGndPins = new ArrayList<>(netlist.getPhysicalGndPins());
+        List<EDIFHierPortInst> physicalVccPins = new ArrayList<>(netlist.getPhysicalVccPins());
+        Assertions.assertFalse(physicalNetPins.isEmpty());
+        for (EDIFHierNet net : nets) {
+            Assertions.assertEquals(found.get(net), netlist.findParentNet(net), net.toString());
+        }
+        Assertions.assertFalse(netlist.isParentNetMapBuilt());
+        Assertions.assertEquals(physicalNetPins, netlist.getPhysicalNetPinMap());
+        Assertions.assertEquals(physicalGndPins, netlist.getPhysicalGndPins());
+        Assertions.assertEquals(physicalVccPins, netlist.getPhysicalVccPins());
+
+        netlist.resetParentNetMap();
+        int withParent = 0;
+        for (EDIFHierNet net : nets) {
+            EDIFHierNet parent = netlist.getParentNet(net);
+            Assertions.assertEquals(parent, found.get(net), net.toString());
+            if (parent != null) withParent++;
+        }
+        Assertions.assertTrue(withParent > 1000);
+        // With the map built, it is used
+        Assertions.assertEquals(netlist.getParentNet(nets.get(0)), netlist.findParentNet(nets.get(0)));
+    }
+
+    /**
+     * Builds a netlist with a net 'wire' in instance 'u' that is connected to a leaf cell input
+     * and, through ports of 'u', to one top-level port per entry of topPortDirections (each on its
+     * own top-level net 'n0', 'n1', ...), and is driven by the given number of leaf cell outputs.
+     * Checks that the parent net of every alias of 'u/wire' is the expected one ("none" for no
+     * parent, "throws" for multiple sources), looked up from any alias before or after building the
+     * parent net map.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "'INOUT INOUT', 1, u/wire",
+            "'INPUT INOUT', 0, n0",
+            "'INOUT INPUT', 0, n1",
+            "'INOUT', 1, u/wire",
+            "'INOUT', 0, n0",
+            "'OUTPUT', 0, none",
+            "'INOUT INOUT', 0, throws",
+            "'INPUT INPUT', 0, throws",
+            "'', 2, throws",
+    })
+    public void testFindParentNetSources(String topPortDirections, int leafDrivers, String expected) {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top");
+        EDIFCell top = netlist.getTopCell();
+        EDIFCell child = new EDIFCell(netlist.getWorkLibrary(), "child");
+        EDIFNet wire = child.createNet("wire");
+        EDIFCellInst u = top.createChildCellInst("u", child);
+        String[] directions = topPortDirections.isEmpty() ? new String[0] : topPortDirections.split(" ");
+        for (int i = 0; i < directions.length; i++) {
+            EDIFDirection dir = EDIFDirection.valueOf(directions[i]);
+            EDIFPort childPort = child.createPort("p" + i, dir, 1);
+            wire.createPortInst(childPort);
+            EDIFNet net = top.createNet("n" + i);
+            net.createPortInst(top.createPort("io" + i, dir, 1));
+            net.createPortInst(childPort, u);
+        }
+        EDIFCell driver = new EDIFCell(netlist.getWorkLibrary(), "driver");
+        EDIFPort o = driver.createPort("O", EDIFDirection.OUTPUT, 1);
+        for (int i = 0; i < leafDrivers; i++) {
+            wire.createPortInst(o, child.createChildCellInst("d" + i, driver));
+        }
+        EDIFCell sink = new EDIFCell(netlist.getWorkLibrary(), "sink");
+        wire.createPortInst(sink.createPort("I", EDIFDirection.INPUT, 1), child.createChildCellInst("s", sink));
+
+        List<EDIFHierNet> aliases = new ArrayList<>();
+        aliases.add(netlist.getHierNetFromName("u/wire"));
+        for (int i = 0; i < directions.length; i++) {
+            aliases.add(netlist.getHierNetFromName("n" + i));
+        }
+
+        if (expected.equals("throws")) {
+            for (EDIFHierNet alias : aliases) {
+                netlist.resetParentNetMap();
+                Assertions.assertThrows(RuntimeException.class, () -> netlist.findParentNet(alias), alias.toString());
+                Assertions.assertFalse(netlist.isParentNetMapBuilt());
+                netlist.resetParentNetMap();
+                Assertions.assertThrows(RuntimeException.class, () -> netlist.getParentNet(alias), alias.toString());
+            }
+            return;
+        }
+
+        EDIFHierNet expectedParent = expected.equals("none") ? null : netlist.getHierNetFromName(expected);
+        // Starting from each alias, before and after building the map from that alias
+        for (EDIFHierNet start : aliases) {
+            netlist.resetParentNetMap();
+            for (EDIFHierNet alias : aliases) {
+                Assertions.assertEquals(expectedParent, netlist.findParentNet(alias), alias.toString());
+            }
+            Assertions.assertFalse(netlist.isParentNetMapBuilt());
+            Assertions.assertEquals(expectedParent, netlist.getParentNet(start), start.toString());
+            Assertions.assertTrue(netlist.isParentNetMapBuilt());
+            for (EDIFHierNet alias : aliases) {
+                Assertions.assertEquals(expectedParent, netlist.getParentNet(alias), alias.toString());
+                Assertions.assertEquals(expectedParent, netlist.findParentNet(alias), alias.toString());
+            }
+        }
     }
 
     @Test

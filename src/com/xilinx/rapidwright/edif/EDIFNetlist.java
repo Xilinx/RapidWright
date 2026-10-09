@@ -1386,38 +1386,88 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
-     * Get's all equivalent nets in the netlist from the provided net name.
-     * The returned list also includes the provided netName.
-     * @param initialNet Full hierarchical netname to use as a starting point in the search.
+     * Gets all equivalent nets in the netlist from the provided net.
+     * The returned list also includes the provided net. The leaf cell pins of these nets are
+     * recorded as the physical pins of their parent net (see {@link #getPhysicalNetPinMap()}).
+     * @param initialNet The net to use as a starting point in the search.
      * @return A list of all electrically connected nets in the netlist that are equivalent.
-     * The list is composed of all full hierarchical net names or an empty list if netName is invalid.
+     * @throws RuntimeException If the net has more than one source, or has connections but no
+     * source.
      */
     public List<EDIFHierNet> getNetAliases(EDIFHierNet initialNet) {
+        List<EDIFHierNet> aliases = new ArrayList<>();
+        recordParentNet(initialNet, aliases);
+        return aliases;
+    }
+
+    /**
+     * Does what {@link #getNetAliases(EDIFHierNet)} does, and returns the parent net.
+     * @param initialNet The net to use as a starting point in the search.
+     * @param aliases All electrically connected nets in the netlist that are equivalent are added
+     * to it.
+     * @return The parent net, or null if the net has no connections.
+     * @throws RuntimeException If the net has more than one source, or has connections but no
+     * source.
+     */
+    private EDIFHierNet recordParentNet(EDIFHierNet initialNet, List<EDIFHierNet> aliases) {
         if (physicalNetPinMap == null) {
             physicalNetPinMap = new HashMap<>();
             physicalGndPins = new ArrayList<>();
             physicalVccPins = new ArrayList<>();
         }
-        ArrayList<EDIFHierPortInst> leafCellPins = new ArrayList<>();
-        List<EDIFHierNet> aliases = new ArrayList<>();
+        List<EDIFHierPortInst> leafCellPins = new ArrayList<>();
+        EDIFHierPortInst source = findParentPortInst(initialNet, aliases, leafCellPins);
+        if (source != null) {
+            switch (identifyNetType(source)) {
+                case GND:
+                    physicalGndPins.addAll(leafCellPins);
+                    break;
+                case VCC:
+                    physicalVccPins.addAll(leafCellPins);
+                    break;
+            }
+            EDIFHierNet parentNet = source.getHierarchicalNet();
+            physicalNetPinMap.put(parentNet, leafCellPins);
+            return parentNet;
+        } else if (initialNet.getNet().getPortInsts().size() != 0) {
+            throw new RuntimeException("ERROR: Couldn't identify parent net, no output pins (or top level output port) found.");
+        }
+        return null;
+    }
+
+    /**
+     * Finds the source port inst of the parent net of the provided net, by searching all its
+     * equivalent nets in the netlist as {@link #getNetAliases(EDIFHierNet)} does. Nothing in the
+     * netlist is changed.
+     * @param initialNet The net to use as a starting point in the search.
+     * @param aliases If not null, all electrically connected nets in the netlist that are
+     * equivalent are added to it.
+     * @param leafCellPins If not null, all leaf cell pins on those nets are added to it.
+     * @return The source port inst of the parent net, or null if none was found.
+     * @throws RuntimeException If the net has more than one source.
+     */
+    private EDIFHierPortInst findParentPortInst(EDIFHierNet initialNet, List<EDIFHierNet> aliases,
+            List<EDIFHierPortInst> leafCellPins) {
         Queue<EDIFHierNet> queue = new ArrayDeque<>();
         queue.add(initialNet);
         HashSet<EDIFHierNet> visited = new HashSet<>();
 
         EDIFHierPortInst source = null;
-        EDIFHierNet parentNet = null;
-        EDIFHierNet fallbackParentNet = null;
+        EDIFHierPortInst fallbackSource = null;
+        boolean multipleFallbackSources = false;
         while (!queue.isEmpty()) {
             EDIFHierNet net = queue.poll();
             if (!visited.add(net)) {
                 continue;
             }
-            aliases.add(net);
+            if (aliases != null) {
+                aliases.add(net);
+            }
             for (EDIFPortInst relP : net.getNet().getPortInsts()) {
                 EDIFHierPortInst p = new EDIFHierPortInst(net.getHierarchicalInst(), relP);
 
                 boolean isCellPin = relP.getCellInst() != null && relP.getCellInst().getCellType().isLeafCellOrBlackBox();
-                if (isCellPin) {
+                if (leafCellPins != null && isCellPin) {
                     leafCellPins.add(p);
                 }
 
@@ -1425,22 +1475,21 @@ public class EDIFNetlist extends EDIFName {
                 boolean isTopLevelPortInst = p.getHierarchicalInst().isTopLevelInst() && relP.getCellInst() == null;
                 boolean isToplevelInput = isTopLevelPortInst && p.isInput();
                 if (isToplevelInput || (isCellPin && p.isOutput())) {
-                    if (parentNet != null) {
+                    if (source != null) {
                         throw new RuntimeException("Multiple sources!");
                     }
                     source = p;
-                    parentNet = net;
                 }
 
                 // For top-level INOUT ports, consider the possibility that it might be an input
-                // and thus a parent net
+                // and thus a parent net. Whether more than one is an error depends on whether
+                // any other source is found, so is only decided once all aliases are visited.
                 boolean isToplevelInout = isTopLevelPortInst && !p.isInput() && !p.isOutput();
                 if (isToplevelInout) {
-                    if (fallbackParentNet != null) {
-                        throw new RuntimeException("Multiple sources!");
-                    } else if (parentNet == null) {
-                        source = p;
-                        fallbackParentNet = net;
+                    if (fallbackSource != null) {
+                        multipleFallbackSources = true;
+                    } else {
+                        fallbackSource = p;
                     }
                 }
 
@@ -1464,28 +1513,14 @@ public class EDIFNetlist extends EDIFName {
             }
         }
 
-        if (parentNet == null) {
-            // No other parent net was found, promote the fallback net
-            parentNet = fallbackParentNet;
+        if (source != null) {
+            return source;
         }
-
-        if (parentNet != null) {
-            switch (identifyNetType(source)) {
-                case GND:
-                    physicalGndPins.addAll(leafCellPins);
-                    break;
-                case VCC:
-                    physicalVccPins.addAll(leafCellPins);
-                    break;
-            }
-            physicalNetPinMap.put(parentNet, leafCellPins);
-        } else if (initialNet.getNet().getPortInsts().size() == 0) {
-            return aliases;
-        } else {
-            throw new RuntimeException("ERROR: Couldn't identify parent net, no output pins (or top level output port) found.");
+        // No other source was found, so the source is the fallback (top-level inout), if unique
+        if (multipleFallbackSources) {
+            throw new RuntimeException("Multiple sources!");
         }
-
-        return aliases;
+        return fallbackSource;
     }
 
     /**
@@ -1506,6 +1541,23 @@ public class EDIFNetlist extends EDIFName {
      */
     public EDIFHierNet getParentNet(EDIFHierNet netAlias) {
         return getParentNetMap().get(netAlias);
+    }
+
+    /**
+     * Finds the canonical net of a net, as {@link #getParentNet(EDIFHierNet)} does, but without
+     * building the parent net map of the whole netlist if it is not already built: only the net's
+     * own aliases are searched. This is much cheaper for looking up a few nets in a large netlist,
+     * though each lookup costs a search, so {@link #getParentNet(EDIFHierNet)} is better for many.
+     * @param netAlias A net in the netlist.
+     * @return The parent net, or null if the net has no source.
+     * @throws RuntimeException If the net has more than one source.
+     */
+    public EDIFHierNet findParentNet(EDIFHierNet netAlias) {
+        if (parentNetMap != null) {
+            return parentNetMap.get(netAlias);
+        }
+        EDIFHierPortInst source = findParentPortInst(netAlias, null, null);
+        return (source != null) ? source.getHierarchicalNet() : null;
     }
 
     /**
@@ -1605,9 +1657,18 @@ public class EDIFNetlist extends EDIFName {
 
         for (EDIFHierPortInst pr : queue) {
             assert(pr.getNet() != null);
-            EDIFHierNet parentNetName = pr.getHierarchicalNet();
-            for (EDIFHierNet alias : getNetAliases(parentNetName)) {
-                parentNetMap.put(alias, parentNetName);
+            EDIFHierNet net = pr.getHierarchicalNet();
+            if (parentNetMap.containsKey(net)) {
+                // Already mapped from another possible source of the same net
+                continue;
+            }
+            // The queued port may not be the source (e.g. a top-level inout next to a top-level
+            // input), so map the aliases to the parent net that the search resolves, just as
+            // findParentNet() does
+            List<EDIFHierNet> aliases = new ArrayList<>();
+            EDIFHierNet parentNet = recordParentNet(net, aliases);
+            for (EDIFHierNet alias : aliases) {
+                parentNetMap.put(alias, parentNet);
             }
         }
         if (DEBUG) {
