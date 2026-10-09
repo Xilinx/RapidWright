@@ -1201,6 +1201,9 @@ public class DesignTools {
             design.getOriginalSiteInsts().remove(evicted.getName());
         }
 
+        // Nets that something was merged onto, and so may hold the same PIP more than once
+        Set<Net> mergedOnto = new HashSet<>();
+
         // Add routing information
         for (Entry<String, Design> e : blackBoxes.entrySet()) {
             String hierarchicalCellName = e.getKey();
@@ -1212,9 +1215,12 @@ public class DesignTools {
                 if (net.isStaticNet()) {
                     Net staticNet = design.getStaticNet(net.getType());
                     staticNet.addPins(net.getPins());
-                    HashSet<PIP> uniquePIPs = new HashSet<>(net.getPIPs());
-                    uniquePIPs.addAll(staticNet.getPIPs());
-                    staticNet.setPIPs(uniquePIPs);
+                    if (staticNet.hasPIPs() && net.hasPIPs()) {
+                        mergedOnto.add(staticNet);
+                    }
+                    for (PIP p : net.getPIPs()) {
+                        staticNet.addPIP(p);
+                    }
                     modifiedNets.add(staticNet);
                 } else {
                     // rename() acts on whichever design currently owns the net, so this re-keys the
@@ -1239,7 +1245,6 @@ public class DesignTools {
         // no routing is left to carry across. The design's GND or VCC net is the exception: it is
         // unrouted, in its entirety, only when something is merged onto it, a port merely tied to
         // a constant not being reason enough
-        Set<Net> mergedOnto = new HashSet<>();
         for (String name : portNames) {
             String parent = resolveParent(portParents, undriven, name);
             Net net = design.getNet(name);
@@ -1267,14 +1272,17 @@ public class DesignTools {
             if (!keepBoundaryRouting && target.isStaticNet()) {
                 target.unroute();
             }
-            mergeOntoNet(design, net, target, modifiedNets);
-            mergedOnto.add(target);
+            if (mergeOntoNet(design, net, target, modifiedNets)) {
+                mergedOnto.add(target);
+            }
             modifiedNets.add(target);
         }
 
         // Where the routing is kept, a net can be handed the same PIPs more than once: the shell and
         // the circuit can each hold the routing of a signal up to the black box port, such as a
-        // clock routed into the region of every black box. A PIP must be on a net only once
+        // clock routed into the region of every black box. The design's GND and VCC nets can likewise
+        // be handed the same PIPs by its own static routing and by each circuit's. A PIP must be on
+        // a net only once
         for (Net target : mergedOnto) {
             removeDuplicatePIPs(target);
         }
@@ -1364,16 +1372,20 @@ public class DesignTools {
      * @param target       The net to merge it onto.
      * @param modifiedNets Updated in place: the net is taken out, so that the set never names a
      *                     net the design no longer has.
+     * @return True if both nets had PIPs, so that the target may now hold the same PIP more than
+     *         once.
      */
-    private static void mergeOntoNet(Design design, Net net, Net target, Set<Net> modifiedNets) {
+    private static boolean mergeOntoNet(Design design, Net net, Net target, Set<Net> modifiedNets) {
         modifiedNets.remove(net);
         // Deleting the net leaves its PIPs where they are, so they can be read afterwards. They are
         // added one by one rather than the list handed over, which would leave the deleted net and
         // the target sharing it
         design.movePinsToNewNetDeleteOldNet(net, target, true);
+        boolean bothRouted = target.hasPIPs() && net.hasPIPs();
         for (PIP p : net.getPIPs()) {
             target.addPIP(p);
         }
+        return bothRouted;
     }
 
     /**
@@ -1387,7 +1399,7 @@ public class DesignTools {
         if (pips.size() < 2) return;
         Set<PIP> unique = new LinkedHashSet<>(pips);
         if (unique.size() < pips.size()) {
-            net.setPIPs(new ArrayList<>(unique));
+            net.setPIPs(unique);
         }
     }
 
