@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -78,22 +78,30 @@ public abstract class AbstractEDIFParserWorker {
 
     protected final EDIFTokenizer tokenizer;
     protected final InputStream in;
-    protected final EDIFReadLegalNameCache cache;
+    /**
+     * The renames recorded by this parser (worker), which are not shared with any other: it is written without
+     * synchronization while parsing, and may only be read by other threads once parsing has finished.
+     */
+    protected final EDIFReadLegalNameCache cache = new EDIFReadLegalNameCache();
 
-    public AbstractEDIFParserWorker(Path fileName, InputStream in, StringPool uniquifier, int maxTokenLength, EDIFReadLegalNameCache cache) {
+    /**
+     * Whether a port of the cell being (or last) parsed by {@link #parseEDIFCell(String, String)} was renamed, and
+     * so has its rename recorded in {@link #cache}.
+     */
+    protected boolean cellHasRenamedPorts;
+
+    public AbstractEDIFParserWorker(Path fileName, InputStream in, StringPool uniquifier, int maxTokenLength) {
         this.in = in;
-        this.cache = cache;
         this.tokenizer = new EDIFTokenizer(fileName, in, uniquifier, maxTokenLength);
     }
 
-    public AbstractEDIFParserWorker(Path fileName, InputStream in, StringPool uniquifier, EDIFReadLegalNameCache cache) {
-        this(fileName, in, uniquifier, EDIFTokenizer.DEFAULT_MAX_TOKEN_LENGTH, cache);
+    public AbstractEDIFParserWorker(Path fileName, InputStream in, StringPool uniquifier) {
+        this(fileName, in, uniquifier, EDIFTokenizer.DEFAULT_MAX_TOKEN_LENGTH);
     }
 
-    public AbstractEDIFParserWorker(Path fileName, StringPool uniquifier, EDIFReadLegalNameCache cache) throws FileNotFoundException {
+    public AbstractEDIFParserWorker(Path fileName, StringPool uniquifier) throws FileNotFoundException {
         in = EDIFTools.openEDIFInputStream(fileName);
         tokenizer = new EDIFTokenizer(fileName, in, uniquifier);
-        this.cache = cache;
     }
 
     /**
@@ -134,7 +142,13 @@ public abstract class AbstractEDIFParserWorker {
     }
 
 
-    protected<T extends EDIFName> T parseEDIFNameObject(T o) {
+    /**
+     * Parse the name of an object, which may be given as (rename identifier "name"), and set it on the object.
+     * The rename (EDIF identifier) is not recorded.
+     * @param o The object being named.
+     * @return The object's EDIF identifier if it was renamed, else null.
+     */
+    protected String parseEDIFName(EDIFName o) {
         String currToken = getNextToken(false);
         if (currToken.equals(EDIFParser.LEFT_PAREN)) {
             expect(EDIFParser.RENAME, getNextToken(true));
@@ -146,11 +160,36 @@ public abstract class AbstractEDIFParserWorker {
                 name = tokenizer.getUniquifier().uniquifyName(tmpName);
             }
             o.setName(name);
-            cache.setRename(o, rename);
             expect(EDIFParser.RIGHT_PAREN, getNextToken(true));
-        } else {
-            o.setName(currToken);
+            return rename;
         }
+        o.setName(currToken);
+        return null;
+    }
+
+    /**
+     * Parse the name of an object that may be referenced by its EDIF identifier while parsing (a library or cell),
+     * recording its rename (if any) in the cache so that such references can be resolved. Ports' renames are
+     * recorded by {@link #parseEDIFPort()} and cell instances' renames are only needed within their parent cell.
+     * @param o The object being named.
+     * @return The object.
+     */
+    protected<T extends EDIFName> T parseEDIFNameObject(T o) {
+        final String rename = parseEDIFName(o);
+        if (rename != null) {
+            cache.setRename(o, rename);
+        }
+        return o;
+    }
+
+    /**
+     * Parse the name of an object that is never referenced by its EDIF identifier while parsing (e.g. a net, view,
+     * property key, design or netlist), so its rename (if any) is not recorded. Export recomputes identifiers.
+     * @param o The object being named.
+     * @return The object.
+     */
+    protected<T extends EDIFName> T parseUnreferencedEDIFNameObject(T o) {
+        parseEDIFName(o);
         return o;
     }
 
@@ -164,7 +203,7 @@ public abstract class AbstractEDIFParserWorker {
     protected EDIFNetlist parseEDIFNetlistHead() {
         expect(LEFT_PAREN, getNextToken(true));
         expect(EDIF, getNextToken(true));
-        EDIFNetlist netlist = parseEDIFNameObject(new EDIFNetlist());
+        EDIFNetlist netlist = parseUnreferencedEDIFNameObject(new EDIFNetlist());
         expect(LEFT_PAREN, getNextToken(true));
         expect(EDIFVERSION, getNextToken(true));
         expect("2", getNextToken(true));
@@ -193,6 +232,7 @@ public abstract class AbstractEDIFParserWorker {
         EDIFCell cell = parseEDIFNameObject(new EDIFCell());
         cell = updateEDIFRefCellMap(libraryLegalName, cell);
         Map<String, EDIFCellInst> instanceLookup = new HashMap<>();
+        cellHasRenamedPorts = false;
         expect(LEFT_PAREN, getNextToken(true));
         expect(CELLTYPE, getNextToken(true));
         expect("GENERIC", getNextToken(true));
@@ -207,7 +247,7 @@ public abstract class AbstractEDIFParserWorker {
             viewOrProperty = getNextToken(true);
         }
         expect(VIEW, viewOrProperty);
-        cell.setView(parseEDIFNameObject(new EDIFName()));
+        cell.setView(parseUnreferencedEDIFNameObject(new EDIFName()));
         expect(LEFT_PAREN, getNextToken(true));
         expect(VIEWTYPE, getNextToken(true));
         expect("NETLIST", getNextToken(true));
@@ -337,7 +377,7 @@ public abstract class AbstractEDIFParserWorker {
 
     protected EDIFPropertyObject parseProperty(EDIFPropertyObject o, String nextToken) {
         expect(PROPERTY, nextToken);
-        EDIFName key = parseEDIFNameObject(new EDIFName());
+        EDIFName key = parseUnreferencedEDIFNameObject(new EDIFName());
         EDIFPropertyValue value = parsePropertyValue();
         o.addProperty(key.getName(),value);
         String paren = getNextToken(true);
@@ -358,7 +398,7 @@ public abstract class AbstractEDIFParserWorker {
 
     protected EDIFNet parseEDIFNet(EDIFCell cell, Map<String, EDIFCellInst> instanceLookup, String netToken, EDIFReadLegalNameCache cache) {
         expect(NET, netToken);
-        EDIFNet net = parseEDIFNameObject(new EDIFNet());
+        EDIFNet net = parseUnreferencedEDIFNameObject(new EDIFNet());
         expect(LEFT_PAREN, getNextToken(true));
         expect(JOINED, getNextToken(true));
         String currToken = null;
@@ -428,14 +468,15 @@ public abstract class AbstractEDIFParserWorker {
         if (currToken.equals(LEFT_PAREN)) {
             currToken = getNextToken(true);
             if (currToken.equals(ARRAY)) {
-                port = parseEDIFNameObject(new EDIFPort());
+                port = new EDIFPort();
+                setPortRename(port, parseEDIFName(port));
                 port.setWidth(Integer.parseInt(getNextToken(true)));
                 expect(RIGHT_PAREN, getNextToken(true));
             } else if (currToken.equals(RENAME)) {
                 port = new EDIFPort();
                 final String rename = getNextToken(false);
                 port.setName(getNextToken(false));
-                cache.setRename(port, rename);
+                setPortRename(port, rename);
                 expect(RIGHT_PAREN, getNextToken(true));
             } else {
                 expect(ARRAY + " | " + RENAME, currToken);
@@ -457,13 +498,24 @@ public abstract class AbstractEDIFParserWorker {
         return port;
     }
 
+    /**
+     * Record a port's rename (if any), which is needed to find the port by its EDIF identifier when linking port
+     * insts to it.
+     */
+    private void setPortRename(EDIFPort port, String rename) {
+        if (rename != null) {
+            cache.setRename(port, rename);
+            cellHasRenamedPorts = true;
+        }
+    }
+
     private EDIFCellInst parseEDIFCellInst(String currentLibraryName, Map<String, EDIFCellInst> instanceLookup, EDIFCell currentCell, String instanceToken) {
         expect(INSTANCE, instanceToken);
-        EDIFCellInst inst = parseEDIFNameObject(new EDIFCellInst());
-        inst = updateEDIFRefCellInstMap(inst, instanceLookup);
+        EDIFCellInst inst = new EDIFCellInst();
+        inst = updateEDIFRefCellInstMap(inst, parseEDIFName(inst), instanceLookup);
         expect(LEFT_PAREN, getNextToken(true));
         expect(VIEWREF, getNextToken(true));
-        inst.setViewref(parseEDIFNameObject(new EDIFName()));
+        inst.setViewref(parseUnreferencedEDIFNameObject(new EDIFName()));
         expect(LEFT_PAREN, getNextToken(true));
         expect(CELLREF, getNextToken(true));
         String cellref = getNextToken(false);
@@ -499,14 +551,14 @@ public abstract class AbstractEDIFParserWorker {
      * {@link EDIFCellInst} that was generated by parsing the definition in the
      * EDIF file and choose the proper one to populate.
      * @param inst
+     * @param rename The instance's EDIF identifier if it was renamed, else null. This is only needed within the
+     * parent cell, so it is not recorded in the cache.
      * @return The {@link EDIFCellInst} to be used going forward
      */
-    private EDIFCellInst updateEDIFRefCellInstMap(EDIFCellInst inst, Map<String, EDIFCellInst> instanceLookup) {
-        final String rename = cache.getEDIFRename(inst);
+    private EDIFCellInst updateEDIFRefCellInstMap(EDIFCellInst inst, String rename, Map<String, EDIFCellInst> instanceLookup) {
         EDIFCellInst existingInst = instanceLookup.get(rename);
         if (existingInst != null) {
             existingInst.setName(inst.getName());
-            cache.setRename(existingInst, rename);
             return existingInst;
         }
         instanceLookup.put(rename != null ? rename : inst.getName(), inst);

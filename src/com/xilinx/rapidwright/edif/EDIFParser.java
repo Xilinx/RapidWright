@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -55,7 +55,7 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
 
 
     public EDIFParser(Path fileName) throws FileNotFoundException {
-        super(fileName, StringPool.singleThreadedPool(), EDIFReadLegalNameCache.createSingleThreaded());
+        super(fileName, StringPool.singleThreadedPool());
     }
 
     public EDIFParser(String fileName) throws FileNotFoundException {
@@ -63,7 +63,7 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
     }
 
     public EDIFParser(InputStream in) {
-        super(null, in, StringPool.singleThreadedPool(), EDIFReadLegalNameCache.createSingleThreaded());
+        super(null, in, StringPool.singleThreadedPool());
     }
 
     /**
@@ -101,7 +101,7 @@ public class EDIFParser extends AbstractEDIFParserWorker implements AutoCloseabl
                 String comment = getNextToken(true);
                 expect(RIGHT_PAREN, getNextToken(true));
             } else if (nextToken.equalsIgnoreCase(DESIGN)) {
-                EDIFDesign design = parseEDIFNameObject(new EDIFDesign());
+                EDIFDesign design = parseUnreferencedEDIFNameObject(new EDIFDesign());
                 currNetlist.setDesign(design);
                 expect(LEFT_PAREN, getNextToken(true));
                 expect(CELLREF, getNextToken(true));
