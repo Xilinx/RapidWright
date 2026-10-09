@@ -1142,6 +1142,13 @@ public class DesignTools {
                 // Nothing but a static source is expected to be sitting on a site the black box covers,
                 // since the site was given to the circuit by the placer on the strength of it being free
                 SiteInst existingSi = design.getSiteInstFromSite(si.getSite());
+                if (existingSi != null && holdsOnlyLockedPlaceholders(existingSi)) {
+                    // ... or a site instance that merely locks the site's BELs, as a static shell
+                    // has for sites in the region of a reconfigurable partition. It holds nothing
+                    // else, so it is simply removed for the circuit's site instance to take over
+                    design.removeSiteInst(existingSi);
+                    existingSi = null;
+                }
                 if (existingSi != null) {
                     if (!existingSi.getName().startsWith(SiteInst.STATIC_SOURCE)) {
                         throw new RuntimeException("ERROR: Site overlap at " + existingSi.getSiteName() + " when populating blackbox '" + hierarchicalCellName + "'");
@@ -1269,6 +1276,20 @@ public class DesignTools {
             modifiedNets.add(target);
         }
         return modifiedNets;
+    }
+
+    /**
+     * Checks whether a site instance holds nothing but locked placeholder cells ({@link Cell#LOCKED}):
+     * no other cells, no site pins and no site routing.
+     *
+     * @param si The site instance.
+     * @return True if the site instance only locks its BELs.
+     */
+    private static boolean holdsOnlyLockedPlaceholders(SiteInst si) {
+        for (Cell c : si.getCells()) {
+            if (!c.getName().endsWith(Cell.LOCKED)) return false;
+        }
+        return si.getSitePinInsts().isEmpty() && si.getSiteWireToNetMap().isEmpty();
     }
 
     /**
