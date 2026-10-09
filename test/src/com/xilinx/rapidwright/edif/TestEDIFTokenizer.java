@@ -170,6 +170,19 @@ public class TestEDIFTokenizer {
     }
 
     @Test
+    public void testSkipIntoUnquotedNonAscii() throws IOException {
+        // Bytes >= 0x80 (here, the UTF-8 encoding of é) used to index past the end of the token ender table.
+        // Skipping into the middle of such a token (as a parallel worker does), with a full buffer of them, must
+        // advance to the next token
+        final String token = "abcédef";
+        final String edif = repeatString(token + " ", 20);
+        try (EDIFTokenizer tokenizer = new EDIFTokenizer(null, stringToInputStream(edif), StringPool.singleThreadedPool(), 16)) {
+            tokenizer.skip(5);
+            Assertions.assertEquals(token, tokenizer.getOptionalNextTokenString(true));
+        }
+    }
+
+    @Test
     public void testTooLongToken() {
         InputStream is = stringToInputStream(repeatString("ASDF", 250));
         EDIFTokenizer tokenizer = new EDIFTokenizer(null, is, StringPool.singleThreadedPool(), 256);

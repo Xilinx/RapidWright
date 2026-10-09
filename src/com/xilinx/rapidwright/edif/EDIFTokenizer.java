@@ -334,9 +334,11 @@ public class EDIFTokenizer implements AutoCloseable {
      * Check if a character ends a token.
      *
      * This is FASTER than endsTokenSwitch! Hooray for jump tables!
+     * @param c A byte of the buffer cast to char. A byte >= 0x80 (part of a non-ASCII character) is negative, so its
+     *          char is 0xFF80 or more; only its low 8 bits index the table (and such a byte never ends a token).
      */
     private static boolean endsTokenOpt(char c) {
-        return ENDS_TOKEN[c];
+        return ENDS_TOKEN[c & 0xff];
     }
 
 
