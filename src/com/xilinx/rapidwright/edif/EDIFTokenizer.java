@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, 2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2024, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -29,6 +29,8 @@ import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.xilinx.rapidwright.util.Params;
 import com.xilinx.rapidwright.util.StringPool;
@@ -157,7 +159,11 @@ public class EDIFTokenizer implements AutoCloseable {
         int length;
         if (endOffset >= startOffset) {
             length = endOffset - startOffset;
-            token = new String(buffer, startOffset, length, charset);
+            // A short-lived token is only compared or parsed, so a keyword can be returned as its constant
+            token = isShortLived ? matchKeyword(buffer, startOffset, length) : null;
+            if (token == null) {
+                token = new String(buffer, startOffset, length, charset);
+            }
         } else {
             int length1 = buffer.length - startOffset;
             length = length1 + endOffset;
@@ -244,6 +250,84 @@ public class EDIFTokenizer implements AutoCloseable {
     }
 
     private static final boolean[] ENDS_TOKEN = makeTokenEnderTable();
+
+    /**
+     * Keywords and other tokens that are only ever compared or parsed, never kept, spelled as they are written
+     * (e.g. by Vivado). A short-lived token whose bytes match one of these exactly is returned as that (interned)
+     * constant rather than as a new String, so that it needs no allocation, and comparing it with the same constant
+     * (equals(), equalsIgnoreCase()) succeeds on identity. Any other spelling still gets a new String. Ordered so
+     * that the most frequent ones (in the contents of cells) come first within each length.
+     */
+    private static final String[] KEYWORDS = {
+            AbstractEDIFParserWorker.PORTREF, AbstractEDIFParserWorker.MEMBER, AbstractEDIFParserWorker.INSTANCEREF,
+            AbstractEDIFParserWorker.JOINED, AbstractEDIFParserWorker.NET, AbstractEDIFParserWorker.INSTANCE,
+            AbstractEDIFParserWorker.PROPERTY, AbstractEDIFParserWorker.RENAME, "string",
+            AbstractEDIFParserWorker.VIEWREF, AbstractEDIFParserWorker.CELLREF, AbstractEDIFParserWorker.LIBRARYREF,
+            AbstractEDIFParserWorker.PORT, AbstractEDIFParserWorker.DIRECTION, "INPUT", "OUTPUT", "INOUT",
+            AbstractEDIFParserWorker.ARRAY, AbstractEDIFParserWorker.OWNER, "integer", "boolean",
+            AbstractEDIFParserWorker.CELL, AbstractEDIFParserWorker.CELLTYPE, "GENERIC",
+            AbstractEDIFParserWorker.VIEW, AbstractEDIFParserWorker.VIEWTYPE, "NETLIST",
+            AbstractEDIFParserWorker.INTERFACE, AbstractEDIFParserWorker.CONTENTS,
+            AbstractEDIFParserWorker.EDIF, AbstractEDIFParserWorker.EDIFVERSION, AbstractEDIFParserWorker.EDIFLEVEL,
+            AbstractEDIFParserWorker.EXTERNAL, AbstractEDIFParserWorker.KEYWORDMAP,
+            AbstractEDIFParserWorker.KEYWORDLEVEL, AbstractEDIFParserWorker.STATUS, AbstractEDIFParserWorker.WRITTEN,
+            AbstractEDIFParserWorker.TIMESTAMP, AbstractEDIFParserWorker.AUTHOR, AbstractEDIFParserWorker.PROGRAM,
+            AbstractEDIFParserWorker.VERSION, AbstractEDIFParserWorker.COMMENT, AbstractEDIFParserWorker.LIBRARY,
+            AbstractEDIFParserWorker.TECHNOLOGY, AbstractEDIFParserWorker.NUMBERDEFINITION,
+            AbstractEDIFParserWorker.DESIGN, AbstractEDIFParserWorker.METAX,
+    };
+
+    /** KEYWORDS grouped by length (the index), in the same order */
+    private static final String[][] KEYWORDS_BY_LENGTH;
+    /** The bytes of KEYWORDS_BY_LENGTH */
+    private static final byte[][][] KEYWORD_BYTES_BY_LENGTH;
+
+    static {
+        int maxLength = 0;
+        for (String keyword : KEYWORDS) {
+            maxLength = Math.max(maxLength, keyword.length());
+        }
+        KEYWORDS_BY_LENGTH = new String[maxLength + 1][];
+        KEYWORD_BYTES_BY_LENGTH = new byte[maxLength + 1][][];
+        for (int length = 0; length <= maxLength; length++) {
+            final List<String> keywords = new ArrayList<>();
+            for (String keyword : KEYWORDS) {
+                if (keyword.length() == length) {
+                    keywords.add(keyword);
+                }
+            }
+            KEYWORDS_BY_LENGTH[length] = keywords.toArray(new String[0]);
+            KEYWORD_BYTES_BY_LENGTH[length] = new byte[keywords.size()][];
+            for (int i = 0; i < keywords.size(); i++) {
+                KEYWORD_BYTES_BY_LENGTH[length][i] = keywords.get(i).getBytes(StandardCharsets.US_ASCII);
+            }
+        }
+    }
+
+    /**
+     * Find the keyword (see {@link #KEYWORDS}) whose bytes are exactly those of a token in the buffer.
+     * @param buffer The buffer.
+     * @param start The token's start offset in the buffer (it must not wrap around the end of the buffer).
+     * @param length The token's length.
+     * @return The keyword constant, or null if the token is not one.
+     */
+    private static String matchKeyword(byte[] buffer, int start, int length) {
+        if (length >= KEYWORD_BYTES_BY_LENGTH.length) {
+            return null;
+        }
+        final byte[][] candidates = KEYWORD_BYTES_BY_LENGTH[length];
+        nextCandidate:
+        for (int k = 0; k < candidates.length; k++) {
+            final byte[] keyword = candidates[k];
+            for (int i = 0; i < length; i++) {
+                if (buffer[start + i] != keyword[i]) {
+                    continue nextCandidate;
+                }
+            }
+            return KEYWORDS_BY_LENGTH[length][k];
+        }
+        return null;
+    }
 
 
     /**

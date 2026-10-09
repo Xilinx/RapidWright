@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -136,6 +136,37 @@ public class TestEDIFTokenizer {
         Assertions.assertNotNull(token);
         Assertions.assertEquals("", token.text);
         Assertions.assertEquals(2, token.byteOffset);
+    }
+
+    @Test
+    public void testShortLivedKeywords() throws IOException {
+        final String edif = "(portref (member D 3) (instanceref inst_1)) portrefx PortRef net \"joined\"";
+        try (EDIFTokenizer tokenizer = new EDIFTokenizer(null, stringToInputStream(edif), StringPool.singleThreadedPool())) {
+            Assertions.assertEquals("(", tokenizer.getOptionalNextTokenString(true));
+            // A short-lived keyword is returned as the parser's constant
+            Assertions.assertSame(AbstractEDIFParserWorker.PORTREF, tokenizer.getOptionalNextTokenString(true));
+            Assertions.assertEquals("(", tokenizer.getOptionalNextTokenString(true));
+            Assertions.assertSame(AbstractEDIFParserWorker.MEMBER, tokenizer.getOptionalNextTokenString(true));
+            Assertions.assertEquals("D", tokenizer.getOptionalNextTokenString(false));
+            // A short-lived token that is not a keyword keeps its text
+            Assertions.assertEquals("3", tokenizer.getOptionalNextTokenString(true));
+            Assertions.assertEquals(")", tokenizer.getOptionalNextTokenString(true));
+            Assertions.assertEquals("(", tokenizer.getOptionalNextTokenString(true));
+            final EDIFToken instanceref = tokenizer.getOptionalNextToken(true);
+            Assertions.assertSame(AbstractEDIFParserWorker.INSTANCEREF, instanceref.text);
+            Assertions.assertEquals(edif.indexOf("instanceref") + "instanceref".length(), instanceref.byteOffset);
+            Assertions.assertEquals("inst_1", tokenizer.getOptionalNextTokenString(false));
+            Assertions.assertEquals(")", tokenizer.getOptionalNextTokenString(true));
+            Assertions.assertEquals(")", tokenizer.getOptionalNextTokenString(true));
+            // Only an exact match is a keyword: not a longer token, nor another spelling
+            Assertions.assertEquals("portrefx", tokenizer.getOptionalNextTokenString(true));
+            Assertions.assertEquals("PortRef", tokenizer.getOptionalNextTokenString(true));
+            // A long-lived token keeps its text, as does a quoted one
+            Assertions.assertEquals(AbstractEDIFParserWorker.NET, tokenizer.getOptionalNextTokenString(false));
+            Assertions.assertEquals(AbstractEDIFParserWorker.JOINED, tokenizer.getOptionalNextTokenString(true));
+            Assertions.assertTrue(tokenizer.wasLastTokenQuoted());
+            Assertions.assertNull(tokenizer.getOptionalNextTokenString(true));
+        }
     }
 
     @Test
