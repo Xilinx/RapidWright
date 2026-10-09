@@ -40,6 +40,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.blocks.PBlock;
@@ -1110,6 +1111,47 @@ public class TestDesignTools {
         Assertions.assertEquals(Collections.singletonList(internalSinkPin),
                 internalAliasNet.getPins());
         assertRouting(true, internalAliasNet, internalPIP, internalSinkPin);
+    }
+
+    /**
+     * Besides its GND and VCC nets, a circuit can hold further static nets, with hierarchical
+     * names such as ".../<const0>". Their site routing and pins must end up on the design's static
+     * net, as those of the circuit's own GND and VCC nets do, and they must not be left in the
+     * site routing as nets the design does not have.
+     */
+    @ParameterizedTest
+    @EnumSource(value = NetType.class, names = {"GND", "VCC"})
+    public void testPopulateBlackBoxExtraStaticNets(NetType type) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", createBlackBox(top, "bb", EDIFDirection.INPUT));
+        Net inNet = design.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+
+        // The circuit: I into a LUT, and another LUT whose input is tied to a constant
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet circuitIn = circuitTop.createNet("I");
+        circuitIn.createPortInst(circuitTop.getPort("I"));
+        addSinkLUT(circuit, circuitTop, "lut0", "SLICE_X1Y0", circuitIn, circuit.createNet("I"));
+        EDIFNet constant = EDIFTools.getStaticNet(type, circuitTop, circuit.getNetlist());
+        Net extra = new Net("lut1/<const>", type);
+        circuit.addNet(extra);
+        SitePinInst constPin = addSinkLUT(circuit, circuitTop, "lut1", "SLICE_X2Y0", constant, extra);
+        SiteInst si = constPin.getSiteInst();
+        BELPin a1 = si.getBEL("A6LUT").getPin("A1");
+        Assertions.assertTrue(si.routeIntraSiteNet(extra, a1, a1));
+        Assertions.assertSame(extra, si.getNetFromSiteWire(a1.getSiteWireName()));
+
+        populateBlackBox(design, "bb", circuit, false);
+
+        Net staticNet = design.getStaticNet(type);
+        Assertions.assertSame(staticNet, si.getNetFromSiteWire(a1.getSiteWireName()));
+        Assertions.assertFalse(extra.getSiteInsts().contains(si));
+        Assertions.assertTrue(staticNet.getPins().contains(constPin));
+        Assertions.assertNull(design.getNet(extra.getName()));
+        Assertions.assertNull(design.getNet("bb/" + extra.getName()));
     }
 
     /**
