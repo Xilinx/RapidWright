@@ -42,6 +42,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -3706,6 +3707,153 @@ public class DesignTools {
         for (SitePIP pip : siteInst.getSite().getSitePIPs()) {
             ps.println("  SitePIP: " + pip + " : " + siteInst.getSitePIPStatus(pip));
         }
+    }
+
+    /**
+     * Opt-in workaround for ambiguous physical net names observed in some checkpoints containing
+     * encrypted IP. A local net named "inst/p[3]" next to an instance named "inst" has the same
+     * flattened name as the unrelated net "p[3]" inside that instance. In the affected designs,
+     * a RapidWright checkpoint round trip introduces routing conflicts; selecting another logical
+     * alias for the physical net avoids those conflicts.
+     * <p>
+     * Each such net is renamed to the deepest of its aliases whose local name does not contain the
+     * separator and whose full name resolves back to that alias. Equal-depth aliases are ordered
+     * lexicographically. Nets without a distinct suitable alias or identifiable source are left
+     * unchanged, as are module-associated nets and renames with conflicting destinations. A name
+     * occupied by another net can be used only if that net can also be renamed in the same call.
+     * <p>
+     * This method assumes that the physical net belongs to the logical net with the separator in
+     * its local name. Callers must establish that this matches their input checkpoint; a previous
+     * call may invalidate this assumption if an alias is also another candidate's original name.
+     * It changes physical names, leaving logical names and connectivity unchanged, and does not establish
+     * checkpoint round-trip equivalence or fix checkpoint serialization. See
+     * <a href="https://github.com/Xilinx/RapidWright/pull/1458">PR #1458</a>.
+     *
+     * @param design The design to modify in place.
+     * @return The number of nets renamed.
+     */
+    public static int renameAmbiguousPhysNets(Design design) {
+        EDIFNetlist netlist = design.getNetlist();
+        // The cells with a net whose local name starts with the name of one of the cell's instances
+        // and the separator, by that local name, and the numbers of segments in those names
+        Map<String, List<EDIFCell>> ambiguous = new HashMap<>();
+        Set<Integer> segmentCounts = new HashSet<>();
+        for (EDIFLibrary lib : netlist.getLibraries()) {
+            for (EDIFCell cell : lib.getCells()) {
+                for (EDIFNet net : cell.getNets()) {
+                    String name = net.getName();
+                    // Check every separator: an instance name can itself contain separators.
+                    for (int sep = name.indexOf(EDIFTools.EDIF_HIER_SEP); sep >= 0;
+                            sep = name.indexOf(EDIFTools.EDIF_HIER_SEP, sep + 1)) {
+                        if (cell.getCellInst(name.substring(0, sep)) != null) {
+                            ambiguous.computeIfAbsent(name, (k) -> new ArrayList<>()).add(cell);
+                            segmentCounts.add(name.split(EDIFTools.EDIF_HIER_SEP, -1).length);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if (ambiguous.isEmpty()) {
+            return 0;
+        }
+
+        // The physical nets named after one of those nets, with the alias to rename each to
+        // Key by immutable original names: Net.hashCode() changes when a net is renamed.
+        Map<String, String> renames = new LinkedHashMap<>();
+        for (Net net : design.getNets()) {
+            if (net.getModuleInst() != null || net.getModuleTemplate() != null
+                    || net.getModuleTemplateNet() != null) {
+                continue;
+            }
+            String name = net.getName();
+            for (int segments : segmentCounts) {
+                int cut = name.length();
+                for (int i = 0; i < segments && cut >= 0; i++) {
+                    cut = name.lastIndexOf(EDIFTools.EDIF_HIER_SEP, cut - 1);
+                }
+                String local = name.substring(cut + 1);
+                List<EDIFCell> cells = ambiguous.get(local);
+                if (cells == null) {
+                    continue;
+                }
+                EDIFHierCellInst inst = cut < 0 ? netlist.getTopHierCellInst()
+                        : netlist.getHierCellInstFromName(name.substring(0, cut));
+                if (inst == null || !cells.contains(inst.getCellType())) {
+                    continue;
+                }
+                List<EDIFHierNet> aliases;
+                try {
+                    aliases = netlist.getNetAliases(inst.getNet(local));
+                } catch (RuntimeException e) {
+                    // No single source could be identified, so neither can the net to rename to
+                    continue;
+                }
+                EDIFHierNet best = null;
+                for (EDIFHierNet alias : aliases) {
+                    String aliasName = alias.getHierarchicalNetName();
+                    if (alias.getNet().getName().contains(EDIFTools.EDIF_HIER_SEP)
+                            || name.equals(aliasName)
+                            || !alias.equals(netlist.getHierNetFromName(aliasName))) {
+                        continue;
+                    }
+                    if (best == null
+                            || alias.getHierarchicalInst().getDepth() > best.getHierarchicalInst().getDepth()
+                            || (alias.getHierarchicalInst().getDepth() == best.getHierarchicalInst().getDepth()
+                                && aliasName.compareTo(best.getHierarchicalNetName()) < 0)) {
+                        best = alias;
+                    }
+                }
+                if (best != null) {
+                    renames.put(name, best.getHierarchicalNetName());
+                }
+            }
+        }
+
+        // Reject all competing renames rather than choose an iteration-dependent winner.
+        Set<String> targets = new HashSet<>();
+        Set<String> duplicates = new HashSet<>();
+        for (String target : renames.values()) {
+            if (!targets.add(target)) {
+                duplicates.add(target);
+            }
+        }
+        renames.values().removeIf(duplicates::contains);
+
+        // If A needs B's name and B cannot move, A cannot move either. Propagate this through
+        // the whole chain before mutating anything; restoring names after a collision is unsafe.
+        boolean removed;
+        do {
+            removed = renames.entrySet().removeIf(e -> design.getNet(e.getValue()) != null
+                    && !renames.containsKey(e.getValue()));
+        } while (removed);
+
+        // Save the Net objects before changing any names. Temporary names must avoid both
+        // existing nets and all final destinations, including destinations not yet occupied.
+        Map<String, Net> nets = new LinkedHashMap<>();
+        for (String name : renames.keySet()) {
+            nets.put(name, design.getNet(name));
+        }
+        int tmp = 0;
+        for (Net net : nets.values()) {
+            String tmpName;
+            do {
+                tmpName = "__renameAmbiguousPhysNets_" + tmp++;
+            } while (design.getNet(tmpName) != null || targets.contains(tmpName));
+            if (!net.rename(tmpName)) {
+                throw new RuntimeException("ERROR: Failed to rename net '" + net.getName() + "' to '"
+                        + tmpName + "'.");
+            }
+        }
+        for (Map.Entry<String, String> e : renames.entrySet()) {
+            Net net = nets.get(e.getKey());
+            String name = e.getValue();
+            if (!net.rename(name)) {
+                throw new RuntimeException("ERROR: Failed to rename net '" + net.getName() + "' to '"
+                        + name + "'.");
+            }
+        }
+        return renames.size();
     }
 
     /**
