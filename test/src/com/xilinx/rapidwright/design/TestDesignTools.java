@@ -1113,6 +1113,68 @@ public class TestDesignTools {
     }
 
     /**
+     * Besides its GND and VCC nets, a circuit can hold further static nets, with hierarchical
+     * names such as ".../<const0>". Their site routing and pins must end up on the design's static
+     * net, as those of the circuit's own GND and VCC nets do, and they must not be left in the
+     * site routing as nets the design does not have. Cover both canonical and extra static nets,
+     * including wires without site pins and the moved pins' references back to their net.
+     */
+    @ParameterizedTest
+    @CsvSource({"GND, true", "GND, false", "VCC, true", "VCC, false"})
+    public void testPopulateBlackBoxStaticNets(NetType type, boolean extraStaticNet) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", createBlackBox(top, "bb", EDIFDirection.INPUT));
+        Net inNet = design.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+
+        // The circuit: I into a LUT, and another LUT whose input is tied to a constant
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet circuitIn = circuitTop.createNet("I");
+        circuitIn.createPortInst(circuitTop.getPort("I"));
+        addSinkLUT(circuit, circuitTop, "lut0", "SLICE_X1Y0", circuitIn, circuit.createNet("I"));
+        EDIFNet constant = EDIFTools.getStaticNet(type, circuitTop, circuit.getNetlist());
+        Net circuitStatic = circuit.getStaticNet(type);
+        if (extraStaticNet) {
+            circuitStatic = new Net("lut1/<const>", type);
+            circuit.addNet(circuitStatic);
+        }
+        SitePinInst constPin = addSinkLUT(circuit, circuitTop, "lut1", "SLICE_X2Y0",
+                constant, circuitStatic);
+        SiteInst si = constPin.getSiteInst();
+        BELPin a1 = si.getBEL("A6LUT").getPin("A1");
+        Assertions.assertTrue(si.routeIntraSiteNet(circuitStatic, a1, a1));
+        Assertions.assertSame(circuitStatic, si.getNetFromSiteWire(a1.getSiteWireName()));
+        // A wire without a SitePinInst cannot be repaired merely by moving the pins.
+        BELPin a2 = si.getBEL("A6LUT").getPin("A2");
+        Assertions.assertNull(si.getSitePinInst("A2"));
+        Assertions.assertTrue(si.routeIntraSiteNet(circuitStatic, a2, a2));
+        Net staticNet = design.getStaticNet(type);
+        PIP circuitPIP = addTestRouting(circuitStatic, 0, constPin);
+        PIP designPIP = addTestRouting(staticNet, 1);
+
+        populateBlackBox(design, "bb", circuit, false);
+
+        Assertions.assertSame(staticNet, design.getStaticNet(type));
+        Assertions.assertSame(staticNet, si.getNetFromSiteWire(a1.getSiteWireName()));
+        Assertions.assertSame(staticNet, si.getNetFromSiteWire(a2.getSiteWireName()));
+        Assertions.assertFalse(circuitStatic.getSiteInsts().contains(si));
+        Assertions.assertTrue(staticNet.getPins().contains(constPin));
+        Assertions.assertSame(staticNet, constPin.getNet());
+        Assertions.assertTrue(constPin.isRouted());
+        Assertions.assertEquals(new HashSet<>(Arrays.asList(circuitPIP, designPIP)),
+                new HashSet<>(staticNet.getPIPs()));
+        if (extraStaticNet) {
+            Assertions.assertNull(design.getNet(circuitStatic.getName()));
+        } else {
+            Assertions.assertSame(staticNet, design.getNet(circuitStatic.getName()));
+        }
+        Assertions.assertNull(design.getNet("bb/" + circuitStatic.getName()));
+    }
+
+    /**
      * A shell that feeds a black box output straight back into one of its inputs makes the
      * circuit's net on that input an alias of the one on that output. Both are inside the black
      * box, but they must still be merged: otherwise the input's sinks are left on a net with no
