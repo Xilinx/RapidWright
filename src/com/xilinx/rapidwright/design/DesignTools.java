@@ -1089,6 +1089,24 @@ public class DesignTools {
             }
         }
 
+        // A circuit's checkpoint can hold physical nets that have nothing on them and no logical
+        // net in the circuit: one written in the context of a shell carries nets named as in the
+        // full design, such as the shell's clocks, or the circuit's own nets prefixed with the
+        // black box's name. Moved in, they would be nets the netlist does not have, and one with
+        // the name that another of the circuit's nets is given once prefixed would block that
+        // net's rename
+        for (Design cell : blackBoxes.values()) {
+            EDIFNetlist cellNetlist = cell.getNetlist();
+            for (Net net : new ArrayList<>(cell.getNets())) {
+                if (net.isStaticNet() || net.getName().equals(Net.USED_NET) || hasPhysicalPresence(net)) {
+                    continue;
+                }
+                if (cellNetlist.getHierNetFromName(net.getName()) == null) {
+                    cell.removeNet(net);
+                }
+            }
+        }
+
         // Populate Logical Netlist into cells. This loop and the physical ones below all walk
         // blackBoxes rather than insts, so that the boxes are filled in whatever order the caller
         // gave them in and not in the hash order of their names. The placeholder cells are left in
