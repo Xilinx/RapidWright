@@ -42,6 +42,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -1238,6 +1239,7 @@ public class DesignTools {
         // no routing is left to carry across. The design's GND or VCC net is the exception: it is
         // unrouted, in its entirety, only when something is merged onto it, a port merely tied to
         // a constant not being reason enough
+        Set<Net> mergedOnto = new HashSet<>();
         for (String name : portNames) {
             String parent = resolveParent(portParents, undriven, name);
             Net net = design.getNet(name);
@@ -1266,7 +1268,15 @@ public class DesignTools {
                 target.unroute();
             }
             mergeOntoNet(design, net, target, modifiedNets);
+            mergedOnto.add(target);
             modifiedNets.add(target);
+        }
+
+        // Where the routing is kept, a net can be handed the same PIPs more than once: the shell and
+        // the circuit can each hold the routing of a signal up to the black box port, such as a
+        // clock routed into the region of every black box. A PIP must be on a net only once
+        for (Net target : mergedOnto) {
+            removeDuplicatePIPs(target);
         }
         return modifiedNets;
     }
@@ -1363,6 +1373,21 @@ public class DesignTools {
         design.movePinsToNewNetDeleteOldNet(net, target, true);
         for (PIP p : net.getPIPs()) {
             target.addPIP(p);
+        }
+    }
+
+    /**
+     * Removes any repeats of a PIP from a net, keeping the PIPs in the order in which each first
+     * appears.
+     *
+     * @param net The net.
+     */
+    private static void removeDuplicatePIPs(Net net) {
+        List<PIP> pips = net.getPIPs();
+        if (pips.size() < 2) return;
+        Set<PIP> unique = new LinkedHashSet<>(pips);
+        if (unique.size() < pips.size()) {
+            net.setPIPs(new ArrayList<>(unique));
         }
     }
 
