@@ -1373,12 +1373,26 @@ public class EDIFNetlist extends EDIFName {
      * source.
      */
     public List<EDIFHierNet> getNetAliases(EDIFHierNet initialNet) {
+        List<EDIFHierNet> aliases = new ArrayList<>();
+        recordParentNet(initialNet, aliases);
+        return aliases;
+    }
+
+    /**
+     * Does what {@link #getNetAliases(EDIFHierNet)} does, and returns the parent net.
+     * @param initialNet The net to use as a starting point in the search.
+     * @param aliases All electrically connected nets in the netlist that are equivalent are added
+     * to it.
+     * @return The parent net, or null if the net has no connections.
+     * @throws RuntimeException If the net has more than one source, or has connections but no
+     * source.
+     */
+    private EDIFHierNet recordParentNet(EDIFHierNet initialNet, List<EDIFHierNet> aliases) {
         if (physicalNetPinMap == null) {
             physicalNetPinMap = new HashMap<>();
             physicalGndPins = new ArrayList<>();
             physicalVccPins = new ArrayList<>();
         }
-        List<EDIFHierNet> aliases = new ArrayList<>();
         List<EDIFHierPortInst> leafCellPins = new ArrayList<>();
         EDIFHierPortInst source = findParentPortInst(initialNet, aliases, leafCellPins);
         if (source != null) {
@@ -1390,11 +1404,13 @@ public class EDIFNetlist extends EDIFName {
                     physicalVccPins.addAll(leafCellPins);
                     break;
             }
-            physicalNetPinMap.put(source.getHierarchicalNet(), leafCellPins);
+            EDIFHierNet parentNet = source.getHierarchicalNet();
+            physicalNetPinMap.put(parentNet, leafCellPins);
+            return parentNet;
         } else if (initialNet.getNet().getPortInsts().size() != 0) {
             throw new RuntimeException("ERROR: Couldn't identify parent net, no output pins (or top level output port) found.");
         }
-        return aliases;
+        return null;
     }
 
     /**
@@ -1415,8 +1431,8 @@ public class EDIFNetlist extends EDIFName {
         HashSet<EDIFHierNet> visited = new HashSet<>();
 
         EDIFHierPortInst source = null;
-        EDIFHierNet parentNet = null;
-        EDIFHierNet fallbackParentNet = null;
+        EDIFHierPortInst fallbackSource = null;
+        boolean multipleFallbackSources = false;
         while (!queue.isEmpty()) {
             EDIFHierNet net = queue.poll();
             if (!visited.add(net)) {
@@ -1437,22 +1453,21 @@ public class EDIFNetlist extends EDIFName {
                 boolean isTopLevelPortInst = p.getHierarchicalInst().isTopLevelInst() && relP.getCellInst() == null;
                 boolean isToplevelInput = isTopLevelPortInst && p.isInput();
                 if (isToplevelInput || (isCellPin && p.isOutput())) {
-                    if (parentNet != null) {
+                    if (source != null) {
                         throw new RuntimeException("Multiple sources!");
                     }
                     source = p;
-                    parentNet = net;
                 }
 
                 // For top-level INOUT ports, consider the possibility that it might be an input
-                // and thus a parent net
+                // and thus a parent net. Whether more than one is an error depends on whether
+                // any other source is found, so is only decided once all aliases are visited.
                 boolean isToplevelInout = isTopLevelPortInst && !p.isInput() && !p.isOutput();
                 if (isToplevelInout) {
-                    if (fallbackParentNet != null) {
-                        throw new RuntimeException("Multiple sources!");
-                    } else if (parentNet == null) {
-                        source = p;
-                        fallbackParentNet = net;
+                    if (fallbackSource != null) {
+                        multipleFallbackSources = true;
+                    } else {
+                        fallbackSource = p;
                     }
                 }
 
@@ -1476,8 +1491,14 @@ public class EDIFNetlist extends EDIFName {
             }
         }
 
-        // If no other source was found, this is the fallback (top-level inout) source
-        return source;
+        if (source != null) {
+            return source;
+        }
+        // No other source was found, so the source is the fallback (top-level inout), if unique
+        if (multipleFallbackSources) {
+            throw new RuntimeException("Multiple sources!");
+        }
+        return fallbackSource;
     }
 
     /**
@@ -1614,9 +1635,18 @@ public class EDIFNetlist extends EDIFName {
 
         for (EDIFHierPortInst pr : queue) {
             assert(pr.getNet() != null);
-            EDIFHierNet parentNetName = pr.getHierarchicalNet();
-            for (EDIFHierNet alias : getNetAliases(parentNetName)) {
-                parentNetMap.put(alias, parentNetName);
+            EDIFHierNet net = pr.getHierarchicalNet();
+            if (parentNetMap.containsKey(net)) {
+                // Already mapped from another possible source of the same net
+                continue;
+            }
+            // The queued port may not be the source (e.g. a top-level inout next to a top-level
+            // input), so map the aliases to the parent net that the search resolves, just as
+            // findParentNet() does
+            List<EDIFHierNet> aliases = new ArrayList<>();
+            EDIFHierNet parentNet = recordParentNet(net, aliases);
+            for (EDIFHierNet alias : aliases) {
+                parentNetMap.put(alias, parentNet);
             }
         }
         if (DEBUG) {
