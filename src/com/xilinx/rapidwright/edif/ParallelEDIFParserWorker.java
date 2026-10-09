@@ -60,12 +60,15 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
     protected EDIFDesign edifDesign = null;
     protected final List<CellReferenceData> linkCellReference = new ArrayList<>();
     protected final List<ParentCellPortInsts> linkPortInstData = new ArrayList<>();
-    protected final EDIFReadLegalNameCache cache;
+    /** Cells parsed by this worker that have renamed ports, whose renames are in this worker's cache */
+    protected final List<EDIFCell> cellsWithRenamedPorts = new ArrayList<>();
 
-    public ParallelEDIFParserWorker(Path fileName, InputStream in, long offset, StringPool uniquifier, int maxTokenLength, EDIFReadLegalNameCache cache) {
-        super(fileName, in, uniquifier, maxTokenLength, cache);
+    /** Renames of the ports of a cell that has no renamed ports */
+    private static final EDIFReadLegalNameCache NO_PORT_RENAMES = new EDIFReadLegalNameCache();
+
+    public ParallelEDIFParserWorker(Path fileName, InputStream in, long offset, StringPool uniquifier, int maxTokenLength) {
+        super(fileName, in, uniquifier, maxTokenLength);
         this.offset = offset;
-        this.cache = cache;
     }
 
     public boolean isFirstParser() {
@@ -138,7 +141,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
                 String comment = getNextToken(true);
                 expect(RIGHT_PAREN, getNextToken(true));
             } else if (nextToken.text.equalsIgnoreCase(DESIGN)) {
-                edifDesign = parseEDIFNameObject(new EDIFDesign());
+                edifDesign = parseUnreferencedEDIFNameObject(new EDIFDesign());
                 expect(LEFT_PAREN, getNextToken(true));
                 expect(CELLREF, getNextToken(true));
                 String cellref = getNextToken(false);
@@ -227,6 +230,9 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
                 }
                 EDIFCell cell = parseEDIFCell(null, next.text);
                 librariesAndCells.add(new CellResult(next, cell));
+                if (cellHasRenamedPorts) {
+                    cellsWithRenamedPorts.add(cell);
+                }
                 if (!parseToNextCell()) {
                     if (stopCellToken != null) {
                         stopTokenMismatch = true;
@@ -366,12 +372,15 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
          * sort and trim the port inst lists of the parent cell's nets and cell insts. This only modifies these
          * port insts and the parent cell's nets, cell insts and internal port map, and otherwise only reads cells'
          * ports, so that different parent cells can be linked in parallel once all cells' types are set.
+         * @param portRenamesByCell For each cell with renamed ports, the renames recorded by the worker that parsed
+         *                          it. Read-only.
          * @param portCaches Port lookup maps of cells with many ports, created on first use. Must be thread-safe.
          * @param uniquifier Pool of port inst names.
          */
-        public void linkAndAdd(Map<EDIFCell, EDIFPortCache> portCaches, StringPool uniquifier) {
+        public void linkAndAdd(Map<EDIFCell, EDIFReadLegalNameCache> portRenamesByCell,
+                               Map<EDIFCell, EDIFPortCache> portCaches, StringPool uniquifier) {
             for (EDIFPortInst portInst : portInsts) {
-                linkPort(portInst, portCaches);
+                linkPort(portInst, portRenamesByCell, portCaches);
                 name(portInst, uniquifier);
                 // To avoid a binary search (and shifting the list) for every port inst, append without keeping
                 // the port inst lists sorted; they are sorted below once all port insts have been added
@@ -387,15 +396,18 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
          * Link the port inst to its port: directly if its cell has few ports, otherwise using a port lookup map for
          * that cell.
          */
-        private void linkPort(EDIFPortInst portInst, Map<EDIFCell, EDIFPortCache> portCaches) {
+        private void linkPort(EDIFPortInst portInst, Map<EDIFCell, EDIFReadLegalNameCache> portRenamesByCell,
+                              Map<EDIFCell, EDIFPortCache> portCaches) {
             final EDIFCell cell = lookupPortCell(parentCell, portInst);
+            // The cell may have been parsed by any worker, which recorded its ports' renames
+            final EDIFReadLegalNameCache portRenames = portRenamesByCell.getOrDefault(cell, NO_PORT_RENAMES);
             if (cell.getPorts().size() < PORT_LOOKUP_MAP_THRESHOLD) {
-                portInst.setPort(cell.getPortByLegalName(portInst.getName(), cache));
+                portInst.setPort(cell.getPortByLegalName(portInst.getName(), portRenames));
                 return;
             }
             EDIFPortCache edifPortCache = portCaches.get(cell);
             if (edifPortCache == null) {
-                edifPortCache = portCaches.computeIfAbsent(cell, c -> new EDIFPortCache(c, cache));
+                edifPortCache = portCaches.computeIfAbsent(cell, c -> new EDIFPortCache(c, portRenames));
             }
             final EDIFPort port = edifPortCache.getPort(portInst.getName());
             if (port == null) {

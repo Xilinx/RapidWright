@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -56,7 +56,7 @@ public class ParallelEDIFParserTestSpecificOffsets extends ParallelEDIFParser{
     protected void initializeWorkers() throws IOException {
         workers.clear();
         for (ParseStart  startOffset : startOffsets) {
-            workers.add(new TestingParallelEDIFParserWorker(fileName, inputStreamSupplier.get(), startOffset.offset, uniquifier, maxTokenLength, startOffset.name, cache));
+            workers.add(new TestingParallelEDIFParserWorker(fileName, inputStreamSupplier.get(), startOffset.offset, uniquifier, maxTokenLength, startOffset.name));
         }
     }
 
@@ -68,8 +68,8 @@ public class ParallelEDIFParserTestSpecificOffsets extends ParallelEDIFParser{
 
         private final String name;
 
-        public TestingParallelEDIFParserWorker(Path fileName, InputStream in, long offset, StringPool uniquifier, int maxTokenLength, String name, EDIFReadLegalNameCache cache) {
-            super(fileName, in, offset, uniquifier, maxTokenLength, cache);
+        public TestingParallelEDIFParserWorker(Path fileName, InputStream in, long offset, StringPool uniquifier, int maxTokenLength, String name) {
+            super(fileName, in, offset, uniquifier, maxTokenLength);
             this.name = name;
         }
 

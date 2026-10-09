@@ -31,6 +31,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -61,8 +62,6 @@ public class ParallelEDIFParser implements AutoCloseable{
     private final boolean gzipped;
     protected StringPool uniquifier = StringPool.concurrentPool();
 
-    protected final EDIFReadLegalNameCache cache;
-
     /**
      * Estimated ratio of EDIF to gzipped EDIF file size, used in calculating the
      * number of thread workers for parallel EDIF parsing
@@ -75,7 +74,6 @@ public class ParallelEDIFParser implements AutoCloseable{
         this.fileSize = fileSize;
         this.inputStreamSupplier = inputStreamSupplier;
         this.maxTokenLength = maxTokenLength;
-        this.cache = EDIFReadLegalNameCache.createMultiThreaded();
         this.maxThreads = maxThreads;
         this.gzipped = gzipped;
     }
@@ -111,7 +109,7 @@ public class ParallelEDIFParser implements AutoCloseable{
     }
 
     protected ParallelEDIFParserWorker makeWorker(long offset) throws IOException {
-        return new ParallelEDIFParserWorker(fileName, inputStreamSupplier.get(), offset, uniquifier, maxTokenLength, cache);
+        return new ParallelEDIFParserWorker(fileName, inputStreamSupplier.get(), offset, uniquifier, maxTokenLength);
     }
 
     public static int calcThreads(long fileSize, int maxThreads, boolean isGzipped) {
@@ -274,6 +272,8 @@ public class ParallelEDIFParser implements AutoCloseable{
         private final EDIFNetlist netlist;
         private final Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName = new HashMap<>();
         private final Map<String, EDIFLibrary> librariesByLegalName = new HashMap<>();
+        /** For each cell with renamed ports, the renames recorded by the worker that parsed it */
+        private final Map<EDIFCell, EDIFReadLegalNameCache> portRenamesByCell = new IdentityHashMap<>();
         private EDIFLibrary currentLibrary = null;
         private EDIFToken currentToken = null;
 
@@ -289,10 +289,14 @@ public class ParallelEDIFParser implements AutoCloseable{
                 currentToken = parsed.getToken();
 
                 currentLibrary = parsed.addToNetlist(netlist, currentLibrary, cellsByLegalName, librariesByLegalName,
-                        cache);
+                        worker.cache);
+            }
+            for (EDIFCell cell : worker.cellsWithRenamedPorts) {
+                portRenamesByCell.put(cell, worker.cache);
             }
             // Release this worker's results, which are no longer needed
             worker.librariesAndCells.clear();
+            worker.cellsWithRenamedPorts.clear();
         }
     }
 
@@ -319,9 +323,14 @@ public class ParallelEDIFParser implements AutoCloseable{
             ParallelismTools.forEach(w.linkCellReference, cellReferenceData -> cellReferenceData.apply(
                     assembler.librariesByLegalName, assembler.cellsByLegalName));
             w.linkCellReference.clear();
-            ParallelismTools.forEach(w.linkPortInstData, links -> links.linkAndAdd(portCaches, uniquifier));
+            ParallelismTools.forEach(w.linkPortInstData, links -> links.linkAndAdd(assembler.portRenamesByCell,
+                    portCaches, uniquifier));
             w.linkPortInstData.clear();
         });
+        // Release each worker's renames only now, as any worker's port insts may have read them
+        for (ParallelEDIFParserWorker w : workers) {
+            w.cache.clear();
+        }
     }
 
     @Override
