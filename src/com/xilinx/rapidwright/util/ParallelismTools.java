@@ -307,27 +307,17 @@ public class ParallelismTools {
      * ForkJoinPool does not support for tasks given to execute()): FutureTask.run()
      * does nothing if another thread has already claimed the task, so the pool
      * worker that eventually dequeues it finds it already done, which costs it
-     * very little. A ForkJoinTask (which, unlike a FutureTask, would run again if
-     * run while another thread is running it) is run only if
-     * {@link ForkJoinTask#tryUnfork()} takes it back from the queue.
+     * very little. Any other Future (e.g. a ForkJoinTask, which, unlike a
+     * FutureTask, could run again if run while another thread is running it) is
+     * left to the thread that runs it.
      * @param future Future representing a previously submitted task.
      * @param <T> Type returned by task.
      * @return True if the task is done (whether run by this thread or another),
      *         false if it is not (e.g. another thread is still running it).
      */
     private static <T> boolean runIfUnclaimed(Future<T> future) {
-        if (future.isDone()) {
-            return true;
-        }
-        if (future instanceof ForkJoinTask) {
-            // Unlike FutureTask.run(), running a ForkJoinTask that another thread is already
-            // running would run it again, so only run one that can be taken back from the queue
-            final ForkJoinTask<T> task = (ForkJoinTask<T>) future;
-            if (task.tryUnfork()) {
-                task.quietlyInvoke();
-            }
-        } else if (future instanceof Runnable) {
-            ((Runnable) future).run();
+        if (!future.isDone() && future instanceof FutureTask) {
+            ((FutureTask<T>) future).run();
         }
         return future.isDone();
     }
