@@ -1210,13 +1210,17 @@ public class DesignTools {
                 if (net.getName().equals(Net.USED_NET)) continue;
                 if (net.isStaticNet()) {
                     Net staticNet = design.getStaticNet(net.getType());
-                    // Besides its GND and VCC nets, a circuit can hold further static nets, such as
-                    // ".../<const0>", whose site routing was not re-pointed above. This moves the
-                    // site routing and pins of each onto the design's static net, but not its PIPs.
-                    // Called on the circuit, since removeNet() removes by name, and the circuit's
-                    // GND and VCC nets share theirs with the design's
-                    boolean keepRouting = true;
-                    cell.movePinsToNewNetDeleteOldNet(net, staticNet, keepRouting);
+                    if (net.getName().equals(staticNet.getName())) {
+                        // The canonical GND/VCC site routing was re-pointed above. Do not delete
+                        // these nets: removeNet() compares nets by name and would clear the moved
+                        // pins' references to the destination net, which has the same name.
+                        staticNet.addPins(net.getPins());
+                    } else {
+                        // Extra static nets, such as ".../<const0>", still need their site
+                        // routing moved. Remove the old net from its owning circuit only.
+                        boolean keepRouting = true;
+                        cell.movePinsToNewNetDeleteOldNet(net, staticNet, keepRouting);
+                    }
                     HashSet<PIP> uniquePIPs = new HashSet<>(net.getPIPs());
                     uniquePIPs.addAll(staticNet.getPIPs());
                     staticNet.setPIPs(uniquePIPs);

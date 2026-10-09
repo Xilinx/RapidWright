@@ -40,7 +40,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.blocks.PBlock;
@@ -1117,11 +1116,12 @@ public class TestDesignTools {
      * Besides its GND and VCC nets, a circuit can hold further static nets, with hierarchical
      * names such as ".../<const0>". Their site routing and pins must end up on the design's static
      * net, as those of the circuit's own GND and VCC nets do, and they must not be left in the
-     * site routing as nets the design does not have.
+     * site routing as nets the design does not have. Cover both canonical and extra static nets,
+     * including wires without site pins and the moved pins' references back to their net.
      */
     @ParameterizedTest
-    @EnumSource(value = NetType.class, names = {"GND", "VCC"})
-    public void testPopulateBlackBoxExtraStaticNets(NetType type) {
+    @CsvSource({"GND, true", "GND, false", "VCC, true", "VCC, false"})
+    public void testPopulateBlackBoxStaticNets(NetType type, boolean extraStaticNet) {
         Design design = new Design("shell", "xcvu3p");
         EDIFCell top = design.getTopEDIFCell();
         EDIFNet in = top.createNet("in");
@@ -1136,22 +1136,42 @@ public class TestDesignTools {
         circuitIn.createPortInst(circuitTop.getPort("I"));
         addSinkLUT(circuit, circuitTop, "lut0", "SLICE_X1Y0", circuitIn, circuit.createNet("I"));
         EDIFNet constant = EDIFTools.getStaticNet(type, circuitTop, circuit.getNetlist());
-        Net extra = new Net("lut1/<const>", type);
-        circuit.addNet(extra);
-        SitePinInst constPin = addSinkLUT(circuit, circuitTop, "lut1", "SLICE_X2Y0", constant, extra);
+        Net circuitStatic = circuit.getStaticNet(type);
+        if (extraStaticNet) {
+            circuitStatic = new Net("lut1/<const>", type);
+            circuit.addNet(circuitStatic);
+        }
+        SitePinInst constPin = addSinkLUT(circuit, circuitTop, "lut1", "SLICE_X2Y0",
+                constant, circuitStatic);
         SiteInst si = constPin.getSiteInst();
         BELPin a1 = si.getBEL("A6LUT").getPin("A1");
-        Assertions.assertTrue(si.routeIntraSiteNet(extra, a1, a1));
-        Assertions.assertSame(extra, si.getNetFromSiteWire(a1.getSiteWireName()));
+        Assertions.assertTrue(si.routeIntraSiteNet(circuitStatic, a1, a1));
+        Assertions.assertSame(circuitStatic, si.getNetFromSiteWire(a1.getSiteWireName()));
+        // A wire without a SitePinInst cannot be repaired merely by moving the pins.
+        BELPin a2 = si.getBEL("A6LUT").getPin("A2");
+        Assertions.assertNull(si.getSitePinInst("A2"));
+        Assertions.assertTrue(si.routeIntraSiteNet(circuitStatic, a2, a2));
+        Net staticNet = design.getStaticNet(type);
+        PIP circuitPIP = addTestRouting(circuitStatic, 0, constPin);
+        PIP designPIP = addTestRouting(staticNet, 1);
 
         populateBlackBox(design, "bb", circuit, false);
 
-        Net staticNet = design.getStaticNet(type);
+        Assertions.assertSame(staticNet, design.getStaticNet(type));
         Assertions.assertSame(staticNet, si.getNetFromSiteWire(a1.getSiteWireName()));
-        Assertions.assertFalse(extra.getSiteInsts().contains(si));
+        Assertions.assertSame(staticNet, si.getNetFromSiteWire(a2.getSiteWireName()));
+        Assertions.assertFalse(circuitStatic.getSiteInsts().contains(si));
         Assertions.assertTrue(staticNet.getPins().contains(constPin));
-        Assertions.assertNull(design.getNet(extra.getName()));
-        Assertions.assertNull(design.getNet("bb/" + extra.getName()));
+        Assertions.assertSame(staticNet, constPin.getNet());
+        Assertions.assertTrue(constPin.isRouted());
+        Assertions.assertEquals(new HashSet<>(Arrays.asList(circuitPIP, designPIP)),
+                new HashSet<>(staticNet.getPIPs()));
+        if (extraStaticNet) {
+            Assertions.assertNull(design.getNet(circuitStatic.getName()));
+        } else {
+            Assertions.assertSame(staticNet, design.getNet(circuitStatic.getName()));
+        }
+        Assertions.assertNull(design.getNet("bb/" + circuitStatic.getName()));
     }
 
     /**
