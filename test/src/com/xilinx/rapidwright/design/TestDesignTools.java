@@ -2046,6 +2046,43 @@ public class TestDesignTools {
         Assertions.assertEquals(Arrays.asList(spi), staticNet.getPins());
     }
 
+    /**
+     * A net whose local name is "inst/p", in a cell with an instance "inst" that has a net "p" of its
+     * own, has a hierarchical name that also names that other net. Its physical net must be renamed
+     * to an alias that does not.
+     */
+    @Test
+    public void testRenameAmbiguousPhysNets() {
+        Design design = new Design("top", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFCell lut1 = netlist.getHDIPrimitive(Unisim.LUT1);
+
+        // An instance "inst" with a net "p" ...
+        EDIFCell instType = new EDIFCell(netlist.getWorkLibrary(), "instType");
+        instType.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFNet inI = instType.createNet("in_i");
+        inI.createPortInst(instType.getPort("I"));
+        inI.createPortInst("I0", instType.createChildCellInst("sink", lut1));
+        EDIFNet p = instType.createNet("p");
+        p.createPortInst("O", instType.createChildCellInst("drv", lut1));
+        EDIFCellInst inst = top.createChildCellInst("inst", instType);
+
+        // ... next to a net named "inst/p" in the top cell, on a different signal, which reaches
+        // into "inst" through its port
+        EDIFNet ambiguous = top.createNet("inst/p");
+        ambiguous.createPortInst("I", inst);
+        Net net = new Net("inst/p");
+        design.addNet(net);
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", ambiguous, net);
+        Assertions.assertEquals(p, netlist.getHierNetFromName("inst/p").getNet());
+
+        Assertions.assertEquals(1, DesignTools.renameAmbiguousPhysNets(design));
+        Assertions.assertSame(net, design.getNet("inst/in_i"));
+        Assertions.assertNull(design.getNet("inst/p"));
+        Assertions.assertEquals(0, DesignTools.renameAmbiguousPhysNets(design));
+    }
+
     @Test
     public void testPlaceCell() {
         //test a design that already contains a Carry4 cell
