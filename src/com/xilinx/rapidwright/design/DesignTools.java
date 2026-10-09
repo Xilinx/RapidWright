@@ -42,6 +42,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -1192,6 +1193,9 @@ public class DesignTools {
             design.getOriginalSiteInsts().remove(evicted.getName());
         }
 
+        // Nets that something was merged onto, and so may hold the same PIP more than once
+        Set<Net> mergedOnto = new HashSet<>();
+
         // Add routing information
         for (Entry<String, Design> e : blackBoxes.entrySet()) {
             String hierarchicalCellName = e.getKey();
@@ -1204,12 +1208,15 @@ public class DesignTools {
                     Net staticNet = design.getStaticNet(net.getType());
                     staticNet.addPins(net.getPins());
                     // TEMPORARY WORKAROUND: as in mergeOntoNet(), a pin move alone leaves the
-                    // destination unmarked. setPIPs() below marks it whenever the circuit brought
+                    // destination unmarked. addPIP() below marks it whenever the circuit brought
                     // routing with it, but not when it brought only pins
                     markModified(design, staticNet);
-                    HashSet<PIP> uniquePIPs = new HashSet<>(net.getPIPs());
-                    uniquePIPs.addAll(staticNet.getPIPs());
-                    staticNet.setPIPs(uniquePIPs);
+                    if (staticNet.hasPIPs() && net.hasPIPs()) {
+                        mergedOnto.add(staticNet);
+                    }
+                    for (PIP p : net.getPIPs()) {
+                        staticNet.addPIP(p);
+                    }
                 } else {
                     // rename() acts on whichever design currently owns the net, so this re-keys the
                     // circuit the net arrived from and addNet() then inserts it into the shell under
@@ -1259,7 +1266,18 @@ public class DesignTools {
             if (!keepBoundaryRouting && target.isStaticNet()) {
                 target.unroute();
             }
-            mergeOntoNet(design, net, target);
+            if (mergeOntoNet(design, net, target)) {
+                mergedOnto.add(target);
+            }
+        }
+
+        // Where the routing is kept, a net can be handed the same PIPs more than once: the shell and
+        // the circuit can each hold the routing of a signal up to the black box port, such as a
+        // clock routed into the region of every black box. The design's GND and VCC nets can likewise
+        // be handed the same PIPs by its own static routing and by each circuit's. A PIP must be on
+        // a net only once
+        for (Net target : mergedOnto) {
+            removeDuplicatePIPs(target);
         }
     }
 
@@ -1342,8 +1360,10 @@ public class DesignTools {
      * @param design The current design.
      * @param net    The net to merge away.
      * @param target The net to merge it onto.
+     * @return True if both nets had PIPs, so that the target may now hold the same PIP more than
+     *         once.
      */
-    private static void mergeOntoNet(Design design, Net net, Net target) {
+    private static boolean mergeOntoNet(Design design, Net net, Net target) {
         // Deleting the net leaves its PIPs where they are, so they can be read afterwards. They are
         // added one by one rather than the list handed over, which would leave the deleted net and
         // the target sharing it
@@ -1355,6 +1375,7 @@ public class DesignTools {
         // getModifiedNets() holds every net this touched rather than only those whose PIPs moved.
         // The fix belongs in whatever marks a Net modified, which should count a pin move too.
         markModified(design, target);
+        boolean bothRouted = target.hasPIPs() && net.hasPIPs();
         for (PIP p : net.getPIPs()) {
             target.addPIP(p);
         }
@@ -1362,6 +1383,22 @@ public class DesignTools {
         // TEMPORARY WORKAROUND: the design has stopped holding this net, but the change tracking
         // still has it. This cannot be done any earlier: taking its pins above marks it again
         untrackRemovedNet(design, net);
+        return bothRouted;
+    }
+
+    /**
+     * Removes any repeats of a PIP from a net, keeping the PIPs in the order in which each first
+     * appears.
+     *
+     * @param net The net.
+     */
+    private static void removeDuplicatePIPs(Net net) {
+        List<PIP> pips = net.getPIPs();
+        if (pips.size() < 2) return;
+        Set<PIP> unique = new LinkedHashSet<>(pips);
+        if (unique.size() < pips.size()) {
+            net.setPIPs(unique);
+        }
     }
 
     /**

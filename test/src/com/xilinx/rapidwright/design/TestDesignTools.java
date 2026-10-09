@@ -955,6 +955,40 @@ public class TestDesignTools {
     }
 
     /**
+     * The shell and the circuit can each hold the routing of a signal up to the black box port, so
+     * that the same PIPs are on both nets. Merged, with the routing kept, the net must hold each
+     * PIP once.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testPopulateBlackBoxSharedBoundaryPIPs(boolean keepBoundaryRouting) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", createBlackBox(top, "bb", EDIFDirection.INPUT));
+        Net inNet = design.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+        PIP shared = addTestRouting(inNet, 0);
+
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet circuitIn = circuitTop.createNet("I");
+        circuitIn.createPortInst(circuitTop.getPort("I"));
+        Net circuitInNet = circuit.createNet("I");
+        SitePinInst sinkPin = addSinkLUT(circuit, circuitTop, "lut", "SLICE_X1Y0", circuitIn,
+                circuitInNet);
+        // The circuit's checkpoint has the shell's routing up to the port as well as its own
+        circuitInNet.addPIP(shared);
+        PIP own = addTestRouting(circuitInNet, 1, sinkPin);
+
+        populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
+
+        Assertions.assertSame(inNet, sinkPin.getNet());
+        assertRouting(keepBoundaryRouting, inNet, Arrays.asList(shared, own), sinkPin);
+        Assertions.assertTrue(design.getModifiedNets().contains(inNet));
+    }
+
+    /**
      * An unused input has no physical net in the circuit, but its shell routing must still respect
      * keepBoundaryRouting. The physical owner can be above the box's enclosing cell. An input
      * merely tied to a constant, on the other hand, must leave the design's GND or VCC net alone,
