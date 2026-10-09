@@ -270,7 +270,7 @@ public abstract class AbstractEDIFParserWorker {
                     if (nextToken.equals(INSTANCE)) {
                         cell.addCellInst(parseEDIFCellInst(libraryLegalName, instanceLookup, cell, nextToken));
                     } else if (nextToken.equals(NET)) {
-                        parseEDIFNet(cell, instanceLookup, nextToken, cache);
+                        parseEDIFNet(cell, instanceLookup, nextToken);
                     } else {
                         expect(INSTANCE + " | " + NET, nextToken);
                     }
@@ -414,7 +414,7 @@ public abstract class AbstractEDIFParserWorker {
         return o;
     }
 
-    protected EDIFNet parseEDIFNet(EDIFCell cell, Map<String, EDIFCellInst> instanceLookup, String netToken, EDIFReadLegalNameCache cache) {
+    protected EDIFNet parseEDIFNet(EDIFCell cell, Map<String, EDIFCellInst> instanceLookup, String netToken) {
         expect(NET, netToken);
         EDIFNet net = parseUnreferencedEDIFNameObject(new EDIFNet());
         expect(LEFT_PAREN, getNextToken(true));
@@ -453,7 +453,8 @@ public abstract class AbstractEDIFParserWorker {
 
         if (currToken.equals(LEFT_PAREN)) {
             expect(INSTANCEREF, getNextToken(true));
-            String instanceref = getNextToken(false); //TODO change longevity?
+            // Only used to look up the instance (the netlist keeps the name from its definition), so not pooled
+            String instanceref = getNextToken(true);
             portInst.setCellInstRaw(getRefEDIFCellInst(instanceref, instanceLookup));
             expect(RIGHT_PAREN, getNextToken(true));
             expect(RIGHT_PAREN, getNextToken(true));
@@ -466,10 +467,10 @@ public abstract class AbstractEDIFParserWorker {
     }
 
     /**
-     * Get the reference cell instance by the given legal EDIF name.
+     * Get the cell instance with the given legal EDIF name.
      * @param edifCellInstName Legal EDIF name for the cell instance.
-     * @return The existing cell instance or the reference instance that
-     * will be used when the cell instance is fully parsed.
+     * @return The cell instance.
+     * @throws EDIFParseException if there is no such cell instance.
      */
     protected EDIFCellInst getRefEDIFCellInst(String edifCellInstName, Map<String, EDIFCellInst> instanceLookup) {
         EDIFCellInst inst = instanceLookup.get(edifCellInstName);
