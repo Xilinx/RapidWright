@@ -57,6 +57,12 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
 
     protected EDIFNetlist netlist = null;
     protected final List<LibraryOrCellResult> librariesAndCells = new ArrayList<>();
+    /**
+     * Byte offsets of the first and last of {@link #librariesAndCells} (which are in file order, as this worker
+     * parses sequentially), so that it can be checked that different workers' results do not overlap
+     */
+    protected long firstResultOffset = -1;
+    protected long lastResultOffset = -1;
     protected EDIFDesign edifDesign = null;
     protected final List<CellReferenceData> linkCellReference = new ArrayList<>();
     protected final List<ParentCellPortInsts> linkPortInstData = new ArrayList<>();
@@ -131,7 +137,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
                 parseStatus(netlist);
             } else if (nextToken.text.equalsIgnoreCase(LIBRARY) || nextToken.text.equalsIgnoreCase(EXTERNAL)) {
                 EDIFLibrary library = parseEdifLibraryHead();
-                librariesAndCells.add(new LibraryResult(nextToken, library));
+                addResult(nextToken, new LibraryResult(library));
                 if (parseToNextCellWithinLibrary()) {
                     inLibrary = true;
                     return true;
@@ -165,6 +171,19 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
         }
         expect(RIGHT_PAREN, currToken);  // edif end
         return false;
+    }
+
+    /**
+     * Add a parsed library or cell to {@link #librariesAndCells}.
+     * @param token The token at which it starts.
+     * @param result The library or cell.
+     */
+    private void addResult(EDIFToken token, LibraryOrCellResult result) {
+        if (librariesAndCells.isEmpty()) {
+            firstResultOffset = token.byteOffset;
+        }
+        lastResultOffset = token.byteOffset;
+        librariesAndCells.add(result);
     }
 
     private void parseToFirstCell() {
@@ -229,7 +248,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
                     return;
                 }
                 EDIFCell cell = parseEDIFCell(null, next.text);
-                librariesAndCells.add(new CellResult(next, cell));
+                addResult(next, cellRename == null ? new CellResult(cell) : new CellRenamedResult(cell, cellRename));
                 if (cellHasRenamedPorts) {
                     cellsWithRenamedPorts.add(cell);
                 }
@@ -269,6 +288,16 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
         return cell;
     }
 
+
+    /** EDIF identifier of the cell being parsed if it was renamed, else null */
+    private String cellRename;
+
+    @Override
+    protected void setCellRename(EDIFCell cell, String rename) {
+        // Only kept until the cell has been parsed, for its CellResult: cells are only referenced by their EDIF
+        // identifiers once all workers' cells have been assembled, which uses that instead of the cache
+        cellRename = rename;
+    }
 
     private ParentCellPortInsts currentLinks = null;
 
@@ -449,24 +478,13 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
     }
 
     static abstract class LibraryOrCellResult {
-        private final EDIFToken token;
-
-        LibraryOrCellResult(EDIFToken token) {
-            this.token = token;
-        }
-
-        public EDIFToken getToken() {
-            return token;
-        }
-
         public abstract EDIFLibrary addToNetlist(EDIFNetlist netlist, EDIFLibrary currentLibrary, Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName, Map<String, EDIFLibrary> librariesByLegalName, EDIFReadLegalNameCache cache);
     }
 
     static class LibraryResult extends LibraryOrCellResult {
         private final EDIFLibrary library;
 
-        LibraryResult(EDIFToken token, EDIFLibrary library) {
-            super(token);
+        LibraryResult(EDIFLibrary library) {
             this.library = library;
         }
 
@@ -485,9 +503,17 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
 
     static class CellResult extends LibraryOrCellResult {
         private final EDIFCell cell;
-        CellResult(EDIFToken token, EDIFCell cell) {
-            super(token);
+
+        CellResult(EDIFCell cell) {
             this.cell = cell;
+        }
+
+        /**
+         * @return The cell's EDIF identifier if it was renamed (see {@link CellRenamedResult}), else null: looked
+         *         up by the worker once it has parsed the cell, so that assembling need not.
+         */
+        String getEDIFRename() {
+            return null;
         }
 
         @Override
@@ -495,11 +521,29 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
             if (currentLibrary == null) {
                 throw new IllegalStateException("Saw first cell before first library");
             }
-            currentLibrary.addCellRenameDuplicates(cell, cache.getEDIFRename(cell));
+            final String edifRename = getEDIFRename();
+            currentLibrary.addCellRenameDuplicates(cell, edifRename);
 
-            cellsByLegalName.computeIfAbsent(currentLibrary, x-> new HashMap<>()).put(cache.getLegalEDIFName(cell), cell);
+            // As EDIFReadLegalNameCache.getLegalEDIFName() does, so after any collision rename above
+            final String legalName = edifRename != null ? edifRename : cell.getName();
+            cellsByLegalName.computeIfAbsent(currentLibrary, x-> new HashMap<>()).put(legalName, cell);
 
             return currentLibrary;
+        }
+    }
+
+    /** A renamed cell, with its EDIF identifier (few cells are renamed, so only these pay for the field) */
+    static class CellRenamedResult extends CellResult {
+        private final String edifRename;
+
+        CellRenamedResult(EDIFCell cell, String edifRename) {
+            super(cell);
+            this.edifRename = edifRename;
+        }
+
+        @Override
+        String getEDIFRename() {
+            return edifRename;
         }
     }
 

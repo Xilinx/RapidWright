@@ -297,19 +297,24 @@ public class ParallelEDIFParser implements AutoCloseable{
         /** For each cell with renamed ports, the renames recorded by the worker that parsed it */
         private final Map<EDIFCell, EDIFReadLegalNameCache> portRenamesByCell = new IdentityHashMap<>();
         private EDIFLibrary currentLibrary = null;
-        private EDIFToken currentToken = null;
+        /** Byte offset of the last library or cell added */
+        private long lastResultOffset = -1;
 
         private Assembler(EDIFNetlist netlist) {
             this.netlist = netlist;
         }
 
         private void add(ParallelEDIFParserWorker worker) {
-            for (ParallelEDIFParserWorker.LibraryOrCellResult parsed : worker.librariesAndCells) {
-                if (currentToken!=null && parsed.getToken().byteOffset<= currentToken.byteOffset) {
-                    throw new IllegalStateException("Not in ascending order! seen: "+currentToken+", now processed "+parsed.getToken());
+            if (!worker.librariesAndCells.isEmpty()) {
+                // Each worker's results are in file order, so it is enough to check that they follow the previous
+                // worker's
+                if (worker.firstResultOffset <= lastResultOffset) {
+                    throw new IllegalStateException("Not in ascending order! seen offset " + lastResultOffset
+                            + ", now processed offset " + worker.firstResultOffset + " (" + worker + ")");
                 }
-                currentToken = parsed.getToken();
-
+                lastResultOffset = worker.lastResultOffset;
+            }
+            for (ParallelEDIFParserWorker.LibraryOrCellResult parsed : worker.librariesAndCells) {
                 currentLibrary = parsed.addToNetlist(netlist, currentLibrary, cellsByLegalName, librariesByLegalName,
                         worker.cache);
             }
