@@ -235,7 +235,8 @@ public class EDIFLibrary extends EDIFName {
 
     /**
      * Creates a list of all cells that have references outside of this
-     * library.
+     * library.  A cell is outside of this library if it belongs to another
+     * library, even if this library also contains a cell of the same name.
      * @return A newly created list of all cells that contains any instances
      * of cells not located within this library.
      */
@@ -243,7 +244,7 @@ public class EDIFLibrary extends EDIFName {
         List<EDIFCell> list = new ArrayList<>();
         for (EDIFCell c : getCells()) {
             for (EDIFCellInst i : c.getCellInsts()) {
-                if (!containsCell(i.getCellType())) {
+                if (i.getCellType().getLibrary() != this) {
                     list.add(i.getCellType());
                 }
             }
@@ -259,10 +260,27 @@ public class EDIFLibrary extends EDIFName {
      */
     public Collection<EDIFLibrary> getExternallyReferencedLibraries() {
         Set<EDIFLibrary> set = new HashSet<>();
-        for (EDIFCell c : getExternallyReferencedCells()) {
-            set.add(c.getLibrary());
-        }
+        addExternallyReferencedLibraries(getCells(), set);
         return set;
+    }
+
+    /**
+     * Adds the libraries, other than this one, of the cells instantiated within the provided cells.
+     * @param cells Cells of this library to visit.
+     * @param set Set to add the referenced libraries to.
+     */
+    void addExternallyReferencedLibraries(Collection<EDIFCell> cells, Set<EDIFLibrary> set) {
+        // Most instances refer to the same few libraries, so skip repeats of the last one found
+        EDIFLibrary last = this;
+        for (EDIFCell c : cells) {
+            for (EDIFCellInst i : c.getCellInsts()) {
+                EDIFLibrary lib = i.getCellType().getLibrary();
+                if (lib != this && lib != last) {
+                    set.add(lib);
+                    last = lib;
+                }
+            }
+        }
     }
 
     /**
