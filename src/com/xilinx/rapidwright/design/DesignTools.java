@@ -884,13 +884,17 @@ public class DesignTools {
             if (otherPort == null) {
                 otherPort = cellPorts.remove(p.getName());
                 if (otherPort == null) {
-                    sb.append("\n  port " + p.getName() + " doesn't exist on " + src);
+                    sb.append("\n  port " + p.getName() + " doesn't exist on " + target);
+                    continue;
                 }
             }
 
-            if (!Objects.equals(p.getWidth(), p.getWidth()) ||
-               !Objects.equals(p.getDirection(), p.getDirection())) {
-                sb.append("\n  port " + p.getName() + " mismatch in direction/width");
+            if (!Objects.equals(p.getName(), otherPort.getName()) ||
+                    !Objects.equals(p.getWidth(), otherPort.getWidth()) ||
+                    !EDIFCell.isCompatibleDirection(otherPort, p, true)) {
+                sb.append("\n  port " + p.getName() + " mismatch in name/direction/width: "
+                        + otherPort.getName() + " " + otherPort.getDirection() + " on " + target + ", "
+                        + p.getName() + " " + p.getDirection() + " on " + src);
             }
         }
         for (String portName : cellPorts.keySet()) {
@@ -1009,7 +1013,9 @@ public class DesignTools {
                 throw new RuntimeException("ERROR: The cell instance " + hierarchicalCellName
                         + " is not a black box.");
             }
-            if (!inst.getCellType().hasCompatibleInterface(cell.getTopEDIFCell())) {
+            // A black box port to a device pin can be an inout that the circuit has resolved to an
+            // input or output, which Vivado accepts
+            if (!inst.getCellType().hasCompatibleInterface(cell.getTopEDIFCell(), true)) {
                 throw new RuntimeException(createInformativeCellInterfaceMismatchMessage(
                         hierarchicalCellName, inst.getCellType(), cell.getTopEDIFCell()));
             }
