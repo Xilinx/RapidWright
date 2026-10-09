@@ -346,7 +346,7 @@ public abstract class AbstractEDIFParserWorker {
     protected EDIFPropertyValue parsePropertyValue() {
         expect(LEFT_PAREN, getNextToken(true));
         EDIFPropertyValue val = new EDIFPropertyValue();
-        val.setType(EDIFValueType.valueOf(getNextToken(false).toUpperCase()));
+        val.setType(parseValueType(getNextToken(true)));
         if (val.getType() == EDIFValueType.BOOLEAN) {
             expect(LEFT_PAREN, getNextToken(true));
             val.setValue(getNextToken(false));
@@ -356,6 +356,24 @@ public abstract class AbstractEDIFParserWorker {
         }
         expect(RIGHT_PAREN, getNextToken(true));
         return val;
+    }
+
+    /**
+     * Get the type of a property value from its keyword, without creating a String for the common spellings.
+     * @param type The keyword, e.g. "string".
+     * @return The type.
+     */
+    private static EDIFValueType parseValueType(String type) {
+        switch (type) {
+            case "string":
+                return EDIFValueType.STRING;
+            case "integer":
+                return EDIFValueType.INTEGER;
+            case "boolean":
+                return EDIFValueType.BOOLEAN;
+            default:
+                return EDIFValueType.valueOf(type.toUpperCase());
+        }
     }
 
     protected EDIFLibrary parseEdifLibraryHead() {
