@@ -32,10 +32,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
@@ -52,50 +53,49 @@ import org.jetbrains.annotations.NotNull;
  * Single-threaded mode means that all tasks submitted will be executed
  * immediately (on the submitting thread), except for the tasks after the
  * first given to {@link #invokeFirstSubmitRest(Callable[])}, which are
- * deferred until {@link #joinFirst(Deque)} is called on them.
+ * deferred until they are waited for ({@link #joinFirst(Deque)},
+ * {@link #get(Future)} or {@link #join(List)}).
  */
 public class ParallelismTools {
     /**
      * Name of the environment variable to disable parallel processing, set RW_PARALLEL=0 (or
      * RW_PARALLEL=false, case insensitive) to disable. Otherwise (if unset, or set to any
-     * other value) parallel processing is enabled only if {@link #maxParallelism()} &gt; 1.
+     * other value) parallel processing is enabled only if there is more than one processor.
      */
     public static final String RW_PARALLEL = "RW_PARALLEL";
 
-    /** The JVM-wide common ForkJoinPool (by default, as many threads as there are
-     * processors minus one), or null if parallel processing was disabled at startup */
-    private static final ForkJoinPool pool;
+    /** Whether parallel processing was enabled at startup (it cannot be enabled later otherwise) */
+    private static final boolean parallelAtStartup;
 
-    private static boolean parallel;
+    /** Volatile, as it may be changed (by {@link #setParallel(boolean)}) while other threads run tasks */
+    private static volatile boolean parallel;
 
     static {
-        final int maxParallelism = maxParallelism();
         final String value = System.getenv(RW_PARALLEL);
 
         if (value != null && (value.equals("0") || value.equalsIgnoreCase("false"))) {
             parallel = false;
         } else {
-            // Otherwise enable parallelism only if maxParallelism > 1
-            parallel = (maxParallelism > 1);
+            // Otherwise enable parallelism only if there is more than one processor
+            parallel = Runtime.getRuntime().availableProcessors() > 1;
         }
 
-        pool = parallel ? ForkJoinPool.commonPool() : null;
+        parallelAtStartup = parallel;
     }
 
     /**
      * Global setter to control parallel processing.
-     * Has no effect (other than printing a warning) if {@link #maxParallelism()} is 1,
+     * Has no effect (other than printing a warning) if there is only one processor,
      * or if enabling parallel processing when it was disabled at startup by the
      * {@link #RW_PARALLEL} environment variable.
      * @param parallel Enable parallel processing.
      */
     public static void setParallel(boolean parallel) {
-        final int maxParallelism = maxParallelism();
-        if (maxParallelism == 1) {
-            System.out.println("WARNING: Parallel execution unsupported since maxParallelism() == 1.");
+        if (Runtime.getRuntime().availableProcessors() == 1) {
+            System.out.println("WARNING: Parallel execution unsupported since there is only one processor.");
             return;
         }
-        if (parallel && pool == null) {
+        if (parallel && !parallelAtStartup) {
             System.out.println("WARNING: Parallel execution unsupported since it was disabled at startup by "
                     + RW_PARALLEL + "=" + System.getenv(RW_PARALLEL) + ".");
             return;
@@ -112,7 +112,13 @@ public class ParallelismTools {
     }
 
     /**
-     * Submit a task-with-return-value to the thread pool.
+     * Submit a task-with-return-value to the common ForkJoinPool, as a {@link FutureTask}
+     * (rather than a ForkJoinTask): any thread waiting for it with {@link #get(Future)},
+     * {@link #join(List)} or {@link #joinFirst(Deque)} runs it itself if no other thread
+     * has claimed it yet, wherever it is in the pool's queues (and so even if the pool has
+     * no threads), and any exception it throws is kept as-is.
+     * When parallel processing is disabled, the task is executed immediately on the
+     * current thread.
      * @param task Task to be performed.
      * @param <T> Type returned by task.
      * @return A Future object holding the value returned by task.
@@ -121,10 +127,8 @@ public class ParallelismTools {
         if (!getParallel()) {
             return callNow(task);
         }
-        // Submit a FutureTask (rather than a ForkJoinTask) so that runIfUnclaimed()
-        // can run it on any thread that has not yet been beaten to it
-        FutureTask<T> future = new FutureTask<>(task);
-        pool.execute(future);
+        final RunnableFuture<T> future = adapt(task);
+        ForkJoinPool.commonPool().execute(future);
         return future;
     }
 
@@ -134,10 +138,7 @@ public class ParallelismTools {
      * @return A Future object used only to determine task completion.
      */
     public static Future<?> submit(Runnable task) {
-        return submit(() -> {
-            task.run();
-            return null;
-        });
+        return submit(Executors.callable(task));
     }
 
     /**
@@ -145,16 +146,12 @@ public class ParallelismTools {
      * @param task Task to be performed.
      * @param <T> Type returned by task.
      * @return A completed Future object holding the value returned by task, or the
-     *         exception it threw.
+     *         exception (or error) it threw, as a task run by the pool would.
      */
-    private static <T> CompletableFuture<T> callNow(Callable<T> task) {
-        CompletableFuture<T> f = new CompletableFuture<>();
-        try {
-            f.complete(task.call());
-        } catch (Exception e) {
-            f.completeExceptionally(e);
-        }
-        return f;
+    private static <T> Future<T> callNow(Callable<T> task) {
+        final RunnableFuture<T> future = adapt(task);
+        future.run();
+        return future;
     }
 
     /**
@@ -174,18 +171,40 @@ public class ParallelismTools {
 
     /**
      * Block until the given Future is complete, and return its value.
+     * A thread of a ForkJoinPool blocks with {@link ForkJoinPool#managedBlock}, so that the
+     * pool can compensate for it (e.g. with a spare thread) rather than run with one thread
+     * fewer.
      * If its task threw an unchecked exception (or error), that is rethrown as-is
      * rather than wrapped in an ExecutionException, with a suppressed exception
      * added to it recording the stack of the rethrowing thread (since the task may
      * have run on another thread); a checked exception, which cannot be rethrown
      * as-is, is wrapped in a RuntimeException. If the wait is interrupted, the
-     * InterruptedException is wrapped in a RuntimeException.
+     * InterruptedException is wrapped in a RuntimeException, and the thread's
+     * interrupt status is restored.
      * @param future Future representing previously submitted task.
      * @param <T> Type returned by task.
      * @return Value returned by task.
      */
     private static <T> T getUnwrapped(Future<T> future) {
         try {
+            if (!future.isDone() && Thread.currentThread() instanceof ForkJoinWorkerThread) {
+                ForkJoinPool.managedBlock(new ForkJoinPool.ManagedBlocker() {
+                    @Override
+                    public boolean block() throws InterruptedException {
+                        try {
+                            future.get();
+                        } catch (ExecutionException e) {
+                            // Rethrown by future.get() below
+                        }
+                        return true;
+                    }
+
+                    @Override
+                    public boolean isReleasable() {
+                        return future.isDone();
+                    }
+                });
+            }
             return future.get();
         } catch (ExecutionException e) {
             final Throwable cause = e.getCause();
@@ -199,6 +218,7 @@ public class ParallelismTools {
             }
             throw new RuntimeException(cause != null ? cause : e);
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             throw new RuntimeException(e);
         }
     }
@@ -208,23 +228,23 @@ public class ParallelismTools {
      * the thread pool to be executed in parallel, then execute that first task with the
      * current thread.
      * In single-threaded mode, all but the first task are not executed here but are
-     * deferred until they are passed to {@link #joinFirst(Deque)}.
-     * @param tasks List of tasks to be executed.
+     * deferred until they are passed to {@link #joinFirst(Deque)} (or waited for by
+     * {@link #get(Future)} or {@link #join(List)}).
+     * @param tasks List of tasks to be executed (if none, an empty Deque is returned).
      * @param <T> Type returned by all tasks.
      * @return A Deque of Future objects corresponding to each task (in order).
      */
     @SafeVarargs
     public static <T> Deque<Future<T>> invokeFirstSubmitRest(@NotNull Callable<T>... tasks) {
-        Deque<Future<T>> futures = new ArrayDeque<>(tasks.length);
-
-        for (int i = 1; i < tasks.length; i++) {
-            if (!getParallel()) {
-                futures.addLast(adapt(tasks[i]));
-            } else {
-                futures.addLast(submit(tasks[i]));
-            }
+        final Deque<Future<T>> futures = new ArrayDeque<>(tasks.length);
+        if (tasks.length == 0) {
+            return futures;
         }
 
+        final boolean parallel = getParallel();
+        for (int i = 1; i < tasks.length; i++) {
+            futures.addLast(parallel ? submit(tasks[i]) : adapt(tasks[i]));
+        }
         futures.addFirst(callNow(tasks[0]));
 
         return futures;
@@ -243,28 +263,13 @@ public class ParallelismTools {
      * @return The value returned by the first task.
      */
     public static <T> T joinFirst(Deque<Future<T>> futures) {
-        Future<T> first = futures.removeFirst();
-
-        if (!getParallel()) {
-            if (!first.isDone()) {
-                if (first instanceof Runnable) {
-                    ((Runnable) first).run();
-                } else {
-                    throw new RuntimeException();
-                }
-            }
-        } else {
-            // Try and invoke it on this thread, unless already done or claimed
-            if (!runIfUnclaimed(first)) {
-                // Not done: another thread must be running it already,
-                // so steal whatever is next until it's done
-                Iterator<Future<T>> it = futures.iterator();
-                while (!first.isDone() && it.hasNext()) {
-                    runIfUnclaimed(it.next());
-                }
+        final Future<T> first = futures.removeFirst();
+        if (!runIfUnclaimed(first)) {
+            final Iterator<Future<T>> it = futures.iterator();
+            while (!first.isDone() && it.hasNext()) {
+                runIfUnclaimed(it.next());
             }
         }
-
         return getUnwrapped(first);
     }
 
@@ -298,18 +303,30 @@ public class ParallelismTools {
      * Callers steal by walking their futures newest first, whereas pool workers
      * take (and steal) the oldest queued tasks first, so as not to contend with
      * them for the same tasks.
-     * The task is run without removing it from the pool's queue (which
+     * A FutureTask is run without removing it from the pool's queue (which
      * ForkJoinPool does not support for tasks given to execute()): FutureTask.run()
      * does nothing if another thread has already claimed the task, so the pool
      * worker that eventually dequeues it finds it already done, which costs it
-     * very little.
+     * very little. A ForkJoinTask (which, unlike a FutureTask, would run again if
+     * run while another thread is running it) is run only if
+     * {@link ForkJoinTask#tryUnfork()} takes it back from the queue.
      * @param future Future representing a previously submitted task.
      * @param <T> Type returned by task.
      * @return True if the task is done (whether run by this thread or another),
      *         false if it is not (e.g. another thread is still running it).
      */
     private static <T> boolean runIfUnclaimed(Future<T> future) {
-        if (!future.isDone() && (future instanceof Runnable)) {
+        if (future.isDone()) {
+            return true;
+        }
+        if (future instanceof ForkJoinTask) {
+            // Unlike FutureTask.run(), running a ForkJoinTask that another thread is already
+            // running would run it again, so only run one that can be taken back from the queue
+            final ForkJoinTask<T> task = (ForkJoinTask<T>) future;
+            if (task.tryUnfork()) {
+                task.quietlyInvoke();
+            }
+        } else if (future instanceof Runnable) {
             ((Runnable) future).run();
         }
         return future.isDone();
@@ -433,11 +450,11 @@ public class ParallelismTools {
      * Given a list of tasks-with-return-value, block until all tasks
      * have been completed, using {@link ForkJoinTask#invokeAll(Collection)}: all
      * but the first are forked (to the current thread's own queue, if it is a
-     * thread of the pool, otherwise to the common pool), the first is executed
-     * by the current thread, which then helps until the others are done, by
-     * executing any not yet taken by another thread and helping those that
-     * did. Unlike blocking on a {@link FutureTask}, a pool thread that must
-     * wait lets the pool compensate with another thread.
+     * thread of a ForkJoinPool, so to that pool, otherwise to the common pool),
+     * the first is executed by the current thread, which then waits for the
+     * others, executing those it can take back from its queue (how many depends
+     * on the JDK), and, on a thread of a ForkJoinPool, also helping the threads
+     * that took the others, or letting the pool compensate for it blocking.
      * If any task throws an exception, one of them (not necessarily the first in
      * order) is rethrown: if thrown on another thread, as a new exception of the
      * same type with the original as its cause, where possible, and a checked
@@ -451,12 +468,15 @@ public class ParallelismTools {
      */
     @SafeVarargs
     public static <T> List<Future<T>> invokeAll(Callable<T>... tasks) {
-        List<Future<T>> futures = new ArrayList<>(tasks.length);
         if (!getParallel()) {
+            final List<Future<T>> futures = new ArrayList<>(tasks.length);
             for (Callable<T> task : tasks) {
                 futures.add(callNow(task));
             }
-            join(futures);
+            // Rethrow the first exception, in order
+            for (Future<T> future : futures) {
+                getUnwrapped(future);
+            }
             return futures;
         }
 
@@ -465,7 +485,9 @@ public class ParallelismTools {
             forkJoinTasks.add(ForkJoinTask.adapt(task));
         }
         ForkJoinTask.invokeAll(forkJoinTasks);
-        futures.addAll(forkJoinTasks);
+        // Every ForkJoinTask<T> is a Future<T>, so no need to copy the list
+        @SuppressWarnings("unchecked")
+        final List<Future<T>> futures = (List<Future<T>>) (List<?>) forkJoinTasks;
         return futures;
     }
 
@@ -483,10 +505,13 @@ public class ParallelismTools {
     }
 
     /**
-     * The number of parallel threads we want to use
+     * The number of threads that run tasks in parallel: the common ForkJoinPool's threads
+     * (by default, as many as there are processors minus one) plus the calling thread,
+     * which also runs tasks while waiting for them; or just the calling thread if parallel
+     * processing is disabled.
      * @return number of parallel threads
      */
     public static int maxParallelism() {
-        return Runtime.getRuntime().availableProcessors();
+        return (getParallel() ? ForkJoinPool.getCommonPoolParallelism() : 0) + 1;
     }
 }
