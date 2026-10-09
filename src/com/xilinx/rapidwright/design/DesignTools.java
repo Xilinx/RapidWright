@@ -3710,18 +3710,24 @@ public class DesignTools {
     }
 
     /**
-     * Renames the physical nets whose names are ambiguous because the local name of their logical
-     * net contains the hierarchy separator: a net named "inst/p[3]" in a cell that also has an
-     * instance named "inst". The net's hierarchical name, ".../inst/p[3]", then also names the net
-     * "p[3]" inside "inst", which is the net Vivado finds by that name when it reads a checkpoint, so
-     * that the routing lands on the wrong net (reported as conflicts). Such local names occur in
-     * encrypted IP, and a checkpoint that has them shows the problem after nothing more than being
-     * read and written back out.
+     * Opt-in workaround for ambiguous physical net names observed in some checkpoints containing
+     * encrypted IP. A local net named "inst/p[3]" next to an instance named "inst" has the same
+     * flattened name as the unrelated net "p[3]" inside that instance. In the affected designs,
+     * a RapidWright checkpoint round trip introduces routing conflicts; selecting another logical
+     * alias for the physical net avoids those conflicts.
      * <p>
      * Each such net is renamed to the deepest of its aliases whose local name does not contain the
-     * separator, as Vivado's own physical net names are. A net with no such alias, or whose alias
-     * is already the name of another physical net, is left as it is. The physical net is taken to
-     * be on the net with the separator in its local name, not the one inside the instance.
+     * separator and whose full name resolves back to that alias. Equal-depth aliases are ordered
+     * lexicographically. Nets without a distinct suitable alias or identifiable source are left
+     * unchanged, as are module-associated nets and renames with conflicting destinations. A name
+     * occupied by another net can be used only if that net can also be renamed in the same call.
+     * <p>
+     * This method assumes that the physical net belongs to the logical net with the separator in
+     * its local name. Callers must establish that this matches their input checkpoint; a previous
+     * call may invalidate this assumption if an alias is also another candidate's original name.
+     * It changes physical names, leaving logical names and connectivity unchanged, and does not establish
+     * checkpoint round-trip equivalence or fix checkpoint serialization. See
+     * <a href="https://github.com/Xilinx/RapidWright/pull/1458">PR #1458</a>.
      *
      * @param design The design to modify in place.
      * @return The number of nets renamed.
@@ -3736,10 +3742,14 @@ public class DesignTools {
             for (EDIFCell cell : lib.getCells()) {
                 for (EDIFNet net : cell.getNets()) {
                     String name = net.getName();
-                    int sep = name.indexOf(EDIFTools.EDIF_HIER_SEP);
-                    if (sep > 0 && cell.getCellInst(name.substring(0, sep)) != null) {
-                        ambiguous.computeIfAbsent(name, (k) -> new ArrayList<>()).add(cell);
-                        segmentCounts.add(name.split(EDIFTools.EDIF_HIER_SEP, -1).length);
+                    // Check every separator: an instance name can itself contain separators.
+                    for (int sep = name.indexOf(EDIFTools.EDIF_HIER_SEP); sep >= 0;
+                            sep = name.indexOf(EDIFTools.EDIF_HIER_SEP, sep + 1)) {
+                        if (cell.getCellInst(name.substring(0, sep)) != null) {
+                            ambiguous.computeIfAbsent(name, (k) -> new ArrayList<>()).add(cell);
+                            segmentCounts.add(name.split(EDIFTools.EDIF_HIER_SEP, -1).length);
+                            break;
+                        }
                     }
                 }
             }
@@ -3749,8 +3759,13 @@ public class DesignTools {
         }
 
         // The physical nets named after one of those nets, with the alias to rename each to
-        Map<Net, String> renames = new LinkedHashMap<>();
+        // Key by immutable original names: Net.hashCode() changes when a net is renamed.
+        Map<String, String> renames = new LinkedHashMap<>();
         for (Net net : design.getNets()) {
+            if (net.getModuleInst() != null || net.getModuleTemplate() != null
+                    || net.getModuleTemplateNet() != null) {
+                continue;
+            }
             String name = net.getName();
             for (int segments : segmentCounts) {
                 int cut = name.length();
@@ -3759,10 +3774,14 @@ public class DesignTools {
                 }
                 String local = name.substring(cut + 1);
                 List<EDIFCell> cells = ambiguous.get(local);
-                if (cells == null) continue;
+                if (cells == null) {
+                    continue;
+                }
                 EDIFHierCellInst inst = cut < 0 ? netlist.getTopHierCellInst()
                         : netlist.getHierCellInstFromName(name.substring(0, cut));
-                if (inst == null || !cells.contains(inst.getCellType())) continue;
+                if (inst == null || !cells.contains(inst.getCellType())) {
+                    continue;
+                }
                 List<EDIFHierNet> aliases;
                 try {
                     aliases = netlist.getNetAliases(inst.getNet(local));
@@ -3772,46 +3791,69 @@ public class DesignTools {
                 }
                 EDIFHierNet best = null;
                 for (EDIFHierNet alias : aliases) {
-                    if (alias.getNet().getName().contains(EDIFTools.EDIF_HIER_SEP)) continue;
+                    String aliasName = alias.getHierarchicalNetName();
+                    if (alias.getNet().getName().contains(EDIFTools.EDIF_HIER_SEP)
+                            || name.equals(aliasName)
+                            || !alias.equals(netlist.getHierNetFromName(aliasName))) {
+                        continue;
+                    }
                     if (best == null
-                            || alias.getHierarchicalInst().getDepth() > best.getHierarchicalInst().getDepth()) {
+                            || alias.getHierarchicalInst().getDepth() > best.getHierarchicalInst().getDepth()
+                            || (alias.getHierarchicalInst().getDepth() == best.getHierarchicalInst().getDepth()
+                                && aliasName.compareTo(best.getHierarchicalNetName()) < 0)) {
                         best = alias;
                     }
                 }
                 if (best != null) {
-                    renames.put(net, best.getHierarchicalNetName());
+                    renames.put(name, best.getHierarchicalNetName());
                 }
             }
         }
 
-        // An alias can be the current name of another net being renamed, so every net is first
-        // moved out of the way, to a name that no net has
-        Map<Net, String> original = new HashMap<>();
+        // Reject all competing renames rather than choose an iteration-dependent winner.
+        Set<String> targets = new HashSet<>();
+        Set<String> duplicates = new HashSet<>();
+        for (String target : renames.values()) {
+            if (!targets.add(target)) {
+                duplicates.add(target);
+            }
+        }
+        renames.values().removeIf(duplicates::contains);
+
+        // If A needs B's name and B cannot move, A cannot move either. Propagate this through
+        // the whole chain before mutating anything; restoring names after a collision is unsafe.
+        boolean removed;
+        do {
+            removed = renames.entrySet().removeIf(e -> design.getNet(e.getValue()) != null
+                    && !renames.containsKey(e.getValue()));
+        } while (removed);
+
+        // Save the Net objects before changing any names. Temporary names must avoid both
+        // existing nets and all final destinations, including destinations not yet occupied.
+        Map<String, Net> nets = new LinkedHashMap<>();
+        for (String name : renames.keySet()) {
+            nets.put(name, design.getNet(name));
+        }
         int tmp = 0;
-        for (Net net : renames.keySet()) {
-            original.put(net, net.getName());
+        for (Net net : nets.values()) {
             String tmpName;
             do {
                 tmpName = "__renameAmbiguousPhysNets_" + tmp++;
-            } while (design.getNet(tmpName) != null);
+            } while (design.getNet(tmpName) != null || targets.contains(tmpName));
             if (!net.rename(tmpName)) {
                 throw new RuntimeException("ERROR: Failed to rename net '" + net.getName() + "' to '"
                         + tmpName + "'.");
             }
         }
-        int renamed = 0;
-        for (Map.Entry<Net, String> e : renames.entrySet()) {
-            Net net = e.getKey();
-            String name = design.getNet(e.getValue()) == null ? e.getValue() : original.get(net);
+        for (Map.Entry<String, String> e : renames.entrySet()) {
+            Net net = nets.get(e.getKey());
+            String name = e.getValue();
             if (!net.rename(name)) {
                 throw new RuntimeException("ERROR: Failed to rename net '" + net.getName() + "' to '"
                         + name + "'.");
             }
-            if (name.equals(e.getValue())) {
-                renamed++;
-            }
         }
-        return renamed;
+        return renames.size();
     }
 
     /**

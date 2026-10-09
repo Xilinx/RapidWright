@@ -2051,8 +2051,9 @@ public class TestDesignTools {
      * own, has a hierarchical name that also names that other net. Its physical net must be renamed
      * to an alias that does not.
      */
-    @Test
-    public void testRenameAmbiguousPhysNets() {
+    @ParameterizedTest
+    @ValueSource(strings = {"inst", "foo/bar", "fred/"})
+    public void testRenameAmbiguousPhysNets(String instName) {
         Design design = new Design("top", "xcvu3p");
         EDIFNetlist netlist = design.getNetlist();
         EDIFCell top = design.getTopEDIFCell();
@@ -2066,21 +2067,170 @@ public class TestDesignTools {
         inI.createPortInst("I0", instType.createChildCellInst("sink", lut1));
         EDIFNet p = instType.createNet("p");
         p.createPortInst("O", instType.createChildCellInst("drv", lut1));
-        EDIFCellInst inst = top.createChildCellInst("inst", instType);
+        EDIFCellInst inst = top.createChildCellInst(instName, instType);
 
         // ... next to a net named "inst/p" in the top cell, on a different signal, which reaches
         // into "inst" through its port
-        EDIFNet ambiguous = top.createNet("inst/p");
+        EDIFNet ambiguous = top.createNet(instName + "/p");
         ambiguous.createPortInst("I", inst);
-        Net net = new Net("inst/p");
+        Net net = new Net(instName + "/p");
         design.addNet(net);
         addSourceLUT(design, top, "src", "SLICE_X0Y0", ambiguous, net);
-        Assertions.assertEquals(p, netlist.getHierNetFromName("inst/p").getNet());
+        Assertions.assertEquals(p, netlist.getHierNetFromName(instName + "/p").getNet());
+        SitePinInst source = net.getSource();
+        PIP pip = addTestRouting(net, 0);
 
         Assertions.assertEquals(1, DesignTools.renameAmbiguousPhysNets(design));
-        Assertions.assertSame(net, design.getNet("inst/in_i"));
-        Assertions.assertNull(design.getNet("inst/p"));
+        Assertions.assertSame(net, design.getNet(instName + "/in_i"));
+        Assertions.assertNull(design.getNet(instName + "/p"));
+        Assertions.assertSame(source, net.getSource());
+        Assertions.assertSame(net, source.getNet());
+        Assertions.assertEquals(Collections.singletonList(pip), new ArrayList<>(net.getPIPs()));
+        Assertions.assertSame(ambiguous, top.getNet(instName + "/p"));
+        Assertions.assertSame(inI, instType.getNet("in_i"));
+        Assertions.assertSame(p, instType.getNet("p"));
         Assertions.assertEquals(0, DesignTools.renameAmbiguousPhysNets(design));
+    }
+
+    /** Creates an ambiguous physical net and a connected alias using real EDIF hierarchy. */
+    private static Net createAmbiguousPhysicalNet(Design design, String from, String to,
+            int sources) {
+        return createAmbiguousPhysicalNet(design, from, to, sources, "inst");
+    }
+
+    private static Net createAmbiguousPhysicalNet(Design design, String from, String to,
+            int sources, String instName) {
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFCellInst inst = top.getCellInst(instName);
+        if (inst == null) {
+            EDIFCell type = new EDIFCell(netlist.getWorkLibrary(), "instType");
+            inst = top.createChildCellInst(instName, type);
+        }
+        EDIFCell type = inst.getCellType();
+        EDIFNet logical = top.createNet(instName + "/" + from);
+        if (to != null) {
+            EDIFPort port = type.createPort("I_" + from, EDIFDirection.INPUT, 1);
+            EDIFNet alias = type.getNet(to);
+            if (alias == null) {
+                alias = type.createNet(to);
+            }
+            alias.createPortInst(port);
+            logical.createPortInst(port, inst);
+        }
+        for (int i = 0; i < sources; i++) {
+            logical.createPortInst("O", top.createChildCellInst("src_" + from + "_" + i,
+                    netlist.getHDIPrimitive(Unisim.LUT1)));
+        }
+        Net physical = new Net(instName + "/" + from);
+        design.addNet(physical);
+        return physical;
+    }
+
+    @Test
+    public void testRenameAmbiguousPhysNetsOccupiedAlias() {
+        Design design = new Design("top", "xcvu3p");
+        Net original = createAmbiguousPhysicalNet(design, "p", "q", 1);
+        Net occupied = design.createNet("inst/q");
+        Assertions.assertEquals(0, DesignTools.renameAmbiguousPhysNets(design));
+        Assertions.assertSame(original, design.getNet("inst/p"));
+        Assertions.assertSame(occupied, design.getNet("inst/q"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testRenameAmbiguousPhysNetsChain(boolean blocked) {
+        Design design = new Design("top", "xcvu3p");
+        Net first = createAmbiguousPhysicalNet(design, "p", "q", 1);
+        Net second = createAmbiguousPhysicalNet(design, "q", "r", 1);
+        Net third = createAmbiguousPhysicalNet(design, "r", "s", 1);
+        Net occupied = blocked ? design.createNet("inst/s") : null;
+        int netCount = design.getNets().size();
+        Assertions.assertEquals(blocked ? 0 : 3, DesignTools.renameAmbiguousPhysNets(design));
+        Assertions.assertSame(first, design.getNet(blocked ? "inst/p" : "inst/q"));
+        Assertions.assertSame(second, design.getNet(blocked ? "inst/q" : "inst/r"));
+        Assertions.assertSame(third, design.getNet(blocked ? "inst/r" : "inst/s"));
+        if (blocked) {
+            Assertions.assertSame(occupied, design.getNet("inst/s"));
+        }
+        Assertions.assertEquals(netCount, design.getNets().size());
+        Assertions.assertEquals(0, DesignTools.renameAmbiguousPhysNets(design));
+    }
+
+    @Test
+    public void testRenameAmbiguousPhysNetsSharedAlias() {
+        Design design = new Design("top", "xcvu3p");
+        Net first = createAmbiguousPhysicalNet(design, "p", "r", 1);
+        Net second = createAmbiguousPhysicalNet(design, "q", "r", 0);
+        Assertions.assertEquals(0, DesignTools.renameAmbiguousPhysNets(design));
+        Assertions.assertSame(first, design.getNet("inst/p"));
+        Assertions.assertSame(second, design.getNet("inst/q"));
+        Assertions.assertNull(design.getNet("inst/r"));
+    }
+
+    @Test
+    public void testRenameAmbiguousPhysNetsNoOp() {
+        Design design = new Design("top", "xcvu3p");
+        Net net = createAmbiguousPhysicalNet(design, "p", "p", 1);
+        Assertions.assertEquals(0, DesignTools.renameAmbiguousPhysNets(design));
+        Assertions.assertSame(net, design.getNet("inst/p"));
+        Assertions.assertEquals(0, DesignTools.renameAmbiguousPhysNets(design));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 2})
+    public void testRenameAmbiguousPhysNetsWithoutSingleSource(int sources) {
+        Design design = new Design("top", "xcvu3p");
+        Net net = createAmbiguousPhysicalNet(design, "p", "q", sources);
+        Assertions.assertEquals(0, DesignTools.renameAmbiguousPhysNets(design));
+        Assertions.assertSame(net, design.getNet("inst/p"));
+    }
+
+    @Test
+    public void testRenameAmbiguousPhysNetsWithoutAlias() {
+        Design design = new Design("top", "xcvu3p");
+        Net net = createAmbiguousPhysicalNet(design, "p", null, 1);
+        Assertions.assertEquals(0, DesignTools.renameAmbiguousPhysNets(design));
+        Assertions.assertSame(net, design.getNet("inst/p"));
+    }
+
+    @Test
+    public void testRenameAmbiguousPhysNetsModuleDependency() {
+        Design design = new Design("top", "xcvu3p");
+        Net first = createAmbiguousPhysicalNet(design, "p", "q", 1);
+        Net second = createAmbiguousPhysicalNet(design, "q", "r", 1);
+        second.setModuleTemplateNet(new Net("template"));
+        Assertions.assertEquals(0, DesignTools.renameAmbiguousPhysNets(design));
+        Assertions.assertSame(first, design.getNet("inst/p"));
+        Assertions.assertSame(second, design.getNet("inst/q"));
+    }
+
+    @Test
+    public void testRenameAmbiguousPhysNetsTemporaryNameOccupied() {
+        Design design = new Design("top", "xcvu3p");
+        Net net = createAmbiguousPhysicalNet(design, "p", "q", 1);
+        Net occupied = design.createNet("__renameAmbiguousPhysNets_0");
+        Assertions.assertEquals(1, DesignTools.renameAmbiguousPhysNets(design));
+        Assertions.assertSame(net, design.getNet("inst/q"));
+        Assertions.assertSame(occupied, design.getNet("__renameAmbiguousPhysNets_0"));
+        Assertions.assertNull(design.getNet("__renameAmbiguousPhysNets_1"));
+    }
+
+    @Test
+    public void testRenameAmbiguousPhysNetsAmbiguousAliasHierarchy() {
+        Design design = new Design("top", "xcvu3p");
+        Net net = createAmbiguousPhysicalNet(design, "p", "q", 1, "foo/bar");
+        EDIFCell top = design.getTopEDIFCell();
+
+        EDIFCell fooType = new EDIFCell(design.getNetlist().getWorkLibrary(), "fooType");
+        EDIFCell barType = new EDIFCell(design.getNetlist().getWorkLibrary(), "barType");
+        top.createChildCellInst("foo", fooType);
+        fooType.createChildCellInst("bar", barType);
+        EDIFNet wrongAlias = barType.createNet("q");
+        Assertions.assertSame(wrongAlias,
+                design.getNetlist().getHierNetFromName("foo/bar/q").getNet());
+        Assertions.assertEquals(0, DesignTools.renameAmbiguousPhysNets(design));
+        Assertions.assertSame(net, design.getNet("foo/bar/p"));
     }
 
     @Test
