@@ -680,4 +680,43 @@ class TestEDIFNetlist {
         // contract here is to return false instead
         Assertions.assertFalse(netlist.expandMacroUnisims());
     }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testRemoveUnusedCells(boolean allWorkLibraries) {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
+        EDIFLibrary work = netlist.getWorkLibrary();
+        EDIFLibrary other = netlist.addLibrary(new EDIFLibrary("other"));
+        EDIFCell top = netlist.getTopCell();
+
+        // top instantiates a twice; a instantiates b and the leaf (black box) f; b instantiates d,
+        // from the other library. c and e are not instantiated anywhere
+        EDIFCell a = new EDIFCell(work, "a");
+        EDIFCell b = new EDIFCell(work, "b");
+        EDIFCell c = new EDIFCell(work, "c");
+        EDIFCell f = new EDIFCell(work, "f");
+        EDIFCell d = new EDIFCell(other, "d");
+        EDIFCell e = new EDIFCell(other, "e");
+        top.createChildCellInst("a0", a);
+        top.createChildCellInst("a1", a);
+        a.createChildCellInst("b", b);
+        a.createChildCellInst("f", f);
+        b.createChildCellInst("d", d);
+        // An unused cell can still instantiate used ones
+        c.createChildCellInst("b", b);
+
+        if (allWorkLibraries) {
+            netlist.removeUnusedCellsFromAllWorkLibraries();
+        } else {
+            netlist.removeUnusedCellsFromWorkLibrary();
+        }
+
+        for (EDIFCell cell : new EDIFCell[] {top, a, b, f}) {
+            Assertions.assertSame(cell, work.getCell(cell.getName()));
+        }
+        Assertions.assertNull(work.getCell("c"));
+        Assertions.assertSame(d, other.getCell("d"));
+        // Only the work library is cleaned up otherwise
+        Assertions.assertEquals(allWorkLibraries ? null : e, other.getCell("e"));
+    }
 }

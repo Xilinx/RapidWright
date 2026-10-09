@@ -369,6 +369,29 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
+     * Gets every cell that is instantiated in the hierarchy below the top cell, and the top cell
+     * itself. Each cell is visited once, however many times it is instantiated, rather than every
+     * instance of the elaborated hierarchy being created, as {@link #getAllDescendants} does.
+     * @return The cells in use, compared by identity.
+     */
+    private Set<EDIFCell> getCellsInUse() {
+        Set<EDIFCell> used = Collections.newSetFromMap(new IdentityHashMap<>());
+        Deque<EDIFCell> toVisit = new ArrayDeque<>();
+        EDIFCell top = getTopCell();
+        used.add(top);
+        toVisit.push(top);
+        while (!toVisit.isEmpty()) {
+            for (EDIFCellInst inst : toVisit.pop().getCellInsts()) {
+                EDIFCell cellType = inst.getCellType();
+                if (used.add(cellType)) {
+                    toVisit.push(cellType);
+                }
+            }
+        }
+        return used;
+    }
+
+    /**
      * Removals all unused cells from a netlist from any work library (all except hdi_primitives)
      */
     public void removeUnusedCellsFromAllWorkLibraries() {
@@ -378,9 +401,8 @@ public class EDIFNetlist extends EDIFName {
             cellsToRemove.put(lib.getName(), new HashMap<>(lib.getCellMap()));
         }
 
-        _keepCell(cellsToRemove, getTopCell());
-        for (EDIFHierCellInst i : getAllDescendants("", null, false)) {
-            _keepCell(cellsToRemove, i.getCellType());
+        for (EDIFCell cell : getCellsInUse()) {
+            _keepCell(cellsToRemove, cell);
         }
 
         for (Entry<String, HashMap<String,EDIFCell>> e : cellsToRemove.entrySet()) {
@@ -396,9 +418,9 @@ public class EDIFNetlist extends EDIFName {
         HashMap<String,EDIFCell> cellsToRemove = new HashMap<>(getWorkLibrary().getCellMap());
 
         cellsToRemove.remove(getTopCell().getName());
-        for (EDIFHierCellInst i : getAllDescendants("", null, false)) {
-            if (i.getCellType().getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_WORK_NAME)) {
-                cellsToRemove.remove(i.getCellType().getName());
+        for (EDIFCell cell : getCellsInUse()) {
+            if (cell.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_WORK_NAME)) {
+                cellsToRemove.remove(cell.getName());
             }
         }
 
