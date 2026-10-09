@@ -482,14 +482,14 @@ public class TestDesignTools {
         for (Net net : design.getNets()) {
             before.put(net.getName(), net.getPins().size() + "/" + net.getPIPs().size());
         }
-        Set<Net> modified = populateBlackBox(design, hierCellName, circuit, false);
+        populateBlackBox(design, hierCellName, circuit, false);
 
         Assertions.assertFalse(inst.getCellType().getCellInsts().isEmpty());
 
         // The wrapper checks that every net reported is still in the design. The other half of the
         // contract is that nothing changed that went unreported
         for (Net net : design.getNets()) {
-            if (modified.contains(net)) {
+            if (design.getModifiedNets().contains(net)) {
                 continue;
             }
             String was = before.get(net.getName());
@@ -672,6 +672,111 @@ public class TestDesignTools {
     }
 
     /**
+     * A net that a circuit's pins are merged onto, while it keeps its own routing, gains pins and
+     * not one PIP. Only a change to a net's routing marks it, so nothing records that the net
+     * changed -- yet an incremental bitstream has to route those new pins, and has no other way to
+     * learn of them. The design clock is the extreme case: it gains hundreds of pins, and its
+     * thousands of PIPs are untouched.
+     */
+    @Test
+    public void testPopulateBlackBoxMarksNetsThatOnlyGainPins() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+
+        EDIFCellInst bb = createBlackBox(top, "bb", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", bb);
+        Net inNet = design.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+        PIP inPIP = addTestRouting(inNet, 1);
+
+        // The net on the box's output carries a sink and no routing of its own, so merging it onto
+        // the input's net moves a pin across and not one PIP
+        EDIFNet out = top.createNet("out");
+        out.createPortInst("O", bb);
+        Net outNet = design.createNet("out");
+        SitePinInst sinkPin = addSinkLUT(design, top, "sink", "SLICE_X2Y0", out, outNet);
+        Assertions.assertTrue(outNet.getPIPs().isEmpty());
+
+        design.setTrackingChanges(true);
+        design.setCopyingOriginalNetsRouting(true);
+
+        int pinsBefore = inNet.getPins().size();
+
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet wire = circuitTop.createNet("wire");
+        wire.createPortInst(circuitTop.getPort("I"));
+        wire.createPortInst(circuitTop.getPort("O"));
+        circuit.createNet("wire");
+
+        populateBlackBox(design, "bb", circuit, true);
+
+        // The sink moved across, and the input's own routing is all the routing there is
+        Assertions.assertSame(inNet, sinkPin.getNet());
+        Assertions.assertTrue(inNet.getPins().size() > pinsBefore);
+        Assertions.assertEquals(Arrays.asList(inPIP), inNet.getPIPs());
+
+        Assertions.assertTrue(design.getModifiedNets().contains(inNet),
+                "the net gained a pin and no PIP, and is not recorded as modified");
+    }
+
+    /**
+     * A net merged onto another is deleted from the design, but the change tracking keeps it, so
+     * getModifiedNets() ends up holding nets getNets() does not. Whoever walks the modified set --
+     * an incremental bitstream writer, for one -- then reads a net that no longer exists. What it
+     * was routed with belongs in the original state, so that those PIPs are still turned off.
+     */
+    @Test
+    public void testPopulateBlackBoxUntracksMergedAwayNets() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+
+        EDIFCellInst bb = createBlackBox(top, "bb", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", bb);
+        Net inNet = design.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+        addTestRouting(inNet, 1);
+
+        // Routed, so that what it was routed with has somewhere to go once it is deleted
+        EDIFNet out = top.createNet("out");
+        out.createPortInst("O", bb);
+        Net outNet = design.createNet("out");
+        SitePinInst sinkPin = addSinkLUT(design, top, "sink", "SLICE_X2Y0", out, outNet);
+        PIP outPIP = addTestRouting(outNet, 0, sinkPin);
+
+        design.setTrackingChanges(true);
+        design.setCopyingOriginalNetsRouting(true);
+
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet wire = circuitTop.createNet("wire");
+        wire.createPortInst(circuitTop.getPort("I"));
+        wire.createPortInst(circuitTop.getPort("O"));
+        circuit.createNet("wire");
+
+        populateBlackBox(design, "bb", circuit, true);
+
+        // 'out' was merged onto 'in', so the design has stopped holding it
+        Assertions.assertNull(design.getNet("out"));
+
+        Assertions.assertFalse(design.getModifiedNets().contains(outNet),
+                "a net the design no longer holds is still recorded as modified");
+
+        for (Net net : design.getModifiedNets()) {
+            Assertions.assertSame(net, design.getNet(net.getName()),
+                    "modified net is no longer the one the design holds: " + net.getName());
+        }
+
+        // What it was routed with has to be in the original state, or an incremental bitstream
+        // leaves those PIPs turned on with nothing owning them
+        List<PIP> original = design.getOriginalNetRouting().get("out");
+        Assertions.assertNotNull(original, "the deleted net's routing is not in the original state");
+        Assertions.assertTrue(original.contains(outPIP), original.toString());
+    }
+
+    /**
      * Creates a black box instance in the given cell, with a single-bit port for each direction
      * given, named 'I' for an input and 'O' for an output.
      */
@@ -740,20 +845,22 @@ public class TestDesignTools {
     }
 
     /**
-     * Calls populateBlackBox(), then asserts what holds for every call: that it left the design's
-     * parent net map unbuilt, since it drops the map once it has changed the netlist and must not
-     * build it again; that every net it reports is one the design still holds, since a merge
-     * deletes the net it merges away, and a deleted net must not be named in the result; and that
-     * every net it reports is named after its source, so is its own parent net, but for one on a
-     * signal that nothing drives, which has none.
+     * Calls populateBlackBox() with the design tracking its changes, so that what it changed is in
+     * Design#getModifiedNets() for the caller to read. Then asserts what holds for every call: that
+     * it left the design's parent net map unbuilt, since it drops the map once it has changed the
+     * netlist and must not build it again; that every net recorded is one the design still holds,
+     * since a merge deletes the net it merges away, and a deleted net must not be left in the
+     * record; and that every net recorded is named after its source, so is its own parent net, but
+     * for one on a signal that nothing drives, which has none.
      */
-    private static Set<Net> populateBlackBox(Design design, Map<String, Design> blackBoxes,
+    private static void populateBlackBox(Design design, Map<String, Design> blackBoxes,
             boolean keepBoundaryRouting) {
-        Set<Net> modified = DesignTools.populateBlackBox(design, blackBoxes, keepBoundaryRouting);
+        design.setTrackingChanges(true);
+        DesignTools.populateBlackBox(design, blackBoxes, keepBoundaryRouting);
         EDIFNetlist netlist = design.getNetlist();
         Assertions.assertFalse(netlist.isParentNetMapBuilt());
         // Checked only now, since asking for a parent builds the map
-        for (Net net : modified) {
+        for (Net net : design.getModifiedNets()) {
             Assertions.assertSame(net, design.getNet(net.getName()), net.getName());
             if (net.isStaticNet()) continue;
             EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
@@ -762,12 +869,11 @@ public class TestDesignTools {
             Assertions.assertTrue(parent == null || parent.equals(hierNet),
                     net.getName() + " is an alias of " + parent);
         }
-        return modified;
     }
 
-    private static Set<Net> populateBlackBox(Design design, String hierarchicalCellName,
+    private static void populateBlackBox(Design design, String hierarchicalCellName,
             Design cell, boolean keepBoundaryRouting) {
-        return populateBlackBox(design, Collections.singletonMap(hierarchicalCellName, cell),
+        populateBlackBox(design, Collections.singletonMap(hierarchicalCellName, cell),
                 keepBoundaryRouting);
     }
 
@@ -834,7 +940,7 @@ public class TestDesignTools {
         // ... held as a physical net with nothing on it
         circuit.createNet("wire");
 
-        Set<Net> modified = populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
+        populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
 
         // That empty net, with nothing to move, is not left behind as an alias of 'in'
         Assertions.assertNull(design.getNet("bb/wire"));
@@ -845,7 +951,7 @@ public class TestDesignTools {
         Assertions.assertSame(inNet, sinkPin.getNet());
         Assertions.assertNull(design.getNet("out"));
         assertRouting(keepBoundaryRouting, inNet, Arrays.asList(inPIP, outPIP), sinkPin);
-        Assertions.assertTrue(modified.contains(inNet));
+        Assertions.assertTrue(design.getModifiedNets().contains(inNet));
     }
 
     /**
@@ -912,17 +1018,17 @@ public class TestDesignTools {
         }
 
         Design circuit = createCircuit("circuit", EDIFDirection.INPUT);
-        Set<Net> modified = populateBlackBox(design, boxName, circuit, keepBoundaryRouting);
+        populateBlackBox(design, boxName, circuit, keepBoundaryRouting);
 
         boolean discarded = !keepBoundaryRouting && type == NetType.WIRE;
         assertRouting(!discarded, physical, pip, sinkPin);
         // Only a signal net is checked for being reported, the design's static nets being liable to
         // be reported for other reasons
         if (type == NetType.WIRE) {
-            Assertions.assertEquals(discarded, modified.contains(physical));
+            Assertions.assertEquals(discarded, design.getModifiedNets().contains(physical));
         }
         assertRouting(true, unrelated, unrelatedPIP);
-        Assertions.assertFalse(modified.contains(unrelated));
+        Assertions.assertFalse(design.getModifiedNets().contains(unrelated));
     }
 
     /**
@@ -954,7 +1060,7 @@ public class TestDesignTools {
         if (hasContents) {
             circuit.getTopEDIFCell().createNet("unconnected");
         }
-        Set<Net> modified = populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
+        populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
 
         if (hasContents) {
             Assertions.assertNull(netlist.getParentNet(netlist.getHierNetFromName("out")));
@@ -963,7 +1069,7 @@ public class TestDesignTools {
         }
         Assertions.assertSame(outNet, design.getNet("out"));
         assertRouting(keepBoundaryRouting, outNet, pip, sinkPin);
-        Assertions.assertEquals(!keepBoundaryRouting, modified.contains(outNet));
+        Assertions.assertEquals(!keepBoundaryRouting, design.getModifiedNets().contains(outNet));
     }
 
     /**
@@ -1013,7 +1119,7 @@ public class TestDesignTools {
             blackBoxes.put("a", circuitA);
             blackBoxes.put("b", circuitB);
         }
-        Set<Net> modified = populateBlackBox(design, blackBoxes, keepBoundaryRouting);
+        populateBlackBox(design, blackBoxes, keepBoundaryRouting);
 
         // The shell's net is merged onto the circuit's. If the routing is kept, the shell's goes
         // with it, joining the circuit's own; if not, neither is left
@@ -1021,7 +1127,7 @@ public class TestDesignTools {
         Assertions.assertNull(design.getNet("ab"));
         Assertions.assertSame(oNet, sinkPin.getNet());
         assertRouting(keepBoundaryRouting, oNet, Arrays.asList(oPIP, abPIP), sinkPin);
-        Assertions.assertTrue(modified.contains(oNet));
+        Assertions.assertTrue(design.getModifiedNets().contains(oNet));
     }
 
     /**
@@ -1096,14 +1202,14 @@ public class TestDesignTools {
         Assertions.assertEquals("in", inputAliasNet.getName());
         Assertions.assertEquals("internal", internalAliasNet.getName());
 
-        Set<Net> modified = populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
+        populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
 
         // The net on the port is merged onto the shell's net, along with its routing if kept
         assertParentNet(netlist, "bb/child/inputAlias", "shellInput");
         Assertions.assertSame(shellNet, sinkPin.getNet());
         Assertions.assertNull(design.getNet("bb/in"));
         assertRouting(keepBoundaryRouting, shellNet, inputAliasPIP, sinkPin);
-        Assertions.assertTrue(modified.contains(shellNet));
+        Assertions.assertTrue(design.getModifiedNets().contains(shellNet));
 
         // The net that never reaches a port keeps its pins and routing
         Assertions.assertSame(internalAliasNet, design.getNet("bb/internal"));
@@ -1147,7 +1253,7 @@ public class TestDesignTools {
         Net iNet = circuit.createNet("i");
         SitePinInst sinkPin = addSinkLUT(circuit, circuitTop, "sink", "SLICE_X2Y0", i, iNet);
 
-        Set<Net> modified = populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
+        populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
 
         assertParentNet(netlist, "bb/i", "bb/o");
         Assertions.assertSame(oNet, sinkPin.getNet());
@@ -1158,7 +1264,7 @@ public class TestDesignTools {
         Assertions.assertNull(design.getNet("loop"));
         assertRouting(keepBoundaryRouting, oNet, loopPIP);
 
-        Assertions.assertTrue(modified.contains(oNet));
+        Assertions.assertTrue(design.getModifiedNets().contains(oNet));
     }
 
     /**
