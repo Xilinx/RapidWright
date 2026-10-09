@@ -1371,7 +1371,23 @@ public class EDIFNetlist extends EDIFName {
      * The list is composed of all full hierarchical net names or an empty list if netName is invalid.
      */
     public List<EDIFHierNet> getNetAliases(EDIFHierNet initialNet) {
-        if (physicalNetPinMap == null) {
+        return getNetAliases(initialNet, true, null);
+    }
+
+    /**
+     * Gets all equivalent nets in the netlist from the provided net, as
+     * {@link #getNetAliases(EDIFHierNet)} does.
+     * @param initialNet The net to use as a starting point in the search.
+     * @param recordPhysicalPins If true, the leaf cell pins found are recorded as the physical pins
+     * of the parent net (see {@link #getPhysicalNetPinMap()}), and a net that has connections but
+     * no source is an error. If false, nothing in the netlist is changed.
+     * @param parentOut If not null, its first element is set to the parent net, or null if none
+     * was found.
+     * @return A list of all electrically connected nets in the netlist that are equivalent.
+     */
+    private List<EDIFHierNet> getNetAliases(EDIFHierNet initialNet, boolean recordPhysicalPins,
+            EDIFHierNet[] parentOut) {
+        if (recordPhysicalPins && physicalNetPinMap == null) {
             physicalNetPinMap = new HashMap<>();
             physicalGndPins = new ArrayList<>();
             physicalVccPins = new ArrayList<>();
@@ -1447,6 +1463,13 @@ public class EDIFNetlist extends EDIFName {
             parentNet = fallbackParentNet;
         }
 
+        if (parentOut != null) {
+            parentOut[0] = parentNet;
+        }
+        if (!recordPhysicalPins) {
+            return aliases;
+        }
+
         if (parentNet != null) {
             switch (identifyNetType(source)) {
                 case GND:
@@ -1484,6 +1507,24 @@ public class EDIFNetlist extends EDIFName {
      */
     public EDIFHierNet getParentNet(EDIFHierNet netAlias) {
         return getParentNetMap().get(netAlias);
+    }
+
+    /**
+     * Finds the canonical net of a net, as {@link #getParentNet(EDIFHierNet)} does, but without
+     * building the parent net map of the whole netlist if it is not already built: only the net's
+     * own aliases are searched. This is much cheaper for looking up a few nets in a large netlist,
+     * though each lookup costs a search, so {@link #getParentNet(EDIFHierNet)} is better for many.
+     * @param netAlias A net in the netlist.
+     * @return The parent net, or null if the net has no source.
+     * @throws RuntimeException If the net has more than one source.
+     */
+    public EDIFHierNet findParentNet(EDIFHierNet netAlias) {
+        if (parentNetMap != null) {
+            return parentNetMap.get(netAlias);
+        }
+        EDIFHierNet[] parentNet = new EDIFHierNet[1];
+        getNetAliases(netAlias, false, parentNet);
+        return parentNet[0];
     }
 
     /**

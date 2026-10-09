@@ -24,6 +24,8 @@
 package com.xilinx.rapidwright.edif;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -507,6 +509,38 @@ class TestEDIFNetlist {
         EDIFNetlist testNetlist = EDIFTools.readEdifFile(tempFile);
         EDIFNetlistComparator comparer = new EDIFNetlistComparator();
         Assertions.assertEquals(0, comparer.compareNetlists(origNetlist, testNetlist));
+    }
+
+    @Test
+    public void testFindParentNet() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+        List<EDIFHierNet> nets = new ArrayList<>();
+        List<EDIFHierCellInst> insts = new ArrayList<>(netlist.getAllDescendants("", null, false));
+        insts.add(netlist.getTopHierCellInst());
+        for (EDIFHierCellInst inst : insts) {
+            for (EDIFNet net : inst.getCellType().getNets()) {
+                nets.add(inst.getNet(net.getName()));
+            }
+        }
+
+        // Without the parent net map, which it must not build
+        netlist.resetParentNetMap();
+        Map<EDIFHierNet, EDIFHierNet> found = new HashMap<>();
+        for (EDIFHierNet net : nets) {
+            found.put(net, netlist.findParentNet(net));
+        }
+        Assertions.assertFalse(netlist.isParentNetMapBuilt());
+
+        int withParent = 0;
+        for (EDIFHierNet net : nets) {
+            EDIFHierNet parent = netlist.getParentNet(net);
+            Assertions.assertEquals(parent, found.get(net), net.toString());
+            if (parent != null) withParent++;
+        }
+        Assertions.assertTrue(withParent > 1000);
+        // With the map built, it is used
+        Assertions.assertEquals(netlist.getParentNet(nets.get(0)), netlist.findParentNet(nets.get(0)));
     }
 
     @Test
