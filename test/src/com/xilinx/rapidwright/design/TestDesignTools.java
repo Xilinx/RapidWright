@@ -1162,6 +1162,52 @@ public class TestDesignTools {
     }
 
     /**
+     * A circuit's checkpoint written in the context of a shell can carry empty physical nets with
+     * no logical net in the circuit, named as in the full design: here, a copy of one of its own
+     * nets with the black box's prefix, and a clock of the shell. They must not stop the circuit's
+     * real net from taking its prefixed name, nor be moved into the design.
+     */
+    @Test
+    public void testPopulateBlackBoxDropsContextNets() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", createBlackBox(top, "bb", EDIFDirection.INPUT));
+        Net inNet = design.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+
+        // The circuit: I into a LUT, which drives another
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet circuitIn = circuitTop.createNet("I");
+        circuitIn.createPortInst(circuitTop.getPort("I"));
+        addSinkLUT(circuit, circuitTop, "lut0", "SLICE_X1Y0", circuitIn, circuit.createNet("I"));
+        EDIFNet x = circuitTop.createNet("x");
+        Net xNet = circuit.createNet("x");
+        x.createPortInst("O", circuitTop.getCellInst("lut0"));
+        xNet.createPin("A_O", circuit.getSiteInstFromSiteName("SLICE_X1Y0"));
+        SitePinInst xSink = addSinkLUT(circuit, circuitTop, "lut1", "SLICE_X2Y0", x, xNet);
+
+        // ... and the context nets, which are physical only
+        Net prefixed = new Net("bb/x");
+        circuit.addNet(prefixed);
+        Net clock = new Net("shell_clk");
+        circuit.addNet(clock);
+        Assertions.assertNull(circuit.getNetlist().getHierNetFromName("bb/x"));
+        Assertions.assertNull(circuit.getNetlist().getHierNetFromName("shell_clk"));
+
+        Set<Net> modified = populateBlackBox(design, "bb", circuit, false);
+
+        Assertions.assertSame(xNet, design.getNet("bb/x"));
+        Assertions.assertSame(xNet, xSink.getNet());
+        Assertions.assertTrue(modified.contains(xNet));
+        Assertions.assertNull(design.getNet("bb/bb/x"));
+        Assertions.assertNull(design.getNet("bb/shell_clk"));
+        // Nets compare by name, so the context nets are looked for by identity
+        Assertions.assertTrue(modified.stream().noneMatch(n -> n == prefixed || n == clock));
+    }
+
+    /**
      * In a netlist that is not uniquified, two hierarchical names can lead to the same black box
      * instance, which cannot be filled with two different circuits.
      */
