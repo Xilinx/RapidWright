@@ -795,7 +795,8 @@ public class EDIFCell extends EDIFPropertyObject {
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), library);
+        // Same value as Objects.hash(super.hashCode(), library), without boxing the int or allocating varargs
+        return 31 * (31 + super.hashCode()) + Objects.hashCode(library);
     }
 
     /**
