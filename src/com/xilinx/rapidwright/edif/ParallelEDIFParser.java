@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -27,15 +27,16 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.Deque;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.concurrent.Future;
 
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -59,9 +60,7 @@ public class ParallelEDIFParser implements AutoCloseable{
 
     /** Whether the input is gzip-compressed, determined once by the caller. */
     private final boolean gzipped;
-    protected StringPool uniquifier = StringPool.concurrentPool();
-
-    protected final EDIFReadLegalNameCache cache;
+    protected final StringPool uniquifier;
 
     /**
      * Estimated ratio of EDIF to gzipped EDIF file size, used in calculating the
@@ -69,15 +68,36 @@ public class ParallelEDIFParser implements AutoCloseable{
      */
     public static final int EDIF_GZIP_COMPRESSION_RATIO = 16;
 
+    /**
+     * Estimated number of bytes of (uncompressed) EDIF per distinct String in the pool, used to size the pool so
+     * that it rarely has to grow while being filled. Pooled Strings per KB of EDIF varied from 0.38 to 14.2 in 14
+     * EDIFs, and from 0.38 to 1.5 in those larger than 100 MB (e.g. 1.11 for a 14.1 GB EDIF and 1.48 for a 38.6 GB
+     * EDIF, whose 55.6M Strings otherwise doubled the pool's table about 23 times). One String per KB avoids all
+     * but the last doubling for such EDIFs, while sizing the pool for at most about 2.6 times as many Strings as
+     * the sparsest of them needs.
+     */
+    private static final int EDIF_BYTES_PER_POOLED_STRING = 1024;
+
+    /**
+     * Estimate the number of distinct Strings that parsing an EDIF file will pool, to size the pool.
+     * @param fileSize Size of the file on disk, in bytes.
+     * @param gzipped Whether the file is gzip-compressed.
+     * @return The estimated number of pooled Strings.
+     */
+    static int estimatePooledStrings(long fileSize, boolean gzipped) {
+        final long edifBytes = gzipped ? fileSize * EDIF_GZIP_COMPRESSION_RATIO : fileSize;
+        return (int) Math.min(Math.max(edifBytes, 0) / EDIF_BYTES_PER_POOLED_STRING, Integer.MAX_VALUE);
+    }
+
     ParallelEDIFParser(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier,
             int maxTokenLength, int maxThreads, boolean gzipped) {
         this.fileName = fileName;
         this.fileSize = fileSize;
         this.inputStreamSupplier = inputStreamSupplier;
         this.maxTokenLength = maxTokenLength;
-        this.cache = EDIFReadLegalNameCache.createMultiThreaded();
         this.maxThreads = maxThreads;
         this.gzipped = gzipped;
+        this.uniquifier = StringPool.concurrentPool(estimatePooledStrings(fileSize, gzipped));
     }
 
     ParallelEDIFParser(Path fileName, long fileSize, InputStreamSupplier inputStreamSupplier,
@@ -111,7 +131,7 @@ public class ParallelEDIFParser implements AutoCloseable{
     }
 
     protected ParallelEDIFParserWorker makeWorker(long offset) throws IOException {
-        return new ParallelEDIFParserWorker(fileName, inputStreamSupplier.get(), offset, uniquifier, maxTokenLength, cache);
+        return new ParallelEDIFParserWorker(fileName, inputStreamSupplier.get(), offset, uniquifier, maxTokenLength);
     }
 
     public static int calcThreads(long fileSize, int maxThreads, boolean isGzipped) {
@@ -183,25 +203,47 @@ public class ParallelEDIFParser implements AutoCloseable{
             workers.get(i - 1).setStopCellToken(workers.get(i).getFirstCellToken());
         }
 
-        t.stop().start("Do Parse");
-        doParse();
+        t.stop().start("Do Parse and Assemble Libraries");
+        final Assembler assembler = doParseAndAssemble();
+        assembler.netlist.setDesign(getEdifDesign());
 
+        t.stop().start("Link Netlist");
+        processLinks(assembler);
+        t.stop();
 
-        return mergeParseResults(t);
+        return assembler.netlist;
     }
 
-    private void doParse() {
-        ParallelismTools.forEach(workers, w->w.doParse(false));
+    /**
+     * Parse all workers in parallel and, on the calling thread, add the libraries and cells that each has parsed
+     * to the netlist in file order, as soon as that worker (and so every worker before it) has finished, while
+     * later workers are still parsing.
+     * @return The assembler holding the netlist and the lookup maps needed to link it.
+     */
+    private Assembler doParseAndAssemble() {
+        final Assembler assembler = new Assembler(Objects.requireNonNull(workers.get(0).netlist));
+        // As EDIFNetlist.exportEDIF() does, submit all workers and then wait for them in order with joinFirst(),
+        // which also runs any worker not yet started by the pool on this thread
+        final Deque<Future<ParallelEDIFParserWorker>> futures = new ArrayDeque<>(workers.size());
+        for (ParallelEDIFParserWorker w : workers) {
+            futures.add(ParallelismTools.submit(() -> {
+                w.doParse(false);
+                return w;
+            }));
+        }
 
         //Check if we had misdetected start tokens
         for (int i=0; i<workers.size();i++) {
-            final ParallelEDIFParserWorker worker = workers.get(i);
+            final ParallelEDIFParserWorker worker = ParallelismTools.joinFirst(futures);
+            assert(worker == workers.get(i));
             if (worker.parseException!=null) {
                 throw worker.parseException;
             }
             while (worker.stopTokenMismatch) {
                 if (i<workers.size()-1) {
-                    final ParallelEDIFParserWorker failedWorker = workers.get(i + 1);
+                    // Wait for the next worker to finish parsing before discarding it
+                    final ParallelEDIFParserWorker failedWorker = ParallelismTools.joinFirst(futures);
+                    assert(failedWorker == workers.get(i + 1));
                     if (!Device.QUIET_MESSAGE) {
                         System.err.println("Token mismatch between "+worker+" and " + failedWorker + ". Discarding second one and reparsing...");
                     }
@@ -227,10 +269,9 @@ public class ParallelEDIFParser implements AutoCloseable{
                     throw worker.parseException;
                 }
             }
+            assembler.add(worker);
         }
-        for (ParallelEDIFParserWorker worker : workers) {
-            worker.finish();
-        }
+        return assembler;
     }
 
     private EDIFDesign getEdifDesign() {
@@ -245,81 +286,78 @@ public class ParallelEDIFParser implements AutoCloseable{
         return null;
     }
 
-    private Map<EDIFLibrary, Map<String, EDIFCell>> addCellsAndLibraries(EDIFNetlist netlist) {
-        Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName = new HashMap<>();
-        EDIFLibrary currentLibrary = null;
-        EDIFToken currentToken = null;
-        for (ParallelEDIFParserWorker worker : workers) {
-            for (ParallelEDIFParserWorker.LibraryOrCellResult parsed : worker.librariesAndCells) {
-                if (currentToken!=null && parsed.getToken().byteOffset<= currentToken.byteOffset) {
-                    throw new IllegalStateException("Not in ascending order! seen: "+currentToken+", now processed "+parsed.getToken());
+    /**
+     * Adds the libraries and cells parsed by each worker to the netlist. Workers must be added in file order: a
+     * cell belongs to the most recent library before it, and name collisions are renamed in order.
+     */
+    private class Assembler {
+        private final EDIFNetlist netlist;
+        private final Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName = new HashMap<>();
+        private final Map<String, EDIFLibrary> librariesByLegalName = new HashMap<>();
+        /** For each cell with renamed ports, the renames recorded by the worker that parsed it */
+        private final Map<EDIFCell, EDIFReadLegalNameCache> portRenamesByCell = new IdentityHashMap<>();
+        private EDIFLibrary currentLibrary = null;
+        /** Byte offset of the last library or cell added */
+        private long lastResultOffset = -1;
+
+        private Assembler(EDIFNetlist netlist) {
+            this.netlist = netlist;
+        }
+
+        private void add(ParallelEDIFParserWorker worker) {
+            if (!worker.librariesAndCells.isEmpty()) {
+                // Each worker's results are in file order, so it is enough to check that they follow the previous
+                // worker's
+                if (worker.firstResultOffset <= lastResultOffset) {
+                    throw new IllegalStateException("Not in ascending order! seen offset " + lastResultOffset
+                            + ", now processed offset " + worker.firstResultOffset + " (" + worker + ")");
                 }
-                currentToken = parsed.getToken();
-
-                currentLibrary = parsed.addToNetlist(netlist, currentLibrary, cellsByLegalName, cache);
+                lastResultOffset = worker.lastResultOffset;
             }
+            for (ParallelEDIFParserWorker.LibraryOrCellResult parsed : worker.librariesAndCells) {
+                currentLibrary = parsed.addToNetlist(netlist, currentLibrary, cellsByLegalName, librariesByLegalName,
+                        worker.cache);
+            }
+            for (EDIFCell cell : worker.cellsWithRenamedPorts) {
+                portRenamesByCell.put(cell, worker.cache);
+            }
+            // Release this worker's results, which are no longer needed
+            worker.librariesAndCells.clear();
+            worker.cellsWithRenamedPorts.clear();
         }
-        return cellsByLegalName;
     }
 
-    private void processLinks(CodePerfTracker t, EDIFNetlist netlist, Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName) {
-        t.start("Link CellInst+SmallPorts");
-        //We have to map from a string representation of the ports' names to the ports.
-        //Directly map the ports from small cells, add ports from large cells to this map
-        final Map<String, EDIFLibrary> librariesByLegalName = netlist.getLibraries().stream()
-                .collect(Collectors.toMap(cache::getLegalEDIFName, Function.identity()));
-        Map<EDIFCell, Collection<ParallelEDIFParserWorker.LinkPortInstData>> byPortCell = new ConcurrentHashMap<>();
+    /**
+     * Link each worker's cell instances to their cells and port insts to their ports, then name and add the port
+     * insts. This needs all libraries and cells to have been assembled, as any cell instance may reference a cell
+     * parsed by any worker; after that, all of a worker's work is done in one parallel step, so that there is one
+     * wait for the slowest worker rather than one per step.
+     */
+    private void processLinks(Assembler assembler) {
+        // Port lookup maps of cells with many ports, created on first use (read-only once constructed)
+        final Map<EDIFCell, EDIFPortCache> portCaches = new ConcurrentHashMap<>();
+        // Workers (byte ranges) need not take equally long, so each also splits its work with nested
+        // forEach()s, whose pieces can be stolen by threads that have finished their own worker:
+        //  - Each apply() sets a different cell instance's type, so their order does not matter; the first
+        //    forEach() returns before the second looks up those cell instances' types.
+        //  - When adding the port insts, we have to make sure that we don't split a parent cell's port instances
+        //    between threads. That could lead to ConcurrentModificationExceptions. Each ParentCellPortInsts in
+        //    linkPortInstData holds all port insts of one parent cell, which are processed sequentially; this only
+        //    modifies those port insts and that parent cell's nets, cell insts and internal port map, whereas other
+        //    parent cells' port insts only read cells' ports.
+        // Each worker's references and port insts are released once linked, as they are no longer needed.
         ParallelismTools.forEach(workers, w-> {
-            for (ParallelEDIFParserWorker.CellReferenceData cellReferenceData : w.linkCellReference) {
-                cellReferenceData.apply(librariesByLegalName, cellsByLegalName);
-            }
-            w.linkSmallPorts(byPortCell);
+            ParallelismTools.forEach(w.linkCellReference, cellReferenceData -> cellReferenceData.apply(
+                    assembler.librariesByLegalName, assembler.cellsByLegalName));
+            w.linkCellReference.clear();
+            ParallelismTools.forEach(w.linkPortInstData, links -> links.linkAndAdd(assembler.portRenamesByCell,
+                    portCaches, uniquifier));
+            w.linkPortInstData.clear();
         });
-
-        t.stop().start("Link Large Port Cells");
-        //Now we can create a map of ports just for large cells and look up the ports
-        ParallelismTools.forEach(byPortCell.entrySet(), entry -> {
-            EDIFCell cell = entry.getKey();
-            final EDIFPortCache edifPortCache = new EDIFPortCache(cell, cache);
-            for (ParallelEDIFParserWorker.LinkPortInstData linkPortInstData : entry.getValue()) {
-                linkPortInstData.enterPort(edifPortCache);
-            }
-        });
-
-        t.stop().start("Name and Add port insts");
-        //When adding the port insts, we have to make sure that we don't split a parent cell's port instances
-        // between threads.
-        //That could lead to ConcurrentModificationExceptions
-        ParallelismTools.forEach(workers,
-                w-> {
-                    for (List<ParallelEDIFParserWorker.LinkPortInstData> list : w.linkPortInstData) {
-                        for (ParallelEDIFParserWorker.LinkPortInstData linkPortInstData : list) {
-                            linkPortInstData.name(uniquifier);
-                            linkPortInstData.add();
-                        }
-                    }
-                });
-        t.stop().start("Trim PortInst Lists");
-        // Port instance lists are built via incremental ArrayList insertion, which
-        // leaves unused capacity slack. Trim it now that all insertions are done.
-        List<EDIFCell> allCells = new ArrayList<>();
-        for (EDIFLibrary lib : netlist.getLibraries()) {
-            allCells.addAll(lib.getCells());
+        // Release each worker's renames only now, as any worker's port insts may have read them
+        for (ParallelEDIFParserWorker w : workers) {
+            w.cache.clear();
         }
-        ParallelismTools.forEach(allCells, EDIFCell::trimEDIFPortInstLists);
-        t.stop();
-    }
-
-    private EDIFNetlist mergeParseResults(CodePerfTracker t) {
-        EDIFNetlist netlist = Objects.requireNonNull(workers.get(0).netlist);
-        netlist.setDesign(getEdifDesign());
-
-        t.stop().start("Assemble Libraries");
-        final Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName = addCellsAndLibraries(netlist);
-        t.stop();
-        processLinks(t, netlist, cellsByLegalName);
-
-        return netlist;
     }
 
     @Override

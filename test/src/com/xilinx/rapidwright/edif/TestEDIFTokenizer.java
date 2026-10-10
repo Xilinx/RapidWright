@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -136,6 +136,133 @@ public class TestEDIFTokenizer {
         Assertions.assertNotNull(token);
         Assertions.assertEquals("", token.text);
         Assertions.assertEquals(2, token.byteOffset);
+    }
+
+    @Test
+    public void testShortLivedKeywords() throws IOException {
+        final String edif = "(portref (member D 3) (instanceref inst_1)) portrefx PortRef net \"joined\"";
+        try (EDIFTokenizer tokenizer = new EDIFTokenizer(null, stringToInputStream(edif), StringPool.singleThreadedPool())) {
+            Assertions.assertEquals("(", tokenizer.getOptionalNextTokenString(true));
+            // A short-lived keyword is returned as the parser's constant
+            Assertions.assertSame(AbstractEDIFParserWorker.PORTREF, tokenizer.getOptionalNextTokenString(true));
+            Assertions.assertEquals("(", tokenizer.getOptionalNextTokenString(true));
+            Assertions.assertSame(AbstractEDIFParserWorker.MEMBER, tokenizer.getOptionalNextTokenString(true));
+            Assertions.assertEquals("D", tokenizer.getOptionalNextTokenString(false));
+            // A short-lived token that is not a keyword keeps its text
+            Assertions.assertEquals("3", tokenizer.getOptionalNextTokenString(true));
+            Assertions.assertEquals(")", tokenizer.getOptionalNextTokenString(true));
+            Assertions.assertEquals("(", tokenizer.getOptionalNextTokenString(true));
+            final EDIFToken instanceref = tokenizer.getOptionalNextToken(true);
+            Assertions.assertSame(AbstractEDIFParserWorker.INSTANCEREF, instanceref.text);
+            Assertions.assertEquals(edif.indexOf("instanceref") + "instanceref".length(), instanceref.byteOffset);
+            Assertions.assertEquals("inst_1", tokenizer.getOptionalNextTokenString(false));
+            Assertions.assertEquals(")", tokenizer.getOptionalNextTokenString(true));
+            Assertions.assertEquals(")", tokenizer.getOptionalNextTokenString(true));
+            // Only an exact match is a keyword: not a longer token, nor another spelling
+            Assertions.assertEquals("portrefx", tokenizer.getOptionalNextTokenString(true));
+            Assertions.assertEquals("PortRef", tokenizer.getOptionalNextTokenString(true));
+            // A long-lived token keeps its text, as does a quoted one
+            Assertions.assertEquals(AbstractEDIFParserWorker.NET, tokenizer.getOptionalNextTokenString(false));
+            Assertions.assertEquals(AbstractEDIFParserWorker.JOINED, tokenizer.getOptionalNextTokenString(true));
+            Assertions.assertTrue(tokenizer.wasLastTokenQuoted());
+            Assertions.assertNull(tokenizer.getOptionalNextTokenString(true));
+        }
+    }
+
+    @Test
+    public void testSkipIntoUnquotedNonAscii() throws IOException {
+        // Bytes >= 0x80 (here, the UTF-8 encoding of é) used to index past the end of the token ender table.
+        // Skipping into the middle of such a token (as a parallel worker does), with a full buffer of them, must
+        // advance to the next token
+        final String token = "abcédef";
+        final String edif = repeatString(token + " ", 20);
+        try (EDIFTokenizer tokenizer = new EDIFTokenizer(null, stringToInputStream(edif), StringPool.singleThreadedPool(), 16)) {
+            tokenizer.skip(5);
+            Assertions.assertEquals(token, tokenizer.getOptionalNextTokenString(true));
+        }
+    }
+
+    @Test
+    public void testKeywordAndCommonTables() {
+        // The gperf-generated values must give every keyword and common name its own slot (checked when the tables
+        // are built) and find each one, including INPUT and INOUT, which differ only at byte 2
+        Assertions.assertEquals(52, EDIFTokenizer.KEYWORD_TABLE.slotCount());
+        for (int i = 0; i < EDIFTokenizer.KEYWORDS.length; i++) {
+            final String keyword = EDIFTokenizer.KEYWORDS[i];
+            final byte[] b = (" " + keyword + " ").getBytes(StandardCharsets.US_ASCII);
+            final int slot = EDIFTokenizer.KEYWORD_TABLE.find(b, 1, b.length - 2);
+            Assertions.assertEquals(EDIFTokenizer.KEYWORD_TABLE.slotOf(i), slot, keyword);
+            Assertions.assertSame(keyword, EDIFTokenizer.KEYWORD_TABLE.get(slot));
+        }
+        Assertions.assertEquals(28, EDIFTokenizer.COMMON_TABLE.slotCount());
+        for (int i = 0; i < EDIFTokenizer.COMMON_NAMES.length; i++) {
+            final String name = EDIFTokenizer.COMMON_NAMES[i];
+            final byte[] b = (" " + name + " ").getBytes(StandardCharsets.US_ASCII);
+            final int slot = EDIFTokenizer.COMMON_TABLE.find(b, 1, b.length - 2);
+            Assertions.assertEquals(EDIFTokenizer.COMMON_TABLE.slotOf(i), slot, name);
+            Assertions.assertSame(name, EDIFTokenizer.COMMON_TABLE.get(slot));
+        }
+    }
+
+    @Test
+    public void testPerfectStringTable() {
+        // Hash = length + value[byte 0] + value[last byte]: "ab" = 2 + 0 + 0 = 2, "cd" = 2 + 10 + 0 = 12
+        final String[] strings = {"ab", "cd"};
+        final PerfectStringTable table = new PerfectStringTable("test", strings, 0, PerfectStringTable.LAST, 200,
+                'a', 0, 'b', 0, 'c', 10, 'd', 0);
+        Assertions.assertEquals(13, table.slotCount());
+        final int[] slots = {2, 12};
+        for (int i = 0; i < strings.length; i++) {
+            final byte[] b = (" " + strings[i] + " ").getBytes(StandardCharsets.US_ASCII);
+            Assertions.assertEquals(slots[i], table.find(b, 1, 2));
+            Assertions.assertEquals(slots[i], table.slotOf(i));
+            Assertions.assertEquals(strings[i], table.get(slots[i]));
+        }
+        // "ad" has the same hash as "ab" but other bytes; "xb" has a byte with the default value; and the wrong
+        // lengths, including an empty sequence
+        for (String miss : new String[]{"ad", "xb", "a", "abc", ""}) {
+            final byte[] b = (miss + " ").getBytes(StandardCharsets.US_ASCII);
+            Assertions.assertEquals(-1, table.find(b, 0, miss.length()), miss);
+        }
+        // Strings with the same hash are rejected
+        Assertions.assertThrows(IllegalArgumentException.class, () -> new PerfectStringTable("test",
+                new String[]{"ab", "ba"}, 0, PerfectStringTable.LAST, 200, 'a', 0, 'b', 0));
+    }
+
+    @Test
+    public void testCommonNames() throws IOException {
+        final StringPool pool = StringPool.singleThreadedPool();
+        // A String already in the pool must be the one returned
+        final String pooledInit = pool.uniquifyName(new String("INIT".toCharArray()));
+        // Near misses share a common name's length and first and last characters, or differ only in the last one
+        final String[] nearMisses = {"INXT", "hdi_primitiXes", "1xb0", "I6", "LUT7", "netlisT", "CX"};
+        final StringBuilder sb = new StringBuilder();
+        for (String name : EDIFTokenizer.COMMON_NAMES) {
+            sb.append(name).append(' ');
+        }
+        for (String name : nearMisses) {
+            sb.append(name).append(' ');
+        }
+        try (EDIFTokenizer tokenizer = new EDIFTokenizer(null, stringToInputStream(sb.toString()), pool)) {
+            for (String name : EDIFTokenizer.COMMON_NAMES) {
+                final String token = tokenizer.getOptionalNextTokenString(false);
+                Assertions.assertEquals(name, token);
+                Assertions.assertSame(pool.uniquifyName(name), token);
+            }
+            for (String name : nearMisses) {
+                final String token = tokenizer.getOptionalNextTokenString(false);
+                Assertions.assertEquals(name, token);
+                Assertions.assertSame(pool.uniquifyName(name), token);
+            }
+            Assertions.assertNull(tokenizer.getOptionalNextTokenString(false));
+        }
+        Assertions.assertSame(pooledInit, pool.uniquifyName("INIT"));
+        // Names that wrap around the buffer are not matched, but are still pooled to the same String
+        try (EDIFTokenizer tokenizer = new EDIFTokenizer(null, stringToInputStream(repeatString("netlist ", 40)), pool, 16)) {
+            for (int i = 0; i < 40; i++) {
+                Assertions.assertSame(pool.uniquifyName("netlist"), tokenizer.getOptionalNextTokenString(false));
+            }
+        }
     }
 
     @Test

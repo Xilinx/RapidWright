@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, 2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2024, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -119,7 +119,15 @@ public class EDIFTokenizer implements AutoCloseable {
         }
         bufferAddressMask = maxTokenLength*2-1;
         this.buffer = new byte[maxTokenLength*2];
+        // Pool the common names up front, so that matching one returns exactly the String the pool would
+        commonPooled = new String[COMMON_TABLE.slotCount()];
+        for (int i = 0; i < COMMON_NAMES.length; i++) {
+            commonPooled[COMMON_TABLE.slotOf(i)] = uniquifier.uniquifyName(COMMON_NAMES[i]);
+        }
     }
+
+    /** The pooled String for each of {@link #COMMON_NAMES}, by its slot in {@link #COMMON_TABLE} */
+    private final String[] commonPooled;
 
     public EDIFTokenizer(Path fileName, InputStream in, StringPool uniquifier) {
         this(fileName, in, uniquifier, DEFAULT_MAX_TOKEN_LENGTH);
@@ -155,16 +163,28 @@ public class EDIFTokenizer implements AutoCloseable {
     protected String getUniqueToken(int startOffset, int endOffset, boolean isShortLived) {
         String token;
         int length;
+        // A long-lived token is pooled, unless it is already the pooled String of a common name
+        boolean toPool = !isShortLived;
         if (endOffset >= startOffset) {
             length = endOffset - startOffset;
-            token = new String(buffer, startOffset, length, charset);
+            if (isShortLived) {
+                // A short-lived token is only compared or parsed, so a keyword can be returned as its constant
+                token = matchKeyword(buffer, startOffset, length);
+            } else {
+                // A common name is returned as its pooled String, without creating one or looking it up
+                token = matchCommonName(buffer, startOffset, length);
+                toPool = token == null;
+            }
+            if (token == null) {
+                token = new String(buffer, startOffset, length, charset);
+            }
         } else {
             int length1 = buffer.length - startOffset;
             length = length1 + endOffset;
             token = byteArrayToStringMulti(buffer, startOffset, length1, 0, endOffset);
 
         }
-        if (!isShortLived) {
+        if (toPool) {
             token = uniquifier.uniquifyName(token);
         }
         byteOffset += length;
@@ -245,14 +265,103 @@ public class EDIFTokenizer implements AutoCloseable {
 
     private static final boolean[] ENDS_TOKEN = makeTokenEnderTable();
 
+    /**
+     * Keywords and other tokens that are only ever compared or parsed, never kept, spelled as they are written
+     * (e.g. by Vivado). A short-lived token whose bytes match one of these exactly is returned as that (interned)
+     * constant rather than as a new String, so that it needs no allocation, and comparing it with the same constant
+     * (equals(), equalsIgnoreCase()) succeeds on identity. Any other spelling still gets a new String. Found by
+     * {@link #KEYWORD_TABLE}, so update its values whenever this list changes.
+     */
+    static final String[] KEYWORDS = {
+            AbstractEDIFParserWorker.PORTREF, AbstractEDIFParserWorker.MEMBER, AbstractEDIFParserWorker.INSTANCEREF,
+            AbstractEDIFParserWorker.JOINED, AbstractEDIFParserWorker.NET, AbstractEDIFParserWorker.INSTANCE,
+            AbstractEDIFParserWorker.PROPERTY, AbstractEDIFParserWorker.RENAME, "string",
+            AbstractEDIFParserWorker.VIEWREF, AbstractEDIFParserWorker.CELLREF, AbstractEDIFParserWorker.LIBRARYREF,
+            AbstractEDIFParserWorker.PORT, AbstractEDIFParserWorker.DIRECTION, "INPUT", "OUTPUT", "INOUT",
+            AbstractEDIFParserWorker.ARRAY, AbstractEDIFParserWorker.OWNER, "integer", "boolean",
+            AbstractEDIFParserWorker.CELL, AbstractEDIFParserWorker.CELLTYPE, "GENERIC",
+            AbstractEDIFParserWorker.VIEW, AbstractEDIFParserWorker.VIEWTYPE, "NETLIST",
+            AbstractEDIFParserWorker.INTERFACE, AbstractEDIFParserWorker.CONTENTS,
+            AbstractEDIFParserWorker.EDIF, AbstractEDIFParserWorker.EDIFVERSION, AbstractEDIFParserWorker.EDIFLEVEL,
+            AbstractEDIFParserWorker.EXTERNAL, AbstractEDIFParserWorker.KEYWORDMAP,
+            AbstractEDIFParserWorker.KEYWORDLEVEL, AbstractEDIFParserWorker.STATUS, AbstractEDIFParserWorker.WRITTEN,
+            AbstractEDIFParserWorker.TIMESTAMP, AbstractEDIFParserWorker.AUTHOR, AbstractEDIFParserWorker.PROGRAM,
+            AbstractEDIFParserWorker.VERSION, AbstractEDIFParserWorker.COMMENT, AbstractEDIFParserWorker.LIBRARY,
+            AbstractEDIFParserWorker.TECHNOLOGY, AbstractEDIFParserWorker.NUMBERDEFINITION,
+            AbstractEDIFParserWorker.DESIGN, AbstractEDIFParserWorker.METAX,
+    };
+
+    /**
+     * Finds {@link #KEYWORDS}, with the hash {@code length + value[byte 2] + value[byte 0]} and these values, which
+     * GNU gperf 3.1 generated from KEYWORDS with {@code gperf -m 1000} (see {@link PerfectStringTable} for how to
+     * regenerate them): the 47 keywords have hashes from 5 to 51, i.e. a table of 52 slots.
+     */
+    static final PerfectStringTable KEYWORD_TABLE = new PerfectStringTable("EDIFTokenizer.KEYWORDS", KEYWORDS,
+            2, 0, 52,
+            'G', 22, 'I', 21, 'L', 17, 'N', 22, 'O', 19, 'P', 20, 'T', 19, 'a', 32, 'b', 25, 'c', 25, 'd', 15,
+            'e', 6, 'i', 1, 'j', 0, 'k', 7, 'l', 7, 'm', 0, 'n', 10, 'o', 15, 'p', 11, 'r', 13, 's', 3, 't', 0,
+            'v', 7, 'w', 11, 'y', 6);
+
+    /** {@link #KEYWORDS} by their slots in {@link #KEYWORD_TABLE} */
+    private static final String[] KEYWORDS_BY_SLOT = KEYWORD_TABLE.stringsBySlot();
+
+    /**
+     * Find the keyword (see {@link #KEYWORDS}) whose bytes are exactly those of a token in the buffer.
+     * @param buffer The buffer.
+     * @param start The token's start offset in the buffer (it must not wrap around the end of the buffer).
+     * @param length The token's length.
+     * @return The keyword constant, or null if the token is not one.
+     */
+    private static String matchKeyword(byte[] buffer, int start, int length) {
+        final int slot = KEYWORD_TABLE.find(buffer, start, length);
+        return slot < 0 ? null : KEYWORDS_BY_SLOT[slot];
+    }
+
+    /**
+     * Names that are very frequent long-lived tokens in netlists written by Vivado (the view and primitives library
+     * of every leaf cell instance, LUT and flip-flop types and pins, their INIT property and constants). A long-lived
+     * token whose bytes match one of these exactly is returned as the pooled String for that name (see
+     * {@link #commonPooled}), without creating a String for it or looking it up in the pool. Chosen from the counts
+     * of long-lived tokens in seven EDIFs: in a 38.6GB EDIF, these names were 26.9% of its 926M long-lived tokens.
+     */
+    static final String[] COMMON_NAMES = {
+            "netlist", "hdi_primitives", "INIT", "GND", "VCC",
+            "I0", "I1", "I2", "I3", "I4", "I5", "O", "D", "Q", "C", "CE", "R", "G",
+            "FDRE", "LUT1", "LUT2", "LUT3", "LUT4", "LUT5", "LUT6", "1'b0", "1'b1",
+    };
+
+    /**
+     * Finds {@link #COMMON_NAMES}, with the hash {@code length + value[last byte] + value[byte 0]} and these values,
+     * which GNU gperf 3.1 generated from COMMON_NAMES with {@code gperf -m 1000} (see {@link PerfectStringTable} for
+     * how to regenerate them): the 27 names have hashes from 1 to 27, i.e. a table of 28 slots.
+     */
+    static final PerfectStringTable COMMON_TABLE = new PerfectStringTable("EDIFTokenizer.COMMON_NAMES",
+            COMMON_NAMES, PerfectStringTable.LAST, 0, 28,
+            '0', 13, '1', 1, '2', 10, '3', 9, '4', 6, '5', 0, '6', 22, 'C', 9, 'D', 4, 'E', 11, 'F', 9, 'G', 0,
+            'I', 0, 'L', 0, 'O', 13, 'Q', 12, 'R', 11, 'T', 17, 'V', 8, 'h', 2, 'n', 5, 's', 1, 't', 4);
+
+    /**
+     * Find the name in {@link #COMMON_NAMES} whose bytes are exactly those of a long-lived token in the buffer.
+     * @param buffer The buffer.
+     * @param start The token's start offset in the buffer (it must not wrap around the end of the buffer).
+     * @param length The token's length.
+     * @return The pooled String for that name, or null if the token is not one.
+     */
+    private String matchCommonName(byte[] buffer, int start, int length) {
+        final int slot = COMMON_TABLE.find(buffer, start, length);
+        return slot < 0 ? null : commonPooled[slot];
+    }
+
 
     /**
      * Check if a character ends a token.
      *
      * This is FASTER than endsTokenSwitch! Hooray for jump tables!
+     * @param c A byte of the buffer cast to char. A byte >= 0x80 (part of a non-ASCII character) is negative, so its
+     *          char is 0xFF80 or more; only its low 8 bits index the table (and such a byte never ends a token).
      */
     private static boolean endsTokenOpt(char c) {
-        return ENDS_TOKEN[c];
+        return ENDS_TOKEN[c & 0xff];
     }
 
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -25,44 +25,30 @@ package com.xilinx.rapidwright.edif;
 
 import java.util.IdentityHashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Helper class that keeps track of EDIF Renames during parsing. Two different subclasses exist for thread-safe vs.
- * non-thread-safe implementation
+ * Helper class that keeps track of EDIF Renames during parsing. It is not thread-safe: each parser (or parallel
+ * parser worker) uses its own, which other threads may only read once that parser has finished writing to it.
  */
-public abstract class EDIFReadLegalNameCache {
+public class EDIFReadLegalNameCache {
+
+    /** EDIFName equality is by name, so renames are looked up by object identity */
+    private final Map<EDIFName, String> renames = new IdentityHashMap<>();
+
+    public void setRename(EDIFName name, String rename) {
+        renames.put(name, rename);
+    }
+
+    public String getEDIFRename(EDIFName name) {
+        return renames.get(name);
+    }
 
     /**
-     * Wrapper object that overrides equals and hashCode to require an identical wrapped object
-     * @param <T>
+     * Remove all renames, e.g. to release them once they are no longer needed.
      */
-    private static class IdentityEqualsHash<T> {
-        private final T obj;
-
-        private IdentityEqualsHash(T obj) {
-            this.obj = obj;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            IdentityEqualsHash<?> that = (IdentityEqualsHash<?>) o;
-            return obj==that.obj;
-        }
-
-        @Override
-        public int hashCode() {
-            return System.identityHashCode(obj);
-        }
+    public void clear() {
+        renames.clear();
     }
-
-    private EDIFReadLegalNameCache() {
-    }
-
-    public abstract void setRename(EDIFName name, String rename);
-    public abstract String getEDIFRename(EDIFName name);
 
     public String getLegalEDIFName(EDIFName name) {
         String rename = getEDIFRename(name);
@@ -70,28 +56,5 @@ public abstract class EDIFReadLegalNameCache {
             return rename;
         }
         return name.getName();
-    }
-
-    public static EDIFReadLegalNameCache createSingleThreaded() {
-        return new EDIFReadLegalNameCache() {
-            private final Map<EDIFName, String> renames = new IdentityHashMap<>();
-            public void setRename(EDIFName name, String rename) {
-                renames.put(name, rename);
-            }
-            public String getEDIFRename(EDIFName name) {
-                return renames.get(name);
-            }
-        };
-    }
-    public static EDIFReadLegalNameCache createMultiThreaded() {
-        return new EDIFReadLegalNameCache() {
-            private final Map<IdentityEqualsHash<EDIFName>, String> renames = new ConcurrentHashMap<>();
-            public void setRename(EDIFName name, String rename) {
-                renames.put(new IdentityEqualsHash<>(name), rename);
-            }
-            public String getEDIFRename(EDIFName name) {
-                return renames.get(new IdentityEqualsHash<>(name));
-            }
-        };
     }
 }

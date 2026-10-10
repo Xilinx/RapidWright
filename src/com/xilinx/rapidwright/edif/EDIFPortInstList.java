@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -139,5 +139,20 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
      */
     public void reSortList() {
         Collections.sort(this);
+        // Unlike add(), deferSortAdd() does not replace an existing equal port inst
+        assert(!hasAdjacentDuplicates());
+    }
+
+    /**
+     * @return True if any two adjacent port insts compare equal (i.e. there are duplicates, if this list
+     * is sorted).
+     */
+    private boolean hasAdjacentDuplicates() {
+        for (int i = 1; i < size(); i++) {
+            if (get(i - 1).compareTo(get(i)) == 0) {
+                return true;
+            }
+        }
+        return false;
     }
 }
