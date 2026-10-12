@@ -1597,7 +1597,8 @@ public class TestDesignTools {
         Assertions.assertNull(circuit.getNetlist().getHierNetFromName("bb/x"));
         Assertions.assertNull(circuit.getNetlist().getHierNetFromName("shell_clk"));
 
-        Set<Net> modified = populateBlackBox(design, "bb", circuit, false);
+        populateBlackBox(design, "bb", circuit, false);
+        Set<Net> modified = design.getModifiedNets();
 
         Assertions.assertSame(xNet, design.getNet("bb/x"));
         Assertions.assertSame(xNet, xSink.getNet());

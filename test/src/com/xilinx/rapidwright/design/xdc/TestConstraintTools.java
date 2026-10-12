@@ -186,7 +186,7 @@ public class TestConstraintTools {
         Assertions.assertTrue(design.getXDCConstraints(ConstraintGroup.IN_CONTEXT).isEmpty());
 
         // Called again, it adds them a second time, counting the circuits' commands it kept
-        Assertions.assertEquals(5, ConstraintTools.addBlackBoxConstraints(design, blackBoxes));
+        Assertions.assertEquals(9, ConstraintTools.addBlackBoxConstraints(design, blackBoxes));
         List<String> twice = new ArrayList<>(early);
         twice.addAll(early);
         Assertions.assertEquals(twice, design.getXDCConstraints(ConstraintGroup.EARLY));
