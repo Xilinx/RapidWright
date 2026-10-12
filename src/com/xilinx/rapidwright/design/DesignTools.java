@@ -1280,7 +1280,7 @@ public class DesignTools {
 
     /**
      * Checks whether a site instance holds nothing but locked placeholder cells ({@link Cell#LOCKED}):
-     * no other cells, no site pins and no site routing.
+     * no other cells, no site pins and no site routing, including used site PIPs without a net.
      *
      * @param si The site instance.
      * @return True if the site instance only locks its BELs.
@@ -1289,7 +1289,7 @@ public class DesignTools {
         for (Cell c : si.getCells()) {
             if (!c.getName().endsWith(Cell.LOCKED)) return false;
         }
-        return si.getSitePinInsts().isEmpty() && si.getSiteWireToNetMap().isEmpty();
+        return si.getSitePinInsts().isEmpty() && si.getSiteWireToNetMap().isEmpty() && !si.hasUsedSitePIPs();
     }
 
     /**
