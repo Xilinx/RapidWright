@@ -23,11 +23,18 @@
 
 package com.xilinx.rapidwright.edif;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -432,6 +439,185 @@ class TestEDIFNetlist {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testExportEDIFLibraryOrder(boolean stable, @TempDir Path path) throws IOException {
+        final EDIFNetlist origNetlist = EDIFTools.createNewNetlist("test");
+        EDIFCell top = origNetlist.getTopCell();
+
+        // A library added after the work library (and sorting after it by name), holding a cell
+        // instantiated by the work library's top cell, as when cells are merged in from another netlist
+        EDIFLibrary otherLib = origNetlist.addLibrary(new EDIFLibrary("z_lib"));
+        EDIFCell sub = new EDIFCell(otherLib, "sub");
+        EDIFPort subPort = sub.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCellInst subInst = top.createChildCellInst("sub_inst", sub);
+        EDIFPort topPort = top.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFNet net = top.createNet("I");
+        net.createPortInst(topPort);
+        net.createPortInst(subPort, subInst);
+
+        // A library that nothing depends upon, added last
+        EDIFLibrary unusedLib = origNetlist.addLibrary(new EDIFLibrary("a_lib"));
+        new EDIFCell(unusedLib, "unused");
+
+        Path tempFile = path.resolve("test.edf");
+        origNetlist.exportEDIF(tempFile, stable);
+
+        // A cell's library must be written before any instance of it
+        String edif = new String(Files.readAllBytes(tempFile));
+        int otherLibIdx = edif.indexOf("(Library z_lib");
+        int workLibIdx = edif.indexOf("(Library " + EDIFTools.EDIF_LIBRARY_WORK_NAME);
+        int unusedLibIdx = edif.indexOf("(Library a_lib");
+        Assertions.assertTrue(otherLibIdx >= 0 && workLibIdx >= 0 && unusedLibIdx >= 0);
+        Assertions.assertTrue(otherLibIdx < workLibIdx);
+        if (stable) {
+            // Libraries without dependencies between them are written in name order
+            Assertions.assertTrue(unusedLibIdx < otherLibIdx);
+        }
+
+        EDIFNetlist testNetlist = EDIFTools.readEdifFile(tempFile);
+        EDIFNetlistComparator comparer = new EDIFNetlistComparator();
+        Assertions.assertEquals(0, comparer.compareNetlists(origNetlist, testNetlist));
+    }
+
+    private static EDIFNetlist createNetlistWithLibraries(String... libNames) {
+        EDIFNetlist netlist = new EDIFNetlist("test");
+        netlist.getHDIPrimitivesLibrary();
+        for (String libName : libNames) {
+            netlist.addLibrary(new EDIFLibrary(libName));
+        }
+        return netlist;
+    }
+
+    private static List<String> getLibraryNamesInExportOrder(EDIFNetlist netlist, boolean stable) {
+        return netlist.getLibrariesInExportOrder(stable).stream()
+                .map(EDIFLibrary::getName)
+                .collect(Collectors.toList());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testLibrariesInExportOrderTieBreak(boolean stable) {
+        EDIFNetlist netlist = createNetlistWithLibraries("z", "b", "a");
+        EDIFCell leaf = new EDIFCell(netlist.getLibrary("a"), "leaf");
+        new EDIFCell(netlist.getLibrary("b"), "top").createChildCellInst("leaf_i", leaf);
+        new EDIFCell(netlist.getLibrary("z"), "unused");
+
+        // Once a is written, b is ready and must be chosen before z by name (if stable) or
+        // after z by order added
+        List<String> expected = stable
+                ? Arrays.asList(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME, "a", "b", "z")
+                : Arrays.asList(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME, "z", "a", "b");
+        Assertions.assertEquals(expected, getLibraryNamesInExportOrder(netlist, stable));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testLibrariesInExportOrderCellNameCollision(boolean stable, @TempDir Path path) {
+        EDIFNetlist netlist = createNetlistWithLibraries("a", "b", "c");
+        EDIFCell leaf = new EDIFCell(netlist.getLibrary("a"), "leaf");
+        EDIFCell shared = new EDIFCell(netlist.getLibrary("b"), "shared");
+        shared.createChildCellInst("leaf_i", leaf);
+        // c has its own cell named 'shared', but instantiates b's
+        new EDIFCell(netlist.getLibrary("c"), "shared");
+        EDIFCell top = new EDIFCell(netlist.getLibrary("c"), "top");
+        top.createChildCellInst("shared_i", shared);
+        EDIFDesign design = new EDIFDesign("test");
+        design.setTopCell(top);
+        netlist.setDesign(design);
+
+        EDIFLibrary c = netlist.getLibrary("c");
+        Assertions.assertEquals(Arrays.asList(shared), c.getExternallyReferencedCells());
+        Assertions.assertEquals(new HashSet<>(Arrays.asList(netlist.getLibrary("b"))),
+                new HashSet<>(c.getExternallyReferencedLibraries()));
+
+        List<String> expected = Arrays.asList(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME, "a", "b", "c");
+        Assertions.assertEquals(expected, getLibraryNamesInExportOrder(netlist, stable));
+
+        Path tempFile = path.resolve("test.edf");
+        netlist.exportEDIF(tempFile, stable);
+        EDIFNetlist testNetlist = EDIFTools.readEdifFile(tempFile);
+        EDIFNetlistComparator comparer = new EDIFNetlistComparator();
+        Assertions.assertEquals(0, comparer.compareNetlists(netlist, testNetlist));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testLibrariesInExportOrderAbsentLibrary(boolean stable) {
+        EDIFNetlist netlist = createNetlistWithLibraries("z", "a");
+        EDIFCell leaf = new EDIFCell(netlist.getLibrary("z"), "leaf");
+        EDIFCell top = new EDIFCell(netlist.getLibrary("a"), "top");
+        top.createChildCellInst("leaf_i", leaf);
+        // A library that is not part of the netlist cannot be waited for
+        EDIFCell absent = new EDIFCell(new EDIFLibrary("absent"), "absent");
+        top.createChildCellInst("absent_i", absent);
+
+        List<String> expected = Arrays.asList(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME, "z", "a");
+        Assertions.assertEquals(expected, getLibraryNamesInExportOrder(netlist, stable));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testLibrariesInExportOrderManyInstances(boolean stable) {
+        EDIFNetlist netlist = createNetlistWithLibraries("c", "b", "a");
+        EDIFCell aLeaf = new EDIFCell(netlist.getLibrary("a"), "a_leaf");
+        EDIFCell bLeaf = new EDIFCell(netlist.getLibrary("b"), "b_leaf");
+        // Enough instances that c's cells are split between several dependency tasks, with
+        // each dependency found by a different task
+        EDIFCell wideA = new EDIFCell(netlist.getLibrary("c"), "wide_a");
+        EDIFCell wideB = new EDIFCell(netlist.getLibrary("c"), "wide_b");
+        for (int i = 0; i < 100000; i++) {
+            wideA.createChildCellInst("a_leaf_" + i, aLeaf);
+            wideB.createChildCellInst("b_leaf_" + i, bLeaf);
+        }
+
+        List<String> expected = stable
+                ? Arrays.asList(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME, "a", "b", "c")
+                : Arrays.asList(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME, "b", "a", "c");
+        Assertions.assertEquals(expected, getLibraryNamesInExportOrder(netlist, stable));
+    }
+
+    private static EDIFNetlist createNetlistWithLibraryCycle() {
+        // b depends on a, while c and d depend on each other
+        EDIFNetlist netlist = createNetlistWithLibraries("a", "b", "c", "d");
+        EDIFCell leaf = new EDIFCell(netlist.getLibrary("a"), "a_leaf");
+        new EDIFCell(netlist.getLibrary("b"), "ready").createChildCellInst("leaf_i", leaf);
+        EDIFCell cLeaf = new EDIFCell(netlist.getLibrary("c"), "c_leaf");
+        EDIFCell dLeaf = new EDIFCell(netlist.getLibrary("d"), "d_leaf");
+        new EDIFCell(netlist.getLibrary("c"), "c_parent").createChildCellInst("d_i", dLeaf);
+        new EDIFCell(netlist.getLibrary("d"), "d_parent").createChildCellInst("c_i", cLeaf);
+        return netlist;
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testLibrariesInExportOrderCycle(boolean stable) {
+        EDIFNetlist netlist = createNetlistWithLibraryCycle();
+        RuntimeException e = Assertions.assertTimeoutPreemptively(Duration.ofSeconds(10),
+                () -> Assertions.assertThrows(RuntimeException.class,
+                        () -> netlist.getLibrariesInExportOrder(stable)));
+        Assertions.assertTrue(e.getMessage().contains("Circular dependency"));
+        Assertions.assertTrue(e.getMessage().contains("[c, d]"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testExportEDIFLibraryCycle(boolean stable, @TempDir Path path) throws IOException {
+        EDIFNetlist netlist = createNetlistWithLibraryCycle();
+        Path tempFile = path.resolve("test.edf");
+        // Libraries that cannot be ordered are still written, after those that can
+        Assertions.assertTimeoutPreemptively(Duration.ofSeconds(10),
+                () -> netlist.exportEDIF(tempFile, stable));
+
+        String edif = new String(Files.readAllBytes(tempFile));
+        int prevIdx = -1;
+        for (String libName : Arrays.asList("a", "b", "c", "d")) {
+            int idx = edif.indexOf("(Library " + libName + "\n");
+            Assertions.assertTrue(idx > prevIdx);
+            prevIdx = idx;
+        }
+    }
+
     @Test
     public void testBussedPortNamingCollision(@TempDir Path path) {
         final EDIFNetlist origNetlist = EDIFTools.createNewNetlist("test");
@@ -507,6 +693,131 @@ class TestEDIFNetlist {
         EDIFNetlist testNetlist = EDIFTools.readEdifFile(tempFile);
         EDIFNetlistComparator comparer = new EDIFNetlistComparator();
         Assertions.assertEquals(0, comparer.compareNetlists(origNetlist, testNetlist));
+    }
+
+    @Test
+    public void testFindParentNet() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+        List<EDIFHierNet> nets = new ArrayList<>();
+        List<EDIFHierCellInst> insts = new ArrayList<>(netlist.getAllDescendants("", null, false));
+        insts.add(netlist.getTopHierCellInst());
+        for (EDIFHierCellInst inst : insts) {
+            for (EDIFNet net : inst.getCellType().getNets()) {
+                nets.add(inst.getNet(net.getName()));
+            }
+        }
+
+        // Without the parent net map, which it must not build
+        netlist.resetParentNetMap();
+        Map<EDIFHierNet, EDIFHierNet> found = new HashMap<>();
+        for (EDIFHierNet net : nets) {
+            found.put(net, netlist.findParentNet(net));
+        }
+        Assertions.assertFalse(netlist.isParentNetMapBuilt());
+
+        // Nor change the physical pins recorded so far
+        EDIFHierNet seed = nets.stream().map(found::get).filter(n -> n != null).findFirst().get();
+        netlist.getNetAliases(seed);
+        Map<EDIFHierNet, List<EDIFHierPortInst>> physicalNetPins = new HashMap<>(netlist.getPhysicalNetPinMap());
+        List<EDIFHierPortInst> physicalGndPins = new ArrayList<>(netlist.getPhysicalGndPins());
+        List<EDIFHierPortInst> physicalVccPins = new ArrayList<>(netlist.getPhysicalVccPins());
+        Assertions.assertFalse(physicalNetPins.isEmpty());
+        for (EDIFHierNet net : nets) {
+            Assertions.assertEquals(found.get(net), netlist.findParentNet(net), net.toString());
+        }
+        Assertions.assertFalse(netlist.isParentNetMapBuilt());
+        Assertions.assertEquals(physicalNetPins, netlist.getPhysicalNetPinMap());
+        Assertions.assertEquals(physicalGndPins, netlist.getPhysicalGndPins());
+        Assertions.assertEquals(physicalVccPins, netlist.getPhysicalVccPins());
+
+        netlist.resetParentNetMap();
+        int withParent = 0;
+        for (EDIFHierNet net : nets) {
+            EDIFHierNet parent = netlist.getParentNet(net);
+            Assertions.assertEquals(parent, found.get(net), net.toString());
+            if (parent != null) withParent++;
+        }
+        Assertions.assertTrue(withParent > 1000);
+        // With the map built, it is used
+        Assertions.assertEquals(netlist.getParentNet(nets.get(0)), netlist.findParentNet(nets.get(0)));
+    }
+
+    /**
+     * Builds a netlist with a net 'wire' in instance 'u' that is connected to a leaf cell input
+     * and, through ports of 'u', to one top-level port per entry of topPortDirections (each on its
+     * own top-level net 'n0', 'n1', ...), and is driven by the given number of leaf cell outputs.
+     * Checks that the parent net of every alias of 'u/wire' is the expected one ("none" for no
+     * parent, "throws" for multiple sources), looked up from any alias before or after building the
+     * parent net map.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "'INOUT INOUT', 1, u/wire",
+            "'INPUT INOUT', 0, n0",
+            "'INOUT INPUT', 0, n1",
+            "'INOUT', 1, u/wire",
+            "'INOUT', 0, n0",
+            "'OUTPUT', 0, none",
+            "'INOUT INOUT', 0, throws",
+            "'INPUT INPUT', 0, throws",
+            "'', 2, throws",
+    })
+    public void testFindParentNetSources(String topPortDirections, int leafDrivers, String expected) {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top");
+        EDIFCell top = netlist.getTopCell();
+        EDIFCell child = new EDIFCell(netlist.getWorkLibrary(), "child");
+        EDIFNet wire = child.createNet("wire");
+        EDIFCellInst u = top.createChildCellInst("u", child);
+        String[] directions = topPortDirections.isEmpty() ? new String[0] : topPortDirections.split(" ");
+        for (int i = 0; i < directions.length; i++) {
+            EDIFDirection dir = EDIFDirection.valueOf(directions[i]);
+            EDIFPort childPort = child.createPort("p" + i, dir, 1);
+            wire.createPortInst(childPort);
+            EDIFNet net = top.createNet("n" + i);
+            net.createPortInst(top.createPort("io" + i, dir, 1));
+            net.createPortInst(childPort, u);
+        }
+        EDIFCell driver = new EDIFCell(netlist.getWorkLibrary(), "driver");
+        EDIFPort o = driver.createPort("O", EDIFDirection.OUTPUT, 1);
+        for (int i = 0; i < leafDrivers; i++) {
+            wire.createPortInst(o, child.createChildCellInst("d" + i, driver));
+        }
+        EDIFCell sink = new EDIFCell(netlist.getWorkLibrary(), "sink");
+        wire.createPortInst(sink.createPort("I", EDIFDirection.INPUT, 1), child.createChildCellInst("s", sink));
+
+        List<EDIFHierNet> aliases = new ArrayList<>();
+        aliases.add(netlist.getHierNetFromName("u/wire"));
+        for (int i = 0; i < directions.length; i++) {
+            aliases.add(netlist.getHierNetFromName("n" + i));
+        }
+
+        if (expected.equals("throws")) {
+            for (EDIFHierNet alias : aliases) {
+                netlist.resetParentNetMap();
+                Assertions.assertThrows(RuntimeException.class, () -> netlist.findParentNet(alias), alias.toString());
+                Assertions.assertFalse(netlist.isParentNetMapBuilt());
+                netlist.resetParentNetMap();
+                Assertions.assertThrows(RuntimeException.class, () -> netlist.getParentNet(alias), alias.toString());
+            }
+            return;
+        }
+
+        EDIFHierNet expectedParent = expected.equals("none") ? null : netlist.getHierNetFromName(expected);
+        // Starting from each alias, before and after building the map from that alias
+        for (EDIFHierNet start : aliases) {
+            netlist.resetParentNetMap();
+            for (EDIFHierNet alias : aliases) {
+                Assertions.assertEquals(expectedParent, netlist.findParentNet(alias), alias.toString());
+            }
+            Assertions.assertFalse(netlist.isParentNetMapBuilt());
+            Assertions.assertEquals(expectedParent, netlist.getParentNet(start), start.toString());
+            Assertions.assertTrue(netlist.isParentNetMapBuilt());
+            for (EDIFHierNet alias : aliases) {
+                Assertions.assertEquals(expectedParent, netlist.getParentNet(alias), alias.toString());
+                Assertions.assertEquals(expectedParent, netlist.findParentNet(alias), alias.toString());
+            }
+        }
     }
 
     @Test
@@ -679,5 +990,44 @@ class TestEDIFNetlist {
         // PartNameTools.getPart() throws for an unidentifiable part; the documented
         // contract here is to return false instead
         Assertions.assertFalse(netlist.expandMacroUnisims());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testRemoveUnusedCells(boolean allWorkLibraries) {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
+        EDIFLibrary work = netlist.getWorkLibrary();
+        EDIFLibrary other = netlist.addLibrary(new EDIFLibrary("other"));
+        EDIFCell top = netlist.getTopCell();
+
+        // top instantiates a twice; a instantiates b and the leaf (black box) f; b instantiates d,
+        // from the other library. c and e are not instantiated anywhere
+        EDIFCell a = new EDIFCell(work, "a");
+        EDIFCell b = new EDIFCell(work, "b");
+        EDIFCell c = new EDIFCell(work, "c");
+        EDIFCell f = new EDIFCell(work, "f");
+        EDIFCell d = new EDIFCell(other, "d");
+        EDIFCell e = new EDIFCell(other, "e");
+        top.createChildCellInst("a0", a);
+        top.createChildCellInst("a1", a);
+        a.createChildCellInst("b", b);
+        a.createChildCellInst("f", f);
+        b.createChildCellInst("d", d);
+        // An unused cell can still instantiate used ones
+        c.createChildCellInst("b", b);
+
+        if (allWorkLibraries) {
+            netlist.removeUnusedCellsFromAllWorkLibraries();
+        } else {
+            netlist.removeUnusedCellsFromWorkLibrary();
+        }
+
+        for (EDIFCell cell : new EDIFCell[] {top, a, b, f}) {
+            Assertions.assertSame(cell, work.getCell(cell.getName()));
+        }
+        Assertions.assertNull(work.getCell("c"));
+        Assertions.assertSame(d, other.getCell("d"));
+        // Only the work library is cleaned up otherwise
+        Assertions.assertEquals(allWorkLibraries ? null : e, other.getCell("e"));
     }
 }
