@@ -638,12 +638,13 @@ public class EDIFCell extends EDIFPropertyObject {
      * @param port A port on the cell being checked, such as a black box.
      * @param other The corresponding port on the other cell.
      * @param allowResolvedInouts If true, port being an inout also matches other being an input or
-     *                            output.
+     *                            output, though not any other direction.
      * @return True if the directions match.
      */
     public static boolean isCompatibleDirection(EDIFPort port, EDIFPort other, boolean allowResolvedInouts) {
         if (Objects.equals(port.getDirection(), other.getDirection())) return true;
-        return allowResolvedInouts && port.getDirection() == EDIFDirection.INOUT;
+        return allowResolvedInouts && port.getDirection() == EDIFDirection.INOUT
+                && (other.isInput() || other.isOutput());
     }
 
     /**

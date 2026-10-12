@@ -847,6 +847,56 @@ public class TestDesignTools {
         assertParentNet(netlist, "out", "bb/lut_O");
     }
 
+    /**
+     * A signal straight through a circuit is driven by another of the circuit's inputs rather than
+     * by anything inside it, so only the circuit's resolved directions can tell which of the black
+     * box's inouts is the input.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testPopulateBlackBoxResolvedInoutPassThrough(boolean keepBoundaryRouting) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+
+        EDIFCell bbType = new EDIFCell(top.getLibrary(), "bbType");
+        bbType.createPort("I", EDIFDirection.INOUT, 1);
+        bbType.createPort("O", EDIFDirection.INOUT, 1);
+        EDIFCellInst bb = bbType.createCellInst("bb", top);
+        bb.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", bb);
+        Net inNet = design.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+        PIP inPIP = addTestRouting(inNet, 1);
+        EDIFNet out = top.createNet("out");
+        out.createPortInst("O", bb);
+        Net outNet = design.createNet("out");
+        SitePinInst sinkPin = addSinkLUT(design, top, "sink", "SLICE_X2Y0", out, outNet);
+        PIP outPIP = addTestRouting(outNet, 0, sinkPin);
+
+        // The circuit: nothing but a wire from I to O
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet wire = circuitTop.createNet("wire");
+        wire.createPortInst(circuitTop.getPort("I"));
+        wire.createPortInst(circuitTop.getPort("O"));
+        circuit.createNet("wire");
+
+        Set<Net> modified = populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
+
+        Assertions.assertEquals(EDIFDirection.INPUT, bb.getPortInst("I").getDirection());
+        Assertions.assertEquals(EDIFDirection.OUTPUT, bb.getPortInst("O").getDirection());
+        // The output's sinks move onto the input's net, just as for a black box with an input and
+        // an output
+        assertParentNet(netlist, "out", "in");
+        Assertions.assertSame(inNet, sinkPin.getNet());
+        Assertions.assertNull(design.getNet("out"));
+        Assertions.assertNull(design.getNet("bb/wire"));
+        assertRouting(keepBoundaryRouting, inNet, Arrays.asList(inPIP, outPIP), sinkPin);
+        Assertions.assertTrue(modified.contains(inNet));
+    }
+
     @Test
     public void testPopulateBlackBoxInterfaceMismatch() {
         Design design = new Design("shell", "xcvu3p");
@@ -871,6 +921,31 @@ public class TestDesignTools {
         Assertions.assertTrue(e.getMessage().contains("port X doesn't exist on bbType"), e.getMessage());
         Assertions.assertTrue(e.getMessage().contains("port O is missing on other"), e.getMessage());
         Assertions.assertFalse(e.getMessage().contains("port I "), e.getMessage());
+
+        // A black box inout is only resolved by an input or output
+        Design inouts = new Design("inouts", "xcvu3p");
+        EDIFCell inoutsTop = inouts.getTopEDIFCell();
+        EDIFCell inoutType = new EDIFCell(inoutsTop.getLibrary(), "inoutType");
+        inoutType.createPort("IO", EDIFDirection.INOUT, 1);
+        inoutType.createCellInst("bb", inoutsTop).addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+        Design internal = new Design("internal", "xcvu3p");
+        internal.getTopEDIFCell().createPort("IO", EDIFDirection.INTERNAL, 1);
+        e = Assertions.assertThrows(RuntimeException.class,
+                () -> DesignTools.populateBlackBox(inouts, "bb", internal));
+        Assertions.assertTrue(e.getMessage().contains("port IO mismatch"), e.getMessage());
+
+        // A width mismatch on a bus whose name doesn't give its width away is shown
+        Design buses = new Design("buses", "xcvu3p");
+        EDIFCell busesTop = buses.getTopEDIFCell();
+        EDIFCell busType = new EDIFCell(busesTop.getLibrary(), "busType");
+        busType.createPort("D[7:0]", EDIFDirection.INPUT, 8);
+        busType.createCellInst("bb", busesTop).addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+        Design narrow = new Design("narrow", "xcvu3p");
+        narrow.getTopEDIFCell().createPort("D[7:0]", EDIFDirection.INPUT, 4);
+        e = Assertions.assertThrows(RuntimeException.class,
+                () -> DesignTools.populateBlackBox(buses, "bb", narrow));
+        Assertions.assertTrue(e.getMessage().contains("D[7:0] INPUT width 8 on busType, "
+                + "D[7:0] INPUT width 4 on narrow"), e.getMessage());
     }
 
     /**
