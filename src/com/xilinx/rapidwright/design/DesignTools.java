@@ -60,6 +60,7 @@ import org.python.google.common.collect.Lists;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
 import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.design.xdc.ConstraintTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
@@ -959,6 +960,10 @@ public class DesignTools {
      * as is every net in the design not on such a signal. The design's parent net map is dropped,
      * since the netlist has changed, and left for whichever caller next needs it to rebuild.
      * <p>
+     * Once the boxes are filled, the early and late constraints of each circuit are added to the
+     * design, scoped to its black box, as
+     * {@link ConstraintTools#addBlackBoxConstraints(Design, Map)} describes.
+     * <p>
      * Every entry is vetted before anything is modified, but there is no rollback once insertion has
      * begun: a failure part way through -- a site overlap, say -- leaves the boxes filled so far in
      * place, and the logical netlist of all of them already swapped in.
@@ -1327,6 +1332,9 @@ public class DesignTools {
         for (Net target : mergedOnto) {
             removeDuplicatePIPs(target);
         }
+
+        // As read_checkpoint -cell does, each circuit brings its constraints with it
+        ConstraintTools.addBlackBoxConstraints(design, blackBoxes);
     }
 
     /**
