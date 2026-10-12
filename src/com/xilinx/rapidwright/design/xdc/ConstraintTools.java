@@ -98,7 +98,10 @@ public class ConstraintTools {
      * <li>the {@code SRC_FILE_INFO} table.</li>
      * </ul>
      * Commands at the circuit's top scope whose {@code get_ports} only name top-level ports of the
-     * design are applied at the design's top scope instead, as they constrain device pins.
+     * design are applied at the design's top scope instead, as they constrain device pins. In the
+     * others, {@code get_ports} names the circuit's own ports, which are the pins of the black box in
+     * the design: it is given {@code -scoped_to_current_instance}, as Vivado writes it, so that it
+     * finds them.
      * <p>
      * These rules go by the text of the constraints, as Vivado writes them to a checkpoint. They
      * were checked against Vivado's {@code link_design} of DFX designs (a static shell and a
@@ -154,6 +157,9 @@ public class ConstraintTools {
 
     private static final Pattern ADD_TOP_TO_PBLOCK =
             Pattern.compile("^add_cells_to_pblock\\s+\\[get_pblocks\\s+\\{?([^\\]\\s}]+)\\}?\\]\\s+-top\\b");
+
+    private static final Pattern UNSCOPED_GET_PORTS =
+            Pattern.compile("\\bget_ports\\b(?!\\s+-scoped_to_current_instance)");
 
     private static final Pattern GET_PORTS =
             Pattern.compile("get_ports\\s+(?:-quiet\\s+)?(?:\\{([^}]*)\\}|([^\\]\\s]+))");
@@ -324,7 +330,17 @@ public class ConstraintTools {
             if (srcInfo != null) {
                 out.addAll(srcInfo);
             }
-            out.addAll(lines);
+            if (!inNestedScope && !atTop) {
+                // At the circuit's top scope, get_ports names the circuit's own ports. Inside the
+                // design, those are the pins of the black box, which get_ports only returns when
+                // told to look in the current instance
+                for (String cmdLine : lines) {
+                    out.add(cmdLine.startsWith("#") ? cmdLine
+                            : UNSCOPED_GET_PORTS.matcher(cmdLine).replaceAll("get_ports -scoped_to_current_instance"));
+                }
+            } else {
+                out.addAll(lines);
+            }
             if (atTop) {
                 out.add(scope);
             }
