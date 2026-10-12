@@ -71,11 +71,15 @@ public class ConstraintTools {
     }
 
     /**
-     * Adds the constraints of the circuits that filled black boxes, which
-     * {@link com.xilinx.rapidwright.design.DesignTools#populateBlackBox(Design, Map, boolean)} does not
-     * carry over, to the design. As Vivado does when it links a reconfigurable module into its
-     * partition, each circuit's {@link ConstraintGroup#EARLY} and {@link ConstraintGroup#LATE}
-     * constraints are added to the same group of the design, scoped to the circuit's cell with
+     * Adds the constraints of the circuits that filled black boxes to the design, as Vivado does
+     * when it reads a checkpoint into a cell ({@code read_checkpoint -cell}) or links a
+     * reconfigurable module into its partition.
+     * {@link com.xilinx.rapidwright.design.DesignTools#populateBlackBox(Design, Map, boolean)} calls
+     * this once the boxes are filled, so only a design filled some other way needs to call it;
+     * calling it again adds the constraints a second time.
+     * <p>
+     * Each circuit's {@link ConstraintGroup#EARLY} and {@link ConstraintGroup#LATE} constraints are
+     * added to the same group of the design, scoped to the circuit's cell with
      * {@code current_instance}. The circuit's {@link ConstraintGroup#NORMAL} constraints (which
      * create its own pblock) and {@link ConstraintGroup#IN_CONTEXT} constraints (which describe the
      * shell it was implemented in) are not added.
@@ -105,7 +109,8 @@ public class ConstraintTools {
      * @param design     The design whose black boxes were filled.
      * @param blackBoxes The circuits that filled them, keyed by the hierarchical name of each black
      *                   box, as given to populateBlackBox().
-     * @return The number of commands added.
+     * @return The number of the circuits' commands kept. The {@code current_instance} commands that
+     *         scope them, and the {@code src_info} that precedes each, are not counted.
      */
     public static int addBlackBoxConstraints(Design design, Map<String, Design> blackBoxes) {
         Set<String> topPorts = new HashSet<>();
@@ -125,8 +130,8 @@ public class ConstraintTools {
             // The partition's own pblock is the one the circuit adds its top cell to
             Set<String> ownPblocks = new HashSet<>();
             for (ConstraintGroup cg : ConstraintGroup.values()) {
-                for (String line : cell.getXDCConstraints(cg)) {
-                    Matcher m = ADD_TOP_TO_PBLOCK.matcher(line.trim());
+                for (List<String> lines : splitCommands(cell.getXDCConstraints(cg))) {
+                    Matcher m = ADD_TOP_TO_PBLOCK.matcher(joinLines(lines));
                     if (m.find()) {
                         ownPblocks.add(m.group(1));
                     }
@@ -137,7 +142,9 @@ public class ConstraintTools {
                 if (xdc.isEmpty()) continue;
                 int[] count = new int[1];
                 List<String> scoped = scopeBlackBoxConstraints(e.getKey(), design.getNetlist(), topPorts,
-                        ownPblocks, xdc, count);
+                        ownPblocks, splitCommands(xdc), count);
+                // Nothing was kept, so the scoping around it is not needed either
+                if (count[0] == 0) continue;
                 design.addXDCConstraint(cg, scoped.toArray(new String[0]));
                 added += count[0];
             }
@@ -150,6 +157,73 @@ public class ConstraintTools {
 
     private static final Pattern GET_PORTS =
             Pattern.compile("get_ports\\s+(?:-quiet\\s+)?(?:\\{([^}]*)\\}|([^\\]\\s]+))");
+
+    private static final Pattern TCL_SPECIAL = Pattern.compile("[\\s\\[\\]{}$\\\\\";]");
+
+    /**
+     * Groups constraints into commands, each with the lines that it continues onto by ending in a
+     * backslash.
+     */
+    private static List<List<String>> splitCommands(List<String> xdc) {
+        List<List<String>> cmds = new ArrayList<>();
+        List<String> lines = new ArrayList<>();
+        for (String line : xdc) {
+            lines.add(line);
+            if (line.endsWith("\\")) continue;
+            cmds.add(lines);
+            lines = new ArrayList<>();
+        }
+        if (!lines.isEmpty()) {
+            cmds.add(lines);
+        }
+        return cmds;
+    }
+
+    /**
+     * @return The lines of a command joined into one, each continuation replaced by a space, as
+     *         Tcl does.
+     */
+    private static String joinLines(List<String> lines) {
+        StringBuilder sb = new StringBuilder();
+        for (String line : lines) {
+            if (line.endsWith("\\")) {
+                line = line.substring(0, line.length() - 1);
+            }
+            if (sb.length() > 0) {
+                sb.append(' ');
+            }
+            sb.append(line.trim());
+        }
+        return sb.toString();
+    }
+
+    /**
+     * @return The name as a single Tcl word: unchanged if Tcl takes it literally; otherwise braced,
+     *         as Vivado writes such names, or if it has braces or backslashes of its own, with each
+     *         special character escaped.
+     */
+    private static String tclWord(String name) {
+        if (!TCL_SPECIAL.matcher(name).find()) return name;
+        if (name.indexOf('{') < 0 && name.indexOf('}') < 0 && name.indexOf('\\') < 0) {
+            return "{" + name + "}";
+        }
+        return TCL_SPECIAL.matcher(name).replaceAll("\\\\$0");
+    }
+
+    /**
+     * @return The value of a Tcl word: without the braces or quotes around it, and with any
+     *         backslash escapes resolved.
+     */
+    private static String tclUnquote(String word) {
+        int len = word.length();
+        if (len >= 2 && word.charAt(0) == '{' && word.charAt(len - 1) == '}') {
+            return word.substring(1, len - 1);
+        }
+        if (len >= 2 && word.charAt(0) == '"' && word.charAt(len - 1) == '"') {
+            word = word.substring(1, len - 1);
+        }
+        return word.replaceAll("\\\\(.)", "$1");
+    }
 
     /**
      * @return True if a command names ports with get_ports, all of them top-level ports.
@@ -195,56 +269,49 @@ public class ConstraintTools {
      * @param netlist    The design's netlist, with the black box filled.
      * @param topPorts   The names of the design's top-level ports, and of each of their bits.
      * @param ownPblocks The pblocks that the circuit adds its top cell to.
-     * @param xdc        The circuit's constraints.
+     * @param cmds       The circuit's constraints, as split by {@link #splitCommands(List)}.
      * @param count      Its first element is incremented for each command kept.
      * @return The scoped constraints.
      */
     private static List<String> scopeBlackBoxConstraints(String cellName, EDIFNetlist netlist,
-            Set<String> topPorts, Set<String> ownPblocks, List<String> xdc, int[] count) {
-        List<String> out = new ArrayList<>(xdc.size() + 2);
-        out.add("current_instance " + cellName);
+            Set<String> topPorts, Set<String> ownPblocks, List<List<String>> cmds, int[] count) {
+        String scope = "current_instance " + tclWord(cellName);
+        List<String> out = new ArrayList<>();
+        out.add(scope);
         boolean inForeignScope = false;
         boolean inNestedScope = false;
-        String pendingSrcInfo = null;
-        StringBuilder cmd = new StringBuilder();
-        List<String> cmdLines = new ArrayList<>();
-        for (String line : xdc) {
-            cmdLines.add(line);
-            cmd.append(line).append('\n');
-            // A command continues onto the next line
-            if (line.endsWith("\\")) continue;
-            String t = cmd.toString().trim();
-            cmd.setLength(0);
-            List<String> lines = new ArrayList<>(cmdLines);
-            cmdLines.clear();
+        List<String> pendingSrcInfo = null;
+        for (List<String> lines : cmds) {
+            String t = joinLines(lines);
 
             // The src_info of a command precedes it
             if (t.startsWith("set_property src_info ")) {
-                pendingSrcInfo = String.join("\n", lines);
+                pendingSrcInfo = lines;
                 continue;
             }
-            String srcInfo = pendingSrcInfo;
+            List<String> srcInfo = pendingSrcInfo;
             pendingSrcInfo = null;
             if (t.equals("current_instance -quiet") || t.equals("current_instance")) {
                 // Back to the circuit's top, which is the black box
                 inForeignScope = false;
                 inNestedScope = false;
                 out.add("current_instance -quiet");
-                out.add("current_instance " + cellName);
+                out.add(scope);
                 continue;
             }
             if (t.startsWith("current_instance ") && !t.substring(17).trim().startsWith("-")) {
-                String path = t.substring(17).trim();
-                inForeignScope = netlist.getHierCellInstFromName(cellName + "/" + path) == null;
+                // Vivado braces a path with characters such as [ ] in it
+                String path = cellName + "/" + tclUnquote(t.substring(17).trim());
+                inForeignScope = netlist.getHierCellInstFromName(path) == null;
                 inNestedScope = true;
                 if (!inForeignScope) {
                     out.add("current_instance -quiet");
-                    out.add("current_instance " + cellName + "/" + path);
+                    out.add("current_instance " + tclWord(path));
                 }
                 continue;
             }
             boolean drop = inForeignScope
-                    || (srcInfo != null && srcInfo.contains("save:NONE"))
+                    || (srcInfo != null && joinLines(srcInfo).contains("save:NONE"))
                     || t.startsWith("set_property SRC_FILE_INFO ")
                     || modifiesPblock(t, ownPblocks)
                     || (t.contains("HD.RECONFIGURABLE") && t.contains("[current_design]"));
@@ -255,11 +322,11 @@ public class ConstraintTools {
                 out.add("current_instance -quiet");
             }
             if (srcInfo != null) {
-                out.add(srcInfo);
+                out.addAll(srcInfo);
             }
             out.addAll(lines);
             if (atTop) {
-                out.add("current_instance " + cellName);
+                out.add(scope);
             }
         }
         out.add("current_instance -quiet");
