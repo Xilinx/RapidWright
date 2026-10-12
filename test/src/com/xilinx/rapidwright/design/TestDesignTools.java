@@ -1441,6 +1441,63 @@ public class TestDesignTools {
                 + " instance.", e.getMessage());
     }
 
+    /**
+     * A static shell can hold site instances in a reconfigurable partition's region that do nothing
+     * but lock the site's BELs, with placeholder cells. A circuit filling the black box has its own
+     * site instances on those sites, which must take their place. A site instance holding anything
+     * else, such as another cell or site routing without a net, is still an overlap.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"onlyLocked", "otherCell", "nullNetSitePIP"})
+    public void testPopulateBlackBoxReplacesLockedSites(String shellSite) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", createBlackBox(top, "bb", EDIFDirection.INPUT));
+        Net inNet = design.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+
+        Site site = design.getDevice().getSite("SLICE_X1Y0");
+        SiteInst locked = design.createSiteInst(site);
+        for (String belName : new String[] {"A6LUT", "B6LUT", "AFF"}) {
+            locked.addCell(new Cell(Cell.LOCKED, locked.getBEL(belName)));
+        }
+        if (shellSite.equals("otherCell")) {
+            design.createAndPlaceCell(top, "other", Unisim.LUT1, site.getName() + "/C6LUT");
+        } else if (shellSite.equals("nullNetSitePIP")) {
+            locked.addSitePIP("FFMUXA1", "D6");
+            Assertions.assertTrue(locked.getSiteWireToNetMap().isEmpty());
+        }
+
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet circuitIn = circuitTop.createNet("I");
+        circuitIn.createPortInst(circuitTop.getPort("I"));
+        SitePinInst lutIn = addSinkLUT(circuit, circuitTop, "lut", site.getName(), circuitIn,
+                circuit.createNet("I"));
+        SiteInst incoming = lutIn.getSiteInst();
+        for (String belName : new String[] {"B6LUT", "AFF"}) {
+            incoming.addCell(new Cell(Cell.LOCKED, incoming.getBEL(belName)));
+        }
+
+        if (!shellSite.equals("onlyLocked")) {
+            RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                    () -> DesignTools.populateBlackBox(design, "bb", circuit));
+            Assertions.assertTrue(e.getMessage().startsWith("ERROR: Site overlap at SLICE_X1Y0"),
+                    e.getMessage());
+            return;
+        }
+
+        populateBlackBox(design, "bb", circuit, false);
+
+        Assertions.assertSame(incoming, design.getSiteInstFromSite(site));
+        // Both are named after the site, so they are told apart by identity
+        Assertions.assertSame(incoming, design.getSiteInst(site.getName()));
+        Assertions.assertNull(locked.getDesign());
+        Assertions.assertNotNull(design.getCell("bb/lut"));
+        Assertions.assertSame(inNet, lutIn.getNet());
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"DX", "D_I"})
     public void testGetTrimmablePIPsFromPins(String pinName) {
