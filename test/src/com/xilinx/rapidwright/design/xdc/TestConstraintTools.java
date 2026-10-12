@@ -133,12 +133,19 @@ public class TestConstraintTools {
                 "set_property SRC_FILE_INFO {cfile:a.xdc rfile:a.xdc id:1} [current_design]",
                 "set_property MAX_FANOUT 5 \\",
                 "    [get_nets m]");
-        circuit.addXDCConstraint(ConstraintGroup.LATE, "set_property IOSTANDARD LVCMOS12 [get_ports local]");
+        circuit.addXDCConstraint(ConstraintGroup.LATE,
+                "set_property IOSTANDARD LVCMOS12 [get_ports local]",
+                "set_false_path -from [get_clocks -of [get_ports clk]] -through [get_pins sub/y/Q]",
+                "set_property KEEP true [get_ports -scoped_to_current_instance already]",
+                "current_instance sub",
+                "set_false_path -through [get_ports -scoped_to_current_instance -no_traverse src_arst]",
+                "set_property DONT_TOUCH true [get_ports p]",
+                "current_instance -quiet");
         circuit.addXDCConstraint(ConstraintGroup.IN_CONTEXT, "create_clock -period 10 [get_ports clk]");
 
         Map<String, Design> blackBoxes = Collections.singletonMap("rp", circuit);
         DesignTools.populateBlackBox(design, blackBoxes, false);
-        Assertions.assertEquals(5, ConstraintTools.addBlackBoxConstraints(design, blackBoxes));
+        Assertions.assertEquals(9, ConstraintTools.addBlackBoxConstraints(design, blackBoxes));
 
         List<String> early = Arrays.asList(
                 "current_instance rp",
@@ -160,9 +167,19 @@ public class TestConstraintTools {
                 "    [get_nets m]",
                 "current_instance -quiet");
         Assertions.assertEquals(early, design.getXDCConstraints(ConstraintGroup.EARLY));
+        // At the circuit's top scope, get_ports of the circuit's own ports is told to look in the
+        // current instance; in a scope nested below it, get_ports is left as it is
         Assertions.assertEquals(Arrays.asList(
                 "current_instance rp",
-                "set_property IOSTANDARD LVCMOS12 [get_ports local]",
+                "set_property IOSTANDARD LVCMOS12 [get_ports -scoped_to_current_instance local]",
+                "set_false_path -from [get_clocks -of [get_ports -scoped_to_current_instance clk]] -through [get_pins sub/y/Q]",
+                "set_property KEEP true [get_ports -scoped_to_current_instance already]",
+                "current_instance -quiet",
+                "current_instance rp/sub",
+                "set_false_path -through [get_ports -scoped_to_current_instance -no_traverse src_arst]",
+                "set_property DONT_TOUCH true [get_ports p]",
+                "current_instance -quiet",
+                "current_instance rp",
                 "current_instance -quiet"), design.getXDCConstraints(ConstraintGroup.LATE));
         Assertions.assertTrue(design.getXDCConstraints(ConstraintGroup.NORMAL).isEmpty());
         Assertions.assertTrue(design.getXDCConstraints(ConstraintGroup.IN_CONTEXT).isEmpty());
