@@ -145,6 +145,12 @@ public class ConstraintTools {
                         ownPblocks, splitCommands(xdc), count);
                 // Nothing was kept, so the scoping around it is not needed either
                 if (count[0] == 0) continue;
+                // The design's own constraints can leave a cell as the current instance, which
+                // the black box's name would then be looked up under, so return to the top first
+                List<String> existing = design.getXDCConstraints(cg);
+                if (!existing.isEmpty() && !existing.get(existing.size() - 1).trim().equals("current_instance -quiet")) {
+                    design.addXDCConstraint(cg, "current_instance -quiet");
+                }
                 design.addXDCConstraint(cg, scoped.toArray(new String[0]));
                 added += count[0];
             }

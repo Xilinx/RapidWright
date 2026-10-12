@@ -175,6 +175,43 @@ public class TestConstraintTools {
         Assertions.assertEquals(twice, design.getXDCConstraints(ConstraintGroup.EARLY));
     }
 
+    /**
+     * The design's own constraints can end with a cell as the current instance. The black box's
+     * constraints then start by returning to the top, since its name is relative to the design's top.
+     */
+    @Test
+    public void testAddBlackBoxConstraintsAfterDesignScope() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFCell rpType = new EDIFCell(top.getLibrary(), "rpType");
+        rpType.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCellInst rp = rpType.createCellInst("rp", top);
+        rp.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+        design.addXDCConstraint(ConstraintGroup.EARLY,
+                "current_instance shell_ip",
+                "set_property KEEP true [get_cells x]");
+
+        Design circuit = new Design("circuit", "xcvu3p");
+        circuit.getTopEDIFCell().createPort("I", EDIFDirection.INPUT, 1);
+        circuit.addXDCConstraint(ConstraintGroup.EARLY, "set_property MAX_FANOUT 10 [get_nets n]");
+        circuit.addXDCConstraint(ConstraintGroup.LATE, "set_property MAX_FANOUT 5 [get_nets m]");
+
+        DesignTools.populateBlackBox(design, Collections.singletonMap("rp", circuit), false);
+
+        Assertions.assertEquals(Arrays.asList(
+                "current_instance shell_ip",
+                "set_property KEEP true [get_cells x]",
+                "current_instance -quiet",
+                "current_instance rp",
+                "set_property MAX_FANOUT 10 [get_nets n]",
+                "current_instance -quiet"), design.getXDCConstraints(ConstraintGroup.EARLY));
+        // Nothing to return from in a group the design has no constraints in
+        Assertions.assertEquals(Arrays.asList(
+                "current_instance rp",
+                "set_property MAX_FANOUT 5 [get_nets m]",
+                "current_instance -quiet"), design.getXDCConstraints(ConstraintGroup.LATE));
+    }
+
     @Test
     public void testAddBlackBoxConstraintsTclNames() {
         Design design = new Design("shell", "xcvu3p");
