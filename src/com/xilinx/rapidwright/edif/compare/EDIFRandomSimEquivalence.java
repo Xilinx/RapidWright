@@ -607,11 +607,18 @@ public class EDIFRandomSimEquivalence {
     private static final Pattern VERILOG_NUMBER = Pattern.compile(
             "(\\d+)'([bBhHdD])([0-9a-fA-F_]+)");
 
-    /** @return The value of a property, numbers in a canonical form. */
+    /**
+     * @return The value of a property in a canonical form: numbers by value, booleans ignoring
+     * case, anything else (e.g. file names) exactly.
+     */
     private static String normalize(String value) {
-        Matcher m = VERILOG_NUMBER.matcher(value.trim());
+        String v = value.trim();
+        if (v.equalsIgnoreCase("TRUE") || v.equalsIgnoreCase("FALSE")) {
+            return v.toUpperCase();
+        }
+        Matcher m = VERILOG_NUMBER.matcher(v);
         if (!m.matches()) {
-            return value.trim().toUpperCase();
+            return value;
         }
         char base = Character.toLowerCase(m.group(2).charAt(0));
         int radix = base == 'b' ? 2 : base == 'h' ? 16 : 10;

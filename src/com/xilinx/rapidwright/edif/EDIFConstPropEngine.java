@@ -176,6 +176,8 @@ class EDIFConstPropEngine {
     final int[] pinMovedTo;
     /** Pins moved onto each net (pinMovedTo[p] == n), allocated on the first move. */
     private IntList[] movedIn;
+    /** Position of each moved pin in its movedIn list. */
+    private int[] movedPos;
     /** Number of live loads (see isLiveSink) of each alias group, indexed by its root. */
     private final int[] loadCount;
     final Lut[] lut;
@@ -426,20 +428,28 @@ class EDIFConstPropEngine {
     /** Moves pin p onto net target. */
     private void movePin(int p, int target) {
         countLoad(p, -1);
+        if (movedIn == null) {
+            movedIn = new IntList[numNets];
+            movedPos = new int[idx.getNumPins()];
+        }
         int old = pinMovedTo[p];
         if (old >= 0) {
-            movedIn[old].removeValue(p);
+            // Constant-time removal: the last pin of the list takes its place
+            IntList list = movedIn[old];
+            int last = list.pop();
+            if (last != p) {
+                list.set(movedPos[p], last);
+                movedPos[last] = movedPos[p];
+            }
         }
         if (target == idx.getPinNet(p)) {
             pinMovedTo[p] = -1;
         } else {
             pinMovedTo[p] = target;
-            if (movedIn == null) {
-                movedIn = new IntList[numNets];
-            }
             if (movedIn[target] == null) {
                 movedIn[target] = new IntList();
             }
+            movedPos[p] = movedIn[target].size();
             movedIn[target].add(p);
         }
         countLoad(p, 1);
@@ -543,6 +553,11 @@ class EDIFConstPropEngine {
             }
         }
         for (int p = 0; p < idx.getNumPins(); p++) {
+            int t = pinMovedTo[p];
+            if (t >= 0 && movedIn[t].get(movedPos[p]) != p) {
+                throw new IllegalStateException("Pin " + idx.getPinName(p) + " misplaced in the "
+                        + "pins moved onto net " + t);
+            }
             if (homeNet(p) >= 0 && seen[p] != 1) {
                 throw new IllegalStateException("Pin " + idx.getPinName(p) + " visited "
                         + seen[p] + " times");

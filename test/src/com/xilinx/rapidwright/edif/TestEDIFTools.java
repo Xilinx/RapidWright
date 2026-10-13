@@ -724,7 +724,10 @@ public class TestEDIFTools {
                 () -> inverterPairPartialAbsorption("A", "B"),
                 () -> inverterPairPartialAbsorption("B", "A"),
                 () -> inverterChainToReset("I0", "I1"),
-                () -> inverterChainToReset("I1", "I0")));
+                () -> inverterChainToReset("I1", "I0"),
+                () -> inverterPairManyLoads("A", "B", 20),
+                () -> inverterPairManyLoads("B", "A", 20),
+                TestEDIFTools::inverterIntoChild));
     }
 
     @ParameterizedTest
@@ -797,6 +800,72 @@ public class TestEDIFTools {
         Assertions.assertEquals(0, eq.check(s.get(), back, 4), eq.getExamples().toString());
     }
 
+    /**
+     * Top-level inverter A drives a flip-flop and inverter B inside a child instance, B drives
+     * output o (o = a).
+     */
+    private static EDIFNetlist inverterIntoChild() {
+        OptProbes.B b = new OptProbes.B("inv_into_child");
+        b.in("clk", "a");
+        b.out("o", "q");
+        EDIFCell sub = b.cell("sub");
+        b.in(sub, "x");
+        b.out(sub, "z");
+        b.lut(sub, "B", "1", "z", "x");
+        b.lut("A", "1", "n", "a");
+        b.fdre("F", "n", "1", "0", "q", "0");
+        b.inst(sub, "u", "x=n", "z=o");
+        return b.nl;
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testOptimizePartialInverterAbsorptionIntoChild(boolean sweep) {
+        // B absorbs A's inversion and becomes a buffer of 'a', which must be routed into 'u'
+        EDIFOptOptions opts = new EDIFOptOptions().setSweep(sweep);
+        EDIFNetlist netlist = inverterIntoChild();
+        EDIFTools.optimizeNetlist(netlist, opts);
+        EDIFCell top = netlist.getTopCell();
+        Assertions.assertNotNull(top.getCellInst("u"));
+        Assertions.assertNotNull(top.getInternalNet("o"));
+        assertOptimizedEquivalent(TestEDIFTools::inverterIntoChild, opts);
+    }
+
+    /**
+     * Two inverters in series; each partially absorbs into many LUT loads (the same loads move
+     * twice).
+     */
+    private static EDIFNetlist inverterPairManyLoads(String first, String second, int loads) {
+        OptProbes.B b = new OptProbes.B("inv_pair_loads");
+        b.in("clk", "a", "b");
+        b.out("q0", "q1");
+        b.lut(first, "1", "n", "a");
+        b.lut(second, "1", "m", "n");
+        // Loads that cannot absorb an inversion keep both inverters
+        b.fdre("F0", "n", "1", "0", "q0", "0");
+        b.fdre("F1", "m", "1", "0", "q1", "0");
+        for (int i = 0; i < loads; i++) {
+            b.lut("L" + i, "8", "d" + i, "m", "b");
+        }
+        return b.nl;
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testInverterAbsorptionIsLinearInMovedPins(boolean swapNames) {
+        int loads = 250000;
+        EDIFNetlist netlist = inverterPairManyLoads(swapNames ? "B" : "A", swapNames ? "A" : "B",
+                loads);
+        EDIFOptStats stats = EDIFTools.propagateConstants(netlist);
+        // Every load reads 'a' through an absorbed double inversion
+        EDIFCellInst l0 = netlist.getTopCell().getCellInst("L0");
+        Assertions.assertEquals("a", l0.getPortInst("I0").getNet().getName());
+        Assertions.assertEquals("4'h8", l0.getProperty("INIT").getValue());
+        // A quadratic update of the moved pins takes several seconds here
+        Assertions.assertTrue(stats.getTimes().get("Constant propagation") < 2_000_000_000L,
+                stats.getTimes().toString());
+    }
+
     @Test
     public void testSweepIsLinearInFanout() {
         // One surviving flip-flop drives many dead LUTs
@@ -845,6 +914,17 @@ public class TestEDIFTools {
         fdse.out("q");
         fdse.inst(Unisim.FDSE, "F", "C=clk", "D=a", "CE=1", "S=r", "Q=q", "@INIT=1'b0");
         Assertions.assertTrue(new EDIFRandomSimEquivalence().check(ff.get(), fdse.nl, 2) > 0);
+        // A surviving memory reads another initialization file (paths are case-sensitive)
+        Supplier<EDIFNetlist> ram = () -> {
+            OptProbes.B b = new OptProbes.B("ram_check");
+            b.in("clk");
+            b.inst(Unisim.RAMB18E5, "M", "CLKARDCLK=clk", "@INIT_FILE=/tmp/a.mem");
+            return b.nl;
+        };
+        EDIFNetlist otherFile = ram.get();
+        otherFile.getTopCell().getCellInst("M").addProperty("INIT_FILE", "/tmp/A.mem");
+        Assertions.assertTrue(new EDIFRandomSimEquivalence().check(ram.get(), otherFile, 2) > 0);
+        Assertions.assertEquals(0, new EDIFRandomSimEquivalence().check(ram.get(), ram.get(), 2));
     }
 
     @Test

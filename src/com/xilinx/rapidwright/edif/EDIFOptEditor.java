@@ -285,20 +285,17 @@ class EDIFOptEditor {
         return sb.append(hex).toString();
     }
 
-    /** Finds the name of a local net in hierarchical instance h that belongs to physical net n. */
-    private String localNet(int n, int h) {
+    /**
+     * Finds the name of a local net in hierarchical instance h that belongs to physical net n
+     * itself. Nets aliased into n by the analysis are deliberately not considered: they are only
+     * joined to n by the merges this lookup serves to create, so using one could merge a net into
+     * itself (or into another net not yet joined to n) instead of connecting it to n.
+     */
+    private String ownLocalNet(int n, int h) {
         for (int i = idx.getNetSegStart(n); i < idx.getNetSegEnd(n); i++) {
             int s = idx.getNetSeg(i);
             if (idx.getSegHier(s) == h) {
                 return idx.getSegEDIFNet(s).getName();
-            }
-        }
-        if (e.aliasChildren[n] != null) {
-            for (int i = 0; i < e.aliasChildren[n].size(); i++) {
-                String name = localNet(e.aliasChildren[n].get(i), h);
-                if (name != null) {
-                    return name;
-                }
             }
         }
         return null;
@@ -306,8 +303,9 @@ class EDIFOptEditor {
 
     /**
      * @return The name of the net that leaf pin p connects to after optimization, in the cell of
-     * its leaf: its own net if that is still in the same alias group, else a net of the group it
-     * was moved to (routed into the cell if needed). Null if unconnected.
+     * its leaf: its own net if it is still in the same alias group (the merges join it to the
+     * group root), else a net of the root of the group it was moved to, routed into the cell if
+     * needed. Null if unconnected.
      */
     private String currentNetName(int p) {
         int n = e.pinNet(p);
@@ -326,7 +324,7 @@ class EDIFOptEditor {
 
     private String available(int n, int h) {
         String name = routed.get(((long) n << 32) | h);
-        return name != null ? name : localNet(n, h);
+        return name != null ? name : ownLocalNet(n, h);
     }
 
     private static int depth(EDIFLeafIndex idx, int h) {
@@ -338,8 +336,9 @@ class EDIFOptEditor {
     }
 
     /**
-     * Returns the name of a net in hierarchical instance h that belongs to physical net n,
-     * creating ports and nets through the hierarchy if n does not reach h yet.
+     * Returns the name of a net in hierarchical instance h that is connected to physical net n
+     * (an alias group root) in the edited netlist: a segment of n itself, or a net routed from
+     * one through new ports and nets.
      */
     String netIn(int n, int h) {
         String local = available(n, h);
