@@ -53,6 +53,7 @@ import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
@@ -854,9 +855,6 @@ public class EDIFNetlist extends EDIFName {
         return getLibrariesInExportOrder(stable, true);
     }
 
-    /** Number of cell instances visited by each task when finding library dependencies */
-    private static final int INSTS_PER_DEPENDENCY_TASK = 1 << 16;
-
     /**
      * Topologically sorts the libraries (Kahn's algorithm) so that each library comes after
      * the libraries it instantiates cells from.  Among libraries that are ready at the same time,
@@ -887,31 +885,6 @@ public class EDIFNetlist extends EDIFName {
         for (int i = 0; i < libs.size(); i++) {
             libIdx.put(libs.get(i), i);
         }
-        // Visiting every cell instance dominates the runtime for large netlists, so cells are
-        // visited in parallel, in chunks with similar numbers of instances
-        List<Pair<Integer, List<EDIFCell>>> chunks = new ArrayList<>();
-        for (int i = 0; i < libs.size(); i++) {
-            List<EDIFCell> chunk = new ArrayList<>();
-            int chunkInsts = 0;
-            for (EDIFCell cell : libs.get(i).getCells()) {
-                if (chunkInsts >= INSTS_PER_DEPENDENCY_TASK) {
-                    chunks.add(new Pair<>(i, chunk));
-                    chunk = new ArrayList<>();
-                    chunkInsts = 0;
-                }
-                chunk.add(cell);
-                chunkInsts += cell.getCellInsts().size();
-            }
-            if (!chunk.isEmpty()) {
-                chunks.add(new Pair<>(i, chunk));
-            }
-        }
-        List<Set<EDIFLibrary>> chunkRefs = ParallelismTools.invokeAll(chunks, chunk -> {
-            Set<EDIFLibrary> refs = new HashSet<>();
-            libs.get(chunk.getFirst()).addExternallyReferencedLibraries(chunk.getSecond(), refs);
-            return refs;
-        });
-
         int[] depCount = new int[libs.size()];
         List<Set<Integer>> deps = new ArrayList<>(libs.size());
         List<List<Integer>> dependents = new ArrayList<>(libs.size());
@@ -919,10 +892,13 @@ public class EDIFNetlist extends EDIFName {
             deps.add(new HashSet<>());
             dependents.add(new ArrayList<>());
         }
-        for (int c = 0; c < chunks.size(); c++) {
-            int i = chunks.get(c).getFirst();
-            for (EDIFLibrary ref : chunkRefs.get(c)) {
-                if (ref == null) continue;
+        for (int i = 0; i < libs.size(); i++) {
+            EDIFLibrary lib = libs.get(i);
+            // Visiting every cell instance dominates the runtime for large netlists, so each library's cells are
+            // visited in parallel
+            Set<EDIFLibrary> refs = ConcurrentHashMap.newKeySet();
+            ParallelismTools.forEach(lib.getCells(), cell -> lib.addExternallyReferencedLibraries(cell, refs));
+            for (EDIFLibrary ref : refs) {
                 // A cell can refer to a library that is not in this netlist (such as one of
                 // Design.getPrimitivesLibrary()'s cells), which no library here can satisfy, so
                 // only the libraries in this netlist are waited for
