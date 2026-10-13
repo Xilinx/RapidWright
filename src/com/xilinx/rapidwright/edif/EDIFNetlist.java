@@ -963,6 +963,18 @@ public class EDIFNetlist extends EDIFName {
     public static final byte[] EXPORT_CONST_CLOSE_EDIF = ")\n".getBytes(StandardCharsets.UTF_8);
 
 
+    /**
+     * Write this netlist as EDIF to the given stream, which is closed afterwards. If parallel processing is enabled and
+     * the stream is that of a DCP being written (see {@link ParallelDCPOutput#cast}), the EDIF is written and
+     * compressed in parallel.
+     * @param out The stream to write to.
+     * @param stable If true, the output is the same each time for the same netlist: the date is fixed, and libraries,
+     *               cells, their contents and properties are written in sorted order. Except when written in
+     *               parallel: then, this applies only to the date, the order of libraries and the netlist's and
+     *               design's properties (cells are written in an unsorted valid order, with unsorted contents), and
+     *               names that are made legal as the same EDIF identifier may be told apart differently each time
+     *               (see {@link EDIFWriteLegalNameCache}).
+     */
     public void exportEDIF(OutputStream out, boolean stable) throws IOException {
         try (BufferedOutputStream os = new BufferedOutputStream(out)) {
             final ParallelDCPOutput dos = ParallelismTools.getParallel() ?
