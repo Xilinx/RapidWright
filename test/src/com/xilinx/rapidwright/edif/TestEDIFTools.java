@@ -33,16 +33,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.eco.ECOTools;
+import com.xilinx.rapidwright.edif.compare.EDIFLeafNetlistComparator;
+import com.xilinx.rapidwright.edif.compare.EDIFRandomSimEquivalence;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Params;
@@ -499,5 +504,245 @@ public class TestEDIFTools {
         Path loadScript = dir.resolve(outputName + EDIFTools.LOAD_TCL_SUFFIX);
         d.writeCheckpoint(dir.resolve(outputName + ".dcp"));
         Assertions.assertFalse(Files.exists(loadScript));
+    }
+
+    // ---------------------------------------------------------------- netlist optimization
+
+    private static Map<String, String> optProbeExpected;
+
+    /** Loads Vivado's opt_design -propconst -sweep results for the probes (leaf dumps). */
+    private static synchronized Map<String, String> getOptProbeExpected() throws Exception {
+        if (optProbeExpected == null) {
+            optProbeExpected = new java.util.HashMap<>();
+            try (java.io.InputStream is = TestEDIFTools.class.getResourceAsStream(
+                    "/edif/opt_probes_expected.txt")) {
+                java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = is.read(buf)) > 0) {
+                    bos.write(buf, 0, n);
+                }
+                String all = new String(bos.toByteArray(), StandardCharsets.UTF_8);
+                for (String section : all.split("### ")) {
+                    int nl = section.indexOf('\n');
+                    if (nl > 0) {
+                        optProbeExpected.put(section.substring(0, nl),
+                                section.substring(nl + 1));
+                    }
+                }
+            }
+        }
+        return optProbeExpected;
+    }
+
+    static Stream<String> optProbeNames() throws Exception {
+        Map<String, String> expected = getOptProbeExpected();
+        return OptProbes.getProbes().keySet().stream().filter(expected::containsKey);
+    }
+
+    private static String dump(EDIFNetlist netlist) {
+        java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+        EDIFLeafNetlistComparator.dump(netlist, new java.io.PrintStream(bos));
+        return bos.toString();
+    }
+
+    @ParameterizedTest
+    @MethodSource("optProbeNames")
+    public void testOptimizeNetlistMatchesVivado(String probe) throws Exception {
+        EDIFNetlist netlist = OptProbes.getProbes().get(probe).get();
+        EDIFTools.optimizeNetlist(netlist, new EDIFOptOptions());
+        Assertions.assertEquals(getOptProbeExpected().get(probe), dump(netlist));
+    }
+
+    static Stream<String> optProbeNamesIdempotent() throws Exception {
+        // Inverter absorption does not re-simplify the absorbing LUT (as in Vivado), so a
+        // second pass may still find something to do
+        return optProbeNames().filter(n -> !n.equals("v2_inv_same_var"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("optProbeNamesIdempotent")
+    public void testOptimizeNetlistIsIdempotent(String probe) {
+        EDIFNetlist netlist = OptProbes.getProbes().get(probe).get();
+        EDIFTools.optimizeNetlist(netlist, new EDIFOptOptions());
+        String first = dump(netlist);
+        EDIFOptStats again = EDIFTools.optimizeNetlist(netlist, new EDIFOptOptions());
+        Assertions.assertEquals(first, dump(netlist));
+        for (EDIFOptStats.Phase phase : EDIFOptStats.Phase.values()) {
+            Assertions.assertEquals(0, again.getCreated(phase));
+            Assertions.assertEquals(0, again.getRemoved(phase));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("optProbeNames")
+    public void testOptimizeNetlistIsEquivalent(String probe) {
+        EDIFNetlist orig = OptProbes.getProbes().get(probe).get();
+        EDIFNetlist opt = OptProbes.getProbes().get(probe).get();
+        EDIFTools.optimizeNetlist(opt, new EDIFOptOptions());
+        EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
+        Assertions.assertEquals(0, eq.check(orig, opt, 4), eq.getExamples().toString());
+    }
+
+    @Test
+    public void testRandomSimEquivalenceDetectsDifference() {
+        EDIFNetlist orig = OptProbes.getProbes().get("lut_chain").get();
+        EDIFNetlist bad = OptProbes.getProbes().get("lut_chain").get();
+        bad.getTopCell().getCellInst("C3").addProperty("INIT", "4'h9");
+        Assertions.assertTrue(new EDIFRandomSimEquivalence().check(orig, bad, 2) > 0);
+    }
+
+    @Test
+    public void testOptimizeLUTRules() {
+        OptProbes.B b = new OptProbes.B("lut_rules");
+        b.in("a", "b", "c");
+        b.out("o", "p");
+        // LUT4 with I2 tied low shrinks to a LUT3 with its remaining pins in order
+        b.lut("L", "6996", "o", "a", "b", "0", "c");
+        // LUT2 AND with I1 tied high is a buffer: removed, its load connects to 'a'
+        b.lut("BF", "8", "m", "a", "1");
+        b.lut("L2", "E", "p", "m", "b");
+        EDIFOptStats stats = EDIFTools.propagateConstants(b.nl);
+        EDIFCellInst l = b.top.getCellInst("L");
+        Assertions.assertEquals("LUT3", l.getCellType().getName());
+        Assertions.assertEquals("8'h96", l.getProperty("INIT").getValue());
+        Assertions.assertEquals("PROPCONST", l.getProperty("OPT_MODIFIED").getValue());
+        Assertions.assertEquals("c", l.getPortInst("I2").getNet().getName());
+        Assertions.assertNull(b.top.getCellInst("BF"));
+        Assertions.assertEquals("a", b.top.getCellInst("L2").getPortInst("I0").getNet().getName());
+        Assertions.assertEquals(1, stats.getCreated(EDIFOptStats.Phase.CONSTANT_PROPAGATION));
+        Assertions.assertEquals(2, stats.getRemoved(EDIFOptStats.Phase.CONSTANT_PROPAGATION));
+    }
+
+    @Test
+    public void testOptimizeFlipFlopRules() {
+        OptProbes.B b = new OptProbes.B("ff_rules");
+        b.in("clk", "a", "r", "ce");
+        b.out("q0", "q1", "q2");
+        // CE low and reset value equal to INIT: constant 0
+        b.fdre("F0", "a", "0", "r", "q0", "0");
+        // CE low but reset can change INIT=1: kept
+        b.fdre("F1", "a", "0", "r", "q1", "1");
+        // D constant equal to INIT, no reset: constant 1
+        b.fdre("F2", "1", "ce", "0", "q2", "1");
+        EDIFTools.propagateConstants(b.nl);
+        Assertions.assertNull(b.top.getCellInst("F0"));
+        Assertions.assertNotNull(b.top.getCellInst("F1"));
+        Assertions.assertNull(b.top.getCellInst("F2"));
+        EDIFNet q0 = b.top.getInternalNet("q0");
+        Assertions.assertTrue(q0.isGND());
+        Assertions.assertTrue(b.top.getInternalNet("q2").isVCC());
+    }
+
+    @Test
+    public void testOptimizeInverterAbsorption() {
+        OptProbes.B b = new OptProbes.B("inv_rules");
+        b.in("clk", "a", "b", "x");
+        b.out("o", "q");
+        b.lut("IV", "1", "n", "a");
+        b.lut("L", "6", "o", "n", "b");
+        b.fdre("F", "x", "1", "n", "q", "0");
+        EDIFTools.propagateConstants(b.nl);
+        // The inverter is absorbed by the LUT (INIT) and the flip-flop reset (IS_R_INVERTED)
+        Assertions.assertNull(b.top.getCellInst("IV"));
+        Assertions.assertEquals("4'h9", b.top.getCellInst("L").getProperty("INIT").getValue());
+        EDIFCellInst f = b.top.getCellInst("F");
+        Assertions.assertEquals("1'b1", f.getProperty("IS_R_INVERTED").getValue());
+        Assertions.assertEquals("a", f.getPortInst("R").getNet().getName());
+    }
+
+    @Test
+    public void testSweepDeadLogicOnly() {
+        EDIFNetlist netlist = OptProbes.getProbes().get("sweep_unloaded").get();
+        EDIFOptStats stats = EDIFTools.sweepDeadLogic(netlist);
+        Assertions.assertEquals(4, stats.getRemoved(EDIFOptStats.Phase.SWEEP));
+        Assertions.assertEquals(1, netlist.getTopCell().getCellInsts().stream()
+                .filter(i -> !i.getCellType().isStaticSource()).count());
+        EDIFNetlist loop = OptProbes.getProbes().get("sweep_loop").get();
+        Assertions.assertEquals(2, EDIFTools.sweepDeadLogic(loop)
+                .getRemoved(EDIFOptStats.Phase.SWEEP));
+    }
+
+    @Test
+    public void testPropagateConstantsDoesNotSweep() {
+        EDIFNetlist netlist = OptProbes.getProbes().get("sweep_unloaded").get();
+        EDIFOptStats stats = EDIFTools.propagateConstants(netlist);
+        Assertions.assertEquals(0, stats.getRemoved(EDIFOptStats.Phase.SWEEP));
+        Assertions.assertNotNull(netlist.getTopCell().getCellInst("D2"));
+    }
+
+    @Test
+    public void testOptimizePreservesDontTouch() {
+        EDIFNetlist netlist = OptProbes.getProbes().get("dont_touch_cell").get();
+        EDIFTools.optimizeNetlist(netlist, new EDIFOptOptions());
+        EDIFCell top = netlist.getTopCell();
+        Assertions.assertEquals("LUT2", top.getCellInst("DT").getCellType().getName());
+        Assertions.assertNotNull(top.getCellInst("DU"));
+        Assertions.assertNotNull(top.getCellInst("DK"));
+    }
+
+    @Test
+    public void testOptimizeUniquifiesOnlyWhenNeeded() {
+        // u0 gets a constant input and u1 does not: u0 needs its own copy of 'sub'
+        EDIFNetlist shared = OptProbes.getProbes().get("hier_const_in_shared").get();
+        EDIFOptStats stats = EDIFTools.optimizeNetlist(shared, new EDIFOptOptions());
+        EDIFCell top = shared.getTopCell();
+        EDIFCell u0 = top.getCellInst("u0").getCellType();
+        EDIFCell u1 = top.getCellInst("u1").getCellType();
+        Assertions.assertNotSame(u0, u1);
+        Assertions.assertEquals("sub", u1.getName());
+        Assertions.assertEquals("sub_HD1", u0.getName());
+        Assertions.assertEquals(2, u1.getCellInsts().size());
+        Assertions.assertEquals(1, stats.getCellsUniquified());
+        // Both instances get the same edit: the definition stays shared
+        EDIFNetlist same = OptProbes.getProbes().get("hier_const_in_same").get();
+        stats = EDIFTools.optimizeNetlist(same, new EDIFOptOptions());
+        Assertions.assertSame(same.getTopCell().getCellInst("u0").getCellType(),
+                same.getTopCell().getCellInst("u1").getCellType());
+        Assertions.assertEquals(0, stats.getCellsUniquified());
+    }
+
+    @Test
+    public void testOptimizeUniquifiesNestedSharedDefinitions() {
+        // top -> m0, m1 (both 'mid') -> l0 ('leafc'); only m0's leaf gets a constant input
+        EDIFNetlist netlist = OptProbes.getProbes().get("hier_nested").get();
+        EDIFNetlist orig = OptProbes.getProbes().get("hier_nested").get();
+        EDIFTools.optimizeNetlist(netlist, new EDIFOptOptions());
+        EDIFCell top = netlist.getTopCell();
+        EDIFCell m1 = top.getCellInst("m1").getCellType();
+        Assertions.assertEquals("mid", m1.getName());
+        Assertions.assertEquals("leafc", m1.getCellInst("l0").getCellType().getName());
+        Assertions.assertEquals("LUT2", m1.getCellInst("l0").getCellType().getCellInst("LL")
+                .getCellType().getName());
+        Assertions.assertEquals(0, new EDIFRandomSimEquivalence().check(orig, netlist, 2));
+    }
+
+    @Test
+    public void testLeafIndexMatchesPhysicalNetPinMap() {
+        EDIFNetlist netlist = OptProbes.getProbes().get("hier_nested").get();
+        EDIFLeafIndex idx = new EDIFLeafIndex(netlist);
+        Map<EDIFHierNet, List<EDIFHierPortInst>> map = netlist.getPhysicalNetPinMap();
+        int leafPins = 0;
+        for (List<EDIFHierPortInst> pins : map.values()) {
+            leafPins += pins.size();
+        }
+        Assertions.assertEquals(leafPins, idx.getNumLeafPins());
+        for (Map.Entry<EDIFHierNet, List<EDIFHierPortInst>> e : map.entrySet()) {
+            int net = -1;
+            for (EDIFHierPortInst hpi : e.getValue()) {
+                String name = hpi.getFullHierarchicalInstName() + "/" + hpi.getPortInst().getName();
+                int found = -1;
+                for (int p = 0; p < idx.getNumLeafPins(); p++) {
+                    if (idx.getPinName(p).equals(name)) {
+                        found = idx.getPinNet(p);
+                    }
+                }
+                Assertions.assertTrue(found >= 0, name);
+                if (net < 0) {
+                    net = found;
+                }
+                Assertions.assertEquals(net, found, name);
+            }
+        }
     }
 }
