@@ -509,20 +509,41 @@ public class ParallelismTools {
         }
         final int size = items.size();
         final int chunkSize = Math.max(1, size / (4 * maxParallelism()));
-        parent.addToPendingCount((size + chunkSize - 1) / chunkSize);
         for (int from = 0; from < size; from += chunkSize) {
             final int start = from;
             final int end = Math.min(size, from + chunkSize);
-            new CountedCompleter<Void>(parent) {
-                @Override
-                public void compute() {
-                    for (int i = start; i < end; i++) {
-                        task.accept(items.get(i));
-                    }
-                    tryComplete();
+            submit(parent, () -> {
+                for (int i = start; i < end; i++) {
+                    task.accept(items.get(i));
                 }
-            }.fork();
+            });
         }
+    }
+
+    /**
+     * Run the specified task without waiting for it, as a child of the given CountedCompleter: so that it only
+     * completes once the task has run, and a thread waiting for it (or any of its completers) runs the task itself if
+     * no other thread has started it. The task is forked to the common ForkJoinPool. If parallel processing is
+     * disabled, the task is instead run immediately, on the calling thread.
+     * If the task throws, the parent (and, unless it is overridden not to, each of its completers) completes
+     * exceptionally; if parallel processing is disabled, the exception is instead thrown immediately.
+     * @param parent The CountedCompleter to run the task as a child of. Its pending count is increased by one; it must
+     *               still call tryComplete() itself, once it has submitted all its children.
+     * @param task The task to run.
+     */
+    public static void submit(@NotNull CountedCompleter<?> parent, @NotNull Runnable task) {
+        if (!getParallel()) {
+            task.run();
+            return;
+        }
+        parent.addToPendingCount(1);
+        new CountedCompleter<Void>(parent) {
+            @Override
+            public void compute() {
+                task.run();
+                tryComplete();
+            }
+        }.fork();
     }
 
     /**
