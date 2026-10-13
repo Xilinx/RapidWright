@@ -32,6 +32,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountedCompleter;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
@@ -40,6 +42,8 @@ import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -155,6 +159,66 @@ public class ParallelismTools {
     }
 
     /**
+     * A CompletableFuture completed by a FutureTask that runs its task: so that, once that FutureTask has been
+     * submitted to the pool, a thread waiting for the CompletableFuture with {@link #get(Future)}, {@link #join(List)}
+     * or {@link #joinFirst(Deque)} can run it itself if no other thread has started it (see
+     * {@link #runIfUnclaimed(Future)}), as for a Future from {@link #submit(Callable)}. A CompletableFuture's own task
+     * (e.g. from CompletableFuture.supplyAsync()) cannot be run that way: the CompletableFuture has no reference to
+     * it, and (unlike a FutureTask) it could run twice if run by a second thread.
+     */
+    private static final class CompletableFutureWithFutureTask<T> extends CompletableFuture<T> {
+        /** Runs the task and completes this, at most once */
+        private final FutureTask<Void> task;
+
+        private CompletableFutureWithFutureTask(Callable<T> callable) {
+            task = new FutureTask<>(() -> {
+                try {
+                    complete(callable.call());
+                } catch (Throwable e) {
+                    completeExceptionally(e);
+                }
+                return null;
+            });
+        }
+    }
+
+    /**
+     * Submit a task-with-return-value to the common ForkJoinPool, as {@link #submit(Callable)} does (so a thread
+     * waiting for it with {@link #get(Future)}, {@link #join(List)} or {@link #joinFirst(Deque)} also runs it itself if
+     * no other thread has started it), but returning a CompletableFuture, so that further work can be chained on its
+     * completion (by default, run by the thread that completes it). Any exception the task throws completes the
+     * CompletableFuture exceptionally.
+     * When parallel processing is disabled, the task is executed immediately on the current thread.
+     * Waiting with the CompletableFuture's own get() or join() does not run the task. (From Java 9, a thread of the
+     * pool that does so helps, within the JDK, which cannot be done from outside it, but only by running
+     * CompletableFutures' own tasks, e.g. from CompletableFuture.supplyAsync(), at the head of its own queue.)
+     * @param task Task to be performed.
+     * @param <T> Type returned by task.
+     * @return A CompletableFuture holding the value returned by task.
+     */
+    public static <T> CompletableFuture<T> submitCompletable(Callable<T> task) {
+        final CompletableFutureWithFutureTask<T> future = new CompletableFutureWithFutureTask<>(task);
+        if (getParallel()) {
+            ForkJoinPool.commonPool().execute(future.task);
+        } else {
+            future.task.run();
+        }
+        return future;
+    }
+
+    /**
+     * Submit a task-without-return-value to the common ForkJoinPool, as {@link #submitCompletable(Callable)} does.
+     * @param task Task to be performed.
+     * @return A CompletableFuture that completes (with null) once task has.
+     */
+    public static CompletableFuture<Void> submitCompletable(Runnable task) {
+        return submitCompletable(() -> {
+            task.run();
+            return null;
+        });
+    }
+
+    /**
      * Block until the task behind the given Future is complete.
      * If the task has not yet been claimed by another thread, steal it for
      * immediate execution on the current thread.
@@ -251,6 +315,37 @@ public class ParallelismTools {
     }
 
     /**
+     * As {@link #invokeFirstSubmitRest(Callable[])}, but returning CompletableFutures, so that further work can be
+     * chained on each task's completion: submit all but the first task with {@link #submitCompletable(Callable)},
+     * then execute that first task with the current thread. Any exception a task throws completes its
+     * CompletableFuture exceptionally.
+     * Unlike invokeFirstSubmitRest(), when parallel processing is disabled, all tasks are executed immediately, in
+     * order, on the current thread (as otherwise work chained on one not yet executed would never run).
+     * @param tasks List of tasks to be executed (if none, an empty List is returned).
+     * @param <T> Type returned by all tasks.
+     * @return A List of CompletableFutures corresponding to each task (in order); the first is complete.
+     */
+    public static <T> List<CompletableFuture<T>> invokeFirstSubmitRestCompletable(
+            @NotNull List<? extends Callable<T>> tasks) {
+        final List<CompletableFuture<T>> futures = new ArrayList<>(tasks.size());
+        if (tasks.isEmpty()) {
+            return futures;
+        }
+        final CompletableFutureWithFutureTask<T> first = new CompletableFutureWithFutureTask<>(tasks.get(0));
+        futures.add(first);
+        if (!getParallel()) {
+            // Before the others, which are then executed immediately too, in order
+            first.task.run();
+        }
+        for (int i = 1; i < tasks.size(); i++) {
+            futures.add(submitCompletable(tasks.get(i)));
+        }
+        // Does nothing if already executed above
+        first.task.run();
+        return futures;
+    }
+
+    /**
      * For a given Deque of Futures, block until the first is complete and
      * remove it from the deque.
      * First, try and steal the task and execute it on this thread. If this
@@ -297,6 +392,45 @@ public class ParallelismTools {
     }
 
     /**
+     * Block until the given CountedCompleter has completed, meanwhile running on this thread any of its descendants
+     * (tasks whose chain of completers leads to it) that no thread has started yet, rather than only blocking.
+     * If it completed exceptionally, that exception is rethrown: the original, rather than the copy (of the same type,
+     * with the original as its cause, and no message of its own) that ForkJoinTask makes of one thrown on another
+     * thread; a checked exception is wrapped in a RuntimeException.
+     * @param completer The CountedCompleter to wait for.
+     */
+    public static void join(@NotNull CountedCompleter<?> completer) {
+        // Each timed wait first helps with any of its descendants that are queued. It is repeated, as a wait that finds
+        // none queued would otherwise block until done, even if more were queued meanwhile. Calling
+        // CountedCompleter.helpComplete() in this loop would be preferred, as it helps without waiting, but it only
+        // exists from Java 9
+        while (!completer.isDone()) {
+            try {
+                completer.get(1, TimeUnit.MILLISECONDS);
+            } catch (TimeoutException | ExecutionException e) {
+                // Not done, so look again for descendants to help with; or done exceptionally, rethrown below
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(e);
+            }
+        }
+        Throwable e = completer.getException();
+        if (e == null) {
+            return;
+        }
+        if (e.getCause() != null && e.getCause().getClass() == e.getClass()) {
+            e = e.getCause();
+        }
+        if (e instanceof RuntimeException) {
+            throw (RuntimeException) e;
+        }
+        if (e instanceof Error) {
+            throw (Error) e;
+        }
+        throw new RuntimeException(e);
+    }
+
+    /**
      * Run a previously submitted task on the current thread, rather than wait
      * for a pool worker to get to it, unless it is already done or another
      * thread has already claimed it.
@@ -307,59 +441,32 @@ public class ParallelismTools {
      * ForkJoinPool does not support for tasks given to execute()): FutureTask.run()
      * does nothing if another thread has already claimed the task, so the pool
      * worker that eventually dequeues it finds it already done, which costs it
-     * very little. Any other Future (e.g. a ForkJoinTask, which, unlike a
-     * FutureTask, could run again if run while another thread is running it) is
-     * left to the thread that runs it.
+     * very little. Likewise for the FutureTask of a
+     * {@link CompletableFutureWithFutureTask}. Any other Future (e.g. a ForkJoinTask,
+     * which, unlike a FutureTask, could run again if run while another thread is
+     * running it) is left to the thread that runs it.
      * @param future Future representing a previously submitted task.
      * @param <T> Type returned by task.
      * @return True if the task is done (whether run by this thread or another),
      *         false if it is not (e.g. another thread is still running it).
      */
     private static <T> boolean runIfUnclaimed(Future<T> future) {
-        if (!future.isDone() && future instanceof FutureTask) {
-            ((FutureTask<T>) future).run();
+        if (!future.isDone()) {
+            if (future instanceof FutureTask) {
+                ((FutureTask<T>) future).run();
+            } else if (future instanceof CompletableFutureWithFutureTask) {
+                ((CompletableFutureWithFutureTask<T>) future).task.run();
+            }
         }
         return future.isDone();
     }
 
     /**
-     * Whether a parallel operation over the given number of items should give each item its
-     * own task, rather than use a parallel stream. A parallel stream divides its items into
-     * roughly four pieces per pool thread, so with fewer items than that each piece is a
-     * single item anyway, and distributing those pieces relies on idle threads stealing them
-     * in time (if one is not stolen before the thread that split it off finishes its own
-     * item, that thread runs it too). Giving each item its own task instead makes all of
-     * them immediately available to any idle pool thread.
-     * @param numItems Number of items.
-     * @return True if each item should be submitted as its own task.
-     */
-    private static boolean oneTaskPerItem(int numItems) {
-        return numItems < 4 * maxParallelism();
-    }
-
-    /**
-     * Create one task per item, applying the given function to that item.
-     * @param items The items.
-     * @param task The function to apply to each item.
-     * @param <T> Item type.
-     * @param <R> Type returned by the function.
-     * @return An array of tasks, in the collection's iteration order.
-     */
-    @SuppressWarnings("unchecked")
-    private static <T,R> Callable<R>[] toCallables(Collection<T> items, Function<T,R> task) {
-        return items.stream()
-                .map(i -> (Callable<R>)() -> task.apply(i))
-                .toArray(value -> (Callable<R>[])new Callable[value]); //Can't create generic arrays, so we need to cast
-    }
-
-    /**
      * Run the specified task on all items, blocking until all have been completed.
-     * When parallel processing is enabled: if there are fewer than four items per
-     * {@link #maxParallelism()} thread, each item is submitted as its own task (as
-     * {@link #invokeAll(Callable[])} does); otherwise a parallel stream is used, where the
-     * calling thread splits the items (using the collection's own Spliterator) into roughly
-     * four pieces per thread of the common ForkJoinPool, which are distributed by work
-     * stealing, and the calling thread also participates.
+     * When parallel processing is enabled, a parallel stream is used, where the calling thread
+     * splits the items (using the collection's own Spliterator) into roughly four pieces per
+     * thread of the common ForkJoinPool (or one per item, if there are fewer), which are
+     * distributed by work stealing, and the calling thread also participates.
      * If the task throws for any item, that exception is rethrown (if thrown on another
      * thread, as a new exception of the same type with the original as its cause, where
      * possible); in that case, the task may not have been run for other items, or may still
@@ -375,14 +482,47 @@ public class ParallelismTools {
             }
             return;
         }
-        if (oneTaskPerItem(items.size())) {
-            invokeAll(toCallables(items, i -> {
-                task.accept(i);
-                return null;
-            }));
+        items.parallelStream().forEach(task);
+    }
+
+    /**
+     * Run the specified task on all items without waiting for it, in chunks that are children of the given
+     * CountedCompleter: so that it only completes once the task has been run on all items, and a thread waiting for it
+     * (or any of its completers) helps run any chunks not yet started. As {@link #forEach(Collection, Consumer)} does,
+     * the items are split into roughly four chunks per {@link #maxParallelism()} thread (or one per item, if there are
+     * fewer), each of which is forked to the common ForkJoinPool. If parallel processing is disabled, the task is
+     * instead run on all items immediately, on the calling thread, with {@link #forEach(Collection, Consumer)}.
+     * If the task throws for any item, the parent (and, unless it is overridden not to, each of its completers)
+     * completes exceptionally; if parallel processing is disabled, the exception is instead thrown immediately.
+     * @param parent The CountedCompleter to run the chunks as children of. Its pending count is increased by the
+     *               number of chunks; it must still call tryComplete() itself, once it has submitted all its children.
+     * @param items The items, whose elements are accessed by index (so should be a random-access list, such as an
+     *              ArrayList), and which must not be modified until the parent has completed.
+     * @param task The task to run on each item.
+     * @param <T> Item type.
+     */
+    public static <T> void submit(@NotNull CountedCompleter<?> parent, @NotNull List<T> items,
+                                  @NotNull Consumer<T> task) {
+        if (!getParallel()) {
+            forEach(items, task);
             return;
         }
-        items.parallelStream().forEach(task);
+        final int size = items.size();
+        final int chunkSize = Math.max(1, size / (4 * maxParallelism()));
+        parent.addToPendingCount((size + chunkSize - 1) / chunkSize);
+        for (int from = 0; from < size; from += chunkSize) {
+            final int start = from;
+            final int end = Math.min(size, from + chunkSize);
+            new CountedCompleter<Void>(parent) {
+                @Override
+                public void compute() {
+                    for (int i = start; i < end; i++) {
+                        task.accept(items.get(i));
+                    }
+                    tryComplete();
+                }
+            }.fork();
+        }
     }
 
     /**
@@ -406,9 +546,8 @@ public class ParallelismTools {
 
     /**
      * Run the specified task on all items, blocking until all have been completed.
-     * When parallel processing is enabled, each item is either submitted as its own task or
-     * processed using a parallel stream, as described for
-     * {@link #forEach(Collection, Consumer)}, including how exceptions are rethrown.
+     * When parallel processing is enabled, the items are processed using a parallel stream, as
+     * described for {@link #forEach(Collection, Consumer)}, including how exceptions are rethrown.
      * @param items the items to call the task with
      * @param task the task that should be executed for all items
      * @param <T> item type
@@ -421,15 +560,6 @@ public class ParallelismTools {
             final List<R> results = new ArrayList<>(items.size());
             for (T item : items) {
                 results.add(task.apply(item));
-            }
-            return results;
-        }
-        if (oneTaskPerItem(items.size())) {
-            // invokeAll() has already waited for all of these to complete
-            final List<Future<R>> futures = invokeAll(toCallables(items, task));
-            final List<R> results = new ArrayList<>(futures.size());
-            for (Future<R> future : futures) {
-                results.add(getUnwrapped(future));
             }
             return results;
         }
