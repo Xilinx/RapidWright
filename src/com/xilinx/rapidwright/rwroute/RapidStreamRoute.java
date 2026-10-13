@@ -32,13 +32,12 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
-import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.ParallelismTools;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -101,40 +100,27 @@ public class RapidStreamRoute extends PartialRouter {
      * @return A Collection of conflicted nets.
      */
     private static Collection<Net> unrouteConflictedNets(Design design, String anchorNameKeyword) {
-        final Map<Node, Collection<Net>> nodeToNet = new ConcurrentHashMap<>();
-        final CountUpDownLatch netsOutstanding = new CountUpDownLatch();
-        for (Net net : design.getNets()) {
-            netsOutstanding.countUp();
-            ParallelismTools.submit(() -> {
-                try {
-                    for (Node node : RouterHelper.getNodesOfNet(net)) {
-                        final Collection<Net> nets = nodeToNet.computeIfAbsent(node, (n) -> new ArrayList<>(1));
-                        synchronized(nets) {
-                            if (!nets.contains(net)) {
-                                // Assume at most two nets (thus ArrayList.contains() will be negligible)
-                                assert(nets.size() < 2);
-                                nets.add(net);
-                            }
-                        }
-                    }
-                } finally {
-                    netsOutstanding.countDown();
+        // Assume at most two nets use the same node: the first net found to use each node, and any other net (a
+        // conflict) found to use it
+        final Map<Node, Net> nodeToNet = new ConcurrentHashMap<>();
+        final Map<Node, Net> nodeToConflictNet = new ConcurrentHashMap<>();
+        ParallelismTools.forEach(design.getNets(), net -> {
+            // A net's nodes may include duplicates
+            for (Node node : RouterHelper.getNodesOfNet(net)) {
+                final Net firstNet = nodeToNet.putIfAbsent(node, net);
+                if (firstNet == null || firstNet == net) {
+                    continue;
                 }
-            });
-        }
-        netsOutstanding.await();
+                final Net conflictNet = nodeToConflictNet.putIfAbsent(node, net);
+                assert(conflictNet == null || conflictNet == net);
+            }
+        });
 
         Set<Net> conflictNets = new HashSet<>();
-        for (Map.Entry<Node,Collection<Net>> e : nodeToNet.entrySet()) {
-            Collection<Net> nets = e.getValue();
-            if (nets.size() == 1)
-                continue;
-            // Assume at most 2 nets are conflicted
-            assert(nets.size() == 2);
-            Iterator<Net> it = nets.iterator();
+        for (Map.Entry<Node,Net> e : nodeToConflictNet.entrySet()) {
             Node node = e.getKey();
-            Net net0 = it.next();
-            Net net1 = it.next();
+            Net net0 = nodeToNet.get(node);
+            Net net1 = e.getValue();
             if (net0.getSource() != null && net1.getSource() != null) {
                 boolean generateWarning = conflictNets.size() < 5;
                 EDIFNet logicalNet0 = net0.getLogicalNet();
@@ -147,7 +133,7 @@ public class RapidStreamRoute extends PartialRouter {
                     if (generateWarning) generateConflictInfo(node, net0, net1);
                 }
 
-                for (Net net : nets) {
+                for (Net net : Arrays.asList(net0, net1)) {
                     if (net.hasPIPs() && isTargetConflictNetToRoute(net, anchorNameKeyword)) {
                         conflictNets.add(net);
                         net.unroute();
