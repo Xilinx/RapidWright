@@ -2894,29 +2894,20 @@ public class DesignTools {
         // (Note that this also computes the parent net map used in assertions)
         netlist.getPhysicalNetPinMap();
 
-        int numNets = design.getNets().size();
-        // Experimentally best performing number of jobs, where each job cannot have less than 100 objects
-        int numJobs = Math.min(ParallelismTools.maxParallelism() * 100, numNets / 100);
-        List<Net> designNets = new ArrayList<>(design.getNets());
-        List<List<Net>> partitionedNets = Lists.partition(designNets, (int) Math.ceil((double) numNets / numJobs));
-        List<Future<?>> futures = new ArrayList<>();
-        for (List<Net> nets : partitionedNets) {
-            Future<?> f = ParallelismTools.submit(() -> {
-                for (Net net : nets) {
-                    if (net.isUsedNet() || net.isZNet()) {
-                        continue;
-                    }
-                    EDIFHierNet ehn;
-                    EDIFHierNet parentEhn;
-                    assert((ehn = net.getLogicalHierNet()) == null || (parentEhn = netlist.getParentNet(ehn)) == null ||
-                            ehn.equals(parentEhn));
-                    createMissingSitePinInsts(design, net);
-                }
-            });
-            futures.add(f);
+        List<Net> nets = new ArrayList<>(design.getNets().size());
+        for (Net net : design.getNets()) {
+            if (net.isUsedNet() || net.isZNet()) {
+                continue;
+            }
+            nets.add(net);
         }
-
-        ParallelismTools.join(futures);
+        ParallelismTools.forEach(nets, net -> {
+            EDIFHierNet ehn;
+            EDIFHierNet parentEhn;
+            assert((ehn = net.getLogicalHierNet()) == null || (parentEhn = netlist.getParentNet(ehn)) == null ||
+                    ehn.equals(parentEhn));
+            createMissingSitePinInsts(design, net);
+        });
     }
 
     private static HashSet<String> muxPins;
