@@ -1187,10 +1187,10 @@ public class TestDesignTools {
      * A static shell can hold site instances in a reconfigurable partition's region that do nothing
      * but lock the site's BELs, with placeholder cells. A circuit filling the black box has its own
      * site instances on those sites, which must take their place. A site instance holding anything
-     * else, such as another cell or site routing without a net, is still an overlap.
+     * else, such as another cell or site routing without a net, or nothing at all, is still an overlap.
      */
     @ParameterizedTest
-    @ValueSource(strings = {"onlyLocked", "otherCell", "nullNetSitePIP"})
+    @ValueSource(strings = {"onlyLocked", "otherCell", "nullNetSitePIP", "empty"})
     public void testPopulateBlackBoxReplacesLockedSites(String shellSite) {
         Design design = new Design("shell", "xcvu3p");
         EDIFCell top = design.getTopEDIFCell();
@@ -1201,8 +1201,10 @@ public class TestDesignTools {
 
         Site site = design.getDevice().getSite("SLICE_X1Y0");
         SiteInst locked = design.createSiteInst(site);
-        for (String belName : new String[] {"A6LUT", "B6LUT", "AFF"}) {
-            locked.addCell(new Cell(Cell.LOCKED, locked.getBEL(belName)));
+        if (!shellSite.equals("empty")) {
+            for (String belName : new String[] {"A6LUT", "B6LUT", "AFF"}) {
+                locked.addCell(new Cell(Cell.LOCKED, locked.getBEL(belName)));
+            }
         }
         if (shellSite.equals("otherCell")) {
             design.createAndPlaceCell(top, "other", Unisim.LUT1, site.getName() + "/C6LUT");
