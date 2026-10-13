@@ -20,12 +20,18 @@
 
 package com.xilinx.rapidwright.edif.compare;
 
+import java.math.BigInteger;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -40,8 +46,12 @@ import com.xilinx.rapidwright.edif.EDIFTools;
  * LOOKAHEAD8) are simulated; all other cells are cut points whose outputs receive identical
  * pseudo-random values in both netlists (keyed by instance name). The observed points are the
  * top-level outputs and the (inversion-corrected) input pins of every cut cell present in both
- * netlists. Flip-flops that exist only in the original netlist are assumed to have been removed
- * as constants: they take their constant value and their next state is checked to equal it.
+ * netlists. Since cut cells are not simulated, a cut cell present in both netlists must also
+ * have the same type, the same properties (except OPT_MODIFIED and the IS_*_INVERTED inversions,
+ * which are simulated) and the same connected inputs (a pin on an undriven net counts as
+ * unconnected); any difference is a mismatch. Flip-flops that exist only in the original netlist
+ * are assumed to have been removed as constants: they take their constant value and their next
+ * state is checked to equal it.
  */
 public class EDIFRandomSimEquivalence {
 
@@ -64,6 +74,10 @@ public class EDIFRandomSimEquivalence {
         final long[] val;
         final Map<String, Integer> byName = new HashMap<>();
         final String[] names;
+        /** Cells not simulated because of their type (black boxes included). */
+        final boolean[] cutType;
+        /** Nets with a driver (a leaf output, bidirectional pin or top-level input). */
+        final boolean[] driven;
         /** Combinational cells turned into cut points because they are on a loop. */
         boolean[] loopCut;
         /** Nets whose value depends on a loop cut through simulated logic. */
@@ -75,6 +89,7 @@ public class EDIFRandomSimEquivalence {
             kind = new int[n];
             init = new long[n];
             names = new String[n];
+            cutType = new boolean[n];
             for (int l = 0; l < n; l++) {
                 names[l] = idx.getLeafName(l);
                 byName.put(names[l], l);
@@ -83,6 +98,13 @@ public class EDIFRandomSimEquivalence {
                 EDIFPropertyValue v = inst.getProperty("INIT");
                 if (v != null && (kind[l] == C_LUT || kind[l] == C_LUT62 || kind[l] == C_LUTCY)) {
                     init[l] = LUTTools.getInitValue(v.getValue());
+                }
+                cutType[l] = kind[l] == C_CUT;
+            }
+            driven = new boolean[idx.getNumNets()];
+            for (int p = 0; p < idx.getNumPins(); p++) {
+                if (idx.getPinDir(p) != EDIFLeafIndex.SINK && idx.getPinNet(p) >= 0) {
+                    driven[idx.getPinNet(p)] = true;
                 }
             }
             loopCut = new boolean[n];
@@ -484,12 +506,15 @@ public class EDIFRandomSimEquivalence {
         }
     }
 
-    /** Effective value of an input pin of a cut cell: inversion attribute applied. */
+    /**
+     * Effective value of an input pin of a cut cell: inversion attribute applied. Null if the pin
+     * is unconnected or on an undriven net.
+     */
     private static Long pinValue(Model m, int l, String pin) {
         for (int p = m.idx.getLeafPinStart(l); p < m.idx.getLeafPinEnd(l); p++) {
             if (m.idx.getPinPortInst(p).getName().equals(pin)) {
                 int n = m.idx.getPinNet(p);
-                if (n < 0) {
+                if (n < 0 || !m.driven[n]) {
                     return null;
                 }
                 long v = m.val[n];
@@ -564,12 +589,90 @@ public class EDIFRandomSimEquivalence {
             removedFF.removeAll(notConst);
             removedNonConstant += new java.util.HashSet<>(notConst).size();
         }
+        compareCutCells(a, b);
         for (int round = 0; round < rounds; round++) {
             simulate(a, round, forced);
             simulate(b, round, new HashMap<>());
             compareRound(a, b, round, forced, removedFF);
         }
         return mismatches;
+    }
+
+    /** Properties a surviving cut cell may change (inversions are part of the simulation). */
+    private static boolean isIgnoredProperty(String key) {
+        String k = key.toUpperCase();
+        return k.equals("OPT_MODIFIED") || (k.startsWith("IS_") && k.endsWith("_INVERTED"));
+    }
+
+    private static final Pattern VERILOG_NUMBER = Pattern.compile(
+            "(\\d+)'([bBhHdD])([0-9a-fA-F_]+)");
+
+    /** @return The value of a property, numbers in a canonical form. */
+    private static String normalize(String value) {
+        Matcher m = VERILOG_NUMBER.matcher(value.trim());
+        if (!m.matches()) {
+            return value.trim().toUpperCase();
+        }
+        char base = Character.toLowerCase(m.group(2).charAt(0));
+        int radix = base == 'b' ? 2 : base == 'h' ? 16 : 10;
+        String digits = m.group(3).replace("_", "");
+        return m.group(1) + "'" + new BigInteger(digits, radix).toString(16);
+    }
+
+    private static Map<String, String> properties(Model m, int l) {
+        Map<String, String> props = new TreeMap<>();
+        for (Map.Entry<String, EDIFPropertyValue> e
+                : m.idx.getLeafInst(l).getPropertiesMap().entrySet()) {
+            if (!isIgnoredProperty(e.getKey())) {
+                props.put(e.getKey().toUpperCase(), normalize(e.getValue().getValue()));
+            }
+        }
+        return props;
+    }
+
+    private static Set<String> inputPins(Model m, int l) {
+        Set<String> pins = new TreeSet<>();
+        for (int p = m.idx.getLeafPinStart(l); p < m.idx.getLeafPinEnd(l); p++) {
+            if (m.idx.getPinDir(p) != EDIFLeafIndex.DRIVER) {
+                pins.add(m.idx.getPinPortInst(p).getName());
+            }
+        }
+        return pins;
+    }
+
+    /**
+     * Checks that cells not simulated because of their type and present in both netlists have
+     * the same type, behavior-defining properties and connected inputs.
+     */
+    private void compareCutCells(Model a, Model b) {
+        for (int la = 0; la < a.idx.getNumLeaves(); la++) {
+            Integer lb = b.byName.get(a.names[la]);
+            if (lb == null || (!a.cutType[la] && !b.cutType[lb])) {
+                continue;
+            }
+            String name = a.names[la];
+            String ta = a.idx.getLeafInst(la).getCellType().getName();
+            String tb = b.idx.getLeafInst(lb).getCellType().getName();
+            checked++;
+            if (!ta.equals(tb) || a.cutType[la] != b.cutType[lb]) {
+                fail("cell " + name + " type " + ta + " -> " + tb);
+                continue;
+            }
+            Map<String, String> pa = properties(a, la);
+            Map<String, String> pb = properties(b, lb);
+            if (!pa.equals(pb)) {
+                fail("cell " + name + " properties " + pa + " -> " + pb);
+            }
+            Set<String> pins = inputPins(a, la);
+            pins.addAll(inputPins(b, lb));
+            for (String pin : pins) {
+                boolean ca = pinValue(a, la, pin) != null;
+                boolean cb = pinValue(b, lb, pin) != null;
+                if (ca != cb) {
+                    fail("pin " + name + "/" + pin + (ca ? " disconnected" : " connected"));
+                }
+            }
+        }
     }
 
     /**

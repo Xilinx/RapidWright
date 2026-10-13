@@ -42,53 +42,24 @@ import com.xilinx.rapidwright.edif.EDIFLeafIndex.IntList;
  */
 class EDIFOptEditor {
 
-    static final byte OP_REMOVE = 0;
-    static final byte OP_LUT = 1;
-    static final byte OP_PROP = 2;
-    static final byte OP_MOVE = 3;
-    static final byte OP_MERGE = 4;
-    static final byte OP_STATIC = 5;
-    /** Adds a port (b = direction) named a to the cell, connected inside to net c. */
-    static final byte OP_NEWPORT = 6;
-    /** Connects port b of child instance a to net c (created if needed). */
-    static final byte OP_CONNECT = 7;
-    /** Removes net a, disconnecting everything on it. */
-    static final byte OP_RMNET = 8;
-
-    /** Separates an output pin name from its net name in LUT edits. */
-    static final char OUT_SEP = '\u0005';
-
-    /** A local edit inside one hierarchical cell definition. */
-    static class Op implements Comparable<Op> {
-        final byte type;
-        /** Leaf instance name, or net name for OP_MERGE/OP_STATIC. */
-        final String a;
-        /** Cell type / property key / pin name / merge target net / static type. */
-        final String b;
-        /** INIT / property value / target net. */
-        final String c;
-        /** LUT pins nets (inputs I0.., then outputs as "O=net", "O5=net", "O6=net"). */
-        final String[] nets;
+    /**
+     * A local edit inside one hierarchical cell definition, with names relative to it. Its key
+     * identifies it, so that instances with the same edits can share a definition.
+     */
+    abstract static class Op implements Comparable<Op> {
         private String key;
 
-        Op(byte type, String a, String b, String c, String[] nets) {
-            this.type = type;
-            this.a = a;
-            this.b = b;
-            this.c = c;
-            this.nets = nets;
+        /** Appends the fields that identify this edit. */
+        abstract void describe(StringBuilder sb);
+
+        static void field(StringBuilder sb, Object o) {
+            sb.append('\u0001').append(o);
         }
 
         String key() {
             if (key == null) {
-                StringBuilder sb = new StringBuilder();
-                sb.append(type).append('\u0001').append(a).append('\u0001').append(b)
-                        .append('\u0001').append(c);
-                if (nets != null) {
-                    for (String n : nets) {
-                        sb.append('\u0001').append(n);
-                    }
-                }
+                StringBuilder sb = new StringBuilder(getClass().getSimpleName());
+                describe(sb);
                 key = sb.toString();
             }
             return key;
@@ -97,6 +68,184 @@ class EDIFOptEditor {
         @Override
         public int compareTo(Op o) {
             return key().compareTo(o.key());
+        }
+    }
+
+    /** Removes a leaf instance, disconnecting it. */
+    static final class RemoveCell extends Op {
+        final String inst;
+
+        RemoveCell(String inst) {
+            this.inst = inst;
+        }
+
+        @Override
+        void describe(StringBuilder sb) {
+            field(sb, inst);
+        }
+    }
+
+    /** Rewrites a LUT: cell type, INIT and all its connections. */
+    static final class RebuildLut extends Op {
+        final String inst;
+        final String cellType;
+        final String init;
+        /** Nets of inputs I0, I1, ... (null: unconnected). */
+        final String[] inputNets;
+        /** Output pins, and their nets (null: unconnected). */
+        final String[] outputPins;
+        final String[] outputNets;
+
+        RebuildLut(String inst, String cellType, String init, List<String> inputNets,
+                   List<String> outputPins, List<String> outputNets) {
+            this.inst = inst;
+            this.cellType = cellType;
+            this.init = init;
+            this.inputNets = inputNets.toArray(new String[0]);
+            this.outputPins = outputPins.toArray(new String[0]);
+            this.outputNets = outputNets.toArray(new String[0]);
+        }
+
+        @Override
+        void describe(StringBuilder sb) {
+            field(sb, inst);
+            field(sb, cellType);
+            field(sb, init);
+            for (String n : inputNets) {
+                field(sb, n);
+            }
+            for (int i = 0; i < outputPins.length; i++) {
+                field(sb, outputPins[i]);
+                field(sb, outputNets[i]);
+            }
+        }
+    }
+
+    /** Sets a property of a leaf instance. */
+    static final class SetProperty extends Op {
+        final String inst;
+        final String property;
+        final String value;
+
+        SetProperty(String inst, String property, String value) {
+            this.inst = inst;
+            this.property = property;
+            this.value = value;
+        }
+
+        @Override
+        void describe(StringBuilder sb) {
+            field(sb, inst);
+            field(sb, property);
+            field(sb, value);
+        }
+    }
+
+    /** Reconnects a pin of a leaf instance to another net. */
+    static final class MovePin extends Op {
+        final String inst;
+        final String pin;
+        final String net;
+
+        MovePin(String inst, String pin, String net) {
+            this.inst = inst;
+            this.pin = pin;
+            this.net = net;
+        }
+
+        @Override
+        void describe(StringBuilder sb) {
+            field(sb, inst);
+            field(sb, pin);
+            field(sb, net);
+        }
+    }
+
+    /** Moves everything connected to net 'from' to net 'into', and removes 'from'. */
+    static final class MergeNets extends Op {
+        final String from;
+        final String into;
+
+        MergeNets(String from, String into) {
+            this.from = from;
+            this.into = into;
+        }
+
+        @Override
+        void describe(StringBuilder sb) {
+            field(sb, from);
+            field(sb, into);
+        }
+    }
+
+    /** Drives a net with a new GND or VCC instance. */
+    static final class AddStaticSource extends Op {
+        final String net;
+        final boolean vcc;
+
+        AddStaticSource(String net, boolean vcc) {
+            this.net = net;
+            this.vcc = vcc;
+        }
+
+        @Override
+        void describe(StringBuilder sb) {
+            field(sb, net);
+            field(sb, vcc);
+        }
+    }
+
+    /** Adds a port to the cell, connected inside to a net (created if needed). */
+    static final class NewPort extends Op {
+        final String port;
+        final EDIFDirection dir;
+        final String net;
+
+        NewPort(String port, EDIFDirection dir, String net) {
+            this.port = port;
+            this.dir = dir;
+            this.net = net;
+        }
+
+        @Override
+        void describe(StringBuilder sb) {
+            field(sb, port);
+            field(sb, dir);
+            field(sb, net);
+        }
+    }
+
+    /** Connects a port of a child (hierarchical) instance to a net (created if needed). */
+    static final class ConnectChild extends Op {
+        final String inst;
+        final String port;
+        final String net;
+
+        ConnectChild(String inst, String port, String net) {
+            this.inst = inst;
+            this.port = port;
+            this.net = net;
+        }
+
+        @Override
+        void describe(StringBuilder sb) {
+            field(sb, inst);
+            field(sb, port);
+            field(sb, net);
+        }
+    }
+
+    /** Removes a net, disconnecting everything on it. */
+    static final class RemoveNet extends Op {
+        final String net;
+
+        RemoveNet(String net) {
+            this.net = net;
+        }
+
+        @Override
+        void describe(StringBuilder sb) {
+            field(sb, net);
         }
     }
 
@@ -155,13 +304,21 @@ class EDIFOptEditor {
         return null;
     }
 
-    private String inputNetName(int l, Lut s, int i) {
-        int p = s.srcPin[i];
+    /**
+     * @return The name of the net that leaf pin p connects to after optimization, in the cell of
+     * its leaf: its own net if that is still in the same alias group, else a net of the group it
+     * was moved to (routed into the cell if needed). Null if unconnected.
+     */
+    private String currentNetName(int p) {
+        int n = e.pinNet(p);
+        if (n < 0) {
+            return null;
+        }
         int orig = idx.getPinNet(p);
-        if (!s.moved[i] || (orig >= 0 && e.resolve(orig) == e.resolve(s.net[i]))) {
+        if (orig >= 0 && e.resolve(orig) == n) {
             return netName(idx.getPinPortInst(p));
         }
-        return netIn(e.resolve(s.net[i]), idx.getLeafHier(l));
+        return netIn(n, idx.getLeafHier(idx.getPinLeaf(p)));
     }
 
     /** Local net names of physical nets routed through new hierarchical ports, by (net, hier). */
@@ -222,10 +379,10 @@ class EDIFOptEditor {
                 continue;
             }
             String inner = available(n, c);
-            String port = uniquePort(idx.getHierCell(c), inner + "_opt_o");
-            add(c, new Op(OP_NEWPORT, port, "OUTPUT", inner, null));
-            String outer = idx.getHierInst(c).getName() + "_" + port;
-            add(parent, new Op(OP_CONNECT, idx.getHierInst(c).getName(), port, outer, null));
+            String port = uniqueName(c, inner + "_opt_o");
+            add(c, new NewPort(port, EDIFDirection.OUTPUT, inner));
+            String outer = uniqueName(parent, idx.getHierInst(c).getName() + "_" + port);
+            add(parent, new ConnectChild(idx.getHierInst(c).getName(), port, outer));
             routed.put(((long) n << 32) | parent, outer);
         }
         // Down from the LCA to h through new input ports
@@ -240,18 +397,29 @@ class EDIFOptEditor {
             }
             int parent = idx.getHierParent(c);
             String outer = available(n, parent);
-            String port = uniquePort(idx.getHierCell(c), outer + "_opt_i");
-            add(c, new Op(OP_NEWPORT, port, "INPUT", port, null));
-            add(parent, new Op(OP_CONNECT, idx.getHierInst(c).getName(), port, outer, null));
+            String port = uniqueName(c, outer + "_opt_i");
+            add(c, new NewPort(port, EDIFDirection.INPUT, port));
+            add(parent, new ConnectChild(idx.getHierInst(c).getName(), port, outer));
             routed.put(((long) n << 32) | c, port);
         }
         return available(n, h);
     }
 
-    private static String uniquePort(EDIFCell cell, String base) {
+    /** Port and net names generated per hierarchical instance (lower case). */
+    private final Map<Integer, Set<String>> generatedNames = new HashMap<>();
+
+    /**
+     * @return A new port or net name for hierarchical instance h, based on base, that is not the
+     * name of a port (or bus) or net of its cell, nor (ignoring case) a name already generated
+     * for h.
+     */
+    private String uniqueName(int h, String base) {
+        EDIFCell cell = idx.getHierCell(h);
+        Set<String> generated = generatedNames.computeIfAbsent(h, k -> new HashSet<>());
         String name = base;
         int k = 1;
-        while (cell.getPort(name) != null || cell.getNet(name) != null) {
+        while (cell.getPort(name) != null || cell.getNet(name) != null
+                || !generated.add(name.toLowerCase())) {
             name = base + "_" + k++;
         }
         return name;
@@ -279,15 +447,17 @@ class EDIFOptEditor {
             int h = idx.getLeafHier(l);
             EDIFCellInst inst = idx.getLeafInst(l);
             if (e.removed[l] != EDIFConstPropEngine.ALIVE) {
-                add(h, new Op(OP_REMOVE, inst.getName(), null, null, null));
+                add(h, new RemoveCell(inst.getName()));
                 continue;
             }
             Lut s = e.lut[l];
             if (s != null && s.changed) {
-                List<String> nets = new ArrayList<>();
+                List<String> inputs = new ArrayList<>();
                 for (int i = 0; i < s.size; i++) {
-                    nets.add(inputNetName(l, s, i));
+                    inputs.add(currentNetName(s.srcPin[i]));
                 }
+                List<String> outPins = new ArrayList<>();
+                List<String> outNets = new ArrayList<>();
                 String type;
                 if (s.dual) {
                     // Same multi-output cell type: keep all its outputs
@@ -295,21 +465,23 @@ class EDIFOptEditor {
                     for (int p = idx.getLeafPinStart(l); p < idx.getLeafPinEnd(l); p++) {
                         if (idx.getPinDir(p) == EDIFLeafIndex.DRIVER) {
                             EDIFPortInst pi = idx.getPinPortInst(p);
-                            nets.add(pi.getName() + OUT_SEP + netName(pi));
+                            outPins.add(pi.getName());
+                            outNets.add(netName(pi));
                         }
                     }
                 } else {
                     type = "LUT" + s.size;
                     int out = e.outputPin(l);
-                    nets.add("O" + OUT_SEP + (out < 0 ? null : netName(idx.getPinPortInst(out))));
+                    outPins.add("O");
+                    outNets.add(out < 0 ? null : netName(idx.getPinPortInst(out)));
                 }
                 String init = initString(s.bits, s.table);
-                add(h, new Op(OP_LUT, inst.getName(), type, init, nets.toArray(new String[0])));
+                add(h, new RebuildLut(inst.getName(), type, init, inputs, outPins, outNets));
             }
             Map<String, String> pm = e.props.get(l);
             if (pm != null) {
                 for (Map.Entry<String, String> p : pm.entrySet()) {
-                    add(h, new Op(OP_PROP, inst.getName(), p.getKey(), p.getValue(), null));
+                    add(h, new SetProperty(inst.getName(), p.getKey(), p.getValue()));
                 }
             }
             String mark = e.marks.get(l);
@@ -318,29 +490,27 @@ class EDIFOptEditor {
                 for (String m : mark.split(" ")) {
                     val = appendMark(val != null ? val : propValue(inst, "OPT_MODIFIED"), m);
                 }
-                add(h, new Op(OP_PROP, inst.getName(), "OPT_MODIFIED", val, null));
+                add(h, new SetProperty(inst.getName(), "OPT_MODIFIED", val));
             }
-            boolean rebuilt = s != null && s.changed;
+            if (s != null && s.changed) {
+                // Connections are part of the rebuilt LUT
+                continue;
+            }
             for (int p = idx.getLeafPinStart(l); p < idx.getLeafPinEnd(l); p++) {
-                int t = e.pinMovedTo[p];
-                if (t < 0 || rebuilt) {
+                int orig = idx.getPinNet(p);
+                if (e.pinMovedTo[p] < 0 || e.resolve(orig) == e.pinNet(p)) {
                     continue;
                 }
-                int target = e.resolve(t);
-                if (e.resolve(idx.getPinNet(p)) == target) {
-                    continue;
-                }
-                String net = netIn(target, h);
-                add(h, new Op(OP_MOVE, inst.getName(), idx.getPinPortInst(p).getName(), net,
-                        null));
+                add(h, new MovePin(inst.getName(), idx.getPinPortInst(p).getName(),
+                        currentNetName(p)));
             }
         }
         for (int i = 0; i < e.aliasLeaf.size(); i++) {
             int l = e.aliasLeaf.get(i);
             int h = idx.getLeafHier(l);
-            EDIFPortInst in = idx.getPinPortInst(e.aliasInPin.get(i));
+            // The output net merges into the net the input is on (it may have been moved)
             EDIFPortInst out = idx.getPinPortInst(e.aliasOutPin.get(i));
-            add(h, new Op(OP_MERGE, netName(out), netName(in), null, null));
+            add(h, new MergeNets(netName(out), currentNetName(e.aliasInPin.get(i))));
             byte why = e.removed[l];
             if (why == EDIFConstPropEngine.RM_ALIAS || why == EDIFConstPropEngine.RM_INV) {
                 markBufferLoads(h, e.aliasOutPin.get(i), EDIFConstPropEngine.MARK_PROPCONST);
@@ -359,8 +529,7 @@ class EDIFOptEditor {
             int n = rmNets.get(i);
             for (int k = idx.getNetSegStart(n); k < idx.getNetSegEnd(n); k++) {
                 int seg = idx.getNetSeg(k);
-                add(idx.getSegHier(seg), new Op(OP_RMNET, idx.getSegEDIFNet(seg).getName(), null,
-                        null, null));
+                add(idx.getSegHier(seg), new RemoveNet(idx.getSegEDIFNet(seg).getName()));
             }
         }
         // Nets that became constant need a static source. Per hierarchical instance and value,
@@ -404,12 +573,12 @@ class EDIFOptEditor {
                         idx.getLeafInst(idx.getPinLeaf(y[1])).getName());
             });
             int h = (int) (en.getKey() >> 1);
-            String type = (en.getKey() & 1) == 0 ? "GND" : "VCC";
+            boolean vcc = (en.getKey() & 1) != 0;
             String first = netName(idx.getPinPortInst(list.get(0)[1]));
-            add(h, new Op(OP_STATIC, first, type, null, null));
+            add(h, new AddStaticSource(first, vcc));
             for (int i = 1; i < list.size(); i++) {
                 int dp = list.get(i)[1];
-                add(h, new Op(OP_MERGE, netName(idx.getPinPortInst(dp)), first, null, null));
+                add(h, new MergeNets(netName(idx.getPinPortInst(dp)), first));
                 markBufferLoads(h, dp, EDIFConstPropEngine.MARK_PROPCONST);
             }
         }
@@ -439,7 +608,7 @@ class EDIFOptEditor {
                 continue;
             }
             EDIFCellInst inst = idx.getLeafInst(l);
-            add(h, new Op(OP_PROP, inst.getName(), "OPT_MODIFIED", markValue(inst, mark), null));
+            add(h, new SetProperty(inst.getName(), "OPT_MODIFIED", markValue(inst, mark)));
             e.marks.put(l, mark);
         }
     }
@@ -620,12 +789,15 @@ class EDIFOptEditor {
                 continue;
             }
             for (Op op : en.getValue()) {
-                if (op.type == OP_NEWPORT && cell.getPort(op.a) == null) {
-                    EDIFPort port = cell.createPort(op.a, op.b.equals("INPUT")
-                            ? EDIFDirection.INPUT : EDIFDirection.OUTPUT, 1);
-                    EDIFNet net = cell.getNet(op.c);
+                if (!(op instanceof NewPort)) {
+                    continue;
+                }
+                NewPort np = (NewPort) op;
+                if (cell.getPort(np.port) == null) {
+                    EDIFPort port = cell.createPort(np.port, np.dir, 1);
+                    EDIFNet net = cell.getNet(np.net);
                     if (net == null) {
-                        net = cell.createNet(op.c);
+                        net = cell.createNet(np.net);
                     }
                     net.createPortInst(port);
                 }
@@ -642,62 +814,63 @@ class EDIFOptEditor {
 
     private void applyOps(EDIFCell cell, List<Op> list) {
         NetBatch batch = new NetBatch();
-        // Phase A: removals
+        // Phase A: removals and disconnections
         for (Op op : list) {
-            EDIFCellInst inst;
-            switch (op.type) {
-                case OP_REMOVE:
-                    inst = cell.getCellInst(op.a);
-                    if (inst != null) {
-                        for (EDIFPortInst pi : inst.getPortInsts()) {
-                            batch.remove(pi);
-                        }
-                        cell.removeCellInst(inst);
-                    }
-                    break;
-                case OP_LUT:
-                    inst = cell.getCellInst(op.a);
-                    for (EDIFPortInst pi : new ArrayList<>(inst.getPortInsts())) {
-                        batch.remove(pi);
-                        inst.removePortInst(pi);
-                    }
-                    break;
-                case OP_MOVE:
-                    inst = cell.getCellInst(op.a);
-                    EDIFPortInst pi = inst.getPortInst(op.b);
-                    if (pi != null) {
+            if (op instanceof RemoveCell) {
+                EDIFCellInst inst = cell.getCellInst(((RemoveCell) op).inst);
+                if (inst != null) {
+                    for (EDIFPortInst pi : inst.getPortInsts()) {
                         batch.remove(pi);
                     }
-                    break;
-                case OP_RMNET: {
-                    EDIFNet rm = cell.getNet(op.a);
-                    if (rm != null) {
-                        for (EDIFPortInst rpi : new ArrayList<>(rm.getPortInsts())) {
-                            rm.removePortInst(rpi);
-                            if (rpi.getCellInst() != null) {
-                                rpi.getCellInst().removePortInst(rpi);
-                            } else {
-                                cell.removeInternalPortMapEntry(rpi.getName());
-                            }
-                        }
-                        cell.removeNet(rm);
-                    }
-                    break;
+                    cell.removeCellInst(inst);
                 }
-                default:
-                    break;
+            } else if (op instanceof RebuildLut) {
+                EDIFCellInst inst = cell.getCellInst(((RebuildLut) op).inst);
+                for (EDIFPortInst pi : new ArrayList<>(inst.getPortInsts())) {
+                    batch.remove(pi);
+                    inst.removePortInst(pi);
+                }
+            } else if (op instanceof MovePin) {
+                MovePin mp = (MovePin) op;
+                EDIFPortInst pi = cell.getCellInst(mp.inst).getPortInst(mp.pin);
+                if (pi != null) {
+                    batch.remove(pi);
+                }
+            } else if (op instanceof RemoveNet) {
+                EDIFNet rm = cell.getNet(((RemoveNet) op).net);
+                if (rm != null) {
+                    for (EDIFPortInst rpi : new ArrayList<>(rm.getPortInsts())) {
+                        rm.removePortInst(rpi);
+                        if (rpi.getCellInst() != null) {
+                            rpi.getCellInst().removePortInst(rpi);
+                        } else {
+                            cell.removeInternalPortMapEntry(rpi.getName());
+                        }
+                    }
+                    cell.removeNet(rm);
+                }
             }
         }
         batch.flushRemovals();
+        // Nets of new connections to children, which merges may refer to
+        for (Op op : list) {
+            if (op instanceof ConnectChild && cell.getNet(((ConnectChild) op).net) == null) {
+                cell.createNet(((ConnectChild) op).net);
+            }
+        }
         // Phase B: merges
         Map<EDIFNet, EDIFNet> merged = new IdentityHashMap<>();
         Map<String, EDIFNet> byName = new HashMap<>();
         for (Op op : list) {
-            if (op.type != OP_MERGE || op.a == null || op.b == null) {
+            if (!(op instanceof MergeNets)) {
                 continue;
             }
-            EDIFNet from = net(cell, byName, merged, op.a);
-            EDIFNet into = net(cell, byName, merged, op.b);
+            MergeNets m = (MergeNets) op;
+            if (m.from == null || m.into == null) {
+                continue;
+            }
+            EDIFNet from = net(cell, byName, merged, m.from);
+            EDIFNet into = net(cell, byName, merged, m.into);
             if (from == null || into == null || from == into) {
                 continue;
             }
@@ -709,88 +882,62 @@ class EDIFOptEditor {
             merged.put(from, into);
             byName.put(from.getName(), from);
         }
-        // Phase C: additions (new hierarchical connections first, they may create nets)
-        List<Op> ordered = new ArrayList<>(list.size());
+        // Phase C: additions (new hierarchical connections first)
         for (Op op : list) {
-            if (op.type == OP_CONNECT) {
-                ordered.add(op);
-            }
-        }
-        for (Op op : list) {
-            if (op.type != OP_CONNECT) {
-                ordered.add(op);
-            }
-        }
-        for (Op op : ordered) {
-            EDIFCellInst inst;
-            switch (op.type) {
-                case OP_LUT:
-                    inst = cell.getCellInst(op.a);
-                    EDIFCell type = op.b.matches("LUT[1-6]") ? luts[op.b.charAt(3) - '0']
-                            : inst.getCellType();
-                    inst.setCellTypeRaw(type);
-                    inst.addProperty("INIT", op.c);
-                    int in = 0;
-                    for (String n : op.nets) {
-                        String pin;
-                        String netName;
-                        int eq = n == null ? -1 : n.indexOf(OUT_SEP);
-                        if (eq > 0) {
-                            pin = n.substring(0, eq);
-                            netName = n.substring(eq + 1);
-                        } else {
-                            pin = "I" + in++;
-                            netName = n;
-                        }
-                        if (netName == null || netName.equals("null")) {
-                            continue;
-                        }
-                        EDIFNet net = net(cell, byName, merged, netName);
-                        if (net == null) {
-                            continue;
-                        }
-                        EDIFPortInst npi = new EDIFPortInst(type.getPort(pin), null, inst, true);
-                        batch.add(net, npi);
-                    }
-                    inst.getEDIFPortInstList().reSortList();
-                    break;
-                case OP_PROP:
-                    inst = cell.getCellInst(op.a);
-                    if (inst != null) {
-                        inst.addProperty(op.b, op.c);
-                    }
-                    break;
-                case OP_MOVE:
-                    inst = cell.getCellInst(op.a);
-                    EDIFPortInst pi = inst.getPortInst(op.b);
-                    EDIFNet target = op.c == null ? null : net(cell, byName, merged, op.c);
-                    if (pi != null && target != null) {
-                        batch.add(target, pi);
-                    }
-                    break;
-                case OP_CONNECT: {
-                    EDIFCellInst child = cell.getCellInst(op.a);
-                    EDIFNet cn = net(cell, byName, merged, op.c);
-                    if (cn == null) {
-                        cn = cell.createNet(op.c);
-                    }
-                    if (child != null && child.getPortInst(op.b) == null) {
-                        batch.add(cn, new EDIFPortInst(child.getCellType().getPort(op.b), null,
-                                child, true));
-                    }
-                    break;
+            if (op instanceof ConnectChild) {
+                ConnectChild cc = (ConnectChild) op;
+                EDIFCellInst child = cell.getCellInst(cc.inst);
+                EDIFNet cn = net(cell, byName, merged, cc.net);
+                if (child != null && child.getPortInst(cc.port) == null) {
+                    batch.add(cn, new EDIFPortInst(child.getCellType().getPort(cc.port), null,
+                            child, true));
                 }
-                case OP_STATIC:
-                    EDIFNet net = net(cell, byName, merged, op.a);
-                    if (net != null) {
-                        addStaticSource(cell, net, op.b);
-                    }
-                    break;
-                default:
-                    break;
+            }
+        }
+        for (Op op : list) {
+            if (op instanceof RebuildLut) {
+                rebuildLut(cell, (RebuildLut) op, batch, byName, merged);
+            } else if (op instanceof SetProperty) {
+                SetProperty sp = (SetProperty) op;
+                EDIFCellInst inst = cell.getCellInst(sp.inst);
+                if (inst != null) {
+                    inst.addProperty(sp.property, sp.value);
+                }
+            } else if (op instanceof MovePin) {
+                MovePin mp = (MovePin) op;
+                EDIFPortInst pi = cell.getCellInst(mp.inst).getPortInst(mp.pin);
+                EDIFNet target = mp.net == null ? null : net(cell, byName, merged, mp.net);
+                if (pi != null && target != null) {
+                    batch.add(target, pi);
+                }
+            } else if (op instanceof AddStaticSource) {
+                AddStaticSource as = (AddStaticSource) op;
+                EDIFNet net = net(cell, byName, merged, as.net);
+                if (net != null) {
+                    addStaticSource(cell, net, as.vcc);
+                }
             }
         }
         batch.flushAdds();
+    }
+
+    private void rebuildLut(EDIFCell cell, RebuildLut op, NetBatch batch,
+                            Map<String, EDIFNet> byName, Map<EDIFNet, EDIFNet> merged) {
+        EDIFCellInst inst = cell.getCellInst(op.inst);
+        EDIFCell type = op.cellType.matches("LUT[1-6]") ? luts[op.cellType.charAt(3) - '0']
+                : inst.getCellType();
+        inst.setCellTypeRaw(type);
+        inst.addProperty("INIT", op.init);
+        for (int i = 0; i < op.inputNets.length + op.outputPins.length; i++) {
+            boolean input = i < op.inputNets.length;
+            String pin = input ? "I" + i : op.outputPins[i - op.inputNets.length];
+            String netName = input ? op.inputNets[i] : op.outputNets[i - op.inputNets.length];
+            EDIFNet net = netName == null ? null : net(cell, byName, merged, netName);
+            if (net != null) {
+                batch.add(net, new EDIFPortInst(type.getPort(pin), null, inst, true));
+            }
+        }
+        inst.getEDIFPortInstList().reSortList();
     }
 
     /** Looks up a net by name, following merges (including nets removed by a merge). */
@@ -815,8 +962,9 @@ class EDIFOptEditor {
         return r;
     }
 
-    private void addStaticSource(EDIFCell cell, EDIFNet net, String type) {
-        EDIFCell src = netlist.getHDIPrimitive(type.equals("GND") ? Unisim.GND : Unisim.VCC);
+    private void addStaticSource(EDIFCell cell, EDIFNet net, boolean vcc) {
+        EDIFCell src = netlist.getHDIPrimitive(vcc ? Unisim.VCC : Unisim.GND);
+        String type = vcc ? "VCC" : "GND";
         int k = staticCounter.getOrDefault(cell, 0);
         String name;
         do {
@@ -824,7 +972,7 @@ class EDIFOptEditor {
         } while (cell.getCellInst(name) != null);
         staticCounter.put(cell, k);
         EDIFCellInst inst = cell.createChildCellInst(name, src);
-        net.createPortInst(type.equals("GND") ? "G" : "P", inst);
+        net.createPortInst(vcc ? "P" : "G", inst);
     }
 
     // ---------------------------------------------------------------- cleanup

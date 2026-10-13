@@ -63,6 +63,14 @@ import com.xilinx.rapidwright.edif.EDIFLeafIndex.IntList;
  * KEEP_HIERARCHY are ignored.</li>
  * </ul>
  * Modified cells get the OPT_MODIFIED property (PROPCONST, SWEEP or POST_PROCESS_NETLIST).
+ * <p>
+ * Connectivity model: every pin is on exactly one net at a time, the net it was moved to by
+ * inverter absorption or else its original net ({@link #pinMovedTo}). Nets merged by removing a
+ * buffer or an absorbed inverter form an alias group represented by its root net
+ * ({@link #resolve}). Connectivity is only queried through {@link #pinNet} and
+ * {@link #forEachGroupPin}, and only changed through {@link #movePin}, {@link #dropPin},
+ * {@link #setRemoved} and {@link #addAlias}, which keep the number of live loads of each group
+ * up to date ({@link #hasLoads}).
  */
 class EDIFConstPropEngine {
 
@@ -139,12 +147,8 @@ class EDIFConstPropEngine {
         int bits;
         /** Truth table over the inputs (address bit i = input i). */
         long table;
-        /** Physical net of each input. */
-        int[] net;
-        /** Original pin (index into the leaf index) whose local net provides each input. */
+        /** Pin (index into the leaf index) providing each input; its net is pinNet(srcPin[i]). */
         int[] srcPin;
-        /** True if the input was redirected (inverter absorption) to net[i]. */
-        boolean[] moved;
         /** True if this is a LUT6_2 kept as is (both outputs used). */
         boolean dual;
         /** For a reduced LUT6_2: the original output pin that remains (O5 or O6). */
@@ -170,6 +174,10 @@ class EDIFConstPropEngine {
     final boolean[] pinDropped;
     /** Target net of a pin moved by inverter absorption, -1 if not moved. */
     final int[] pinMovedTo;
+    /** Pins moved onto each net (pinMovedTo[p] == n), allocated on the first move. */
+    private IntList[] movedIn;
+    /** Number of live loads (see isLiveSink) of each alias group, indexed by its root. */
+    private final int[] loadCount;
     final Lut[] lut;
     final long[] origInit;
     final IntList[] aliasChildren;
@@ -177,7 +185,10 @@ class EDIFConstPropEngine {
     final Map<Integer, Map<String, String>> props = new HashMap<>();
     /** OPT_MODIFIED marks per leaf. */
     final Map<Integer, String> marks = new HashMap<>();
-    /** Alias records: the leaf removed and the input pin whose net its output merges into. */
+    /**
+     * Alias records: the leaf removed, its input pin and its output pin. The output net merges
+     * into the net the input pin is on (pinNet, which may differ from its original net).
+     */
     final IntList aliasLeaf = new IntList();
     final IntList aliasInPin = new IntList();
     final IntList aliasOutPin = new IntList();
@@ -209,9 +220,16 @@ class EDIFConstPropEngine {
         lut = new Lut[numLeaves];
         origInit = new long[numLeaves];
         aliasChildren = new IntList[numNets];
+        loadCount = new int[numNets];
         queue = new int[numLeaves + 1];
         queued = new boolean[numLeaves];
         classify();
+        for (int p = 0; p < idx.getNumPins(); p++) {
+            int n = idx.getPinNet(p);
+            if (n >= 0 && isLiveSink(p)) {
+                loadCount[n]++;
+            }
+        }
     }
 
     static boolean isTrue(EDIFPropertyValue v) {
@@ -342,7 +360,7 @@ class EDIFConstPropEngine {
         }
     }
 
-    // ---------------------------------------------------------------- net helpers
+    // ---------------------------------------------------------------- connectivity
 
     int resolve(int n) {
         int r = n;
@@ -361,61 +379,16 @@ class EDIFConstPropEngine {
         return n < 0 ? UNK : netVal[resolve(n)];
     }
 
-    /** @return The current net of pin p (following inverter-absorption moves and aliases). */
+    /** @return The net pin p is on, before resolving aliases (-1 if unconnected). */
+    private int homeNet(int p) {
+        int t = pinMovedTo[p];
+        return t >= 0 ? t : idx.getPinNet(p);
+    }
+
+    /** @return The current net (alias group root) of pin p, -1 if unconnected. */
     int pinNet(int p) {
-        int n = pinMovedTo[p] >= 0 ? pinMovedTo[p] : idx.getPinNet(p);
+        int n = homeNet(p);
         return n < 0 ? -1 : resolve(n);
-    }
-
-    private void addAlias(int from, int to) {
-        alias[from] = to;
-        if (aliasChildren[to] == null) {
-            aliasChildren[to] = new IntList();
-        }
-        aliasChildren[to].add(from);
-    }
-
-    /** Calls the visitor for every pin on any net of the alias group rooted at root. */
-    interface PinVisitor {
-        void visit(int pin);
-    }
-
-    void forEachGroupPin(int root, PinVisitor v) {
-        IntList stack = new IntList();
-        stack.add(root);
-        while (stack.size() > 0) {
-            int n = stack.pop();
-            for (int i = idx.getNetPinStart(n); i < idx.getNetPinEnd(n); i++) {
-                int p = idx.getNetPin(i);
-                if (pinMovedTo[p] < 0) {
-                    v.visit(p);
-                }
-            }
-            if (aliasChildren[n] != null) {
-                for (int i = 0; i < aliasChildren[n].size(); i++) {
-                    stack.add(aliasChildren[n].get(i));
-                }
-            }
-        }
-        if (movedIn != null) {
-            IntList m = movedIn.get(root);
-            if (m != null) {
-                for (int i = 0; i < m.size(); i++) {
-                    v.visit(m.get(i));
-                }
-            }
-        }
-    }
-
-    /** Pins moved onto a net by inverter absorption, keyed by target root net. */
-    private Map<Integer, IntList> movedIn;
-
-    private void movePin(int p, int target) {
-        pinMovedTo[p] = target;
-        if (movedIn == null) {
-            movedIn = new HashMap<>();
-        }
-        movedIn.computeIfAbsent(target, k -> new IntList()).add(p);
     }
 
     /** @return True if pin p currently loads its net (leaf alive and pin not dropped). */
@@ -427,14 +400,155 @@ class EDIFConstPropEngine {
         return l < 0 || removed[l] == ALIVE;
     }
 
-    boolean hasLoads(int root) {
-        final boolean[] found = new boolean[1];
-        forEachGroupPin(root, p -> {
-            if (!found[0] && isLiveSink(p)) {
-                found[0] = true;
+    /** @return True if the alias group of net n has a live load. */
+    boolean hasLoads(int n) {
+        return n >= 0 && loadCount[resolve(n)] > 0;
+    }
+
+    private void countLoad(int p, int delta) {
+        int n = pinNet(p);
+        if (n >= 0 && isLiveSink(p)) {
+            loadCount[n] += delta;
+        }
+    }
+
+    /** Merges the alias group of root 'from' into the one of root 'to'. */
+    private void addAlias(int from, int to) {
+        alias[from] = to;
+        if (aliasChildren[to] == null) {
+            aliasChildren[to] = new IntList();
+        }
+        aliasChildren[to].add(from);
+        loadCount[to] += loadCount[from];
+        loadCount[from] = 0;
+    }
+
+    /** Moves pin p onto net target. */
+    private void movePin(int p, int target) {
+        countLoad(p, -1);
+        int old = pinMovedTo[p];
+        if (old >= 0) {
+            movedIn[old].removeValue(p);
+        }
+        if (target == idx.getPinNet(p)) {
+            pinMovedTo[p] = -1;
+        } else {
+            pinMovedTo[p] = target;
+            if (movedIn == null) {
+                movedIn = new IntList[numNets];
             }
+            if (movedIn[target] == null) {
+                movedIn[target] = new IntList();
+            }
+            movedIn[target].add(p);
+        }
+        countLoad(p, 1);
+    }
+
+    /** Disconnects input pin p of a surviving leaf (an input its function no longer uses). */
+    private void dropPin(int p) {
+        countLoad(p, -1);
+        pinDropped[p] = true;
+    }
+
+    private void setRemoved(int l, byte reason) {
+        if (removed[l] == ALIVE) {
+            for (int p = idx.getLeafPinStart(l); p < idx.getLeafPinEnd(l); p++) {
+                countLoad(p, -1);
+            }
+        }
+        removed[l] = reason;
+    }
+
+    /** Visits pins; returns false to stop the visit. */
+    interface PinVisitor {
+        boolean visit(int pin);
+    }
+
+    /**
+     * Calls the visitor for every pin currently on a net of the alias group rooted at root
+     * (pins originally there and not moved away, and pins moved there).
+     * @return False if the visitor stopped the visit.
+     */
+    boolean forEachGroupPin(int root, PinVisitor v) {
+        IntList stack = new IntList();
+        stack.add(root);
+        while (stack.size() > 0) {
+            int n = stack.pop();
+            for (int i = idx.getNetPinStart(n); i < idx.getNetPinEnd(n); i++) {
+                int p = idx.getNetPin(i);
+                if (pinMovedTo[p] < 0 && !v.visit(p)) {
+                    return false;
+                }
+            }
+            IntList moved = movedIn == null ? null : movedIn[n];
+            if (moved != null) {
+                for (int i = 0; i < moved.size(); i++) {
+                    if (!v.visit(moved.get(i))) {
+                        return false;
+                    }
+                }
+            }
+            if (aliasChildren[n] != null) {
+                for (int i = 0; i < aliasChildren[n].size(); i++) {
+                    stack.add(aliasChildren[n].get(i));
+                }
+            }
+        }
+        return true;
+    }
+
+    /** Collects the live load pins of the alias group of root. */
+    IntList liveLoads(int root) {
+        IntList loads = new IntList();
+        forEachGroupPin(root, p -> {
+            if (isLiveSink(p)) {
+                loads.add(p);
+            }
+            return true;
         });
-        return found[0];
+        return loads;
+    }
+
+    /**
+     * Checks the connectivity invariants: each connected pin is in exactly one alias group, on
+     * its current net, and the live load counts match.
+     * @return True (throws if an invariant is violated).
+     */
+    boolean checkConsistency() {
+        int[] seen = new int[idx.getNumPins()];
+        for (int n = 0; n < numNets; n++) {
+            if (alias[n] >= 0) {
+                if (loadCount[n] != 0) {
+                    throw new IllegalStateException("Load count on aliased net " + n);
+                }
+                continue;
+            }
+            int root = n;
+            int[] loads = new int[1];
+            forEachGroupPin(n, p -> {
+                seen[p]++;
+                if (pinNet(p) != root) {
+                    throw new IllegalStateException("Pin " + idx.getPinName(p) + " visited in "
+                            + "the group of net " + root + " but is on net " + pinNet(p));
+                }
+                if (isLiveSink(p)) {
+                    loads[0]++;
+                }
+                return true;
+            });
+            if (loads[0] != loadCount[n]) {
+                throw new IllegalStateException("Net " + n + " has " + loads[0]
+                        + " live loads, counted " + loadCount[n]);
+            }
+        }
+        for (int p = 0; p < idx.getNumPins(); p++) {
+            if (homeNet(p) >= 0 && seen[p] != 1) {
+                throw new IllegalStateException("Pin " + idx.getPinName(p) + " visited "
+                        + seen[p] + " times");
+            }
+        }
+        return true;
     }
 
     private void enqueue(int l) {
@@ -450,6 +564,7 @@ class EDIFConstPropEngine {
             if (idx.getPinDir(p) != EDIFLeafIndex.DRIVER) {
                 enqueue(idx.getPinLeaf(p));
             }
+            return true;
         });
     }
 
@@ -466,7 +581,7 @@ class EDIFConstPropEngine {
     }
 
     private void removeLeaf(int l, byte reason) {
-        removed[l] = reason;
+        setRemoved(l, reason);
         // A LUT6_2 driving one of the inputs may now have an unused output
         for (int p = idx.getLeafPinStart(l); p < idx.getLeafPinEnd(l); p++) {
             if (idx.getPinDir(p) != EDIFLeafIndex.DRIVER) {
@@ -765,9 +880,7 @@ class EDIFConstPropEngine {
         s.size = f.size;
         s.bits = f.size;
         s.table = f.table;
-        s.net = f.net;
         s.srcPin = f.srcPin;
-        s.moved = new boolean[f.size];
         s.outPin = origOutPin;
         s.changed = !sameAsOriginal(l, s);
         lut[l] = s;
@@ -805,7 +918,7 @@ class EDIFConstPropEngine {
                 }
             }
             if (!used && !pinDropped[p]) {
-                pinDropped[p] = true;
+                dropPin(p);
                 // The driver of this pin may be a LUT6_2 that lost a load
                 int n = pinNet(p);
                 if (n >= 0 && netDriver[n] >= 0) {
@@ -986,7 +1099,7 @@ class EDIFConstPropEngine {
         if (kind[l] == K_LUT || kind[l] == K_LUT62) {
             Lut s = getLut(l);
             if (s != null && !s.dual && s.size == 1 && s.table == 1L) {
-                return resolve(s.net[0]);
+                return pinNet(s.srcPin[0]);
             }
         }
         return -1;
@@ -1009,62 +1122,41 @@ class EDIFConstPropEngine {
         if (frozen[l]) {
             return null;
         }
-        Lut s = new Lut();
-        if (kind[l] == K_LUT62) {
-            int[] pins = lutPins(l, 6);
-            for (int p : pins) {
-                if (p < 0 || pinNet(p) < 0) {
-                    return null;
-                }
-            }
-            s.size = 6;
-            s.bits = 6;
-            s.table = origInit[l];
-            s.dual = true;
-            s.srcPin = pins;
-            s.moved = new boolean[6];
-            s.net = new int[6];
-            for (int i = 0; i < 6; i++) {
-                s.net[i] = pinNet(pins[i]);
-            }
-        } else if (kind[l] == K_LUT) {
-            int k = lutSizeOf(idx.getLeafInst(l));
-            int[] pins = lutPins(l, k);
-            for (int p : pins) {
-                if (p < 0 || pinNet(p) < 0) {
-                    return null;
-                }
-            }
-            s.size = k;
-            s.bits = k;
-            s.table = origInit[l] & mask(k);
-            s.srcPin = pins;
-            s.moved = new boolean[k];
-            s.net = new int[k];
-            for (int i = 0; i < k; i++) {
-                s.net[i] = pinNet(pins[i]);
-            }
-        } else if (kind[l] == K_LUTCY) {
-            int[] pins = lutPins(l, 5);
-            for (int p : pins) {
-                if (p < 0 || pinNet(p) < 0) {
-                    return null;
-                }
-            }
-            boolean six = idx.getLeafInst(l).getCellType().getName().equals("LUT6CY");
-            s.size = 5;
-            s.bits = six ? 6 : 5;
-            s.table = origInit[l] & mask(s.bits);
-            s.dual = true;
-            s.srcPin = pins;
-            s.moved = new boolean[5];
-            s.net = new int[5];
-            for (int i = 0; i < 5; i++) {
-                s.net[i] = pinNet(pins[i]);
-            }
-        } else {
-            return null;
+        int inputs;
+        int bits;
+        boolean dual;
+        switch (kind[l]) {
+            case K_LUT62:
+                inputs = 6;
+                bits = 6;
+                dual = true;
+                break;
+            case K_LUT:
+                inputs = lutSizeOf(idx.getLeafInst(l));
+                bits = inputs;
+                dual = false;
+                break;
+            case K_LUTCY:
+                // O51/O52 (or O) and PROP share the inputs I0-I4
+                inputs = 5;
+                bits = idx.getLeafInst(l).getCellType().getName().equals("LUT6CY") ? 6 : 5;
+                dual = true;
+                break;
+            default:
+                return null;
         }
+        int[] pins = lutPins(l, inputs);
+        for (int p : pins) {
+            if (p < 0 || pinNet(p) < 0) {
+                return null;
+            }
+        }
+        Lut s = new Lut();
+        s.size = inputs;
+        s.bits = bits;
+        s.table = origInit[l] & mask(bits);
+        s.dual = dual;
+        s.srcPin = pins;
         lut[l] = s;
         return s;
     }
@@ -1141,11 +1233,9 @@ class EDIFConstPropEngine {
         if (kind[l] == K_LUT || kind[l] == K_LUT62 || kind[l] == K_LUTCY) {
             Lut s = getLut(l);
             for (int i = 0; i < s.size; i++) {
-                if (s.srcPin[i] == p && resolve(s.net[i]) == oldNet) {
+                if (s.srcPin[i] == p && pinNet(p) == oldNet) {
                     s.table = flipInput(s.table, s.bits, i);
-                    s.net[i] = newNet;
                     if (move) {
-                        s.moved[i] = true;
                         movePin(p, newNet);
                     }
                     s.changed = true;
@@ -1159,17 +1249,6 @@ class EDIFConstPropEngine {
             }
             mark(l, m);
         }
-    }
-
-    /** Collects the live load pins of the alias group of root. */
-    IntList liveLoads(int root) {
-        IntList loads = new IntList();
-        forEachGroupPin(root, p -> {
-            if (isLiveSink(p)) {
-                loads.add(p);
-            }
-        });
-        return loads;
     }
 
     /** Absorbs inverters into the LUTs and invertible pins they drive (constant propagation). */
@@ -1202,8 +1281,10 @@ class EDIFConstPropEngine {
             boolean all = true;
             boolean port = false;
             int nAbsorb = 0;
+            boolean[] absorbable = new boolean[loads.size()];
             for (int i = 0; i < loads.size(); i++) {
                 if (canAbsorb(loads.get(i))) {
+                    absorbable[i] = true;
                     nAbsorb++;
                 } else {
                     all = false;
@@ -1229,56 +1310,24 @@ class EDIFConstPropEngine {
             } else {
                 IntList absorbed = new IntList();
                 for (int i = 0; i < loads.size(); i++) {
-                    int p = loads.get(i);
-                    int pl = idx.getPinLeaf(p);
-                    if (canAbsorb(p)) {
-                        absorb(p, b, a, pushMark, true);
-                        absorbed.add(p);
-                    }
-                }
-                if (absorbed.size() == 0) {
-                    continue;
-                }
-                // A single load left on the inverter is modified as well
-                int remaining = 0;
-                for (int i = 0; i < loads.size(); i++) {
-                    int p = loads.get(i);
-                    int pl = idx.getPinLeaf(p);
-                    if (pl >= 0 && pinMovedTo[p] < 0 && !isAbsorbedLutPin(p, a)) {
-                        remaining++;
+                    if (absorbable[i]) {
+                        absorb(loads.get(i), b, a, pushMark, true);
+                        absorbed.add(loads.get(i));
                     }
                 }
                 // The smaller group of loads is the one reconnected: when that is the group left
                 // on the inverter, those loads are modified as well
-                if (remaining > 0 && remaining <= absorbed.size()) {
+                int remaining = loads.size() - absorbed.size();
+                if (remaining <= absorbed.size()) {
                     for (int i = 0; i < loads.size(); i++) {
-                        int p = loads.get(i);
-                        int pl = idx.getPinLeaf(p);
-                        if (pl >= 0 && pinMovedTo[p] < 0 && !isAbsorbedLutPin(p, a)) {
-                            mark(pl, pushMark);
+                        if (!absorbable[i]) {
+                            mark(idx.getPinLeaf(loads.get(i)), pushMark);
                         }
                     }
                 }
                 collapseBuffers(absorbed, reason);
             }
         }
-    }
-
-    private boolean isAbsorbedLutPin(int p, int a) {
-        int l = idx.getPinLeaf(p);
-        if (kind[l] != K_LUT && kind[l] != K_LUT62) {
-            return false;
-        }
-        Lut s = lut[l];
-        if (s == null) {
-            return false;
-        }
-        for (int i = 0; i < s.size; i++) {
-            if (s.srcPin[i] == p && s.moved[i]) {
-                return true;
-            }
-        }
-        return false;
     }
 
     int inputPinOf(int l) {
@@ -1306,13 +1355,9 @@ class EDIFConstPropEngine {
                 continue;
             }
             int r = resolve(outNet);
-            int in = resolve(s.net[0]);
-            if (r == in || netOpaque[r]) {
-                continue;
-            }
             int inPin = s.srcPin[0];
-            if (s.moved[0] && pinNet(inPin) != in) {
-                // Its input was moved to a net its own pin is not on
+            int in = pinNet(inPin);
+            if (r == in || netOpaque[r]) {
                 continue;
             }
             removeLeaf(l, reason);
@@ -1466,16 +1511,10 @@ class EDIFConstPropEngine {
                 }
                 markDriverLive(pinNet(p), live, stack);
             }
-            Lut s = lut[l];
-            if (s != null) {
-                for (int i = 0; i < s.size; i++) {
-                    markDriverLive(resolve(s.net[i]), live, stack);
-                }
-            }
         }
         for (int l = 0; l < numLeaves; l++) {
             if (removed[l] == ALIVE && !live[l] && kind[l] != K_GND && kind[l] != K_VCC) {
-                removed[l] = RM_SWEEP;
+                setRemoved(l, RM_SWEEP);
             }
         }
         // Surviving cells whose output lost all its loads to the sweep are modified
@@ -1535,35 +1574,24 @@ class EDIFConstPropEngine {
             return;
         }
         int dp = netDriver[r];
-        if (dp == -2) {
-            // Several drivers: keep all of them
+        if (dp >= 0) {
+            markLive(idx.getPinLeaf(dp), live, stack);
+        }
+        if (dp == -2 || netOpaque[r]) {
+            // Several drivers, or bidirectional pins (which may drive it): keep all of them
             for (int i = idx.getNetPinStart(r); i < idx.getNetPinEnd(r); i++) {
                 int q = idx.getNetPin(i);
-                int l = idx.getPinLeaf(q);
-                if (idx.getPinDir(q) != EDIFLeafIndex.SINK && l >= 0 && !live[l]) {
-                    live[l] = true;
-                    stack.add(l);
+                if (idx.getPinDir(q) != EDIFLeafIndex.SINK) {
+                    markLive(idx.getPinLeaf(q), live, stack);
                 }
             }
-            return;
         }
-        if (dp < 0) {
-            return;
-        }
-        int l = idx.getPinLeaf(dp);
+    }
+
+    private void markLive(int l, boolean[] live, IntList stack) {
         if (l >= 0 && !live[l] && removed[l] == ALIVE) {
             live[l] = true;
             stack.add(l);
-        }
-        if (netOpaque[r]) {
-            for (int i = idx.getNetPinStart(r); i < idx.getNetPinEnd(r); i++) {
-                int q = idx.getNetPin(i);
-                int ql = idx.getPinLeaf(q);
-                if (idx.getPinDir(q) == EDIFLeafIndex.BIDIR && ql >= 0 && !live[ql]) {
-                    live[ql] = true;
-                    stack.add(ql);
-                }
-            }
         }
     }
 
@@ -1596,6 +1624,7 @@ class EDIFConstPropEngine {
             }
         }
         stats.addTime("Post processing", System.nanoTime() - t);
+        assert checkConsistency();
         findOrphanNets();
         countStats(stats);
     }

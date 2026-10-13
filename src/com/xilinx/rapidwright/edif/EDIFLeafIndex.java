@@ -678,6 +678,16 @@ public class EDIFLeafIndex {
             return size;
         }
 
+        /** Removes one occurrence of v (order of the remaining values is not kept). */
+        void removeValue(int v) {
+            for (int i = 0; i < size; i++) {
+                if (a[i] == v) {
+                    a[i] = a[--size];
+                    return;
+                }
+            }
+        }
+
         void clear() {
             size = 0;
         }
