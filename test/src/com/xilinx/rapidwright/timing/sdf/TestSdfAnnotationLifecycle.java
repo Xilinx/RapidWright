@@ -1,0 +1,331 @@
+/*
+ * Copyright (c) 2026, Advanced Micro Devices, Inc.
+ * All rights reserved.
+ *
+ * This file is part of RapidWright.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+package com.xilinx.rapidwright.timing.sdf;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.timing.TimingEdge;
+import com.xilinx.rapidwright.timing.TimingGraph;
+import com.xilinx.rapidwright.timing.TimingManager;
+import com.xilinx.rapidwright.timing.TimingVertex;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+/**
+ * Tests the graph lifecycle around annotation, and coverage accounting per delay component.
+ *
+ * These are the failure modes that individual-delay assertions cannot see. Annotating can add arcs
+ * the graph did not have, which invalidates the super source and sink and the cached topological
+ * order; the resulting arrival times are wrong even though every edge delay is right. Separately,
+ * an edge holds up to two delays that arrive from different SDF constructs, so counting an edge as
+ * covered once either has arrived hides a missing one.
+ *
+ * The SDF is generated from the design under test rather than hard-coded, so the test cannot drift
+ * out of step with the netlist's names. No Vivado is required.
+ */
+public class TestSdfAnnotationLifecycle {
+
+    private static final String DCP = "picoblaze_ooc_X10Y235.dcp";
+
+    /**
+     * Builds an SDF against a design's own timing graph.
+     *
+     * @param graph The graph to take names from.
+     * @param omitInterconnectForFlopOutputs When true, no INTERCONNECT is written for net edges
+     *                                       leaving a flop output, so their net delay is missing
+     *                                       while their clock-to-output delay is present.
+     * @return The SDF text, and the number of cell-internal arcs it will ask the graph to create.
+     */
+    private static Generated generate(TimingGraph graph, boolean omitInterconnectForFlopOutputs) {
+        Set<String> vertexNames = new HashSet<>();
+        for (TimingVertex v : graph.vertexSet()) {
+            vertexNames.add(v.getName());
+        }
+
+        List<TimingEdge> netEdges = new ArrayList<>();
+        for (TimingEdge e : graph.edgeSet()) {
+            if (e.getNet() != null || e.getEdifNet() != null) {
+                netEdges.add(e);
+            }
+        }
+        Assertions.assertFalse(netEdges.isEmpty(), "the design has no net edges to work with");
+
+        // Cells whose input pin is fed by a net edge and whose output pin is also in the graph.
+        // An IOPATH between the two forces the annotator to create an arc, because a graph built
+        // without the delay estimator has no cell-internal arcs at all.
+        List<String[]> internalArcs = new ArrayList<>();
+        Set<String> seenCells = new HashSet<>();
+        for (TimingEdge e : netEdges) {
+            String dst = e.getDst().getName();
+            int slash = dst.lastIndexOf('/');
+            if (slash <= 0) {
+                continue;
+            }
+            String cell = dst.substring(0, slash);
+            String inPin = dst.substring(slash + 1);
+            if (!seenCells.add(cell) || !vertexNames.contains(cell + "/O")) {
+                continue;
+            }
+            Assertions.assertNotNull(graph.getTimingVertex(cell + "/O"));
+            if (graph.getEdge(e.getDst(), graph.getTimingVertex(cell + "/O")) != null) {
+                continue;   // already present, so it would not exercise arc creation
+            }
+            internalArcs.add(new String[] {cell, inPin});
+            if (internalArcs.size() >= 8) {
+                break;
+            }
+        }
+        Assertions.assertFalse(internalArcs.isEmpty(),
+                "found no cell whose input and output pins are both in the graph");
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("(DELAYFILE \n(SDFVERSION \"3.0\" )\n(DESIGN \"t\")\n")
+          .append("(DIVIDER /)\n(TIMESCALE 1ps)\n");
+
+        for (String[] arc : internalArcs) {
+            sb.append("(CELL \n  (CELLTYPE \"LUT6\")\n  (INSTANCE ")
+              .append(SdfNames.escape(arc[0])).append(")\n")
+              .append("  (DELAY \n    (ABSOLUTE \n      (IOPATH ").append(arc[1])
+              .append(" O (11.0:11.0:11.0) (11.0:11.0:11.0))\n    )\n  )\n)\n");
+        }
+
+        // Every flop output gets its clock-to-output arc, so the logic half of its outgoing net
+        // edges is supplied even when the net half is not.
+        Map<String, String> flopOutPinByCell = new LinkedHashMap<>();
+        for (TimingEdge e : netEdges) {
+            if (!e.getSrc().getFlopOutput()) {
+                continue;
+            }
+            String src = e.getSrc().getName();
+            int slash = src.lastIndexOf('/');
+            if (slash > 0) {
+                flopOutPinByCell.put(src.substring(0, slash), src.substring(slash + 1));
+            }
+        }
+        for (Map.Entry<String, String> flop : flopOutPinByCell.entrySet()) {
+            sb.append("(CELL \n  (CELLTYPE \"FDRE\")\n  (INSTANCE ")
+              .append(SdfNames.escape(flop.getKey())).append(")\n")
+              .append("  (DELAY \n    (ABSOLUTE \n      (IOPATH C ").append(flop.getValue())
+              .append(" (22.0:22.0:22.0) (22.0:22.0:22.0))\n    )\n  )\n")
+              .append("    (TIMINGCHECK\n      (PERIOD (posedge C) (500.0:500.0:500.0))\n")
+              .append("    )\n)\n");
+        }
+
+        sb.append("(CELL \n    (CELLTYPE \"t\")\n    (INSTANCE )\n    (DELAY\n      (ABSOLUTE\n");
+        int omitted = 0;
+        for (TimingEdge e : netEdges) {
+            if (omitInterconnectForFlopOutputs && e.getSrc().getFlopOutput()) {
+                omitted++;
+                continue;
+            }
+            sb.append("      (INTERCONNECT ").append(SdfNames.escape(e.getSrc().getName()))
+              .append(' ').append(SdfNames.escape(e.getDst().getName()))
+              .append(" (33.0:33.0:33.0) (33.0:33.0:33.0))\n");
+        }
+        sb.append("      )\n    )\n)\n)\n");
+
+        return new Generated(sb.toString(), internalArcs.size(), omitted);
+    }
+
+    /** An SDF built for a design, with what it is expected to exercise. */
+    private static final class Generated {
+        final String text;
+        final int internalArcCount;
+        final int omittedInterconnects;
+
+        Generated(String text, int internalArcCount, int omittedInterconnects) {
+            this.text = text;
+            this.internalArcCount = internalArcCount;
+            this.omittedInterconnects = omittedInterconnects;
+        }
+    }
+
+    @Test
+    public void testGraphStaysConsistentWhenAnnotationAddsArcs(@TempDir Path tempDir) {
+        Design design = RapidWrightDCP.loadDCP(DCP);
+        SdfAnnotator.ensureMacrosExpanded(design);
+
+        // Finalized up front, so annotation is adding arcs to a graph that has already computed
+        // its super source and sink and its topological order.
+        TimingManager tm = new TimingManager(design, false);
+        TimingGraph graph = tm.getTimingGraph();
+        Assertions.assertNotNull(graph.superSource, "graph should already be finalized");
+
+        Generated g = generate(graph, false);
+        Path sdfPath = SdfTestFiles.write(tempDir, "gen.sdf", g.text);
+        SdfFile sdf = SdfParser.parse(sdfPath);
+
+        SdfAnnotationReport report = new SdfAnnotator(design, sdf,
+                new SdfAnnotationConfig().setWarnWhenNotClean(false)).annotate(graph);
+
+        Assertions.assertTrue(
+                report.getCount(SdfAnnotationReport.Reason.OK_IOPATH_EDGE_CREATED) > 0,
+                "the SDF was supposed to make the annotator create cell-internal arcs");
+
+        assertSuperEdgesConsistent(graph);
+        assertTopologicalOrderIsValid(tm, graph);
+    }
+
+    @Test
+    public void testDeferredFinalizeProducesTheSameConsistentGraph(@TempDir Path tempDir) {
+        Design design = RapidWrightDCP.loadDCP(DCP);
+        SdfAnnotator.ensureMacrosExpanded(design);
+
+        TimingManager probe = new TimingManager(design, false);
+        Generated g = generate(probe.getTimingGraph(), false);
+        Path sdfPath = SdfTestFiles.write(tempDir, "gen.sdf", g.text);
+        SdfFile sdf = SdfParser.parse(sdfPath);
+
+        // The path SdfTools takes: build unfinalized, annotate, then finalize once.
+        Design fresh = RapidWrightDCP.loadDCP(DCP);
+        SdfAnnotator.ensureMacrosExpanded(fresh);
+        TimingManager tm = new TimingManager(fresh, false, true);
+        Assertions.assertNull(tm.getTimingGraph().superSource,
+                "a deferred build should not have finalized the graph");
+
+        new SdfAnnotator(fresh, sdf, new SdfAnnotationConfig().setWarnWhenNotClean(false))
+                .annotate(tm.getTimingGraph());
+        tm.finalizeTimingGraph();
+
+        Assertions.assertNotNull(tm.getTimingGraph().superSource);
+        assertSuperEdgesConsistent(tm.getTimingGraph());
+        assertTopologicalOrderIsValid(tm, tm.getTimingGraph());
+    }
+
+    @Test
+    public void testFinalizeTopologyIsIdempotent() {
+        Design design = RapidWrightDCP.loadDCP(DCP);
+        SdfAnnotator.ensureMacrosExpanded(design);
+        TimingManager tm = new TimingManager(design, false);
+        TimingGraph graph = tm.getTimingGraph();
+
+        int vertices = graph.vertexSet().size();
+        int edges = graph.edgeSet().size();
+
+        tm.finalizeTimingGraph();
+        tm.finalizeTimingGraph();
+
+        Assertions.assertEquals(vertices, graph.vertexSet().size(),
+                "finalizing twice changed the vertex count");
+        Assertions.assertEquals(edges, graph.edgeSet().size(),
+                "finalizing twice changed the edge count");
+        assertSuperEdgesConsistent(graph);
+        assertTopologicalOrderIsValid(tm, graph);
+    }
+
+    @Test
+    public void testMissingNetDelayIsNotHiddenByAPresentClockArc(@TempDir Path tempDir) {
+        Design design = RapidWrightDCP.loadDCP(DCP);
+        SdfAnnotator.ensureMacrosExpanded(design);
+        TimingManager tm = new TimingManager(design, false, true);
+        TimingGraph graph = tm.getTimingGraph();
+
+        // Deliberately omit the INTERCONNECT for every net edge leaving a flop, while still
+        // supplying each flop's clock-to-output arc. Those edges therefore get their logic delay
+        // and not their net delay.
+        Generated g = generate(graph, true);
+        Assertions.assertTrue(g.omittedInterconnects > 0,
+                "the design has no flop-output net edges to omit");
+        Path sdfPath = SdfTestFiles.write(tempDir, "gen.sdf", g.text);
+        SdfFile sdf = SdfParser.parse(sdfPath);
+
+        SdfAnnotationReport report = new SdfAnnotator(design, sdf,
+                new SdfAnnotationConfig().setWarnWhenNotClean(false)).annotate(graph);
+        tm.finalizeTimingGraph();
+
+        // The clock-to-output arcs did land, so a per-edge view would call these edges covered.
+        Assertions.assertTrue(report.getCount(SdfAnnotationReport.Reason.OK_SEQUENTIAL_ARC) > 0,
+                "expected the clock-to-output arcs to have been applied");
+
+        // Component accounting must still show the missing net delays.
+        Assertions.assertEquals(g.omittedInterconnects,
+                report.getCount(SdfAnnotationReport.Reason.EDGE_MISSING_NET_DELAY),
+                "every omitted INTERCONNECT should be reported as a missing net delay");
+        Assertions.assertTrue(report.getNetDelayCoverage() < 1.0,
+                "net delay coverage should be short, was " + report.getNetDelayCoverage());
+        Assertions.assertFalse(report.isClean(),
+                "a graph missing net delays must not report itself clean");
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Invariants
+    // ------------------------------------------------------------------------------------------
+
+    /**
+     * Checks that no vertex is both fed by a real arc and still treated as a graph source.
+     *
+     * This is what goes wrong when arcs are added after the super source has been computed: the
+     * vertex acquires an incoming edge but keeps its super-source edge, so the path search can
+     * start midway through the logic.
+     *
+     * @param graph The graph to check.
+     */
+    private static void assertSuperEdgesConsistent(TimingGraph graph) {
+        TimingVertex superSource = graph.superSource;
+        TimingVertex superSink = graph.superSink;
+        Assertions.assertNotNull(superSource);
+        Assertions.assertNotNull(superSink);
+
+        for (TimingEdge e : graph.outgoingEdgesOf(superSource)) {
+            TimingVertex v = e.getDst();
+            long realIncoming = graph.incomingEdgesOf(v).stream()
+                    .filter(in -> !superSource.equals(in.getSrc()))
+                    .count();
+            Assertions.assertEquals(0, realIncoming,
+                    "vertex " + v + " has a super-source edge but is fed by " + realIncoming
+                    + " real arc(s); the super source is stale");
+        }
+    }
+
+    /**
+     * Checks that the cached topological order actually holds, by requiring every edge to be
+     * consistent with the arrival times computed from it.
+     *
+     * A stale or duplicated order silently produces arrival times that violate this, which is the
+     * symptom that individual-delay assertions cannot detect.
+     *
+     * @param tm The manager owning the graph.
+     * @param graph The graph to check.
+     */
+    private static void assertTopologicalOrderIsValid(TimingManager tm, TimingGraph graph) {
+        graph.resetRequiredAndArrivalTime();
+        graph.computeArrivalTimesTopologicalOrder();
+
+        for (TimingEdge e : graph.edgeSet()) {
+            float src = e.getSrc().getArrivalTime();
+            float dst = e.getDst().getArrivalTime();
+            Assertions.assertTrue(dst + 1e-3f >= src + e.getDelay(),
+                    "arrival time is inconsistent across " + e.getSrc() + " -> " + e.getDst()
+                    + ": src=" + src + " delay=" + e.getDelay() + " dst=" + dst
+                    + "; the cached topological order is wrong");
+        }
+    }
+}
