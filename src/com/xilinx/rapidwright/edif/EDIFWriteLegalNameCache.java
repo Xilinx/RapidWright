@@ -33,6 +33,17 @@ import java.util.function.Supplier;
 
 /**
  * Helper class that keeps track of EDIF Renames during writing. This class is thread-safe.
+ * <p>
+ * A name that is not a legal EDIF identifier is renamed to a legal one, once per cache. Different names can be made
+ * legal as the same identifier (ignoring case, as Vivado does not like renames that differ only in case), e.g.
+ * {@code a[0]} and {@code A(0)}: the first of them to be renamed gets that identifier, and each later one gets it
+ * with a suffix ({@code _HDI_0}, {@code _HDI_1}, ...), in the order in which they are first renamed. Each renamed name
+ * keeps the same legal identifier for as long as the cache is used, and no two renamed names share one. (A name that
+ * is already legal is written as it is, without being checked against these: so a legal {@code a_0_} and a renamed
+ * {@code a[0]} would share one.) Which renamed name gets which identifier depends on that order: with
+ * {@link #singleThreaded()}, that is the order in which the names are written; with {@link #multiThreaded()}, shared
+ * by threads writing different parts of a netlist at the same time, it depends on their timing, so the identifiers
+ * (and so the text, and its length) may differ between exports of the same netlist.
  */
 public abstract class EDIFWriteLegalNameCache<T> {
 
@@ -107,6 +118,11 @@ public abstract class EDIFWriteLegalNameCache<T> {
         };
     }
 
+    /**
+     * @return A cache that can be shared by threads writing different parts of a netlist at the same time. Names that
+     * are made legal as the same identifier are told apart in the order in which threads first rename them, which
+     * depends on their timing (see {@link EDIFWriteLegalNameCache}).
+     */
     public static EDIFWriteLegalNameCache<?> multiThreaded() {
         return new EDIFWriteLegalNameCache<AtomicInteger>(new ConcurrentHashMap<>(), ConcurrentHashMap::new) {
             @Override
