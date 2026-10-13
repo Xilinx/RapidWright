@@ -33,11 +33,18 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.VivadoProp;
+import com.xilinx.rapidwright.design.VivadoPropType;
 import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.device.Part;
+import com.xilinx.rapidwright.device.PartNameTools;
+import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLeafIndex;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
+import com.xilinx.rapidwright.edif.EDIFValueType;
 import com.xilinx.rapidwright.edif.EDIFTools;
 
 /**
@@ -48,7 +55,8 @@ import com.xilinx.rapidwright.edif.EDIFTools;
  * top-level outputs and the (inversion-corrected) input pins of every cut cell present in both
  * netlists. Since cut cells are not simulated, a cut cell present in both netlists must also
  * have the same type, the same properties (except OPT_MODIFIED and the IS_*_INVERTED inversions,
- * which are simulated) and the same connected inputs (a pin on an undriven net counts as
+ * which are simulated; values are compared exactly unless declared numeric or boolean for the
+ * primitive) and the same connected inputs (a pin on an undriven net counts as
  * unconnected); any difference is a mismatch. Flip-flops that exist only in the original netlist
  * are assumed to have been removed as constants: they take their constant value and their next
  * state is checked to equal it.
@@ -534,6 +542,9 @@ public class EDIFRandomSimEquivalence {
     public int check(EDIFNetlist orig, EDIFNetlist opt, int rounds) {
         Model a = new Model(orig);
         Model b = new Model(opt);
+        String partName = EDIFTools.getPartName(orig);
+        Part part = partName == null ? null : PartNameTools.getPart(partName);
+        series = part == null ? null : part.getSeries();
         // Sequential cells removed by the optimization that still influence an observed point
         // must have been constant: they are assumed constant in the original and checked
         Map<Integer, Long> forced = new HashMap<>();
@@ -607,31 +618,83 @@ public class EDIFRandomSimEquivalence {
     private static final Pattern VERILOG_NUMBER = Pattern.compile(
             "(\\d+)'([bBhHdD])([0-9a-fA-F_]+)");
 
-    /**
-     * @return The value of a property in a canonical form: numbers by value, booleans ignoring
-     * case, anything else (e.g. file names) exactly.
-     */
-    private static String normalize(String value) {
-        String v = value.trim();
-        if (v.equalsIgnoreCase("TRUE") || v.equalsIgnoreCase("FALSE")) {
-            return v.toUpperCase();
+    /** Series of the original netlist (null if unknown), for the declared property types. */
+    private Series series;
+    /** Declared properties per primitive type. */
+    private final Map<String, Map<String, VivadoProp>> declared = new HashMap<>();
+
+    /** @return The declared type of a property of a primitive, null if unknown. */
+    private VivadoPropType declaredType(String cellType, String key) {
+        if (series == null) {
+            return null;
         }
-        Matcher m = VERILOG_NUMBER.matcher(v);
-        if (!m.matches()) {
-            return value;
+        Map<String, VivadoProp> props = declared.computeIfAbsent(cellType, t -> {
+            Map<String, VivadoProp> m = Design.getDefaultCellProperties(series, t);
+            return m == null ? new HashMap<>() : m;
+        });
+        VivadoProp p = props.get(key);
+        if (p == null) {
+            p = props.get(key.toUpperCase());
         }
-        char base = Character.toLowerCase(m.group(2).charAt(0));
-        int radix = base == 'b' ? 2 : base == 'h' ? 16 : 10;
-        String digits = m.group(3).replace("_", "");
-        return m.group(1) + "'" + new BigInteger(digits, radix).toString(16);
+        return p == null ? null : p.getType();
     }
 
-    private static Map<String, String> properties(Model m, int l) {
+    /** @return The value of a Verilog-style or decimal number, null if not a number. */
+    private static BigInteger number(String value) {
+        Matcher m = VERILOG_NUMBER.matcher(value);
+        try {
+            if (!m.matches()) {
+                return new BigInteger(value);
+            }
+            char base = Character.toLowerCase(m.group(2).charAt(0));
+            int radix = base == 'b' ? 2 : base == 'h' ? 16 : 10;
+            return new BigInteger(m.group(3).replace("_", ""), radix);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * @return The value of a property in a canonical form. Only properties known to be numbers or
+     * booleans (by their declared type for the primitive, or their EDIF value type) are
+     * normalized; anything else, e.g. a file name, is kept exactly.
+     */
+    private String normalize(String cellType, String key, EDIFPropertyValue pv) {
+        String value = pv.getValue();
+        VivadoPropType type = declaredType(cellType, key);
+        boolean bool = type == VivadoPropType.BOOL || pv.getType() == EDIFValueType.BOOLEAN;
+        boolean num = type == VivadoPropType.HEX || type == VivadoPropType.BINARY
+                || type == VivadoPropType.INT || pv.getType() == EDIFValueType.INTEGER;
+        String v = value.trim();
+        if (bool) {
+            if (v.equalsIgnoreCase("TRUE") || v.equals("1") || v.equalsIgnoreCase("1'b1")) {
+                return "TRUE";
+            }
+            if (v.equalsIgnoreCase("FALSE") || v.equals("0") || v.equalsIgnoreCase("1'b0")) {
+                return "FALSE";
+            }
+        } else if (num) {
+            BigInteger n = number(v);
+            if (n != null) {
+                return n.toString(16);
+            }
+        } else if (type == VivadoPropType.DOUBLE) {
+            try {
+                return Double.toString(Double.parseDouble(v));
+            } catch (NumberFormatException e) {
+                // Kept exactly
+            }
+        }
+        return value;
+    }
+
+    private Map<String, String> properties(Model m, int l) {
+        EDIFCellInst inst = m.idx.getLeafInst(l);
+        String cellType = inst.getCellType().getName();
         Map<String, String> props = new TreeMap<>();
-        for (Map.Entry<String, EDIFPropertyValue> e
-                : m.idx.getLeafInst(l).getPropertiesMap().entrySet()) {
+        for (Map.Entry<String, EDIFPropertyValue> e : inst.getPropertiesMap().entrySet()) {
             if (!isIgnoredProperty(e.getKey())) {
-                props.put(e.getKey().toUpperCase(), normalize(e.getValue().getValue()));
+                props.put(e.getKey().toUpperCase(), normalize(cellType, e.getKey(), e.getValue()));
             }
         }
         return props;

@@ -925,6 +925,23 @@ public class TestEDIFTools {
         otherFile.getTopCell().getCellInst("M").addProperty("INIT_FILE", "/tmp/A.mem");
         Assertions.assertTrue(new EDIFRandomSimEquivalence().check(ram.get(), otherFile, 2) > 0);
         Assertions.assertEquals(0, new EDIFRandomSimEquivalence().check(ram.get(), ram.get(), 2));
+        // File names that look like booleans or numbers are still compared exactly
+        for (String[] names : new String[][] {{"true", "TRUE"}, {"8'h1", "8'h01"}}) {
+            EDIFNetlist x = ram.get();
+            EDIFNetlist y = ram.get();
+            x.getTopCell().getCellInst("M").addProperty("INIT_FILE", names[0]);
+            y.getTopCell().getCellInst("M").addProperty("INIT_FILE", names[1]);
+            Assertions.assertTrue(new EDIFRandomSimEquivalence().check(x, y, 2) > 0, names[0]);
+        }
+        // Declared numeric properties are compared by value
+        EDIFNetlist hex = ram.get();
+        hex.getTopCell().getCellInst("M").addProperty("SRVAL_A", "18'h00001");
+        EDIFNetlist bin = ram.get();
+        bin.getTopCell().getCellInst("M").addProperty("SRVAL_A", "18'b1");
+        Assertions.assertEquals(0, new EDIFRandomSimEquivalence().check(hex, bin, 2));
+        EDIFNetlist other = ram.get();
+        other.getTopCell().getCellInst("M").addProperty("SRVAL_A", "18'h00002");
+        Assertions.assertTrue(new EDIFRandomSimEquivalence().check(hex, other, 2) > 0);
     }
 
     @Test
