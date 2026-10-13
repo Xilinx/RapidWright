@@ -27,10 +27,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 import com.xilinx.rapidwright.util.StringPool;
@@ -267,9 +267,12 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
 
     }
 
+    /**
+     * Close the worker's input stream and release its tokenizer's buffer, as it cannot parse any more.
+     */
     @Override
     public void close() throws IOException {
-        in.close();
+        tokenizer.close();
     }
 
     @Override
@@ -343,12 +346,15 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
                 }
                 library = currentCell.getLibrary();
             } else {
-                library = Objects.requireNonNull(librariesByLegalName.get(libraryref), ()-> "No library with name "+libraryref);
+                library = Objects.requireNonNull(librariesByLegalName.get(libraryref), ()-> "No library with name "
+                        + libraryref + " (libraries must be defined before they are referenced)");
             }
 
-            final EDIFCell cell = cellsByLegalName.get(library).get(cellref);
+            final Map<String, EDIFCell> cells = cellsByLegalName.get(library);
+            final EDIFCell cell = cells != null ? cells.get(cellref) : null;
             if (cell == null) {
-                throw new RuntimeException("did not find cell "+cellref+" in library "+libraryref);
+                throw new RuntimeException("did not find cell "+cellref+" in library "+libraryref
+                        + " (cells must be defined before they are referenced)");
             }
             setCell(cell);
         }
@@ -526,7 +532,15 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
 
             // As EDIFReadLegalNameCache.getLegalEDIFName() does, so after any collision rename above
             final String legalName = edifRename != null ? edifRename : cell.getName();
-            cellsByLegalName.computeIfAbsent(currentLibrary, x-> new HashMap<>()).put(legalName, cell);
+            // Concurrent, as workers already assembled are linked (reading it) while later ones are still added
+            final EDIFCell duplicate = cellsByLegalName.computeIfAbsent(currentLibrary, x -> new ConcurrentHashMap<>())
+                    .putIfAbsent(legalName, cell);
+            if (duplicate != null) {
+                // References are resolved as soon as the cells before them are assembled, so references could not be
+                // resolved to a later cell with the same EDIF identifier (which EDIF does not allow within a library)
+                throw new IllegalStateException("Duplicate EDIF identifier " + legalName + " in library "
+                        + currentLibrary.getName() + " (cells " + duplicate + " and " + cell + ")");
+            }
 
             return currentLibrary;
         }

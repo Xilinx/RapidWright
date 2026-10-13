@@ -43,7 +43,8 @@ public class EDIFTokenizer implements AutoCloseable {
 
     private final InputStream in;
 
-    private final byte[] buffer;
+    /** Released by {@link #close()}, as no more tokens can then be read */
+    private byte[] buffer;
     private static final Charset charset = StandardCharsets.UTF_8;
 
     protected long byteOffset;
@@ -475,6 +476,7 @@ public class EDIFTokenizer implements AutoCloseable {
 
     @Override
     public void close() throws IOException {
+        buffer = null;
         in.close();
     }
 

@@ -27,16 +27,16 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Future;
+import java.util.concurrent.CountedCompleter;
+import java.util.function.BiFunction;
 
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -203,75 +203,167 @@ public class ParallelEDIFParser implements AutoCloseable{
             workers.get(i - 1).setStopCellToken(workers.get(i).getFirstCellToken());
         }
 
-        t.stop().start("Do Parse and Assemble Libraries");
-        final Assembler assembler = doParseAndAssemble();
-        assembler.netlist.setDesign(getEdifDesign());
-
-        t.stop().start("Link Netlist");
-        processLinks(assembler);
+        t.stop().start("Parse, Assemble and Link Netlist");
+        final EDIFNetlist netlist = parseAssembleAndLink();
+        netlist.setDesign(getEdifDesign());
         t.stop();
 
+        return netlist;
+    }
+
+    /**
+     * Parse all workers in parallel, add the libraries and cells that each has parsed to the netlist in file order,
+     * and link each worker as soon as it (and so every worker before it) has been added, while later workers are
+     * still being parsed or added. This requires EDIF's define-before-use rule: a worker's references can then only
+     * be to cells that it or an earlier worker parsed, which have been added. This thread parses the first worker,
+     * so that adding and linking can start as soon as possible.
+     * Workers are added by a chain of stages, one per worker, each of which runs once its worker has been parsed and
+     * the previous stage has completed, on whichever thread completes the later of the two. So no thread waits for
+     * another to add a worker, and one thread may add several workers in a row while others link those added. Once
+     * this thread has parsed the first worker, it helps with any queued linking until all workers have been added
+     * and linked.
+     * @return The netlist.
+     */
+    private EDIFNetlist parseAssembleAndLink() {
+        final Assembler assembler = new Assembler(Objects.requireNonNull(workers.get(0).netlist));
+        // Port lookup maps of cells with many ports, created on first use by any worker's linking
+        final Map<EDIFCell, EDIFPortCache> portCaches = new ConcurrentHashMap<>();
+        final List<ParallelEDIFParserWorker> discarded = new ArrayList<>();
+        final List<Callable<Void>> parses = new ArrayList<>(workers.size());
+        for (ParallelEDIFParserWorker w : workers) {
+            parses.add(() -> {
+                w.doParse(false);
+                return null;
+            });
+        }
+        // This thread parses the first worker, while the others are parsed in the pool
+        final List<CompletableFuture<Void>> parsed = ParallelismTools.invokeFirstSubmitRestCompletable(parses);
+
+        // Completes once the stages below have, and so has every worker's linking, which each stage submits (see
+        // link()) as chunks that are its descendants: so a thread waiting for it helps with only that linking
+        final CountedCompleter<Void> linked = new CountedCompleter<Void>() {
+            @Override
+            public void compute() {
+                // Never run: completed by the stages and each worker's linking
+            }
+        };
+        // Add a worker that has been parsed, given the worker still to be added (or null if none) if the previous one
+        // did not stop exactly at this worker's first cell: this worker then misdetected its start, so is discarded,
+        // and that worker parses on up to the following worker's first cell instead. Returns the worker still to be
+        // added, if this one (or that one) also did not stop exactly at the following worker's first cell
+        final BiFunction<ParallelEDIFParserWorker, Integer, ParallelEDIFParserWorker> add = (mismatched, index) -> {
+            final ParallelEDIFParserWorker worker;
+            if (mismatched == null) {
+                worker = workers.get(index);
+            } else {
+                worker = mismatched;
+                final ParallelEDIFParserWorker failedWorker = workers.get(index);
+                if (!Device.QUIET_MESSAGE) {
+                    System.err.println("Token mismatch between " + worker + " and " + failedWorker
+                            + ". Discarding second one and reparsing...");
+                }
+                try {
+                    failedWorker.close();
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+                discarded.add(failedWorker);
+                worker.setStopCellToken(index + 1 < workers.size() ? workers.get(index + 1).getFirstCellToken()
+                        : null);
+                //Re-Parse :(
+                worker.doParse(true);
+            }
+            if (worker.parseException != null) {
+                throw worker.parseException;
+            }
+            if (worker.stopTokenMismatch) {
+                if (index == workers.size() - 1) {
+                    throw new IllegalStateException(worker + " claims to have a mismatch with the following " +
+                            "thread, but is is the last one");
+                }
+                return worker;
+            }
+            assembler.add(worker);
+            // An added worker never parses again, so release its input (and tokenizer buffer) while linking
+            try {
+                worker.close();
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            link(linked, worker, assembler, portCaches);
+            return null;
+        };
+        // Each stage adds its worker once that has been parsed and the previous stage has completed
+        CompletableFuture<ParallelEDIFParserWorker> stage = parsed.get(0).thenApply(x -> add.apply(null, 0));
+        for (int i = 1; i < workers.size(); i++) {
+            final int index = i;
+            stage = stage.thenCompose(mismatched -> parsed.get(index).thenApply(x -> add.apply(mismatched, index)));
+        }
+        stage.whenComplete((x, e) -> {
+            if (e == null) {
+                linked.tryComplete();
+            } else {
+                linked.completeExceptionally(e instanceof CompletionException && e.getCause() != null
+                        ? e.getCause() : e);
+            }
+        });
+        // Until all workers have been added and linked, rather than block, help with any of their linking that is
+        // queued; then rethrow any exception from parsing, adding or linking
+        ParallelismTools.join(linked);
+        // Discarded workers are only removed now, as the stages index into workers (if an exception was rethrown above,
+        // they are left in it). All workers have already been closed, so close() closes them again, which is harmless
+        workers.removeAll(discarded);
+        // Release each worker's renames only now, as any worker's port insts may have read them
+        for (ParallelEDIFParserWorker w : workers) {
+            w.cache.clear();
+        }
         return assembler.netlist;
     }
 
     /**
-     * Parse all workers in parallel and, on the calling thread, add the libraries and cells that each has parsed
-     * to the netlist in file order, as soon as that worker (and so every worker before it) has finished, while
-     * later workers are still parsing.
-     * @return The assembler holding the netlist and the lookup maps needed to link it.
+     * Link a worker that has been added, as part of the given completer (so that a thread waiting for it helps): its
+     * cell references, then, once all have been applied (as linking a port inst needs its cell instance's type), its
+     * port insts. Each step's items are split into chunks that any thread can run.
+     * Each cell reference sets a different cell instance's type, so their order does not matter.
+     * When adding the port insts, we have to make sure that we don't split a parent cell's port instances between
+     * threads. That could lead to ConcurrentModificationExceptions. Each ParentCellPortInsts in linkPortInstData
+     * holds all port insts of one parent cell, which are processed sequentially; this only modifies those port
+     * insts and that parent cell's nets, cell insts and internal port map, whereas other parent cells' port insts
+     * only read cells' ports.
+     * The worker's references and port insts are released once linked, as they are no longer needed.
      */
-    private Assembler doParseAndAssemble() {
-        final Assembler assembler = new Assembler(Objects.requireNonNull(workers.get(0).netlist));
-        // As EDIFNetlist.exportEDIF() does, submit all workers and then wait for them in order with joinFirst(),
-        // which also runs any worker not yet started by the pool on this thread
-        final Deque<Future<ParallelEDIFParserWorker>> futures = new ArrayDeque<>(workers.size());
-        for (ParallelEDIFParserWorker w : workers) {
-            futures.add(ParallelismTools.submit(() -> {
-                w.doParse(false);
-                return w;
-            }));
-        }
-
-        //Check if we had misdetected start tokens
-        for (int i=0; i<workers.size();i++) {
-            final ParallelEDIFParserWorker worker = ParallelismTools.joinFirst(futures);
-            assert(worker == workers.get(i));
-            if (worker.parseException!=null) {
-                throw worker.parseException;
+    private void link(CountedCompleter<?> linked, ParallelEDIFParserWorker worker, Assembler assembler,
+                      Map<EDIFCell, EDIFPortCache> portCaches) {
+        // Each step is a completer that is never run itself, only completed by its chunks, as part of linked
+        final CountedCompleter<Void> cellReferences = new CountedCompleter<Void>(linked) {
+            @Override
+            public void compute() {
             }
-            while (worker.stopTokenMismatch) {
-                if (i<workers.size()-1) {
-                    // Wait for the next worker to finish parsing before discarding it
-                    final ParallelEDIFParserWorker failedWorker = ParallelismTools.joinFirst(futures);
-                    assert(failedWorker == workers.get(i + 1));
-                    if (!Device.QUIET_MESSAGE) {
-                        System.err.println("Token mismatch between "+worker+" and " + failedWorker + ". Discarding second one and reparsing...");
-                    }
-                    try {
-                        failedWorker.close();
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-                    workers.remove(i+1);
-                } else {
-                    throw new IllegalStateException(worker+" claims to have a mismatch with the following thread, but is is the last one");
-                }
 
-                if (i<workers.size()-1) {
-                    worker.setStopCellToken(workers.get(i + 1).getFirstCellToken());
-                } else {
-                    worker.setStopCellToken(null);
-                }
+            @Override
+            public void onCompletion(CountedCompleter<?> caller) {
+                worker.linkCellReference.clear();
+                final CountedCompleter<Void> portInsts = new CountedCompleter<Void>(linked) {
+                    @Override
+                    public void compute() {
+                    }
 
-                //Re-Parse :(
-                worker.doParse(true);
-                if (worker.parseException!=null) {
-                    throw worker.parseException;
-                }
+                    @Override
+                    public void onCompletion(CountedCompleter<?> caller) {
+                        worker.linkPortInstData.clear();
+                    }
+                };
+                // Counted before this step completes, so that linked cannot complete in between
+                linked.addToPendingCount(1);
+                ParallelismTools.submit(portInsts, worker.linkPortInstData,
+                        parent -> parent.linkAndAdd(assembler.portRenamesByCell, portCaches, uniquifier));
+                portInsts.tryComplete();
             }
-            assembler.add(worker);
-        }
-        return assembler;
+        };
+        linked.addToPendingCount(1);
+        ParallelismTools.submit(cellReferences, worker.linkCellReference,
+                ref -> ref.apply(assembler.librariesByLegalName, assembler.cellsByLegalName));
+        cellReferences.tryComplete();
     }
 
     private EDIFDesign getEdifDesign() {
@@ -292,10 +384,11 @@ public class ParallelEDIFParser implements AutoCloseable{
      */
     private class Assembler {
         private final EDIFNetlist netlist;
-        private final Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName = new HashMap<>();
-        private final Map<String, EDIFLibrary> librariesByLegalName = new HashMap<>();
+        // Concurrent maps, as workers already added are linked (reading them) while later workers are added
+        private final Map<EDIFLibrary, Map<String, EDIFCell>> cellsByLegalName = new ConcurrentHashMap<>();
+        private final Map<String, EDIFLibrary> librariesByLegalName = new ConcurrentHashMap<>();
         /** For each cell with renamed ports, the renames recorded by the worker that parsed it */
-        private final Map<EDIFCell, EDIFReadLegalNameCache> portRenamesByCell = new IdentityHashMap<>();
+        private final Map<EDIFCell, EDIFReadLegalNameCache> portRenamesByCell = new ConcurrentHashMap<>();
         private EDIFLibrary currentLibrary = null;
         /** Byte offset of the last library or cell added */
         private long lastResultOffset = -1;
@@ -324,39 +417,6 @@ public class ParallelEDIFParser implements AutoCloseable{
             // Release this worker's results, which are no longer needed
             worker.librariesAndCells.clear();
             worker.cellsWithRenamedPorts.clear();
-        }
-    }
-
-    /**
-     * Link each worker's cell instances to their cells and port insts to their ports, then name and add the port
-     * insts. This needs all libraries and cells to have been assembled, as any cell instance may reference a cell
-     * parsed by any worker; after that, all of a worker's work is done in one parallel step, so that there is one
-     * wait for the slowest worker rather than one per step.
-     */
-    private void processLinks(Assembler assembler) {
-        // Port lookup maps of cells with many ports, created on first use (read-only once constructed)
-        final Map<EDIFCell, EDIFPortCache> portCaches = new ConcurrentHashMap<>();
-        // Workers (byte ranges) need not take equally long, so each also splits its work with nested
-        // forEach()s, whose pieces can be stolen by threads that have finished their own worker:
-        //  - Each apply() sets a different cell instance's type, so their order does not matter; the first
-        //    forEach() returns before the second looks up those cell instances' types.
-        //  - When adding the port insts, we have to make sure that we don't split a parent cell's port instances
-        //    between threads. That could lead to ConcurrentModificationExceptions. Each ParentCellPortInsts in
-        //    linkPortInstData holds all port insts of one parent cell, which are processed sequentially; this only
-        //    modifies those port insts and that parent cell's nets, cell insts and internal port map, whereas other
-        //    parent cells' port insts only read cells' ports.
-        // Each worker's references and port insts are released once linked, as they are no longer needed.
-        ParallelismTools.forEach(workers, w-> {
-            ParallelismTools.forEach(w.linkCellReference, cellReferenceData -> cellReferenceData.apply(
-                    assembler.librariesByLegalName, assembler.cellsByLegalName));
-            w.linkCellReference.clear();
-            ParallelismTools.forEach(w.linkPortInstData, links -> links.linkAndAdd(assembler.portRenamesByCell,
-                    portCaches, uniquifier));
-            w.linkPortInstData.clear();
-        });
-        // Release each worker's renames only now, as any worker's port insts may have read them
-        for (ParallelEDIFParserWorker w : workers) {
-            w.cache.clear();
         }
     }
 
