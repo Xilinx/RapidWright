@@ -1032,6 +1032,53 @@ public class TestDesignTools {
     }
 
     /**
+     * A circuit's BEL attributes are moved into the design, each onto the net it is on there: the
+     * circuit's own nets as renamed, the design's static net for a static one, and for a net on a
+     * port, the net it was merged onto.
+     */
+    @Test
+    public void testPopulateBlackBoxBELAttrs() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", createBlackBox(top, "bb", EDIFDirection.INPUT));
+        Net inNet = design.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+
+        // The circuit: I into a LUT, which drives another
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet circuitIn = circuitTop.createNet("I");
+        circuitIn.createPortInst(circuitTop.getPort("I"));
+        Net circuitInNet = circuit.createNet("I");
+        SitePinInst lutIn = addSinkLUT(circuit, circuitTop, "lut0", "SLICE_X1Y0", circuitIn, circuitInNet);
+        EDIFNet x = circuitTop.createNet("x");
+        Net xNet = circuit.createNet("x");
+        x.createPortInst("O", circuitTop.getCellInst("lut0"));
+        xNet.createPin("A_O", lutIn.getSiteInst());
+        addSinkLUT(circuit, circuitTop, "lut1", "SLICE_X2Y0", x, xNet);
+
+        Site site = lutIn.getSiteInst().getSite();
+        BEL bel = site.getBEL("A6LUT");
+        circuit.addBELAttr(circuitInNet, site, site.getSiteTypeEnum(), bel, "ON_PORT", "1");
+        circuit.addBELAttr(xNet, site, site.getSiteTypeEnum(), bel, "INTERNAL", "2");
+        circuit.addBELAttr(circuit.getGndNet(), site, site.getSiteTypeEnum(), bel, "STATIC", "3");
+        circuit.addBELAttr(null, site, site.getSiteTypeEnum(), site.getBEL("B6LUT"), "NO_NET", "4");
+
+        populateBlackBox(design, "bb", circuit, false);
+
+        SiteConfig siteConfig = design.getBELAttrs().get(site);
+        Assertions.assertNotNull(siteConfig);
+        Assertions.assertSame(inNet, siteConfig.getBELAttribute(bel, "ON_PORT").getNet());
+        Assertions.assertSame(xNet, siteConfig.getBELAttribute(bel, "INTERNAL").getNet());
+        Assertions.assertEquals("bb/x", xNet.getName());
+        Assertions.assertSame(design.getGndNet(), siteConfig.getBELAttribute(bel, "STATIC").getNet());
+        BELAttr noNet = siteConfig.getBELAttribute(site.getBEL("B6LUT"), "NO_NET");
+        Assertions.assertNull(noNet.getNet());
+        Assertions.assertEquals("4", noNet.getValue());
+    }
+
+    /**
      * An output the circuit does not drive brings in no physical net to merge, but its shell
      * routing must still respect keepBoundaryRouting. A circuit that is nothing but ports is still
      * a leaf to the parent net map, so the net owns itself; one with contents leaves the net with
