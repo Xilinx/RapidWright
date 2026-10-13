@@ -1147,6 +1147,15 @@ public class DesignTools {
                     // has for sites in the region of a reconfigurable partition. It holds nothing
                     // else, so it is simply removed for the circuit's site instance to take over
                     design.removeSiteInst(existingSi);
+                    // Removing it marks it modified on its way out. Untrack it: SiteInst equality
+                    // goes by name, and both are usually named after the site, so it would stand
+                    // in for the circuit's site instance in the modified set. Its snapshot, if
+                    // one was taken, is what the site changes from
+                    design.getModifiedSiteInsts().remove(existingSi);
+                    SiteInst original = design.getOriginalSiteInsts().remove(existingSi.getName());
+                    if (original != null) {
+                        design.getOriginalSiteInsts().put(si.getName(), original);
+                    }
                     existingSi = null;
                 }
                 if (existingSi != null) {

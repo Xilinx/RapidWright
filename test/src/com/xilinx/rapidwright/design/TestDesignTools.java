@@ -1212,6 +1212,9 @@ public class TestDesignTools {
             locked.addSitePIP("FFMUXA1", "D6");
             Assertions.assertTrue(locked.getSiteWireToNetMap().isEmpty());
         }
+        // The shell is as it was read: from here on, changes to it are tracked
+        design.setTrackingChanges(true);
+        design.setCopyingOriginalSiteInsts(true);
 
         Design circuit = createCircuit("circuit", EDIFDirection.INPUT);
         EDIFCell circuitTop = circuit.getTopEDIFCell();
@@ -1240,6 +1243,29 @@ public class TestDesignTools {
         Assertions.assertNull(locked.getDesign());
         Assertions.assertNotNull(design.getCell("bb/lut"));
         Assertions.assertSame(inNet, lutIn.getNet());
+
+        // The site's one modified site instance is the incoming one, and every modified site
+        // instance is still in the design. SiteInst equality goes by name, so a locked site
+        // instance left in the modified set would stand in for the incoming one: both are checked
+        // by identity
+        SiteInst modified = null;
+        for (SiteInst si : design.getModifiedSiteInsts()) {
+            Assertions.assertSame(si, design.getSiteInst(si.getName()),
+                    "modified site instance is no longer in the design: " + si.getName());
+            if (si.getSite() == site) {
+                Assertions.assertNull(modified, "two modified site instances on " + site.getName());
+                modified = si;
+            }
+        }
+        Assertions.assertSame(incoming, modified);
+        // What the site changes from is the locked site instance it replaced
+        SiteInst original = design.getOriginalSiteInsts().get(incoming.getName());
+        Assertions.assertNotNull(original);
+        Assertions.assertSame(site, original.getSite());
+        Assertions.assertEquals(3, original.getCells().size());
+        for (Cell c : original.getCells()) {
+            Assertions.assertEquals(Cell.LOCKED, c.getName());
+        }
     }
 
     @ParameterizedTest
