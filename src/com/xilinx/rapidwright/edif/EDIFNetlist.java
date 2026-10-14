@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -53,8 +54,8 @@ import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Future;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -964,6 +965,59 @@ public class EDIFNetlist extends EDIFName {
 
 
     /**
+     * Most estimated number of (uncompressed) bytes of EDIF in each run of consecutive cells written to a
+     * {@link ParallelDCPInput} when exporting in parallel (see {@link #estimateExportBytes(EDIFCell)}), unless the run
+     * is a single cell estimated to be bigger.
+     * {@link ParallelDCPOutput#newStream} keeps up to 1 MiB of compressed output in memory, and writes any more to a
+     * temporary file: so this is as many bytes as are expected to compress to half of that, estimating with
+     * {@link ParallelEDIFParser#EDIF_GZIP_COMPRESSION_RATIO}, leaving room for estimates that are too low and text that
+     * compresses less well (a run that compresses to more than 1 MiB, such as a cell that alone does, is still written
+     * correctly, but through a temporary file).
+     */
+    private static final int PARALLEL_EXPORT_RUN_BYTES =
+            (1 << 20) / 2 * ParallelEDIFParser.EDIF_GZIP_COMPRESSION_RATIO;
+
+    /** Nominal length of an identifier, for {@link #estimateExportBytes(EDIFCell)}, which does not look at names */
+    private static final int EXPORT_ESTIMATE_NAME_BYTES = 16;
+
+    /**
+     * Estimate the number of bytes of EDIF that {@link EDIFCell#exportEDIF} writes for the given cell, from the fixed
+     * text that it writes for the cell and for each of its ports, instances, nets and their port insts, with each
+     * name taken to be {@link #EXPORT_ESTIMATE_NAME_BYTES} long (looking at each name would cost nearly as much as
+     * writing it), and without properties. Only counts are looked at: those of the cell's ports, instances and nets,
+     * and of each net's port insts.
+     * @param cell The cell.
+     * @return The estimated number of bytes.
+     */
+    static long estimateExportBytes(EDIFCell cell) {
+        final int name = EXPORT_ESTIMATE_NAME_BYTES;
+        // Cell, view, interface and contents, with the names of the cell and its view
+        long bytes = EDIFCell.EXPORT_CONST_CELL_BEGIN.length + EDIFCell.EXPORT_CONST_CELLTYPE.length
+                + EDIFCell.EXPORT_CONST_VIEWTYPE.length + EDIFCell.EXPORT_CONST_INTERFACE_END.length
+                + EDIFCell.EXPORT_CONST_CONTENTS.length + EDIFCell.EXPORT_CONST_CONTENTS_END.length
+                + EDIFCell.EXPORT_CONST_VIEW_END.length + EDIFCell.EXPORT_CONST_CELL_END.length + 2 * name;
+        // Each port, with its name, its direction (at most 6 bytes) and its closing ")", ")" and newline
+        bytes += (long) cell.getPorts().size() * (EDIFPort.EXPORT_CONST_INDENT.length
+                + EDIFPort.EXPORT_CONST_PORT_BEGIN.length + EDIFPort.EXPORT_CONST_DIRECTION_START.length + 6 + 3
+                + name);
+        // Each instance, with the names of itself, its view, its cell and that cell's library
+        bytes += (long) cell.getCellInsts().size() * (EDIFCellInst.EXPORT_CONST_INSTANCE_BEGIN.length
+                + EDIFCellInst.EXPORT_CONST_VIEWREF.length + EDIFCellInst.EXPORT_CONST_CELLREF.length
+                + EDIFCellInst.EXPORT_CONST_LIBRARYREF.length + EDIFCellInst.EXPORT_CONST_CLOSE_NO_PROPS.length
+                + 4 * name);
+        // Each net, with its name, and each of its port insts, with the names of its port and instance
+        final long perNet = EDIFNet.EXPORT_CONST_NET_START.length + EDIFNet.EXPORT_CONST_JOINED.length
+                + EDIFNet.EXPORT_CONST_JOINED_END.length + EDIFNet.EXPORT_CONST_NET_END.length + name;
+        final long perPortInst = EDIFNet.EXPORT_CONST_PORT_INDENT.length + EDIFPortInst.EXPORT_CONST_PORTREF.length
+                + EDIFPortInst.EXPORT_CONST_INSTANCEREF.length + 1 + EDIFPortInst.EXPORT_CONST_CLOSE_PORT_INST.length
+                + 2 * name;
+        for (EDIFNet net : cell.getNets()) {
+            bytes += perNet + net.getPortInsts().size() * perPortInst;
+        }
+        return bytes;
+    }
+
+    /**
      * Write this netlist as EDIF to the given stream, which is closed afterwards. If parallel processing is enabled and
      * the stream is that of a DCP being written (see {@link ParallelDCPOutput#cast}), the EDIF is written and
      * compressed in parallel.
@@ -1011,21 +1065,69 @@ public class EDIFNetlist extends EDIFName {
             List<EDIFLibrary> librariesToWrite = getLibrariesInExportOrder(stable, false);
 
             if (dos != null) {
-                Deque<Future<ParallelDCPInput>> streamFutures = new ArrayDeque<>();
-                for (EDIFLibrary lib : librariesToWrite) {
-                    streamFutures.addAll(lib.exportEDIF(cache));
-                }
-
                 os.flush();
-
-                while (!streamFutures.isEmpty()) {
-                    try {
-                        ParallelDCPInput dis = ParallelismTools.joinFirst(streamFutures);
-                        dos.write(dis);
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
+                // The libraries' cells, one after the other: those of the i-th library are from offsets[i]
+                // (inclusive) to offsets[i + 1] (exclusive)
+                final List<EDIFCell> cells = new ArrayList<>();
+                final int[] offsets = new int[librariesToWrite.size() + 1];
+                for (int i = 0; i < librariesToWrite.size(); i++) {
+                    cells.addAll(librariesToWrite.get(i).getValidCellExportOrder(false));
+                    offsets[i + 1] = cells.size();
                 }
+                // Split the cells into chunks of consecutive cells, each the most estimated to make up at most
+                // PARALLEL_EXPORT_RUN_BYTES (ending a chunk before the cell that would take it beyond that), but at
+                // least one. There is at least one chunk, so that libraries are written even if none has any cells
+                final List<Long> estimates = ParallelismTools.invokeAll(cells, EDIFNetlist::estimateExportBytes);
+                final List<CompletableFuture<ParallelDCPInput>> pieces = new ArrayList<>();
+                int from = 0;
+                do {
+                    final int start = from;
+                    long bytes = 0;
+                    while (from < cells.size()
+                            && (from == start || bytes + estimates.get(from) <= PARALLEL_EXPORT_RUN_BYTES)) {
+                        bytes += estimates.get(from++);
+                    }
+                    final int end = from;
+                    // Write this chunk's cells, and the header of each library that starts within it and the footer
+                    // of each that ends within it (a library without cells is written by the chunk that contains its
+                    // offset, or by the last chunk if it comes after all cells), directly into the compressing
+                    // stream of one piece
+                    pieces.add(ParallelismTools.submitCompletable(() -> ParallelDCPOutput.newStream(chunkOs -> {
+                        try {
+                            for (int i = 0; i < librariesToWrite.size(); i++) {
+                                final int libStart = Math.max(start, offsets[i]);
+                                final int libEnd = Math.min(end, offsets[i + 1]);
+                                final boolean noCells = offsets[i] == offsets[i + 1];
+                                if (noCells ? !(start <= offsets[i] && (offsets[i] < end || end == cells.size()))
+                                            : libStart >= libEnd) {
+                                    continue;
+                                }
+                                librariesToWrite.get(i).exportEDIF(cells.subList(libStart, libEnd), chunkOs,
+                                        libStart == offsets[i], libEnd == offsets[i + 1], cache, false);
+                            }
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    })));
+                } while (from < cells.size());
+
+                // Each chunk's piece is written once that chunk is done and the previous chunk's piece has been
+                // written, by whichever thread completes the later of the two (so it may block on that I/O)
+                CompletableFuture<Void> written = CompletableFuture.completedFuture(null);
+                for (CompletableFuture<ParallelDCPInput> piece : pieces) {
+                    written = written.thenCombine(piece, (x, p) -> {
+                        try {
+                            dos.write(p);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                        return null;
+                    });
+                }
+                // Wait for the chunks in order, meanwhile running any not yet started (which rethrows any exception
+                // thrown by a chunk), then for the last piece to have been written
+                ParallelismTools.joinAll(pieces);
+                ParallelismTools.get(written);
             } else {
                 for (EDIFLibrary lib : librariesToWrite) {
                     lib.exportEDIF(os, cache, stable);
