@@ -694,8 +694,12 @@ public class RouteNodeGraph {
 
     public void awaitPreserve() {
         asyncPreserveOutstanding.tryComplete();
-        // Runs any of those calls' tasks not yet started, rather than only blocking
-        ParallelismTools.join(asyncPreserveOutstanding);
+        // Uninterruptibly (as before). First runs any of those calls' tasks not yet started on this thread, rather than
+        // only blocking, then blocks for those already started: it helps only that once, which is enough, as the
+        // calling thread submitted all of them before this and none of them submits any more (unlike
+        // ParallelismTools.join(CountedCompleter), which keeps helping). Never completes exceptionally, as each task
+        // catches what it throws
+        asyncPreserveOutstanding.quietlyJoin();
         // Only once done (all of its children have completed, and this was its only join), so that it can be reused
         // for any later calls to preserveAsync()
         asyncPreserveOutstanding.reinitialize();
