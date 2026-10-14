@@ -77,8 +77,8 @@ import com.xilinx.rapidwright.edif.optimizer.EDIFLeafIndex.IntList;
  * buffer or an absorbed inverter form an alias group represented by its root net
  * ({@link #resolve}). Connectivity is only queried through {@link #pinNet} and
  * {@link #forEachGroupPin}, and only changed through {@link #movePin}, {@link #dropPin},
- * {@link #setRemoved} and {@link #addAlias}, which keep the number of live loads of each group
- * up to date ({@link #hasLoads}).
+ * {@link #restorePin}, {@link #setRemoved} and {@link #addAlias}, which keep the number of live
+ * loads of each group up to date ({@link #hasLoads}).
  */
 class EDIFConstPropEngine {
 
@@ -476,6 +476,12 @@ class EDIFConstPropEngine {
     private void dropPin(int p) {
         countLoad(p, -1);
         pinDropped[p] = true;
+    }
+
+    /** Reconnects a dropped input pin that a LUT's simplified function uses again. */
+    private void restorePin(int p) {
+        pinDropped[p] = false;
+        countLoad(p, 1);
     }
 
     private void setRemoved(int l, byte reason) {
@@ -969,7 +975,10 @@ class EDIFConstPropEngine {
                     used = true;
                 }
             }
-            if (!used && !pinDropped[p]) {
+            if (used && pinDropped[p]) {
+                // Merged inputs can make a pin dropped earlier represent a variable again
+                restorePin(p);
+            } else if (!used && !pinDropped[p]) {
                 dropPin(p);
                 // The driver of this pin may be a LUT6_2 that lost a load
                 int n = pinNet(p);

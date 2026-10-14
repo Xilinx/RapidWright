@@ -46,6 +46,7 @@ import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.edif.EDIFValueType;
 import com.xilinx.rapidwright.edif.compare.EDIFLeafNetlistComparator;
 import com.xilinx.rapidwright.edif.compare.EDIFRandomSimEquivalence;
 
@@ -275,7 +276,8 @@ public class TestEDIFNetlistOptimizer {
                 () -> inverterPairManyLoads("A", "B", 20),
                 () -> inverterPairManyLoads("B", "A", 20),
                 TestEDIFNetlistOptimizer::inverterIntoChild,
-                TestEDIFNetlistOptimizer::lut62BufferedInvertedInput));
+                TestEDIFNetlistOptimizer::lut62BufferedInvertedInput,
+                TestEDIFNetlistOptimizer::reselectedDroppedPin));
     }
 
     @ParameterizedTest
@@ -509,7 +511,16 @@ public class TestEDIFNetlistOptimizer {
         Assertions.assertEquals(BigInteger.valueOf(5), VerilogLiterals.parseNumber("3'b1_01"));
         Assertions.assertEquals(BigInteger.valueOf(12), VerilogLiterals.parseNumber("'d12"));
         Assertions.assertEquals(BigInteger.valueOf(12), VerilogLiterals.parseNumber("12"));
+        // Signs, widths and signed literals
+        Assertions.assertEquals(BigInteger.valueOf(-1), VerilogLiterals.parseNumber("-01"));
+        Assertions.assertEquals(BigInteger.ONE, VerilogLiterals.parseNumber("+1"));
+        Assertions.assertEquals(BigInteger.valueOf(-1), VerilogLiterals.parseNumber("8'shff"));
+        Assertions.assertEquals(BigInteger.valueOf(127), VerilogLiterals.parseNumber("8'sh7f"));
+        Assertions.assertEquals(BigInteger.valueOf(255), VerilogLiterals.parseNumber("8'hff"));
+        Assertions.assertEquals(BigInteger.valueOf(-2), VerilogLiterals.parseNumber("'shfffffffe"));
+        Assertions.assertEquals(BigInteger.valueOf(15), VerilogLiterals.parseNumber("4'hff"));
         Assertions.assertNull(VerilogLiterals.parseNumber("1'bx"));
+        Assertions.assertNull(VerilogLiterals.parseNumber("2'b12"));
         Assertions.assertNull(VerilogLiterals.parseNumber("/tmp/a.mem"));
         for (String t : new String[] {"TRUE", "true", "yes", "1", "1'b1", "1'h1", "2'b10"}) {
             Assertions.assertTrue(VerilogLiterals.isTrue(t), t);
@@ -536,6 +547,60 @@ public class TestEDIFNetlistOptimizer {
         r.inst(Unisim.GND, "GND_q", "G=q");
         EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
         Assertions.assertTrue(eq.check(o.nl, r.nl, 2) > 0);
+    }
+
+    @Test
+    public void testRandomSimEquivalenceComparesSignedIntegers() {
+        java.util.function.Function<String, EDIFNetlist> build = value -> {
+            OptProbes.B b = new OptProbes.B("signed_property");
+            b.in("a");
+            b.out("q");
+            EDIFCell bb = b.cell("opaque");
+            bb.createPort("D", EDIFDirection.INPUT, 1);
+            bb.createPort("Q", EDIFDirection.OUTPUT, 1);
+            EDIFCellInst inst = b.inst(bb, "X", "D=a", "Q=q");
+            inst.addProperty("OFFSET", value, EDIFValueType.INTEGER);
+            return b.nl;
+        };
+        for (String[] same : new String[][] {{"-1", "-01"}, {"+1", "1"}, {"8'shff", "-1"}}) {
+            Assertions.assertEquals(0, new EDIFRandomSimEquivalence().check(build.apply(same[0]),
+                    build.apply(same[1]), 2), same[0]);
+        }
+        for (String[] diff : new String[][] {{"8'shff", "255"}, {"8'shff", "8'hff"}}) {
+            Assertions.assertTrue(new EDIFRandomSimEquivalence().check(build.apply(diff[0]),
+                    build.apply(diff[1]), 2) > 0, diff[0]);
+        }
+    }
+
+    /**
+     * q = a ^ b ^ c through a LUT whose first input (m, a buffer of n) is initially unused: once
+     * the buffer is removed, that input represents n again.
+     */
+    private static EDIFNetlist reselectedDroppedPin() {
+        OptProbes.B b = new OptProbes.B("dropped_pin");
+        b.in("a", "b", "c");
+        b.out("q");
+        b.lut("A", "3C", "q", "m", "n", "c");
+        b.lut("G", "6", "n", "a", "b");
+        b.lut("Z", "2", "m", "n");
+        return b.nl;
+    }
+
+    @Test
+    public void testOptimizeRestoresReselectedInputPin() {
+        EDIFNetlist netlist = reselectedDroppedPin();
+        EDIFTools.optimizeNetlist(netlist, new EDIFOptOptions());
+        EDIFCell top = netlist.getTopCell();
+        Assertions.assertNotNull(top.getCellInst("G"));
+        EDIFCellInst a = top.getCellInst("A");
+        Assertions.assertEquals("LUT2", a.getCellType().getName());
+        for (EDIFPortInst pi : a.getPortInsts()) {
+            Assertions.assertNotNull(pi.getNet(), pi.getName());
+        }
+        assertOptimizedEquivalent(TestEDIFNetlistOptimizer::reselectedDroppedPin,
+                new EDIFOptOptions());
+        assertOptimizedEquivalent(TestEDIFNetlistOptimizer::reselectedDroppedPin,
+                new EDIFOptOptions().setSweep(false));
     }
 
     @Test
