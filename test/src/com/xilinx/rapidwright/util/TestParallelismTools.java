@@ -22,9 +22,12 @@ package com.xilinx.rapidwright.util;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.Future;
@@ -204,7 +207,7 @@ public class TestParallelismTools {
     }
 
     @Test
-    public void testSingleThreaded() {
+    public void testSingleThreaded() throws Exception {
         final boolean wasParallel = ParallelismTools.getParallel();
         ParallelismTools.setParallel(false);
         try {
@@ -241,12 +244,60 @@ public class TestParallelismTools {
                     () -> runs.incrementAndGet(2)));
             assertEachRunOnce(runs);
 
-            // A submitted task is run immediately; its exception is rethrown by get()
-            final Future<Integer> future = ParallelismTools.submit(() -> {
+            // A submitted task is deferred until waited for, then run once by the waiting thread: whether waited for
+            // with ParallelismTools.get() or the Future's own get()
+            final AtomicIntegerArray submitted = new AtomicIntegerArray(5);
+            final Future<Integer> future = ParallelismTools.submit(() -> submitted.incrementAndGet(0));
+            Assertions.assertFalse(future.isDone());
+            Assertions.assertEquals(0, submitted.get(0));
+            Assertions.assertEquals(1, ParallelismTools.get(future));
+            Assertions.assertEquals(1, ParallelismTools.get(future));
+            final Future<Integer> plain = ParallelismTools.submit(() -> submitted.incrementAndGet(1));
+            Assertions.assertFalse(plain.isDone());
+            Assertions.assertEquals(0, submitted.get(1));
+            Assertions.assertEquals(1, (int) plain.get());
+            Assertions.assertEquals(1, (int) plain.get(1, TimeUnit.SECONDS));
+
+            // Its exception is rethrown once it has been run there: as-is by ParallelismTools.get(), and wrapped in an
+            // ExecutionException by the Future's own get()
+            final Future<Integer> failing = ParallelismTools.submit(() -> {
                 throw new IllegalStateException("submitted");
             });
-            Assertions.assertTrue(future.isDone());
-            Assertions.assertThrows(IllegalStateException.class, () -> ParallelismTools.get(future));
+            Assertions.assertFalse(failing.isDone());
+            Assertions.assertThrows(IllegalStateException.class, () -> ParallelismTools.get(failing));
+            final Future<Integer> failingPlain = ParallelismTools.submit(() -> {
+                throw new IllegalStateException("submitted");
+            });
+            Assertions.assertFalse(failingPlain.isDone());
+            Assertions.assertTrue(Assertions.assertThrows(ExecutionException.class, failingPlain::get).getCause()
+                    instanceof IllegalStateException);
+
+            // So is a task given to submitCompletable(), and so is work chained on it: whether waited for with
+            // ParallelismTools.joinAll() or the CompletableFuture's own join() or get()
+            final CompletableFuture<Integer> completable = ParallelismTools.submitCompletable(
+                    () -> submitted.incrementAndGet(2));
+            final CompletableFuture<Integer> chained = completable.thenApply((x) -> x + 1);
+            Assertions.assertFalse(completable.isDone());
+            Assertions.assertFalse(chained.isDone());
+            Assertions.assertEquals(0, submitted.get(2));
+            ParallelismTools.joinAll(new ArrayList<>(Collections.singletonList(completable)));
+            Assertions.assertTrue(chained.isDone());
+            Assertions.assertEquals(2, (int) chained.join());
+
+            final CompletableFuture<Integer> joined = ParallelismTools.submitCompletable(
+                    () -> submitted.incrementAndGet(3));
+            final CompletableFuture<Integer> joinedChained = joined.thenApply((x) -> x + 1);
+            Assertions.assertFalse(joined.isDone());
+            Assertions.assertEquals(0, submitted.get(3));
+            Assertions.assertEquals(1, (int) joined.join());
+            Assertions.assertEquals(2, (int) joinedChained.join());
+
+            final CompletableFuture<Integer> got = ParallelismTools.submitCompletable(
+                    () -> submitted.incrementAndGet(4));
+            Assertions.assertFalse(got.isDone());
+            Assertions.assertEquals(0, submitted.get(4));
+            Assertions.assertEquals(1, (int) got.get());
+            assertEachRunOnce(submitted);
         } finally {
             ParallelismTools.setParallel(wasParallel);
         }
