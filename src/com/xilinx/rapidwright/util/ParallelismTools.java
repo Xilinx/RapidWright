@@ -371,21 +371,33 @@ public class ParallelismTools {
      * tasks' results are consumed in the List's order as they complete (e.g. by
      * work chained on their CompletableFutures), so that fewer results are held
      * until the earlier ones have completed.
+     * Once each Future has completed, its element is set to null, so that the
+     * List no longer keeps it (or its result) from being garbage collected once
+     * nothing else refers to it (e.g. once work chained on it has consumed its
+     * result), rather than until the List itself is. So the List must be
+     * modifiable, and must not be read by anything else while (or after) this
+     * runs: work chained on a Future should be given the Future itself, rather
+     * than look it up in the List later.
      * If a task threw an exception, it is rethrown (as described in
-     * {@link #getUnwrapped(Future)}) once the tasks before it have completed.
-     * @param futures A List of Future objects corresponding to previously
-     *                submitted tasks, whose elements are accessed by index (so
-     *                should be a random-access list, such as an ArrayList).
+     * {@link #getUnwrapped(Future)}) once the tasks before it have completed,
+     * leaving the elements of that task and of those after it in the List.
+     * @param futures A modifiable List of Future objects corresponding to
+     *                previously submitted tasks, whose elements are accessed by
+     *                index (so should be a random-access list, such as an
+     *                ArrayList), and are each set to null once completed.
      */
     public static void joinAll(@NotNull List<? extends Future<?>> futures) {
         // Every task before this index has been run by this thread, or claimed by another
         int next = 0;
         for (int i = 0; i < futures.size(); i++) {
             final Future<?> future = futures.get(i);
+            // Never steal from before this one, whose elements have been set to null
+            next = Math.max(next, i);
             while (!future.isDone() && next < futures.size()) {
                 runIfUnclaimed(futures.get(next++));
             }
             getUnwrapped(future);
+            futures.set(i, null);
         }
     }
 
