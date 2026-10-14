@@ -1129,8 +1129,15 @@ public class EDIFNetlist extends EDIFName {
                     });
                 }
                 // Wait for the chunks in order, meanwhile running any not yet started (which rethrows any exception
-                // thrown by a chunk), then for the last piece to have been written
-                ParallelismTools.joinAll(pieces);
+                // thrown by a chunk), dropping each from pieces once done (so that each piece is kept only until the
+                // relay has written it), then for the last piece to have been written. Even if a chunk threw, do not
+                // return (and close the stream) until the relay has finished: each stage runs only once both its
+                // inputs have completed, so the last completes only once every write has returned
+                try {
+                    ParallelismTools.joinAll(pieces);
+                } finally {
+                    written.handle((x, e) -> null).join();
+                }
                 ParallelismTools.get(written);
             } else {
                 for (EDIFLibrary lib : librariesToWrite) {
