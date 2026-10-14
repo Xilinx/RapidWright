@@ -65,6 +65,11 @@ public abstract class EDIFWriteLegalNameCache<T> {
 
     private final Map<String, byte[]> busCollisionRenames;
 
+    /**
+     * {@link #calcRename(String)}, made once rather than on every {@link #getEDIFRename(String)}
+     */
+    private final Function<String, byte[]> calcRename = this::calcRename;
+
     @SuppressWarnings("unchecked")
     private EDIFWriteLegalNameCache(Map<String, T> usedRenames, Supplier<Map<String, byte[]>> renameSupplier) {
         this.usedRenames = usedRenames;
@@ -93,7 +98,11 @@ public abstract class EDIFWriteLegalNameCache<T> {
 
     public byte[] getEDIFRename(String name) {
         Map<String, byte[]> map = renames[name.charAt(0)&0xFF];
-        final byte[] rename = map.computeIfAbsent(name, this::calcRename);
+        // Look up first: ConcurrentHashMap.computeIfAbsent() locks the bin unless the name is its first node
+        byte[] rename = map.get(name);
+        if (rename == null) {
+            rename = map.computeIfAbsent(name, calcRename);
+        }
         //Checking equality against this special marker instance is ok
         if (rename == MARKER_NO_RENAME) {
             return null;
