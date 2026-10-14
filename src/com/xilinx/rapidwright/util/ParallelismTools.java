@@ -55,11 +55,17 @@ import org.jetbrains.annotations.NotNull;
  * Utilities to aid in parallel processing
  *
  * A class that abstracts away single-threaded and multi-threaded execution.
- * Single-threaded mode means that all tasks submitted will be executed
- * immediately (on the submitting thread), except for the tasks after the
- * first given to {@link #invokeFirstSubmitRest(Callable[])}, which are
- * deferred until they are waited for ({@link #joinFirst(Deque)},
- * {@link #get(Future)} or {@link #join(List)}).
+ * Single-threaded mode means that all tasks are executed on the current
+ * thread: those given to {@link #submit(Callable)} or
+ * {@link #submitCompletable(Callable)} (and all but the first given to
+ * {@link #invokeFirstSubmitRest(Callable[])}) are deferred until they are
+ * waited for ({@link #get(Future)}, {@link #join(List)},
+ * {@link #joinAll(List)} or {@link #joinFirst(Deque)}, or the returned
+ * Future's own get(), or CompletableFuture's own get() or join()), which
+ * executes them on the waiting thread; all others are executed immediately.
+ * So a task submitted that way is never executed if it is never waited for,
+ * and waiting only for further work chained on a CompletableFuture (e.g. by
+ * thenApply()), rather than for the CompletableFuture itself, blocks forever.
  */
 public class ParallelismTools {
     /**
@@ -122,15 +128,17 @@ public class ParallelismTools {
      * {@link #join(List)} or {@link #joinFirst(Deque)} runs it itself if no other thread
      * has claimed it yet, wherever it is in the pool's queues (and so even if the pool has
      * no threads), and any exception it throws is kept as-is.
-     * When parallel processing is disabled, the task is executed immediately on the
-     * current thread.
+     * When parallel processing is disabled, the task is not submitted, but deferred until
+     * it is waited for, with {@link #get(Future)}, {@link #join(List)},
+     * {@link #joinAll(List)}, {@link #joinFirst(Deque)} or the returned Future's own get(),
+     * which executes it on the waiting thread (see {@link LazyFutureTask}).
      * @param task Task to be performed.
      * @param <T> Type returned by task.
      * @return A Future object holding the value returned by task.
      */
     public static <T> Future<T> submit(Callable<T> task) {
         if (!getParallel()) {
-            return callNow(task);
+            return new LazyFutureTask<>(task);
         }
         final RunnableFuture<T> future = adapt(task);
         ForkJoinPool.commonPool().execute(future);
@@ -138,7 +146,8 @@ public class ParallelismTools {
     }
 
     /**
-     * Submit a task-without-return-value to the thread pool.
+     * Submit a task-without-return-value to the thread pool, as {@link #submit(Callable)} does
+     * (so, when parallel processing is disabled, it is deferred until waited for).
      * @param task Task to be performed.
      * @return A Future object used only to determine task completion.
      */
@@ -160,6 +169,32 @@ public class ParallelismTools {
     }
 
     /**
+     * A FutureTask that is not submitted to the pool (as when parallel processing is disabled), but run by the first
+     * thread to wait for it with its own get(), as well as by {@link #get(Future)}, {@link #join(List)},
+     * {@link #joinAll(List)} or {@link #joinFirst(Deque)} (see {@link #runIfUnclaimed(Future)}). FutureTask.run()
+     * does nothing if another thread has already claimed the task, so it is run at most once, and any other thread
+     * waiting for it meanwhile waits for that one.
+     */
+    private static final class LazyFutureTask<T> extends FutureTask<T> {
+        private LazyFutureTask(Callable<T> task) {
+            super(task);
+        }
+
+        @Override
+        public T get() throws InterruptedException, ExecutionException {
+            run();
+            return super.get();
+        }
+
+        @Override
+        public T get(long timeout, @NotNull TimeUnit unit)
+                throws InterruptedException, ExecutionException, TimeoutException {
+            run();
+            return super.get(timeout, unit);
+        }
+    }
+
+    /**
      * A CompletableFuture completed by a FutureTask that runs its task: so that, once that FutureTask has been
      * submitted to the pool, a thread waiting for the CompletableFuture with {@link #get(Future)}, {@link #join(List)}
      * or {@link #joinFirst(Deque)} can run it itself if no other thread has started it (see
@@ -167,9 +202,9 @@ public class ParallelismTools {
      * (e.g. from CompletableFuture.supplyAsync()) cannot be run that way: the CompletableFuture has no reference to
      * it, and (unlike a FutureTask) it could run twice if run by a second thread.
      */
-    private static final class CompletableFutureWithFutureTask<T> extends CompletableFuture<T> {
+    private static class CompletableFutureWithFutureTask<T> extends CompletableFuture<T> {
         /** Runs the task and completes this, at most once */
-        private final FutureTask<Void> task;
+        protected final FutureTask<Void> task;
 
         private CompletableFutureWithFutureTask(Callable<T> callable) {
             task = new FutureTask<>(() -> {
@@ -184,26 +219,60 @@ public class ParallelismTools {
     }
 
     /**
+     * A {@link CompletableFutureWithFutureTask} whose FutureTask is not submitted to the pool (as when parallel
+     * processing is disabled), but run by the first thread to wait for this with its own get() or join(), as for a
+     * {@link LazyFutureTask}, as well as by {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)} or
+     * {@link #joinFirst(Deque)}.
+     */
+    private static final class CompletableFutureWithLazyFutureTask<T> extends CompletableFutureWithFutureTask<T> {
+        private CompletableFutureWithLazyFutureTask(Callable<T> callable) {
+            super(callable);
+        }
+
+        @Override
+        public T get() throws InterruptedException, ExecutionException {
+            task.run();
+            return super.get();
+        }
+
+        @Override
+        public T get(long timeout, @NotNull TimeUnit unit)
+                throws InterruptedException, ExecutionException, TimeoutException {
+            task.run();
+            return super.get(timeout, unit);
+        }
+
+        @Override
+        public T join() {
+            task.run();
+            return super.join();
+        }
+    }
+
+    /**
      * Submit a task-with-return-value to the common ForkJoinPool, as {@link #submit(Callable)} does (so a thread
      * waiting for it with {@link #get(Future)}, {@link #join(List)} or {@link #joinFirst(Deque)} also runs it itself if
      * no other thread has started it), but returning a CompletableFuture, so that further work can be chained on its
      * completion (by default, run by the thread that completes it). Any exception the task throws completes the
      * CompletableFuture exceptionally.
-     * When parallel processing is disabled, the task is executed immediately on the current thread.
-     * Waiting with the CompletableFuture's own get() or join() does not run the task. (From Java 9, a thread of the
-     * pool that does so helps, within the JDK, which cannot be done from outside it, but only by running
+     * When parallel processing is disabled, the task is deferred as for {@link #submit(Callable)}: until it is waited
+     * for with {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)}, {@link #joinFirst(Deque)} or the
+     * returned CompletableFuture's own get() or join(), which executes it (and then, on the same thread, any work
+     * chained on it) on the waiting thread. Waiting only for work chained on it (e.g. by thenApply()) does not run the
+     * task, so blocks forever.
+     * Otherwise, waiting with the CompletableFuture's own get() or join() does not run the task. (From Java 9, a thread
+     * of the pool that does so helps, within the JDK, which cannot be done from outside it, but only by running
      * CompletableFutures' own tasks, e.g. from CompletableFuture.supplyAsync(), at the head of its own queue.)
      * @param task Task to be performed.
      * @param <T> Type returned by task.
      * @return A CompletableFuture holding the value returned by task.
      */
     public static <T> CompletableFuture<T> submitCompletable(Callable<T> task) {
-        final CompletableFutureWithFutureTask<T> future = new CompletableFutureWithFutureTask<>(task);
-        if (getParallel()) {
-            ForkJoinPool.commonPool().execute(future.task);
-        } else {
-            future.task.run();
+        if (!getParallel()) {
+            return new CompletableFutureWithLazyFutureTask<>(task);
         }
+        final CompletableFutureWithFutureTask<T> future = new CompletableFutureWithFutureTask<>(task);
+        ForkJoinPool.commonPool().execute(future.task);
         return future;
     }
 
@@ -213,10 +282,7 @@ public class ParallelismTools {
      * @return A CompletableFuture that completes (with null) once task has.
      */
     public static CompletableFuture<Void> submitCompletable(Runnable task) {
-        return submitCompletable(() -> {
-            task.run();
-            return null;
-        });
+        return submitCompletable(Executors.callable(task, null));
     }
 
     /**
@@ -293,8 +359,9 @@ public class ParallelismTools {
      * the thread pool to be executed in parallel, then execute that first task with the
      * current thread.
      * In single-threaded mode, all but the first task are not executed here but are
-     * deferred until they are passed to {@link #joinFirst(Deque)} (or waited for by
-     * {@link #get(Future)} or {@link #join(List)}).
+     * deferred, as by {@link #submit(Callable)}, until they are passed to
+     * {@link #joinFirst(Deque)} (or waited for by {@link #get(Future)}, {@link #join(List)}
+     * or the Future's own get()).
      * @param tasks List of tasks to be executed (if none, an empty Deque is returned).
      * @param <T> Type returned by all tasks.
      * @return A Deque of Future objects corresponding to each task (in order).
@@ -306,9 +373,8 @@ public class ParallelismTools {
             return futures;
         }
 
-        final boolean parallel = getParallel();
         for (int i = 1; i < tasks.length; i++) {
-            futures.addLast(parallel ? submit(tasks[i]) : adapt(tasks[i]));
+            futures.addLast(submit(tasks[i]));
         }
         futures.addFirst(callNow(tasks[0]));
 
