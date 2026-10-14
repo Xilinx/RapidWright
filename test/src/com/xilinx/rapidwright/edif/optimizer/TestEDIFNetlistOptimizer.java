@@ -32,6 +32,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -653,6 +654,123 @@ public class TestEDIFNetlistOptimizer {
                 new EDIFOptOptions());
         assertOptimizedEquivalent(TestEDIFNetlistOptimizer::reselectedDroppedPin,
                 new EDIFOptOptions().setSweep(false));
+    }
+
+    /** A set/preset flip-flop or latch without INIT (default 1) that can never change. */
+    private static EDIFNetlist heldDefaultInit(Unisim type) {
+        OptProbes.B b = new OptProbes.B("default_init");
+        b.in("clk", "d");
+        b.out("q");
+        if (type == Unisim.LDPE) {
+            b.inst(type, "F", "G=clk", "GE=0", "PRE=0", "D=d", "Q=q");
+        } else {
+            b.inst(type, "F", "C=clk", "CE=0", (type == Unisim.FDPE ? "PRE" : "S") + "=0", "D=d",
+                    "Q=q");
+        }
+        return b.nl;
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = Unisim.class, names = {"FDSE", "FDPE", "LDPE"})
+    public void testDefaultInitOfSetFlipFlops(Unisim type) {
+        // The optimizer and the checker both use the primitive's default INIT (1)
+        EDIFNetlist opt = heldDefaultInit(type);
+        EDIFTools.propagateConstants(opt);
+        Assertions.assertTrue(opt.getTopCell().getInternalNet("q").isVCC());
+        Assertions.assertEquals(0, new EDIFRandomSimEquivalence().check(heldDefaultInit(type),
+                opt, 4));
+        OptProbes.B gnd = new OptProbes.B("default_init");
+        gnd.in("clk", "d");
+        gnd.out("q");
+        gnd.inst(Unisim.GND, "G", "G=q");
+        Assertions.assertTrue(new EDIFRandomSimEquivalence().check(heldDefaultInit(type), gnd.nl,
+                4) > 0);
+    }
+
+    @Test
+    public void testPrimitiveDefaultsMatchDeclaredDefaults() {
+        for (Unisim u : new Unisim[] {Unisim.FDRE, Unisim.FDSE, Unisim.FDCE, Unisim.FDPE,
+                Unisim.LDCE, Unisim.LDPE, Unisim.SRL16E, Unisim.SRLC32E}) {
+            EDIFNetlist nl = EDIFTools.createNewNetlist("defaults");
+            String ours = PrimitiveDefaults.getDefault(nl.getHDIPrimitive(u), "INIT");
+            String declared = com.xilinx.rapidwright.design.Design.getDefaultCellProperties(
+                    com.xilinx.rapidwright.device.Series.Versal, u.name()).get("INIT").getValue();
+            Assertions.assertEquals(VerilogLiterals.parseNumber(declared),
+                    VerilogLiterals.parseNumber(ours), u.name());
+        }
+        // A user cell named like a primitive has no defaults
+        EDIFNetlist nl = EDIFTools.createNewNetlist("defaults");
+        Assertions.assertNull(PrimitiveDefaults.getDefault(new EDIFCell(nl.getWorkLibrary(),
+                "FDSE"), "INIT"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testOptimizeKeepsPreservedStaticSource(boolean sweep) {
+        // The LUT's only use of the preserved ground simplifies away; the ground stays (as in
+        // Vivado, which removes its net)
+        OptProbes.B b = new OptProbes.B("preserve");
+        b.in("a");
+        b.out("o");
+        b.inst(Unisim.GND, "G", "G=z", "@DONT_TOUCH=TRUE");
+        b.lut("L", "E", "o", "a", "z");
+        EDIFTools.optimizeNetlist(b.nl, new EDIFOptOptions().setSweep(sweep));
+        EDIFCellInst g = b.top.getCellInst("G");
+        Assertions.assertNotNull(g);
+        Assertions.assertNull(b.top.getCellInst("L"));
+        Assertions.assertSame(b.top.getInternalNet("a"), b.top.getInternalNet("o"));
+    }
+
+    @Test
+    public void testBufferChainMergesAreLinear() {
+        // A chain of buffers, each stage also loading a flip-flop: every stage's net merges into
+        // the next one towards the input
+        OptProbes.B b = new OptProbes.B("chain");
+        b.in("a", "clk");
+        int size = 32000;
+        for (int i = 0; i < size; i++) {
+            String in = String.format("n%06d", i + 1);
+            String out = String.format("n%06d", i);
+            b.lut("B" + i, "2", out, i == size - 1 ? "a" : in);
+            b.fdre("F" + i, out, "1", "0", "", "0");
+        }
+        EDIFOptStats stats = EDIFTools.propagateConstants(b.nl);
+        Assertions.assertEquals(size, stats.getRemoved(EDIFOptStats.Phase.CONSTANT_PROPAGATION));
+        // The input port and every flip-flop
+        Assertions.assertEquals(size + 1, b.top.getInternalNet("a").getPortInsts().size());
+        // Moving the accumulated loads at every merge takes over a minute here
+        Assertions.assertTrue(stats.getTimes().get("Apply edits") < 5_000_000_000L,
+                stats.getTimes().toString());
+    }
+
+    @Test
+    public void testComparatorsCheckTopLevelInterface() {
+        Supplier<OptProbes.B> base = () -> {
+            OptProbes.B b = new OptProbes.B("ports");
+            b.in("a");
+            b.out("o");
+            b.lut("L", "2", "o", "a");
+            return b;
+        };
+        // An extra (connected) output, an extra input, an output of another width
+        OptProbes.B extraOut = base.get();
+        EDIFPort extra = extraOut.top.createPort("extra", EDIFDirection.OUTPUT, 1);
+        extraOut.top.getNet("o").createPortInst(extra);
+        OptProbes.B extraIn = base.get();
+        extraIn.in("b");
+        OptProbes.B wide = base.get();
+        wide.top.createPort("w[1:0]", EDIFDirection.OUTPUT, 2);
+        OptProbes.B wide1 = base.get();
+        wide1.top.createPort("w[0:0]", EDIFDirection.OUTPUT, 1);
+        for (OptProbes.B[] pair : new OptProbes.B[][] {{base.get(), extraOut},
+                {base.get(), extraIn}, {extraOut, base.get()}, {wide, wide1}}) {
+            Assertions.assertTrue(new EDIFLeafNetlistComparator().compare(pair[0].nl,
+                    pair[1].nl) > 0);
+            Assertions.assertTrue(new EDIFRandomSimEquivalence().check(pair[0].nl, pair[1].nl,
+                    2) > 0);
+        }
+        Assertions.assertEquals(0, new EDIFLeafNetlistComparator().compare(base.get().nl,
+                base.get().nl));
     }
 
     @Test

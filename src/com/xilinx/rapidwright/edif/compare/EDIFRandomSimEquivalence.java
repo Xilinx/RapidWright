@@ -46,6 +46,7 @@ import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.edif.EDIFValueType;
 import com.xilinx.rapidwright.edif.optimizer.EDIFLeafIndex;
+import com.xilinx.rapidwright.edif.optimizer.PrimitiveDefaults;
 import com.xilinx.rapidwright.edif.optimizer.VerilogLiterals;
 
 /**
@@ -323,9 +324,9 @@ public class EDIFRandomSimEquivalence {
             }
         }
 
+        /** @return True if a property of leaf l (or its primitive default) is true. */
         boolean attrTrue(int l, String key) {
-            EDIFPropertyValue v = idx.getLeafInst(l).getProperty(key);
-            return v != null && VerilogLiterals.isTrue(v.getValue());
+            return VerilogLiterals.isTrue(PrimitiveDefaults.getValue(idx.getLeafInst(l), key));
         }
     }
 
@@ -548,6 +549,10 @@ public class EDIFRandomSimEquivalence {
             declared.clear();
             series = s;
         }
+        // The top-level interfaces must match
+        for (String d : EDIFLeafNetlistComparator.interfaceDiffs(orig, opt)) {
+            fail(d);
+        }
         Model a = new Model(orig);
         Model b = new Model(opt);
         // Sequential cells removed by the optimization that still influence an observed point
@@ -568,9 +573,9 @@ public class EDIFRandomSimEquivalence {
             } else if (type.matches("SRL16E|SRLC32E")) {
                 // A removed shift register can only be constant if all its initial bits are
                 // equal (then D must equal them); otherwise it keeps pseudo-random values
-                EDIFPropertyValue v = a.idx.getLeafInst(l).getProperty("INIT");
                 long all = type.equals("SRL16E") ? 0xFFFFL : 0xFFFFFFFFL;
-                long init = v == null ? 0L : LUTTools.getInitValue(v.getValue()) & all;
+                long init = LUTTools.getInitValue(PrimitiveDefaults.getValue(
+                        a.idx.getLeafInst(l), "INIT")) & all;
                 if (init == 0L || init == all) {
                     forced.put(l, init == 0L ? 0L : -1L);
                     removedFF.add(l);
@@ -836,7 +841,7 @@ public class EDIFRandomSimEquivalence {
         for (int p = a.idx.getNumLeafPins(); p < a.idx.getNumPins(); p++) {
             if (a.idx.getPinDir(p) != EDIFLeafIndex.DRIVER && a.idx.getPinNet(p) >= 0) {
                 String name = a.idx.getPinPortInst(p).getName();
-                Long v = bOut.get(name);
+                Long v = bOut.remove(name);
                 if (a.tainted[a.idx.getPinNet(p)]) {
                     unchecked++;
                     continue;
@@ -846,6 +851,11 @@ public class EDIFRandomSimEquivalence {
                     fail("round " + round + " port " + name);
                 }
             }
+        }
+        // Outputs connected only in the optimized netlist
+        for (String name : bOut.keySet()) {
+            checked++;
+            fail("round " + round + " port " + name + " connected only in the optimized netlist");
         }
         // Inputs of cut cells present in both netlists
         for (int la = 0; la < a.idx.getNumLeaves(); la++) {

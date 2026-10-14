@@ -28,12 +28,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
@@ -366,14 +368,50 @@ public class EDIFLeafNetlistComparator {
     }
 
     private void compareTopPorts(EDIFLeafIndex g, EDIFLeafIndex t, String[] gc, String[] tc) {
+        for (String d : interfaceDiffs(g.getNetlist(), t.getNetlist())) {
+            addDiff(Category.TOP_PORT, "port", d);
+        }
         Map<String, String> gp = topOutputDrivers(g, gc);
         Map<String, String> tp = topOutputDrivers(t, tc);
-        for (Map.Entry<String, String> e : gp.entrySet()) {
-            String tv = tp.get(e.getKey());
-            if (!e.getValue().equals(tv)) {
-                addDiff(Category.TOP_PORT, "port", e.getKey() + ": " + e.getValue() + " vs " + tv);
+        Set<String> ports = new TreeSet<>(gp.keySet());
+        ports.addAll(tp.keySet());
+        for (String port : ports) {
+            String gv = gp.get(port);
+            String tv = tp.get(port);
+            if (!Objects.equals(gv, tv)) {
+                addDiff(Category.TOP_PORT, "port", port + ": " + gv + " vs " + tv);
             }
         }
+    }
+
+    /**
+     * @return The top-level ports of a netlist: name (with its bus range) to direction and
+     * width.
+     */
+    static Map<String, String> topInterface(EDIFNetlist netlist) {
+        Map<String, String> ports = new TreeMap<>();
+        for (EDIFPort port : netlist.getTopCell().getPorts()) {
+            ports.put(port.getName(), port.getDirection() + " width " + port.getWidth());
+        }
+        return ports;
+    }
+
+    /**
+     * @return One message per top-level port that differs between the two netlists (missing in
+     * either, or with a different direction or width).
+     */
+    static List<String> interfaceDiffs(EDIFNetlist gold, EDIFNetlist test) {
+        Map<String, String> g = topInterface(gold);
+        Map<String, String> t = topInterface(test);
+        Set<String> names = new TreeSet<>(g.keySet());
+        names.addAll(t.keySet());
+        List<String> diffs = new ArrayList<>();
+        for (String name : names) {
+            if (!Objects.equals(g.get(name), t.get(name))) {
+                diffs.add("interface " + name + ": " + g.get(name) + " vs " + t.get(name));
+            }
+        }
+        return diffs;
     }
 
     private static Map<String, String> topOutputDrivers(EDIFLeafIndex idx, String[] cache) {

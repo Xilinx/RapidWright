@@ -878,28 +878,27 @@ class EDIFOptEditor {
                 cell.createNet(((ConnectChild) op).net);
             }
         }
-        // Phase B: merges
+        // Phase B: merges. The final net of each merged net is resolved first, so that every pin
+        // moves once (along a chain of merges, pins would otherwise move repeatedly)
         Map<EDIFNet, EDIFNet> merged = new IdentityHashMap<>();
         Map<String, EDIFNet> byName = new HashMap<>();
         for (Op op : list) {
-            if (!(op instanceof MergeNets)) {
-                continue;
+            if (op instanceof MergeNets) {
+                MergeNets m = (MergeNets) op;
+                EDIFNet from = m.from == null ? null : cell.getNet(m.from);
+                EDIFNet into = m.into == null ? null : cell.getNet(m.into);
+                if (from != null && into != null) {
+                    union(merged, from, into);
+                }
             }
-            MergeNets m = (MergeNets) op;
-            if (m.from == null || m.into == null) {
-                continue;
-            }
-            EDIFNet from = net(cell, byName, merged, m.from);
-            EDIFNet into = net(cell, byName, merged, m.into);
-            if (from == null || into == null || from == into) {
-                continue;
-            }
+        }
+        for (EDIFNet from : new ArrayList<>(merged.keySet())) {
+            EDIFNet into = rootOf(merged, from);
             for (EDIFPortInst pi : new ArrayList<>(from.getPortInsts())) {
                 batch.add(into, pi);
             }
             from.getPortInsts().clear();
             cell.removeNet(from);
-            merged.put(from, into);
             byName.put(from.getName(), from);
         }
         // Phase C: additions (new hierarchical connections first)
@@ -966,19 +965,33 @@ class EDIFOptEditor {
         if (n == null) {
             n = byName.get(name);
         }
-        return find(merged, n);
+        return n == null ? null : rootOf(merged, n);
     }
 
-    private static EDIFNet find(Map<EDIFNet, EDIFNet> merged, EDIFNet n) {
-        if (n == null) {
-            return null;
-        }
+    /**
+     * @return The representative of the set of n in a union-find forest of nets (parent links;
+     * roots are absent), compressing the path to it.
+     */
+    private static EDIFNet rootOf(Map<EDIFNet, EDIFNet> parent, EDIFNet n) {
         EDIFNet r = n;
         EDIFNet next;
-        while ((next = merged.get(r)) != null) {
+        while ((next = parent.get(r)) != null) {
             r = next;
         }
+        while ((next = parent.get(n)) != null && next != r) {
+            parent.put(n, r);
+            n = next;
+        }
         return r;
+    }
+
+    /** Joins the set of 'from' into the set of 'into' (whose representative stays). */
+    private static void union(Map<EDIFNet, EDIFNet> parent, EDIFNet from, EDIFNet into) {
+        EDIFNet rf = rootOf(parent, from);
+        EDIFNet ri = rootOf(parent, into);
+        if (rf != ri) {
+            parent.put(rf, ri);
+        }
     }
 
     private void addStaticSource(EDIFCell cell, EDIFNet net, boolean vcc) {
@@ -1116,10 +1129,11 @@ class EDIFOptEditor {
                 net.getParentCell().removeNet(net);
             }
         }
-        // Static sources left without a net, and nets left without any connection
+        // Static sources left without a net (unless preserved, as in Vivado)
         for (EDIFCell cell : touched) {
             for (EDIFCellInst inst : new ArrayList<>(cell.getCellInsts())) {
-                if (inst.getCellType().isStaticSource()) {
+                if (inst.getCellType().isStaticSource()
+                        && !EDIFConstPropEngine.hasPreserveProp(inst)) {
                     boolean connected = false;
                     for (EDIFPortInst pi : inst.getPortInsts()) {
                         if (pi.getNet() != null) {
@@ -1184,7 +1198,7 @@ class EDIFOptEditor {
                 if (pi.getCellInst() != null) {
                     continue;
                 }
-                EDIFNet r = findNet(uf, net);
+                EDIFNet r = rootOf(uf, net);
                 String g = rootPort.putIfAbsent(r, pi.getName());
                 if (g != null) {
                     d.feedthrough = true;
@@ -1193,23 +1207,6 @@ class EDIFOptEditor {
             }
         }
         return d;
-    }
-
-    private static EDIFNet findNet(Map<EDIFNet, EDIFNet> uf, EDIFNet n) {
-        EDIFNet r = n;
-        EDIFNet next;
-        while ((next = uf.get(r)) != null && next != r) {
-            r = next;
-        }
-        return r;
-    }
-
-    private static void union(Map<EDIFNet, EDIFNet> uf, EDIFNet a, EDIFNet b) {
-        EDIFNet ra = findNet(uf, a);
-        EDIFNet rb = findNet(uf, b);
-        if (ra != rb) {
-            uf.put(ra, rb);
-        }
     }
 
     /**
