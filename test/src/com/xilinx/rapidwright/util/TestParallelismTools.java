@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
@@ -188,6 +189,49 @@ public class TestParallelismTools {
                 () -> 1);
         Assertions.assertThrows(IllegalArgumentException.class, () -> ParallelismTools.joinFirst(futures));
         Assertions.assertEquals(1, ParallelismTools.joinFirst(futures));
+    }
+
+    @Test
+    public void testJoinAllCancelsRestAfterFailure() {
+        final boolean wasParallel = ParallelismTools.getParallel();
+        // With parallel processing disabled, tasks are deferred until waited for, so those after the one that throws
+        // cannot have been started when joinAll() rethrows
+        ParallelismTools.setParallel(false);
+        try {
+            final IllegalStateException thrown = new IllegalStateException("task 1");
+            final AtomicIntegerArray runs = new AtomicIntegerArray(4);
+            final List<CompletableFuture<Integer>> completables = new ArrayList<>();
+            completables.add(ParallelismTools.submitCompletable(() -> runs.incrementAndGet(0)));
+            completables.add(ParallelismTools.submitCompletable(() -> {
+                runs.incrementAndGet(1);
+                throw thrown;
+            }));
+            completables.add(ParallelismTools.submitCompletable(() -> runs.incrementAndGet(2)));
+            final Future<Integer> plain = ParallelismTools.submit(() -> runs.incrementAndGet(3));
+            // Work chained on the CompletableFutures in order, as by EDIF export's relay
+            CompletableFuture<Void> chained = CompletableFuture.completedFuture(null);
+            for (CompletableFuture<Integer> completable : completables) {
+                chained = chained.thenCombine(completable, (x, y) -> null);
+            }
+            final List<Future<Integer>> futures = new ArrayList<>(completables);
+            futures.add(plain);
+
+            Assertions.assertSame(thrown,
+                    Assertions.assertThrows(IllegalStateException.class, () -> ParallelismTools.joinAll(futures)));
+            // The tasks after it were cancelled rather than run, so the chained work has completed without them
+            Assertions.assertEquals(1, runs.get(0));
+            Assertions.assertEquals(1, runs.get(1));
+            Assertions.assertTrue(completables.get(2).isCancelled());
+            Assertions.assertTrue(plain.isCancelled());
+            Assertions.assertTrue(chained.isDone());
+            // Nor are they run by waiting for them afterwards, even with their own join() or get()
+            Assertions.assertThrows(CancellationException.class, () -> completables.get(2).join());
+            Assertions.assertThrows(CancellationException.class, plain::get);
+            Assertions.assertEquals(0, runs.get(2));
+            Assertions.assertEquals(0, runs.get(3));
+        } finally {
+            ParallelismTools.setParallel(wasParallel);
+        }
     }
 
     @Test
