@@ -18,7 +18,7 @@
  *
  */
 
-package com.xilinx.rapidwright.edif;
+package com.xilinx.rapidwright.edif.optimizer;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -27,6 +27,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.edif.compare.EDIFLeafNetlistComparator;
 
 /**

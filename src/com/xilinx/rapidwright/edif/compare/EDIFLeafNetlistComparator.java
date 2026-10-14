@@ -33,11 +33,11 @@ import java.util.TreeSet;
 
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
-import com.xilinx.rapidwright.edif.EDIFLeafIndex;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.edif.optimizer.EDIFLeafIndex;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 /**

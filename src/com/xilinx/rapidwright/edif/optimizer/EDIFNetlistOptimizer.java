@@ -18,15 +18,55 @@
  *
  */
 
-package com.xilinx.rapidwright.edif;
+package com.xilinx.rapidwright.edif.optimizer;
 
 import java.nio.file.Paths;
 
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFTools;
+
 /**
- * Command-line entry point running {@link EDIFTools#optimizeNetlist(EDIFNetlist, EDIFOptOptions)}
- * (Vivado opt_design -propconst -sweep equivalent) on an EDIF file.
+ * Netlist optimizer equivalent to Vivado's opt_design -propconst -sweep: constant propagation
+ * and dead logic elimination as edits of an {@link EDIFNetlist}. An {@link EDIFLeafIndex} gives
+ * the flat connectivity, an {@link EDIFConstPropEngine} decides what changes and an
+ * {@link EDIFOptEditor} applies the changes to the hierarchical netlist. The usual entry points
+ * are {@link EDIFTools#propagateConstants(EDIFNetlist)}, {@link EDIFTools#sweepDeadLogic(EDIFNetlist)}
+ * and {@link EDIFTools#optimizeNetlist(EDIFNetlist, EDIFOptOptions)}; {@link #main(String[])} runs
+ * the optimizer on an EDIF file.
  */
 public class EDIFNetlistOptimizer {
+
+    /**
+     * Runs constant propagation and/or sweep (as selected in the options) on the netlist,
+     * equivalent to Vivado's opt_design -propconst -sweep. Both analyses share one flat
+     * connectivity index and all netlist edits are applied once at the end.
+     * @param netlist The netlist to optimize (modified in place).
+     * @param opts Options selecting the optimizations.
+     * @return Statistics of the changes, counted as in Vivado's opt_design summary.
+     */
+    public static EDIFOptStats optimize(EDIFNetlist netlist, EDIFOptOptions opts) {
+        EDIFOptStats stats = new EDIFOptStats();
+        long t = System.nanoTime();
+        // The ports of preserved (DONT_TOUCH) hierarchical instances are optimization boundaries
+        EDIFLeafIndex idx = new EDIFLeafIndex(netlist, EDIFConstPropEngine::hasPreserveProp);
+        stats.addTime("Build index", System.nanoTime() - t);
+        EDIFConstPropEngine engine = new EDIFConstPropEngine(idx, opts);
+        engine.run(stats);
+        t = System.nanoTime();
+        EDIFOptEditor editor = new EDIFOptEditor(engine, stats);
+        editor.generate();
+        EDIFCell[] defs = editor.uniquify();
+        editor.apply(defs);
+        stats.addTime("Apply edits", System.nanoTime() - t);
+        t = System.nanoTime();
+        int emptyHier = editor.cleanup(opts.isSweep());
+        stats.addRemoved(EDIFOptStats.Phase.SWEEP, emptyHier);
+        netlist.removeUnusedCellsFromAllWorkLibraries();
+        netlist.resetParentNetMap();
+        stats.addTime("Cleanup", System.nanoTime() - t);
+        return stats;
+    }
 
     public static void main(String[] args) {
         if (args.length < 2) {
@@ -63,7 +103,7 @@ public class EDIFNetlistOptimizer {
         long t0 = System.nanoTime();
         EDIFNetlist netlist = EDIFTools.readEdifFile(Paths.get(args[0]));
         long t1 = System.nanoTime();
-        EDIFOptStats stats = EDIFTools.optimizeNetlist(netlist, opts);
+        EDIFOptStats stats = optimize(netlist, opts);
         long t2 = System.nanoTime();
         netlist.exportEDIF(Paths.get(args[1]));
         long t3 = System.nanoTime();

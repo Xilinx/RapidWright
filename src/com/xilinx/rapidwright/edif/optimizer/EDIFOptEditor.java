@@ -18,7 +18,7 @@
  *
  */
 
-package com.xilinx.rapidwright.edif;
+package com.xilinx.rapidwright.edif.optimizer;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,8 +30,17 @@ import java.util.Map;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.Unisim;
-import com.xilinx.rapidwright.edif.EDIFConstPropEngine.Lut;
-import com.xilinx.rapidwright.edif.EDIFLeafIndex.IntList;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPort;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFPropertyValue;
+import com.xilinx.rapidwright.edif.optimizer.EDIFConstPropEngine.Lut;
+import com.xilinx.rapidwright.edif.optimizer.EDIFLeafIndex.IntList;
 
 /**
  * Applies the decisions of an {@link EDIFConstPropEngine} to the hierarchical netlist. Decisions
@@ -734,11 +743,8 @@ class EDIFOptEditor {
 
         void flushRemovals() {
             for (Map.Entry<EDIFNet, Set<EDIFPortInst>> en : removals.entrySet()) {
-                EDIFPortInstList list = en.getKey().getEDIFPortInstList();
                 Set<EDIFPortInst> set = en.getValue();
-                if (list != null) {
-                    list.removeIf(set::contains);
-                }
+                en.getKey().getPortInsts().removeIf(set::contains);
                 EDIFCell parent = en.getKey().getParentCell();
                 for (EDIFPortInst pi : set) {
                     if (pi.getCellInst() == null && parent != null) {
@@ -756,11 +762,9 @@ class EDIFOptEditor {
         }
 
         void flushAdds() {
+            // Concludes the additions with deferred sorting (see EDIFNet.addPortInst)
             for (EDIFNet net : added) {
-                EDIFPortInstList list = net.getEDIFPortInstList();
-                if (list != null) {
-                    list.reSortList();
-                }
+                net.getPortInsts().sort(null);
             }
             added.clear();
         }
@@ -876,7 +880,7 @@ class EDIFOptEditor {
             for (EDIFPortInst pi : new ArrayList<>(from.getPortInsts())) {
                 batch.add(into, pi);
             }
-            from.getEDIFPortInstList().clear();
+            from.getPortInsts().clear();
             cell.removeNet(from);
             merged.put(from, into);
             byName.put(from.getName(), from);
@@ -889,7 +893,7 @@ class EDIFOptEditor {
                 EDIFNet cn = net(cell, byName, merged, cc.net);
                 if (child != null && child.getPortInst(cc.port) == null) {
                     batch.add(cn, new EDIFPortInst(child.getCellType().getPort(cc.port), null,
-                            child, true));
+                            child));
                 }
             }
         }
@@ -933,10 +937,9 @@ class EDIFOptEditor {
             String netName = input ? op.inputNets[i] : op.outputNets[i - op.inputNets.length];
             EDIFNet net = netName == null ? null : net(cell, byName, merged, netName);
             if (net != null) {
-                batch.add(net, new EDIFPortInst(type.getPort(pin), null, inst, true));
+                batch.add(net, new EDIFPortInst(type.getPort(pin), null, inst));
             }
         }
-        inst.getEDIFPortInstList().reSortList();
     }
 
     /** Looks up a net by name, following merges (including nets removed by a merge). */

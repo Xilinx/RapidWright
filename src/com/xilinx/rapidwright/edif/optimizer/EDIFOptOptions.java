@@ -18,7 +18,7 @@
  *
  */
 
-package com.xilinx.rapidwright.edif;
+package com.xilinx.rapidwright.edif.optimizer;
 
 /**
  * Options controlling the netlist optimizations performed by

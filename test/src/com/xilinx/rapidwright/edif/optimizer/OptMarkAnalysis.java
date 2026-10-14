@@ -18,11 +18,16 @@
  *
  */
 
-package com.xilinx.rapidwright.edif;
+package com.xilinx.rapidwright.edif.optimizer;
 
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPropertyValue;
+import com.xilinx.rapidwright.edif.EDIFTools;
 
 /**
  * Analysis helper: for leaf cells removed as constant (present in the input, absent in the gold

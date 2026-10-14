@@ -18,7 +18,7 @@
  *
  */
 
-package com.xilinx.rapidwright.edif;
+package com.xilinx.rapidwright.edif.optimizer;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -27,7 +27,15 @@ import java.util.Map;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.tools.LUTTools;
-import com.xilinx.rapidwright.edif.EDIFLeafIndex.IntList;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFPort;
+import com.xilinx.rapidwright.edif.EDIFPropertyObject;
+import com.xilinx.rapidwright.edif.EDIFPropertyValue;
+import com.xilinx.rapidwright.edif.optimizer.EDIFLeafIndex.IntList;
 
 /**
  * Analysis half of the netlist optimizer: on a flat {@link EDIFLeafIndex} it computes, without

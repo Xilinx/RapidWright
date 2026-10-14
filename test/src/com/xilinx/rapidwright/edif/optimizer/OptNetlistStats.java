@@ -18,12 +18,17 @@
  *
  */
 
-package com.xilinx.rapidwright.edif;
+package com.xilinx.rapidwright.edif.optimizer;
 
 import java.nio.file.Paths;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.TreeMap;
+
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFTools;
 
 /**
  * Prints statistics of a netlist relevant to the optimizer: leaf cells by type, hierarchical

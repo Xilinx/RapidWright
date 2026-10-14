@@ -18,7 +18,7 @@
  *
  */
 
-package com.xilinx.rapidwright.edif;
+package com.xilinx.rapidwright.edif.optimizer;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,6 +31,16 @@ import java.util.function.Supplier;
 
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFDesign;
+import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPort;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFPropertyValue;
+import com.xilinx.rapidwright.edif.EDIFTools;
 
 /**
  * Small hand-built netlists that exercise individual constant propagation and sweep rules. They
@@ -1287,6 +1297,17 @@ public class OptProbes {
         });
     }
 
+    /** Renames the EDIF design of a netlist, keeping its top cell and properties. */
+    private static void renameDesign(EDIFNetlist nl, String name) {
+        EDIFDesign design = new EDIFDesign(name);
+        design.setTopCell(nl.getTopCell());
+        for (Map.Entry<String, EDIFPropertyValue> e
+                : nl.getDesign().getPropertiesMap().entrySet()) {
+            design.addProperty(e.getKey(), e.getValue());
+        }
+        nl.setDesign(design);
+    }
+
     /**
      * Derives a probe from a synthesized netlist by tying top-level input port bits to constants.
      * @param synEdf Synthesized EDIF file.
@@ -1298,7 +1319,7 @@ public class OptProbes {
         EDIFNetlist nl = EDIFTools.readEdifFile(synEdf);
         EDIFCell top = nl.getTopCell();
         top.rename(name);
-        nl.getDesign().setName(name);
+        renameDesign(nl, name);
         for (String tie : ties) {
             if (tie.startsWith("!")) {
                 // Disconnect a top-level port from its net
@@ -1351,7 +1372,7 @@ public class OptProbes {
         EDIFNetlist nl = EDIFTools.readEdifFile(synEdf);
         EDIFCell top = nl.getTopCell();
         top.rename(name);
-        nl.getDesign().setName(name);
+        renameDesign(nl, name);
         EDIFCell lut1 = nl.getHDIPrimitive(Unisim.LUT1);
         int i = 0;
         for (String port : ports) {

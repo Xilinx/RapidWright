@@ -60,6 +60,9 @@ import com.xilinx.rapidwright.design.PinType;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
+import com.xilinx.rapidwright.edif.optimizer.EDIFNetlistOptimizer;
+import com.xilinx.rapidwright.edif.optimizer.EDIFOptOptions;
+import com.xilinx.rapidwright.edif.optimizer.EDIFOptStats;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
@@ -984,26 +987,7 @@ public class EDIFTools {
      * @return Statistics of the changes, counted as in Vivado's opt_design summary.
      */
     public static EDIFOptStats optimizeNetlist(EDIFNetlist netlist, EDIFOptOptions opts) {
-        EDIFOptStats stats = new EDIFOptStats();
-        long t = System.nanoTime();
-        // The ports of preserved (DONT_TOUCH) hierarchical instances are optimization boundaries
-        EDIFLeafIndex idx = new EDIFLeafIndex(netlist, EDIFConstPropEngine::hasPreserveProp);
-        stats.addTime("Build index", System.nanoTime() - t);
-        EDIFConstPropEngine engine = new EDIFConstPropEngine(idx, opts);
-        engine.run(stats);
-        t = System.nanoTime();
-        EDIFOptEditor editor = new EDIFOptEditor(engine, stats);
-        editor.generate();
-        EDIFCell[] defs = editor.uniquify();
-        editor.apply(defs);
-        stats.addTime("Apply edits", System.nanoTime() - t);
-        t = System.nanoTime();
-        int emptyHier = editor.cleanup(opts.isSweep());
-        stats.addRemoved(EDIFOptStats.Phase.SWEEP, emptyHier);
-        netlist.removeUnusedCellsFromAllWorkLibraries();
-        netlist.resetParentNetMap();
-        stats.addTime("Cleanup", System.nanoTime() - t);
-        return stats;
+        return EDIFNetlistOptimizer.optimize(netlist, opts);
     }
 
     public static void main(String[] args) {
