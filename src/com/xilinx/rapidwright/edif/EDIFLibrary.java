@@ -24,7 +24,6 @@
 
 package com.xilinx.rapidwright.edif;
 
-import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -35,13 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Future;
 import java.util.function.Predicate;
-
-import com.xilinx.rapidwright.util.NoCloseOutputStream;
-import com.xilinx.rapidwright.util.ParallelDCPInput;
-import com.xilinx.rapidwright.util.ParallelDCPOutput;
-import com.xilinx.rapidwright.util.ParallelismTools;
 
 /**
  * Keeps track of a set of {@link EDIFCell} objects
@@ -356,33 +349,5 @@ public class EDIFLibrary extends EDIFName {
     }
     public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache) throws IOException {
         exportEDIF(os, cache, false);
-    }
-
-    public List<Future<ParallelDCPInput>> exportEDIF(EDIFWriteLegalNameCache<?> cache) throws IOException{
-        if (!ParallelismTools.getParallel()) {
-            throw new RuntimeException();
-        }
-
-        List<EDIFCell> validCellOrder = getValidCellExportOrder(false);
-        final int chunkSize = 256;
-
-        List<Future<ParallelDCPInput>> streamFutures = new ArrayList<>();
-        for (long i = 0; i < validCellOrder.size(); i += chunkSize) {
-            final boolean firstChunk = (i == 0);
-            final boolean lastChunk = (i + chunkSize >= validCellOrder.size());
-            List<EDIFCell> chunk = validCellOrder.subList((int) i, (int) (lastChunk ? validCellOrder.size() : i + chunkSize));
-
-            streamFutures.add(ParallelismTools.submit(
-                    () -> ParallelDCPOutput.newStream((os) -> {
-                        try (BufferedOutputStream bs = new BufferedOutputStream(new NoCloseOutputStream(os))) {
-                            exportEDIF(chunk, bs, firstChunk, lastChunk, cache, false);
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
-                    })
-            ));
-        }
-
-        return streamFutures;
     }
 }
