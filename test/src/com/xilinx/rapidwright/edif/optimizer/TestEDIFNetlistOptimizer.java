@@ -519,6 +519,15 @@ public class TestEDIFNetlistOptimizer {
         Assertions.assertEquals(BigInteger.valueOf(255), VerilogLiterals.parseNumber("8'hff"));
         Assertions.assertEquals(BigInteger.valueOf(-2), VerilogLiterals.parseNumber("'shfffffffe"));
         Assertions.assertEquals(BigInteger.valueOf(15), VerilogLiterals.parseNumber("4'hff"));
+        // Unsized literals are at least 32 bits wide, wider if their digits need it
+        Assertions.assertEquals(BigInteger.ONE.shiftLeft(32),
+                VerilogLiterals.parseNumber("'sh100000000"));
+        Assertions.assertEquals(Integer.valueOf(36), VerilogLiterals.parseWidth("'sh100000000"));
+        Assertions.assertEquals(BigInteger.valueOf(-1), VerilogLiterals.parseNumber("'shfffffffff"));
+        Assertions.assertEquals(Integer.valueOf(32), VerilogLiterals.parseWidth("'h1"));
+        Assertions.assertEquals(Integer.valueOf(8), VerilogLiterals.parseWidth("8'shff"));
+        Assertions.assertEquals(Integer.valueOf(-1), VerilogLiterals.parseWidth("-12"));
+        Assertions.assertNull(VerilogLiterals.parseWidth("SYNC"));
         Assertions.assertNull(VerilogLiterals.parseNumber("1'bx"));
         Assertions.assertNull(VerilogLiterals.parseNumber("2'b12"));
         Assertions.assertNull(VerilogLiterals.parseNumber("/tmp/a.mem"));
@@ -567,6 +576,29 @@ public class TestEDIFNetlistOptimizer {
                     build.apply(same[1]), 2), same[0]);
         }
         for (String[] diff : new String[][] {{"8'shff", "255"}, {"8'shff", "8'hff"}}) {
+            Assertions.assertTrue(new EDIFRandomSimEquivalence().check(build.apply(diff[0]),
+                    build.apply(diff[1]), 2) > 0, diff[0]);
+        }
+    }
+
+    @Test
+    public void testRandomSimEquivalenceComparesBitVectorsAtDeclaredWidth() {
+        // SRVAL_A of a RAMB36E5 is a 36-bit HEX parameter
+        java.util.function.Function<String, EDIFNetlist> build = value -> {
+            OptProbes.B b = new OptProbes.B("vector_property");
+            b.in("clk");
+            b.inst(Unisim.RAMB36E5, "RAM", "CLKARDCLK=clk", "@SRVAL_A=" + value);
+            return b.nl;
+        };
+        for (String[] same : new String[][] {{"36'shfffffffff", "36'hfffffffff"},
+                {"8'shff", "36'hfffffffff"}, {"'sh100000000", "36'h100000000"},
+                {"36'h0_0000_00FF", "8'hff"}}) {
+            EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
+            Assertions.assertEquals(0, eq.check(build.apply(same[0]), build.apply(same[1]), 2),
+                    same[0] + " " + eq.getExamples());
+        }
+        for (String[] diff : new String[][] {{"'sh100000000", "36'h000000000"},
+                {"8'hff", "36'hfffffffff"}}) {
             Assertions.assertTrue(new EDIFRandomSimEquivalence().check(build.apply(diff[0]),
                     build.apply(diff[1]), 2) > 0, diff[0]);
         }

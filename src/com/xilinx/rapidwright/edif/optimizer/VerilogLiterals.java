@@ -37,52 +37,95 @@ public final class VerilogLiterals {
 
     private static final Pattern DECIMAL = Pattern.compile("[+-]?\\d+");
 
-    /** Width of an unsized Verilog literal. */
-    private static final int UNSIZED_WIDTH = 32;
+    /** Minimum width of an unsized Verilog literal. */
+    private static final int UNSIZED_MIN_WIDTH = 32;
 
     private VerilogLiterals() {
     }
 
-    /**
-     * @param value A property value.
-     * @return The value of a decimal number (optionally signed) or of a Verilog number literal.
-     * As in Verilog, a sized literal is truncated to its width and a signed literal (e.g. 8'shff)
-     * is a two's complement number of its width (32 bits if unsized), so 8'shff is -1. Null if
-     * value is not a number (including literals with x or z digits).
-     */
-    public static BigInteger parseNumber(String value) {
+    /** A decoded number: its value and width in bits (-1 for a plain decimal number). */
+    private static final class Literal {
+        final BigInteger value;
+        final int width;
+
+        Literal(BigInteger value, int width) {
+            this.value = value;
+            this.width = width;
+        }
+    }
+
+    private static Literal parse(String value) {
         if (value == null) {
             return null;
         }
         String v = value.trim();
         try {
             if (DECIMAL.matcher(v).matches()) {
-                return new BigInteger(v);
+                return new Literal(new BigInteger(v), -1);
             }
             Matcher m = NUMBER.matcher(v);
             if (!m.matches()) {
                 return null;
             }
             boolean signed = !m.group(2).isEmpty();
-            int width = m.group(1).isEmpty() ? (signed ? UNSIZED_WIDTH : -1)
-                    : Integer.parseInt(m.group(1));
-            if (width == 0) {
-                return null;
-            }
             char base = Character.toLowerCase(m.group(3).charAt(0));
-            int radix = base == 'b' ? 2 : base == 'o' ? 8 : base == 'h' ? 16 : 10;
-            BigInteger n = new BigInteger(m.group(4).replace("_", ""), radix);
-            if (width > 0) {
-                BigInteger range = BigInteger.ONE.shiftLeft(width);
-                n = n.mod(range);
-                if (signed && n.testBit(width - 1)) {
-                    n = n.subtract(range);
+            int bitsPerDigit = base == 'b' ? 1 : base == 'o' ? 3 : base == 'h' ? 4 : 0;
+            String digits = m.group(4).replace("_", "");
+            BigInteger n = new BigInteger(digits, bitsPerDigit == 0 ? 10 : 1 << bitsPerDigit);
+            int width;
+            if (!m.group(1).isEmpty()) {
+                width = Integer.parseInt(m.group(1));
+                if (width == 0) {
+                    return null;
                 }
+            } else {
+                // Unsized: at least 32 bits, more if the digits need them (a decimal value stays
+                // non-negative)
+                int needed = bitsPerDigit == 0 ? n.bitLength() + 1 : digits.length() * bitsPerDigit;
+                width = Math.max(UNSIZED_MIN_WIDTH, needed);
             }
-            return n;
+            BigInteger range = BigInteger.ONE.shiftLeft(width);
+            n = n.mod(range);
+            if (signed && n.testBit(width - 1)) {
+                n = n.subtract(range);
+            }
+            return new Literal(n, width);
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    /**
+     * @param value A property value.
+     * @return The value of a decimal number (optionally signed) or of a Verilog number literal.
+     * As in Verilog, a literal is truncated to its width (see {@link #parseWidth}) and a signed
+     * literal (e.g. 8'shff) is a two's complement number of its width, so 8'shff is -1. Null if
+     * value is not a number (including literals with x or z digits).
+     */
+    public static BigInteger parseNumber(String value) {
+        Literal l = parse(value);
+        return l == null ? null : l.value;
+    }
+
+    /**
+     * @param value A property value.
+     * @return The width in bits of a Verilog number literal: its size if sized, else the larger
+     * of 32 and the bits its digits need; -1 for a plain decimal number; null if value is not a
+     * number.
+     */
+    public static Integer parseWidth(String value) {
+        Literal l = parse(value);
+        return l == null ? null : l.width;
+    }
+
+    /**
+     * @param n A number (see {@link #parseNumber}).
+     * @param width The width in bits of a bit-vector parameter.
+     * @return The value of the parameter when assigned n: n truncated, or sign-extended if
+     * negative, to width bits (as a non-negative number).
+     */
+    public static BigInteger toWidth(BigInteger n, int width) {
+        return n.mod(BigInteger.ONE.shiftLeft(width));
     }
 
     /**

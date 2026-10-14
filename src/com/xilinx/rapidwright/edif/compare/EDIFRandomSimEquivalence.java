@@ -663,8 +663,8 @@ public class EDIFRandomSimEquivalence {
         return cell.getLibrary().getName() + ":" + cell.getName();
     }
 
-    /** @return The declared type of a property of a primitive cell, null if unknown. */
-    private VivadoPropType declaredType(EDIFCell cell, String key) {
+    /** @return The declaration (type, default) of a property of a primitive cell, or null. */
+    private VivadoProp declaredProperty(EDIFCell cell, String key) {
         if (series == null || !isPrimitive(cell)) {
             return null;
         }
@@ -673,20 +673,19 @@ public class EDIFRandomSimEquivalence {
             return m == null ? new HashMap<>() : m;
         });
         VivadoProp p = props.get(key);
-        if (p == null) {
-            p = props.get(key.toUpperCase());
-        }
-        return p == null ? null : p.getType();
+        return p != null ? p : props.get(key.toUpperCase());
     }
 
     /**
      * @return The value of a property in a canonical form. Only properties known to be numbers or
      * booleans (by their declared type for the primitive, or their EDIF value type) are
-     * normalized; anything else, e.g. a file name, is kept exactly.
+     * normalized; anything else, e.g. a file name, is kept exactly. Integers are compared by
+     * value, bit vectors (HEX/BINARY) by the bits they assign at the parameter's width.
      */
     private String normalize(EDIFCell cell, String key, EDIFPropertyValue pv) {
         String value = pv.getValue();
-        VivadoPropType type = declaredType(cell, key);
+        VivadoProp decl = declaredProperty(cell, key);
+        VivadoPropType type = decl == null ? null : decl.getType();
         boolean bool = type == VivadoPropType.BOOL || pv.getType() == EDIFValueType.BOOLEAN;
         boolean num = type == VivadoPropType.HEX || type == VivadoPropType.BINARY
                 || type == VivadoPropType.INT || pv.getType() == EDIFValueType.INTEGER;
@@ -699,6 +698,17 @@ public class EDIFRandomSimEquivalence {
         } else if (num) {
             BigInteger n = VerilogLiterals.parseNumber(v);
             if (n != null) {
+                if (type == VivadoPropType.HEX || type == VivadoPropType.BINARY) {
+                    // A bit vector: the bits assigned to the parameter (of its declared width,
+                    // else of the literal's width), so 36'shfffffffff == 36'hfffffffff
+                    Integer width = VerilogLiterals.parseWidth(decl.getValue());
+                    if (width == null || width <= 0) {
+                        width = VerilogLiterals.parseWidth(v);
+                    }
+                    if (width > 0) {
+                        n = VerilogLiterals.toWidth(n, width);
+                    }
+                }
                 return n.toString(16);
             }
         } else if (type == VivadoPropType.DOUBLE) {
