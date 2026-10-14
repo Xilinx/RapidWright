@@ -985,9 +985,10 @@ public class EDIFNetlist extends EDIFName {
      * text that it writes for the cell and for each of its ports, instances, nets and their port insts, with each
      * name taken to be {@link #EXPORT_ESTIMATE_NAME_BYTES} long (looking at each name would cost nearly as much as
      * writing it), and without properties. Only counts are looked at: those of the cell's ports, instances and nets,
-     * and of each net's port insts.
+     * and of each net's port insts. Stops counting once over {@link #PARALLEL_EXPORT_CHUNK_BYTES}, as such a cell is
+     * a chunk of its own anyway.
      * @param cell The cell.
-     * @return The estimated number of bytes.
+     * @return The estimated number of bytes, or a number over {@link #PARALLEL_EXPORT_CHUNK_BYTES} if that is.
      */
     static long estimateExportBytes(EDIFCell cell) {
         final int name = EXPORT_ESTIMATE_NAME_BYTES;
@@ -1012,6 +1013,9 @@ public class EDIFNetlist extends EDIFName {
                 + EDIFPortInst.EXPORT_CONST_INSTANCEREF.length + 1 + EDIFPortInst.EXPORT_CONST_CLOSE_PORT_INST.length
                 + 2 * name;
         for (EDIFNet net : cell.getNets()) {
+            if (bytes > PARALLEL_EXPORT_CHUNK_BYTES) {
+                break;
+            }
             bytes += perNet + net.getPortInsts().size() * perPortInst;
         }
         return bytes;
@@ -1077,15 +1081,16 @@ public class EDIFNetlist extends EDIFName {
                 // Split the cells into chunks of consecutive cells, each the most estimated to make up at most
                 // PARALLEL_EXPORT_CHUNK_BYTES (ending a chunk before the cell that would take it beyond that), but at
                 // least one. There is at least one chunk, so that libraries are written even if none has any cells
-                final List<Long> estimates = ParallelismTools.invokeAll(cells, EDIFNetlist::estimateExportBytes);
+                final long[] estimates = ParallelismTools.stream(cells).mapToLong(EDIFNetlist::estimateExportBytes)
+                        .toArray();
                 final List<CompletableFuture<ParallelDCPInput>> pieces = new ArrayList<>();
                 int from = 0;
                 do {
                     final int start = from;
                     long bytes = 0;
                     while (from < cells.size()
-                            && (from == start || bytes + estimates.get(from) <= PARALLEL_EXPORT_CHUNK_BYTES)) {
-                        bytes += estimates.get(from++);
+                            && (from == start || bytes + estimates[from] <= PARALLEL_EXPORT_CHUNK_BYTES)) {
+                        bytes += estimates[from++];
                     }
                     final int end = from;
                     // Write this chunk's cells, and the header of each library that starts within it and the footer
