@@ -31,7 +31,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -215,13 +214,13 @@ public class ParallelEDIFParser implements AutoCloseable{
      * Parse all workers in parallel, add the libraries and cells that each has parsed to the netlist in file order,
      * and link each worker as soon as it (and so every worker before it) has been added, while later workers are
      * still being parsed or added. This requires EDIF's define-before-use rule: a worker's references can then only
-     * be to cells that it or an earlier worker parsed, which have been added. This thread parses the first worker,
-     * so that adding and linking can start as soon as possible.
+     * be to cells that it or an earlier worker parsed, which have been added. Workers are parsed in the pool, and
+     * this thread parses any that the pool has not started while it waits for all workers to be parsed.
      * Workers are added by a chain of stages, one per worker, each of which runs once its worker has been parsed and
      * the previous stage has completed, on whichever thread completes the later of the two. So no thread waits for
      * another to add a worker, and one thread may add several workers in a row while others link those added. Once
-     * this thread has parsed the first worker, it helps with any queued linking until all workers have been added
-     * and linked.
+     * all workers have been parsed, this thread helps with any queued linking until all workers have been added and
+     * linked.
      * @return The netlist.
      */
     private EDIFNetlist parseAssembleAndLink() {
@@ -229,15 +228,10 @@ public class ParallelEDIFParser implements AutoCloseable{
         // Port lookup maps of cells with many ports, created on first use by any worker's linking
         final Map<EDIFCell, EDIFPortCache> portCaches = new ConcurrentHashMap<>();
         final List<ParallelEDIFParserWorker> discarded = new ArrayList<>();
-        final List<Callable<Void>> parses = new ArrayList<>(workers.size());
+        final List<CompletableFuture<Void>> parsed = new ArrayList<>(workers.size());
         for (ParallelEDIFParserWorker w : workers) {
-            parses.add(() -> {
-                w.doParse(false);
-                return null;
-            });
+            parsed.add(ParallelismTools.submitCompletable(() -> w.doParse(false)));
         }
-        // This thread parses the first worker, while the others are parsed in the pool
-        final List<CompletableFuture<Void>> parsed = ParallelismTools.invokeFirstSubmitRestCompletable(parses);
 
         // Completes once the stages below have, and so has every worker's linking, which each stage submits (see
         // link()) as chunks that are its descendants: so a thread waiting for it helps with only that linking
@@ -307,6 +301,9 @@ public class ParallelEDIFParser implements AutoCloseable{
                         ? e.getCause() : e);
             }
         });
+        // There are as many workers as threads, including this one: so, until all workers have been parsed, parse any
+        // that no pool thread has started, so that none waits for a pool thread to become free
+        ParallelismTools.joinAll(parsed);
         // Until all workers have been added and linked, rather than block, help with any of their linking that is
         // queued; then rethrow any exception from parsing, adding or linking
         ParallelismTools.join(linked);
