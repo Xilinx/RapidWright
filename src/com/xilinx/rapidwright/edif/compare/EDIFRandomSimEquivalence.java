@@ -40,12 +40,14 @@ import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLeafIndex;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
-import com.xilinx.rapidwright.edif.EDIFValueType;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.edif.EDIFValueType;
 
 /**
  * Checks that an optimized netlist is functionally equivalent to its original by bit-parallel
@@ -55,8 +57,9 @@ import com.xilinx.rapidwright.edif.EDIFTools;
  * top-level outputs and the (inversion-corrected) input pins of every cut cell present in both
  * netlists. Since cut cells are not simulated, a cut cell present in both netlists must also
  * have the same type, the same properties (except OPT_MODIFIED and the IS_*_INVERTED inversions,
- * which are simulated; values are compared exactly unless declared numeric or boolean for the
- * primitive) and the same connected inputs (a pin on an undriven net counts as
+ * which are simulated; values are compared exactly unless the EDIF value or, for a library
+ * primitive of a known part, its declared parameter type is numeric or boolean) and the same
+ * connected inputs (a pin on an undriven net counts as
  * unconnected); any difference is a mismatch. Flip-flops that exist only in the original netlist
  * are assumed to have been removed as constants: they take their constant value and their next
  * state is checked to equal it.
@@ -542,17 +545,16 @@ public class EDIFRandomSimEquivalence {
     public int check(EDIFNetlist orig, EDIFNetlist opt, int rounds) {
         Model a = new Model(orig);
         Model b = new Model(opt);
-        String partName = EDIFTools.getPartName(orig);
-        Part part = partName == null ? null : PartNameTools.getPart(partName);
-        series = part == null ? null : part.getSeries();
+        series = seriesOf(orig);
         // Sequential cells removed by the optimization that still influence an observed point
         // must have been constant: they are assumed constant in the original and checked
         Map<Integer, Long> forced = new HashMap<>();
         List<Integer> removedFF = new ArrayList<>();
         boolean[] observed = observedCone(a, b);
         for (int l = 0; l < a.idx.getNumLeaves(); l++) {
-            String type = a.idx.getLeafInst(l).getCellType().getName();
-            if (!observed[l] || b.byName.containsKey(a.names[l])) {
+            EDIFCell cell = a.idx.getLeafInst(l).getCellType();
+            String type = cell.getName();
+            if (!observed[l] || b.byName.containsKey(a.names[l]) || !isPrimitive(cell)) {
                 continue;
             }
             if (type.matches("FD[RSCP]E|LD[CP]E")) {
@@ -623,12 +625,43 @@ public class EDIFRandomSimEquivalence {
     /** Declared properties per primitive type. */
     private final Map<String, Map<String, VivadoProp>> declared = new HashMap<>();
 
-    /** @return The declared type of a property of a primitive, null if unknown. */
-    private VivadoPropType declaredType(String cellType, String key) {
-        if (series == null) {
+    /**
+     * @return The series of the part of a netlist, null if it has no part or the part is not in
+     * the part database (property types are then not available).
+     */
+    private static Series seriesOf(EDIFNetlist netlist) {
+        String partName = EDIFTools.getPartName(netlist);
+        if (partName == null) {
             return null;
         }
-        Map<String, VivadoProp> props = declared.computeIfAbsent(cellType, t -> {
+        try {
+            Part part = PartNameTools.getPart(partName);
+            return part == null ? null : part.getSeries();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** @return True if a cell is a library primitive (not a user-defined cell of that name). */
+    private static boolean isPrimitive(EDIFCell cell) {
+        EDIFLibrary lib = cell.getLibrary();
+        return lib != null && lib.isHDIPrimitivesLibrary();
+    }
+
+    /** @return The type of a cell: its name, qualified by its library unless a primitive. */
+    private static String typeName(EDIFCell cell) {
+        if (isPrimitive(cell) || cell.getLibrary() == null) {
+            return cell.getName();
+        }
+        return cell.getLibrary().getName() + ":" + cell.getName();
+    }
+
+    /** @return The declared type of a property of a primitive cell, null if unknown. */
+    private VivadoPropType declaredType(EDIFCell cell, String key) {
+        if (series == null || !isPrimitive(cell)) {
+            return null;
+        }
+        Map<String, VivadoProp> props = declared.computeIfAbsent(cell.getName(), t -> {
             Map<String, VivadoProp> m = Design.getDefaultCellProperties(series, t);
             return m == null ? new HashMap<>() : m;
         });
@@ -659,9 +692,9 @@ public class EDIFRandomSimEquivalence {
      * booleans (by their declared type for the primitive, or their EDIF value type) are
      * normalized; anything else, e.g. a file name, is kept exactly.
      */
-    private String normalize(String cellType, String key, EDIFPropertyValue pv) {
+    private String normalize(EDIFCell cell, String key, EDIFPropertyValue pv) {
         String value = pv.getValue();
-        VivadoPropType type = declaredType(cellType, key);
+        VivadoPropType type = declaredType(cell, key);
         boolean bool = type == VivadoPropType.BOOL || pv.getType() == EDIFValueType.BOOLEAN;
         boolean num = type == VivadoPropType.HEX || type == VivadoPropType.BINARY
                 || type == VivadoPropType.INT || pv.getType() == EDIFValueType.INTEGER;
@@ -690,11 +723,11 @@ public class EDIFRandomSimEquivalence {
 
     private Map<String, String> properties(Model m, int l) {
         EDIFCellInst inst = m.idx.getLeafInst(l);
-        String cellType = inst.getCellType().getName();
+        EDIFCell cell = inst.getCellType();
         Map<String, String> props = new TreeMap<>();
         for (Map.Entry<String, EDIFPropertyValue> e : inst.getPropertiesMap().entrySet()) {
             if (!isIgnoredProperty(e.getKey())) {
-                props.put(e.getKey().toUpperCase(), normalize(cellType, e.getKey(), e.getValue()));
+                props.put(e.getKey().toUpperCase(), normalize(cell, e.getKey(), e.getValue()));
             }
         }
         return props;
@@ -721,8 +754,8 @@ public class EDIFRandomSimEquivalence {
                 continue;
             }
             String name = a.names[la];
-            String ta = a.idx.getLeafInst(la).getCellType().getName();
-            String tb = b.idx.getLeafInst(lb).getCellType().getName();
+            String ta = typeName(a.idx.getLeafInst(la).getCellType());
+            String tb = typeName(b.idx.getLeafInst(lb).getCellType());
             checked++;
             if (!ta.equals(tb) || a.cutType[la] != b.cutType[lb]) {
                 fail("cell " + name + " type " + ta + " -> " + tb);

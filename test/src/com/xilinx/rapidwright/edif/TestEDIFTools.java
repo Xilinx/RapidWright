@@ -942,6 +942,43 @@ public class TestEDIFTools {
         EDIFNetlist other = ram.get();
         other.getTopCell().getCellInst("M").addProperty("SRVAL_A", "18'h00002");
         Assertions.assertTrue(new EDIFRandomSimEquivalence().check(hex, other, 2) > 0);
+        // A user-defined black box named like a primitive does not get its property types
+        Supplier<EDIFNetlist> userFdre = () -> {
+            OptProbes.B b = new OptProbes.B("user_fdre");
+            b.in("a");
+            b.out("q");
+            EDIFCell bb = b.cell("FDRE");
+            bb.createPort("D", EDIFDirection.INPUT, 1);
+            bb.createPort("Q", EDIFDirection.OUTPUT, 1);
+            b.inst(bb, "F", "D=a", "Q=q", "@INIT=0");
+            return b.nl;
+        };
+        EDIFNetlist userInit = userFdre.get();
+        userInit.getTopCell().getCellInst("F").addProperty("INIT", "1'b0");
+        Assertions.assertTrue(new EDIFRandomSimEquivalence().check(userFdre.get(), userInit, 2) > 0);
+        Assertions.assertEquals(0, new EDIFRandomSimEquivalence().check(userFdre.get(),
+                userFdre.get(), 2));
+        // A user-defined cell does not match the primitive of the same name
+        EDIFNetlist primitive = ff.get();
+        EDIFNetlist user = ff.get();
+        EDIFCell bb = new EDIFCell(user.getWorkLibrary(), "FDRE");
+        for (EDIFPort port : primitive.getHDIPrimitive(Unisim.FDRE).getPorts()) {
+            bb.createPort(port.getName(), port.getDirection(), 1);
+        }
+        user.getTopCell().getCellInst("F").setCellType(bb);
+        Assertions.assertTrue(new EDIFRandomSimEquivalence().check(primitive, user, 2) > 0);
+        // An unknown part only disables declared property types
+        Supplier<EDIFNetlist> unknownPart = () -> {
+            EDIFNetlist n = ram.get();
+            n.getDesign().addProperty(EDIFTools.EDIF_PART_PROP, "xcnosuchpart-ffvb1234-1-e");
+            return n;
+        };
+        Assertions.assertEquals(0, new EDIFRandomSimEquivalence().check(unknownPart.get(),
+                unknownPart.get(), 2));
+        EDIFNetlist unknownOther = unknownPart.get();
+        unknownOther.getTopCell().getCellInst("M").addProperty("INIT_FILE", "/tmp/A.mem");
+        Assertions.assertTrue(new EDIFRandomSimEquivalence().check(unknownPart.get(),
+                unknownOther, 2) > 0);
     }
 
     @Test
