@@ -47,6 +47,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -456,6 +457,17 @@ public class ParallelismTools {
             }
         }
         return future.isDone();
+    }
+
+    /**
+     * A stream of the given items: a parallel one (run on the common ForkJoinPool, as for
+     * {@link #forEach(Collection, Consumer)}) when parallel processing is enabled, else a sequential one.
+     * @param items The items to stream.
+     * @param <T> Item type.
+     * @return {@code items.parallelStream()} if {@link #getParallel()}, else {@code items.stream()}.
+     */
+    public static <T> Stream<T> stream(@NotNull Collection<T> items) {
+        return getParallel() ? items.parallelStream() : items.stream();
     }
 
     /**
