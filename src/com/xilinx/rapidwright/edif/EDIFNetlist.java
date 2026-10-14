@@ -1100,15 +1100,14 @@ public class EDIFNetlist extends EDIFName {
                     pieces.add(ParallelismTools.submitCompletable(() -> ParallelDCPOutput.newStream(chunkOs -> {
                         try {
                             for (int i = 0; i < librariesToWrite.size(); i++) {
-                                final int libStart = Math.max(start, offsets[i]);
-                                final int libEnd = Math.min(end, offsets[i + 1]);
-                                final boolean noCells = offsets[i] == offsets[i + 1];
-                                if (noCells ? !(start <= offsets[i] && (offsets[i] < end || end == cells.size()))
-                                            : libStart >= libEnd) {
+                                final int libFrom = offsets[i];
+                                final int libTo = offsets[i + 1];
+                                if (start <= libFrom ? libFrom >= end && end < cells.size() : start >= libTo) {
                                     continue;
                                 }
-                                librariesToWrite.get(i).exportEDIF(cells.subList(libStart, libEnd), chunkOs,
-                                        libStart == offsets[i], libEnd == offsets[i + 1], cache, false);
+                                librariesToWrite.get(i).exportEDIF(
+                                        cells.subList(Math.max(start, libFrom), Math.min(end, libTo)), chunkOs,
+                                        start <= libFrom, libTo <= end, cache, false);
                             }
                         } catch (IOException e) {
                             throw new UncheckedIOException(e);
