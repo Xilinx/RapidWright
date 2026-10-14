@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +35,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountedCompleter;
-import java.util.concurrent.Future;
 import java.util.function.BiFunction;
 
 import com.xilinx.rapidwright.device.Device;
@@ -217,12 +215,12 @@ public class ParallelEDIFParser implements AutoCloseable{
      * and link each worker as soon as it (and so every worker before it) has been added, while later workers are
      * still being parsed or added. This requires EDIF's define-before-use rule: a worker's references can then only
      * be to cells that it or an earlier worker parsed, which have been added. Workers are parsed in the pool, and
-     * this thread parses any that the pool has not started while it waits for the first worker to be parsed.
+     * this thread parses any that the pool has not started while it waits for all workers to be parsed.
      * Workers are added by a chain of stages, one per worker, each of which runs once its worker has been parsed and
      * the previous stage has completed, on whichever thread completes the later of the two. So no thread waits for
      * another to add a worker, and one thread may add several workers in a row while others link those added. Once
-     * the first worker has been parsed, this thread helps with any queued linking until all workers have been added
-     * and linked.
+     * all workers have been parsed, this thread helps with any queued linking until all workers have been added and
+     * linked.
      * @return The netlist.
      */
     private EDIFNetlist parseAssembleAndLink() {
@@ -303,10 +301,9 @@ public class ParallelEDIFParser implements AutoCloseable{
                         ? e.getCause() : e);
             }
         });
-        // There are as many workers as threads, including this one, and nothing can be added (or so linked) until the
-        // first worker has been parsed: meanwhile, parse any worker that no pool thread has started, so that none
-        // waits for a pool thread to become free
-        ParallelismTools.joinFirst(new ArrayDeque<Future<Void>>(parsed));
+        // There are as many workers as threads, including this one: so, until all workers have been parsed, parse any
+        // that no pool thread has started, so that none waits for a pool thread to become free
+        ParallelismTools.joinAll(parsed);
         // Until all workers have been added and linked, rather than block, help with any of their linking that is
         // queued; then rethrow any exception from parsing, adding or linking
         ParallelismTools.join(linked);
