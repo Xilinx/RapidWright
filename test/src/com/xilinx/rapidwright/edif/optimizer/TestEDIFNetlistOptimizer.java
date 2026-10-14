@@ -20,6 +20,7 @@
 
 package com.xilinx.rapidwright.edif.optimizer;
 
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
@@ -273,7 +274,8 @@ public class TestEDIFNetlistOptimizer {
                 () -> inverterChainToReset("I1", "I0"),
                 () -> inverterPairManyLoads("A", "B", 20),
                 () -> inverterPairManyLoads("B", "A", 20),
-                TestEDIFNetlistOptimizer::inverterIntoChild));
+                TestEDIFNetlistOptimizer::inverterIntoChild,
+                TestEDIFNetlistOptimizer::lut62BufferedInvertedInput));
     }
 
     @ParameterizedTest
@@ -412,6 +414,75 @@ public class TestEDIFNetlistOptimizer {
                 stats.getTimes().toString());
     }
 
+    /**
+     * An inverter drives input I0 of a LUT6_2 whose O5 buffers I0 into a flip-flop while O6
+     * stays in use.
+     */
+    private static EDIFNetlist lut62BufferedInvertedInput() {
+        OptProbes.B b = new OptProbes.B("lut62_alias");
+        b.in("b", "clk");
+        b.out("q", "o6");
+        b.lut("A", "1", "inv", "b");
+        b.inst(Unisim.LUT6_2, "B", "I0=inv", "I1=b", "I2=0", "I3=0", "I4=0", "I5=1", "O5=n5",
+                "O6=o6", "@INIT=64'h66666666AAAAAAAA");
+        b.fdre("F", "n5", "1", "0", "q", "0");
+        return b.nl;
+    }
+
+    @Test
+    public void testOptimizeBypassedOutputKeepsItsSource() {
+        // O5 is removed (its load reads 'inv'); the inverter is then absorbed by the LUT
+        EDIFNetlist netlist = lut62BufferedInvertedInput();
+        EDIFTools.optimizeNetlist(netlist, new EDIFOptOptions());
+        EDIFNet d = netlist.getTopCell().getCellInst("F").getPortInst("D").getNet();
+        Assertions.assertEquals("A", d.getPortInsts().stream().filter(EDIFPortInst::isOutput)
+                .findFirst().get().getCellInst().getName());
+        assertOptimizedEquivalent(TestEDIFNetlistOptimizer::lut62BufferedInvertedInput,
+                new EDIFOptOptions());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testSweepRemovesHierarchyItEmpties(boolean reoptimize) {
+        // Sweep removes the inverter and every net of the child (its input has no other load)
+        OptProbes.B b = new OptProbes.B("hier_emptied");
+        b.in("a", "c");
+        b.out("o");
+        EDIFCell sub = b.cell("sub");
+        b.in(sub, "x");
+        b.lut(sub, "IV", "1", "y", "x");
+        b.inst(sub, "u", "x=a");
+        b.lut("L", "1", "o", "c");
+        EDIFOptStats stats = EDIFTools.optimizeNetlist(b.nl, new EDIFOptOptions());
+        if (reoptimize) {
+            stats = EDIFTools.optimizeNetlist(b.nl, new EDIFOptOptions());
+            Assertions.assertEquals(0, stats.getRemoved(EDIFOptStats.Phase.SWEEP));
+        } else {
+            // The inverter and the emptied instance
+            Assertions.assertEquals(2, stats.getRemoved(EDIFOptStats.Phase.SWEEP));
+        }
+        Assertions.assertNull(b.top.getCellInst("u"));
+        Assertions.assertNull(b.nl.getWorkLibrary().getCell("sub"));
+    }
+
+    @Test
+    public void testBufferRemovalIsLinearInSharedInputFanout() {
+        // Many buffers of the same input, each driving its own flip-flop
+        OptProbes.B b = new OptProbes.B("shared_buffers");
+        b.in("clk", "a");
+        int buffers = 64000;
+        for (int i = 0; i < buffers; i++) {
+            b.lut("U" + i, "2", "n" + i, "a");
+            b.fdre("F" + i, "n" + i, "1", "0", "", "0");
+        }
+        EDIFOptStats stats = EDIFTools.propagateConstants(b.nl);
+        Assertions.assertEquals(buffers, stats.getRemoved(EDIFOptStats.Phase.CONSTANT_PROPAGATION));
+        Assertions.assertEquals("a", b.top.getCellInst("F0").getPortInst("D").getNet().getName());
+        // A quadratic propagation takes about 30s here
+        Assertions.assertTrue(stats.getTimes().get("Constant propagation") < 3_000_000_000L,
+                stats.getTimes().toString());
+    }
+
     @Test
     public void testSweepIsLinearInFanout() {
         // One surviving flip-flop drives many dead LUTs
@@ -430,6 +501,56 @@ public class TestEDIFNetlistOptimizer {
         // A quadratic sweep takes minutes here
         Assertions.assertTrue(stats.getTimes().get("Sweep") < 5_000_000_000L,
                 stats.getTimes().toString());
+    }
+
+    @Test
+    public void testVerilogLiterals() {
+        Assertions.assertEquals(BigInteger.valueOf(10), VerilogLiterals.parseNumber("4'hA"));
+        Assertions.assertEquals(BigInteger.valueOf(5), VerilogLiterals.parseNumber("3'b1_01"));
+        Assertions.assertEquals(BigInteger.valueOf(12), VerilogLiterals.parseNumber("'d12"));
+        Assertions.assertEquals(BigInteger.valueOf(12), VerilogLiterals.parseNumber("12"));
+        Assertions.assertNull(VerilogLiterals.parseNumber("1'bx"));
+        Assertions.assertNull(VerilogLiterals.parseNumber("/tmp/a.mem"));
+        for (String t : new String[] {"TRUE", "true", "yes", "1", "1'b1", "1'h1", "2'b10"}) {
+            Assertions.assertTrue(VerilogLiterals.isTrue(t), t);
+        }
+        for (String f : new String[] {"FALSE", "no", "0", "1'b0", "4'h0"}) {
+            Assertions.assertEquals(Boolean.FALSE, VerilogLiterals.parseBoolean(f), f);
+        }
+        Assertions.assertNull(VerilogLiterals.parseBoolean("SYNC"));
+    }
+
+    @Test
+    public void testRandomSimEquivalenceChecksRemovedShiftRegister() {
+        // INIT is not uniform: with CE low the output stays at INIT bit 1 (address 1)
+        OptProbes.B o = new OptProbes.B("srl_check");
+        o.in("clk", "d");
+        o.out("q");
+        // D equals INIT bit 0, so a constant 0 would look inductively stable
+        o.inst(Unisim.SRL16E, "S", "CLK=clk", "D=0", "CE=0", "A0=1", "A1=0", "A2=0", "A3=0",
+                "Q=q", "@INIT=16'h0002");
+        // A replacement that wrongly drives the output low
+        OptProbes.B r = new OptProbes.B("srl_check");
+        r.in("clk", "d");
+        r.out("q");
+        r.inst(Unisim.GND, "GND_q", "G=q");
+        EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
+        Assertions.assertTrue(eq.check(o.nl, r.nl, 2) > 0);
+    }
+
+    @Test
+    public void testComparatorsResetBetweenComparisons() {
+        Supplier<EDIFNetlist> s = OptProbes.getProbes().get("lut_chain");
+        EDIFNetlist bad = s.get();
+        bad.getTopCell().getCellInst("C3").addProperty("INIT", "4'h9");
+        EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
+        Assertions.assertTrue(eq.check(s.get(), bad, 2) > 0);
+        Assertions.assertEquals(0, eq.check(s.get(), s.get(), 2));
+        Assertions.assertTrue(eq.getExamples().isEmpty());
+        EDIFLeafNetlistComparator cmp = new EDIFLeafNetlistComparator();
+        Assertions.assertTrue(cmp.compare(s.get(), bad) > 0);
+        Assertions.assertEquals(0, cmp.compare(s.get(), s.get()));
+        Assertions.assertEquals(0, cmp.getTotalDiffs());
     }
 
     @Test

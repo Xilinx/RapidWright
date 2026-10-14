@@ -188,6 +188,8 @@ class EDIFConstPropEngine {
     private int[] movedPos;
     /** Number of live loads (see isLiveSink) of each alias group, indexed by its root. */
     private final int[] loadCount;
+    /** Number of pins (of any kind) of each alias group, indexed by its root. */
+    private final int[] groupPins;
     final Lut[] lut;
     final long[] origInit;
     final IntList[] aliasChildren;
@@ -196,12 +198,14 @@ class EDIFConstPropEngine {
     /** OPT_MODIFIED marks per leaf. */
     final Map<Integer, String> marks = new HashMap<>();
     /**
-     * Alias records: the leaf removed, its input pin and its output pin. The output net merges
-     * into the net the input pin is on (pinNet, which may differ from its original net).
+     * Alias records (see bypass): the leaf bypassed, its output pin, and the alias group root its
+     * output net merges into. The input pin is recorded only if its original net was already in
+     * that group (-1 otherwise): the output net can then merge into that net directly.
      */
     final IntList aliasLeaf = new IntList();
     final IntList aliasInPin = new IntList();
     final IntList aliasOutPin = new IntList();
+    final IntList aliasTarget = new IntList();
     /** Nets whose loads were all removed while their (non-static) driver survives. */
     final IntList orphanNets = new IntList();
 
@@ -231,13 +235,17 @@ class EDIFConstPropEngine {
         origInit = new long[numLeaves];
         aliasChildren = new IntList[numNets];
         loadCount = new int[numNets];
+        groupPins = new int[numNets];
         queue = new int[numLeaves + 1];
         queued = new boolean[numLeaves];
         classify();
         for (int p = 0; p < idx.getNumPins(); p++) {
             int n = idx.getPinNet(p);
-            if (n >= 0 && isLiveSink(p)) {
-                loadCount[n]++;
+            if (n >= 0) {
+                groupPins[n]++;
+                if (isLiveSink(p)) {
+                    loadCount[n]++;
+                }
             }
         }
     }
@@ -247,12 +255,7 @@ class EDIFConstPropEngine {
     }
 
     static boolean isTrue(String value) {
-        if (value == null) {
-            return false;
-        }
-        String s = value.toLowerCase();
-        return s.equals("true") || s.equals("yes") || s.equals("1") || s.endsWith("'b1")
-                || s.endsWith("'h1");
+        return VerilogLiterals.isTrue(value);
     }
 
     static boolean hasPreserveProp(EDIFPropertyObject o) {
@@ -431,11 +434,16 @@ class EDIFConstPropEngine {
         aliasChildren[to].add(from);
         loadCount[to] += loadCount[from];
         loadCount[from] = 0;
+        groupPins[to] += groupPins[from];
+        groupPins[from] = 0;
     }
 
     /** Moves pin p onto net target. */
     private void movePin(int p, int target) {
         countLoad(p, -1);
+        if (homeNet(p) >= 0) {
+            groupPins[pinNet(p)]--;
+        }
         if (movedIn == null) {
             movedIn = new IntList[numNets];
             movedPos = new int[idx.getNumPins()];
@@ -460,6 +468,7 @@ class EDIFConstPropEngine {
             movedPos[p] = movedIn[target].size();
             movedIn[target].add(p);
         }
+        groupPins[pinNet(p)]++;
         countLoad(p, 1);
     }
 
@@ -537,15 +546,16 @@ class EDIFConstPropEngine {
         int[] seen = new int[idx.getNumPins()];
         for (int n = 0; n < numNets; n++) {
             if (alias[n] >= 0) {
-                if (loadCount[n] != 0) {
+                if (loadCount[n] != 0 || groupPins[n] != 0) {
                     throw new IllegalStateException("Load count on aliased net " + n);
                 }
                 continue;
             }
             int root = n;
-            int[] loads = new int[1];
+            int[] loads = new int[2];
             forEachGroupPin(n, p -> {
                 seen[p]++;
+                loads[1]++;
                 if (pinNet(p) != root) {
                     throw new IllegalStateException("Pin " + idx.getPinName(p) + " visited in "
                             + "the group of net " + root + " but is on net " + pinNet(p));
@@ -555,9 +565,10 @@ class EDIFConstPropEngine {
                 }
                 return true;
             });
-            if (loads[0] != loadCount[n]) {
+            if (loads[0] != loadCount[n] || loads[1] != groupPins[n]) {
                 throw new IllegalStateException("Net " + n + " has " + loads[0]
-                        + " live loads, counted " + loadCount[n]);
+                        + " live loads and " + loads[1] + " pins, counted " + loadCount[n]
+                        + " and " + groupPins[n]);
             }
         }
         for (int p = 0; p < idx.getNumPins(); p++) {
@@ -589,6 +600,33 @@ class EDIFConstPropEngine {
             }
             return true;
         });
+    }
+
+    /**
+     * Bypasses leaf l from input pin inPin to output pin outPin: the output's net joins the alias
+     * group of target, the net inPin is on now. The target is recorded with the bypass, as inPin
+     * may be moved later (e.g. when l survives through another output).
+     * @param reevaluate If true (constant propagation), the loads that may now have duplicate
+     * inputs (those with pins in both groups) are re-evaluated.
+     */
+    private void bypass(int l, int inPin, int outPin, int target, boolean reevaluate) {
+        int from = resolve(idx.getPinNet(outPin));
+        int to = resolve(target);
+        int inNet = idx.getPinNet(inPin);
+        aliasLeaf.add(l);
+        aliasInPin.add(inNet >= 0 && resolve(inNet) == to ? inPin : -1);
+        aliasOutPin.add(outPin);
+        aliasTarget.add(to);
+        if (reevaluate) {
+            // A load with pins in both groups has one in the smaller group
+            if (groupPins[from] <= groupPins[to]) {
+                addAlias(from, to);
+                enqueueSinks(from);
+                return;
+            }
+            enqueueSinks(to);
+        }
+        addAlias(from, to);
     }
 
     private void setConst(int n, byte v) {
@@ -887,16 +925,7 @@ class EDIFConstPropEngine {
         }
         if (f.isBuffer() && outNet >= 0 && resolve(outNet) != f.net[0]) {
             removeLeaf(l, RM_ALIAS);
-            int r = resolve(outNet);
-            aliasLeaf.add(l);
-            aliasInPin.add(f.srcPin[0]);
-            aliasOutPin.add(outPin);
-            addAlias(r, f.net[0]);
-            byte v = netVal[f.net[0]];
-            if (v != UNK) {
-                setConst(r, v);
-            }
-            enqueueSinks(f.net[0]);
+            bypass(l, f.srcPin[0], outPin, f.net[0], true);
             return;
         }
         Lut s = new Lut();
@@ -1008,15 +1037,8 @@ class EDIFConstPropEngine {
         int outNet = idx.getPinNet(outPin);
         if (f.constVal != UNK) {
             setConst(outNet, f.constVal);
-        } else if (f.isBuffer()) {
-            int r = resolve(outNet);
-            if (r != f.net[0]) {
-                aliasLeaf.add(l);
-                aliasInPin.add(f.srcPin[0]);
-                aliasOutPin.add(outPin);
-                addAlias(r, f.net[0]);
-                enqueueSinks(f.net[0]);
-            }
+        } else if (f.isBuffer() && resolve(outNet) != f.net[0]) {
+            bypass(l, f.srcPin[0], outPin, f.net[0], true);
         }
     }
 
@@ -1037,11 +1059,7 @@ class EDIFConstPropEngine {
             setConst(outNet, kind[l] == K_INV ? (v == C0 ? C1 : C0) : v);
         } else if (kind[l] == K_BUF && outNet >= 0 && resolve(outNet) != n) {
             removeLeaf(l, RM_ALIAS);
-            aliasLeaf.add(l);
-            aliasInPin.add(in);
-            aliasOutPin.add(out);
-            addAlias(resolve(outNet), n);
-            enqueueSinks(n);
+            bypass(l, in, out, n, true);
         }
     }
 
@@ -1325,10 +1343,7 @@ class EDIFConstPropEngine {
                     absorb(loads.get(i), b, a, pushMark, false);
                 }
                 removeLeaf(l, reason);
-                aliasLeaf.add(l);
-                aliasInPin.add(inputPinOf(l));
-                aliasOutPin.add(out);
-                addAlias(b, a);
+                bypass(l, inputPinOf(l), out, a, false);
                 collapseBuffers(loads, reason);
             } else {
                 IntList absorbed = new IntList();
@@ -1384,10 +1399,7 @@ class EDIFConstPropEngine {
                 continue;
             }
             removeLeaf(l, reason);
-            aliasLeaf.add(l);
-            aliasInPin.add(inPin);
-            aliasOutPin.add(out);
-            addAlias(r, in);
+            bypass(l, inPin, out, in, false);
         }
     }
 
@@ -1473,10 +1485,7 @@ class EDIFConstPropEngine {
             }
         }
         removeLeaf(l, RM_PULLBACK);
-        aliasLeaf.add(l);
-        aliasInPin.add(inputPinOf(l));
-        aliasOutPin.add(out);
-        addAlias(b, a);
+        bypass(l, inputPinOf(l), out, a, false);
         collapseBuffers(others, RM_PULLBACK);
         return true;
     }

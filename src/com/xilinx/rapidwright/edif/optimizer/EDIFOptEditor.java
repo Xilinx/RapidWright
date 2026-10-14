@@ -21,6 +21,7 @@
 package com.xilinx.rapidwright.edif.optimizer;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -516,9 +517,13 @@ class EDIFOptEditor {
         for (int i = 0; i < e.aliasLeaf.size(); i++) {
             int l = e.aliasLeaf.get(i);
             int h = idx.getLeafHier(l);
-            // The output net merges into the net the input is on (it may have been moved)
+            // The output net merges into the input's own net if that was already in the target
+            // group when bypassed, else into a net of the target group's root
             EDIFPortInst out = idx.getPinPortInst(e.aliasOutPin.get(i));
-            add(h, new MergeNets(netName(out), currentNetName(e.aliasInPin.get(i))));
+            int inPin = e.aliasInPin.get(i);
+            String into = inPin >= 0 ? netName(idx.getPinPortInst(inPin))
+                    : netIn(e.resolve(e.aliasTarget.get(i)), h);
+            add(h, new MergeNets(netName(out), into));
             byte why = e.removed[l];
             if (why == EDIFConstPropEngine.RM_ALIAS || why == EDIFConstPropEngine.RM_INV) {
                 markBufferLoads(h, e.aliasOutPin.get(i), EDIFConstPropEngine.MARK_PROPCONST);
@@ -626,6 +631,17 @@ class EDIFOptEditor {
     private int[] sigId;
 
     /** Assigns cell definitions so that instances with different edits have their own copy. */
+    /** Hierarchical cell definitions of the edited netlist (they stay so even if emptied). */
+    private final Set<EDIFCell> hierCells = Collections.newSetFromMap(new IdentityHashMap<>());
+
+    /**
+     * @return True if cell is a leaf (primitive or black box), as opposed to a hierarchical cell,
+     * possibly emptied by the optimization.
+     */
+    private boolean isLeaf(EDIFCell cell) {
+        return !hierCells.contains(cell) && EDIFLeafIndex.isLeafCell(cell);
+    }
+
     EDIFCell[] uniquify() {
         int numHier = idx.getNumHierInsts();
         List<List<Integer>> children = new ArrayList<>();
@@ -723,6 +739,7 @@ class EDIFOptEditor {
             newCell[h] = def;
         }
         stats.addCellsUniquified(copies);
+        hierCells.addAll(Arrays.asList(newCell));
         return newCell;
     }
 
@@ -1137,7 +1154,7 @@ class EDIFOptEditor {
         Map<EDIFNet, EDIFNet> uf = new IdentityHashMap<>();
         for (EDIFCellInst child : cell.getCellInsts()) {
             EDIFCell t = child.getCellType();
-            if (EDIFLeafIndex.isLeafCell(t)) {
+            if (isLeaf(t)) {
                 // Static sources still connected (e.g. to a constant output) count as well
                 d.hasLeaves = true;
                 continue;
@@ -1213,7 +1230,7 @@ class EDIFOptEditor {
             EDIFCell cell = todo.get(i);
             for (EDIFCellInst child : new ArrayList<>(cell.getCellInsts())) {
                 EDIFCell t = child.getCellType();
-                if (EDIFLeafIndex.isLeafCell(t)) {
+                if (isLeaf(t)) {
                     continue;
                 }
                 DefCleanup cd = defCleanup(t, memo);
@@ -1255,10 +1272,10 @@ class EDIFOptEditor {
         return count;
     }
 
-    private static int countHierInsts(EDIFCell cell) {
+    private int countHierInsts(EDIFCell cell) {
         int n = 0;
         for (EDIFCellInst child : cell.getCellInsts()) {
-            if (!EDIFLeafIndex.isLeafCell(child.getCellType())) {
+            if (!isLeaf(child.getCellType())) {
                 n += 1 + countHierInsts(child.getCellType());
             }
         }

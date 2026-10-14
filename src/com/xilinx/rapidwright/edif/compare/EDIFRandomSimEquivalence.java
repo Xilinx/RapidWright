@@ -30,8 +30,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.VivadoProp;
@@ -48,6 +46,7 @@ import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.edif.EDIFValueType;
 import com.xilinx.rapidwright.edif.optimizer.EDIFLeafIndex;
+import com.xilinx.rapidwright.edif.optimizer.VerilogLiterals;
 
 /**
  * Checks that an optimized netlist is functionally equivalent to its original by bit-parallel
@@ -326,11 +325,7 @@ public class EDIFRandomSimEquivalence {
 
         boolean attrTrue(int l, String key) {
             EDIFPropertyValue v = idx.getLeafInst(l).getProperty(key);
-            if (v == null) {
-                return false;
-            }
-            String s = v.getValue().toUpperCase();
-            return s.equals("TRUE") || s.endsWith("'B1") || s.equals("1");
+            return v != null && VerilogLiterals.isTrue(v.getValue());
         }
     }
 
@@ -543,9 +538,18 @@ public class EDIFRandomSimEquivalence {
      * @return The number of mismatching observations.
      */
     public int check(EDIFNetlist orig, EDIFNetlist opt, int rounds) {
+        mismatches = 0;
+        checked = 0;
+        unchecked = 0;
+        removedNonConstant = 0;
+        examples.clear();
+        Series s = seriesOf(orig);
+        if (s != series) {
+            declared.clear();
+            series = s;
+        }
         Model a = new Model(orig);
         Model b = new Model(opt);
-        series = seriesOf(orig);
         // Sequential cells removed by the optimization that still influence an observed point
         // must have been constant: they are assumed constant in the original and checked
         Map<Integer, Long> forced = new HashMap<>();
@@ -562,11 +566,17 @@ public class EDIFRandomSimEquivalence {
                 forced.put(l, init1 ? -1L : 0L);
                 removedFF.add(l);
             } else if (type.matches("SRL16E|SRLC32E")) {
-                // A removed shift register holds its (uniform) INIT value: D must equal it
+                // A removed shift register can only be constant if all its initial bits are
+                // equal (then D must equal them); otherwise it keeps pseudo-random values
                 EDIFPropertyValue v = a.idx.getLeafInst(l).getProperty("INIT");
-                boolean ones = v != null && (LUTTools.getInitValue(v.getValue()) & 1L) != 0;
-                forced.put(l, ones ? -1L : 0L);
-                removedFF.add(l);
+                long all = type.equals("SRL16E") ? 0xFFFFL : 0xFFFFFFFFL;
+                long init = v == null ? 0L : LUTTools.getInitValue(v.getValue()) & all;
+                if (init == 0L || init == all) {
+                    forced.put(l, init == 0L ? 0L : -1L);
+                    removedFF.add(l);
+                } else {
+                    removedNonConstant++;
+                }
             }
         }
         // Async clear/preset tied active determine the constant regardless of INIT
@@ -616,9 +626,6 @@ public class EDIFRandomSimEquivalence {
         String k = key.toUpperCase();
         return k.equals("OPT_MODIFIED") || (k.startsWith("IS_") && k.endsWith("_INVERTED"));
     }
-
-    private static final Pattern VERILOG_NUMBER = Pattern.compile(
-            "(\\d+)'([bBhHdD])([0-9a-fA-F_]+)");
 
     /** Series of the original netlist (null if unknown), for the declared property types. */
     private Series series;
@@ -672,21 +679,6 @@ public class EDIFRandomSimEquivalence {
         return p == null ? null : p.getType();
     }
 
-    /** @return The value of a Verilog-style or decimal number, null if not a number. */
-    private static BigInteger number(String value) {
-        Matcher m = VERILOG_NUMBER.matcher(value);
-        try {
-            if (!m.matches()) {
-                return new BigInteger(value);
-            }
-            char base = Character.toLowerCase(m.group(2).charAt(0));
-            int radix = base == 'b' ? 2 : base == 'h' ? 16 : 10;
-            return new BigInteger(m.group(3).replace("_", ""), radix);
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
     /**
      * @return The value of a property in a canonical form. Only properties known to be numbers or
      * booleans (by their declared type for the primitive, or their EDIF value type) are
@@ -700,14 +692,12 @@ public class EDIFRandomSimEquivalence {
                 || type == VivadoPropType.INT || pv.getType() == EDIFValueType.INTEGER;
         String v = value.trim();
         if (bool) {
-            if (v.equalsIgnoreCase("TRUE") || v.equals("1") || v.equalsIgnoreCase("1'b1")) {
-                return "TRUE";
-            }
-            if (v.equalsIgnoreCase("FALSE") || v.equals("0") || v.equalsIgnoreCase("1'b0")) {
-                return "FALSE";
+            Boolean b = VerilogLiterals.parseBoolean(v);
+            if (b != null) {
+                return b.toString();
             }
         } else if (num) {
-            BigInteger n = number(v);
+            BigInteger n = VerilogLiterals.parseNumber(v);
             if (n != null) {
                 return n.toString(16);
             }

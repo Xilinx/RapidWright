@@ -38,6 +38,7 @@ import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.edif.optimizer.EDIFLeafIndex;
+import com.xilinx.rapidwright.edif.optimizer.VerilogLiterals;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 /**
@@ -240,6 +241,11 @@ public class EDIFLeafNetlistComparator {
     }
 
     public int compare(EDIFLeafIndex g, EDIFLeafIndex t) {
+        diffs.clear();
+        diffsByType.clear();
+        matched = 0;
+        goldLeaves = 0;
+        testLeaves = 0;
         String[] gc = new String[g.getNumNets()];
         String[] tc = new String[t.getNumNets()];
         Map<String, Integer> gm = leafMap(g);
@@ -300,7 +306,8 @@ public class EDIFLeafNetlistComparator {
             }
         }
         if (v != null && isCaseInsensitive(key)) {
-            return v.getValue().toLowerCase();
+            Boolean b = VerilogLiterals.parseBoolean(v.getValue());
+            return b != null ? b.toString() : v.getValue().toLowerCase();
         }
         return v == null ? null : v.getValue();
     }
