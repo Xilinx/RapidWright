@@ -52,6 +52,7 @@ public class NOCJSONUtil implements Serializable {
     protected static final String JSON_FIELD_SYSTEM_PROPERTIES = "SystemProperties";
     protected static final String JSON_FIELD_DFX_PATHS = "DfxPaths";
     protected static final String JSON_FIELD_FREQUENCY = "Frequency";
+    protected static final String JSON_FIELD_DEVICE_NAME = "DeviceName";
     protected static final String JSON_FIELD_CLIENT_INSTANCES = "LogicalInstances";
     protected static final String JSON_FIELD_PATHS = "Paths";
     protected static final String JSON_FIELD_SOLUTION_TYPE = "SolutionType";

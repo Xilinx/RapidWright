@@ -908,10 +908,9 @@ public class DesignTools {
      * @param design               The top level design
      * @param hierarchicalCellName Name of the black box in the design netlist.
      * @param cell                 The 'guts' to be inserted into the black box
-     * @return Every net this touched, as {@link #populateBlackBox(Design, Map, boolean)} describes.
      */
-    public static Set<Net> populateBlackBox(Design design, String hierarchicalCellName, Design cell) {
-        return populateBlackBox(design, hierarchicalCellName, cell, false);
+    public static void populateBlackBox(Design design, String hierarchicalCellName, Design cell) {
+        populateBlackBox(design, hierarchicalCellName, cell, false);
     }
 
     /**
@@ -923,11 +922,10 @@ public class DesignTools {
      * @param cell                 The 'guts' to be inserted into the black box
      * @param keepBoundaryRouting  Preserves the routing on the boundaries of the black box, as
      *                             {@link #populateBlackBox(Design, Map, boolean)} describes.
-     * @return Every net this touched, as {@link #populateBlackBox(Design, Map, boolean)} describes.
      */
-    public static Set<Net> populateBlackBox(Design design, String hierarchicalCellName, Design cell,
+    public static void populateBlackBox(Design design, String hierarchicalCellName, Design cell,
             boolean keepBoundaryRouting) {
-        return populateBlackBox(design, Collections.singletonMap(hierarchicalCellName, cell),
+        populateBlackBox(design, Collections.singletonMap(hierarchicalCellName, cell),
                 keepBoundaryRouting);
     }
 
@@ -957,6 +955,13 @@ public class DesignTools {
      * Every entry is vetted before anything is modified, but there is no rollback once insertion has
      * begun: a failure part way through -- a site overlap, say -- leaves the boxes filled so far in
      * place, and the logical netlist of all of them already swapped in.
+     * <p>
+     * Nets are only recorded if tracking is enabled on the design before this is called, with
+     * {@link Design#setTrackNetChanges(boolean)} or {@link Design#setTrackingChanges(boolean)}.
+     * Every net this touches is then recorded, and no net outside that record is altered here, so a
+     * caller that needs to operate on the result can start from {@link Design#getModifiedNets()}.
+     * That record is cumulative: it also holds any net recorded by earlier operations, until
+     * emptied with {@link Design#clearTrackedChanges()}.
      *
      * @param design              The top level design
      * @param blackBoxes          The 'guts' to be inserted, keyed by the hierarchical name of the
@@ -969,24 +974,13 @@ public class DesignTools {
      *                            port. The exception is a port tied to a constant: the design's
      *                            GND or VCC net is unrouted, in its entirety, only if a net on that
      *                            port is merged onto it, and not for a port merely tied to it.
-     * @return Every net this touched that the design still holds: the ones the filled cells brought
-     *         in with them, the net each signal crossing a black box port ends up on wherever
-     *         something was merged onto it or its routing discarded, and the static nets that took
-     *         a circuit's static routing or gave up a displaced source pin. Each is named after its
-     *         source, so is its own parent net, but for one on a signal that nothing drives, which
-     *         has none. A net merged away is deleted from the design and so is deliberately absent
-     *         -- including one that predates this call, such as the design's net on a black box
-     *         output, whose source is now inside the box. No net outside this set was altered, so a
-     *         caller that means to route the result can start from these rather than have
-     *         {@link com.xilinx.rapidwright.rwroute.PartialRouter} rediscover them by walking every
-     *         net in the design.
      */
-    public static Set<Net> populateBlackBox(Design design, Map<String, Design> blackBoxes,
+    public static void populateBlackBox(Design design, Map<String, Design> blackBoxes,
             boolean keepBoundaryRouting) {
         // Nothing to fill, so return before the unused cell cleanup and static net lookups below,
         // which would otherwise still modify the design
         if (blackBoxes.isEmpty()) {
-            return Collections.emptySet();
+            return;
         }
 
         EDIFNetlist netlist = design.getNetlist();
@@ -1111,7 +1105,6 @@ public class DesignTools {
 
         Net vcc = design.getVccNet();
         Net gnd = design.getGndNet();
-        Set<Net> modifiedNets = new HashSet<>();
 
         // Static source pins displaced by the incoming site instances. They cannot be removed as they
         // are found since unrouting a static net walks its pins, so they are collected and taken off
@@ -1184,7 +1177,6 @@ public class DesignTools {
         // alone. This has to happen before the routing below merges the circuits' own static pins in
         boolean preserveOtherRoutes = true;
         DesignTools.batchRemoveSitePins(deferredRemovals, preserveOtherRoutes);
-        modifiedNets.addAll(deferredRemovals.keySet());
 
         // TEMPORARY WORKAROUND, part 2 of 2. addSiteInst() displaced each of these from the design,
         // but left it in the change tracking - which marked it again just above, as its pins were
@@ -1211,10 +1203,13 @@ public class DesignTools {
                 if (net.isStaticNet()) {
                     Net staticNet = design.getStaticNet(net.getType());
                     staticNet.addPins(net.getPins());
+                    // TEMPORARY WORKAROUND: as in mergeOntoNet(), a pin move alone leaves the
+                    // destination unmarked. setPIPs() below marks it whenever the circuit brought
+                    // routing with it, but not when it brought only pins
+                    markModified(design, staticNet);
                     HashSet<PIP> uniquePIPs = new HashSet<>(net.getPIPs());
                     uniquePIPs.addAll(staticNet.getPIPs());
                     staticNet.setPIPs(uniquePIPs);
-                    modifiedNets.add(staticNet);
                 } else {
                     // rename() acts on whichever design currently owns the net, so this re-keys the
                     // circuit the net arrived from and addNet() then inserts it into the shell under
@@ -1222,7 +1217,6 @@ public class DesignTools {
                     // unprefixed name first, displacing any net the shell already has by that name.
                     renameNet(net, cellPrefix + net.getName());
                     design.addNet(net);
-                    modifiedNets.add(net);
                 }
             }
 
@@ -1244,31 +1238,29 @@ public class DesignTools {
             Net target = parent != null ? design.getNet(parent) : null;
             boolean toMerge = parent != null && !parent.equals(name) && net != null;
             if (!keepBoundaryRouting) {
-                unrouteSignalNet(net, modifiedNets);
-                unrouteSignalNet(target, modifiedNets);
+                unrouteSignalNet(net);
+                unrouteSignalNet(target);
             }
             if (!toMerge) continue;
             if (!hasPhysicalPresence(net)) {
                 // Nothing to move, so the net is simply removed rather than left behind as an
                 // alias of its parent
-                modifiedNets.remove(net);
                 design.removeNet(net);
+                // TEMPORARY WORKAROUND: the design has stopped holding this net, but the change
+                // tracking still has it
+                untrackRemovedNet(design, net);
                 continue;
             }
             if (target == null) {
                 // The parent has no physical net yet, so this one becomes it
-                modifiedNets.remove(net);
                 renameNet(net, parent);
-                modifiedNets.add(net);
                 continue;
             }
             if (!keepBoundaryRouting && target.isStaticNet()) {
                 target.unroute();
             }
-            mergeOntoNet(design, net, target, modifiedNets);
-            modifiedNets.add(target);
+            mergeOntoNet(design, net, target);
         }
-        return modifiedNets;
     }
 
     /**
@@ -1276,13 +1268,11 @@ public class DesignTools {
      * net or has nothing on it. A net reached through several ports is unrouted each time, which
      * costs no more than walking its pins again.
      *
-     * @param net          The net, or null.
-     * @param modifiedNets Updated in place: the net is added if it is unrouted.
+     * @param net The net, or null.
      */
-    private static void unrouteSignalNet(Net net, Set<Net> modifiedNets) {
+    private static void unrouteSignalNet(Net net) {
         if (net == null || net.isStaticNet() || !hasPhysicalPresence(net)) return;
         net.unroute();
-        modifiedNets.add(net);
     }
 
     /**
@@ -1349,20 +1339,60 @@ public class DesignTools {
      * moves pins and site routing, so the net's PIPs, if it still has any, are moved across here.
      * Where routing is to be discarded, the caller unroutes the net first, leaving none.
      *
-     * @param design       The current design.
-     * @param net          The net to merge away.
-     * @param target       The net to merge it onto.
-     * @param modifiedNets Updated in place: the net is taken out, so that the set never names a
-     *                     net the design no longer has.
+     * @param design The current design.
+     * @param net    The net to merge away.
+     * @param target The net to merge it onto.
      */
-    private static void mergeOntoNet(Design design, Net net, Net target, Set<Net> modifiedNets) {
-        modifiedNets.remove(net);
+    private static void mergeOntoNet(Design design, Net net, Net target) {
         // Deleting the net leaves its PIPs where they are, so they can be read afterwards. They are
         // added one by one rather than the list handed over, which would leave the deleted net and
         // the target sharing it
         design.movePinsToNewNetDeleteOldNet(net, target, true);
+        // TEMPORARY WORKAROUND: moving pins onto a net does not mark it as modified -- only a
+        // change to its routing does -- so a target that keeps its own routing and merely gains
+        // the merged net's pins is left unmarked. With boundary routing preserved that is the
+        // common case: the clock gains hundreds of pins and not one PIP. Mark it here, so that
+        // getModifiedNets() holds every net this touched rather than only those whose PIPs moved.
+        // The fix belongs in whatever marks a Net modified, which should count a pin move too.
+        markModified(design, target);
         for (PIP p : net.getPIPs()) {
             target.addPIP(p);
+        }
+
+        // TEMPORARY WORKAROUND: the design has stopped holding this net, but the change tracking
+        // still has it. This cannot be done any earlier: taking its pins above marks it again
+        untrackRemovedNet(design, net);
+    }
+
+    /**
+     * TEMPORARY WORKAROUND: takes a net the design has stopped holding out of the change tracking,
+     * putting what it was routed with into the original state on the way.
+     *
+     * Without this, getModifiedNets() holds nets getNets() does not, and whoever walks the modified
+     * set -- an incremental bitstream writer, for one -- reads a net that no longer exists. The
+     * routing has to be kept, rather than simply dropped, or those PIPs are left turned on with
+     * nothing owning them. Deleting a net leaves its PIPs where they are, so they can still be read
+     * here. putIfAbsent keeps an earlier snapshot, which is the truer original.
+     *
+     * The fix belongs in whatever deletes a Net, which should move it to the original state itself.
+     */
+    private static void untrackRemovedNet(Design design, Net net) {
+        if (!design.isTrackingNetChanges()) {
+            return;
+        }
+        if (design.isCopyingOriginalNetsRouting() && !net.getPIPs().isEmpty()) {
+            design.getOriginalNetRouting().putIfAbsent(net.getName(), new ArrayList<>(net.getPIPs()));
+        }
+        design.getModifiedNets().remove(net);
+    }
+
+    /**
+     * TEMPORARY WORKAROUND: marks a net as modified, for a change that the design's own change
+     * tracking does not notice. See the call sites.
+     */
+    private static void markModified(Design design, Net net) {
+        if (design.isTrackingNetChanges()) {
+            design.addModifiedNet(net);
         }
     }
 
