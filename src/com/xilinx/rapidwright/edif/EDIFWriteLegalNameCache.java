@@ -111,8 +111,13 @@ public abstract class EDIFWriteLegalNameCache<T> {
     }
 
     public byte[] getBusCollisionEDIFRename(String name) {
-        return busCollisionRenames.computeIfAbsent(name,
-                n -> (EDIFTools.makeNameEDIFCompatible(n) + "_BUS_").getBytes(StandardCharsets.UTF_8));
+        // Look up first, as in getEDIFRename()
+        byte[] rename = busCollisionRenames.get(name);
+        if (rename == null) {
+            rename = busCollisionRenames.computeIfAbsent(name,
+                    n -> (EDIFTools.makeNameEDIFCompatible(n) + "_BUS_").getBytes(StandardCharsets.UTF_8));
+        }
+        return rename;
     }
 
     public static EDIFWriteLegalNameCache<?> singleThreaded() {
