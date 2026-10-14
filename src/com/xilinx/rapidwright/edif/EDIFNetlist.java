@@ -906,7 +906,7 @@ public class EDIFNetlist extends EDIFName {
                 chunks.add(new Pair<>(i, chunk));
             }
         }
-        List<Future<Set<EDIFLibrary>>> chunkRefs = ParallelismTools.invokeAll(chunks, chunk -> {
+        List<Set<EDIFLibrary>> chunkRefs = ParallelismTools.invokeAll(chunks, chunk -> {
             Set<EDIFLibrary> refs = new HashSet<>();
             libs.get(chunk.getFirst()).addExternallyReferencedLibraries(chunk.getSecond(), refs);
             return refs;
@@ -921,7 +921,7 @@ public class EDIFNetlist extends EDIFName {
         }
         for (int c = 0; c < chunks.size(); c++) {
             int i = chunks.get(c).getFirst();
-            for (EDIFLibrary ref : ParallelismTools.get(chunkRefs.get(c))) {
+            for (EDIFLibrary ref : chunkRefs.get(c)) {
                 if (ref == null) continue;
                 // A cell can refer to a library that is not in this netlist (such as one of
                 // Design.getPrimitivesLibrary()'s cells), which no library here can satisfy, so
