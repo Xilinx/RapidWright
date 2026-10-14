@@ -216,6 +216,16 @@ public class ParallelismTools {
                 return null;
             });
         }
+
+        /**
+         * Also cancels the FutureTask, so that it is not run if no thread has started it (as a CompletableFuture's
+         * own cancel() only completes it, which would leave the FutureTask to run when a pool thread dequeues it).
+         */
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            task.cancel(false);
+            return super.cancel(mayInterruptIfRunning);
+        }
     }
 
     /**
@@ -446,7 +456,13 @@ public class ParallelismTools {
      * than look it up in the List later.
      * If a task threw an exception, it is rethrown (as described in
      * {@link #getUnwrapped(Future)}) once the tasks before it have completed,
-     * leaving the elements of that task and of those after it in the List.
+     * after cancelling the Futures of those after it (or of that one and those
+     * after it, if the wait for it was interrupted), leaving their elements in
+     * the List: so that, when this returns or throws, every Future given to it
+     * is done, and work chained on them can complete, without waiting for a
+     * thread that may never run their tasks (such as when the pool has no
+     * threads). A task not yet started is then never run; one that is running
+     * runs to the end, but its result is discarded.
      * @param futures A modifiable List of Future objects corresponding to
      *                previously submitted tasks, whose elements are accessed by
      *                index (so should be a random-access list, such as an
@@ -462,7 +478,14 @@ public class ParallelismTools {
             while (!future.isDone() && next < futures.size()) {
                 runIfUnclaimed(futures.get(next++));
             }
-            getUnwrapped(future);
+            try {
+                getUnwrapped(future);
+            } catch (Throwable e) {
+                for (int j = i; j < futures.size(); j++) {
+                    futures.get(j).cancel(false);
+                }
+                throw e;
+            }
             futures.set(i, null);
         }
     }

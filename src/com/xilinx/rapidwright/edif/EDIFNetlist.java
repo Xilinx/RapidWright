@@ -1132,7 +1132,9 @@ public class EDIFNetlist extends EDIFName {
                 // thrown by a chunk), dropping each from pieces once done (so that each piece is kept only until the
                 // relay has written it), then for the last piece to have been written. Even if a chunk threw, do not
                 // return (and close the stream) until the relay has finished: each stage runs only once both its
-                // inputs have completed, so the last completes only once every write has returned
+                // inputs have completed, so the last completes only once every write has returned. That does not
+                // wait for chunks after one that threw, as joinAll() then cancels them (so their stages complete
+                // without writing): only for a write already in progress on another thread
                 try {
                     ParallelismTools.joinAll(pieces);
                 } finally {
