@@ -965,16 +965,16 @@ public class EDIFNetlist extends EDIFName {
 
 
     /**
-     * Most estimated number of (uncompressed) bytes of EDIF in each run of consecutive cells written to a
-     * {@link ParallelDCPInput} when exporting in parallel (see {@link #estimateExportBytes(EDIFCell)}), unless the run
-     * is a single cell estimated to be bigger.
+     * Most estimated number of (uncompressed) bytes of EDIF in each chunk of consecutive cells written to a
+     * {@link ParallelDCPInput} when exporting in parallel (see {@link #estimateExportBytes(EDIFCell)}), unless the
+     * chunk is a single cell estimated to be bigger.
      * {@link ParallelDCPOutput#newStream} keeps up to 1 MiB of compressed output in memory, and writes any more to a
      * temporary file: so this is as many bytes as are expected to compress to half of that, estimating with
      * {@link ParallelEDIFParser#EDIF_GZIP_COMPRESSION_RATIO}, leaving room for estimates that are too low and text that
-     * compresses less well (a run that compresses to more than 1 MiB, such as a cell that alone does, is still written
-     * correctly, but through a temporary file).
+     * compresses less well (a chunk that compresses to more than 1 MiB, such as a cell that alone does, is still
+     * written correctly, but through a temporary file).
      */
-    private static final int PARALLEL_EXPORT_RUN_BYTES =
+    private static final int PARALLEL_EXPORT_CHUNK_BYTES =
             (1 << 20) / 2 * ParallelEDIFParser.EDIF_GZIP_COMPRESSION_RATIO;
 
     /** Nominal length of an identifier, for {@link #estimateExportBytes(EDIFCell)}, which does not look at names */
@@ -1075,7 +1075,7 @@ public class EDIFNetlist extends EDIFName {
                     offsets[i + 1] = cells.size();
                 }
                 // Split the cells into chunks of consecutive cells, each the most estimated to make up at most
-                // PARALLEL_EXPORT_RUN_BYTES (ending a chunk before the cell that would take it beyond that), but at
+                // PARALLEL_EXPORT_CHUNK_BYTES (ending a chunk before the cell that would take it beyond that), but at
                 // least one. There is at least one chunk, so that libraries are written even if none has any cells
                 final List<Long> estimates = ParallelismTools.invokeAll(cells, EDIFNetlist::estimateExportBytes);
                 final List<CompletableFuture<ParallelDCPInput>> pieces = new ArrayList<>();
@@ -1084,7 +1084,7 @@ public class EDIFNetlist extends EDIFName {
                     final int start = from;
                     long bytes = 0;
                     while (from < cells.size()
-                            && (from == start || bytes + estimates.get(from) <= PARALLEL_EXPORT_RUN_BYTES)) {
+                            && (from == start || bytes + estimates.get(from) <= PARALLEL_EXPORT_CHUNK_BYTES)) {
                         bytes += estimates.get(from++);
                     }
                     final int end = from;
