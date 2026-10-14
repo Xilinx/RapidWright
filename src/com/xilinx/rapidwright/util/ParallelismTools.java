@@ -315,37 +315,6 @@ public class ParallelismTools {
     }
 
     /**
-     * As {@link #invokeFirstSubmitRest(Callable[])}, but returning CompletableFutures, so that further work can be
-     * chained on each task's completion: submit all but the first task with {@link #submitCompletable(Callable)},
-     * then execute that first task with the current thread. Any exception a task throws completes its
-     * CompletableFuture exceptionally.
-     * Unlike invokeFirstSubmitRest(), when parallel processing is disabled, all tasks are executed immediately, in
-     * order, on the current thread (as otherwise work chained on one not yet executed would never run).
-     * @param tasks List of tasks to be executed (if none, an empty List is returned).
-     * @param <T> Type returned by all tasks.
-     * @return A List of CompletableFutures corresponding to each task (in order); the first is complete.
-     */
-    public static <T> List<CompletableFuture<T>> invokeFirstSubmitRestCompletable(
-            @NotNull List<? extends Callable<T>> tasks) {
-        final List<CompletableFuture<T>> futures = new ArrayList<>(tasks.size());
-        if (tasks.isEmpty()) {
-            return futures;
-        }
-        final CompletableFutureWithFutureTask<T> first = new CompletableFutureWithFutureTask<>(tasks.get(0));
-        futures.add(first);
-        if (!getParallel()) {
-            // Before the others, which are then executed immediately too, in order
-            first.task.run();
-        }
-        for (int i = 1; i < tasks.size(); i++) {
-            futures.add(submitCompletable(tasks.get(i)));
-        }
-        // Does nothing if already executed above
-        first.task.run();
-        return futures;
-    }
-
-    /**
      * For a given Deque of Futures, block until the first is complete and
      * remove it from the deque.
      * First, try and steal the task and execute it on this thread. If this
@@ -372,6 +341,7 @@ public class ParallelismTools {
      * For a given List of Futures, block until all are complete.
      * The list is walked in reverse order and tasks not yet claimed are
      * stolen so that they may be completed using the current thread.
+     * See also {@link #joinAll(List)}, which steals them in order instead.
      * @param futures A List of Future objects corresponding to previously
      *                submitted tasks.
      * @param <T> Type returned by all tasks.
@@ -388,6 +358,33 @@ public class ParallelismTools {
         // Now block to wait for other threads to finish their tasks
         for (Future<? extends T> f : futures) {
             get(f);
+        }
+    }
+
+    /**
+     * For a given List of Futures, block until all are complete, waiting for
+     * each in order: meanwhile, tasks not yet claimed are stolen in order (the
+     * oldest first, as the pool's workers also take them), so that the current
+     * thread helps complete the tasks roughly in the List's order, unlike
+     * {@link #join(List)}, which steals them in reverse order. Useful when the
+     * tasks' results are consumed in the List's order as they complete (e.g. by
+     * work chained on their CompletableFutures), so that fewer results are held
+     * until the earlier ones have completed.
+     * If a task threw an exception, it is rethrown (as described in
+     * {@link #getUnwrapped(Future)}) once the tasks before it have completed.
+     * @param futures A List of Future objects corresponding to previously
+     *                submitted tasks, whose elements are accessed by index (so
+     *                should be a random-access list, such as an ArrayList).
+     */
+    public static void joinAll(@NotNull List<? extends Future<?>> futures) {
+        // Every task before this index has been run by this thread, or claimed by another
+        int next = 0;
+        for (int i = 0; i < futures.size(); i++) {
+            final Future<?> future = futures.get(i);
+            while (!future.isDone() && next < futures.size()) {
+                runIfUnclaimed(futures.get(next++));
+            }
+            getUnwrapped(future);
         }
     }
 
