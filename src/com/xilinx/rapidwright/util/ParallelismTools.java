@@ -315,37 +315,6 @@ public class ParallelismTools {
     }
 
     /**
-     * As {@link #invokeFirstSubmitRest(Callable[])}, but returning CompletableFutures, so that further work can be
-     * chained on each task's completion: submit all but the first task with {@link #submitCompletable(Callable)},
-     * then execute that first task with the current thread. Any exception a task throws completes its
-     * CompletableFuture exceptionally.
-     * Unlike invokeFirstSubmitRest(), when parallel processing is disabled, all tasks are executed immediately, in
-     * order, on the current thread (as otherwise work chained on one not yet executed would never run).
-     * @param tasks List of tasks to be executed (if none, an empty List is returned).
-     * @param <T> Type returned by all tasks.
-     * @return A List of CompletableFutures corresponding to each task (in order); the first is complete.
-     */
-    public static <T> List<CompletableFuture<T>> invokeFirstSubmitRestCompletable(
-            @NotNull List<? extends Callable<T>> tasks) {
-        final List<CompletableFuture<T>> futures = new ArrayList<>(tasks.size());
-        if (tasks.isEmpty()) {
-            return futures;
-        }
-        final CompletableFutureWithFutureTask<T> first = new CompletableFutureWithFutureTask<>(tasks.get(0));
-        futures.add(first);
-        if (!getParallel()) {
-            // Before the others, which are then executed immediately too, in order
-            first.task.run();
-        }
-        for (int i = 1; i < tasks.size(); i++) {
-            futures.add(submitCompletable(tasks.get(i)));
-        }
-        // Does nothing if already executed above
-        first.task.run();
-        return futures;
-    }
-
-    /**
      * For a given Deque of Futures, block until the first is complete and
      * remove it from the deque.
      * First, try and steal the task and execute it on this thread. If this
