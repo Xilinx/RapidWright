@@ -528,6 +528,25 @@ public class TestEDIFNetlistOptimizer {
         Assertions.assertEquals(Integer.valueOf(8), VerilogLiterals.parseWidth("8'shff"));
         Assertions.assertEquals(Integer.valueOf(-1), VerilogLiterals.parseWidth("-12"));
         Assertions.assertNull(VerilogLiterals.parseWidth("SYNC"));
+        // Values and widths of unsized literals as given by Vivado's simulator (xsim 2025.1)
+        String[][] xsim = {
+            {"'sd2147483648", "-2147483648", "32"},
+            {"'sd4294967295", "-1", "32"},
+            {"'sd4294967296", "0", "32"},
+            {"'sd8589934591", "-1", "32"},
+            {"'sd12", "12", "32"},
+            {"'d4294967296", "0", "32"},
+            {"'d4294967295", "4294967295", "32"},
+            {"'sh800000000", "-34359738368", "36"},
+            {"'sh100000000", "4294967296", "36"},
+            {"'sh0100000000", "4294967296", "40"},
+            {"'sb100000000000000000000000000000000", "-4294967296", "33"},
+            {"'so40000000000", "-4294967296", "33"},
+        };
+        for (String[] x : xsim) {
+            Assertions.assertEquals(new BigInteger(x[1]), VerilogLiterals.parseNumber(x[0]), x[0]);
+            Assertions.assertEquals(Integer.valueOf(x[2]), VerilogLiterals.parseWidth(x[0]), x[0]);
+        }
         Assertions.assertNull(VerilogLiterals.parseNumber("1'bx"));
         Assertions.assertNull(VerilogLiterals.parseNumber("2'b12"));
         Assertions.assertNull(VerilogLiterals.parseNumber("/tmp/a.mem"));
@@ -592,13 +611,14 @@ public class TestEDIFNetlistOptimizer {
         };
         for (String[] same : new String[][] {{"36'shfffffffff", "36'hfffffffff"},
                 {"8'shff", "36'hfffffffff"}, {"'sh100000000", "36'h100000000"},
+                {"'sd2147483648", "36'hf80000000"},
                 {"36'h0_0000_00FF", "8'hff"}}) {
             EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
             Assertions.assertEquals(0, eq.check(build.apply(same[0]), build.apply(same[1]), 2),
                     same[0] + " " + eq.getExamples());
         }
         for (String[] diff : new String[][] {{"'sh100000000", "36'h000000000"},
-                {"8'hff", "36'hfffffffff"}}) {
+                {"8'hff", "36'hfffffffff"}, {"'sd2147483648", "36'h080000000"}}) {
             Assertions.assertTrue(new EDIFRandomSimEquivalence().check(build.apply(diff[0]),
                     build.apply(diff[1]), 2) > 0, diff[0]);
         }

@@ -37,8 +37,8 @@ public final class VerilogLiterals {
 
     private static final Pattern DECIMAL = Pattern.compile("[+-]?\\d+");
 
-    /** Minimum width of an unsized Verilog literal. */
-    private static final int UNSIZED_MIN_WIDTH = 32;
+    /** Width of an unsized Verilog literal (the minimum for binary, octal and hex ones). */
+    private static final int UNSIZED_WIDTH = 32;
 
     private VerilogLiterals() {
     }
@@ -78,11 +78,13 @@ public final class VerilogLiterals {
                 if (width == 0) {
                     return null;
                 }
+            } else if (bitsPerDigit == 0) {
+                // Unsized decimal: 32 bits (as in Vivado, e.g. 'sd4294967295 is -1)
+                width = UNSIZED_WIDTH;
             } else {
-                // Unsized: at least 32 bits, more if the digits need them (a decimal value stays
-                // non-negative)
-                int needed = bitsPerDigit == 0 ? n.bitLength() + 1 : digits.length() * bitsPerDigit;
-                width = Math.max(UNSIZED_MIN_WIDTH, needed);
+                // Unsized binary/octal/hex: 32 bits, more if its digits (leading zeros
+                // included) need them (as in Vivado, e.g. 'sh0100000000 has 40 bits)
+                width = Math.max(UNSIZED_WIDTH, digits.length() * bitsPerDigit);
             }
             BigInteger range = BigInteger.ONE.shiftLeft(width);
             n = n.mod(range);
@@ -109,9 +111,9 @@ public final class VerilogLiterals {
 
     /**
      * @param value A property value.
-     * @return The width in bits of a Verilog number literal: its size if sized, else the larger
-     * of 32 and the bits its digits need; -1 for a plain decimal number; null if value is not a
-     * number.
+     * @return The width in bits of a Verilog number literal: its size if sized; for an unsized
+     * one, 32 if decimal, else the larger of 32 and the bits its digits need (leading zeros
+     * included); -1 for a plain decimal number; null if value is not a number.
      */
     public static Integer parseWidth(String value) {
         Literal l = parse(value);
