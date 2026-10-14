@@ -287,11 +287,13 @@ public class ParallelEDIFParser implements AutoCloseable{
             link(linked, worker, assembler, portCaches);
             return null;
         };
-        // Each stage adds its worker once that has been parsed and the previous stage has completed
+        // Each stage adds its worker once that has been parsed and the previous stage has completed. Each stage is given
+        // its worker's future here, rather than looking it up in parsed once the previous stage has completed: so that
+        // the stages do not depend on parsed after this, while joinAll() below waits for (and is done with) each entry
         CompletableFuture<ParallelEDIFParserWorker> stage = parsed.get(0).thenApply(x -> add.apply(null, 0));
         for (int i = 1; i < workers.size(); i++) {
             final int index = i;
-            stage = stage.thenCompose(mismatched -> parsed.get(index).thenApply(x -> add.apply(mismatched, index)));
+            stage = stage.thenCombine(parsed.get(index), (mismatched, x) -> add.apply(mismatched, index));
         }
         stage.whenComplete((x, e) -> {
             if (e == null) {
