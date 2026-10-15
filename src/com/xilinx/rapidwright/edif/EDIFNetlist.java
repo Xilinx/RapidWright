@@ -56,6 +56,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -1022,146 +1023,177 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
-     * Write this netlist as EDIF to the given stream, which is closed afterwards. If parallel processing is enabled and
-     * the stream is that of a DCP being written (see {@link ParallelDCPOutput#cast}), the EDIF is written and
-     * compressed in parallel.
+     * Write this netlist as EDIF to the given stream, on this thread, which is closed afterwards. To write it into a
+     * DCP in parallel, see {@link #exportEDIFParallel(boolean)} instead.
      * @param out The stream to write to.
      * @param stable If true, the output is the same each time for the same netlist: the date is fixed, and libraries,
-     *               cells, their contents and properties are written in sorted order. Except when written in
-     *               parallel: then, this applies only to the date, the order of libraries and the netlist's and
-     *               design's properties (cells are written in an unsorted valid order, with unsorted contents), and
-     *               names that are made legal as the same EDIF identifier may be told apart differently each time
-     *               (see {@link EDIFWriteLegalNameCache}).
+     *               cells, their contents and properties are written in sorted order.
      */
     public void exportEDIF(OutputStream out, boolean stable) throws IOException {
         try (BufferedOutputStream os = new BufferedOutputStream(out)) {
-            final ParallelDCPOutput dos = ParallelismTools.getParallel() ?
-                    ParallelDCPOutput.cast(out) : null;
+            EDIFWriteLegalNameCache<?> cache = EDIFWriteLegalNameCache.singleThreaded();
 
-            EDIFWriteLegalNameCache<?> cache = dos!=null ? EDIFWriteLegalNameCache.multiThreaded() : EDIFWriteLegalNameCache.singleThreaded();
-
-            os.write(EXPORT_CONST_EDIF_HEAD);
-            exportEDIFName(os, cache);
-            os.write(EXPORT_CONST_EDIF_VERSION);
-            if (stable) {
-                os.write("1970 01 01 00 00 00".getBytes(StandardCharsets.UTF_8));
-            } else {
-                SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
-                os.write(formatter.format(new Date()).getBytes(StandardCharsets.UTF_8));
-            }
-            os.write(EXPORT_CONST_PROGRAM);
-            for (String comment : getComments()) {
-                os.write(EXPORT_CONST_COMMENT);
-                os.write(comment.getBytes(StandardCharsets.UTF_8));
-                os.write(EXPORT_CONST_QUOTE_CLOSE_NL);
-            }
-            for (Entry<String, EDIFPropertyValue> e : EDIFTools.sortIfStable(metax, stable)) {
-                os.write(EXPORT_CONST_META_X);
-                os.write(e.getKey().getBytes(StandardCharsets.UTF_8));
-                os.write(' ');
-                e.getValue().writeEDIFString(os);
-                os.write(EXPORT_CONST_CLOSE_NL);
-            }
-            os.write(EXPORT_CONST_DOUBLE_CLOSE);
+            exportEDIFHeader(os, cache, stable);
 
             // Cells can only be instantiated after their library has been written.  A circular
             // dependency cannot be ordered, but is still written (as it was before ordering)
-            List<EDIFLibrary> librariesToWrite = getLibrariesInExportOrder(stable, false);
-
-            if (dos != null) {
-                os.flush();
-                // The libraries' cells, one after the other: those of the i-th library are from offsets[i]
-                // (inclusive) to offsets[i + 1] (exclusive)
-                final List<EDIFCell> cells = new ArrayList<>();
-                final int[] offsets = new int[librariesToWrite.size() + 1];
-                for (int i = 0; i < librariesToWrite.size(); i++) {
-                    cells.addAll(librariesToWrite.get(i).getValidCellExportOrder(false));
-                    offsets[i + 1] = cells.size();
-                }
-                // Split the cells into chunks of consecutive cells, each the most estimated to make up at most
-                // PARALLEL_EXPORT_CHUNK_BYTES (ending a chunk before the cell that would take it beyond that), but at
-                // least one. There is at least one chunk, so that libraries are written even if none has any cells
-                final long[] estimates = ParallelismTools.stream(cells).mapToLong(EDIFNetlist::estimateExportBytes)
-                        .toArray();
-                final List<CompletableFuture<ParallelDCPInput>> pieces = new ArrayList<>();
-                int from = 0;
-                do {
-                    final int start = from;
-                    long bytes = 0;
-                    while (from < cells.size()
-                            && (from == start || bytes + estimates[from] <= PARALLEL_EXPORT_CHUNK_BYTES)) {
-                        bytes += estimates[from++];
-                    }
-                    final int end = from;
-                    // Write this chunk's cells, and the header of each library that starts within it and the footer
-                    // of each that ends within it (a library without cells is written by the chunk that contains its
-                    // offset, or by the last chunk if it comes after all cells), directly into the compressing
-                    // stream of one piece
-                    pieces.add(ParallelismTools.submitCompletable(() -> ParallelDCPOutput.newStream(chunkOs -> {
-                        try {
-                            for (int i = 0; i < librariesToWrite.size(); i++) {
-                                final int libFrom = offsets[i];
-                                final int libTo = offsets[i + 1];
-                                if (start <= libFrom ? libFrom >= end && end < cells.size() : start >= libTo) {
-                                    continue;
-                                }
-                                librariesToWrite.get(i).exportEDIF(
-                                        cells.subList(Math.max(start, libFrom), Math.min(end, libTo)), chunkOs,
-                                        start <= libFrom, libTo <= end, cache, false);
-                            }
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    })));
-                } while (from < cells.size());
-
-                // Each chunk's piece is written once that chunk is done and the previous chunk's piece has been
-                // written, by whichever thread completes the later of the two (so it may block on that I/O)
-                CompletableFuture<Void> written = CompletableFuture.completedFuture(null);
-                for (CompletableFuture<ParallelDCPInput> piece : pieces) {
-                    written = written.thenCombine(piece, (x, p) -> {
-                        try {
-                            dos.write(p);
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                        return null;
-                    });
-                }
-                // Wait for the chunks in order, meanwhile running any not yet started (which rethrows any exception
-                // thrown by a chunk), dropping each from pieces once done (so that each piece is kept only until the
-                // relay has written it), then for the last piece to have been written. Even if a chunk threw, do not
-                // return (and close the stream) until the relay has finished: each stage runs only once both its
-                // inputs have completed, so the last completes only once every write has returned. That does not
-                // wait for chunks after one that threw, as joinAll() then cancels them (so their stages complete
-                // without writing): only for a write already in progress on another thread
-                try {
-                    ParallelismTools.joinAll(pieces);
-                } finally {
-                    written.handle((x, e) -> null).join();
-                }
-                ParallelismTools.get(written);
-            } else {
-                for (EDIFLibrary lib : librariesToWrite) {
-                    lib.exportEDIF(os, cache, stable);
-                }
+            for (EDIFLibrary lib : getLibrariesInExportOrder(stable, false)) {
+                lib.exportEDIF(os, cache, stable);
             }
 
-            os.write(EXPORT_CONST_DESIGN_START);
-            EDIFDesign design = getDesign();
-            if (design != null) {
-                design.exportEDIFName(os, cache);
-                os.write(EXPORT_CONST_CELLREF);
-                os.write(cache.getLegalEDIFName(design.getTopCell().getName()));
-                os.write(EXPORT_CONST_LIBRARYREF);
-                os.write(cache.getLegalEDIFName(design.getTopCell().getLibrary().getName()));
-                os.write(EXPORT_CONST_CLOSE_REF);
-                design.exportEDIFProperties(os, EXPORT_CONST_PROP_INDENT, cache, stable);
-                os.write(EXPORT_CONST_CLOSE_DESIGN);
-            }
-            os.write(EXPORT_CONST_CLOSE_EDIF);
+            exportEDIFFooter(os, cache, stable);
         }
     }
+
+    /**
+     * Write what comes before the libraries in this netlist's EDIF.
+     */
+    private void exportEDIFHeader(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable)
+            throws IOException {
+        os.write(EXPORT_CONST_EDIF_HEAD);
+        exportEDIFName(os, cache);
+        os.write(EXPORT_CONST_EDIF_VERSION);
+        if (stable) {
+            os.write("1970 01 01 00 00 00".getBytes(StandardCharsets.UTF_8));
+        } else {
+            SimpleDateFormat formatter = new SimpleDateFormat("yyyy MM dd HH mm ss");
+            os.write(formatter.format(new Date()).getBytes(StandardCharsets.UTF_8));
+        }
+        os.write(EXPORT_CONST_PROGRAM);
+        for (String comment : getComments()) {
+            os.write(EXPORT_CONST_COMMENT);
+            os.write(comment.getBytes(StandardCharsets.UTF_8));
+            os.write(EXPORT_CONST_QUOTE_CLOSE_NL);
+        }
+        for (Entry<String, EDIFPropertyValue> e : EDIFTools.sortIfStable(metax, stable)) {
+            os.write(EXPORT_CONST_META_X);
+            os.write(e.getKey().getBytes(StandardCharsets.UTF_8));
+            os.write(' ');
+            e.getValue().writeEDIFString(os);
+            os.write(EXPORT_CONST_CLOSE_NL);
+        }
+        os.write(EXPORT_CONST_DOUBLE_CLOSE);
+    }
+
+    /**
+     * Write what comes after the libraries in this netlist's EDIF: its design, and the end of the EDIF.
+     */
+    private void exportEDIFFooter(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable)
+            throws IOException {
+        os.write(EXPORT_CONST_DESIGN_START);
+        EDIFDesign design = getDesign();
+        if (design != null) {
+            design.exportEDIFName(os, cache);
+            os.write(EXPORT_CONST_CELLREF);
+            os.write(cache.getLegalEDIFName(design.getTopCell().getName()));
+            os.write(EXPORT_CONST_LIBRARYREF);
+            os.write(cache.getLegalEDIFName(design.getTopCell().getLibrary().getName()));
+            os.write(EXPORT_CONST_CLOSE_REF);
+            design.exportEDIFProperties(os, EXPORT_CONST_PROP_INDENT, cache, stable);
+            os.write(EXPORT_CONST_CLOSE_DESIGN);
+        }
+        os.write(EXPORT_CONST_CLOSE_EDIF);
+    }
+
+    /**
+     * Submit the given libraries' cells to be written as EDIF in parallel, in chunks of consecutive cells, each
+     * written and compressed into a piece of a DCP's EDIF (see {@link ParallelDCPOutput#newStream}), without waiting
+     * for any.
+     * @param librariesToWrite The libraries, in the order to be written.
+     * @param cache The cache of legal EDIF names, which must be safe to use from multiple threads.
+     * @return The pieces, in order: one per chunk, of which there is at least one.
+     */
+    private List<CompletableFuture<ParallelDCPInput>> submitExportChunks(List<EDIFLibrary> librariesToWrite,
+                                                                        EDIFWriteLegalNameCache<?> cache) {
+        // The libraries' cells, one after the other: those of the i-th library are from offsets[i]
+        // (inclusive) to offsets[i + 1] (exclusive)
+        final List<EDIFCell> cells = new ArrayList<>();
+        final int[] offsets = new int[librariesToWrite.size() + 1];
+        for (int i = 0; i < librariesToWrite.size(); i++) {
+            cells.addAll(librariesToWrite.get(i).getValidCellExportOrder(false));
+            offsets[i + 1] = cells.size();
+        }
+        // Split the cells into chunks of consecutive cells, each the most estimated to make up at most
+        // PARALLEL_EXPORT_CHUNK_BYTES (ending a chunk before the cell that would take it beyond that), but at
+        // least one. There is at least one chunk, so that libraries are written even if none has any cells
+        final long[] estimates = ParallelismTools.stream(cells).mapToLong(EDIFNetlist::estimateExportBytes)
+                .toArray();
+        final List<CompletableFuture<ParallelDCPInput>> pieces = new ArrayList<>();
+        int from = 0;
+        do {
+            final int start = from;
+            long bytes = 0;
+            while (from < cells.size()
+                    && (from == start || bytes + estimates[from] <= PARALLEL_EXPORT_CHUNK_BYTES)) {
+                bytes += estimates[from++];
+            }
+            final int end = from;
+            // Write this chunk's cells, and the header of each library that starts within it and the footer
+            // of each that ends within it (a library without cells is written by the chunk that contains its
+            // offset, or by the last chunk if it comes after all cells), directly into the compressing
+            // stream of one piece
+            pieces.add(ParallelismTools.submitCompletable(() -> ParallelDCPOutput.newStream(chunkOs -> {
+                try {
+                    for (int i = 0; i < librariesToWrite.size(); i++) {
+                        final int libFrom = offsets[i];
+                        final int libTo = offsets[i + 1];
+                        if (start <= libFrom ? libFrom >= end && end < cells.size() : start >= libTo) {
+                            continue;
+                        }
+                        librariesToWrite.get(i).exportEDIF(
+                                cells.subList(Math.max(start, libFrom), Math.min(end, libTo)), chunkOs,
+                                start <= libFrom, libTo <= end, cache, false);
+                    }
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            })));
+        } while (from < cells.size());
+        return pieces;
+    }
+
+    /**
+     * Write this netlist as EDIF in parallel, into compressed pieces of a DCP's EDIF (see
+     * {@link ParallelDCPOutput#newStream}), returned in order without waiting for any: so that the caller can copy
+     * each elsewhere (e.g. into the DCP) as soon as it, and every piece before it, is done, while the rest
+     * are still being written. In order, they are: the EDIF's header; the libraries, in chunks of consecutive cells,
+     * each submitted to be written in parallel (with
+     * {@link ParallelismTools#submitCompletable(java.util.concurrent.Callable)}); and the
+     * design and the end of the EDIF, which ends the compressed stream. The header and the end are already written.
+     * Each piece's compressed data follows that of the piece before it, so that together they are this netlist's EDIF.
+     * They should be waited for in order with {@link ParallelismTools#joinInOrder(List)} (or its other ways of
+     * waiting for a Future), which runs any not yet started.
+     * @param stable If true, the date is fixed, and libraries and the netlist's and design's properties are written
+     *               in sorted order; but cells are written in an unsorted valid order, with unsorted contents, and
+     *               names that are made legal as the same EDIF identifier may be told apart differently each time (see
+     *               {@link EDIFWriteLegalNameCache}).
+     * @return The pieces, in order.
+     */
+    public List<Future<ParallelDCPInput>> exportEDIFParallel(boolean stable) {
+        final EDIFWriteLegalNameCache<?> cache = EDIFWriteLegalNameCache.multiThreaded();
+        final List<Future<ParallelDCPInput>> pieces = new ArrayList<>();
+        pieces.add(CompletableFuture.completedFuture(ParallelDCPOutput.newStream(os -> {
+            try {
+                exportEDIFHeader(os, cache, stable);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        })));
+        // Cells can only be instantiated after their library has been written.  A circular
+        // dependency cannot be ordered, but is still written (as it was before ordering)
+        pieces.addAll(submitExportChunks(getLibrariesInExportOrder(stable, false), cache));
+        pieces.add(CompletableFuture.completedFuture(ParallelDCPOutput.newStream(os -> {
+            try {
+                exportEDIFFooter(os, cache, stable);
+                // So that its last block is marked as being the final one
+                os.close();
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        })));
+        return pieces;
+    }
+
     public void exportEDIF(OutputStream out) throws IOException {
         exportEDIF(out, false);
     }
