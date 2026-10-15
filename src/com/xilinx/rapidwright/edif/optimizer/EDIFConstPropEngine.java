@@ -208,6 +208,12 @@ class EDIFConstPropEngine {
     final IntList aliasTarget = new IntList();
     /** Nets whose loads were all removed while their (non-static) driver survives. */
     final IntList orphanNets = new IntList();
+    /**
+     * Explanations of decisions that cannot be derived from the final state (only kept when a
+     * report is requested): per leaf, and per pin the inverter it absorbed.
+     */
+    final Map<Integer, String> why;
+    final Map<Integer, Integer> absorbedFrom;
 
     private final int[] queue;
     private int qHead;
@@ -238,6 +244,9 @@ class EDIFConstPropEngine {
         groupPins = new int[numNets];
         queue = new int[numLeaves + 1];
         queued = new boolean[numLeaves];
+        boolean report = opts.getReport() != null;
+        why = report ? new HashMap<>() : null;
+        absorbedFrom = report ? new HashMap<>() : null;
         classify();
         for (int p = 0; p < idx.getNumPins(); p++) {
             int n = idx.getPinNet(p);
@@ -663,6 +672,13 @@ class EDIFConstPropEngine {
         }
     }
 
+    /** Records why leaf l was removed or changed (when a report is requested). */
+    private void explain(int l, String reason) {
+        if (why != null) {
+            why.merge(l, reason, (a, b) -> a + "; " + b);
+        }
+    }
+
     // ---------------------------------------------------------------- pin lookup
 
     int findPin(int l, String name) {
@@ -763,7 +779,47 @@ class EDIFConstPropEngine {
         if (reach == SET0 || reach == SET1) {
             removeLeaf(l, RM_CONST);
             setConst(idx.getPinNet(q), reach == SET0 ? C0 : C1);
+            if (why != null) {
+                explain(l, explainFD(l, isLatch, async, rstPin, rst, init, rstVal));
+            }
         }
+    }
+
+    /** @return Why a flip-flop or latch found constant can only hold one value. */
+    private String explainFD(int l, boolean isLatch, boolean async, String rstPin, byte rst,
+                             int init, int rstVal) {
+        if (async && rst == C1) {
+            return "asynchronous " + rstPin + " always active";
+        }
+        StringBuilder sb = new StringBuilder("holds INIT=" + (init == SET1 ? 1 : 0));
+        if (rst == C0) {
+            sb.append(", ").append(rstPin).append(" never active");
+        } else if (rstVal == init) {
+            sb.append(", ").append(rstPin).append(" sets the same value");
+        }
+        if (isLatch) {
+            byte g = effVal(l, "G");
+            byte ge = effVal(l, "GE");
+            if (g == C0 || ge == C0) {
+                sb.append(", gate never open (").append(g == C0 ? "G" : "GE")
+                        .append(" constant 0)");
+            } else {
+                sb.append(", D constant ").append(effVal(l, "D") == C1 ? 1 : 0);
+            }
+            return sb.toString();
+        }
+        byte c = valueOf(pinNet0(l, "C"));
+        byte ce = effVal(l, "CE");
+        if (c != UNK) {
+            sb.append(", clock C constant (no edges)");
+        } else if (ce == C0) {
+            sb.append(", CE constant 0");
+        } else if (!async && rst == C1) {
+            sb.append(", synchronous ").append(rstPin).append(" always active");
+        } else {
+            sb.append(", D constant ").append(effVal(l, "D") == C1 ? 1 : 0);
+        }
+        return sb.toString();
     }
 
     private int pinNet0(int l, String pin) {
@@ -1084,6 +1140,7 @@ class EDIFConstPropEngine {
                 setConst(idx.getPinNet(p), d);
             }
         }
+        explain(l, "D constant " + (d == C1 ? 1 : 0) + " equal to all INIT bits");
     }
 
     private void evaluate(int l) {
@@ -1343,7 +1400,9 @@ class EDIFConstPropEngine {
             if (all) {
                 for (int i = 0; i < loads.size(); i++) {
                     absorb(loads.get(i), b, a, pushMark, false);
+                    noteAbsorbed(loads.get(i), l);
                 }
+                explain(l, "inverter absorbed by all its " + loads.size() + " loads");
                 removeLeaf(l, reason);
                 bypass(l, inputPinOf(l), out, a, false);
                 collapseBuffers(loads, reason);
@@ -1352,6 +1411,7 @@ class EDIFConstPropEngine {
                 for (int i = 0; i < loads.size(); i++) {
                     if (absorbable[i]) {
                         absorb(loads.get(i), b, a, pushMark, true);
+                        noteAbsorbed(loads.get(i), l);
                         absorbed.add(loads.get(i));
                     }
                 }
@@ -1367,6 +1427,13 @@ class EDIFConstPropEngine {
                 }
                 collapseBuffers(absorbed, reason);
             }
+        }
+    }
+
+    /** Records that load pin p absorbed inverter l (when a report is requested). */
+    private void noteAbsorbed(int p, int l) {
+        if (absorbedFrom != null) {
+            absorbedFrom.put(p, l);
         }
     }
 
@@ -1400,6 +1467,7 @@ class EDIFConstPropEngine {
             if (r == in || netOpaque[r]) {
                 continue;
             }
+            explain(l, "became a buffer by absorbing an inverter");
             removeLeaf(l, reason);
             bypass(l, inPin, out, in, false);
         }
@@ -1478,14 +1546,17 @@ class EDIFConstPropEngine {
         xs.table = ~xs.table & mask(xs.size);
         xs.changed = true;
         mark(x, MARK_POST_PROCESS);
+        explain(x, "inverted to absorb inverter " + idx.getLeafName(l) + " it drove");
         IntList others = new IntList();
         for (int i = 0; i < loads.size(); i++) {
             int p = loads.get(i);
             if (idx.getPinLeaf(p) != l) {
                 absorb(p, a, a, MARK_POST_PROCESS, false);
+                noteAbsorbed(p, l);
                 others.add(p);
             }
         }
+        explain(l, "pulled back into its driver " + idx.getLeafName(x));
         removeLeaf(l, RM_PULLBACK);
         bypass(l, inputPinOf(l), out, a, false);
         collapseBuffers(others, RM_PULLBACK);

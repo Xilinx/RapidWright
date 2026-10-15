@@ -266,6 +266,13 @@ class EDIFOptEditor {
     private final EDIFOptStats stats;
     private final Map<Integer, List<Op>> ops = new HashMap<>();
 
+    /** Receives the edits made at the level of cell definitions, null if no report. */
+    private EDIFOptReport report;
+
+    void setReport(EDIFOptReport report) {
+        this.report = report;
+    }
+
     EDIFOptEditor(EDIFConstPropEngine e, EDIFOptStats stats) {
         this.e = e;
         this.idx = e.idx;
@@ -756,6 +763,11 @@ class EDIFOptEditor {
                 def = new EDIFCell(lib, orig, name);
                 m.put(sigId[h], def);
                 copies++;
+                if (report != null) {
+                    report.add("DEFINITION_COPIED", name, orig.getName(), "copy of "
+                            + orig.getName() + " for instances that need different edits, e.g. "
+                            + idx.getHierName(h));
+                }
             }
             EDIFCellInst inst = newCell[idx.getHierParent(h)].getCellInst(
                     idx.getHierInst(h).getName());
@@ -1031,6 +1043,10 @@ class EDIFOptEditor {
         staticCounter.put(cell, k);
         EDIFCellInst inst = cell.createChildCellInst(name, src);
         net.createPortInst(vcc ? "P" : "G", inst);
+        if (report != null) {
+            report.add("SOURCE_ADDED", cell.getName() + ":" + name, type, "drives net "
+                    + net.getName() + ", which became constant " + (vcc ? 1 : 0));
+        }
     }
 
     // ---------------------------------------------------------------- cleanup
@@ -1264,7 +1280,13 @@ class EDIFOptEditor {
                     }
                     cell.removeCellInst(child);
                     parents.add(cell);
-                    count += 1 + countHierInsts(t);
+                    int nested = countHierInsts(t);
+                    count += 1 + nested;
+                    if (report != null) {
+                        report.add("HIERARCHY_REMOVED", cell.getName() + ":" + child.getName(),
+                                t.getName(), "no leaf cells left and no signal passing through"
+                                + (nested > 0 ? " (with " + nested + " nested instances)" : ""));
+                    }
                 } else if (visited.add(t)) {
                     todo.add(t);
                 }

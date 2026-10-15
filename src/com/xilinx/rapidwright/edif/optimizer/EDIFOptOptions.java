@@ -20,6 +20,8 @@
 
 package com.xilinx.rapidwright.edif.optimizer;
 
+import java.io.Writer;
+
 /**
  * Options controlling the netlist optimizations performed by
  * {@link EDIFTools#optimizeNetlist(EDIFNetlist, EDIFOptOptions)}, modeled after Vivado's
@@ -32,6 +34,7 @@ public class EDIFOptOptions {
     private boolean pushInverters = true;
     private boolean postProcess = true;
     private boolean markModified = true;
+    private Writer report;
 
     public EDIFOptOptions() {
     }
@@ -43,6 +46,7 @@ public class EDIFOptOptions {
         pushInverters = o.pushInverters;
         postProcess = o.postProcess;
         markModified = o.markModified;
+        report = o.report;
     }
 
     /** @return True if constant propagation (and the LUT simplifications it implies) runs. */
@@ -98,6 +102,25 @@ public class EDIFOptOptions {
 
     public EDIFOptOptions setMarkModified(boolean markModified) {
         this.markModified = markModified;
+        return this;
+    }
+
+    /** @return The writer receiving the optimization report, null if none. */
+    public Writer getReport() {
+        return report;
+    }
+
+    /**
+     * Requests a report of every change: one tab-separated line per decision (action, object,
+     * cell type, explanation), e.g. a cell removed as constant and the input that made it so, a
+     * buffer removed and the net its output was merged into, a LUT rewritten and why each input
+     * was dropped, or a cell swept; then the number of each action. The report is written to the
+     * given writer (which is flushed, not closed). Off by default.
+     * @param report The writer, or null for no report.
+     * @return This object.
+     */
+    public EDIFOptOptions setReport(Writer report) {
+        this.report = report;
         return this;
     }
 }

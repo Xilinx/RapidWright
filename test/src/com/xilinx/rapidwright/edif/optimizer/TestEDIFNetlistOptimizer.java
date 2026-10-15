@@ -904,6 +904,107 @@ public class TestEDIFNetlistOptimizer {
         Assertions.assertEquals(0, eq.getRemovedNonConstant());
     }
 
+    private static String optimizeWithReport(EDIFNetlist netlist, EDIFOptOptions opts,
+                                             EDIFOptStats[] stats) {
+        java.io.StringWriter w = new java.io.StringWriter();
+        stats[0] = EDIFTools.optimizeNetlist(netlist, opts.setReport(w));
+        return w.toString();
+    }
+
+    private static List<String> reportLines(String report, String action) {
+        List<String> lines = new java.util.ArrayList<>();
+        for (String line : report.split("\n")) {
+            if (line.startsWith(action + "\t")) {
+                lines.add(line);
+            }
+        }
+        return lines;
+    }
+
+    @ParameterizedTest
+    @MethodSource("optProbeNames")
+    public void testReportAccountsForEveryRemovedCell(String probe) {
+        // Removed cells, resized LUTs (counted as removed and created) and removed hierarchy
+        // (with nested instances) add up to the cells removed in the statistics
+        EDIFOptStats[] stats = new EDIFOptStats[1];
+        String report = optimizeWithReport(OptProbes.getProbes().get(probe).get(),
+                new EDIFOptOptions(), stats);
+        int removed = 0;
+        for (EDIFOptStats.Phase phase : EDIFOptStats.Phase.values()) {
+            removed += stats[0].getRemoved(phase);
+        }
+        int lines = 0;
+        for (String action : new String[] {"REMOVED_CONSTANT", "REMOVED_BUFFER",
+                "REMOVED_INVERTER", "REMOVED_UNLOADED", "SWEPT", "LUT_RESIZED"}) {
+            lines += reportLines(report, action).size();
+        }
+        for (String line : reportLines(report, "HIERARCHY_REMOVED")) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("with (\\d+) nested")
+                    .matcher(line);
+            lines += 1 + (m.find() ? Integer.parseInt(m.group(1)) : 0);
+        }
+        Assertions.assertEquals(removed, lines, report);
+        // The summary matches the lines
+        for (String line : report.split("\n")) {
+            if (line.startsWith("# SUMMARY")) {
+                String[] f = line.split("\t");
+                Assertions.assertEquals(Integer.parseInt(f[2]), reportLines(report, f[1]).size());
+            }
+        }
+    }
+
+    @Test
+    public void testReportExplainsDecisions() {
+        OptProbes.B b = new OptProbes.B("report");
+        b.in("clk", "a", "b", "c", "r");
+        b.out("o1", "o2", "o3", "q1", "q2");
+        // Constant: an AND with a ground input
+        b.lut("K", "8", "o1", "a", "0");
+        // Resized: I1 & (I0 ^ I3), with I1 constant and I2 unused by the function
+        b.lut("S", "4488", "o2", "a", "1", "c", "b");
+        // Buffer
+        b.lut("U", "2", "m", "b");
+        b.lut("V", "6", "o3", "m", "c");
+        // Flip-flop that can only hold its INIT (CE low, no reset)
+        b.fdre("F", "a", "0", "0", "q1", "0");
+        // Inverter absorbed by a reset pin
+        b.lut("IV", "1", "rn", "r");
+        b.fdre("G", "a", "1", "rn", "q2", "0");
+        // Dead logic
+        b.lut("D", "6", "dead", "a", "b");
+        EDIFOptStats[] stats = new EDIFOptStats[1];
+        String report = optimizeWithReport(b.nl, new EDIFOptOptions(), stats);
+        Assertions.assertTrue(report.contains("REMOVED_CONSTANT\tK\tLUT2\tO constant 0: constant"
+                + " inputs I1=0 from "), report);
+        Assertions.assertTrue(report.contains("LUT_RESIZED\tS\tLUT4\tLUT4 INIT=16'h4488 -> LUT2 "
+                + "INIT=4'h6: I0->I0, I1 dropped (constant 1 from VCC/P (VCC)), I2 dropped "
+                + "(function does not depend on it), I3->I1"), report);
+        Assertions.assertTrue(report.contains("REMOVED_BUFFER\tU\tLUT1\tbuffer; O merged into b"
+                + " (from I0)"), report);
+        Assertions.assertTrue(report.contains("REMOVED_CONSTANT\tF\tFDRE\tQ constant 0: holds "
+                + "INIT=0, R never active, CE constant 0"), report);
+        Assertions.assertTrue(report.contains("REMOVED_INVERTER\tIV\tLUT1\tinverter absorbed by"
+                + " all its 1 loads; O merged into r"), report);
+        Assertions.assertTrue(report.contains("PIN_INVERTED\tG\tFDRE\tIS_R_INVERTED=1'b1, "
+                + "absorbed inverter IV"), report);
+        Assertions.assertTrue(report.contains("SWEPT\tD\tLUT2\tno path to a top-level output"),
+                report);
+        Assertions.assertTrue(report.contains("SOURCE_ADDED\t"), report);
+        Assertions.assertTrue(report.contains("# SUMMARY\tSWEPT\t1"), report);
+    }
+
+    @Test
+    public void testReportShowsDefinitionEdits() {
+        // u0 gets a constant input, u1 does not: 'sub' is copied for u0
+        EDIFOptStats[] stats = new EDIFOptStats[1];
+        String report = optimizeWithReport(OptProbes.getProbes().get("hier_const_in_shared").get(),
+                new EDIFOptOptions(), stats);
+        Assertions.assertTrue(report.contains("DEFINITION_COPIED\tsub_HD1\tsub\tcopy of sub for "
+                + "instances that need different edits, e.g. u0"), report);
+        // No report is written unless requested
+        Assertions.assertNull(new EDIFOptOptions().getReport());
+    }
+
     @Test
     public void testComparatorsResetBetweenComparisons() {
         Supplier<EDIFNetlist> s = OptProbes.getProbes().get("lut_chain");

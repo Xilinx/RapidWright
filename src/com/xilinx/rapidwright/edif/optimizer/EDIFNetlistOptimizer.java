@@ -20,6 +20,10 @@
 
 package com.xilinx.rapidwright.edif.optimizer;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.io.Writer;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 
 import com.xilinx.rapidwright.edif.EDIFCell;
@@ -56,6 +60,13 @@ public class EDIFNetlistOptimizer {
         t = System.nanoTime();
         EDIFOptEditor editor = new EDIFOptEditor(engine, stats);
         editor.generate();
+        EDIFOptReport report = opts.getReport() == null ? null
+                : new EDIFOptReport(opts.getReport());
+        if (report != null) {
+            // Before any edit, so that cells and nets have their input names
+            report.addDecisions(engine);
+            editor.setReport(report);
+        }
         EDIFCell[] defs = editor.uniquify();
         editor.apply(defs);
         stats.addTime("Apply edits", System.nanoTime() - t);
@@ -65,18 +76,22 @@ public class EDIFNetlistOptimizer {
         netlist.removeUnusedCellsFromAllWorkLibraries();
         netlist.resetParentNetMap();
         stats.addTime("Cleanup", System.nanoTime() - t);
+        if (report != null) {
+            report.finish();
+        }
         return stats;
     }
 
     public static void main(String[] args) {
         if (args.length < 2) {
             System.out.println("USAGE: <input.edf[.gz]> <output.edf> [-propconst] [-sweep]"
-                    + " [-no_push_inverters] [-no_post_process]");
+                    + " [-no_push_inverters] [-no_post_process] [-report <file>]");
             System.out.println("  With neither -propconst nor -sweep, both are run.");
             return;
         }
         EDIFOptOptions opts = new EDIFOptOptions().setPropConst(false).setSweep(false);
         boolean any = false;
+        String reportFile = null;
         for (int i = 2; i < args.length; i++) {
             switch (args[i]) {
                 case "-propconst":
@@ -93,6 +108,9 @@ public class EDIFNetlistOptimizer {
                 case "-no_post_process":
                     opts.setPostProcess(false);
                     break;
+                case "-report":
+                    reportFile = args[++i];
+                    break;
                 default:
                     throw new RuntimeException("Unknown option " + args[i]);
             }
@@ -103,7 +121,16 @@ public class EDIFNetlistOptimizer {
         long t0 = System.nanoTime();
         EDIFNetlist netlist = EDIFTools.readEdifFile(Paths.get(args[0]));
         long t1 = System.nanoTime();
-        EDIFOptStats stats = optimize(netlist, opts);
+        EDIFOptStats stats;
+        if (reportFile == null) {
+            stats = optimize(netlist, opts);
+        } else {
+            try (Writer report = Files.newBufferedWriter(Paths.get(reportFile))) {
+                stats = optimize(netlist, opts.setReport(report));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
         long t2 = System.nanoTime();
         netlist.exportEDIF(Paths.get(args[1]));
         long t3 = System.nanoTime();
