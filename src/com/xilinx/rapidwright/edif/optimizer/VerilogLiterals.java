@@ -139,6 +139,21 @@ public final class VerilogLiterals {
         if (value == null) {
             return null;
         }
+        // Fast path for the common forms (this is called for every pin inversion and INIT)
+        switch (value) {
+            case "1'b1":
+            case "1":
+            case "TRUE":
+            case "true":
+                return Boolean.TRUE;
+            case "1'b0":
+            case "0":
+            case "FALSE":
+            case "false":
+                return Boolean.FALSE;
+            default:
+                break;
+        }
         String v = value.trim();
         if (v.equalsIgnoreCase("TRUE") || v.equalsIgnoreCase("YES")) {
             return Boolean.TRUE;
