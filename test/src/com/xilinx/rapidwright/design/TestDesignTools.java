@@ -1271,7 +1271,8 @@ public class TestDesignTools {
      * A circuit's checkpoint written in the context of a shell can carry empty physical nets with
      * no logical net in the circuit, named as in the full design: here, a copy of one of its own
      * nets with the black box's prefix, and a clock of the shell. They must not stop the circuit's
-     * real net from taking its prefixed name, nor be moved into the design.
+     * real net from taking its prefixed name, nor be moved into the design. An empty physical net
+     * that does have a logical net is one of the circuit's own, so is moved in all the same.
      */
     @Test
     public void testPopulateBlackBoxDropsContextNets() {
@@ -1293,6 +1294,10 @@ public class TestDesignTools {
         x.createPortInst("O", circuitTop.getCellInst("lut0"));
         xNet.createPin("A_O", circuit.getSiteInstFromSiteName("SLICE_X1Y0"));
         SitePinInst xSink = addSinkLUT(circuit, circuitTop, "lut1", "SLICE_X2Y0", x, xNet);
+        // ... and one that has no pins yet, but is a net of the circuit
+        EDIFNet y = circuitTop.createNet("y");
+        y.createPortInst("O", circuitTop.getCellInst("lut1"));
+        Net yNet = circuit.createNet("y");
 
         // ... and the context nets, which are physical only
         Net prefixed = new Net("bb/x");
@@ -1302,11 +1307,14 @@ public class TestDesignTools {
         Assertions.assertNull(circuit.getNetlist().getHierNetFromName("bb/x"));
         Assertions.assertNull(circuit.getNetlist().getHierNetFromName("shell_clk"));
 
-        Set<Net> modified = populateBlackBox(design, "bb", circuit, false);
+        populateBlackBox(design, "bb", circuit, false);
 
+        Set<Net> modified = design.getModifiedNets();
         Assertions.assertSame(xNet, design.getNet("bb/x"));
         Assertions.assertSame(xNet, xSink.getNet());
         Assertions.assertTrue(modified.contains(xNet));
+        Assertions.assertSame(yNet, design.getNet("bb/y"));
+        Assertions.assertTrue(modified.contains(yNet));
         Assertions.assertNull(design.getNet("bb/bb/x"));
         Assertions.assertNull(design.getNet("bb/shell_clk"));
         // Nets compare by name, so the context nets are looked for by identity
