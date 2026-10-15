@@ -1,0 +1,372 @@
+### lut4_i2_gnd
+L LUT3 INIT=8'h96 OPT_MODIFIED=PROPCONST {I0=a, I1=b, I2=c} O->n
+PORTS {o=L/O}
+### lut4_i0_vcc
+L LUT3 INIT=8'hB7 OPT_MODIFIED=PROPCONST {I0=a, I1=b, I2=c} O->n
+PORTS {o=L/O}
+### lut6_two_const
+L LUT4 INIT=16'h56FC OPT_MODIFIED=PROPCONST {I0=a, I1=b, I2=c, I3=d} O->n
+PORTS {o=L/O}
+### lut_to_const_fanout
+PORTS {o1=b, o2=<CONST0>, o3=c, o4=<CONST0>}
+### lut_const_to_output
+PORTS {o=<CONST0>, p=<CONST1>}
+### lut_init_const
+PORTS {o=b, p=<CONST1>}
+### lut_to_buf
+L2 LUT2 INIT=4'h6 OPT_MODIFIED=PROPCONST {I0=a, I1=b} O->n
+L3 LUT2 INIT=4'hE OPT_MODIFIED=PROPCONST {I0=a, I1=c} O->n
+PORTS {o=L2/O, p=L3/O}
+### lut_to_buf_out
+PORTS {o=a}
+### lut_to_inv
+L2 LUT2 INIT=4'h9 OPT_MODIFIED=PROPCONST {I0=a, I1=b} O->n
+PORTS {o=L2/O}
+### lut_dontcare
+L LUT2 INIT=4'h6 OPT_MODIFIED=PROPCONST {I0=a, I1=b} O->n
+PORTS {o=L/O}
+### lut_dup_pins
+PORTS {o=<CONST0>, p=a}
+### lut_undriven
+U1 LUT2 INIT=4'h6 {I0=a} O->n
+U2 LUT2 INIT=4'h6 {I0=b} O->n
+PORTS {o=U1/O, p=U2/O}
+### lut_chain
+C2 LUT2 INIT=4'h8 OPT_MODIFIED=PROPCONST {I0=b, I1=c} O->n
+C3 LUT2 INIT=4'h6 {I0=C2/O, I1=d} O->n
+C5 LUT2 INIT=4'h9 OPT_MODIFIED=PROPCONST {I0=C3/O, I1=e} O->n
+PORTS {o=C5/O}
+### lut1_const
+PORTS {o=a, p=<CONST0>}
+### lut_all_const
+PORTS {o=a}
+### lut_shared_const_net
+L3 LUT2 INIT=4'h6 OPT_MODIFIED=PROPCONST {I0=d, I1=a} O->n
+PORTS {o=b, p=c, q=L3/O}
+### lut62_i5_vcc
+L LUT6_2 INIT=64'hF0F0CCCC96966996 {I0=a, I1=b, I2=c, I3=d, I4=e, I5=<CONST1>} O5->n O6->n
+PORTS {o5=L/O5, o6=L/O6}
+### lut62_i4_gnd
+L LUT4 INIT=16'h6996 OPT_MODIFIED=PROPCONST {I0=a, I1=b, I2=c, I3=d} O->n
+PORTS {o5=L/O, o6=b}
+### lut62_o5_unused
+L LUT3 INIT=8'hCA OPT_MODIFIED=PROPCONST {I0=b, I1=c, I2=e} O->n
+PORTS {o6=L/O}
+### lut62_o6_unused
+L LUT5 INIT=32'h96966996 OPT_MODIFIED=PROPCONST {I0=a, I1=b, I2=c, I3=d, I4=e} O->n
+PORTS {o5=L/O}
+### lut62_o5_const
+L LUT3 INIT=8'hCA OPT_MODIFIED=PROPCONST {I0=b, I1=c, I2=e} O->n
+PORTS {o5=<CONST0>, o6=L/O}
+### inv_const
+PORTS {o=a}
+### buf_nonconst
+L LUT2 INIT=4'h6 OPT_MODIFIED=PROPCONST {I0=a, I1=b} O->n
+PORTS {o=L/O}
+### inv_nonconst
+L LUT2 INIT=4'h9 OPT_MODIFIED=PROPCONST {I0=a, I1=b} O->n
+PORTS {o=L/O}
+### fdre_ce0
+F1 FDRE INIT=1'b1 {C=clk, CE=<CONST0>, D=a, R=r} Q->n
+PORTS {q=<CONST0>, q1=F1/Q}
+### fdre_ce0_r0
+PORTS {q=<CONST0>, q1=<CONST1>}
+### fdre_d_eq_init
+PORTS {q=<CONST0>, q1=<CONST1>}
+### fdre_d_eq_init_r0
+PORTS {q=<CONST0>}
+### fdre_d_ne_init
+F0 FDRE INIT=1'b0 {C=clk, CE=ce, D=<CONST1>, R=<CONST0>} Q->n
+F1 FDRE INIT=1'b1 {C=clk, CE=<CONST1>, D=<CONST0>, R=<CONST0>} Q->n
+PORTS {q=F0/Q, q1=F1/Q}
+### fdre_r1
+F1 FDRE INIT=1'b1 {C=clk, CE=ce, D=a, R=<CONST1>} Q->n
+PORTS {q=<CONST0>, q1=F1/Q}
+### fdse_s1
+PORTS {q=<CONST1>, q1=<CONST1>, q2=<CONST1>}
+### fdce_clr1
+PORTS {q=<CONST0>, q1=<CONST0>, q2=<CONST0>}
+### fdpe_pre1
+PORTS {q=<CONST1>, q1=<CONST1>, q2=<CONST1>}
+### fdre_c_const
+PORTS {q=<CONST0>}
+### fdre_inverted
+PORTS {q=<CONST0>, q1=<CONST0>, q2=<CONST0>}
+### ff_chain
+PORTS {o=a}
+### ff_chain_ne
+F0 FDRE INIT=1'b0 {C=clk, CE=<CONST1>, D=<CONST1>, R=<CONST0>} Q->n
+F1 FDRE INIT=1'b1 {C=clk, CE=<CONST1>, D=F0/Q, R=<CONST0>} Q->n
+L LUT2 INIT=4'h6 {I0=F1/Q, I1=a} O->n
+PORTS {o=L/O}
+### ff_ce_from_const_lut
+PORTS {q=<CONST0>}
+### ldce
+PORTS {q=<CONST0>, q1=<CONST0>}
+### sweep_unloaded
+L0 LUT2 INIT=4'h6 {I0=a, I1=b} O->n
+PORTS {o=L0/O}
+### sweep_loop
+L0 LUT2 INIT=4'h6 {I0=a, I1=b} O->n
+PORTS {o=L0/O}
+### sweep_unused_static
+L0 LUT2 INIT=4'h6 {I0=a, I1=b} O->n
+PORTS {o=L0/O}
+### sweep_half_used_ff
+F1 FDRE INIT=1'b0 {C=clk, CE=<CONST1>, D=L0/O, R=<CONST0>} Q->n
+L0 LUT2 INIT=4'h6 {I0=a, I1=b} O->n
+PORTS {o=F1/Q}
+### dont_touch_cell
+DK LUT2 DONT_TOUCH=true INIT=4'h8 {I0=<CONST0>, I1=c} O->n
+DT LUT2 DONT_TOUCH=true INIT=4'h6 {I0=a, I1=<CONST0>} O->n
+DU LUT2 DONT_TOUCH=true INIT=4'h6 {I0=a, I1=b}
+PORTS {o=DT/O, p=DK/O}
+### dont_touch_net
+K LUT2 INIT=4'h8 {I0=<CONST0>, I1=a} O->n
+L LUT2 INIT=4'hE {I0=K/O, I1=b} O->n
+P LUT2 INIT=4'h6 {I0=b, I1=c} O->n
+U LUT2 INIT=4'h6 {I0=a, I1=c} O->n
+PORTS {o=L/O, p=P/O}
+### mark_debug_net
+K LUT2 INIT=4'h8 {I0=<CONST0>, I1=a} O->n
+L LUT2 INIT=4'hE {I0=K/O, I1=b} O->n
+U LUT2 INIT=4'h6 {I0=a, I1=c} O->n
+PORTS {o=L/O}
+### keep_attrs
+PORTS {o=<CONST0>, p=b}
+### hier_const_in_shared
+u1/SL LUT2 INIT=4'h6 {I0=b, I1=c} O->n
+u1/SM LUT2 INIT=4'h8 {I0=u1/SL/O, I1=c} O->n
+PORTS {o0=a, o1=u1/SM/O}
+### hier_const_in_same
+PORTS {o0=a, o1=b}
+### hier_const_out
+L2 LUT2 INIT=4'h9 OPT_MODIFIED=PROPCONST {I0=b, I1=a} O->n
+PORTS {o=L2/O}
+### hier_dangling
+u0/SZ LUT2 INIT=4'h6 {I0=a, I1=b} O->n
+PORTS {o=u0/SZ/O}
+### hier_empty
+L LUT2 INIT=4'h6 {I0=a, I1=c} O->n
+PORTS {o=L/O}
+### hier_nested
+m1/l0/LL LUT2 INIT=4'h6 {I0=b, I1=c} O->n
+PORTS {o0=a, o1=m1/l0/LL/O}
+### hier_dont_touch
+u0/SL LUT2 INIT=4'h6 {I0=<CONST0>, I1=a} O->n
+PORTS {o0=u0/SL/O, o1=b}
+### hier_dont_touch_unused
+L LUT2 INIT=4'h6 {I0=a, I1=b} O->n
+u0/SL LUT2 INIT=4'h6 {I0=a, I1=b} O->n
+PORTS {o=L/O}
+### hier_const_pin_from_parent_gnd
+u0/SL LUT2 INIT=4'h6 OPT_MODIFIED=PROPCONST {I0=a, I1=b} O->n
+PORTS {o=u0/SL/O}
+### unloaded_hard
+L LUT2 INIT=4'h6 {I0=a, I1=b} O->n
+PORTS {o=L/O}
+### srl_const
+SR0 SRL16E INIT=16'h0002 {A0=<CONST1>, A1=<CONST0>, A2=<CONST0>, A3=<CONST0>, CE=<CONST0>, CLK=clk, D=a} Q->n
+SR1 SRLC32E INIT=32'h00000000 {A[0]=<CONST0>, A[1]=<CONST0>, A[2]=<CONST0>, A[3]=<CONST0>, A[4]=<CONST0>, CE=<CONST1>, CLK=clk, D=b} Q->n
+PORTS {o=SR0/Q, p=SR1/Q}
+### v2_lut1_inv_plain
+L LUT2 INIT=4'h9 OPT_MODIFIED=PROPCONST {I0=a, I1=b} O->n
+PORTS {o=L/O}
+### v2_lut1_buf_plain
+L LUT2 INIT=4'h6 OPT_MODIFIED=PROPCONST {I0=a, I1=b} O->n
+PORTS {o=L/O}
+### v2_inv_to_port
+IV LUT1 INIT=2'h1 {I0=a} O->n
+PORTS {o=IV/O}
+### v2_inv_to_multi
+F FDRE INIT=1'b0 OPT_MODIFIED=PROPCONST {C=clk, CE=<CONST1>, D=IV/O, R=<CONST0>} Q->n
+IV LUT1 INIT=2'h1 {I0=a} O->n
+L1 LUT2 INIT=4'h9 OPT_MODIFIED=PROPCONST {I0=a, I1=b} O->n
+L2 LUT2 INIT=4'h4 OPT_MODIFIED=PROPCONST {I0=a, I1=c} O->n
+PORTS {o=L1/O, p=L2/O, q=F/Q}
+### v2_inv_two_luts
+L1 LUT2 INIT=4'h9 OPT_MODIFIED=PROPCONST {I0=a, I1=b} O->n
+L2 LUT2 INIT=4'h4 OPT_MODIFIED=PROPCONST {I0=a, I1=c} O->n
+PORTS {o=L1/O, p=L2/O}
+### v2_inv_to_lut6
+L LUT6 INIT=64'h21436587A9CBED0F OPT_MODIFIED=PROPCONST {I0=b, I1=c, I2=a, I3=d, I4=e, I5=f} O->n
+PORTS {o=L/O}
+### v2_inv_to_lut62
+L LUT6_2 INIT=64'hF0F0CCCC69699669 OPT_MODIFIED=PROPCONST {I0=a, I1=b, I2=c, I3=d, I4=e, I5=<CONST1>} O5->n O6->n
+PORTS {o5=L/O5, o6=L/O6}
+### v2_inv_same_var
+L LUT3 INIT=8'hB2 OPT_MODIFIED=PROPCONST {I0=a, I1=a, I2=b} O->n
+PORTS {o=L/O}
+### v2_inv_hier_out
+L LUT2 INIT=4'h9 OPT_MODIFIED=PROPCONST {I0=a, I1=b} O->n
+PORTS {o=L/O}
+### v2_inv_hier_in
+u0/L LUT2 INIT=4'h9 OPT_MODIFIED=PROPCONST {I0=a, I1=b} O->n
+PORTS {o=u0/L/O}
+### v2_buf_hier
+L LUT2 INIT=4'h6 {I0=a, I1=b} O->n
+PORTS {o=L/O, p=b}
+### v2_inv_dont_touch_load
+IV LUT1 INIT=2'h1 {I0=a} O->n
+L LUT2 DONT_TOUCH=true INIT=4'h6 {I0=IV/O, I1=b} O->n
+PORTS {o=L/O}
+### v2_inv_dont_touch
+IV LUT1 DONT_TOUCH=true INIT=2'h1 {I0=a} O->n
+L LUT2 INIT=4'h6 {I0=IV/O, I1=b} O->n
+PORTS {o=L/O}
+### v2_lut62_both_const_in
+L LUT6_2 INIT=64'hE8E8FEE896966996 {I0=<CONST0>, I1=a, I2=b, I3=c, I4=d, I5=<CONST1>} O5->n O6->n
+PORTS {o5=L/O5, o6=L/O6}
+### v2_lut62_dontcare
+L LUT6_2 INIT=64'hE8E8E8E896969696 {I0=a, I1=b, I2=c, I3=d, I4=e, I5=<CONST1>} O5->n O6->n
+PORTS {o5=L/O5, o6=L/O6}
+### v2_lut62_inv_out
+L LUT6_2 INIT=64'h5555555596966996 {I0=a, I1=b, I2=c, I3=d, I4=e, I5=<CONST1>} O5->n O6->n
+L2 LUT2 INIT=4'h6 {I0=L/O6, I1=f} O->n
+PORTS {o=L2/O, o5=L/O5}
+### v2_lut_dup_nonconst
+L LUT3 INIT=8'h40 OPT_MODIFIED=PROPCONST {I0=a, I1=b, I2=c} O->n
+PORTS {o=L/O}
+### v2_lut1_inv_chain
+L LUT2 INIT=4'h6 OPT_MODIFIED=PROPCONST {I0=a, I1=b} O->n
+PORTS {o=L/O}
+### v2_inv_to_lut6_2load
+L LUT6 INIT=64'h21436587A9CBED0F OPT_MODIFIED=PROPCONST {I0=b, I1=c, I2=a, I3=d, I4=e, I5=f} O->n
+L2 LUT2 INIT=4'h9 OPT_MODIFIED=PROPCONST {I0=a, I1=g} O->n
+PORTS {o=L/O, p=L2/O}
+### v2_ff_to_inv_lut
+F FDRE INIT=1'b0 {C=clk, CE=<CONST1>, D=a, R=<CONST0>} Q->n
+L LUT2 INIT=4'h9 OPT_MODIFIED=PROPCONST {I0=F/Q, I1=b} O->n
+PORTS {o=L/O}
+### v2_lut_mixed_load
+F FDRE INIT=1'b0 {C=clk, CE=<CONST1>, D=IV/O, R=<CONST0>} Q->n
+IV LUT2 INIT=4'h7 {I0=a, I1=b} O->n
+L LUT2 INIT=4'h6 {I0=IV/O, I1=c} O->n
+PORTS {o=L/O, q=F/Q}
+### v3_inv_ff_pins
+F0 FDRE INIT=1'b0 IS_R_INVERTED=1'b1 OPT_MODIFIED=PROPCONST {C=clk, CE=<CONST1>, D=x, R=a} Q->n
+F1 FDSE INIT=1'b1 IS_S_INVERTED=1'b1 OPT_MODIFIED=PROPCONST {C=clk, CE=<CONST1>, D=x, S=b} Q->n
+F2 FDCE INIT=1'b0 IS_CLR_INVERTED=1'b1 OPT_MODIFIED=PROPCONST {C=clk, CE=<CONST1>, CLR=c, D=x} Q->n
+F3 FDPE INIT=1'b1 IS_PRE_INVERTED=1'b1 OPT_MODIFIED=PROPCONST {C=clk, CE=<CONST1>, D=x, PRE=d} Q->n
+F4 FDRE INIT=1'b0 IS_C_INVERTED=1'b1 OPT_MODIFIED=PROPCONST {C=e, CE=<CONST1>, D=x, R=<CONST0>} Q->n
+F5 FDRE INIT=1'b0 {C=clk, CE=IF/O, D=x, R=<CONST0>} Q->n
+IF LUT1 INIT=2'h1 {I0=f} O->n
+PORTS {q0=F0/Q, q1=F1/Q, q2=F2/Q, q3=F3/Q, q4=F4/Q, q5=F5/Q}
+### v3_inv_r_and_d
+F0 FDRE INIT=1'b0 IS_R_INVERTED=1'b1 OPT_MODIFIED=PROPCONST {C=clk, CE=<CONST1>, D=x, R=a} Q->n
+F1 FDRE INIT=1'b0 OPT_MODIFIED=PROPCONST {C=clk, CE=<CONST1>, D=IV/O, R=<CONST0>} Q->n
+IV LUT1 INIT=2'h1 {I0=a} O->n
+PORTS {q0=F0/Q, q1=F1/Q}
+### v3_inv_r_and_lut
+F0 FDRE INIT=1'b0 IS_R_INVERTED=1'b1 OPT_MODIFIED=PROPCONST {C=clk, CE=<CONST1>, D=x, R=a} Q->n
+L LUT2 INIT=4'h9 OPT_MODIFIED=PROPCONST {I0=a, I1=x} O->n
+PORTS {o=L/O, q0=F0/Q}
+### v3_pullback_ce
+F FDRE INIT=1'b0 {C=clk, CE=X/O, D=x, R=<CONST0>} Q->n
+L LUT2 INIT=4'h9 OPT_MODIFIED=POST_PROCESS_NETLIST {I0=X/O, I1=c} O->n
+X LUT2 INIT=4'h8 OPT_MODIFIED=POST_PROCESS_NETLIST {I0=a, I1=b} O->n
+PORTS {o=L/O, q=F/Q}
+### v3_pullback_d
+F FDRE INIT=1'b0 {C=clk, CE=<CONST1>, D=X/O, R=<CONST0>} Q->n
+L LUT2 INIT=4'h9 OPT_MODIFIED=POST_PROCESS_NETLIST {I0=X/O, I1=c} O->n
+X LUT2 INIT=4'h8 OPT_MODIFIED=POST_PROCESS_NETLIST {I0=a, I1=b} O->n
+PORTS {o=L/O, q=F/Q}
+### v3_pullback_single
+F FDRE INIT=1'b0 {C=clk, CE=<CONST1>, D=X/O, R=<CONST0>} Q->n
+X LUT2 INIT=4'h8 OPT_MODIFIED=POST_PROCESS_NETLIST {I0=a, I1=b} O->n
+PORTS {q=F/Q}
+### v3_pullback_xff
+F FDRE INIT=1'b0 {C=clk, CE=IV/O, D=x, R=<CONST0>} Q->n
+F2 FDRE INIT=1'b0 {C=clk, CE=<CONST1>, D=X/O, R=<CONST0>} Q->n
+IV LUT1 INIT=2'h1 {I0=X/O} O->n
+X LUT2 INIT=4'h7 {I0=a, I1=b} O->n
+PORTS {q=F/Q, q2=F2/Q}
+### v3_pullback_port
+F FDRE INIT=1'b0 {C=clk, CE=IV/O, D=x, R=<CONST0>} Q->n
+IV LUT1 INIT=2'h1 {I0=X/O} O->n
+X LUT2 INIT=4'h7 {I0=a, I1=b} O->n
+PORTS {nx=X/O, q=F/Q}
+### v3_pullback_from_ff
+F FDRE INIT=1'b0 {C=clk, CE=IV/O, D=x, R=<CONST0>} Q->n
+F0 FDRE INIT=1'b0 {C=clk, CE=<CONST1>, D=a, R=<CONST0>} Q->n
+IV LUT1 INIT=2'h1 {I0=F0/Q} O->n
+L LUT2 INIT=4'h6 {I0=F0/Q, I1=c} O->n
+PORTS {o=L/O, q=F/Q}
+### v3_pullback_two_iv
+F FDRE INIT=1'b0 {C=clk, CE=X/O, D=x, R=<CONST0>} Q->n
+F2 FDRE INIT=1'b0 OPT_MODIFIED=POST_PROCESS_NETLIST {C=clk, CE=X/O, D=y, R=<CONST0>} Q->n
+X LUT2 INIT=4'h8 OPT_MODIFIED=POST_PROCESS_NETLIST {I0=a, I1=b} O->n
+PORTS {q=F/Q, q2=F2/Q}
+### v3_pullback_lut62
+F FDRE INIT=1'b0 {C=clk, CE=IV/O, D=x, R=<CONST0>} Q->n
+IV LUT1 INIT=2'h1 {I0=X/O6} O->n
+X LUT6_2 INIT=64'hF0F0CCCC96966996 {I0=a, I1=b, I2=c, I3=d, I4=e, I5=<CONST1>} O5->n O6->n
+PORTS {o5=X/O5, q=F/Q}
+### v3_pullback_hier
+F FDRE INIT=1'b0 {C=clk, CE=u0/X/O, D=x, R=<CONST0>} Q->n
+L LUT2 INIT=4'h9 OPT_MODIFIED=POST_PROCESS_NETLIST {I0=u0/X/O, I1=c} O->n
+u0/X LUT2 INIT=4'h8 OPT_MODIFIED=POST_PROCESS_NETLIST {I0=a, I1=b} O->n
+PORTS {o=L/O, q=F/Q}
+### v3_reduced_inv_to_ff
+F FDRE INIT=1'b0 {C=clk, CE=<CONST1>, D=X/O, R=<CONST0>} Q->n
+X LUT1 INIT=2'h1 OPT_MODIFIED=PROPCONST {I0=a} O->n
+PORTS {q=F/Q}
+### v3_inv_r_dt
+F FDRE DONT_TOUCH=true INIT=1'b0 {C=clk, CE=<CONST1>, D=x, R=IV/O} Q->n
+IV LUT1 INIT=2'h1 {I0=a} O->n
+PORTS {q=F/Q}
+### v3_inv_chain_r
+F FDRE INIT=1'b0 OPT_MODIFIED=PROPCONST {C=clk, CE=<CONST1>, D=x, R=a} Q->n
+PORTS {q=F/Q}
+### v3_inv_chain_ce
+F FDRE INIT=1'b0 OPT_MODIFIED=PROPCONST {C=clk, CE=a, D=x, R=<CONST0>} Q->n
+PORTS {q=F/Q}
+### v3_clr_pre_init
+PORTS {q=<CONST0>, q1=<CONST1>}
+### v3_dt_const_out
+DT LUT2 DONT_TOUCH=true INIT=4'h8 {I0=<CONST0>, I1=a} O->n
+L LUT2 INIT=4'hE {I0=DT/O, I1=b} O->n
+PORTS {o=L/O}
+### v3_inv_lut_and_port
+IV LUT1 INIT=2'h1 {I0=a} O->n
+L LUT2 INIT=4'h6 {I0=IV/O, I1=b} O->n
+PORTS {n=IV/O, o=L/O}
+### v3_x_inv_lut
+L1 LUT2 INIT=4'h6 {I0=X/O, I1=c} O->n
+L2 LUT2 INIT=4'h4 OPT_MODIFIED=PROPCONST {I0=X/O, I1=d} O->n
+X LUT2 INIT=4'h7 {I0=a, I1=b} O->n
+PORTS {o=L1/O, p=L2/O}
+### v5_r_and_two_d
+F0 FDRE INIT=1'b0 IS_R_INVERTED=1'b1 OPT_MODIFIED=PROPCONST {C=clk, CE=<CONST1>, D=x, R=a} Q->n
+F1 FDRE INIT=1'b0 {C=clk, CE=<CONST1>, D=IV/O, R=<CONST0>} Q->n
+F2 FDRE INIT=1'b0 {C=clk, CE=<CONST1>, D=IV/O, R=<CONST0>} Q->n
+IV LUT1 INIT=2'h1 {I0=a} O->n
+PORTS {q0=F0/Q, q1=F1/Q, q2=F2/Q}
+### v5_r_and_one_ce
+F0 FDRE INIT=1'b0 IS_R_INVERTED=1'b1 OPT_MODIFIED=PROPCONST {C=clk, CE=<CONST1>, D=x, R=a} Q->n
+F1 FDRE INIT=1'b0 OPT_MODIFIED=PROPCONST {C=clk, CE=IV/O, D=y, R=<CONST0>} Q->n
+IV LUT1 INIT=2'h1 {I0=a} O->n
+PORTS {q0=F0/Q, q1=F1/Q}
+### v5_r_and_two_ce
+F0 FDRE INIT=1'b0 IS_R_INVERTED=1'b1 OPT_MODIFIED=PROPCONST {C=clk, CE=<CONST1>, D=x, R=a} Q->n
+F1 FDRE INIT=1'b0 {C=clk, CE=IV/O, D=y, R=<CONST0>} Q->n
+F2 FDRE INIT=1'b0 {C=clk, CE=IV/O, D=x, R=<CONST0>} Q->n
+IV LUT1 INIT=2'h1 {I0=a} O->n
+PORTS {q0=F0/Q, q1=F1/Q, q2=F2/Q}
+### v5_lut_and_one_ce
+F1 FDRE INIT=1'b0 OPT_MODIFIED=PROPCONST {C=clk, CE=IV/O, D=y, R=<CONST0>} Q->n
+IV LUT1 INIT=2'h1 {I0=a} O->n
+L LUT2 INIT=4'h9 OPT_MODIFIED=PROPCONST {I0=a, I1=x} O->n
+PORTS {o=L/O, q1=F1/Q}
+### v5_lut_and_ce_and_d
+F1 FDRE INIT=1'b0 {C=clk, CE=IV/O, D=y, R=<CONST0>} Q->n
+F2 FDRE INIT=1'b0 {C=clk, CE=<CONST1>, D=IV/O, R=<CONST0>} Q->n
+IV LUT1 INIT=2'h1 {I0=a} O->n
+L LUT2 INIT=4'h9 OPT_MODIFIED=PROPCONST {I0=a, I1=x} O->n
+PORTS {o=L/O, q1=F1/Q, q2=F2/Q}
+### v5_srl_ce0
+SR0 SRL16E INIT=16'h0000 {A0=b, A1=<CONST0>, A2=<CONST0>, A3=<CONST0>, CE=<CONST0>, CLK=clk, D=a} Q->n
+PORTS {o=SR0/Q, p=<CONST1>}
+### v4_keep_yes_unloaded
+L LUT2 INIT=4'h6 {I0=a, I1=b} O->n
+PORTS {o=L/O}
