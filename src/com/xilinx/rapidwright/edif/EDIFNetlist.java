@@ -969,14 +969,14 @@ public class EDIFNetlist extends EDIFName {
      * Most estimated number of (uncompressed) bytes of EDIF in each chunk of consecutive cells written to a
      * {@link ParallelDCPInput} when exporting in parallel (see {@link #estimateExportBytes(EDIFCell)}), unless the
      * chunk is a single cell estimated to be bigger.
-     * {@link ParallelDCPOutput#newStream} keeps up to 1 MiB of compressed output in memory, and writes any more to a
-     * temporary file: so this is as many bytes as are expected to compress to half of that, estimating with
-     * {@link ParallelEDIFParser#EDIF_GZIP_COMPRESSION_RATIO}, leaving room for estimates that are too low and text that
-     * compresses less well (a chunk that compresses to more than 1 MiB, such as a cell that alone does, is still
-     * written correctly, but through a temporary file).
+     * {@link ParallelDCPOutput#newStream} keeps up to {@link ParallelDCPOutput#DEFERRED_FILE_THRESHOLD} bytes of
+     * compressed output in memory, and writes any more to a temporary file: so this is as many bytes as are expected
+     * to compress to half of that, estimating with {@link ParallelEDIFParser#EDIF_GZIP_COMPRESSION_RATIO}, leaving
+     * room for estimates that are too low and text that compresses less well (a chunk that compresses to more than
+     * that, such as a cell that alone does, is still written correctly, but through a temporary file).
      */
     private static final int PARALLEL_EXPORT_CHUNK_BYTES =
-            (1 << 20) / 2 * ParallelEDIFParser.EDIF_GZIP_COMPRESSION_RATIO;
+            ParallelDCPOutput.DEFERRED_FILE_THRESHOLD / 2 * ParallelEDIFParser.EDIF_GZIP_COMPRESSION_RATIO;
 
     /** Nominal length of an identifier, for {@link #estimateExportBytes(EDIFCell)}, which does not look at names */
     private static final int EXPORT_ESTIMATE_NAME_BYTES = 16;
