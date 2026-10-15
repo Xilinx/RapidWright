@@ -1498,6 +1498,7 @@ class EDIFConstPropEngine {
     void sweep() {
         boolean[] live = new boolean[numLeaves];
         IntList stack = new IntList();
+        driversDone = new boolean[numNets];
         for (int p = idx.getNumLeafPins(); p < idx.getNumPins(); p++) {
             // Top-level output (or inout) ports
             if (idx.getPinLeaf(p) < 0 && idx.getPinDir(p) != EDIFLeafIndex.DRIVER) {
@@ -1546,6 +1547,7 @@ class EDIFConstPropEngine {
                 markDriverLive(pinNet(p), live, stack);
             }
         }
+        driversDone = null;
         for (int l = 0; l < numLeaves; l++) {
             if (removed[l] == ALIVE && !live[l] && kind[l] != K_GND && kind[l] != K_VCC) {
                 setRemoved(l, RM_SWEEP);
@@ -1599,14 +1601,19 @@ class EDIFConstPropEngine {
         return false;
     }
 
+    /** Nets (roots) whose drivers sweep has already marked live. */
+    private boolean[] driversDone;
+
     private void markDriverLive(int n, boolean[] live, IntList stack) {
         if (n < 0) {
             return;
         }
         int r = resolve(n);
-        if (netVal[r] != UNK) {
+        // Each net once: a net with several drivers is scanned whole (once per load otherwise)
+        if (netVal[r] != UNK || driversDone[r]) {
             return;
         }
+        driversDone[r] = true;
         int dp = netDriver[r];
         if (dp >= 0) {
             markLive(idx.getPinLeaf(dp), live, stack);

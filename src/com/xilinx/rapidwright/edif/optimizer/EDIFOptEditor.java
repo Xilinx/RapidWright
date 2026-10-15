@@ -302,14 +302,35 @@ class EDIFOptEditor {
      * itself (or into another net not yet joined to n) instead of connecting it to n.
      */
     private String ownLocalNet(int n, int h) {
-        for (int i = idx.getNetSegStart(n); i < idx.getNetSegEnd(n); i++) {
-            int s = idx.getNetSeg(i);
-            if (idx.getSegHier(s) == h) {
-                return idx.getSegEDIFNet(s).getName();
+        int start = idx.getNetSegStart(n);
+        int end = idx.getNetSegEnd(n);
+        if (end - start <= SMALL_NET_SEGMENTS) {
+            for (int i = start; i < end; i++) {
+                int s = idx.getNetSeg(i);
+                if (idx.getSegHier(s) == h) {
+                    return idx.getSegEDIFNet(s).getName();
+                }
             }
+            return null;
         }
-        return null;
+        // A net spanning many hierarchical instances: index its segments once
+        Map<Integer, Integer> byHier = segmentsByHier.computeIfAbsent(n, net -> {
+            Map<Integer, Integer> m = new HashMap<>();
+            for (int i = start; i < end; i++) {
+                int seg = idx.getNetSeg(i);
+                m.putIfAbsent(idx.getSegHier(seg), seg);
+            }
+            return m;
+        });
+        Integer seg = byHier.get(h);
+        return seg == null ? null : idx.getSegEDIFNet(seg).getName();
     }
+
+    /** Nets with at most this many segments are searched rather than indexed. */
+    private static final int SMALL_NET_SEGMENTS = 16;
+
+    /** Per physical net with many segments: the first segment in each hierarchical instance. */
+    private final Map<Integer, Map<Integer, Integer>> segmentsByHier = new HashMap<>();
 
     /**
      * @return The name of the net that leaf pin p connects to after optimization, in the cell of
@@ -416,6 +437,8 @@ class EDIFOptEditor {
 
     /** Port and net names generated per hierarchical instance (lower case). */
     private final Map<Integer, Set<String>> generatedNames = new HashMap<>();
+    /** Next suffix to try per hierarchical instance and base name. */
+    private final Map<String, Integer> nextSuffix = new HashMap<>();
 
     /**
      * @return A new port or net name for hierarchical instance h, based on base, that is not the
@@ -424,13 +447,16 @@ class EDIFOptEditor {
      */
     private String uniqueName(int h, String base) {
         EDIFCell cell = idx.getHierCell(h);
-        Set<String> generated = generatedNames.computeIfAbsent(h, k -> new HashSet<>());
-        String name = base;
-        int k = 1;
+        Set<String> generated = generatedNames.computeIfAbsent(h, x -> new HashSet<>());
+        // Suffixes already tried for this base are skipped (many ports can share a base name)
+        String key = h + "\u0000" + base;
+        int k = nextSuffix.getOrDefault(key, 0);
+        String name = k == 0 ? base : base + "_" + k;
         while (cell.getPort(name) != null || cell.getNet(name) != null
                 || !generated.add(name.toLowerCase())) {
-            name = base + "_" + k++;
+            name = base + "_" + ++k;
         }
+        nextSuffix.put(key, k + 1);
         return name;
     }
 

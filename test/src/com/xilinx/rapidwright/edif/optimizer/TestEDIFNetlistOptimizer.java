@@ -722,6 +722,69 @@ public class TestEDIFNetlistOptimizer {
     }
 
     @Test
+    public void testSweepIsLinearInPreservedNetFanout() {
+        // A preserved (DONT_TOUCH) net keeps all its loads live; each live load used to rescan
+        // the whole net for its drivers
+        OptProbes.B b = new OptProbes.B("dt_fanout");
+        b.in("clk", "a", "c");
+        b.fdre("F", "a", "1", "0", "n", "0");
+        b.net(b.top, "n").addProperty("DONT_TOUCH", "TRUE");
+        int loads = 100000;
+        for (int i = 0; i < loads; i++) {
+            b.lut("L" + i, "6", "d" + i, "n", "c");
+        }
+        EDIFOptStats stats = EDIFTools.sweepDeadLogic(b.nl);
+        Assertions.assertEquals(0, stats.getRemoved(EDIFOptStats.Phase.SWEEP));
+        Assertions.assertEquals(loads + 1, b.top.getNet("n").getPortInsts().size());
+        // A quadratic sweep takes minutes here
+        Assertions.assertTrue(stats.getTimes().get("Sweep") < 3_000_000_000L,
+                stats.getTimes().toString());
+    }
+
+    @Test
+    public void testEditsAreLinearInHierarchicalFanout() {
+        // Net 'a' and its inverse 'n' reach every instance of a shared child; inside each one, a
+        // LUT absorbs the inverter and moves onto 'a' (a top-level flip-flop keeps the inverter)
+        OptProbes.B b = new OptProbes.B("hier_fanout");
+        b.in("clk", "a");
+        b.out("q");
+        EDIFCell sub = b.cell("sub");
+        b.in(sub, "x", "w");
+        b.out(sub, "z");
+        b.lut(sub, "L", "6", "z", "x", "w");
+        b.lut("A", "1", "n", "a");
+        b.fdre("F", "n", "1", "0", "q", "0");
+        int subs = 20000;
+        for (int i = 0; i < subs; i++) {
+            b.out("o" + i);
+            b.inst(sub, "u" + i, "x=n", "w=a", "z=o" + i);
+        }
+        Supplier<EDIFNetlist> small = () -> {
+            OptProbes.B c = new OptProbes.B("hier_fanout");
+            c.in("clk", "a");
+            c.out("q");
+            EDIFCell cs = c.cell("sub");
+            c.in(cs, "x", "w");
+            c.out(cs, "z");
+            c.lut(cs, "L", "6", "z", "x", "w");
+            c.lut("A", "1", "n", "a");
+            c.fdre("F", "n", "1", "0", "q", "0");
+            for (int i = 0; i < 3; i++) {
+                c.out("o" + i);
+                c.inst(cs, "u" + i, "x=n", "w=a", "z=o" + i);
+            }
+            return c.nl;
+        };
+        assertOptimizedEquivalent(small, new EDIFOptOptions());
+        EDIFOptStats stats = EDIFTools.optimizeNetlist(b.nl, new EDIFOptOptions());
+        EDIFCellInst l = b.top.getCellInst("u0").getCellType().getCellInst("L");
+        Assertions.assertEquals("4'h9", l.getProperty("INIT").getValue());
+        // Searching all segments of 'a' for every instance takes minutes here
+        Assertions.assertTrue(stats.getTimes().get("Apply edits") < 5_000_000_000L,
+                stats.getTimes().toString());
+    }
+
+    @Test
     public void testBufferChainMergesAreLinear() {
         // A chain of buffers, each stage also loading a flip-flop: every stage's net merges into
         // the next one towards the input
