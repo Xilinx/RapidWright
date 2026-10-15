@@ -22,6 +22,7 @@
 
 package com.xilinx.rapidwright.design.xdc;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -143,9 +144,9 @@ public class TestConstraintTools {
                 "current_instance -quiet");
         circuit.addXDCConstraint(ConstraintGroup.IN_CONTEXT, "create_clock -period 10 [get_ports clk]");
 
+        // populateBlackBox() adds the constraints itself
         Map<String, Design> blackBoxes = Collections.singletonMap("rp", circuit);
         DesignTools.populateBlackBox(design, blackBoxes, false);
-        Assertions.assertEquals(9, ConstraintTools.addBlackBoxConstraints(design, blackBoxes));
 
         List<String> early = Arrays.asList(
                 "current_instance rp",
@@ -183,5 +184,87 @@ public class TestConstraintTools {
                 "current_instance -quiet"), design.getXDCConstraints(ConstraintGroup.LATE));
         Assertions.assertTrue(design.getXDCConstraints(ConstraintGroup.NORMAL).isEmpty());
         Assertions.assertTrue(design.getXDCConstraints(ConstraintGroup.IN_CONTEXT).isEmpty());
+
+        // Called again, it adds them a second time, counting the circuits' commands it kept
+        Assertions.assertEquals(9, ConstraintTools.addBlackBoxConstraints(design, blackBoxes));
+        List<String> twice = new ArrayList<>(early);
+        twice.addAll(early);
+        Assertions.assertEquals(twice, design.getXDCConstraints(ConstraintGroup.EARLY));
+    }
+
+    /**
+     * The design's own constraints can end with a cell as the current instance. The black box's
+     * constraints then start by returning to the top, since its name is relative to the design's top.
+     */
+    @Test
+    public void testAddBlackBoxConstraintsAfterDesignScope() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFCell rpType = new EDIFCell(top.getLibrary(), "rpType");
+        rpType.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCellInst rp = rpType.createCellInst("rp", top);
+        rp.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+        design.addXDCConstraint(ConstraintGroup.EARLY,
+                "current_instance shell_ip",
+                "set_property KEEP true [get_cells x]");
+
+        Design circuit = new Design("circuit", "xcvu3p");
+        circuit.getTopEDIFCell().createPort("I", EDIFDirection.INPUT, 1);
+        circuit.addXDCConstraint(ConstraintGroup.EARLY, "set_property MAX_FANOUT 10 [get_nets n]");
+        circuit.addXDCConstraint(ConstraintGroup.LATE, "set_property MAX_FANOUT 5 [get_nets m]");
+
+        DesignTools.populateBlackBox(design, Collections.singletonMap("rp", circuit), false);
+
+        Assertions.assertEquals(Arrays.asList(
+                "current_instance shell_ip",
+                "set_property KEEP true [get_cells x]",
+                "current_instance -quiet",
+                "current_instance rp",
+                "set_property MAX_FANOUT 10 [get_nets n]",
+                "current_instance -quiet"), design.getXDCConstraints(ConstraintGroup.EARLY));
+        // Nothing to return from in a group the design has no constraints in
+        Assertions.assertEquals(Arrays.asList(
+                "current_instance rp",
+                "set_property MAX_FANOUT 5 [get_nets m]",
+                "current_instance -quiet"), design.getXDCConstraints(ConstraintGroup.LATE));
+    }
+
+    @Test
+    public void testAddBlackBoxConstraintsTclNames() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFCell rpType = new EDIFCell(top.getLibrary(), "rpType");
+        rpType.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCellInst rp = rpType.createCellInst("rp[0]", top);
+        rp.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+
+        Design circuit = new Design("circuit", "xcvu3p");
+        circuit.getTopEDIFCell().createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCell subType = new EDIFCell(circuit.getNetlist().getWorkLibrary(), "subType");
+        subType.createChildCellInst("y", circuit.getNetlist().getHDIPrimitive(Unisim.FDRE));
+        subType.createCellInst("sub[1].u", circuit.getTopEDIFCell());
+
+        circuit.addXDCConstraint(ConstraintGroup.EARLY,
+                // Continued over two lines, but still the partition's pblock
+                "add_cells_to_pblock [get_pblocks pblock_rp] \\",
+                "    -top",
+                "resize_pblock [get_pblocks pblock_rp] -add CLOCKREGION_X0Y0",
+                "current_instance {sub[1].u}",
+                "set_property DONT_TOUCH true [get_cells y]",
+                "current_instance -quiet",
+                "set_property MAX_FANOUT 10 [get_nets n]");
+
+        DesignTools.populateBlackBox(design, Collections.singletonMap("rp[0]", circuit), false);
+
+        // Names with [ ] in them are braced, as Vivado writes them, so that Tcl takes them as is
+        Assertions.assertEquals(Arrays.asList(
+                "current_instance {rp[0]}",
+                "current_instance -quiet",
+                "current_instance {rp[0]/sub[1].u}",
+                "set_property DONT_TOUCH true [get_cells y]",
+                "current_instance -quiet",
+                "current_instance {rp[0]}",
+                "set_property MAX_FANOUT 10 [get_nets n]",
+                "current_instance -quiet"), design.getXDCConstraints(ConstraintGroup.EARLY));
     }
 }
