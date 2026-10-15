@@ -48,6 +48,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.zip.GZIPInputStream;
@@ -63,6 +64,7 @@ import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.util.ParallelDCPInput;
 import com.xilinx.rapidwright.util.Params;
 import com.xilinx.rapidwright.util.function.InputStreamSupplier;
 
@@ -1200,6 +1202,27 @@ public class EDIFTools {
         } else {
             writeEDIFFile(out, Paths.get(dcpFileName), edif, partName);
         }
+    }
+
+    /**
+     * Write out EDIF in parallel, into pieces of a DCP's EDIF, as
+     * {@link EDIFNetlist#exportEDIFParallel(boolean)} does, without waiting for them.  Also, as
+     * {@link #writeEDIFFile(OutputStream, Path, EDIFNetlist, String)} does, checks if netlist has
+     * potential encrypted cells and creates a Tcl script to help re-import design into Vivado intact.
+     * @param dcpFileName The name of the DCP file associated with this netlist
+     * @param edif The netlist of the design
+     * @param partName The target part for this design
+     * @return The pieces, in order, to be waited for in order (see
+     *         {@link EDIFNetlist#exportEDIFParallel(boolean)}).
+     */
+    public static List<Future<ParallelDCPInput>> exportEDIFParallel(Path dcpFileName, EDIFNetlist edif,
+                                                                   String partName) {
+        ensureCorrectPartInEDIF(edif, partName);
+        List<Future<ParallelDCPInput>> pieces = edif.exportEDIFParallel(false);
+        if (dcpFileName != null && edif.hasEncryptedCells()) {
+            writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
+        }
+        return pieces;
     }
 
     public static void writeTclLoadScriptForPartialEncryptedDesigns(EDIFNetlist edif,
