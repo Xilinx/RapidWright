@@ -590,6 +590,17 @@ public class ParallelismTools {
     }
 
     /**
+     * A stream of the given array's items, as {@link #stream(Collection)} is of a collection's: a parallel one (run on
+     * the common ForkJoinPool) when parallel processing is enabled, else a sequential one, in the array's order.
+     * @param items The items to stream.
+     * @param <T> Item type.
+     * @return {@code stream(Arrays.asList(items))}, which wraps the array without copying it.
+     */
+    public static <T> Stream<T> stream(@NotNull T[] items) {
+        return stream(Arrays.asList(items));
+    }
+
+    /**
      * The indices from start (inclusive) to end (exclusive) in chunks of consecutive indices, in order, for a task to
      * be run on each chunk in parallel: when parallel processing is enabled, roughly four chunks per
      * {@link #maxParallelism()} thread (or one per index, if there are fewer), else a single chunk of all the indices.
