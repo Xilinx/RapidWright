@@ -884,13 +884,19 @@ public class DesignTools {
             if (otherPort == null) {
                 otherPort = cellPorts.remove(p.getName());
                 if (otherPort == null) {
-                    sb.append("\n  port " + p.getName() + " doesn't exist on " + src);
+                    sb.append("\n  port " + p.getName() + " doesn't exist on " + target);
+                    continue;
                 }
             }
 
-            if (!Objects.equals(p.getWidth(), p.getWidth()) ||
-               !Objects.equals(p.getDirection(), p.getDirection())) {
-                sb.append("\n  port " + p.getName() + " mismatch in direction/width");
+            if (!Objects.equals(p.getName(), otherPort.getName()) ||
+                    !Objects.equals(p.getWidth(), otherPort.getWidth()) ||
+                    !EDIFCell.isCompatibleDirection(otherPort, p, true)) {
+                sb.append("\n  port " + p.getName() + " mismatch in name/direction/width: "
+                        + otherPort.getName() + " " + otherPort.getDirection() + " width "
+                        + otherPort.getWidth() + " on " + target + ", "
+                        + p.getName() + " " + p.getDirection() + " width " + p.getWidth()
+                        + " on " + src);
             }
         }
         for (String portName : cellPorts.keySet()) {
@@ -1003,7 +1009,9 @@ public class DesignTools {
                 throw new RuntimeException("ERROR: The cell instance " + hierarchicalCellName
                         + " is not a black box.");
             }
-            if (!inst.getCellType().hasCompatibleInterface(cell.getTopEDIFCell())) {
+            // A black box port to a device pin can be an inout that the circuit has resolved to an
+            // input or output, which Vivado accepts
+            if (!inst.getCellType().hasCompatibleInterface(cell.getTopEDIFCell(), true)) {
                 throw new RuntimeException(createInformativeCellInterfaceMismatchMessage(
                         hierarchicalCellName, inst.getCellType(), cell.getTopEDIFCell()));
             }
@@ -1054,7 +1062,12 @@ public class DesignTools {
                         : outer.getHierarchicalNetName();
                 portNames.add(shellName);
                 EDIFNet innerNet = cellNetlist.getTopCell().getInternalNet(portInst.getName());
-                if (shellOwner == null || (innerNet == null && portInst.isOutput())) {
+                // The circuit's port gives the direction: the black box's may be an inout that the
+                // circuit has resolved, and the instance only takes on the circuit's ports once
+                // filled, below
+                EDIFPort circuitPort = cellNetlist.getTopCell()
+                        .getPortByPortInstName(portInst.getName());
+                if (shellOwner == null || (innerNet == null && circuitPort.isOutput())) {
                     undriven.add(shellName);
                 }
                 if (innerNet == null) continue;
@@ -1066,9 +1079,9 @@ public class DesignTools {
                 if (innerOwner == null) {
                     undriven.add(innerName);
                 }
-                // An inout has no direction to go by, so it is the circuit that drives it if
-                // anything inside it does
-                boolean circuitDrives = portInst.isOutput() || (!portInst.isInput()
+                // An inout left unresolved has no direction to go by, so it is the circuit that
+                // drives it if anything inside it does
+                boolean circuitDrives = circuitPort.isOutput() || (!circuitPort.isInput()
                         && innerOwner != null
                         && !innerOwner.getNet().getSourcePortInsts(false).isEmpty());
                 String from = circuitDrives ? shellName : innerName;
