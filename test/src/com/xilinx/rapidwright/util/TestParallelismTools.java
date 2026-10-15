@@ -20,10 +20,8 @@
 
 package com.xilinx.rapidwright.util;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -31,8 +29,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerArray;
@@ -72,41 +68,6 @@ public class TestParallelismTools {
         }
     }
 
-    /** Submit tasks one by one and collect their results in order with joinFirst() */
-    private static void checkSubmitJoinFirstInOrder() {
-        final AtomicIntegerArray runs = new AtomicIntegerArray(NUM_TASKS);
-        final Deque<Future<Integer>> futures = new ArrayDeque<>();
-        for (Callable<Integer> task : countingTasks(runs)) {
-            futures.add(ParallelismTools.submit(task));
-        }
-        for (int i = 0; i < NUM_TASKS; i++) {
-            Assertions.assertEquals(i, ParallelismTools.joinFirst(futures));
-        }
-        Assertions.assertTrue(futures.isEmpty());
-        assertEachRunOnce(runs);
-    }
-
-    @Test
-    public void testSubmitJoinFirstInOrder() {
-        checkSubmitJoinFirstInOrder();
-    }
-
-    @Test
-    public void testFromPoolThread() throws Exception {
-        // The same on a thread of a ForkJoinPool (which blocks in managedBlock()); a separate pool, so
-        // that this thread cannot run the task itself
-        final ForkJoinPool pool = new ForkJoinPool(4);
-        try {
-            pool.submit(() -> {
-                Assertions.assertTrue(Thread.currentThread() instanceof ForkJoinWorkerThread);
-                checkSubmitJoinFirstInOrder();
-                return null;
-            }).get();
-        } finally {
-            pool.shutdown();
-        }
-    }
-
     @Test
     public void testSubmitJoinRunsEachTaskOnce() {
         final AtomicIntegerArray runs = new AtomicIntegerArray(NUM_TASKS);
@@ -139,18 +100,7 @@ public class TestParallelismTools {
     @Test
     public void testExceptionRethrownAsIs() {
         final IllegalStateException thrown = new IllegalStateException("task 1");
-        final Deque<Future<Integer>> futures = new ArrayDeque<>();
-        futures.add(ParallelismTools.submit(() -> 0));
-        futures.add(ParallelismTools.submit(() -> {
-            throw thrown;
-        }));
-        futures.add(ParallelismTools.submit(() -> 2));
-        Assertions.assertEquals(0, ParallelismTools.joinFirst(futures));
         // The task's own exception, whichever thread ran it
-        Assertions.assertSame(thrown,
-                Assertions.assertThrows(IllegalStateException.class, () -> ParallelismTools.joinFirst(futures)));
-        Assertions.assertEquals(2, ParallelismTools.joinFirst(futures));
-
         final Future<Object> future = ParallelismTools.submit(() -> {
             throw thrown;
         });
@@ -167,17 +117,6 @@ public class TestParallelismTools {
         final RuntimeException rethrown = Assertions.assertThrows(RuntimeException.class,
                 () -> ParallelismTools.get(future));
         Assertions.assertSame(thrown, rethrown.getCause());
-    }
-
-    @Test
-    public void testFirstTaskExceptionRethrownByJoinFirst() {
-        final Deque<Future<Integer>> futures = new ArrayDeque<>();
-        futures.add(ParallelismTools.submit(() -> {
-            throw new IllegalArgumentException("task 0");
-        }));
-        futures.add(ParallelismTools.submit(() -> 1));
-        Assertions.assertThrows(IllegalArgumentException.class, () -> ParallelismTools.joinFirst(futures));
-        Assertions.assertEquals(1, ParallelismTools.joinFirst(futures));
     }
 
     @Test
@@ -257,25 +196,6 @@ public class TestParallelismTools {
         final boolean wasParallel = ParallelismTools.getParallel();
         ParallelismTools.setParallel(false);
         try {
-            checkSubmitJoinFirstInOrder();
-
-            // Submitted tasks are deferred until joined, each joinFirst() running only the first
-            final AtomicIntegerArray deferred = new AtomicIntegerArray(3);
-            final Deque<Future<Integer>> futures = new ArrayDeque<>();
-            futures.add(ParallelismTools.submit(() -> deferred.incrementAndGet(0)));
-            futures.add(ParallelismTools.submit(() -> deferred.incrementAndGet(1)));
-            futures.add(ParallelismTools.submit(() -> deferred.incrementAndGet(2)));
-            Assertions.assertEquals(0, deferred.get(0));
-            ParallelismTools.joinFirst(futures);
-            Assertions.assertEquals(1, deferred.get(0));
-            Assertions.assertEquals(0, deferred.get(1));
-            Assertions.assertEquals(0, deferred.get(2));
-            ParallelismTools.joinFirst(futures);
-            Assertions.assertEquals(1, deferred.get(1));
-            Assertions.assertEquals(0, deferred.get(2));
-            ParallelismTools.joinFirst(futures);
-            assertEachRunOnce(deferred);
-
             // All tasks are run, in order, then the first exception (in order) is rethrown
             final AtomicIntegerArray runs = new AtomicIntegerArray(3);
             Assertions.assertThrows(IllegalStateException.class, () -> ParallelismTools.invokeAll(

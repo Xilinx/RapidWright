@@ -26,7 +26,6 @@ package com.xilinx.rapidwright.util;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
@@ -59,9 +58,9 @@ import org.jetbrains.annotations.NotNull;
  * Single-threaded mode means that all tasks are executed on the current
  * thread: those given to {@link #submit(Callable)} or
  * {@link #submitCompletable(Callable)} are deferred until they are waited for
- * ({@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)} or
- * {@link #joinFirst(Deque)}, or the returned
- * Future's own get(), or CompletableFuture's own get() or join()), which
+ * ({@link #get(Future)}, {@link #join(List)} or {@link #joinAll(List)}, or
+ * the returned Future's own get(), or CompletableFuture's own get() or
+ * join()), which
  * executes them on the waiting thread; all others are executed immediately.
  * So a task submitted that way is never executed if it is never waited for,
  * and waiting only for further work chained on a CompletableFuture (e.g. by
@@ -125,12 +124,12 @@ public class ParallelismTools {
     /**
      * Submit a task-with-return-value to the common ForkJoinPool, as a {@link FutureTask}
      * (rather than a ForkJoinTask): any thread waiting for it with {@link #get(Future)},
-     * {@link #join(List)} or {@link #joinFirst(Deque)} runs it itself if no other thread
+     * {@link #join(List)} or {@link #joinAll(List)} runs it itself if no other thread
      * has claimed it yet, wherever it is in the pool's queues (and so even if the pool has
      * no threads), and any exception it throws is kept as-is.
      * When parallel processing is disabled, the task is not submitted, but deferred until
      * it is waited for, with {@link #get(Future)}, {@link #join(List)},
-     * {@link #joinAll(List)}, {@link #joinFirst(Deque)} or the returned Future's own get(),
+     * {@link #joinAll(List)} or the returned Future's own get(),
      * which executes it on the waiting thread (see {@link LazyFutureTask}).
      * @param task Task to be performed.
      * @param <T> Type returned by task.
@@ -170,8 +169,8 @@ public class ParallelismTools {
 
     /**
      * A FutureTask that is not submitted to the pool (as when parallel processing is disabled), but run by the first
-     * thread to wait for it with its own get(), as well as by {@link #get(Future)}, {@link #join(List)},
-     * {@link #joinAll(List)} or {@link #joinFirst(Deque)} (see {@link #runIfUnclaimed(Future)}). FutureTask.run()
+     * thread to wait for it with its own get(), as well as by {@link #get(Future)}, {@link #join(List)} or
+     * {@link #joinAll(List)} (see {@link #runIfUnclaimed(Future)}). FutureTask.run()
      * does nothing if another thread has already claimed the task, so it is run at most once, and any other thread
      * waiting for it meanwhile waits for that one.
      */
@@ -197,7 +196,7 @@ public class ParallelismTools {
     /**
      * A CompletableFuture completed by a FutureTask that runs its task: so that, once that FutureTask has been
      * submitted to the pool, a thread waiting for the CompletableFuture with {@link #get(Future)}, {@link #join(List)}
-     * or {@link #joinFirst(Deque)} can run it itself if no other thread has started it (see
+     * or {@link #joinAll(List)} can run it itself if no other thread has started it (see
      * {@link #runIfUnclaimed(Future)}), as for a Future from {@link #submit(Callable)}. A CompletableFuture's own task
      * (e.g. from CompletableFuture.supplyAsync()) cannot be run that way: the CompletableFuture has no reference to
      * it, and (unlike a FutureTask) it could run twice if run by a second thread.
@@ -231,8 +230,7 @@ public class ParallelismTools {
     /**
      * A {@link CompletableFutureWithFutureTask} whose FutureTask is not submitted to the pool (as when parallel
      * processing is disabled), but run by the first thread to wait for this with its own get() or join(), as for a
-     * {@link LazyFutureTask}, as well as by {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)} or
-     * {@link #joinFirst(Deque)}.
+     * {@link LazyFutureTask}, as well as by {@link #get(Future)}, {@link #join(List)} or {@link #joinAll(List)}.
      */
     private static final class CompletableFutureWithLazyFutureTask<T> extends CompletableFutureWithFutureTask<T> {
         private CompletableFutureWithLazyFutureTask(Callable<T> callable) {
@@ -261,12 +259,12 @@ public class ParallelismTools {
 
     /**
      * Submit a task-with-return-value to the common ForkJoinPool, as {@link #submit(Callable)} does (so a thread
-     * waiting for it with {@link #get(Future)}, {@link #join(List)} or {@link #joinFirst(Deque)} also runs it itself if
+     * waiting for it with {@link #get(Future)}, {@link #join(List)} or {@link #joinAll(List)} also runs it itself if
      * no other thread has started it), but returning a CompletableFuture, so that further work can be chained on its
      * completion (by default, run by the thread that completes it). Any exception the task throws completes the
      * CompletableFuture exceptionally.
      * When parallel processing is disabled, the task is deferred as for {@link #submit(Callable)}: until it is waited
-     * for with {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)}, {@link #joinFirst(Deque)} or the
+     * for with {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)} or the
      * returned CompletableFuture's own get() or join(), which executes it (and then, on the same thread, any work
      * chained on it) on the waiting thread. Waiting only for work chained on it (e.g. by thenApply()) does not run the
      * task, so blocks forever.
@@ -362,29 +360,6 @@ public class ParallelismTools {
             Thread.currentThread().interrupt();
             throw new RuntimeException(e);
         }
-    }
-
-    /**
-     * For a given Deque of Futures, block until the first is complete and
-     * remove it from the deque.
-     * First, try and steal the task and execute it on this thread. If this
-     * is not possible (indicating another thread has already claimed it)
-     * then use this thread productively by stealing subsequent unclaimed
-     * tasks to work on until the first is complete.
-     * @param futures A Deque of Future objects corresponding to previously
-     *                submitted tasks.
-     * @param <T> Type returned by all tasks.
-     * @return The value returned by the first task.
-     */
-    public static <T> T joinFirst(Deque<Future<T>> futures) {
-        final Future<T> first = futures.removeFirst();
-        if (!runIfUnclaimed(first)) {
-            final Iterator<Future<T>> it = futures.iterator();
-            while (!first.isDone() && it.hasNext()) {
-                runIfUnclaimed(it.next());
-            }
-        }
-        return getUnwrapped(first);
     }
 
     /**
