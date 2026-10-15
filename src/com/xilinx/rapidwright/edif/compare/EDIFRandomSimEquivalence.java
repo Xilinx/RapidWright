@@ -296,6 +296,103 @@ public class EDIFRandomSimEquivalence {
             return Arrays.copyOf(order, k);
         }
 
+        /** States of a net in {@link #fixedNets}. */
+        static final byte NOT_FIXED = 0;
+        static final byte FIXED_0 = 1;
+        static final byte FIXED_1 = 2;
+        static final byte FIXED_UNKNOWN = 3;
+
+        /**
+         * @return For each net, whether it never changes (and its value if known) when the removed
+         * sequential cells in forced hold their values. Nets driven by static sources or forced
+         * cells never change. So does the output of a LUT that, with its fixed inputs at their
+         * values, does not depend on its other inputs (e.g. a clock gate whose enable is
+         * constant 0), and the outputs of other simulated cells whose inputs all never change.
+         * Cells cut to break loops are not included.
+         */
+        byte[] fixedNets(Map<Integer, Long> forced) {
+            byte[] fixed = new byte[idx.getNumNets()];
+            for (int l = 0; l < idx.getNumLeaves(); l++) {
+                Long f = forced.get(l);
+                if (kind[l] == C_GND || f != null && f == 0L) {
+                    markOutputs(l, fixed, FIXED_0);
+                } else if (kind[l] == C_VCC || f != null && f == -1L) {
+                    markOutputs(l, fixed, FIXED_1);
+                } else if (f != null) {
+                    markOutputs(l, fixed, FIXED_UNKNOWN);
+                }
+            }
+            for (int node : order) {
+                int l = node / 4;
+                if (kind[l] == C_LUT) {
+                    byte out = fixedLut(l, fixed);
+                    if (out != NOT_FIXED) {
+                        markOutputs(l, fixed, out);
+                    }
+                    continue;
+                }
+                boolean all = true;
+                for (int p = idx.getLeafPinStart(l); p < idx.getLeafPinEnd(l) && all; p++) {
+                    int n = idx.getPinNet(p);
+                    all = idx.getPinDir(p) == EDIFLeafIndex.DRIVER || n < 0
+                            || fixed[n] != NOT_FIXED;
+                }
+                if (all) {
+                    markOutputs(l, fixed, FIXED_UNKNOWN);
+                }
+            }
+            return fixed;
+        }
+
+        /** @return The fixed state of the output of LUT l (NOT_FIXED if it may change). */
+        private byte fixedLut(int l, byte[] fixed) {
+            int k = idx.getLeafInst(l).getCellType().getName().charAt(3) - '0';
+            int known = 0;
+            int knownVal = 0;
+            boolean allFixed = true;
+            for (int i = 0; i < k; i++) {
+                int n = netOfPin(l, "I" + i);
+                byte f = n < 0 ? FIXED_0 : fixed[n];
+                allFixed &= f != NOT_FIXED;
+                if (f == FIXED_0 || f == FIXED_1) {
+                    known |= 1 << i;
+                    knownVal |= f == FIXED_1 ? 1 << i : 0;
+                }
+            }
+            // Output over all values of the inputs not known
+            int first = -1;
+            for (int row = 0; row < (1 << k); row++) {
+                if ((row & known) != knownVal) {
+                    continue;
+                }
+                int bit = (int) ((init[l] >>> row) & 1L);
+                if (first < 0) {
+                    first = bit;
+                } else if (bit != first) {
+                    return allFixed ? FIXED_UNKNOWN : NOT_FIXED;
+                }
+            }
+            return first == 1 ? FIXED_1 : FIXED_0;
+        }
+
+        private int netOfPin(int l, String pin) {
+            for (int p = idx.getLeafPinStart(l); p < idx.getLeafPinEnd(l); p++) {
+                if (idx.getPinPortInst(p).getName().equals(pin)) {
+                    return idx.getPinNet(p);
+                }
+            }
+            return -1;
+        }
+
+        private void markOutputs(int l, byte[] nets, byte state) {
+            for (int p = idx.getLeafPinStart(l); p < idx.getLeafPinEnd(l); p++) {
+                int n = idx.getPinNet(p);
+                if (idx.getPinDir(p) == EDIFLeafIndex.DRIVER && n >= 0) {
+                    nets[n] = state;
+                }
+            }
+        }
+
         /** @return The (first) driver pin of a net, -1 if none. */
         int driverPin(int net) {
             return netDriverPin[net];
@@ -600,13 +697,20 @@ public class EDIFRandomSimEquivalence {
             }
         }
         // Removed sequential cells that are not inductively constant were removed as dead
-        // logic: they keep pseudo-random values (any dependence on them shows as a mismatch)
-        for (int iter = 0; iter < 20; iter++) {
-            List<Integer> notConst = new ArrayList<>();
+        // logic: they keep pseudo-random values (any dependence on them shows as a mismatch).
+        // Dropping one can invalidate others (e.g. cells it clocks): repeat until none is dropped
+        while (true) {
+            Set<Integer> notConst = new java.util.HashSet<>();
+            byte[] fixed = a.fixedNets(forced);
             for (int round = 0; round < rounds; round++) {
                 simulate(a, round, forced);
                 for (int l : removedFF) {
-                    if (forced.containsKey(l) && !isInductivelyConstant(a, l, forced.get(l))) {
+                    if (!isInductivelyConstant(a, l, forced.get(l), fixed)) {
+                        if (DEBUG && notConst.add(l)) {
+                            System.out.println("NOT_CONSTANT " + a.names[l] + " "
+                                    + a.idx.getLeafInst(l).getCellType().getName() + " assumed="
+                                    + Long.toHexString(forced.get(l)) + describePins(a, l, fixed));
+                        }
                         notConst.add(l);
                     }
                 }
@@ -617,8 +721,8 @@ public class EDIFRandomSimEquivalence {
             for (int l : notConst) {
                 forced.remove(l);
             }
-            removedFF.removeAll(notConst);
-            removedNonConstant += new java.util.HashSet<>(notConst).size();
+            removedFF.removeIf(notConst::contains);
+            removedNonConstant += notConst.size();
         }
         compareCutCells(a, b);
         for (int round = 0; round < rounds; round++) {
@@ -627,6 +731,25 @@ public class EDIFRandomSimEquivalence {
             compareRound(a, b, round, forced, removedFF);
         }
         return mismatches;
+    }
+
+    /** Prints the removed sequential cells found not to be constant (and why). */
+    private static final boolean DEBUG = System.getProperty("rapidwright.equiv.debug") != null;
+
+    private static String describePins(Model m, int l, byte[] fixed) {
+        StringBuilder sb = new StringBuilder();
+        for (int p = m.idx.getLeafPinStart(l); p < m.idx.getLeafPinEnd(l); p++) {
+            int n = m.idx.getPinNet(p);
+            if (m.idx.getPinDir(p) == EDIFLeafIndex.DRIVER) {
+                continue;
+            }
+            int dp = n < 0 ? -1 : m.driverPin(n);
+            sb.append(' ').append(m.idx.getPinPortInst(p).getName()).append('=')
+                    .append(n < 0 ? "-" : Long.toHexString(m.val[n]))
+                    .append(n >= 0 && fixed[n] != Model.NOT_FIXED ? "(fixed)" : "")
+                    .append('<').append(dp < 0 ? "none" : m.idx.getPinName(dp)).append('>');
+        }
+        return sb.toString();
     }
 
     /** Properties a surviving cut cell may change (inversions are part of the simulation). */
@@ -901,7 +1024,7 @@ public class EDIFRandomSimEquivalence {
     }
 
     /** Checks that the next state of a removed sequential cell equals its assumed constant. */
-    private static boolean isInductivelyConstant(Model a, int l, long q) {
+    private static boolean isInductivelyConstant(Model a, int l, long q, byte[] fixed) {
         String type = a.idx.getLeafInst(l).getCellType().getName();
         if (type.startsWith("SRL")) {
             Long d = pinValue(a, l, "D");
@@ -916,7 +1039,7 @@ public class EDIFRandomSimEquivalence {
             ce = (clk == null ? -1L : clk) & (ge == null ? -1L : ge);
         } else {
             ce = pinValue(a, l, "CE");
-            if (clk != null && isConstNet(a, l, "C")) {
+            if (clk != null && isConstNet(a, l, "C", fixed)) {
                 // No clock edges: only the asynchronous inputs can change it
                 ce = 0L;
             }
@@ -925,7 +1048,7 @@ public class EDIFRandomSimEquivalence {
                 : type.equals("FDCE") || type.equals("LDCE") ? "CLR" : "PRE";
         Long r = pinValue(a, l, rstPin);
         if (!latch && ce != null && ce == 0L && (type.equals("FDRE") || type.equals("FDSE"))
-                && isConstNet(a, l, "C")) {
+                && isConstNet(a, l, "C", fixed)) {
             r = 0L;
         }
         long rv = type.equals("FDRE") || type.equals("FDCE") || type.equals("LDCE") ? 0L : -1L;
@@ -936,12 +1059,16 @@ public class EDIFRandomSimEquivalence {
         return next == q;
     }
 
-    private static boolean isConstNet(Model m, int l, String pin) {
+    /**
+     * @return True if a pin of leaf l is unconnected or on a net that never changes (see
+     * {@link Model#fixedNets}: the removed sequential cells are assumed constant together, and
+     * the assumption is checked for all of them, so e.g. a stopped ripple counter is constant).
+     */
+    private static boolean isConstNet(Model m, int l, String pin, byte[] fixed) {
         for (int p = m.idx.getLeafPinStart(l); p < m.idx.getLeafPinEnd(l); p++) {
             if (m.idx.getPinPortInst(p).getName().equals(pin)) {
                 int n = m.idx.getPinNet(p);
-                int d = n < 0 ? -1 : m.driverLeaf(n);
-                return n < 0 || (d >= 0 && (m.kind[d] == C_GND || m.kind[d] == C_VCC));
+                return n < 0 || fixed[n] != Model.NOT_FIXED;
             }
         }
         return true;

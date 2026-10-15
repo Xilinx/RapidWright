@@ -32,6 +32,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -856,6 +857,51 @@ public class TestEDIFNetlistOptimizer {
         Assertions.assertEquals(0, eq.check(a, b, 1));
         // Looking up the driver of the shared net once per load takes about 40s here
         Assertions.assertTrue(System.nanoTime() - t < 10_000_000_000L);
+    }
+
+    /**
+     * A ripple counter whose first stage has its clock tied high (or, if gated, gated off by a
+     * constant enable): no stage ever sees a clock edge, so each holds its INIT (1, also the
+     * preset value).
+     */
+    private static EDIFNetlist stoppedRippleCounter(boolean invertedClocks, boolean gated) {
+        OptProbes.B b = new OptProbes.B("ripple");
+        b.in("p", "clk");
+        b.out("o");
+        String clk = "1";
+        if (gated) {
+            // Clock gate: clk AND enable, the enable being constant 0
+            b.lut("G", "8", "gclk", "clk", "0");
+            clk = "gclk";
+        }
+        for (int i = 0; i < 3; i++) {
+            b.lut("N" + i, "1", "d" + i, "q" + i);
+            b.inst(Unisim.FDPE, "S" + i, "C=" + clk, "CE=1", "D=d" + i, "PRE=p", "Q=q" + i,
+                    "@INIT=1'b1");
+            clk = "q" + i;
+            if (invertedClocks) {
+                // The next stage is clocked through an inverter
+                b.lut("K" + i, "1", "k" + i, clk);
+                clk = "k" + i;
+            }
+        }
+        b.lut("X", "96", "o", "q0", "q1", "q2");
+        return b.nl;
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false,false", "true,false", "false,true"})
+    public void testOptimizeRemovesStoppedRippleCounter(boolean invertedClocks, boolean gated) {
+        // The optimizer removes every stage as constant; the checker must accept it (a clock
+        // driven, possibly through logic, by stages assumed constant never ticks either)
+        EDIFNetlist opt = stoppedRippleCounter(invertedClocks, gated);
+        EDIFTools.optimizeNetlist(opt, new EDIFOptOptions());
+        Assertions.assertNull(opt.getTopCell().getCellInst("S2"));
+        Assertions.assertTrue(opt.getTopCell().getInternalNet("o").isVCC());
+        EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
+        Assertions.assertEquals(0, eq.check(stoppedRippleCounter(invertedClocks, gated), opt, 4),
+                eq.getExamples().toString());
+        Assertions.assertEquals(0, eq.getRemovedNonConstant());
     }
 
     @Test
