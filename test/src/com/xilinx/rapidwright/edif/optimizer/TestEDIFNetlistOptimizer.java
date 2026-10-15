@@ -837,6 +837,28 @@ public class TestEDIFNetlistOptimizer {
     }
 
     @Test
+    public void testRandomSimEquivalenceIsLinearInFanout() {
+        // A LUT drives many LUTs, each feeding a flip-flop (observed cut cells)
+        Supplier<EDIFNetlist> s = () -> {
+            OptProbes.B b = new OptProbes.B("sim_fanout");
+            b.in("clk", "a", "c");
+            b.lut("G", "6", "n", "a", "c");
+            for (int i = 0; i < 150000; i++) {
+                b.lut("L" + i, "8", "d" + i, "n", "c");
+                b.fdre("F" + i, "d" + i, "1", "0", "", "0");
+            }
+            return b.nl;
+        };
+        EDIFNetlist a = s.get();
+        EDIFNetlist b = s.get();
+        long t = System.nanoTime();
+        EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
+        Assertions.assertEquals(0, eq.check(a, b, 1));
+        // Looking up the driver of the shared net once per load takes about 40s here
+        Assertions.assertTrue(System.nanoTime() - t < 10_000_000_000L);
+    }
+
+    @Test
     public void testComparatorsResetBetweenComparisons() {
         Supplier<EDIFNetlist> s = OptProbes.getProbes().get("lut_chain");
         EDIFNetlist bad = s.get();

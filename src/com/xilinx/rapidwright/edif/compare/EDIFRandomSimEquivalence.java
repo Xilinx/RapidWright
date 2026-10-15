@@ -89,6 +89,8 @@ public class EDIFRandomSimEquivalence {
         final boolean[] cutType;
         /** Nets with a driver (a leaf output, bidirectional pin or top-level input). */
         final boolean[] driven;
+        /** First driver pin of each net, -1 if none. */
+        final int[] netDriverPin;
         /** Combinational cells turned into cut points because they are on a loop. */
         boolean[] loopCut;
         /** Nets whose value depends on a loop cut through simulated logic. */
@@ -116,6 +118,17 @@ public class EDIFRandomSimEquivalence {
             for (int p = 0; p < idx.getNumPins(); p++) {
                 if (idx.getPinDir(p) != EDIFLeafIndex.SINK && idx.getPinNet(p) >= 0) {
                     driven[idx.getPinNet(p)] = true;
+                }
+            }
+            // Found once per net: looking it up per load is quadratic in the fanout
+            netDriverPin = new int[idx.getNumNets()];
+            for (int net = 0; net < idx.getNumNets(); net++) {
+                netDriverPin[net] = -1;
+                for (int i = idx.getNetPinStart(net); i < idx.getNetPinEnd(net); i++) {
+                    if (idx.getPinDir(idx.getNetPin(i)) == EDIFLeafIndex.DRIVER) {
+                        netDriverPin[net] = idx.getNetPin(i);
+                        break;
+                    }
                 }
             }
             loopCut = new boolean[n];
@@ -283,24 +296,14 @@ public class EDIFRandomSimEquivalence {
             return Arrays.copyOf(order, k);
         }
 
+        /** @return The (first) driver pin of a net, -1 if none. */
         int driverPin(int net) {
-            for (int i = idx.getNetPinStart(net); i < idx.getNetPinEnd(net); i++) {
-                int q = idx.getNetPin(i);
-                if (idx.getPinDir(q) == EDIFLeafIndex.DRIVER) {
-                    return q;
-                }
-            }
-            return -1;
+            return netDriverPin[net];
         }
 
         int driverLeaf(int net) {
-            for (int i = idx.getNetPinStart(net); i < idx.getNetPinEnd(net); i++) {
-                int q = idx.getNetPin(i);
-                if (idx.getPinDir(q) == EDIFLeafIndex.DRIVER) {
-                    return idx.getPinLeaf(q);
-                }
-            }
-            return -1;
+            int dp = netDriverPin[net];
+            return dp < 0 ? -1 : idx.getPinLeaf(dp);
         }
 
         long in(int l, String pin) {
