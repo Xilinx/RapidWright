@@ -603,13 +603,7 @@ public class ParallelismTools {
      * @param <T> item type
      */
     public static <T> void forEach(Collection<T> items, Consumer<T> task) {
-        if (!getParallel()) {
-            for (T item : items) {
-                task.accept(item);
-            }
-            return;
-        }
-        items.parallelStream().forEach(task);
+        stream(items).forEach(task);
     }
 
     /**
@@ -704,14 +698,7 @@ public class ParallelismTools {
      *         order (its iteration order, if the collection is ordered)
      */
     public static <T,R> List<R> invokeAll(Collection<T> items, Function<T,R> task) {
-        if (!getParallel()) {
-            final List<R> results = new ArrayList<>(items.size());
-            for (T item : items) {
-                results.add(task.apply(item));
-            }
-            return results;
-        }
-        return items.parallelStream().map(task).collect(Collectors.toList());
+        return stream(items).map(task).collect(Collectors.toList());
     }
 
     /**
