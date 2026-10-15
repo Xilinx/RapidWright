@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.design.xdc;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -98,10 +99,13 @@ public class ConstraintTools {
      * <li>the {@code SRC_FILE_INFO} table.</li>
      * </ul>
      * Commands at the circuit's top scope whose {@code get_ports} only name top-level ports of the
-     * design are applied at the design's top scope instead, as they constrain device pins. In the
-     * others, {@code get_ports} names the circuit's own ports, which are the pins of the black box in
-     * the design: it is given {@code -scoped_to_current_instance}, as Vivado writes it, so that it
-     * finds them.
+     * design are applied at the design's top scope instead, as they constrain device pins. This
+     * includes names that are also ports of the circuit, as they are when a device pin passes
+     * through the black box; Vivado applies those at the top too. In the others, {@code get_ports}
+     * names the circuit's own ports, which are the pins of the black box in the design: it is given
+     * {@code -scoped_to_current_instance}, as Vivado writes it, so that it finds them. A
+     * {@code get_ports} that already has that option, or names no ports (such as one given only
+     * {@code -of_objects}), is taken to refer to the circuit's ports.
      * <p>
      * These rules go by the text of the constraints, as Vivado writes them to a checkpoint. They
      * were checked against Vivado's {@code link_design} of DFX designs (a static shell and a
@@ -164,11 +168,18 @@ public class ConstraintTools {
     private static final Pattern ADD_TOP_TO_PBLOCK =
             Pattern.compile("^add_cells_to_pblock\\s+\\[get_pblocks\\s+\\{?([^\\]\\s}]+)\\}?\\]\\s+-top\\b");
 
-    private static final Pattern UNSCOPED_GET_PORTS =
-            Pattern.compile("\\bget_ports\\b(?!\\s+-scoped_to_current_instance)");
+    private static final Pattern GET_PORTS = Pattern.compile("\\[\\s*get_ports(?=[\\s\\]\\\\])");
 
-    private static final Pattern GET_PORTS =
-            Pattern.compile("get_ports\\s+(?:-quiet\\s+)?(?:\\{([^}]*)\\}|([^\\]\\s]+))");
+    private static final String SCOPED_TO_CURRENT_INSTANCE = "-scoped_to_current_instance";
+
+    /** The options of get_ports, as Vivado lists them. */
+    private static final List<String> GET_PORTS_OPTIONS = Arrays.asList("-regexp", "-nocase", "-filter",
+            "-of_objects", "-match_style", SCOPED_TO_CURRENT_INSTANCE, "-no_traverse", "-prop_thru_buffers",
+            "-quiet", "-verbose");
+
+    /** The options of get_ports that take a value. */
+    private static final Set<String> GET_PORTS_VALUE_OPTIONS =
+            new HashSet<>(Arrays.asList("-filter", "-of_objects", "-match_style"));
 
     private static final Pattern TCL_SPECIAL = Pattern.compile("[\\s\\[\\]{}$\\\\\";]");
 
@@ -238,20 +249,152 @@ public class ConstraintTools {
     }
 
     /**
+     * @return Where the Tcl word that starts at the given index ends: a braced or quoted word after
+     *         its closing brace or quote, any other word at the first space or unmatched ] outside
+     *         brackets.
+     */
+    private static int tclWordEnd(String s, int start) {
+        char first = s.charAt(start);
+        int depth = 0;
+        for (int i = start; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\\') {
+                // A backslash and newline that continue the command separate words
+                if (first != '{' && depth == 0 && i + 1 < s.length() && s.charAt(i + 1) == '\n') return i;
+                i++;
+            } else if (first == '{') {
+                if (c == '{') {
+                    depth++;
+                } else if (c == '}' && --depth == 0) {
+                    return i + 1;
+                }
+            } else if (first == '"') {
+                if (c == '"' && i > start) return i + 1;
+            } else if (c == '[') {
+                depth++;
+            } else if (c == ']') {
+                if (depth == 0) return i;
+                depth--;
+            } else if (depth == 0 && Character.isWhitespace(c)) {
+                return i;
+            }
+        }
+        return s.length();
+    }
+
+    /**
+     * @return The index of the first character from the given one that is neither a space nor a
+     *         backslash and newline that continue the command.
+     */
+    private static int skipTclSpace(String s, int i) {
+        while (i < s.length()) {
+            char c = s.charAt(i);
+            if (Character.isWhitespace(c)) {
+                i++;
+            } else if (c == '\\' && i + 1 < s.length() && s.charAt(i + 1) == '\n') {
+                i += 2;
+            } else {
+                break;
+            }
+        }
+        return i;
+    }
+
+    /**
+     * @return The option of get_ports that a word names, which Vivado lets be abbreviated as long as
+     *         it is unambiguous, or the word itself if it names none.
+     */
+    private static String getPortsOption(String word) {
+        String option = null;
+        for (String o : GET_PORTS_OPTIONS) {
+            if (o.equals(word)) return o;
+            if (o.startsWith(word)) {
+                if (option != null) return word;
+                option = o;
+            }
+        }
+        return option != null ? option : word;
+    }
+
+    /** A get_ports in a command. */
+    private static class GetPorts {
+        /** The index just after the name of the command, where its arguments start. */
+        final int argsStart;
+        /** Whether it has -scoped_to_current_instance. */
+        boolean scoped;
+        /** The port names or patterns it is given. */
+        final List<String> patterns = new ArrayList<>();
+
+        GetPorts(int argsStart) {
+            this.argsStart = argsStart;
+        }
+    }
+
+    /**
+     * @param cmd A command, either joined into one line, or with the lines it continues onto
+     *            separated by newlines.
+     * @return Each get_ports in the command, with its options and patterns told apart.
+     */
+    private static List<GetPorts> findGetPorts(String cmd) {
+        List<GetPorts> found = new ArrayList<>();
+        Matcher m = GET_PORTS.matcher(cmd);
+        while (m.find()) {
+            GetPorts getPorts = new GetPorts(m.end());
+            boolean isValue = false;
+            int i = skipTclSpace(cmd, m.end());
+            while (i < cmd.length() && cmd.charAt(i) != ']') {
+                int end = tclWordEnd(cmd, i);
+                String word = cmd.substring(i, end);
+                i = skipTclSpace(cmd, end);
+                if (isValue) {
+                    isValue = false;
+                } else if (word.startsWith("-")) {
+                    String option = getPortsOption(word);
+                    getPorts.scoped |= option.equals(SCOPED_TO_CURRENT_INSTANCE);
+                    isValue = GET_PORTS_VALUE_OPTIONS.contains(option);
+                } else {
+                    for (String name : tclUnquote(word).trim().split("\\s+")) {
+                        if (!name.isEmpty()) {
+                            getPorts.patterns.add(name);
+                        }
+                    }
+                }
+            }
+            found.add(getPorts);
+        }
+        return found;
+    }
+
+    /**
      * @return True if a command names ports with get_ports, all of them top-level ports.
      */
     private static boolean refersOnlyToTopPorts(String cmd, Set<String> topPorts) {
-        Matcher m = GET_PORTS.matcher(cmd);
         boolean any = false;
-        while (m.find()) {
-            String names = m.group(1) != null ? m.group(1) : m.group(2);
-            for (String name : names.trim().split("\\s+")) {
-                if (name.isEmpty()) continue;
+        for (GetPorts getPorts : findGetPorts(cmd)) {
+            // Ports of the current instance, or ones found by other means than their names
+            if (getPorts.scoped || getPorts.patterns.isEmpty()) return false;
+            for (String name : getPorts.patterns) {
                 if (!topPorts.contains(name)) return false;
-                any = true;
             }
+            any = true;
         }
         return any;
+    }
+
+    /**
+     * @return The lines of a command, with -scoped_to_current_instance given to each get_ports that
+     *         does not have it.
+     */
+    private static List<String> scopeGetPorts(List<String> lines) {
+        String cmd = String.join("\n", lines);
+        List<GetPorts> found = findGetPorts(cmd);
+        StringBuilder sb = new StringBuilder(cmd);
+        for (int i = found.size() - 1; i >= 0; i--) {
+            if (!found.get(i).scoped) {
+                sb.insert(found.get(i).argsStart, " " + SCOPED_TO_CURRENT_INSTANCE);
+            }
+        }
+        return Arrays.asList(sb.toString().split("\n", -1));
     }
 
     /**
@@ -336,14 +479,11 @@ public class ConstraintTools {
             if (srcInfo != null) {
                 out.addAll(srcInfo);
             }
-            if (!inNestedScope && !atTop) {
+            if (!inNestedScope && !atTop && !t.startsWith("#")) {
                 // At the circuit's top scope, get_ports names the circuit's own ports. Inside the
                 // design, those are the pins of the black box, which get_ports only returns when
                 // told to look in the current instance
-                for (String cmdLine : lines) {
-                    out.add(cmdLine.startsWith("#") ? cmdLine
-                            : UNSCOPED_GET_PORTS.matcher(cmdLine).replaceAll("get_ports -scoped_to_current_instance"));
-                }
+                out.addAll(scopeGetPorts(lines));
             } else {
                 out.addAll(lines);
             }

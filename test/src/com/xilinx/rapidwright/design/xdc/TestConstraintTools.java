@@ -267,4 +267,57 @@ public class TestConstraintTools {
                 "set_property MAX_FANOUT 10 [get_nets n]",
                 "current_instance -quiet"), design.getXDCConstraints(ConstraintGroup.EARLY));
     }
+
+    /**
+     * get_ports is told apart from its options in any order, abbreviated, with values, and over
+     * continued lines.
+     */
+    @Test
+    public void testAddBlackBoxConstraintsGetPortsOptions() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        top.createPort("pad", EDIFDirection.OUTPUT, 1);
+        top.createPort("bus[1:0]", EDIFDirection.OUTPUT, 2);
+        EDIFCell rpType = new EDIFCell(top.getLibrary(), "rpType");
+        rpType.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCellInst rp = rpType.createCellInst("rp", top);
+        rp.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+
+        Design circuit = new Design("circuit", "xcvu3p");
+        circuit.getTopEDIFCell().createPort("I", EDIFDirection.INPUT, 1);
+        circuit.addXDCConstraint(ConstraintGroup.LATE,
+                "set_property KEEP true [get_ports -quiet -scoped_to_current_instance a]",
+                "set_property KEEP true [get_ports -sco b]",
+                "set_property IOSTANDARD LVCMOS18 [get_ports -nocase pad]",
+                "set_property KEEP true [get_ports -of_objects [get_nets n]]",
+                "set_property PULLDOWN true [get_ports -filter {DIRECTION == OUT} -quiet {bus[0]}]",
+                "set_property KEEP true [get_ports \\",
+                "    -scoped_to_current_instance d]",
+                "set_false_path -to [get_ports \\",
+                "    e]");
+
+        DesignTools.populateBlackBox(design, Collections.singletonMap("rp", circuit), false);
+
+        Assertions.assertEquals(Arrays.asList(
+                "current_instance rp",
+                // Already scoped, even if not first or abbreviated
+                "set_property KEEP true [get_ports -quiet -scoped_to_current_instance a]",
+                "set_property KEEP true [get_ports -sco b]",
+                // Options before the names of top-level ports
+                "current_instance -quiet",
+                "set_property IOSTANDARD LVCMOS18 [get_ports -nocase pad]",
+                "current_instance rp",
+                // No names, so the circuit's ports
+                "set_property KEEP true [get_ports -scoped_to_current_instance -of_objects [get_nets n]]",
+                // An option's value is not a name
+                "current_instance -quiet",
+                "set_property PULLDOWN true [get_ports -filter {DIRECTION == OUT} -quiet {bus[0]}]",
+                "current_instance rp",
+                // Options on the next line
+                "set_property KEEP true [get_ports \\",
+                "    -scoped_to_current_instance d]",
+                "set_false_path -to [get_ports -scoped_to_current_instance \\",
+                "    e]",
+                "current_instance -quiet"), design.getXDCConstraints(ConstraintGroup.LATE));
+    }
 }
