@@ -47,6 +47,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.jetbrains.annotations.NotNull;
@@ -589,6 +590,48 @@ public class ParallelismTools {
     }
 
     /**
+     * The indices from start (inclusive) to end (exclusive) in chunks of consecutive indices, in order, for a task to
+     * be run on each chunk in parallel: when parallel processing is enabled, roughly four chunks per
+     * {@link #maxParallelism()} thread (or one per index, if there are fewer), else a single chunk of all the indices.
+     * Every index is in exactly one chunk.
+     * @param start The first index.
+     * @param end One past the last index.
+     * @return The chunks, in encounter order, each as {@code {from, to}}: the indices from from (inclusive) to to
+     *         (exclusive). When parallel processing is enabled, a parallel stream of them (so use an operation that
+     *         respects encounter order, such as forEachOrdered(), if their order matters), none if end is not after
+     *         start; else a sequential stream of the single chunk (which is empty if end is not after start).
+     */
+    public static Stream<int[]> chunkRanges(int start, int end) {
+        if (!getParallel()) {
+            return Stream.of(new int[]{start, end});
+        }
+        final int size = end - start;
+        final int chunkSize = Math.max(1, size / (4 * maxParallelism()));
+        return IntStream.range(0, (size + chunkSize - 1) / chunkSize).parallel()
+                .mapToObj(i -> new int[]{start + i * chunkSize, Math.min(start + (i + 1) * chunkSize, end)});
+    }
+
+    /**
+     * The given items in chunks of consecutive items, in order, for a task to be run on each chunk in parallel: when
+     * parallel processing is enabled, the chunks of {@link #chunkRanges(int, int)} (roughly four per
+     * {@link #maxParallelism()} thread, or one per item, if there are fewer), else a single chunk of all the items.
+     * Each chunk is a view of the given list (see {@link List#subList(int, int)}), so the list must not be
+     * structurally modified while any chunk is in use.
+     * @param items The items, which should be a random-access list (such as an ArrayList), as each chunk starts at
+     *              an index.
+     * @param <T> Item type.
+     * @return The chunks, in encounter order: when parallel processing is enabled, a parallel stream of them (so use
+     *         an operation that respects encounter order, such as forEachOrdered(), if their order matters), none if
+     *         there are no items; else a sequential stream of the single chunk.
+     */
+    public static <T> Stream<List<T>> chunkedStream(@NotNull List<T> items) {
+        if (!getParallel()) {
+            return Stream.of(items);
+        }
+        return chunkRanges(0, items.size()).map(r -> items.subList(r[0], r[1]));
+    }
+
+    /**
      * Run the specified task on all items, blocking until all have been completed.
      * When parallel processing is enabled, a parallel stream is used, where the calling thread
      * splits the items (using the collection's own Spliterator) into roughly four pieces per
@@ -628,17 +671,11 @@ public class ParallelismTools {
             forEach(items, task);
             return;
         }
-        final int size = items.size();
-        final int chunkSize = Math.max(1, size / (4 * maxParallelism()));
-        for (int from = 0; from < size; from += chunkSize) {
-            final int start = from;
-            final int end = Math.min(size, from + chunkSize);
-            submit(parent, () -> {
-                for (int i = start; i < end; i++) {
-                    task.accept(items.get(i));
-                }
-            });
-        }
+        chunkedStream(items).sequential().forEachOrdered(chunk -> submit(parent, () -> {
+            for (T item : chunk) {
+                task.accept(item);
+            }
+        }));
     }
 
     /**
