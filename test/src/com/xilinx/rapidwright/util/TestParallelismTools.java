@@ -453,6 +453,20 @@ public class TestParallelismTools {
             Assertions.assertEquals(1, (int) polled.get());
             assertEachRunOnce(submitted);
 
+            // Unless this thread has been interrupted: then, as FutureTask.get() would rather than wait, its own get()
+            // throws InterruptedException (clearing the interrupt status) without running it
+            AtomicIntegerArray interrupted = new AtomicIntegerArray(1);
+            Future<Integer> afterInterrupt = ParallelismTools.submit(() -> interrupted.incrementAndGet(0));
+            Thread.currentThread().interrupt();
+            Assertions.assertThrows(InterruptedException.class, afterInterrupt::get);
+            Assertions.assertFalse(Thread.interrupted());
+            Thread.currentThread().interrupt();
+            Assertions.assertThrows(InterruptedException.class, () -> afterInterrupt.get(1, TimeUnit.SECONDS));
+            Assertions.assertFalse(Thread.interrupted());
+            Assertions.assertEquals(0, interrupted.get(0));
+            Assertions.assertEquals(1, (int) afterInterrupt.get());
+            assertEachRunOnce(interrupted);
+
             // Its exception is rethrown once it has been run there: as-is by ParallelismTools.get(), and wrapped in an
             // ExecutionException by the Future's own get()
             final Future<Integer> failing = ParallelismTools.submit(() -> {

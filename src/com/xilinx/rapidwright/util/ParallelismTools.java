@@ -196,9 +196,21 @@ public class ParallelismTools {
             super(task);
         }
 
+        /**
+         * As FutureTask.get() does if it would wait, throws InterruptedException (clearing the interrupt status) if this
+         * thread has been interrupted and the task is not done; otherwise runs the task if no thread has claimed it.
+         */
+        private void runUnlessInterrupted() throws InterruptedException {
+            // Not isDone(), which runs the task
+            if (!super.isDone() && Thread.interrupted()) {
+                throw new InterruptedException();
+            }
+            run();
+        }
+
         @Override
         public T get() throws InterruptedException, ExecutionException {
-            run();
+            runUnlessInterrupted();
             return super.get();
         }
 
@@ -209,7 +221,7 @@ public class ParallelismTools {
         @Override
         public T get(long timeout, @NotNull TimeUnit unit)
                 throws InterruptedException, ExecutionException, TimeoutException {
-            run();
+            runUnlessInterrupted();
             return super.get(timeout, unit);
         }
 
