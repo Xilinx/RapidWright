@@ -1268,6 +1268,151 @@ public class TestDesignTools {
     }
 
     /**
+     * Creates a circuit for black box {@code box}, as a checkpoint written in the context of a
+     * shell holds it: I into a LUT, which drives another over x; y, which has a logical net but no
+     * pins yet; and two empty nets with no logical net, named as in the full design -- a copy of x
+     * with the black box's prefix, and a clock of the shell. The LUTs are placed in the given
+     * column of slices and the one after it.
+     */
+    private static Design createContextNetCircuit(String box, int column) {
+        Design circuit = createCircuit(box + "_circuit", EDIFDirection.INPUT);
+        EDIFCell top = circuit.getTopEDIFCell();
+        EDIFNet in = top.createNet("I");
+        in.createPortInst(top.getPort("I"));
+        String site = "SLICE_X" + column + "Y0";
+        addSinkLUT(circuit, top, "lut0", site, in, circuit.createNet("I"));
+        EDIFNet x = top.createNet("x");
+        Net xNet = circuit.createNet("x");
+        x.createPortInst("O", top.getCellInst("lut0"));
+        xNet.createPin("A_O", circuit.getSiteInstFromSiteName(site));
+        addSinkLUT(circuit, top, "lut1", "SLICE_X" + (column + 1) + "Y0", x, xNet);
+        top.createNet("y").createPortInst("O", top.getCellInst("lut1"));
+        circuit.createNet("y");
+        circuit.addNet(new Net(box + "/x"));
+        circuit.addNet(new Net("shell_clk"));
+        return circuit;
+    }
+
+    /**
+     * A circuit's checkpoint written in the context of a shell can carry empty physical nets with
+     * no logical net in the circuit, named as in the full design: here, a copy of one of its own
+     * nets with the black box's prefix, and a clock of the shell. They must not stop the circuit's
+     * real net from taking its prefixed name, nor be moved into the design, and are taken out of
+     * the circuit. An empty physical net that does have a logical net is one of the circuit's own,
+     * so is moved in all the same. Two boxes are filled in one call, each circuit with its own.
+     */
+    @Test
+    public void testPopulateBlackBoxDropsContextNets() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, design.createNet("in"));
+        Map<String, Design> circuits = new LinkedHashMap<>();
+        for (String box : new String[] {"bb0", "bb1"}) {
+            in.createPortInst("I", createBlackBox(top, box, EDIFDirection.INPUT));
+            circuits.put(box, createContextNetCircuit(box, 1 + 2 * circuits.size()));
+        }
+        // Nets compare by name, so each circuit's are kept to be looked for by identity
+        Map<String, Net> nets = new HashMap<>();
+        for (Entry<String, Design> e : circuits.entrySet()) {
+            String box = e.getKey();
+            for (String name : new String[] {"x", "y", box + "/x", "shell_clk"}) {
+                nets.put(box + ":" + name, e.getValue().getNet(name));
+            }
+            EDIFNetlist circuitNetlist = e.getValue().getNetlist();
+            Assertions.assertNull(circuitNetlist.getHierNetFromName(box + "/x"));
+            Assertions.assertNull(circuitNetlist.getHierNetFromName("shell_clk"));
+        }
+
+        populateBlackBox(design, circuits, false);
+
+        Set<Net> modified = design.getModifiedNets();
+        for (Entry<String, Design> e : circuits.entrySet()) {
+            String box = e.getKey();
+            Net xNet = nets.get(box + ":x");
+            Assertions.assertSame(xNet, design.getNet(box + "/x"));
+            Assertions.assertEquals(2, xNet.getPins().size());
+            Assertions.assertTrue(modified.contains(xNet));
+            Net yNet = nets.get(box + ":y");
+            Assertions.assertSame(yNet, design.getNet(box + "/y"));
+            Assertions.assertTrue(modified.contains(yNet));
+
+            Net prefixed = nets.get(box + ":" + box + "/x");
+            Net clock = nets.get(box + ":shell_clk");
+            Assertions.assertNull(design.getNet(box + "/" + box + "/x"));
+            Assertions.assertNull(design.getNet(box + "/shell_clk"));
+            Assertions.assertTrue(modified.stream().noneMatch(n -> n == prefixed || n == clock));
+            Design circuit = e.getValue();
+            Assertions.assertNull(circuit.getNet("shell_clk"));
+            Assertions.assertNotSame(prefixed, circuit.getNet(box + "/x"));
+        }
+    }
+
+    /**
+     * A net inside an encrypted cell has no logical net in the circuit's netlist either, since the
+     * cell's contents are not in it, but is one of the circuit's own: even with nothing on it, it
+     * is moved in rather than dropped as a context net.
+     */
+    @Test
+    public void testPopulateBlackBoxKeepsEncryptedCellNets() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", createBlackBox(top, "bb", EDIFDirection.INPUT));
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, design.createNet("in"));
+
+        // An encrypted cell is held in the netlist as a cell with ports and no contents
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT);
+        EDIFNetlist circuitNetlist = circuit.getNetlist();
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet circuitIn = circuitTop.createNet("I");
+        circuitIn.createPortInst(circuitTop.getPort("I"));
+        EDIFCell encrypted = new EDIFCell(circuitNetlist.getWorkLibrary(), "encrypted");
+        encrypted.createPort("I", EDIFDirection.INPUT, 1);
+        circuitIn.createPortInst("I", encrypted.createCellInst("enc", circuitTop));
+        circuitNetlist.setEncryptedCells(Collections.singletonList("encrypted.edn"));
+        Assertions.assertTrue(circuitNetlist.hasEncryptedCells());
+        Net inside = new Net("enc/n");
+        circuit.addNet(inside);
+        Assertions.assertNull(inside.getLogicalHierNet());
+
+        // Called directly, since the helper expects every net it records to have a logical net
+        DesignTools.populateBlackBox(design, Collections.singletonMap("bb", circuit), false);
+
+        Assertions.assertFalse(design.getNetlist().isParentNetMapBuilt());
+        Assertions.assertSame(inside, design.getNet("bb/enc/n"));
+    }
+
+    /**
+     * A net that already carries the black box's prefix and has no logical net, but has routing,
+     * cannot be dropped as a context net, and moved in it would take the name meant for one of
+     * the circuit's own nets. It is rejected before anything is modified.
+     */
+    @Test
+    public void testPopulateBlackBoxRejectsRoutedContextNet() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        EDIFCellInst bb = createBlackBox(top, "bb", EDIFDirection.INPUT);
+        in.createPortInst("I", bb);
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, design.createNet("in"));
+
+        Design circuit = createContextNetCircuit("bb", 1);
+        Net prefixed = circuit.getNet("bb/x");
+        addTestRouting(prefixed, 0);
+
+        RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                () -> DesignTools.populateBlackBox(design, Collections.singletonMap("bb", circuit),
+                        false));
+        Assertions.assertTrue(e.getMessage().startsWith("ERROR: The net 'bb/x' in the circuit for"
+                + " black box 'bb'"), e.getMessage());
+        Assertions.assertTrue(bb.isBlackBox());
+        Assertions.assertSame(prefixed, circuit.getNet("bb/x"));
+        Assertions.assertNotNull(circuit.getNet("x"));
+        Assertions.assertNotNull(circuit.getNet("shell_clk"));
+    }
+
+    /**
      * In a netlist that is not uniquified, two hierarchical names can lead to the same black box
      * instance, which cannot be filled with two different circuits.
      */
