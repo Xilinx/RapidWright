@@ -1134,28 +1134,16 @@ public class DesignTools {
                 // Nothing but a static source is expected to be sitting on a site the black box covers,
                 // since the site was given to the circuit by the placer on the strength of it being free
                 SiteInst existingSi = design.getSiteInstFromSite(si.getSite());
-                if (existingSi != null && holdsOnlyLockedPlaceholders(existingSi)) {
+                if (existingSi != null) {
                     // ... or a site instance that merely locks the site's BELs, as a static shell
                     // has for sites in the region of a reconfigurable partition. It holds nothing
-                    // else, so it is simply removed for the circuit's site instance to take over
-                    design.removeSiteInst(existingSi);
-                    // Removing it marks it modified on its way out. Untrack it: SiteInst equality
-                    // goes by name, and both are usually named after the site, so it would stand
-                    // in for the circuit's site instance in the modified set. Its snapshot, if
-                    // one was taken, is what the site changes from
-                    design.getModifiedSiteInsts().remove(existingSi);
-                    SiteInst original = design.getOriginalSiteInsts().remove(existingSi.getName());
-                    if (original != null) {
-                        design.getOriginalSiteInsts().put(si.getName(), original);
-                    }
-                    existingSi = null;
-                }
-                if (existingSi != null) {
-                    if (!existingSi.getName().startsWith(SiteInst.STATIC_SOURCE)) {
+                    // else, so it is evicted just the same
+                    if (!existingSi.getName().startsWith(SiteInst.STATIC_SOURCE)
+                            && !holdsOnlyLockedPlaceholders(existingSi)) {
                         throw new RuntimeException("ERROR: Site overlap at " + existingSi.getSiteName() + " when populating blackbox '" + hierarchicalCellName + "'");
                     }
-                    // Cell is only allowed to evict STATIC_SOURCEs -- but we have to unroute all
-                    // static trees affected by its evicted output pins
+                    // Cell is otherwise only allowed to evict STATIC_SOURCEs -- but we have to
+                    // unroute all static trees affected by its evicted output pins
                     // TODO: In the future, perhaps we can port the mutually exclusive parts
                     //       of the static source into the cell SiteInst?
                     for (SitePinInst spi : existingSi.getSitePinInsts()) {
@@ -1163,7 +1151,9 @@ public class DesignTools {
                         assert(spi.getNet().isStaticNet());
                     }
                     // Its pins are collected into deferredRemovals rather than taken now. Removing
-                    // it hands what the site held originally on to the site instance added below
+                    // it hands what the site held originally on to the site instance added below.
+                    // The design does that by site rather than by name, which matters since both are
+                    // usually named after the site
                     boolean keepSitePinRouting = false;
                     design.removeSiteInst(existingSi, keepSitePinRouting, deferredRemovals);
                 }
