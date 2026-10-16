@@ -46,11 +46,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.Future;
@@ -369,6 +369,29 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
+     * Gets every cell that is instantiated in the hierarchy below the top cell, and the top cell
+     * itself. Each cell is visited once, however many times it is instantiated, rather than every
+     * instance of the elaborated hierarchy being created, as {@link #getAllDescendants} does.
+     * @return The cells in use, compared by identity.
+     */
+    private Set<EDIFCell> getCellsInUse() {
+        Set<EDIFCell> used = Collections.newSetFromMap(new IdentityHashMap<>());
+        Deque<EDIFCell> toVisit = new ArrayDeque<>();
+        EDIFCell top = getTopCell();
+        used.add(top);
+        toVisit.push(top);
+        while (!toVisit.isEmpty()) {
+            for (EDIFCellInst inst : toVisit.pop().getCellInsts()) {
+                EDIFCell cellType = inst.getCellType();
+                if (used.add(cellType)) {
+                    toVisit.push(cellType);
+                }
+            }
+        }
+        return used;
+    }
+
+    /**
      * Removals all unused cells from a netlist from any work library (all except hdi_primitives)
      */
     public void removeUnusedCellsFromAllWorkLibraries() {
@@ -378,9 +401,8 @@ public class EDIFNetlist extends EDIFName {
             cellsToRemove.put(lib.getName(), new HashMap<>(lib.getCellMap()));
         }
 
-        _keepCell(cellsToRemove, getTopCell());
-        for (EDIFHierCellInst i : getAllDescendants("", null, false)) {
-            _keepCell(cellsToRemove, i.getCellType());
+        for (EDIFCell cell : getCellsInUse()) {
+            _keepCell(cellsToRemove, cell);
         }
 
         for (Entry<String, HashMap<String,EDIFCell>> e : cellsToRemove.entrySet()) {
@@ -396,9 +418,9 @@ public class EDIFNetlist extends EDIFName {
         HashMap<String,EDIFCell> cellsToRemove = new HashMap<>(getWorkLibrary().getCellMap());
 
         cellsToRemove.remove(getTopCell().getName());
-        for (EDIFHierCellInst i : getAllDescendants("", null, false)) {
-            if (i.getCellType().getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_WORK_NAME)) {
-                cellsToRemove.remove(i.getCellType().getName());
+        for (EDIFCell cell : getCellsInUse()) {
+            if (cell.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_WORK_NAME)) {
+                cellsToRemove.remove(cell.getName());
             }
         }
 
@@ -815,50 +837,137 @@ public class EDIFNetlist extends EDIFName {
      * is always first.
      */
     public List<EDIFLibrary> getLibrariesInExportOrder() {
-        Set<EDIFLibrary> toExport = new LinkedHashSet<EDIFLibrary>();
+        return getLibrariesInExportOrder(false);
+    }
+
+    /**
+     * Get Libraries in export order so that any cell instance appearing in a library will only
+     * refer to cells in its own library or previous libraries in the list.  This is a pre-requisite
+     * for export to a file.
+     * @param stable If true, libraries that do not depend on each other are ordered by name rather
+     * than by the order in which they were added to the netlist.
+     * @return List of all libraries in the netlist sorted for valid export, HDIPrimitives library
+     * is always first.
+     * @throws RuntimeException If the libraries have a circular dependency.
+     */
+    public List<EDIFLibrary> getLibrariesInExportOrder(boolean stable) {
+        return getLibrariesInExportOrder(stable, true);
+    }
+
+    /** Number of cell instances visited by each task when finding library dependencies */
+    private static final int INSTS_PER_DEPENDENCY_TASK = 1 << 16;
+
+    /**
+     * Topologically sorts the libraries (Kahn's algorithm) so that each library comes after
+     * the libraries it instantiates cells from.  Among libraries that are ready at the same time,
+     * the one that comes first by name (if stable) or by order added to the netlist is chosen, so
+     * libraries that are already in a valid order keep that order.
+     * @param stable If true, ties are broken by name rather than by order added to the netlist.
+     * @param throwOnCycle If true, a circular dependency throws an exception, otherwise a warning
+     * is printed and the libraries in the cycle are appended in tie-break order.
+     */
+    private List<EDIFLibrary> getLibrariesInExportOrder(boolean stable, boolean throwOnCycle) {
         // Assume HDI Primitives are always first as they should not refer to any previous libraries
-        toExport.add(getHDIPrimitivesLibrary());
-
-        Map<String, HashSet<EDIFLibrary>> deps = new HashMap<String, HashSet<EDIFLibrary>>();
-        for (EDIFLibrary lib : getLibraries()) {
-            if (lib.isHDIPrimitivesLibrary()) continue;
-            HashSet<EDIFLibrary> externalRefs =
-                    new HashSet<EDIFLibrary>(lib.getExternallyReferencedLibraries());
-            externalRefs.remove(getHDIPrimitivesLibrary());
-
-            if (externalRefs.isEmpty()) {
-                toExport.add(lib);
-            } else {
-                deps.put(lib.getName(), externalRefs);
+        EDIFLibrary hdiLib = getHDIPrimitivesLibrary();
+        List<EDIFLibrary> libs = new ArrayList<>(libraries.size());
+        for (EDIFLibrary lib : EDIFTools.sortIfStable(getLibraries(), stable)) {
+            if (lib != hdiLib) {
+                libs.add(lib);
             }
         }
+        List<EDIFLibrary> toExport = new ArrayList<>(libs.size() + 1);
+        toExport.add(hdiLib);
+        if (libs.size() <= 1) {
+            // Typical netlists only have one other library, so its cells need not be visited
+            toExport.addAll(libs);
+            return toExport;
+        }
 
-        Queue<Entry<String, HashSet<EDIFLibrary>>> q = new LinkedList<>(deps.entrySet());
-        int lastSize = q.size();
-        int size = lastSize;
-        int watchdog = 10;
-        while (!q.isEmpty()) {
-            Entry<String,HashSet<EDIFLibrary>> curr = q.poll();
-            size--;
-            if (toExport.containsAll(curr.getValue())) {
-                toExport.add(getLibrary(curr.getKey()));
-                continue;
+        Map<EDIFLibrary, Integer> libIdx = new IdentityHashMap<>();
+        for (int i = 0; i < libs.size(); i++) {
+            libIdx.put(libs.get(i), i);
+        }
+        // Visiting every cell instance dominates the runtime for large netlists, so cells are
+        // visited in parallel, in chunks with similar numbers of instances
+        List<Pair<Integer, List<EDIFCell>>> chunks = new ArrayList<>();
+        for (int i = 0; i < libs.size(); i++) {
+            List<EDIFCell> chunk = new ArrayList<>();
+            int chunkInsts = 0;
+            for (EDIFCell cell : libs.get(i).getCells()) {
+                if (chunkInsts >= INSTS_PER_DEPENDENCY_TASK) {
+                    chunks.add(new Pair<>(i, chunk));
+                    chunk = new ArrayList<>();
+                    chunkInsts = 0;
+                }
+                chunk.add(cell);
+                chunkInsts += cell.getCellInsts().size();
             }
-            q.add(curr);
-            if (!q.isEmpty() && size == 0) {
-                if (q.size() == lastSize) {
-                    watchdog--;
-                    if (watchdog == 0) {
-                        throw new RuntimeException("Circular dependency in EDIF Libraries between "
-                                + "cells.  Please merge libraries or resolve dependency.");
-                    }
-                    lastSize = q.size();
-                    size = lastSize;
+            if (!chunk.isEmpty()) {
+                chunks.add(new Pair<>(i, chunk));
+            }
+        }
+        List<Future<Set<EDIFLibrary>>> chunkRefs = ParallelismTools.invokeAll(chunks, chunk -> {
+            Set<EDIFLibrary> refs = new HashSet<>();
+            libs.get(chunk.getFirst()).addExternallyReferencedLibraries(chunk.getSecond(), refs);
+            return refs;
+        });
+
+        int[] depCount = new int[libs.size()];
+        List<Set<Integer>> deps = new ArrayList<>(libs.size());
+        List<List<Integer>> dependents = new ArrayList<>(libs.size());
+        for (int i = 0; i < libs.size(); i++) {
+            deps.add(new HashSet<>());
+            dependents.add(new ArrayList<>());
+        }
+        for (int c = 0; c < chunks.size(); c++) {
+            int i = chunks.get(c).getFirst();
+            for (EDIFLibrary ref : ParallelismTools.get(chunkRefs.get(c))) {
+                if (ref == null) continue;
+                // A cell can refer to a library that is not in this netlist (such as one of
+                // Design.getPrimitivesLibrary()'s cells), which no library here can satisfy, so
+                // only the libraries in this netlist are waited for
+                Integer j = libIdx.get(getLibrary(ref.getName()));
+                if (j != null && j != i && deps.get(i).add(j)) {
+                    dependents.get(j).add(i);
+                    depCount[i]++;
                 }
             }
         }
 
-        return new ArrayList<>(toExport);
+        // Libraries are indexed in tie-break order, so the smallest ready index goes next
+        PriorityQueue<Integer> ready = new PriorityQueue<>();
+        for (int i = 0; i < libs.size(); i++) {
+            if (depCount[i] == 0) {
+                ready.add(i);
+            }
+        }
+        while (!ready.isEmpty()) {
+            int i = ready.poll();
+            toExport.add(libs.get(i));
+            for (int dependent : dependents.get(i)) {
+                if (--depCount[dependent] == 0) {
+                    ready.add(dependent);
+                }
+            }
+        }
+
+        if (toExport.size() <= libs.size()) {
+            // Libraries left over are in, or depend upon, a cycle
+            List<EDIFLibrary> unsorted = new ArrayList<>();
+            for (int i = 0; i < libs.size(); i++) {
+                if (depCount[i] > 0) {
+                    unsorted.add(libs.get(i));
+                }
+            }
+            String msg = "Circular dependency in EDIF Libraries between cells.  Please merge "
+                    + "libraries or resolve dependency.  Libraries involved: " + unsorted;
+            if (throwOnCycle) {
+                throw new RuntimeException(msg);
+            }
+            MessageGenerator.briefMessage("WARNING: " + msg);
+            toExport.addAll(unsorted);
+        }
+        return toExport;
     }
 
     public static final byte[] EXPORT_CONST_EDIF_VERSION = "\n  (edifversion 2 0 0)\n  (edifLevel 0)\n  (keywordmap (keywordlevel 0))\n(status\n (written\n  (timeStamp ".getBytes(StandardCharsets.UTF_8);
@@ -909,14 +1018,9 @@ public class EDIFNetlist extends EDIFName {
             }
             os.write(EXPORT_CONST_DOUBLE_CLOSE);
 
-            List<EDIFLibrary> librariesToWrite = new ArrayList<>();
-            librariesToWrite.add(getHDIPrimitivesLibrary());
-            for (EDIFLibrary lib : EDIFTools.sortIfStable(getLibrariesMap().values(), stable)) {
-                if (lib.isHDIPrimitivesLibrary()) {
-                    continue;
-                }
-                librariesToWrite.add(lib);
-            }
+            // Cells can only be instantiated after their library has been written.  A circular
+            // dependency cannot be ordered, but is still written (as it was before ordering)
+            List<EDIFLibrary> librariesToWrite = getLibrariesInExportOrder(stable, false);
 
             if (dos != null) {
                 Deque<Future<ParallelDCPInput>> streamFutures = new ArrayDeque<>();
@@ -1364,38 +1468,88 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
-     * Get's all equivalent nets in the netlist from the provided net name.
-     * The returned list also includes the provided netName.
-     * @param initialNet Full hierarchical netname to use as a starting point in the search.
+     * Gets all equivalent nets in the netlist from the provided net.
+     * The returned list also includes the provided net. The leaf cell pins of these nets are
+     * recorded as the physical pins of their parent net (see {@link #getPhysicalNetPinMap()}).
+     * @param initialNet The net to use as a starting point in the search.
      * @return A list of all electrically connected nets in the netlist that are equivalent.
-     * The list is composed of all full hierarchical net names or an empty list if netName is invalid.
+     * @throws RuntimeException If the net has more than one source, or has connections but no
+     * source.
      */
     public List<EDIFHierNet> getNetAliases(EDIFHierNet initialNet) {
+        List<EDIFHierNet> aliases = new ArrayList<>();
+        recordParentNet(initialNet, aliases);
+        return aliases;
+    }
+
+    /**
+     * Does what {@link #getNetAliases(EDIFHierNet)} does, and returns the parent net.
+     * @param initialNet The net to use as a starting point in the search.
+     * @param aliases All electrically connected nets in the netlist that are equivalent are added
+     * to it.
+     * @return The parent net, or null if the net has no connections.
+     * @throws RuntimeException If the net has more than one source, or has connections but no
+     * source.
+     */
+    private EDIFHierNet recordParentNet(EDIFHierNet initialNet, List<EDIFHierNet> aliases) {
         if (physicalNetPinMap == null) {
             physicalNetPinMap = new HashMap<>();
             physicalGndPins = new ArrayList<>();
             physicalVccPins = new ArrayList<>();
         }
-        ArrayList<EDIFHierPortInst> leafCellPins = new ArrayList<>();
-        List<EDIFHierNet> aliases = new ArrayList<>();
+        List<EDIFHierPortInst> leafCellPins = new ArrayList<>();
+        EDIFHierPortInst source = findParentPortInst(initialNet, aliases, leafCellPins);
+        if (source != null) {
+            switch (identifyNetType(source)) {
+                case GND:
+                    physicalGndPins.addAll(leafCellPins);
+                    break;
+                case VCC:
+                    physicalVccPins.addAll(leafCellPins);
+                    break;
+            }
+            EDIFHierNet parentNet = source.getHierarchicalNet();
+            physicalNetPinMap.put(parentNet, leafCellPins);
+            return parentNet;
+        } else if (initialNet.getNet().getPortInsts().size() != 0) {
+            throw new RuntimeException("ERROR: Couldn't identify parent net, no output pins (or top level output port) found.");
+        }
+        return null;
+    }
+
+    /**
+     * Finds the source port inst of the parent net of the provided net, by searching all its
+     * equivalent nets in the netlist as {@link #getNetAliases(EDIFHierNet)} does. Nothing in the
+     * netlist is changed.
+     * @param initialNet The net to use as a starting point in the search.
+     * @param aliases If not null, all electrically connected nets in the netlist that are
+     * equivalent are added to it.
+     * @param leafCellPins If not null, all leaf cell pins on those nets are added to it.
+     * @return The source port inst of the parent net, or null if none was found.
+     * @throws RuntimeException If the net has more than one source.
+     */
+    private EDIFHierPortInst findParentPortInst(EDIFHierNet initialNet, List<EDIFHierNet> aliases,
+            List<EDIFHierPortInst> leafCellPins) {
         Queue<EDIFHierNet> queue = new ArrayDeque<>();
         queue.add(initialNet);
         HashSet<EDIFHierNet> visited = new HashSet<>();
 
         EDIFHierPortInst source = null;
-        EDIFHierNet parentNet = null;
-        EDIFHierNet fallbackParentNet = null;
+        EDIFHierPortInst fallbackSource = null;
+        boolean multipleFallbackSources = false;
         while (!queue.isEmpty()) {
             EDIFHierNet net = queue.poll();
             if (!visited.add(net)) {
                 continue;
             }
-            aliases.add(net);
+            if (aliases != null) {
+                aliases.add(net);
+            }
             for (EDIFPortInst relP : net.getNet().getPortInsts()) {
                 EDIFHierPortInst p = new EDIFHierPortInst(net.getHierarchicalInst(), relP);
 
                 boolean isCellPin = relP.getCellInst() != null && relP.getCellInst().getCellType().isLeafCellOrBlackBox();
-                if (isCellPin) {
+                if (leafCellPins != null && isCellPin) {
                     leafCellPins.add(p);
                 }
 
@@ -1403,22 +1557,21 @@ public class EDIFNetlist extends EDIFName {
                 boolean isTopLevelPortInst = p.getHierarchicalInst().isTopLevelInst() && relP.getCellInst() == null;
                 boolean isToplevelInput = isTopLevelPortInst && p.isInput();
                 if (isToplevelInput || (isCellPin && p.isOutput())) {
-                    if (parentNet != null) {
+                    if (source != null) {
                         throw new RuntimeException("Multiple sources!");
                     }
                     source = p;
-                    parentNet = net;
                 }
 
                 // For top-level INOUT ports, consider the possibility that it might be an input
-                // and thus a parent net
+                // and thus a parent net. Whether more than one is an error depends on whether
+                // any other source is found, so is only decided once all aliases are visited.
                 boolean isToplevelInout = isTopLevelPortInst && !p.isInput() && !p.isOutput();
                 if (isToplevelInout) {
-                    if (fallbackParentNet != null) {
-                        throw new RuntimeException("Multiple sources!");
-                    } else if (parentNet == null) {
-                        source = p;
-                        fallbackParentNet = net;
+                    if (fallbackSource != null) {
+                        multipleFallbackSources = true;
+                    } else {
+                        fallbackSource = p;
                     }
                 }
 
@@ -1442,28 +1595,14 @@ public class EDIFNetlist extends EDIFName {
             }
         }
 
-        if (parentNet == null) {
-            // No other parent net was found, promote the fallback net
-            parentNet = fallbackParentNet;
+        if (source != null) {
+            return source;
         }
-
-        if (parentNet != null) {
-            switch (identifyNetType(source)) {
-                case GND:
-                    physicalGndPins.addAll(leafCellPins);
-                    break;
-                case VCC:
-                    physicalVccPins.addAll(leafCellPins);
-                    break;
-            }
-            physicalNetPinMap.put(parentNet, leafCellPins);
-        } else if (initialNet.getNet().getPortInsts().size() == 0) {
-            return aliases;
-        } else {
-            throw new RuntimeException("ERROR: Couldn't identify parent net, no output pins (or top level output port) found.");
+        // No other source was found, so the source is the fallback (top-level inout), if unique
+        if (multipleFallbackSources) {
+            throw new RuntimeException("Multiple sources!");
         }
-
-        return aliases;
+        return fallbackSource;
     }
 
     /**
@@ -1484,6 +1623,23 @@ public class EDIFNetlist extends EDIFName {
      */
     public EDIFHierNet getParentNet(EDIFHierNet netAlias) {
         return getParentNetMap().get(netAlias);
+    }
+
+    /**
+     * Finds the canonical net of a net, as {@link #getParentNet(EDIFHierNet)} does, but without
+     * building the parent net map of the whole netlist if it is not already built: only the net's
+     * own aliases are searched. This is much cheaper for looking up a few nets in a large netlist,
+     * though each lookup costs a search, so {@link #getParentNet(EDIFHierNet)} is better for many.
+     * @param netAlias A net in the netlist.
+     * @return The parent net, or null if the net has no source.
+     * @throws RuntimeException If the net has more than one source.
+     */
+    public EDIFHierNet findParentNet(EDIFHierNet netAlias) {
+        if (parentNetMap != null) {
+            return parentNetMap.get(netAlias);
+        }
+        EDIFHierPortInst source = findParentPortInst(netAlias, null, null);
+        return (source != null) ? source.getHierarchicalNet() : null;
     }
 
     /**
@@ -1526,6 +1682,15 @@ public class EDIFNetlist extends EDIFName {
         physicalNetPinMap = null;
         physicalGndPins = null;
         physicalVccPins = null;
+    }
+
+    /**
+     * Checks whether the parent net map is currently built, without building it. It is built lazily
+     * by {@link #getParentNetMap()} and dropped by {@link #resetParentNetMap()}.
+     * @return True if the parent net map is built, false otherwise.
+     */
+    public boolean isParentNetMapBuilt() {
+        return parentNetMap != null;
     }
 
     private void generateParentNetMap() {
@@ -1574,9 +1739,18 @@ public class EDIFNetlist extends EDIFName {
 
         for (EDIFHierPortInst pr : queue) {
             assert(pr.getNet() != null);
-            EDIFHierNet parentNetName = pr.getHierarchicalNet();
-            for (EDIFHierNet alias : getNetAliases(parentNetName)) {
-                parentNetMap.put(alias, parentNetName);
+            EDIFHierNet net = pr.getHierarchicalNet();
+            if (parentNetMap.containsKey(net)) {
+                // Already mapped from another possible source of the same net
+                continue;
+            }
+            // The queued port may not be the source (e.g. a top-level inout next to a top-level
+            // input), so map the aliases to the parent net that the search resolves, just as
+            // findParentNet() does
+            List<EDIFHierNet> aliases = new ArrayList<>();
+            EDIFHierNet parentNet = recordParentNet(net, aliases);
+            for (EDIFHierNet alias : aliases) {
+                parentNetMap.put(alias, parentNet);
             }
         }
         if (DEBUG) {

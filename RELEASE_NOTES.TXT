@@ -1,3 +1,56 @@
+============= RapidWright 2026.1.1-beta released on 2026-09-30 ================
+Notes: 
+  - Have tests preserve edif gen flag (#1438)
+  - [DesignTools] Improve createMissingSitePinInsts() (#1429)
+  - [RouterHelper] getSourceToSinkINTNodeDelays() only for fully routed (#1434)
+  - [TestCell] Add testUpdateNameResetsLogicalInst() (#1409)
+  - [TestNet] Check name changes invalidate cached logical hier net (#1425)
+  - [TestSitePinInst] Add testSetRoutedTracksSiteInstChanges() (#1427)
+  - [TestDesign] Add test{Add,Create}SiteInstDuplicate() (#1432)
+  - [Examples] Run example programs as smoke tests in CI (#1435)
+  - Test for module relocation in modular SLRs (#1399)
+  - [TestDesign] Add testTrack{SiteInst,Net}Changes() (#1411)
+  - [CodePerfTracker] Only track OS memory usage on Linux (#1433)
+  - [PartialRouter] Allow partially-routed nets using RCLK tiles (#1426)
+  - [PartialRouter] Only recover arcs between projected pins (#1412)
+  - [DesignTools] Make makePhysNetNamesConsistent() deterministic (#1413)
+  - [NetlistBrowser] Speed up the NetlistBrowser schematic viewer (#1420)
+  - [EDIFParser] Accept cell properties ahead of the view (#1421)
+  - Edif tokenizer max length config and standaloneJar task fix (#1422)
+  - [EDIFParser] Accept author and optional program in (written ...) (#1418)
+  - [EDIFTools] Detect gzipped EDIF by content, not file name (#1414)
+  - [EDIFNetlist] Guard expandMacroUnisims() against a missing part name (#1416)
+  - Resolves new Net(null) with getParentNetName() (#1417)
+  - [EDIFParser] Key cell reference map by legal library name (#1415)
+  - [ModuleInst] Fix connect(NetType) removing the wrong pin; assert removals (#1410)
+  - [DesignTools] populateBlackBox() to evict clobbered STATIC_SOURCEs (#1408)
+  - Experimental fix for random bin/rapidwright deletion (#1396)
+  - TimingAndWirelengthReport and RouterHelper fixes (#1405)
+  - [Timing] Fixes for unrouted and post-routed designs (#1402)
+  - [PartialRouter] Preserve LUT routethru arcs when unpreserving nets (#1404)
+  - [PartialRouter] main() to accept optional --softPreserve argument (#1403)
+  - Module Metadata: Implicit connections (#1395)
+  - Add FlopTreeTools for SLR-crossing flop-tree/chain insertion (#1393)
+  - Harden InlineFlopTools inline-flop removal and add parseSideMap overload (#1381)
+  - Add RegisterInitTools for reading/writing FF INIT values (#1380)
+  - Add ConstraintTools.getClockNetsFromXDC (#1379)
+  - Add null-safety guards in design/EDIF utilities (#1378)
+  - Fix for handling module relocation in Modular SLRs
+  - [Design] addSiteInst() to use != over !equals() for collision check
+  - [SitePinInst] track setRouted() false -> true change for ?MUX pins
+  - [SiteInst][Net] Track when new objs are added; make empty copies
+  - [Net] setName() to invalidate logicalHierNet 
+  - [Cell] setName() to invalidate logical EDIFHierCellInst
+  - Correctly calculates bitstream header length & fixes FDRI/MFWR packet parsing 
+  - Fixes a MFWR packet missing decode issue
+  - Add createBUFGCE() support for Series 7 and Versal
+
+API Additions:
+  - com.xilinx.rapidwright.device.Tile "public int getSLRIndex()"
+  
+API Removals:
+
+
 ============= RapidWright 2026.1.0-beta released on 2026-06-30 ================
 Notes: 
   - 2026.1.0 Vivado DCP and device compatibility

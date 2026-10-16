@@ -54,6 +54,8 @@ public class NOCDesign implements Serializable {
 
     private int nocFrequency;
 
+    private String deviceName; // As read from the traffic file, if it had one
+
     private Map<String,NOCMaster> masterClients;
     private Map<String,NOCSlave> slaveClients;
     private Map<String,Integer> switchDestIDs;
@@ -342,6 +344,7 @@ public class NOCDesign implements Serializable {
         if (sysProps.has(NOCJSONUtil.JSON_FIELD_FREQUENCY)) {
             nocFrequency = sysProps.getInt(NOCJSONUtil.JSON_FIELD_FREQUENCY);
         }
+        deviceName = sysProps.optString(NOCJSONUtil.JSON_FIELD_DEVICE_NAME, null);
         if (sysProps.has(NOCJSONUtil.JSON_FIELD_DFX_PATHS)) {
             //System.out.println("Unsupported NoC traffic encountered: " + NOCJSONUtil.JSON_FIELD_DFX_PATHS);
             JSONArray dfxPathsArray = sysProps.getJSONArray(NOCJSONUtil.JSON_FIELD_DFX_PATHS);
@@ -350,9 +353,9 @@ public class NOCDesign implements Serializable {
             }
         }
 
-        //Logical Instances
-        JSONArray instances = jsonTraffic.getJSONArray(NOCJSONUtil.JSON_FIELD_CLIENT_INSTANCES);
-        for (int i=0; i<instances.length(); i++) {
+        //Logical Instances (absent from traffic files written by RapidWright for a design without any)
+        JSONArray instances = jsonTraffic.optJSONArray(NOCJSONUtil.JSON_FIELD_CLIENT_INSTANCES);
+        for (int i=0; instances != null && i<instances.length(); i++) {
             JSONObject inst = instances.getJSONObject(i);
             boolean isMaster = inst.getBoolean(NOCJSONUtil.JSON_FIELD_IS_MASTER);
             if (isMaster) {
@@ -445,6 +448,9 @@ public class NOCDesign implements Serializable {
         JSONObject nocTraffic = NOCJSONUtil.createOrderedJSONObject();
         JSONObject sysProps = NOCJSONUtil.createOrderedJSONObject();
         sysProps.put(NOCJSONUtil.JSON_FIELD_FREQUENCY,nocFrequency);
+        if (deviceName != null) {
+            sysProps.put(NOCJSONUtil.JSON_FIELD_DEVICE_NAME, deviceName);
+        }
         if (!dfxPaths.isEmpty() ) {
             JSONArray dfxPathsArray = new JSONArray();
             for (String rpCellName : dfxPaths)
@@ -452,6 +458,9 @@ public class NOCDesign implements Serializable {
             sysProps.put(NOCJSONUtil.JSON_FIELD_DFX_PATHS,dfxPathsArray);
         }
         nocTraffic.put(NOCJSONUtil.JSON_FIELD_SYSTEM_PROPERTIES, sysProps);
+        // Both arrays are written even when empty, as Vivado writes them
+        nocTraffic.put(NOCJSONUtil.JSON_FIELD_CLIENT_INSTANCES, new JSONArray());
+        nocTraffic.put(NOCJSONUtil.JSON_FIELD_PATHS, new JSONArray());
         for (NOCClient nc : getClients().values()) {
             nocTraffic.append(NOCJSONUtil.JSON_FIELD_CLIENT_INSTANCES, nc.toJSONObject());
         }

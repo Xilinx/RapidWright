@@ -24,7 +24,7 @@ from jpype.types import *
 from typing import List, Optional
 import os, urllib.request, platform, shutil
 
-version='2026.1.0'
+version='2026.1.1'
 java_home_var='JAVA_HOME'
 
 def _find_java_home():

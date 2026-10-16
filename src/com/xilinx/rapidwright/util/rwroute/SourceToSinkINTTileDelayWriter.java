@@ -64,6 +64,9 @@ public class SourceToSinkINTTileDelayWriter {
         if (net == null) {
             System.err.println("ERROR: Cannot find net under name " + args[2]);
             return;
+        } else if (net.isStaticNet()) {
+            System.err.println("ERROR: No route delays to report for static net " + net.getName());
+            return;
         } else if (!net.hasPIPs()) {
             System.err.println("ERROR: No PIPs found of net " + net.getName());
             return;

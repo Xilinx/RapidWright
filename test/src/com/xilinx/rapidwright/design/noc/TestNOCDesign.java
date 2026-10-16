@@ -23,11 +23,15 @@
 
 package com.xilinx.rapidwright.design.noc;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.json.JSONObject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -129,5 +133,42 @@ public class TestNOCDesign {
                 Assertions.assertEquals(goldCh.getRequiredLatency(),testCh.getRequiredLatency());
             }
         }
+    }
+
+    /**
+     * A design without NOC clients, such as a reconfigurable module, has a traffic file with no logical
+     * instances or paths. What RapidWright writes for it must be readable again, by RapidWright as well.
+     */
+    @Test
+    public void testTrafficWithoutClients() {
+        String vivadoTraffic = "{\n"
+                + "  \"SystemProperties\": {\"Frequency\": 960, \"DeviceName\": \"xcvp1902\"},\n"
+                + "  \"LogicalInstances\": [],\n"
+                + "  \"Paths\": []\n"
+                + "}";
+        NOCDesign noc = new NOCDesign();
+        noc.loadTraffic(new ByteArrayInputStream(vivadoTraffic.getBytes(StandardCharsets.UTF_8)));
+        Assertions.assertEquals(960, noc.getFrequency());
+        Assertions.assertTrue(noc.getClients().isEmpty());
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        noc.writeTraffic(out);
+        JSONObject written = new JSONObject(out.toString(StandardCharsets.UTF_8));
+        Assertions.assertTrue(written.getJSONArray("LogicalInstances").length() == 0);
+        Assertions.assertTrue(written.getJSONArray("Paths").length() == 0);
+        Assertions.assertEquals(960, written.getJSONObject("SystemProperties").getInt("Frequency"));
+        Assertions.assertEquals("xcvp1902", written.getJSONObject("SystemProperties").getString("DeviceName"));
+
+        NOCDesign reread = new NOCDesign();
+        reread.loadTraffic(new ByteArrayInputStream(out.toByteArray()));
+        Assertions.assertEquals(960, reread.getFrequency());
+        Assertions.assertTrue(reread.getClients().isEmpty());
+
+        // Without the arrays at all, as RapidWright wrote them before
+        NOCDesign old = new NOCDesign();
+        old.loadTraffic(new ByteArrayInputStream("{\"SystemProperties\": {\"Frequency\": 1000}}"
+                .getBytes(StandardCharsets.UTF_8)));
+        Assertions.assertTrue(old.getClients().isEmpty());
+        Assertions.assertTrue(old.getAllConnections().isEmpty());
     }
 }

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -902,197 +902,497 @@ public class DesignTools {
     }
 
     /**
-     * NOTE: This method is not fully tested. Populates a black box in a netlist
-     * with the provided design. This method most closely resembles the Vivado
-     * command {@code read_checkpoint -cell <cell name> <DCP Name>}
+     * Populates a black box in a netlist with the provided design.
+     * This method most closely resembles the Vivado command {@code read_checkpoint -cell <cell name> <DCP Name>}
      * 
      * @param design               The top level design
      * @param hierarchicalCellName Name of the black box in the design netlist.
      * @param cell                 The 'guts' to be inserted into the black box
-     * 
      */
     public static void populateBlackBox(Design design, String hierarchicalCellName, Design cell) {
         populateBlackBox(design, hierarchicalCellName, cell, false);
     }
 
     /**
-     * NOTE: This method is not fully tested. Populates a black box in a netlist
-     * with the provided design. This method most closely resembles the Vivado
-     * command {@code read_checkpoint -cell <cell name> <DCP Name>}
+     * Populates a black box in a netlist with the provided design.
+     * This method most closely resembles the Vivado command {@code read_checkpoint -cell <cell name> <DCP Name>}
      * 
      * @param design               The top level design
      * @param hierarchicalCellName Name of the black box in the design netlist.
      * @param cell                 The 'guts' to be inserted into the black box
-     * @param keepBoundaryRouting  Preserves the routing on the boundaries of the
-     *                             black box.
+     * @param keepBoundaryRouting  Preserves the routing on the boundaries of the black box, as
+     *                             {@link #populateBlackBox(Design, Map, boolean)} describes.
      */
     public static void populateBlackBox(Design design, String hierarchicalCellName, Design cell,
             boolean keepBoundaryRouting) {
-        EDIFNetlist netlist = design.getNetlist();
+        populateBlackBox(design, Collections.singletonMap(hierarchicalCellName, cell),
+                keepBoundaryRouting);
+    }
 
-        // Populate Logical Netlist into cell
-        EDIFCellInst inst = netlist.getCellInstFromHierName(hierarchicalCellName);
-        if (!inst.isBlackBox()) {
-            System.err.println("ERROR: The cell instance " + hierarchicalCellName + " is not a black box.");
+    /**
+     * Populates a set of black boxes in a netlist with the provided designs,
+     * as {@link #populateBlackBox(Design, String, Design, boolean)} does for a
+     * single one. Filling them together is not just a convenience: every black box port is resolved
+     * before the netlist changes, in the parent net maps the inputs arrive with, and no parent net
+     * map is built after that. Filling them one at a time instead has each call after the first
+     * rebuild the design's map, which the call before it had to drop.
+     * <p>
+     * {@code design} and every Design in {@code blackBoxes} must arrive with every physical net
+     * named after its source -- in the design, a black box output counts as the source of the net
+     * attached to it. Calling {@link #makePhysNetNamesConsistent(Design)} on each beforehand
+     * ensures this, as does an earlier call to this method for the design. That is what lets both
+     * sides of every port be found by name, in each netlist's parent net map, which is built first
+     * if it is not already. This is not checked: a physical net held under any other name is
+     * missed, and its signal left split across two physical nets.
+     * <p>
+     * Only the physical nets on a signal that crosses a black box port are touched. Those on each
+     * such signal, from whichever side, are merged onto the one named after the signal's source
+     * once the boxes are filled -- or, having nothing on them to move, simply removed. A signal
+     * that nothing drives has no source to name a net after, so its nets are left where they are,
+     * as is every net in the design not on such a signal. The design's parent net map is dropped,
+     * since the netlist has changed, and left for whichever caller next needs it to rebuild.
+     * <p>
+     * Every entry is vetted before anything is modified, but there is no rollback once insertion has
+     * begun: a failure part way through -- a site overlap, say -- leaves the boxes filled so far in
+     * place, and the logical netlist of all of them already swapped in.
+     * <p>
+     * Nets are only recorded if tracking is enabled on the design before this is called, with
+     * {@link Design#setTrackNetChanges(boolean)} or {@link Design#setTrackingChanges(boolean)}.
+     * Every net this touches is then recorded, and no net outside that record is altered here, so a
+     * caller that needs to operate on the result can start from {@link Design#getModifiedNets()}.
+     * That record is cumulative: it also holds any net recorded by earlier operations, until
+     * emptied with {@link Design#clearTrackedChanges()}.
+     *
+     * @param design              The top level design
+     * @param blackBoxes          The 'guts' to be inserted, keyed by the hierarchical name of the
+     *                            black box in the design netlist that each belongs in. A given
+     *                            Design may appear only once, since its contents are moved into the
+     *                            top level design rather than copied.
+     * @param keepBoundaryRouting Preserves the routing on the boundaries of the black boxes. If
+     *                            false, the net each signal crossing a black box port ends up on
+     *                            is unrouted in its entirety, whether or not the circuit uses that
+     *                            port. The exception is a port tied to a constant: the design's
+     *                            GND or VCC net is unrouted, in its entirety, only if a net on that
+     *                            port is merged onto it, and not for a port merely tied to it.
+     */
+    public static void populateBlackBox(Design design, Map<String, Design> blackBoxes,
+            boolean keepBoundaryRouting) {
+        // Nothing to fill, so return before the unused cell cleanup and static net lookups below,
+        // which would otherwise still modify the design
+        if (blackBoxes.isEmpty()) {
             return;
         }
-        if (!inst.getCellType().hasCompatibleInterface(cell.getTopEDIFCell())) {
-            throw new RuntimeException(createInformativeCellInterfaceMismatchMessage(
-                    hierarchicalCellName, inst.getCellType(), cell.getTopEDIFCell()));
+
+        EDIFNetlist netlist = design.getNetlist();
+
+        // Every entry is vetted before anything is modified, so that bad input cannot leave the
+        // design with the other boxes already inserted
+        Map<String, EDIFHierCellInst> insts = new HashMap<>();
+        Map<Design, String> firstUseOf = new IdentityHashMap<>();
+        Map<EDIFCellInst, String> firstFillOf = new IdentityHashMap<>();
+        for (Entry<String, Design> e : blackBoxes.entrySet()) {
+            String hierarchicalCellName = e.getKey();
+            Design cell = e.getValue();
+            EDIFHierCellInst hierInst = netlist.getHierCellInstFromName(hierarchicalCellName);
+            if (hierInst == null) {
+                throw new RuntimeException("ERROR: The cell instance " + hierarchicalCellName
+                        + " does not exist.");
+            }
+            EDIFCellInst inst = hierInst.getInst();
+            if (!inst.isBlackBox()) {
+                throw new RuntimeException("ERROR: The cell instance " + hierarchicalCellName
+                        + " is not a black box.");
+            }
+            if (!inst.getCellType().hasCompatibleInterface(cell.getTopEDIFCell())) {
+                throw new RuntimeException(createInformativeCellInterfaceMismatchMessage(
+                        hierarchicalCellName, inst.getCellType(), cell.getTopEDIFCell()));
+            }
+            // A Design's cells and site instances are moved into the top level design rather than
+            // copied, so a second box given the same Design would be handed content that the first
+            // has already taken and renamed
+            String firstUse = firstUseOf.put(cell, hierarchicalCellName);
+            if (firstUse != null) {
+                throw new RuntimeException("ERROR: The same Design was provided for black boxes '"
+                        + firstUse + "' and '" + hierarchicalCellName + "'.");
+            }
+            // In a netlist that is not uniquified, two hierarchical names can lead to the same cell
+            // instance, and filling it for one would fill it for the other as well
+            String firstFill = firstFillOf.put(inst, hierarchicalCellName);
+            if (firstFill != null) {
+                throw new RuntimeException("ERROR: Black boxes '" + firstFill + "' and '"
+                        + hierarchicalCellName + "' are the same cell instance.");
+            }
+            insts.put(hierarchicalCellName, hierInst);
         }
 
-        inst.getCellType().getLibrary().removeCell(inst.getCellType());
-        netlist.migrateCellAndSubCells(cell.getTopEDIFCell(), true);
-        inst.setCellType(cell.getTopEDIFCell());
+        // Both sides of every black box port are looked up now, in the parent net maps of the shell
+        // and of each circuit, while those still describe them: nothing after the logical merge
+        // below builds a parent net map. Each side is recorded by the name of its parent net,
+        // which is also the name of its physical net since the inputs are named consistently, a
+        // circuit's being prefixed as it will be once moved in. The parent that matters is found on
+        // the side that drives the port -- the shell's for an input, the circuit's for an output --
+        // and is recorded as the parent of the net on the other side. Where that parent is only
+        // another black box port in this batch -- for a signal straight through a circuit, back
+        // into the box that drives it, or from one box into another -- it is resolved further,
+        // through that port's own entry, once every port has been looked up
+        Map<String, String> portParents = new HashMap<>();
+        // Parents that nothing drives
+        Set<String> undriven = new HashSet<>();
+        // Every name found on a port, each once however many ports it is on
+        Set<String> portNames = new HashSet<>();
+        for (Entry<String, Design> e : blackBoxes.entrySet()) {
+            String cellPrefix = e.getKey() + EDIFTools.EDIF_HIER_SEP;
+            EDIFHierCellInst hierInst = insts.get(e.getKey());
+            EDIFNetlist cellNetlist = e.getValue().getNetlist();
+            for (EDIFPortInst portInst : hierInst.getInst().getPortInsts()) {
+                // A port the shell leaves unconnected carries nothing across the boundary
+                EDIFNet outerNet = portInst.getNet();
+                if (outerNet == null) continue;
+                EDIFHierNet outer = new EDIFHierNet(hierInst.getParent(), outerNet);
+                EDIFHierNet shellOwner = netlist.getParentNet(outer);
+                String shellName = shellOwner != null ? getOwnerName(shellOwner, "")
+                        : outer.getHierarchicalNetName();
+                portNames.add(shellName);
+                EDIFNet innerNet = cellNetlist.getTopCell().getInternalNet(portInst.getName());
+                if (shellOwner == null || (innerNet == null && portInst.isOutput())) {
+                    undriven.add(shellName);
+                }
+                if (innerNet == null) continue;
+                EDIFHierNet inner = new EDIFHierNet(cellNetlist.getTopHierCellInst(), innerNet);
+                EDIFHierNet innerOwner = cellNetlist.getParentNet(inner);
+                String innerName = innerOwner != null ? getOwnerName(innerOwner, cellPrefix)
+                        : cellPrefix + inner.getHierarchicalNetName();
+                portNames.add(innerName);
+                if (innerOwner == null) {
+                    undriven.add(innerName);
+                }
+                // An inout has no direction to go by, so it is the circuit that drives it if
+                // anything inside it does
+                boolean circuitDrives = portInst.isOutput() || (!portInst.isInput()
+                        && innerOwner != null
+                        && !innerOwner.getNet().getSourcePortInsts(false).isEmpty());
+                String from = circuitDrives ? shellName : innerName;
+                String to = circuitDrives ? innerName : shellName;
+                String previous = portParents.put(from, to);
+                if (NetType.getNetTypeFromNetName(from).isStaticNetType()
+                        || (previous != null && !previous.equals(to))) {
+                    throw new RuntimeException("ERROR: The signal on black box port '" + e.getKey()
+                            + EDIFTools.EDIF_HIER_SEP + portInst.getName() + "' has more than one"
+                            + " source.");
+                }
+            }
+        }
+
+        // Populate Logical Netlist into cells. This loop and the physical ones below all walk
+        // blackBoxes rather than insts, so that the boxes are filled in whatever order the caller
+        // gave them in and not in the hash order of their names. The placeholder cells are left in
+        // their libraries here, since one may be shared with another black box -- in this batch or
+        // not -- and removing it would orphan that box's cell type. Any placeholder left unused is
+        // removed below, at the cost of a filling whose name clashes with a placeholder still in
+        // place being uniquified by migrateCellAndSubCells()
+        for (Entry<String, Design> e : blackBoxes.entrySet()) {
+            EDIFCellInst inst = insts.get(e.getKey()).getInst();
+            EDIFCell cellType = e.getValue().getTopEDIFCell();
+            netlist.migrateCellAndSubCells(cellType, true);
+            inst.setCellType(cellType);
+        }
         netlist.removeUnusedCellsFromAllWorkLibraries();
 
+        // The logical netlist is final from here on, so the cached parent net map -- which describes
+        // the black boxes as they were, empty -- can be dropped now. Nothing below builds it again:
+        // every owner needed was recorded above, and a caller that wants the map pays for it
+        netlist.resetParentNetMap();
+
+        Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
+
         // Static source pins displaced by the incoming site instances. They cannot be removed as they
-        // are found since unrouting a static net walks its pins, so they are collected and taken off in
-        // one batch once every site instance is in
+        // are found since unrouting a static net walks its pins, so they are collected and taken off
+        // in one batch once every site instance of every box is in. Trimming them per box instead
+        // would, from the second box on, compute against static routing an earlier box had merged in
         Map<Net, Set<SitePinInst>> deferredRemovals = new HashMap<>();
+        List<SiteInst> evictedSiteInsts = new ArrayList<>();
 
         // Add placement information
         // We need to prefix all cell and net names with the hierarchicalCellName as a prefix
-        Net vcc = design.getVccNet();
-        Net gnd = design.getGndNet();
-        Net vccCell = cell.getVccNet();
-        Net gndCell = cell.getGndNet();
-        for (SiteInst si : cell.getSiteInsts()) {
-            for (Cell c : new ArrayList<Cell>(si.getCells())) {
-                c.updateName(hierarchicalCellName + "/" + c.getName());
-                if (!c.isRoutethru())
-                    design.addCell(c);
-                else {
-                    for (Entry<String, AltPinMapping> p : c.getAltPinMappings().entrySet()) {
-                        p.getValue().setAltCellName(hierarchicalCellName + "/" + p.getValue().getAltCellName());
+        for (Entry<String, Design> e : blackBoxes.entrySet()) {
+            String hierarchicalCellName = e.getKey();
+            Design cell = e.getValue();
+            Net vccCell = cell.getVccNet();
+            Net gndCell = cell.getGndNet();
+            for (SiteInst si : cell.getSiteInsts()) {
+                for (Cell c : new ArrayList<>(si.getCells())) {
+                    c.updateName(hierarchicalCellName + "/" + c.getName());
+                    if (!c.isRoutethru())
+                        design.addCell(c);
+                    else {
+                        for (Entry<String, AltPinMapping> p : c.getAltPinMappings().entrySet()) {
+                            p.getValue().setAltCellName(hierarchicalCellName + "/" + p.getValue().getAltCellName());
+                        }
                     }
                 }
-            }
 
-            // Nothing but a static source is expected to be sitting on a site the black box covers,
-            // since the site was given to the circuit by the placer on the strength of it being free
-            SiteInst existingSi = design.getSiteInstFromSite(si.getSite());
-            if (existingSi != null) {
-                if (!existingSi.getName().startsWith(SiteInst.STATIC_SOURCE)) {
-                    throw new RuntimeException("ERROR: Site overlap at " + existingSi.getSiteName() + " when populating blackbox '" + hierarchicalCellName + "'");
+                // Nothing but a static source is expected to be sitting on a site the black box covers,
+                // since the site was given to the circuit by the placer on the strength of it being free
+                SiteInst existingSi = design.getSiteInstFromSite(si.getSite());
+                if (existingSi != null) {
+                    if (!existingSi.getName().startsWith(SiteInst.STATIC_SOURCE)) {
+                        throw new RuntimeException("ERROR: Site overlap at " + existingSi.getSiteName() + " when populating blackbox '" + hierarchicalCellName + "'");
+                    }
+                    // Cell is only allowed to evict STATIC_SOURCEs -- but we have to unroute all
+                    // static trees affected by its evicted output pins
+                    // TODO: In the future, perhaps we can port the mutually exclusive parts
+                    //       of the static source into the cell SiteInst?
+                    for (SitePinInst spi : existingSi.getSitePinInsts()) {
+                        assert(spi.isOutPin());
+                        Net net = spi.getNet();
+                        assert(net.isStaticNet());
+                        deferredRemovals.computeIfAbsent(net, (p) -> new HashSet<>()).add(spi);
+                    }
+
+                    // TEMPORARY WORKAROUND, part 1 of 2: remember what addSiteInst() below is
+                    // about to displace. It cannot be untracked here, because batchRemoveSitePins()
+                    // at the end of this method takes its pins and marks it again
+                    evictedSiteInsts.add(existingSi);
                 }
-                // Cell is only allowed to evict STATIC_SOURCEs -- but we have to unroute all
-                // static trees affected by its evicted output pins
-                // TODO: In the future, perhaps we can port the mutually exclusive parts
-                //       of the static source into the cell SiteInst?
-                for (SitePinInst spi : existingSi.getSitePinInsts()) {
-                    assert(spi.isOutPin());
-                    Net net = spi.getNet();
-                    assert(net.isStaticNet());
-                    deferredRemovals.computeIfAbsent(net, (p) -> new HashSet<>()).add(spi);
+
+                design.addSiteInst(si);
+
+                // Update GND/VCC site routing to point to destination design's GND/VCC nets. The
+                // circuit's static nets have the same names as the design's, which matters: were
+                // they to differ, routeIntraSiteNet() would rebuild the parent net map, to resolve
+                // the name of the net it is displacing
+                for (String siteWire : si.getSiteWiresFromNet(vccCell)) {
+                    BELPin pin = si.getSiteWirePins(siteWire)[0];
+                    si.routeIntraSiteNet(vcc, pin, pin);
                 }
-            }
-
-            design.addSiteInst(si);
-
-            // Update GND/VCC site routing to point to destination design's GND/VCC nets
-            for (String siteWire : si.getSiteWiresFromNet(vccCell)) {
-                BELPin pin = si.getSiteWirePins(siteWire)[0];
-                si.routeIntraSiteNet(vcc, pin, pin);
-            }
-            for (String siteWire : si.getSiteWiresFromNet(gndCell)) {
-                BELPin pin = si.getSiteWirePins(siteWire)[0];
-                si.routeIntraSiteNet(gnd, pin, pin);
+                for (String siteWire : si.getSiteWiresFromNet(gndCell)) {
+                    BELPin pin = si.getSiteWirePins(siteWire)[0];
+                    si.routeIntraSiteNet(gnd, pin, pin);
+                }
             }
         }
 
         // Only the branches feeding the displaced pins come out; the rest of each static net is left
-        // alone. This has to happen before the routing below merges the circuit's own static pins in
+        // alone. This has to happen before the routing below merges the circuits' own static pins in
         boolean preserveOtherRoutes = true;
         DesignTools.batchRemoveSitePins(deferredRemovals, preserveOtherRoutes);
 
+        // TEMPORARY WORKAROUND, part 2 of 2. addSiteInst() displaced each of these from the design,
+        // but left it in the change tracking - which marked it again just above, as its pins were
+        // taken. It is then a SiteInst that getModifiedSiteInsts() holds and getSiteInsts() does
+        // not, so whoever walks the modified set - BitGenerator, for one - reads a site the design
+        // no longer owns, alongside the live SiteInst for that same site. Two entries for one site
+        // means two writers of its configuration bits, and which one lands last depends on the
+        // iteration order of the modified set, which changes as the set grows and rehashes.
+        // The proper fix belongs in Design.addSiteInst(), which should treat displacing an
+        // existing SiteInst as a tracked removal, so that no caller has to remember to do this.
+        for (SiteInst evicted : evictedSiteInsts) {
+            design.getModifiedSiteInsts().remove(evicted);
+            design.getOriginalSiteInsts().remove(evicted.getName());
+        }
+
         // Add routing information
-        for (Net net : new ArrayList<>(cell.getNets())) {
-            if (net.getName().equals(Net.USED_NET)) continue;
-            if (net.isStaticNet()) {
-                Net staticNet = design.getStaticNet(net.getType());
-                staticNet.addPins((ArrayList<SitePinInst>)net.getPins());
-                HashSet<PIP> uniquePIPs = new HashSet<PIP>(net.getPIPs());
-                uniquePIPs.addAll(staticNet.getPIPs());
-                staticNet.setPIPs(uniquePIPs);
-            } else {
-                net.updateName(hierarchicalCellName + "/" + net.getName());
-                design.addNet(net);
+        for (Entry<String, Design> e : blackBoxes.entrySet()) {
+            String hierarchicalCellName = e.getKey();
+            Design cell = e.getValue();
+
+            final String cellPrefix = hierarchicalCellName + EDIFTools.EDIF_HIER_SEP;
+            for (Net net : new ArrayList<>(cell.getNets())) {
+                if (net.getName().equals(Net.USED_NET)) continue;
+                if (net.isStaticNet()) {
+                    Net staticNet = design.getStaticNet(net.getType());
+                    staticNet.addPins(net.getPins());
+                    // TEMPORARY WORKAROUND: as in mergeOntoNet(), a pin move alone leaves the
+                    // destination unmarked. setPIPs() below marks it whenever the circuit brought
+                    // routing with it, but not when it brought only pins
+                    markModified(design, staticNet);
+                    HashSet<PIP> uniquePIPs = new HashSet<>(net.getPIPs());
+                    uniquePIPs.addAll(staticNet.getPIPs());
+                    staticNet.setPIPs(uniquePIPs);
+                } else {
+                    // rename() acts on whichever design currently owns the net, so this re-keys the
+                    // circuit the net arrived from and addNet() then inserts it into the shell under
+                    // the prefixed name. The other order would put it into the shell under its
+                    // unprefixed name first, displacing any net the shell already has by that name.
+                    renameNet(net, cellPrefix + net.getName());
+                    design.addNet(net);
+                }
+            }
+
+            if (cell.getNetlist().hasEncryptedCells()) {
+                design.getNetlist().addEncryptedCells(cell.getNetlist().getEncryptedCells());
             }
         }
 
-        // Rectify boundary nets
-        netlist.resetParentNetMap();
-
-        postBlackBoxCleanup(hierarchicalCellName, design, keepBoundaryRouting);
-
-        if (cell.getNetlist().hasEncryptedCells()) {
-            design.getNetlist().addEncryptedCells(cell.getNetlist().getEncryptedCells());
+        // Each net on a port is merged onto its parent's physical net, resolved through any black
+        // box ports in between; one whose parent nothing drives is left where it is. With the
+        // boundary routing discarded, every net on these signals -- parent or not -- is unrouted
+        // as soon as it is reached, before anything is merged onto it or it onto anything, so that
+        // no routing is left to carry across. The design's GND or VCC net is the exception: it is
+        // unrouted, in its entirety, only when something is merged onto it, a port merely tied to
+        // a constant not being reason enough
+        for (String name : portNames) {
+            String parent = resolveParent(portParents, undriven, name);
+            Net net = design.getNet(name);
+            Net target = parent != null ? design.getNet(parent) : null;
+            boolean toMerge = parent != null && !parent.equals(name) && net != null;
+            if (!keepBoundaryRouting) {
+                unrouteSignalNet(net);
+                unrouteSignalNet(target);
+            }
+            if (!toMerge) continue;
+            if (!hasPhysicalPresence(net)) {
+                // Nothing to move, so the net is simply removed rather than left behind as an
+                // alias of its parent
+                design.removeNet(net);
+                // TEMPORARY WORKAROUND: the design has stopped holding this net, but the change
+                // tracking still has it
+                untrackRemovedNet(design, net);
+                continue;
+            }
+            if (target == null) {
+                // The parent has no physical net yet, so this one becomes it
+                renameNet(net, parent);
+                continue;
+            }
+            if (!keepBoundaryRouting && target.isStaticNet()) {
+                target.unroute();
+            }
+            mergeOntoNet(design, net, target);
         }
     }
 
     /**
-     * Attempts to rename boundary nets around the previous blackbox to follow
-     * naming convention (net is named after source).
-     * 
-     * @param hierCellName        The hierarchical cell instance that was previously
-     *                            a black box
-     * @param design              The current design.
-     * @param keepBoundaryRouting Preserves the routing on the boundaries of the
-     *                            black box.
+     * Unroutes a net on a signal crossing a black box port, unless it is the design's GND or VCC
+     * net or has nothing on it. A net reached through several ports is unrouted each time, which
+     * costs no more than walking its pins again.
+     *
+     * @param net The net, or null.
      */
-    public static void postBlackBoxCleanup(String hierCellName, Design design, boolean keepBoundaryRouting) {
-        EDIFNetlist netlist = design.getNetlist();
-        EDIFHierCellInst inst = netlist.getHierCellInstFromName(hierCellName);
-        final EDIFHierCellInst parentInst = inst.getParent();
+    private static void unrouteSignalNet(Net net) {
+        if (net == null || net.isStaticNet() || !hasPhysicalPresence(net)) return;
+        net.unroute();
+    }
 
-        // for each port on the black box,
-        //   iterate over all the nets and regularize on the proper net name for the physical
-        //   net.  Put all physical pins on the correct physical net once the black box has been
-        //   updated.
-        for (EDIFPortInst portInst : inst.getInst().getPortInsts()) {
-            EDIFNet net = portInst.getNet();
-            EDIFHierNet hierNet = new EDIFHierNet(parentInst, net);
-            Net parentNet;
-            if (net.isGND()) {
-                parentNet = design.getGndNet();
-            } else if (net.isVCC()) {
-                parentNet = design.getVccNet();
-            } else {
-                EDIFHierNet parentHierName = netlist.getParentNet(hierNet);
-                parentNet = design.getNet(parentHierName.getHierarchicalNetName());
-                if (parentNet == null) {
-                    parentNet = new Net(parentHierName);
-                }
-            }
-            for (EDIFHierNet netAlias : netlist.getNetAliases(hierNet)) {
-                if (parentNet.getName().equals(netAlias.getHierarchicalNetName())) continue;
-                Net alias = design.getNet(netAlias.getHierarchicalNetName());
-                if (alias != null) {
-                    // Move this non-parent net physical information to the parent
-                    for (SiteInst si : new ArrayList<>(alias.getSiteInsts())) {
-                        List<String> siteWires = si.getSiteWiresFromNet(alias);
-                        if (siteWires != null) {
-                            for (String siteWire : new ArrayList<>(siteWires)) {
-                                BELPin belPin = si.getSite().getBELPins(siteWire)[0];
-                                si.unrouteIntraSiteNet(belPin, belPin);
-                                si.routeIntraSiteNet(parentNet, belPin, belPin);
-                            }
-                        }
-                    }
-                    if (keepBoundaryRouting) {
-                        for (PIP p : alias.getPIPs()) {
-                            parentNet.addPIP(p);
-                        }
-                    }
-                    for (SitePinInst pin : new ArrayList<SitePinInst>(alias.getPins())) {
-                        alias.removePin(pin);
-                        parentNet.addPin(pin);
-                    }
-                    if (!keepBoundaryRouting) alias.unroute();
-                }
-            }
-            if (!keepBoundaryRouting) parentNet.unroute();
+    /**
+     * @param net A physical net.
+     * @return True if it has any pins, site routing or PIPs, false if there is nothing on it.
+     */
+    private static boolean hasPhysicalPresence(Net net) {
+        return !net.getPins().isEmpty() || !net.getSiteInsts().isEmpty() || net.hasPIPs();
+    }
+
+    /**
+     * Gets the name of the physical net that a logical net is held under, the design being
+     * consistently named: that of the design's GND or VCC net for a constant, and otherwise that of
+     * the logical net itself.
+     *
+     * @param net    The logical net, the owner of whatever signal it is on.
+     * @param prefix Prepended to a name that is not a constant's, for a circuit's net that is to be
+     *               moved into a black box.
+     * @return The physical net's name.
+     */
+    private static String getOwnerName(EDIFHierNet net, String prefix) {
+        NetType type = net.getNet().getPhysStaticSourceType();
+        if (type == NetType.GND) return Net.GND_NET;
+        if (type == NetType.VCC) return Net.VCC_NET;
+        return prefix + net.getHierarchicalNetName();
+    }
+
+    /**
+     * Resolves the parent of a net on a black box port, now that the black boxes are filled. Each
+     * port's parent was found in the parent net map of the side that drives it, and is usually the
+     * answer. It is not where that parent is only the net on another black box port in this batch,
+     * since that map treated the box as a leaf and its port as the source: then that port's own
+     * parent is taken instead, and so on, iteratively, until a parent is not on such a port. This
+     * consults no parent net map and walks no netlist, taking one step per port the signal
+     * crosses.
+     *
+     * @param portParents The parent each port found for the net on its other side, by name.
+     * @param undriven    Parents that nothing drives.
+     * @param name        The net's name.
+     * @return The name of the resolved parent, or null if nothing drives it -- including if the
+     *         parents lead round in a loop.
+     */
+    private static String resolveParent(Map<String, String> portParents, Set<String> undriven,
+            String name) {
+        // A chain that does not loop takes at most one step per link, so one that takes more has
+        // come round to a name it already passed
+        int steps = 0;
+        for (String next = portParents.get(name); next != null; next = portParents.get(name)) {
+            if (++steps > portParents.size()) return null;
+            name = next;
+        }
+        return undriven.contains(name) ? null : name;
+    }
+
+    private static void renameNet(Net net, String name) {
+        if (!net.rename(name)) {
+            throw new RuntimeException("ERROR: Failed to rename net '" + net.getName() + "' to '"
+                    + name + "'.");
+        }
+    }
+
+    /**
+     * Merges one physical net onto another on the same signal, deleting it. The merge itself only
+     * moves pins and site routing, so the net's PIPs, if it still has any, are moved across here.
+     * Where routing is to be discarded, the caller unroutes the net first, leaving none.
+     *
+     * @param design The current design.
+     * @param net    The net to merge away.
+     * @param target The net to merge it onto.
+     */
+    private static void mergeOntoNet(Design design, Net net, Net target) {
+        // Deleting the net leaves its PIPs where they are, so they can be read afterwards. They are
+        // added one by one rather than the list handed over, which would leave the deleted net and
+        // the target sharing it
+        design.movePinsToNewNetDeleteOldNet(net, target, true);
+        // TEMPORARY WORKAROUND: moving pins onto a net does not mark it as modified -- only a
+        // change to its routing does -- so a target that keeps its own routing and merely gains
+        // the merged net's pins is left unmarked. With boundary routing preserved that is the
+        // common case: the clock gains hundreds of pins and not one PIP. Mark it here, so that
+        // getModifiedNets() holds every net this touched rather than only those whose PIPs moved.
+        // The fix belongs in whatever marks a Net modified, which should count a pin move too.
+        markModified(design, target);
+        for (PIP p : net.getPIPs()) {
+            target.addPIP(p);
+        }
+
+        // TEMPORARY WORKAROUND: the design has stopped holding this net, but the change tracking
+        // still has it. This cannot be done any earlier: taking its pins above marks it again
+        untrackRemovedNet(design, net);
+    }
+
+    /**
+     * TEMPORARY WORKAROUND: takes a net the design has stopped holding out of the change tracking,
+     * putting what it was routed with into the original state on the way.
+     *
+     * Without this, getModifiedNets() holds nets getNets() does not, and whoever walks the modified
+     * set -- an incremental bitstream writer, for one -- reads a net that no longer exists. The
+     * routing has to be kept, rather than simply dropped, or those PIPs are left turned on with
+     * nothing owning them. Deleting a net leaves its PIPs where they are, so they can still be read
+     * here. putIfAbsent keeps an earlier snapshot, which is the truer original.
+     *
+     * The fix belongs in whatever deletes a Net, which should move it to the original state itself.
+     */
+    private static void untrackRemovedNet(Design design, Net net) {
+        if (!design.isTrackingNetChanges()) {
+            return;
+        }
+        if (design.isCopyingOriginalNetsRouting() && !net.getPIPs().isEmpty()) {
+            design.getOriginalNetRouting().putIfAbsent(net.getName(), new ArrayList<>(net.getPIPs()));
+        }
+        design.getModifiedNets().remove(net);
+    }
+
+    /**
+     * TEMPORARY WORKAROUND: marks a net as modified, for a change that the design's own change
+     * tracking does not notice. See the call sites.
+     */
+    private static void markModified(Design design, Net net) {
+        if (design.isTrackingNetChanges()) {
+            design.addModifiedNet(net);
         }
     }
 
@@ -2266,6 +2566,11 @@ public class DesignTools {
         EDIFNetlist netlist = design.getNetlist();
         List<EDIFHierPortInst> physPins = netlist.getPhysicalPins(net);
         List<SitePinInst> newPins = new ArrayList<>();
+        // A net the netlist knows nothing about, or one with a physical pin that has no Cell behind
+        // it -- a pin inside encrypted IP, or under a black box -- is one the logical walk below can
+        // say nothing about, so its site wires have to be walked instead
+        boolean walkSiteWires;
+
         if (physPins == null) {
             // Assert that this physical net is a parent logical net
             EDIFHierNet hierNet;
@@ -2275,21 +2580,102 @@ public class DesignTools {
 
             // Likely net inside encrypted IP, let's see if we can infer anything from existing
             // physical description
+            walkSiteWires = true;
+        } else {
+            walkSiteWires = false;
+
+            for (EDIFHierPortInst p :  physPins) {
+                EDIFCell ec = p.getCellType();
+                assert(ec.isLeafCellOrBlackBox());
+                if (!ec.isPrimitive()) {
+                    walkSiteWires = true;
+                    continue;
+                }
+                if (ec.isVCCSource() || ec.isGNDSource()) {
+                    continue;
+                }
+                Cell c = design.getCell(p.getFullHierarchicalInstName());
+                if (c == null) {
+                    // A logical leaf cell that hasn't had its physical Cell object created yet (and is thus unplaced)
+                    continue;
+                }
+                BEL bel = c.getBEL();
+                if (bel == null) continue;
+                String logicalPinName = p.getPortInst().getName();
+                Set<String> physPinMappings;
+                // Need to synchronize on the cell since its internally cached logical-to-physical map is computed lazily
+                synchronized (c) {
+                    physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
+                }
+                // BRAMs can have two (or more) physical pin mappings for a logical pin
+                if (physPinMappings != null) {
+                    SiteInst si = c.getSiteInst();
+                    for (String physPin : physPinMappings) {
+                        BELPin belPin = bel.getPin(physPin);
+                        // Use the net attached to the phys pin
+                        // This call (a read operation) does not need to be synchronized since it is assumed that this thread
+                        // is the only one that performs (i.e. modifies) intra-site routing for this net (or its aliases)
+                        Net siteWireNet = si.getNetFromSiteWire(belPin.getSiteWireName());
+                        if (siteWireNet == null) {
+                            if (isVersal && net.isStaticNet() && bel.isLUT()) {
+                                siteWireNet = net;
+                                synchronized (si) {
+                                    si.routeIntraSiteNet(net, belPin, belPin);
+                                }
+                            } else {
+                                continue;
+                            }
+                        }
+                        if (siteWireNet != net && !siteWireNet.isStaticNet()) {
+                            EDIFHierNet hierNet = null;
+                            assert((hierNet = net.getLogicalHierNet()) == null || hierNet.equals(netlist.getParentNet(hierNet)));
+                            if (hierNet != null) {
+                                EDIFHierNet siteWireHierNet = null;
+                                assert((siteWireHierNet = siteWireNet.getLogicalHierNet()) == null || siteWireHierNet.equals(netlist.getParentNet(siteWireHierNet)));
+                                assert(hierNet.equals(siteWireHierNet) || (isNetDrivenByMBUFGCE(hierNet) && isNetDrivenByMBUFGCE(siteWireHierNet)));
+                            }
+                        }
+                        // Similarly, this call (a read operation) does not need to be synchronized since it is assumed that
+                        // this thread is the only one that performs (i.e. modifies) intra-site routing for this net
+                        String sitePinName = getRoutedSitePinFromPhysicalPin(c, siteWireNet, physPin);
+                        if (sitePinName == null) continue;
+                        SitePinInst newPin = createSitePinInst(net, si, sitePinName);
+                        if (newPin != null) {
+                            newPins.add(newPin);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (walkSiteWires) {
+            // Walk the site wires this net occupies rather than its logical pins.  A site pin and the
+            // site wire behind it go by the same name, and the wire is the only description left of a
+            // connection whose Cell cannot be found, since there is nothing to ask for a physical pin
+            // mapping
             for (SiteInst siteInst : net.getSiteInsts()) {
+                int siteWireCount = siteInst.getSiteWires().length;
                 for (int siteWire : siteInst.getSiteWireIndicesFromNet(net)) {
+                    if (siteWire >= siteWireCount) {
+                        // The indices reported here are not indices into the site's site wire array: on
+                        // some site types (e.g. HPIOB, HDIOB, HPIOBDIFFINBUF) they run past the end of it,
+                        // where SiteInst.getSiteWirePins() throws at exactly the count and reports no pins
+                        // above it.  Such a site wire has no site pin to create here either way
+                        // Tracked by https://github.com/Xilinx/RapidWright/pull/1428
+                        continue;
+                    }
                     for (BELPin pin : siteInst.getSiteWirePins(siteWire)) {
                         if (!pin.isSitePort()) {
                             continue;
                         }
 
                         String pinName = pin.getName();
-                        SitePinInst currPin;
-                        synchronized(siteInst) {
-                            currPin = siteInst.getSitePinInst(pinName);
-                        }
-                        if (currPin != null) {
-                            // SitePinInst already exists
-                            continue;
+                        synchronized (siteInst) {
+                            if (siteInst.getSitePinInst(pinName) != null) {
+                                // SitePinInst already exists; checked again by createSitePinInst()
+                                // below, but doing so here avoids the search that follows
+                                continue;
+                            }
                         }
 
                         if (pin.isInput()) {
@@ -2308,79 +2694,41 @@ public class DesignTools {
                             }
                         }
 
-                        synchronized (siteInst) {
-                            currPin = new SitePinInst(pinName, siteInst);
+                        SitePinInst currPin = createSitePinInst(net, siteInst, pinName);
+                        if (currPin != null) {
+                            newPins.add(currPin);
                         }
-                        net.addPin(currPin);
-                        newPins.add(currPin);
-                    }
-                }
-            }
-
-            return newPins;
-        }
-
-        for (EDIFHierPortInst p :  physPins) {
-            Cell c = design.getCell(p.getFullHierarchicalInstName());
-            if (c == null) continue;
-            BEL bel = c.getBEL();
-            if (bel == null) continue;
-            String logicalPinName = p.getPortInst().getName();
-            Set<String> physPinMappings;
-            // Need to synchronize on the cell since its internally cached logical-to-physical map is computed lazily
-            synchronized (c) {
-                physPinMappings = c.getAllPhysicalPinMappings(logicalPinName);
-            }
-            // BRAMs can have two (or more) physical pin mappings for a logical pin
-            if (physPinMappings != null) {
-                SiteInst si = c.getSiteInst();
-                for (String physPin : physPinMappings) {
-                    BELPin belPin = bel.getPin(physPin);
-                    // Use the net attached to the phys pin
-                    // This call (a read operation) does not need to be synchronized since it is assumed that this thread
-                    // is the only one that performs (i.e. modifies) intra-site routing for this net (or its aliases)
-                    Net siteWireNet = si.getNetFromSiteWire(belPin.getSiteWireName());
-                    if (siteWireNet == null) {
-                        if (isVersal && net.isStaticNet() && bel.isLUT()) {
-                            siteWireNet = net;
-                            synchronized (si) {
-                                si.routeIntraSiteNet(net, belPin, belPin);
-                            }
-                        } else {
-                            continue;
-                        }
-                    }
-                    if (siteWireNet != net && !siteWireNet.isStaticNet()) {
-                        EDIFHierNet hierNet = null;
-                        assert((hierNet = net.getLogicalHierNet()) == null || hierNet.equals(netlist.getParentNet(hierNet)));
-                        if (hierNet != null) {
-                            EDIFHierNet siteWireHierNet = null;
-                            assert((siteWireHierNet = siteWireNet.getLogicalHierNet()) == null || siteWireHierNet.equals(netlist.getParentNet(siteWireHierNet)));
-                            assert(hierNet.equals(siteWireHierNet) || (isNetDrivenByMBUFGCE(hierNet) && isNetDrivenByMBUFGCE(siteWireHierNet)));
-                        }
-                    }
-                    SitePinInst newPin;
-                    // Similarly, this call (a read operation) does not need to be synchronized since it is assumed that
-                    // this thread is the only one that performs (i.e. modifies) intra-site routing for this net
-                    String sitePinName = getRoutedSitePinFromPhysicalPin(c, siteWireNet, physPin);
-                    if (sitePinName == null) continue;
-                    synchronized (si) {
-                        newPin = si.getSitePinInst(sitePinName);
-                        if (newPin != null) continue;
-                        if (sitePinName.equals("IO") && Utils.isIOB(si)) {
-                            // Do not create a SitePinInst for the "IO" input site pin of any IOB site,
-                            // since the sitewire it drives is assumed to be driven by the IO PAD.
-                            continue;
-                        }
-                        newPin = net.createPin(sitePinName, si);
-                    }
-                    if (newPin != null) {
-                        newPins.add(newPin);
                     }
                 }
             }
         }
+
         return newPins;
+    }
+
+    /**
+     * Creates a SitePinInst on the given net, unless the site pin already has one or is one that no
+     * SitePinInst is to be created for.  Both descriptions a net can be discovered through --
+     * logical pins and site wires -- create their pins here, so that they agree on what is created.
+     * @param net The net to create the pin on.
+     * @param siteInst The site instance the pin belongs to.
+     * @param sitePinName The name of the site pin.
+     * @return The new pin, or null if none was created.
+     */
+    private static SitePinInst createSitePinInst(Net net, SiteInst siteInst, String sitePinName) {
+        if (Utils.isIOB(siteInst) && sitePinName.equals("IO")) {
+            // Do not create a SitePinInst for the "IO" input site pin of any IOB site,
+            // since the sitewire it drives is assumed to be driven by the IO PAD.
+            return null;
+        }
+        // Net.createPin() throws if the site instance already has a pin of this name, so the check
+        // and the creation must be held under the one lock
+        synchronized (siteInst) {
+            if (siteInst.getSitePinInst(sitePinName) != null) {
+                return null;
+            }
+            return net.createPin(sitePinName, siteInst);
+        }
     }
 
     private static boolean isNetDrivenByMBUFGCE(EDIFHierNet net) {
