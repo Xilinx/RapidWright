@@ -1278,6 +1278,10 @@ public class TestDesignTools {
             Assertions.assertSame(staticNet, design.getNet(circuitStatic.getName()));
         }
         Assertions.assertNull(design.getNet("bb/" + circuitStatic.getName()));
+        // The circuit's static net is detached, so nothing is left referring to it
+        Assertions.assertNull(circuitStatic.getDesign());
+        Assertions.assertNull(circuit.getNet(circuitStatic.getName()));
+        Assertions.assertTrue(circuitStatic.getSiteInsts().isEmpty());
     }
 
     /**

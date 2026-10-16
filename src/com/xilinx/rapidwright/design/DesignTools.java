@@ -1203,10 +1203,13 @@ public class DesignTools {
                 if (net.isStaticNet()) {
                     Net staticNet = design.getStaticNet(net.getType());
                     if (net.getName().equals(staticNet.getName())) {
-                        // The canonical GND/VCC site routing was re-pointed above. Do not delete
-                        // these nets: removeNet() compares nets by name and would clear the moved
-                        // pins' references to the destination net, which has the same name.
-                        staticNet.addPins(net.getPins());
+                        // The canonical GND/VCC site routing was re-pointed above. Detach the
+                        // circuit's net before moving its pins, not after: removeNet() compares
+                        // nets by name and would otherwise clear the moved pins' references to
+                        // the destination net, which has the same name.
+                        List<SitePinInst> pins = new ArrayList<>(net.getPins());
+                        cell.removeNet(net);
+                        staticNet.addPins(pins);
                     } else {
                         // Extra static nets, such as ".../<const0>", still need their site
                         // routing moved. Remove the old net from its owning circuit only.
