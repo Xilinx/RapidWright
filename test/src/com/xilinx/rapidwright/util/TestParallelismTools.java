@@ -22,7 +22,6 @@ package com.xilinx.rapidwright.util;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
@@ -30,12 +29,15 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CountedCompleter;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerArray;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -191,6 +193,61 @@ public class TestParallelismTools {
     }
 
     @Test
+    public void testOriginalExceptionRethrownByAll() {
+        boolean wasParallel = ParallelismTools.getParallel();
+        try {
+            for (boolean parallel : new boolean[] {false, true}) {
+                ParallelismTools.setParallel(parallel);
+                List<Integer> items = new ArrayList<>();
+                for (int i = 0; i < NUM_TASKS; i++) {
+                    items.add(i);
+                }
+                // Every item throws the same exception, after spinning (so that other threads start on items too),
+                // so whichever is rethrown, from whichever thread, must be that one, rather than a copy of it
+                Callable<Integer>[] tasks = countingTasks(new AtomicIntegerArray(NUM_TASKS));
+                IllegalStateException thrown = new IllegalStateException("every item");
+                Consumer<Integer> throwing = (i) -> {
+                    try {
+                        tasks[i].call();
+                    } catch (Exception e) {
+                        throw new AssertionError(e);
+                    }
+                    throw thrown;
+                };
+
+                Assertions.assertSame(thrown, Assertions.assertThrows(IllegalStateException.class,
+                        () -> ParallelismTools.forEach(items, throwing)));
+                Assertions.assertSame(thrown, Assertions.assertThrows(IllegalStateException.class,
+                        () -> ParallelismTools.invokeAll(items, (i) -> {
+                            throwing.accept(i);
+                            return i;
+                        })));
+                @SuppressWarnings("unchecked")
+                Callable<Integer>[] callables = items.stream().map((i) -> (Callable<Integer>) () -> {
+                    throwing.accept(i);
+                    return i;
+                }).toArray(Callable[]::new);
+                Assertions.assertSame(thrown, Assertions.assertThrows(IllegalStateException.class,
+                        () -> ParallelismTools.invokeAll(callables)));
+                CountedCompleter<Void> parent = new CountedCompleter<Void>() {
+                    @Override
+                    public void compute() {
+                    }
+                };
+                Assertions.assertSame(thrown, Assertions.assertThrows(IllegalStateException.class, () -> {
+                    ParallelismTools.submit(parent, items, throwing);
+                    parent.tryComplete();
+                    ParallelismTools.join(parent);
+                }));
+                // Each rethrow recorded the stack of the rethrowing thread
+                Assertions.assertTrue(thrown.getSuppressed().length >= 4);
+            }
+        } finally {
+            ParallelismTools.setParallel(wasParallel);
+        }
+    }
+
+    @Test
     public void testCheckedExceptionWrapped() {
         final Exception thrown = new Exception("checked");
         final Future<Object> future = ParallelismTools.submit(() -> {
@@ -216,20 +273,21 @@ public class TestParallelismTools {
     @Test
     public void testJoinAllCancelsRestAfterFailure() {
         final boolean wasParallel = ParallelismTools.getParallel();
-        // With parallel processing disabled, tasks are deferred until waited for, so those after the one that throws
-        // cannot have been started when joinAll() rethrows
+        // With parallel processing disabled, submitted tasks are deferred until waited for, so the one after the one
+        // that throws cannot have been started when joinAll() rethrows. Those given to supplyAsync() are run
+        // immediately, so one not yet run is stood in for by a CompletableFuture that is never completed
         ParallelismTools.setParallel(false);
         try {
             final IllegalStateException thrown = new IllegalStateException("task 1");
-            final AtomicIntegerArray runs = new AtomicIntegerArray(4);
+            final AtomicIntegerArray runs = new AtomicIntegerArray(3);
             final List<CompletableFuture<Integer>> completables = new ArrayList<>();
-            completables.add(ParallelismTools.submitCompletable(() -> runs.incrementAndGet(0)));
-            completables.add(ParallelismTools.submitCompletable(() -> {
+            completables.add(ParallelismTools.supplyAsync(() -> runs.incrementAndGet(0)));
+            completables.add(ParallelismTools.supplyAsync(() -> {
                 runs.incrementAndGet(1);
                 throw thrown;
             }));
-            completables.add(ParallelismTools.submitCompletable(() -> runs.incrementAndGet(2)));
-            final Future<Integer> plain = ParallelismTools.submit(() -> runs.incrementAndGet(3));
+            completables.add(new CompletableFuture<>());
+            final Future<Integer> plain = ParallelismTools.submit(() -> runs.incrementAndGet(2));
             // Work chained on the CompletableFutures in order, as by EDIF export's relay
             CompletableFuture<Void> chained = CompletableFuture.completedFuture(null);
             for (CompletableFuture<Integer> completable : completables) {
@@ -246,12 +304,48 @@ public class TestParallelismTools {
             Assertions.assertTrue(completables.get(2).isCancelled());
             Assertions.assertTrue(plain.isCancelled());
             Assertions.assertTrue(chained.isDone());
-            // Nor are they run by waiting for them afterwards, even with their own join() or get()
+            // Nor is the submitted one run by waiting for (or polling) it afterwards, even with its own get()
             Assertions.assertThrows(CancellationException.class, () -> completables.get(2).join());
+            Assertions.assertTrue(plain.isDone());
             Assertions.assertThrows(CancellationException.class, plain::get);
             Assertions.assertEquals(0, runs.get(2));
-            Assertions.assertEquals(0, runs.get(3));
         } finally {
+            ParallelismTools.setParallel(wasParallel);
+        }
+    }
+
+    @Test
+    public void testJoinAllCancelsRestAfterFailureParallel() {
+        boolean wasParallel = ParallelismTools.getParallel();
+        CountDownLatch release = new CountDownLatch(1);
+        ParallelismTools.setParallel(true);
+        try {
+            IllegalStateException thrown = new IllegalStateException("task 0");
+            List<CompletableFuture<Integer>> futures = new ArrayList<>();
+            futures.add(ParallelismTools.supplyAsync(() -> {
+                throw thrown;
+            }));
+            // Wait for it to have thrown, so that joinAll() does not help by running one of the blocked tasks below
+            futures.get(0).handle((x, e) -> null).join();
+            // More tasks than the pool has threads, each blocked until released
+            for (int i = 0; i < ForkJoinPool.getCommonPoolParallelism() + 2; i++) {
+                futures.add(ParallelismTools.supplyAsync(() -> {
+                    release.await();
+                    return 0;
+                }));
+            }
+            CompletableFuture<Void> chained = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+
+            Assertions.assertSame(thrown,
+                    Assertions.assertThrows(IllegalStateException.class, () -> ParallelismTools.joinAll(futures)));
+            // Those after it were cancelled, whether or not their tasks have started, so the chained work has
+            // completed without waiting for them
+            for (int i = 1; i < futures.size(); i++) {
+                Assertions.assertTrue(futures.get(i).isCancelled());
+            }
+            Assertions.assertTrue(chained.isDone());
+        } finally {
+            release.countDown();
             ParallelismTools.setParallel(wasParallel);
         }
     }
@@ -331,59 +425,74 @@ public class TestParallelismTools {
             assertEachRunOnce(runs);
 
             // A submitted task is deferred until waited for, then run once by the waiting thread: whether waited for
-            // with ParallelismTools.get() or the Future's own get()
-            final AtomicIntegerArray submitted = new AtomicIntegerArray(5);
+            // with ParallelismTools.get() or the Future's own get(), or polled with its own isDone()
+            final AtomicIntegerArray submitted = new AtomicIntegerArray(3);
             final Future<Integer> future = ParallelismTools.submit(() -> submitted.incrementAndGet(0));
-            Assertions.assertFalse(future.isDone());
             Assertions.assertEquals(0, submitted.get(0));
             Assertions.assertEquals(1, ParallelismTools.get(future));
             Assertions.assertEquals(1, ParallelismTools.get(future));
             final Future<Integer> plain = ParallelismTools.submit(() -> submitted.incrementAndGet(1));
-            Assertions.assertFalse(plain.isDone());
             Assertions.assertEquals(0, submitted.get(1));
             Assertions.assertEquals(1, (int) plain.get());
             Assertions.assertEquals(1, (int) plain.get(1, TimeUnit.SECONDS));
+            final Future<Integer> polled = ParallelismTools.submit(() -> submitted.incrementAndGet(2));
+            Assertions.assertEquals(0, submitted.get(2));
+            Assertions.assertTrue(polled.isDone());
+            Assertions.assertEquals(1, submitted.get(2));
+            Assertions.assertTrue(polled.isDone());
+            Assertions.assertEquals(1, (int) polled.get());
+            assertEachRunOnce(submitted);
+
+            // Unless this thread has been interrupted: then, as FutureTask.get() would rather than wait, its own get()
+            // throws InterruptedException (clearing the interrupt status) without running it
+            AtomicIntegerArray interrupted = new AtomicIntegerArray(1);
+            Future<Integer> afterInterrupt = ParallelismTools.submit(() -> interrupted.incrementAndGet(0));
+            Thread.currentThread().interrupt();
+            Assertions.assertThrows(InterruptedException.class, afterInterrupt::get);
+            Assertions.assertFalse(Thread.interrupted());
+            Thread.currentThread().interrupt();
+            Assertions.assertThrows(InterruptedException.class, () -> afterInterrupt.get(1, TimeUnit.SECONDS));
+            Assertions.assertFalse(Thread.interrupted());
+            Assertions.assertEquals(0, interrupted.get(0));
+            Assertions.assertEquals(1, (int) afterInterrupt.get());
+            assertEachRunOnce(interrupted);
 
             // Its exception is rethrown once it has been run there: as-is by ParallelismTools.get(), and wrapped in an
             // ExecutionException by the Future's own get()
             final Future<Integer> failing = ParallelismTools.submit(() -> {
                 throw new IllegalStateException("submitted");
             });
-            Assertions.assertFalse(failing.isDone());
             Assertions.assertThrows(IllegalStateException.class, () -> ParallelismTools.get(failing));
             final Future<Integer> failingPlain = ParallelismTools.submit(() -> {
                 throw new IllegalStateException("submitted");
             });
-            Assertions.assertFalse(failingPlain.isDone());
             Assertions.assertTrue(Assertions.assertThrows(ExecutionException.class, failingPlain::get).getCause()
                     instanceof IllegalStateException);
 
-            // So is a task given to submitCompletable(), and so is work chained on it: whether waited for with
-            // ParallelismTools.joinAll() or the CompletableFuture's own join() or get()
-            final CompletableFuture<Integer> completable = ParallelismTools.submitCompletable(
-                    () -> submitted.incrementAndGet(2));
+            // A task given to supplyAsync() is run immediately, so work chained on it runs as soon as it is chained,
+            // and composing it in any way completes
+            final AtomicIntegerArray supplied = new AtomicIntegerArray(2);
+            final CompletableFuture<Integer> completable = ParallelismTools.supplyAsync(
+                    () -> supplied.incrementAndGet(0));
+            Assertions.assertTrue(completable.isDone());
+            Assertions.assertEquals(1, supplied.get(0));
             final CompletableFuture<Integer> chained = completable.thenApply((x) -> x + 1);
-            Assertions.assertFalse(completable.isDone());
-            Assertions.assertFalse(chained.isDone());
-            Assertions.assertEquals(0, submitted.get(2));
-            ParallelismTools.joinAll(new ArrayList<>(Collections.singletonList(completable)));
             Assertions.assertTrue(chained.isDone());
-            Assertions.assertEquals(2, (int) chained.join());
+            Assertions.assertEquals(2, (int) chained.get());
+            final CompletableFuture<Integer> other = ParallelismTools.supplyAsync(() -> supplied.incrementAndGet(1));
+            CompletableFuture.allOf(completable, other).get();
+            Assertions.assertEquals(1, (int) CompletableFuture.anyOf(completable, other).get());
+            Assertions.assertEquals(2, (int) completable.thenCombine(other, Integer::sum).join());
+            assertEachRunOnce(supplied);
 
-            final CompletableFuture<Integer> joined = ParallelismTools.submitCompletable(
-                    () -> submitted.incrementAndGet(3));
-            final CompletableFuture<Integer> joinedChained = joined.thenApply((x) -> x + 1);
-            Assertions.assertFalse(joined.isDone());
-            Assertions.assertEquals(0, submitted.get(3));
-            Assertions.assertEquals(1, (int) joined.join());
-            Assertions.assertEquals(2, (int) joinedChained.join());
-
-            final CompletableFuture<Integer> got = ParallelismTools.submitCompletable(
-                    () -> submitted.incrementAndGet(4));
-            Assertions.assertFalse(got.isDone());
-            Assertions.assertEquals(0, submitted.get(4));
-            Assertions.assertEquals(1, (int) got.get());
-            assertEachRunOnce(submitted);
+            // Its exception completes it exceptionally
+            final IllegalStateException thrown = new IllegalStateException("supplied");
+            final CompletableFuture<Integer> failingSupplied = ParallelismTools.supplyAsync(() -> {
+                throw thrown;
+            });
+            Assertions.assertTrue(failingSupplied.isCompletedExceptionally());
+            Assertions.assertSame(thrown, Assertions.assertThrows(IllegalStateException.class,
+                    () -> ParallelismTools.get(failingSupplied)));
         } finally {
             ParallelismTools.setParallel(wasParallel);
         }

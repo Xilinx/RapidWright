@@ -3757,7 +3757,8 @@ public class DesignTools {
         final Net gndNet = design.getGndNet();
         final Net vccNet = design.getVccNet();
 
-        ParallelismTools.stream(new ArrayList<>(design.getNets())).map(net -> {
+        // Only the classification runs in parallel
+        List<PhysNetMerge> merges = ParallelismTools.stream(design.getNets()).map(net -> {
             if (net.isStaticNet()) {
                 Net staticNet;
                 if (net.getType() == NetType.GND) {
@@ -3812,15 +3813,14 @@ public class DesignTools {
                 return new PhysNetMerge(net, parentPhysNet, null);
             }
             return null;
-        }).filter(Objects::nonNull).forEachOrdered(merge -> {
-            // The merges themselves are applied one at a time, in design.getNets() order, though not necessarily
-            // on this thread, and while later nets may still be being classified: which is safe, as classifying a
-            // net only reads its type, name, design and logical net (and the netlist), which merging other nets
-            // never changes (adding pins to a parent net updates its fan-out, which shares a field with its type,
-            // but not its type). Applying them in any other order would leave both the surviving Net of an
-            // alias group and the order that group's pins are appended in decided by whichever thread happened
-            // to arrive first, which is enough to change the order RWRoute walks its connections in and so the
-            // routing it produces
+        }).filter(Objects::nonNull).collect(Collectors.toList());
+
+        // The merges themselves are applied on this thread, in design.getNets() order, once all nets have been
+        // classified (so that a net that cannot be classified leaves the design unchanged). Applying them in any
+        // other order would leave both the surviving Net of an alias group and the order that group's pins are
+        // appended in decided by whichever thread happened to arrive first, which is enough to change the order
+        // RWRoute walks its connections in and so the routing it produces
+        for (PhysNetMerge merge : merges) {
             Net parentPhysNet = merge.parentPhysNet;
             if (parentPhysNet == null) {
                 parentPhysNet = design.getNet(merge.parentNetName);
@@ -3830,12 +3830,12 @@ public class DesignTools {
                     if (!merge.net.rename(merge.parentNetName)) {
                         System.out.println("WARNING: Failed to adjust physical net name " + merge.net.getName());
                     }
-                    return;
+                    continue;
                 }
             }
 
             design.movePinsToNewNetDeleteOldNet(merge.net, parentPhysNet, true);
-        });
+        }
     }
 
     /**

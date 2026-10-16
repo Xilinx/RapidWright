@@ -59,15 +59,26 @@ import org.jetbrains.annotations.NotNull;
  *
  * A class that abstracts away single-threaded and multi-threaded execution.
  * Single-threaded mode means that all tasks are executed on the current
- * thread: those given to {@link #submit(Callable)} or
- * {@link #submitCompletable(Callable)} are deferred until they are waited for
- * ({@link #get(Future)}, {@link #join(List)} or {@link #joinAll(List)}, or
- * the returned Future's own get(), or CompletableFuture's own get() or
- * join()), which
- * executes them on the waiting thread; all others are executed immediately.
- * So a task submitted that way is never executed if it is never waited for,
- * and waiting only for further work chained on a CompletableFuture (e.g. by
- * thenApply()), rather than for the CompletableFuture itself, blocks forever.
+ * thread: those given to {@link #submit(Callable)} (and all but the first
+ * given to {@link #invokeFirstSubmitRest(Callable[])}) are deferred until they
+ * are waited for ({@link #get(Future)}, {@link #join(List)},
+ * {@link #joinAll(List)}, {@link #joinInOrder(List)} or
+ * {@link #joinFirst(Deque)}, or the returned Future's own get()) or polled
+ * (its own isDone()), which executes them on that thread, so a task submitted
+ * that way is never executed if it is never waited for (or polled); all others
+ * are executed immediately, including those given to
+ * {@link #supplyAsync(Callable)}, so that the returned CompletableFuture is
+ * already complete and work can be chained on it in any way (a deferred task
+ * could not be run by waiting for work chained on it).
+ *
+ * An exception (or error) thrown by a task is rethrown the same way by every
+ * method here that waits for tasks, or runs them, whichever thread ran the task
+ * and whether or not parallel processing is enabled: an unchecked exception
+ * as-is (the original, rather than a copy of it), with a suppressed exception
+ * added to it recording the stack of the rethrowing thread; a checked
+ * exception, which cannot be rethrown as-is, wrapped in a RuntimeException. The
+ * exception is {@link #stream(Collection)}, whose terminal operations are the
+ * caller's own.
  */
 public class ParallelismTools {
     /**
@@ -132,8 +143,14 @@ public class ParallelismTools {
      * no threads), and any exception it throws is kept as-is.
      * When parallel processing is disabled, the task is not submitted, but deferred until
      * it is waited for, with {@link #get(Future)}, {@link #join(List)},
-     * {@link #joinAll(List)} or the returned Future's own get(),
-     * which executes it on the waiting thread (see {@link LazyFutureTask}).
+     * {@link #joinAll(List)}, {@link #joinInOrder(List)}, {@link #joinFirst(Deque)} or the
+     * returned Future's own get(), or polled with its isDone(), which executes it on that thread (see
+     * {@link LazyFutureTask}). So a task that is never waited for (or polled) is never
+     * executed: for one whose result is not needed, use {@link #supplyAsync(Callable)},
+     * which executes it immediately instead. Nor can a timed get() bound how long the task
+     * takes: with no other thread to run it, it runs the task to completion on the waiting
+     * thread, whatever the timeout (as executing it immediately would). So a timed get()
+     * can only serve as a watchdog when parallel processing is enabled.
      * @param task Task to be performed.
      * @param <T> Type returned by task.
      * @return A Future object holding the value returned by task.
@@ -172,27 +189,54 @@ public class ParallelismTools {
 
     /**
      * A FutureTask that is not submitted to the pool (as when parallel processing is disabled), but run by the first
-     * thread to wait for it with its own get(), as well as by {@link #get(Future)}, {@link #join(List)} or
-     * {@link #joinAll(List)} (see {@link #runIfUnclaimed(Future)}). FutureTask.run()
-     * does nothing if another thread has already claimed the task, so it is run at most once, and any other thread
-     * waiting for it meanwhile waits for that one.
+     * thread to wait for it with its own get(), or to poll it with its own isDone(), as well as by {@link #get(Future)},
+     * {@link #join(List)}, {@link #joinAll(List)}, {@link #joinInOrder(List)} or {@link #joinFirst(Deque)} (see
+     * {@link #runIfUnclaimed(Future)}). FutureTask.run() does nothing if another thread has already claimed the task
+     * (or it has been cancelled), so it is run at most once, and any other thread waiting for it meanwhile waits for
+     * that one.
      */
     private static final class LazyFutureTask<T> extends FutureTask<T> {
         private LazyFutureTask(Callable<T> task) {
             super(task);
         }
 
-        @Override
-        public T get() throws InterruptedException, ExecutionException {
+        /**
+         * As FutureTask.get() does if it would wait, throws InterruptedException (clearing the interrupt status) if this
+         * thread has been interrupted and the task is not done; otherwise runs the task if no thread has claimed it.
+         */
+        private void runUnlessInterrupted() throws InterruptedException {
+            // Not isDone(), which runs the task
+            if (!super.isDone() && Thread.interrupted()) {
+                throw new InterruptedException();
+            }
             run();
-            return super.get();
         }
 
         @Override
+        public T get() throws InterruptedException, ExecutionException {
+            runUnlessInterrupted();
+            return super.get();
+        }
+
+        /**
+         * Runs the task to the end first if no thread has claimed it, whatever the timeout: no other thread would ever
+         * run it, so only waiting would always time out (see {@link ParallelismTools#submit(Callable)}).
+         */
+        @Override
         public T get(long timeout, @NotNull TimeUnit unit)
                 throws InterruptedException, ExecutionException, TimeoutException {
-            run();
+            runUnlessInterrupted();
             return super.get(timeout, unit);
+        }
+
+        /**
+         * Runs the task first if no thread has claimed it (or it has been cancelled), so that polling isDone() until it
+         * returns true completes, as it would were the task submitted to the pool.
+         */
+        @Override
+        public boolean isDone() {
+            run();
+            return super.isDone();
         }
     }
 
@@ -247,40 +291,45 @@ public class ParallelismTools {
     /**
      * Submit a task-with-return-value to the common ForkJoinPool, as {@link #submit(Callable)} does, but returning a
      * CompletableFuture, so that further work can be chained on its completion (by default, run by the thread that
-     * completes it). Any exception the task throws completes the CompletableFuture exceptionally. A thread waiting
-     * for it, whether with {@link #get(Future)}, {@link #join(List)} or {@link #joinAll(List)}, or with the
-     * CompletableFuture's own get() or join(), runs the task itself if no other thread has started it (and a timed
-     * get() then runs it to the end, whatever the timeout).
-     * When parallel processing is disabled, the task is deferred as for {@link #submit(Callable)}: until it is waited
-     * for, which executes it (and then, on the same thread, any work chained on it) on the waiting thread. Waiting
-     * only for work chained on it (e.g. by thenApply()) does not run the task, so blocks forever.
+     * completes it), in any way. Any exception the task throws completes the CompletableFuture exceptionally. A thread
+     * waiting for it, whether with {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)} or
+     * {@link #joinInOrder(List)}, or with the CompletableFuture's own get() or join(), runs the task itself if no other
+     * thread has started it (and a timed get() then runs it to the end, whatever the timeout).
+     * When parallel processing is disabled, the task is executed immediately on the current thread, so that the
+     * returned CompletableFuture is already complete: work chained on it then runs as soon as it is chained, on the
+     * thread chaining it.
      * @param task Task to be performed.
      * @param <T> Type returned by task.
      * @return A CompletableFuture holding the value returned by task.
      */
-    public static <T> CompletableFuture<T> submitCompletable(Callable<T> task) {
+    public static <T> CompletableFuture<T> supplyAsync(Callable<T> task) {
         final RunnableCompletableFuture<T> future = new RunnableCompletableFuture<>(task);
         if (getParallel()) {
             ForkJoinPool.commonPool().execute(future);
+        } else {
+            // Run now, rather than deferring it until waited for as submit() does: work chained on the returned
+            // CompletableFuture is a CompletableFuture of its own (e.g. from thenApply(), or allOf(), which builds its
+            // dependents directly), with no reference to this task, so a thread waiting for that work could not run
+            // it, and would wait forever
+            future.run();
         }
         return future;
     }
 
     /**
-     * Submit a task-without-return-value to the common ForkJoinPool, as {@link #submitCompletable(Callable)} does.
+     * Submit a task-without-return-value to the common ForkJoinPool, as {@link #supplyAsync(Callable)} does.
      * @param task Task to be performed.
      * @return A CompletableFuture that completes (with null) once task has.
      */
-    public static CompletableFuture<Void> submitCompletable(Runnable task) {
-        return submitCompletable(Executors.callable(task, null));
+    public static CompletableFuture<Void> supplyAsync(Runnable task) {
+        return supplyAsync(Executors.callable(task, null));
     }
 
     /**
      * Block until the task behind the given Future is complete.
      * If the task has not yet been claimed by another thread, steal it for
      * immediate execution on the current thread.
-     * If the task threw an exception, it is rethrown as described in
-     * {@link #getUnwrapped(Future)}.
+     * If the task threw an exception, it is rethrown as described for this class.
      * @param future Future representing previously submitted task.
      * @param <T> Type returned by task.
      * @return Value returned by task.
@@ -295,11 +344,8 @@ public class ParallelismTools {
      * A thread of a ForkJoinPool blocks with {@link ForkJoinPool#managedBlock}, so that the
      * pool can compensate for it (e.g. with a spare thread) rather than run with one thread
      * fewer.
-     * If its task threw an unchecked exception (or error), that is rethrown as-is
-     * rather than wrapped in an ExecutionException, with a suppressed exception
-     * added to it recording the stack of the rethrowing thread (since the task may
-     * have run on another thread); a checked exception, which cannot be rethrown
-     * as-is, is wrapped in a RuntimeException. If the wait is interrupted, the
+     * If its task threw an exception, it is rethrown (see {@link #rethrow(Throwable)})
+     * rather than wrapped in an ExecutionException. If the wait is interrupted, the
      * InterruptedException is wrapped in a RuntimeException, and the thread's
      * interrupt status is restored.
      * @param future Future representing previously submitted task.
@@ -328,20 +374,47 @@ public class ParallelismTools {
             }
             return future.get();
         } catch (ExecutionException e) {
-            final Throwable cause = e.getCause();
-            if (cause instanceof RuntimeException || cause instanceof Error) {
-                cause.addSuppressed(new Exception("Task exception rethrown by thread \""
-                        + Thread.currentThread().getName() + "\""));
-                if (cause instanceof RuntimeException) {
-                    throw (RuntimeException) cause;
-                }
-                throw (Error) cause;
-            }
-            throw new RuntimeException(cause != null ? cause : e);
+            throw rethrow(e.getCause() != null ? e.getCause() : e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Rethrow an exception (or error) thrown by a task, as described for this class: an unchecked one as-is, with a
+     * suppressed exception added to it recording the stack of the rethrowing thread (since the task may have run on
+     * another thread); a checked one wrapped in a RuntimeException.
+     * @param e The exception thrown by the task.
+     * @return Never returns, so that a caller can throw what it returns, to show that it does not return either.
+     */
+    private static RuntimeException rethrow(Throwable e) {
+        if (e instanceof RuntimeException || e instanceof Error) {
+            e.addSuppressed(new Exception("Task exception rethrown by thread \""
+                    + Thread.currentThread().getName() + "\""));
+            if (e instanceof RuntimeException) {
+                throw (RuntimeException) e;
+            }
+            throw (Error) e;
+        }
+        throw new RuntimeException(e);
+    }
+
+    /**
+     * The original of an exception rethrown by a ForkJoinTask (as by a parallel stream). One that was thrown on
+     * another thread is rethrown as a copy, where possible: of the same type, with the original as its cause, and
+     * either the original's toString() or no message as its own. So an exception that is not such a copy but looks
+     * like one (one that wraps an exception of its own type, with no message of its own) is taken to be one too.
+     * @param e The exception rethrown by a ForkJoinTask.
+     * @return The exception that e is a copy of, or e itself if it is not one.
+     */
+    private static Throwable originalOf(Throwable e) {
+        Throwable cause = e.getCause();
+        if (cause != null && cause.getClass() == e.getClass()
+                && (e.getMessage() == null || e.getMessage().equals(cause.toString()))) {
+            return cause;
+        }
+        return e;
     }
 
     /**
@@ -350,14 +423,15 @@ public class ParallelismTools {
      * current thread.
      * In single-threaded mode, all but the first task are not executed here but are
      * deferred, as by {@link #submit(Callable)}, until they are passed to
-     * {@link #joinFirst(Deque)} (or waited for by {@link #get(Future)}, {@link #join(List)}
-     * or the Future's own get()).
+     * {@link #joinFirst(Deque)} (or waited for by {@link #get(Future)}, {@link #join(List)},
+     * {@link #joinAll(List)}, {@link #joinInOrder(List)} or the Future's own get(), or polled by
+     * its own isDone()).
      * @param tasks List of tasks to be executed (if none, an empty Deque is returned).
      * @param <T> Type returned by all tasks.
      * @return A Deque of Future objects corresponding to each task (in order).
-     * @deprecated Submit each task with {@link #submit(Callable)} (or
-     *             {@link #submitCompletable(Callable)}) into a List, and wait for them in
-     *             order with {@link #joinInOrder(List)}, which also runs any not yet started.
+     * @deprecated Submit each task with {@link #submit(Callable)} into a List, and wait for
+     *             them in order with {@link #joinInOrder(List)}, which also runs any not yet
+     *             started.
      */
     @Deprecated
     @SafeVarargs
@@ -441,8 +515,8 @@ public class ParallelismTools {
      * modifiable, and must not be read by anything else while (or after) this
      * runs: work chained on a Future should be given the Future itself, rather
      * than look it up in the List later.
-     * If a task threw an exception, it is rethrown (as described in
-     * {@link #getUnwrapped(Future)}) once the tasks before it have completed,
+     * If a task threw an exception, it is rethrown (as described for this
+     * class) once the tasks before it have completed,
      * after cancelling the Futures of those after it (or of that one and those
      * after it, if the wait for it was interrupted), leaving their elements in
      * the List: so that, when this returns or throws, every Future given to it
@@ -525,9 +599,8 @@ public class ParallelismTools {
     /**
      * Block until the given CountedCompleter has completed, meanwhile running on this thread any of its descendants
      * (tasks whose chain of completers leads to it) that no thread has started yet, rather than only blocking.
-     * If it completed exceptionally, that exception is rethrown: the original, rather than the copy (of the same type,
-     * with the original as its cause, and no message of its own) that ForkJoinTask makes of one thrown on another
-     * thread; a checked exception is wrapped in a RuntimeException.
+     * If it completed exceptionally, that exception is rethrown as described for this class: the original, rather
+     * than the copy that ForkJoinTask makes of one thrown on another thread (see {@link #originalOf(Throwable)}).
      * @param completer The CountedCompleter to wait for.
      */
     public static void join(@NotNull CountedCompleter<?> completer) {
@@ -546,19 +619,9 @@ public class ParallelismTools {
             }
         }
         Throwable e = completer.getException();
-        if (e == null) {
-            return;
+        if (e != null) {
+            throw rethrow(originalOf(e));
         }
-        if (e.getCause() != null && e.getCause().getClass() == e.getClass()) {
-            e = e.getCause();
-        }
-        if (e instanceof RuntimeException) {
-            throw (RuntimeException) e;
-        }
-        if (e instanceof Error) {
-            throw (Error) e;
-        }
-        throw new RuntimeException(e);
     }
 
     /**
@@ -582,12 +645,11 @@ public class ParallelismTools {
      *         false if it is not (e.g. another thread is still running it).
      */
     private static <T> boolean runIfUnclaimed(Future<T> future) {
-        if (!future.isDone()) {
-            if (future instanceof FutureTask) {
-                ((FutureTask<T>) future).run();
-            } else if (future instanceof RunnableCompletableFuture) {
-                ((RunnableCompletableFuture<T>) future).run();
-            }
+        // Each does nothing unless the task is unclaimed (and so not done)
+        if (future instanceof FutureTask) {
+            ((FutureTask<T>) future).run();
+        } else if (future instanceof RunnableCompletableFuture) {
+            ((RunnableCompletableFuture<T>) future).run();
         }
         return future.isDone();
     }
@@ -595,6 +657,9 @@ public class ParallelismTools {
     /**
      * A stream of the given items: a parallel one (run on the common ForkJoinPool, as for
      * {@link #forEach(Collection, Consumer)}) when parallel processing is enabled, else a sequential one.
+     * Unlike the other methods here, exceptions thrown by its terminal operation are as the JDK throws them: when
+     * parallel, one thrown on another thread is rethrown as a copy where possible (of the same type, with the original
+     * as its cause), and without a suppressed exception recording the stack of the rethrowing thread.
      * @param items The items to stream.
      * @param <T> Item type.
      * @return {@code items.parallelStream()} if {@link #getParallel()}, else {@code items.stream()}.
@@ -674,16 +739,20 @@ public class ParallelismTools {
      * splits the items (using the collection's own Spliterator) into roughly four pieces per
      * thread of the common ForkJoinPool (or one per item, if there are fewer), which are
      * distributed by work stealing, and the calling thread also participates.
-     * If the task throws for any item, that exception is rethrown (if thrown on another
-     * thread, as a new exception of the same type with the original as its cause, where
-     * possible); in that case, the task may not have been run for other items, or may still
-     * be running.
+     * If the task throws for any item, that exception is rethrown as described for this class;
+     * in that case, the task may not have been run for other items, or may still be running.
      * @param items the items to call the task with
      * @param task the task that should be executed for all items
      * @param <T> item type
      */
     public static <T> void forEach(Collection<T> items, Consumer<T> task) {
-        stream(items).forEach(task);
+        final boolean parallel = getParallel();
+        try {
+            stream(items).forEach(task);
+        } catch (RuntimeException | Error e) {
+            // Only a parallel stream rethrows a copy of an exception thrown on another thread
+            throw rethrow(parallel ? originalOf(e) : e);
+        }
     }
 
     /**
@@ -694,7 +763,8 @@ public class ParallelismTools {
      * fewer), each of which is forked to the common ForkJoinPool. If parallel processing is disabled, the task is
      * instead run on all items immediately, on the calling thread, with {@link #forEach(Collection, Consumer)}.
      * If the task throws for any item, the parent (and, unless it is overridden not to, each of its completers)
-     * completes exceptionally; if parallel processing is disabled, the exception is instead thrown immediately.
+     * completes exceptionally (see {@link #join(CountedCompleter)}); if parallel processing is disabled, the exception
+     * is instead rethrown immediately, as described for this class.
      * @param parent The CountedCompleter to run the chunks as children of. Its pending count is increased by the
      *               number of chunks; it must still call tryComplete() itself, once it has submitted all its children.
      * @param items The items, whose elements are accessed by index (so should be a random-access list, such as an
@@ -721,14 +791,19 @@ public class ParallelismTools {
      * no other thread has started it. The task is forked to the common ForkJoinPool. If parallel processing is
      * disabled, the task is instead run immediately, on the calling thread.
      * If the task throws, the parent (and, unless it is overridden not to, each of its completers) completes
-     * exceptionally; if parallel processing is disabled, the exception is instead thrown immediately.
+     * exceptionally (see {@link #join(CountedCompleter)}); if parallel processing is disabled, the exception is instead
+     * rethrown immediately, as described for this class.
      * @param parent The CountedCompleter to run the task as a child of. Its pending count is increased by one; it must
      *               still call tryComplete() itself, once it has submitted all its children.
      * @param task The task to run.
      */
     public static void submit(@NotNull CountedCompleter<?> parent, @NotNull Runnable task) {
         if (!getParallel()) {
-            task.run();
+            try {
+                task.run();
+            } catch (RuntimeException | Error e) {
+                throw rethrow(e);
+            }
             return;
         }
         parent.addToPendingCount(1);
@@ -772,7 +847,13 @@ public class ParallelismTools {
      *         order (its iteration order, if the collection is ordered)
      */
     public static <T,R> List<R> invokeAll(Collection<T> items, Function<T,R> task) {
-        return stream(items).map(task).collect(Collectors.toList());
+        final boolean parallel = getParallel();
+        try {
+            return stream(items).map(task).collect(Collectors.toList());
+        } catch (RuntimeException | Error e) {
+            // Only a parallel stream rethrows a copy of an exception thrown on another thread
+            throw rethrow(parallel ? originalOf(e) : e);
+        }
     }
 
     /**
@@ -785,12 +866,10 @@ public class ParallelismTools {
      * on the JDK), and, on a thread of a ForkJoinPool, also helping the threads
      * that took the others, or letting the pool compensate for it blocking.
      * If any task throws an exception, one of them (not necessarily the first in
-     * order) is rethrown: if thrown on another thread, as a new exception of the
-     * same type with the original as its cause, where possible, and a checked
-     * exception wrapped in a RuntimeException. In that case, the other tasks may
-     * have been cancelled or not run. When parallel processing is disabled, all
-     * tasks are executed in order on the current thread, and then the first
-     * exception (in order) is rethrown as described in {@link #getUnwrapped(Future)}.
+     * order) is rethrown as described for this class. In that case, the other
+     * tasks may have been cancelled or not run. When parallel processing is
+     * disabled, all tasks are executed in order on the current thread, and then
+     * the first exception (in order) is rethrown.
      * @param tasks List of tasks-with-return-value.
      * @param <T> Type returned by all tasks.
      * @return A list of Future objects used to hold returned data.
@@ -813,7 +892,12 @@ public class ParallelismTools {
         for (Callable<T> task : tasks) {
             forkJoinTasks.add(ForkJoinTask.adapt(task));
         }
-        ForkJoinTask.invokeAll(forkJoinTasks);
+        try {
+            ForkJoinTask.invokeAll(forkJoinTasks);
+        } catch (RuntimeException | Error e) {
+            // A checked exception arrives already wrapped in a RuntimeException (by ForkJoinTask.adapt())
+            throw rethrow(originalOf(e));
+        }
         // Every ForkJoinTask<T> is a Future<T>, so no need to copy the list
         @SuppressWarnings("unchecked")
         final List<Future<T>> futures = (List<Future<T>>) (List<?>) forkJoinTasks;

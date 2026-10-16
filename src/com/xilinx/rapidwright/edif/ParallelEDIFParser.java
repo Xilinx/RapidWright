@@ -228,7 +228,7 @@ public class ParallelEDIFParser implements AutoCloseable{
         final List<ParallelEDIFParserWorker> discarded = new ArrayList<>();
         final List<CompletableFuture<Void>> parsed = new ArrayList<>(workers.size());
         for (ParallelEDIFParserWorker w : workers) {
-            parsed.add(ParallelismTools.submitCompletable(() -> w.doParse(false)));
+            parsed.add(ParallelismTools.supplyAsync(() -> w.doParse(false)));
         }
 
         // Completes once the stages below have, and so has every worker's linking, which each stage submits (see
