@@ -45,6 +45,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.function.Executable;
 
 // A hang (e.g. a task that is never run) fails the test rather than stalling the build
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
@@ -176,8 +177,25 @@ public class TestParallelismTools {
                 Assertions.assertThrows(IllegalStateException.class, () -> ParallelismTools.get(future)));
     }
 
+    /**
+     * Assert that the given call rethrows the given exception as described for ParallelismTools: itself, when parallel
+     * processing is disabled; otherwise, as ForkJoinTask.join() does, itself if thrown on the calling thread, else a
+     * copy of it (of its type, with it as its cause); either way, with a suppressed exception recording the stack of
+     * the rethrowing thread.
+     */
+    private static void assertRethrown(RuntimeException thrown, boolean parallel, Executable call) {
+        final RuntimeException rethrown = Assertions.assertThrows(thrown.getClass(), call);
+        Assertions.assertEquals(thrown.getClass(), rethrown.getClass());
+        if (parallel) {
+            Assertions.assertTrue(rethrown == thrown || rethrown.getCause() == thrown);
+        } else {
+            Assertions.assertSame(thrown, rethrown);
+        }
+        Assertions.assertTrue(rethrown.getSuppressed().length > 0);
+    }
+
     @Test
-    public void testOriginalExceptionRethrownByAll() {
+    public void testExceptionRethrownByAll() {
         boolean wasParallel = ParallelismTools.getParallel();
         try {
             for (boolean parallel : new boolean[] {false, true}) {
@@ -186,45 +204,43 @@ public class TestParallelismTools {
                 for (int i = 0; i < NUM_TASKS; i++) {
                     items.add(i);
                 }
-                // Every item throws the same exception, after spinning (so that other threads start on items too),
-                // so whichever is rethrown, from whichever thread, must be that one, rather than a copy of it
-                Callable<Integer>[] tasks = countingTasks(new AtomicIntegerArray(NUM_TASKS));
-                IllegalStateException thrown = new IllegalStateException("every item");
-                Consumer<Integer> throwing = (i) -> {
-                    try {
-                        tasks[i].call();
-                    } catch (Exception e) {
-                        throw new AssertionError(e);
-                    }
-                    throw thrown;
-                };
+                // A plain exception, and one that wraps an exception of its own type, with that one's toString() as
+                // its message, as a copy of it would have: which must never be unwrapped
+                for (IllegalStateException thrown : Arrays.asList(new IllegalStateException("every item"),
+                        new IllegalStateException(new IllegalStateException("wrapped")))) {
+                    // Every item throws the same exception, after spinning (so that other threads start on items too)
+                    Callable<Integer>[] tasks = countingTasks(new AtomicIntegerArray(NUM_TASKS));
+                    Consumer<Integer> throwing = (i) -> {
+                        try {
+                            tasks[i].call();
+                        } catch (Exception e) {
+                            throw new AssertionError(e);
+                        }
+                        throw thrown;
+                    };
 
-                Assertions.assertSame(thrown, Assertions.assertThrows(IllegalStateException.class,
-                        () -> ParallelismTools.forEach(items, throwing)));
-                Assertions.assertSame(thrown, Assertions.assertThrows(IllegalStateException.class,
-                        () -> ParallelismTools.invokeAll(items, (i) -> {
-                            throwing.accept(i);
-                            return i;
-                        })));
-                @SuppressWarnings("unchecked")
-                Callable<Integer>[] callables = items.stream().map((i) -> (Callable<Integer>) () -> {
-                    throwing.accept(i);
-                    return i;
-                }).toArray(Callable[]::new);
-                Assertions.assertSame(thrown, Assertions.assertThrows(IllegalStateException.class,
-                        () -> ParallelismTools.invokeAll(callables)));
-                CountedCompleter<Void> parent = new CountedCompleter<Void>() {
-                    @Override
-                    public void compute() {
-                    }
-                };
-                Assertions.assertSame(thrown, Assertions.assertThrows(IllegalStateException.class, () -> {
-                    ParallelismTools.submit(parent, items, throwing);
-                    parent.tryComplete();
-                    ParallelismTools.join(parent);
-                }));
-                // Each rethrow recorded the stack of the rethrowing thread
-                Assertions.assertTrue(thrown.getSuppressed().length >= 4);
+                    assertRethrown(thrown, parallel, () -> ParallelismTools.forEach(items, throwing));
+                    assertRethrown(thrown, parallel, () -> ParallelismTools.invokeAll(items, (i) -> {
+                        throwing.accept(i);
+                        return i;
+                    }));
+                    @SuppressWarnings("unchecked")
+                    Callable<Integer>[] callables = items.stream().map((i) -> (Callable<Integer>) () -> {
+                        throwing.accept(i);
+                        return i;
+                    }).toArray(Callable[]::new);
+                    assertRethrown(thrown, parallel, () -> ParallelismTools.invokeAll(callables));
+                    CountedCompleter<Void> parent = new CountedCompleter<Void>() {
+                        @Override
+                        public void compute() {
+                        }
+                    };
+                    assertRethrown(thrown, parallel, () -> {
+                        ParallelismTools.submit(parent, items, throwing);
+                        parent.tryComplete();
+                        ParallelismTools.join(parent);
+                    });
+                }
             }
         } finally {
             ParallelismTools.setParallel(wasParallel);
