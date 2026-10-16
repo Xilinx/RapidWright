@@ -1074,7 +1074,10 @@ public class EDIFNetlist extends EDIFName {
                 os.flush();
                 final List<CompletableFuture<ParallelDCPInput>> pieces = new ArrayList<>();
                 // Each chunk's piece is written once that chunk is done and the previous chunk's piece has been
-                // written, by whichever thread completes the later of the two (so it may block on that I/O)
+                // written, by whichever thread completes the later of the two (so it may block on that I/O). That is
+                // often a thread of the common pool, which then blocks without ForkJoinPool.managedBlock(): each
+                // write is assumed to be fast, as it only copies a piece that is already compressed (most estimated
+                // to compress to half of 1 MiB, see PARALLEL_EXPORT_CHUNK_BYTES), and only one is ever in progress
                 CompletableFuture<Void> written = CompletableFuture.completedFuture(null);
                 for (EDIFLibrary lib : librariesToWrite) {
                     // Split each library's cells into chunks of consecutive cells, each the most estimated to make up
