@@ -24,6 +24,7 @@
 package com.xilinx.rapidwright.design;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -32,10 +33,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -60,6 +64,7 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.edif.EDIFWriteLegalNameCache;
 import com.xilinx.rapidwright.router.Router;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -164,6 +169,34 @@ public class TestDesign {
                                 new HashSet<>(after.getSiteInsts()));
         Assertions.assertEquals(new HashSet<>(before.getNets()),
                                 new HashSet<>(after.getNets()));
+    }
+
+    @Test
+    @Timeout(value = 120, unit = TimeUnit.SECONDS)
+    @Disabled("A failed parallel DCP write leaves unwritten pieces open (and their temporary files on disk), which"
+            + " fails the open files check: https://github.com/Xilinx/RapidWright/issues/1471")
+    public void checkDcpParallelEdifExportFailure(@TempDir Path tempDir) {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("parallelEdifExportFailure");
+        EDIFTools.ensureCorrectPartInEDIF(netlist, Device.AWS_F1);
+        IllegalStateException thrown = new IllegalStateException("cell export");
+        // A cell that fails to be written
+        new EDIFCell(netlist.getWorkLibrary(), "failing") {
+            @Override
+            public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) {
+                throw thrown;
+            }
+        };
+        Design design = new Design(netlist);
+
+        boolean wasParallel = ParallelismTools.getParallel();
+        try {
+            ParallelismTools.setParallel(true);
+            // Rethrown as-is, rather than hanging, from the chunk that writes that cell in parallel
+            Assertions.assertSame(thrown, Assertions.assertThrows(IllegalStateException.class,
+                    () -> design.writeCheckpoint(tempDir.resolve("parallelEdifExportFailure.dcp"))));
+        } finally {
+            ParallelismTools.setParallel(wasParallel);
+        }
     }
 
     @Test

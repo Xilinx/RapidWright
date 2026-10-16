@@ -345,6 +345,42 @@ public class TestParallelismTools {
     }
 
     @Test
+    public void testJoinAllCancelsRestAfterFailureParallel() {
+        boolean wasParallel = ParallelismTools.getParallel();
+        CountDownLatch release = new CountDownLatch(1);
+        ParallelismTools.setParallel(true);
+        try {
+            IllegalStateException thrown = new IllegalStateException("task 0");
+            List<CompletableFuture<Integer>> futures = new ArrayList<>();
+            futures.add(ParallelismTools.supplyAsync(() -> {
+                throw thrown;
+            }));
+            // Wait for it to have thrown, so that joinAll() does not help by running one of the blocked tasks below
+            futures.get(0).handle((x, e) -> null).join();
+            // More tasks than the pool has threads, each blocked until released
+            for (int i = 0; i < ForkJoinPool.getCommonPoolParallelism() + 2; i++) {
+                futures.add(ParallelismTools.supplyAsync(() -> {
+                    release.await();
+                    return 0;
+                }));
+            }
+            CompletableFuture<Void> chained = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+
+            Assertions.assertSame(thrown,
+                    Assertions.assertThrows(IllegalStateException.class, () -> ParallelismTools.joinAll(futures)));
+            // Those after it were cancelled, whether or not their tasks have started, so the chained work has
+            // completed without waiting for them
+            for (int i = 1; i < futures.size(); i++) {
+                Assertions.assertTrue(futures.get(i).isCancelled());
+            }
+            Assertions.assertTrue(chained.isDone());
+        } finally {
+            release.countDown();
+            ParallelismTools.setParallel(wasParallel);
+        }
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     public void testInvokeFirstSubmitRestNoTasks() {
         Assertions.assertTrue(ParallelismTools.invokeFirstSubmitRest(new Callable[0]).isEmpty());
