@@ -981,32 +981,82 @@ public class EDIFNetlist extends EDIFName {
     private static final int EXPORT_ESTIMATE_NAME_BYTES = 16;
 
     /**
+     * Nominal length of a property's key and value together, for {@link #estimateExportBytes(EDIFCell)}, which does
+     * not look at properties, only counts them. The average measured over several netlists, from small designs to
+     * large post-synthesis ones, was 16 to 31 bytes: most properties are short, such as INIT, BOX_TYPE and DONT_TOUCH,
+     * and long ones, such as CORE_GENERATION_INFO, are rare.
+     */
+    private static final int EXPORT_ESTIMATE_PROPERTY_BYTES = 18;
+
+    /**
+     * Estimated number of bytes that {@link EDIFPropertyObject#exportEDIFProperties} writes for each property, besides
+     * its indent: "(property ", its key, a space, its value as a string, which most are, i.e. (string "..."), and its
+     * closing ")" and newline, with its key and value taken to be {@link #EXPORT_ESTIMATE_PROPERTY_BYTES} long.
+     */
+    private static final int EXPORT_ESTIMATE_BYTES_PER_PROPERTY = EDIFPropertyObject.EXPORT_CONST_PROP_START.length
+            + 1 + ("(" + EDIFValueType.STRING + " \"\")").length() + EDIFPropertyObject.EXPORT_CONST_PROP_END.length
+            + EXPORT_ESTIMATE_PROPERTY_BYTES;
+
+    /**
+     * Estimate the number of bytes of EDIF written for the properties of the given object.
+     * @param o The cell, port, instance or net.
+     * @param indent The indent written before each of its properties.
+     * @param extra The number of bytes that its owner writes besides, if it has any properties.
+     * @return The estimated number of bytes, or 0 if it has no properties.
+     */
+    private static long estimatePropertyBytes(EDIFPropertyObject o, byte[] indent, int extra) {
+        int count = o.getPropertyCount();
+        return count == 0 ? 0 : extra + (long) count * (indent.length + EXPORT_ESTIMATE_BYTES_PER_PROPERTY);
+    }
+
+    /**
      * Estimate the number of bytes of EDIF that {@link EDIFCell#exportEDIF} writes for the given cell, from the fixed
-     * text that it writes for the cell and for each of its ports, instances, nets and their port insts, with each
-     * name taken to be {@link #EXPORT_ESTIMATE_NAME_BYTES} long (looking at each name would cost nearly as much as
-     * writing it), and without properties. Only counts are looked at: those of the cell's ports, instances and nets,
-     * and of each net's port insts. Stops counting once over {@link #PARALLEL_EXPORT_CHUNK_BYTES}, as such a cell is
-     * a chunk of its own anyway.
+     * text that it writes for the cell and for each of its ports, instances, nets and their port insts, and for each of
+     * their properties, with each name taken to be {@link #EXPORT_ESTIMATE_NAME_BYTES} long (looking at each name would
+     * cost nearly as much as writing it), and each property's key and value together
+     * {@link #EXPORT_ESTIMATE_PROPERTY_BYTES} long. Only counts are looked at: those of the cell's ports, instances and
+     * nets, of each net's port insts, and of each one's properties. Stops counting once over
+     * {@link #PARALLEL_EXPORT_CHUNK_BYTES}, as such a cell is a chunk of its own anyway.
      * @param cell The cell.
      * @return The estimated number of bytes, or a number over {@link #PARALLEL_EXPORT_CHUNK_BYTES} if that is.
      */
     static long estimateExportBytes(EDIFCell cell) {
         final int name = EXPORT_ESTIMATE_NAME_BYTES;
-        // Cell, view, interface and contents, with the names of the cell and its view
+        // Cell, view, interface and contents, with the names of the cell and its view, and its properties, preceded by
+        // a newline
         long bytes = EDIFCell.EXPORT_CONST_CELL_BEGIN.length + EDIFCell.EXPORT_CONST_CELLTYPE.length
                 + EDIFCell.EXPORT_CONST_VIEWTYPE.length + EDIFCell.EXPORT_CONST_INTERFACE_END.length
                 + EDIFCell.EXPORT_CONST_CONTENTS.length + EDIFCell.EXPORT_CONST_CONTENTS_END.length
-                + EDIFCell.EXPORT_CONST_VIEW_END.length + EDIFCell.EXPORT_CONST_CELL_END.length + 2 * name;
-        // Each port, with its name, its direction (at most 6 bytes) and its closing ")", ")" and newline
+                + EDIFCell.EXPORT_CONST_VIEW_END.length + EDIFCell.EXPORT_CONST_CELL_END.length + 2 * name
+                + estimatePropertyBytes(cell, EDIFCell.EXPORT_CONST_PROP_INDENT, 1);
+        // Each port, with its name, its direction (at most 6 bytes) and its closing ")", ")" and newline, and its
+        // properties, preceded by a newline and followed by an indent
         bytes += (long) cell.getPorts().size() * (EDIFPort.EXPORT_CONST_INDENT.length
                 + EDIFPort.EXPORT_CONST_PORT_BEGIN.length + EDIFPort.EXPORT_CONST_DIRECTION_START.length + 6 + 3
                 + name);
-        // Each instance, with the names of itself, its view, its cell and that cell's library
+        final int portExtra = 1 + EDIFPort.EXPORT_CONST_INDENT.length;
+        for (EDIFPort port : cell.getPorts()) {
+            if (bytes > PARALLEL_EXPORT_CHUNK_BYTES) {
+                return bytes;
+            }
+            bytes += estimatePropertyBytes(port, EDIFPort.EXPORT_CONST_CHILD_INDENT, portExtra);
+        }
+        // Each instance, with the names of itself, its view, its cell and that cell's library, and its properties,
+        // which it closes differently
         bytes += (long) cell.getCellInsts().size() * (EDIFCellInst.EXPORT_CONST_INSTANCE_BEGIN.length
                 + EDIFCellInst.EXPORT_CONST_VIEWREF.length + EDIFCellInst.EXPORT_CONST_CELLREF.length
                 + EDIFCellInst.EXPORT_CONST_LIBRARYREF.length + EDIFCellInst.EXPORT_CONST_CLOSE_NO_PROPS.length
                 + 4 * name);
-        // Each net, with its name, and each of its port insts, with the names of its port and instance
+        final int instExtra = EDIFCellInst.EXPORT_CONST_CLOSE_WITH_PROPS.length + EDIFCellInst.EXPORT_CONST_CLOSE.length
+                - EDIFCellInst.EXPORT_CONST_CLOSE_NO_PROPS.length;
+        for (EDIFCellInst inst : cell.getCellInsts()) {
+            if (bytes > PARALLEL_EXPORT_CHUNK_BYTES) {
+                return bytes;
+            }
+            bytes += estimatePropertyBytes(inst, EDIFCellInst.EXPORT_CONST_PROP_INDENT, instExtra);
+        }
+        // Each net, with its name, each of its port insts, with the names of its port and instance, and its
+        // properties, preceded by a newline
         final long perNet = EDIFNet.EXPORT_CONST_NET_START.length + EDIFNet.EXPORT_CONST_JOINED.length
                 + EDIFNet.EXPORT_CONST_JOINED_END.length + EDIFNet.EXPORT_CONST_NET_END.length + name;
         final long perPortInst = EDIFNet.EXPORT_CONST_PORT_INDENT.length + EDIFPortInst.EXPORT_CONST_PORTREF.length
@@ -1016,7 +1066,8 @@ public class EDIFNetlist extends EDIFName {
             if (bytes > PARALLEL_EXPORT_CHUNK_BYTES) {
                 break;
             }
-            bytes += perNet + net.getPortInsts().size() * perPortInst;
+            bytes += perNet + net.getPortInsts().size() * perPortInst
+                    + estimatePropertyBytes(net, EDIFNet.EXPORT_CONST_PROP_INDENT, 1);
         }
         return bytes;
     }
