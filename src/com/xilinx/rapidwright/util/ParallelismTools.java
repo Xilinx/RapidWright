@@ -576,6 +576,18 @@ public class ParallelismTools {
     }
 
     /**
+     * The number of items in each chunk when the given number of items are split into chunks for a task to be run on
+     * each in parallel, as {@link #chunkRanges(int, int)} does: when parallel processing is enabled, roughly four
+     * chunks per {@link #maxParallelism()} thread (or one item per chunk, if there are fewer items), else a single
+     * chunk of all the items.
+     * @param size The number of items.
+     * @return The number of items in each chunk (the last may have fewer), at least 1.
+     */
+    public static int chunkSize(int size) {
+        return Math.max(1, getParallel() ? size / (4 * maxParallelism()) : size);
+    }
+
+    /**
      * The indices from start (inclusive) to end (exclusive) in chunks of consecutive indices, in order, for a task to
      * be run on each chunk in parallel: when parallel processing is enabled, roughly four chunks per
      * {@link #maxParallelism()} thread (or one per index, if there are fewer), else a single chunk of all the indices.
@@ -592,7 +604,7 @@ public class ParallelismTools {
             return Stream.of(new int[]{start, end});
         }
         final int size = end - start;
-        final int chunkSize = Math.max(1, size / (4 * maxParallelism()));
+        final int chunkSize = chunkSize(size);
         return IntStream.range(0, (size + chunkSize - 1) / chunkSize).parallel()
                 .mapToObj(i -> new int[]{start + i * chunkSize, Math.min(start + (i + 1) * chunkSize, end)});
     }
