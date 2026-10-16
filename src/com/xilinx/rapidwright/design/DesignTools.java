@@ -1202,7 +1202,20 @@ public class DesignTools {
                 if (net.getName().equals(Net.USED_NET)) continue;
                 if (net.isStaticNet()) {
                     Net staticNet = design.getStaticNet(net.getType());
-                    staticNet.addPins(net.getPins());
+                    if (net.getName().equals(staticNet.getName())) {
+                        // The canonical GND/VCC site routing was re-pointed above. Detach the
+                        // circuit's net before moving its pins, not after: removeNet() compares
+                        // nets by name and would otherwise clear the moved pins' references to
+                        // the destination net, which has the same name.
+                        List<SitePinInst> pins = new ArrayList<>(net.getPins());
+                        cell.removeNet(net);
+                        staticNet.addPins(pins);
+                    } else {
+                        // Extra static nets, such as ".../<const0>", still need their site
+                        // routing moved. Remove the old net from its owning circuit only.
+                        boolean keepRouting = true;
+                        cell.movePinsToNewNetDeleteOldNet(net, staticNet, keepRouting);
+                    }
                     // TEMPORARY WORKAROUND: as in mergeOntoNet(), a pin move alone leaves the
                     // destination unmarked. setPIPs() below marks it whenever the circuit brought
                     // routing with it, but not when it brought only pins
