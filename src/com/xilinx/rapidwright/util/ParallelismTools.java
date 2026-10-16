@@ -134,7 +134,10 @@ public class ParallelismTools {
      * or polled with its isDone(), which executes it on that thread (see
      * {@link LazyFutureTask}). So a task that is never waited for (or polled) is never
      * executed: for one whose result is not needed, use {@link #supplyAsync(Callable)},
-     * which executes it immediately instead.
+     * which executes it immediately instead. Nor can a timed get() bound how long the task
+     * takes: with no other thread to run it, it runs the task to completion on the waiting
+     * thread, whatever the timeout (as executing it immediately would). So a timed get()
+     * can only serve as a watchdog when parallel processing is enabled.
      * @param task Task to be performed.
      * @param <T> Type returned by task.
      * @return A Future object holding the value returned by task.
@@ -190,7 +193,10 @@ public class ParallelismTools {
             return super.get();
         }
 
-        /** Runs the task to the end first if no thread has claimed it, whatever the timeout */
+        /**
+         * Runs the task to the end first if no thread has claimed it, whatever the timeout: no other thread would ever
+         * run it, so only waiting would always time out (see {@link ParallelismTools#submit(Callable)}).
+         */
         @Override
         public T get(long timeout, @NotNull TimeUnit unit)
                 throws InterruptedException, ExecutionException, TimeoutException {
