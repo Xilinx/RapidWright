@@ -111,18 +111,19 @@ public class ParallelismTools {
      * or if enabling parallel processing when it was disabled at startup by the
      * {@link #RW_PARALLEL} environment variable.
      * @param parallel Enable parallel processing.
+     * @return True if parallel processing is now enabled or disabled as requested, false if it could not be (e.g.
+     *         to skip a test that needs parallel processing when it cannot be enabled).
      */
-    public static void setParallel(boolean parallel) {
+    public static boolean setParallel(boolean parallel) {
         if (Runtime.getRuntime().availableProcessors() == 1) {
             System.out.println("WARNING: Parallel execution unsupported since there is only one processor.");
-            return;
-        }
-        if (parallel && !parallelAtStartup) {
+        } else if (parallel && !parallelAtStartup) {
             System.out.println("WARNING: Parallel execution unsupported since it was disabled at startup by "
                     + RW_PARALLEL + "=" + System.getenv(RW_PARALLEL) + ".");
-            return;
+        } else {
+            ParallelismTools.parallel = parallel;
         }
-        ParallelismTools.parallel = parallel;
+        return ParallelismTools.parallel == parallel;
     }
 
     /**

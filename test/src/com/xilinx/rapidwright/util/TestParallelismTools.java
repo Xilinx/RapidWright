@@ -42,6 +42,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -320,7 +321,9 @@ public class TestParallelismTools {
             Assertions.assertEquals(Arrays.asList(0, 1, 2, 3, 4, 5), log);
 
             // Otherwise, a stage runs only once both its inputs are complete, on the thread that completes the later
-            ParallelismTools.setParallel(true);
+            // Which needs parallel processing, which cannot be enabled if there is only one processor, or if it was
+            // disabled at startup (RW_PARALLEL=0): then, the blocked task below would run on this thread, and hang
+            Assumptions.assumeTrue(ParallelismTools.setParallel(true));
             final CompletableFuture<Integer> previous = ParallelismTools.supplyAsync(() -> 1);
             ParallelismTools.get(previous);
             final CountDownLatch release = new CountDownLatch(1);
@@ -350,8 +353,10 @@ public class TestParallelismTools {
     public void testJoinAllCancelsRestAfterFailureParallel() {
         boolean wasParallel = ParallelismTools.getParallel();
         CountDownLatch release = new CountDownLatch(1);
-        ParallelismTools.setParallel(true);
         try {
+            // Parallel processing cannot be enabled if there is only one processor, or if it was disabled at startup
+            // (RW_PARALLEL=0): then, the blocked tasks below would run on this thread, and hang
+            Assumptions.assumeTrue(ParallelismTools.setParallel(true));
             IllegalStateException thrown = new IllegalStateException("task 0");
             List<CompletableFuture<Integer>> futures = new ArrayList<>();
             futures.add(ParallelismTools.supplyAsync(() -> {
