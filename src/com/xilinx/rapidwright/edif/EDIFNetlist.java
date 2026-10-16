@@ -46,6 +46,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -54,8 +55,8 @@ import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -1123,67 +1124,14 @@ public class EDIFNetlist extends EDIFName {
 
             if (dos != null) {
                 os.flush();
-                final List<CompletableFuture<ParallelDCPInput>> pieces = new ArrayList<>();
-                // Each chunk's piece is written once that chunk is done and the previous chunk's piece has been
-                // written, by whichever thread completes the later of the two (so it may block on that I/O). That is
-                // often a thread of the common pool, which then blocks without ForkJoinPool.managedBlock(): each
-                // write is assumed to be fast, as it only copies a piece that is already compressed (most estimated
-                // to compress to half of 1 MiB, see PARALLEL_EXPORT_CHUNK_BYTES), and only one is ever in progress
-                CompletableFuture<Void> written = CompletableFuture.completedFuture(null);
-                for (EDIFLibrary lib : librariesToWrite) {
-                    // Split each library's cells into chunks of consecutive cells, each the most estimated to make up
-                    // at most PARALLEL_EXPORT_CHUNK_BYTES (ending a chunk before the cell that would take it beyond
-                    // that), but at least one; chunks do not span libraries. A library has at least one chunk, so
-                    // that it is written even if it has no cells
-                    final List<EDIFCell> cells = lib.getValidCellExportOrder(false);
-                    final long[] estimates = ParallelismTools.stream(cells)
-                            .mapToLong(EDIFNetlist::estimateExportBytes).toArray();
-                    int from = 0;
-                    do {
-                        final int start = from;
-                        long bytes = 0;
-                        while (from < cells.size()
-                                && (from == start || bytes + estimates[from] <= PARALLEL_EXPORT_CHUNK_BYTES)) {
-                            bytes += estimates[from++];
-                        }
-                        final List<EDIFCell> chunk = cells.subList(start, from);
-                        final boolean first = start == 0;
-                        final boolean last = from == cells.size();
-                        // Write this chunk's cells, and the library's header if it is the first chunk and its footer
-                        // if it is the last, directly into the compressing stream of one piece
-                        final CompletableFuture<ParallelDCPInput> piece = ParallelismTools.supplyAsync(
-                                () -> ParallelDCPOutput.newStream(chunkOs -> {
-                            try {
-                                lib.exportEDIF(chunk, chunkOs, first, last, cache, false);
-                            } catch (IOException e) {
-                                throw new UncheckedIOException(e);
-                            }
-                        }));
-                        pieces.add(piece);
-                        written = written.thenCombine(piece, (x, p) -> {
-                            try {
-                                dos.write(p);
-                            } catch (IOException e) {
-                                throw new UncheckedIOException(e);
-                            }
-                            return null;
-                        });
-                    } while (from < cells.size());
+                // Write each chunk's piece on this thread, in order, as soon as it (and every piece before it) is done,
+                // meanwhile running any not yet started (and, if a chunk threw, cancelling those after it before
+                // rethrowing)
+                final Iterator<ParallelDCPInput> pieces =
+                        ParallelismTools.joinInOrder(submitExportChunks(librariesToWrite, cache));
+                while (pieces.hasNext()) {
+                    dos.write(pieces.next());
                 }
-
-                // Wait for the chunks in order, meanwhile running any not yet started (which rethrows any exception
-                // thrown by a chunk), dropping each from pieces once done (so that each piece is kept only until the
-                // relay has written it), then for the last piece to have been written. Even if a chunk threw, do not
-                // return (and close the stream) until the relay has finished: each stage runs only once both its
-                // inputs have completed, so the last completes only once every write has returned. That does not
-                // wait for chunks after one that threw, as joinAll() then cancels them (so their stages complete
-                // without writing): only for a write already in progress on another thread
-                try {
-                    ParallelismTools.joinAll(pieces);
-                } finally {
-                    written.handle((x, e) -> null).join();
-                }
-                ParallelismTools.get(written);
             } else {
                 for (EDIFLibrary lib : librariesToWrite) {
                     lib.exportEDIF(os, cache, stable);
@@ -1205,6 +1153,50 @@ public class EDIFNetlist extends EDIFName {
             os.write(EXPORT_CONST_CLOSE_EDIF);
         }
     }
+    /**
+     * Submit the given libraries' cells to be written as EDIF in parallel, in chunks of consecutive cells, each
+     * written and compressed into a piece of a DCP's EDIF (see {@link ParallelDCPOutput#newStream}), without waiting
+     * for any.
+     * @param librariesToWrite The libraries, in the order to be written.
+     * @param cache The cache of legal EDIF names, which must be safe to use from multiple threads.
+     * @return The pieces, in order: one per chunk, and at least one per library.
+     */
+    private List<Future<ParallelDCPInput>> submitExportChunks(List<EDIFLibrary> librariesToWrite,
+                                                             EDIFWriteLegalNameCache<?> cache) {
+        final List<Future<ParallelDCPInput>> pieces = new ArrayList<>();
+        for (EDIFLibrary lib : librariesToWrite) {
+            // Split each library's cells into chunks of consecutive cells, each the most estimated to make up at most
+            // PARALLEL_EXPORT_CHUNK_BYTES (ending a chunk before the cell that would take it beyond that), but at
+            // least one; chunks do not span libraries. A library has at least one chunk, so that it is written even
+            // if it has no cells
+            final List<EDIFCell> cells = lib.getValidCellExportOrder(false);
+            final long[] estimates = ParallelismTools.stream(cells).mapToLong(EDIFNetlist::estimateExportBytes)
+                    .toArray();
+            int from = 0;
+            do {
+                final int start = from;
+                long bytes = 0;
+                while (from < cells.size()
+                        && (from == start || bytes + estimates[from] <= PARALLEL_EXPORT_CHUNK_BYTES)) {
+                    bytes += estimates[from++];
+                }
+                final List<EDIFCell> chunk = cells.subList(start, from);
+                final boolean first = start == 0;
+                final boolean last = from == cells.size();
+                // Write this chunk's cells, and the library's header if it is the first chunk and its footer if it is
+                // the last, directly into the compressing stream of one piece
+                pieces.add(ParallelismTools.submit(() -> ParallelDCPOutput.newStream(chunkOs -> {
+                    try {
+                        lib.exportEDIF(chunk, chunkOs, first, last, cache, false);
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                })));
+            } while (from < cells.size());
+        }
+        return pieces;
+    }
+
     public void exportEDIF(OutputStream out) throws IOException {
         exportEDIF(out, false);
     }

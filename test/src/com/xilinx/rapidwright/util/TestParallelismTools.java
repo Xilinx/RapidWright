@@ -24,7 +24,9 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -268,7 +270,7 @@ public class TestParallelismTools {
             }));
             completables.add(new CompletableFuture<>());
             final Future<Integer> plain = ParallelismTools.submit(() -> runs.incrementAndGet(2));
-            // Work chained on the CompletableFutures in order, as by EDIF export's relay
+            // Work chained on the CompletableFutures in order
             CompletableFuture<Void> chained = CompletableFuture.completedFuture(null);
             for (CompletableFuture<Integer> completable : completables) {
                 chained = chained.thenCombine(completable, (x, y) -> null);
@@ -384,6 +386,25 @@ public class TestParallelismTools {
     @SuppressWarnings("unchecked")
     public void testInvokeFirstSubmitRestNoTasks() {
         Assertions.assertTrue(ParallelismTools.invokeFirstSubmitRest(new Callable[0]).isEmpty());
+    }
+
+    @Test
+    public void testJoinInOrder() {
+        final AtomicIntegerArray runs = new AtomicIntegerArray(NUM_TASKS);
+        final List<Future<Integer>> futures = new ArrayList<>();
+        for (Callable<Integer> task : countingTasks(runs)) {
+            futures.add(ParallelismTools.submit(task));
+        }
+        // Each value in order, its element set to null once waited for
+        final Iterator<Integer> it = ParallelismTools.joinInOrder(futures);
+        for (int i = 0; i < NUM_TASKS; i++) {
+            Assertions.assertTrue(it.hasNext());
+            Assertions.assertEquals(i, it.next());
+            Assertions.assertNull(futures.get(i));
+        }
+        Assertions.assertFalse(it.hasNext());
+        Assertions.assertThrows(NoSuchElementException.class, it::next);
+        assertEachRunOnce(runs);
     }
 
     @Test

@@ -31,6 +31,7 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountedCompleter;
@@ -59,8 +60,9 @@ import org.jetbrains.annotations.NotNull;
  * thread: those given to {@link #submit(Callable)} (and all but the first
  * given to {@link #invokeFirstSubmitRest(Callable[])}) are deferred until they
  * are waited for ({@link #get(Future)}, {@link #join(List)},
- * {@link #joinAll(List)} or {@link #joinFirst(Deque)}, or the returned
- * Future's own get()) or polled (its own isDone()), which executes them on
+ * {@link #joinAll(List)}, {@link #joinInOrder(List)} or
+ * {@link #joinFirst(Deque)}, or the returned Future's own get()) or polled
+ * (its own isDone()), which executes them on
  * that thread, so a task submitted that way is never executed if it is never
  * waited for (or polled); all others are executed immediately, including those
  * given to {@link #supplyAsync(Callable)}, so that the returned
@@ -139,8 +141,8 @@ public class ParallelismTools {
      * no threads), and any exception it throws is kept as-is.
      * When parallel processing is disabled, the task is not submitted, but deferred until
      * it is waited for, with {@link #get(Future)}, {@link #join(List)},
-     * {@link #joinAll(List)}, {@link #joinFirst(Deque)} or the returned Future's own get(),
-     * or polled with its isDone(), which executes it on that thread (see
+     * {@link #joinAll(List)}, {@link #joinInOrder(List)}, {@link #joinFirst(Deque)} or the
+     * returned Future's own get(), or polled with its isDone(), which executes it on that thread (see
      * {@link LazyFutureTask}). So a task that is never waited for (or polled) is never
      * executed: for one whose result is not needed, use {@link #supplyAsync(Callable)},
      * which executes it immediately instead. Nor can a timed get() bound how long the task
@@ -186,7 +188,7 @@ public class ParallelismTools {
     /**
      * A FutureTask that is not submitted to the pool (as when parallel processing is disabled), but run by the first
      * thread to wait for it with its own get(), or to poll it with its own isDone(), as well as by {@link #get(Future)},
-     * {@link #join(List)}, {@link #joinAll(List)} or {@link #joinFirst(Deque)} (see
+     * {@link #join(List)}, {@link #joinAll(List)}, {@link #joinInOrder(List)} or {@link #joinFirst(Deque)} (see
      * {@link #runIfUnclaimed(Future)}). FutureTask.run() does nothing if another thread has already claimed the task
      * (or it has been cancelled), so it is run at most once, and any other thread waiting for it meanwhile waits for
      * that one.
@@ -409,7 +411,8 @@ public class ParallelismTools {
      * In single-threaded mode, all but the first task are not executed here but are
      * deferred, as by {@link #submit(Callable)}, until they are passed to
      * {@link #joinFirst(Deque)} (or waited for by {@link #get(Future)}, {@link #join(List)},
-     * {@link #joinAll(List)} or the Future's own get(), or polled by its own isDone()).
+     * {@link #joinAll(List)}, {@link #joinInOrder(List)} or the Future's own get(), or polled by
+     * its own isDone()).
      * @param tasks List of tasks to be executed (if none, an empty Deque is returned).
      * @param <T> Type returned by all tasks.
      * @return A Deque of Future objects corresponding to each task (in order).
@@ -507,25 +510,70 @@ public class ParallelismTools {
      *                ArrayList), and are each set to null once completed.
      */
     public static void joinAll(@NotNull List<? extends Future<?>> futures) {
-        // Every task before this index has been run by this thread, or claimed by another
-        int next = 0;
-        for (int i = 0; i < futures.size(); i++) {
-            final Future<?> future = futures.get(i);
-            // Never steal from before this one, whose elements have been set to null
-            next = Math.max(next, i);
-            while (!future.isDone() && next < futures.size()) {
-                runIfUnclaimed(futures.get(next++));
-            }
-            try {
-                getUnwrapped(future);
-            } catch (Throwable e) {
-                for (int j = i; j < futures.size(); j++) {
-                    futures.get(j).cancel(false);
-                }
-                throw e;
-            }
-            futures.set(i, null);
+        final Iterator<?> it = joinInOrder(futures);
+        while (it.hasNext()) {
+            it.next();
         }
+    }
+
+    /**
+     * For a given List of Futures, return an Iterator over their values, in
+     * order, each of whose next() waits for the next Future as
+     * {@link #joinAll(List)} does: meanwhile stealing tasks not yet claimed in
+     * order, then setting its element to null, and returning its value; or, if
+     * its task threw, cancelling the Futures of those after it and rethrowing
+     * (after which the Iterator must not be used). Useful when each value is
+     * consumed by the waiting thread (e.g. copied elsewhere) before it waits
+     * for the next, rather than by work chained on the Futures.
+     * The given List is modified: each next() sets the element of the Future
+     * it waited for to null, leaving those not yet reached (and that of a task
+     * that threw) as they are, so that the List no longer keeps a Future (or
+     * its value) once it has been waited for. So the List must be modifiable,
+     * and may be read between calls to next() (e.g. to cancel the Futures not
+     * yet waited for), when each Future already waited for is null.
+     * @param futures A modifiable List of Future objects corresponding to
+     *                previously submitted tasks, whose elements are accessed by
+     *                index (so should be a random-access list, such as an
+     *                ArrayList).
+     * @param <T> Type returned by all tasks.
+     * @return An Iterator over the values of the Futures, in order.
+     */
+    public static <T> Iterator<T> joinInOrder(@NotNull List<? extends Future<? extends T>> futures) {
+        return new Iterator<T>() {
+            // The index of the next Future to wait for
+            private int i = 0;
+            // Every task before this index has been run by this thread, or claimed by another
+            private int next = 0;
+
+            @Override
+            public boolean hasNext() {
+                return i < futures.size();
+            }
+
+            @Override
+            public T next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                final Future<? extends T> future = futures.get(i);
+                // Never steal from before this one, whose elements have been set to null
+                next = Math.max(next, i);
+                while (!future.isDone() && next < futures.size()) {
+                    runIfUnclaimed(futures.get(next++));
+                }
+                final T value;
+                try {
+                    value = getUnwrapped(future);
+                } catch (Throwable e) {
+                    for (int j = i; j < futures.size(); j++) {
+                        futures.get(j).cancel(false);
+                    }
+                    throw e;
+                }
+                futures.set(i++, null);
+                return value;
+            }
+        };
     }
 
     /**
