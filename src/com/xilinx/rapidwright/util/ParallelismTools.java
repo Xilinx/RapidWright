@@ -243,10 +243,11 @@ public class ParallelismTools {
     /**
      * A CompletableFuture that runs its own task, unless already done (e.g. cancelled), at most once, on whichever
      * thread runs it first: a thread of the pool, if it was submitted to it, or a thread waiting for it, whether with
-     * its own get() or join(), or with {@link #get(Future)}, {@link #join(List)} or {@link #joinAll(List)} (see
-     * {@link #runIfUnclaimed(Future)}). So it need not be submitted at all (as when parallel processing is disabled),
-     * as waiting for it runs it. A CompletableFuture's own task (e.g. from CompletableFuture.supplyAsync()) cannot be
-     * run that way: the CompletableFuture has no reference to it, and it could run twice if run by a second thread.
+     * its own get() or join(), or with {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)} or
+     * {@link #joinAnyOrder(Collection)} (see {@link #runIfUnclaimed(Future)}). So it need not be submitted at all (as
+     * when parallel processing is disabled), as waiting for it runs it. A CompletableFuture's own task (e.g. from
+     * CompletableFuture.supplyAsync()) cannot be run that way: the CompletableFuture has no reference to it, and it
+     * could run twice if run by a second thread.
      */
     private static final class RunnableCompletableFuture<T> extends CompletableFuture<T> implements Runnable {
         /** The task, until a thread claims it to run it */
@@ -292,9 +293,10 @@ public class ParallelismTools {
      * Submit a task-with-return-value to the common ForkJoinPool, as {@link #submit(Callable)} does, but returning a
      * CompletableFuture, so that further work can be chained on its completion (by default, run by the thread that
      * completes it), in any way. Any exception the task throws completes the CompletableFuture exceptionally. A thread
-     * waiting for it, whether with {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)} or
-     * {@link #joinInOrder(List)}, or with the CompletableFuture's own get() or join(), runs the task itself if no other
-     * thread has started it (and a timed get() then runs it to the end, whatever the timeout).
+     * waiting for it, whether with {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)},
+     * {@link #joinInOrder(List)} or {@link #joinAnyOrder(Collection)}, or with the CompletableFuture's own get() or
+     * join(), runs the task itself if no other thread has started it (and a timed get() then runs it to the end,
+     * whatever the timeout).
      * When parallel processing is disabled, the task is executed immediately on the current thread, so that the
      * returned CompletableFuture is already complete: work chained on it then runs as soon as it is chained, on the
      * thread chaining it.
@@ -594,6 +596,66 @@ public class ParallelismTools {
                 return value;
             }
         };
+    }
+
+    /**
+     * For a given Collection of CompletableFutures, block until any one is done, and return an Iterator of the
+     * Collection (from its iterator()) positioned at it: so that its next() returns it, after which its remove()
+     * removes it from the Collection, without searching the Collection for it. The one done is one already done, if
+     * any; else one whose task this thread runs itself, the first in the Collection's order not yet claimed by another
+     * thread (so, when parallel processing is disabled, as by {@link #supplyAsync(Callable)}, each is already done and
+     * the first is returned); else, as every one is running on another thread, whichever is done first. Useful when
+     * each result is consumed by this thread as soon as it is ready, in whatever order the tasks complete: remove each
+     * from the Collection before calling this again (else it is returned again), so that the Collection holds those
+     * not yet consumed (e.g. to close their results if consuming one fails). Its value, or the exception its task
+     * threw, is not taken here: get it with {@link #get(Future)}, which rethrows such an exception as described for
+     * this class.
+     * Only CompletableFutures can be waited for this way, as for any one of them (CompletableFuture.anyOf()): any other
+     * Future (e.g. from {@link #submit(Callable)}) could only be polled.
+     * @param futures A non-empty Collection of CompletableFutures, e.g. from {@link #supplyAsync(Callable)}.
+     * @param <F> Type of the CompletableFutures.
+     * @return An Iterator of the Collection, whose next() returns a CompletableFuture that is done.
+     * @throws NoSuchElementException If the Collection is empty.
+     */
+    public static <F extends CompletableFuture<?>> Iterator<F> joinAnyOrder(@NotNull Collection<F> futures) {
+        if (futures.isEmpty()) {
+            throw new NoSuchElementException();
+        }
+        while (true) {
+            // The index (in the Collection's order) of one that is done, if any
+            int done = -1;
+            int i = 0;
+            for (F future : futures) {
+                if (future.isDone()) {
+                    done = i;
+                    break;
+                }
+                i++;
+            }
+            if (done < 0) {
+                i = 0;
+                for (F future : futures) {
+                    // As a CompletableFuture<?>, so that its type argument can be captured
+                    CompletableFuture<?> f = future;
+                    if (runIfUnclaimed(f)) {
+                        done = i;
+                        break;
+                    }
+                    i++;
+                }
+            }
+            if (done >= 0) {
+                // An Iterator cannot step back to the one it last returned, so a new one is stopped just before it
+                Iterator<F> it = futures.iterator();
+                for (i = 0; i < done; i++) {
+                    it.next();
+                }
+                return it;
+            }
+            // Every one has been claimed by another thread (so will complete without this one), and none is done yet.
+            // The exception of the one done, if any, is left for get(), as handle() completes normally
+            getUnwrapped(CompletableFuture.anyOf(futures.toArray(new CompletableFuture<?>[0])).handle((r, e) -> null));
+        }
     }
 
     /**
