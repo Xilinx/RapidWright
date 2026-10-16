@@ -23,9 +23,11 @@
 
 package com.xilinx.rapidwright.util;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
@@ -340,6 +342,63 @@ public class ParallelismTools {
             Thread.currentThread().interrupt();
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * For a given list of value-returning-tasks, first submit all but the first task to
+     * the thread pool to be executed in parallel, then execute that first task with the
+     * current thread.
+     * In single-threaded mode, all but the first task are not executed here but are
+     * deferred, as by {@link #submit(Callable)}, until they are passed to
+     * {@link #joinFirst(Deque)} (or waited for by {@link #get(Future)}, {@link #join(List)}
+     * or the Future's own get()).
+     * @param tasks List of tasks to be executed (if none, an empty Deque is returned).
+     * @param <T> Type returned by all tasks.
+     * @return A Deque of Future objects corresponding to each task (in order).
+     * @deprecated Submit each task with {@link #submit(Callable)} (or
+     *             {@link #submitCompletable(Callable)}) into a List, and wait for them in
+     *             order with {@link #joinInOrder(List)}, which also runs any not yet started.
+     */
+    @Deprecated
+    @SafeVarargs
+    public static <T> Deque<Future<T>> invokeFirstSubmitRest(@NotNull Callable<T>... tasks) {
+        final Deque<Future<T>> futures = new ArrayDeque<>(tasks.length);
+        if (tasks.length == 0) {
+            return futures;
+        }
+
+        for (int i = 1; i < tasks.length; i++) {
+            futures.addLast(submit(tasks[i]));
+        }
+        futures.addFirst(callNow(tasks[0]));
+
+        return futures;
+    }
+
+    /**
+     * For a given Deque of Futures, block until the first is complete and
+     * remove it from the deque.
+     * First, try and steal the task and execute it on this thread. If this
+     * is not possible (indicating another thread has already claimed it)
+     * then use this thread productively by stealing subsequent unclaimed
+     * tasks to work on until the first is complete.
+     * @param futures A Deque of Future objects corresponding to previously
+     *                submitted tasks.
+     * @param <T> Type returned by all tasks.
+     * @return The value returned by the first task.
+     * @deprecated Wait for the Futures in order with {@link #joinInOrder(List)}, which
+     *             likewise steals subsequent unclaimed tasks while waiting for each.
+     */
+    @Deprecated
+    public static <T> T joinFirst(Deque<Future<T>> futures) {
+        final Future<T> first = futures.removeFirst();
+        if (!runIfUnclaimed(first)) {
+            final Iterator<Future<T>> it = futures.iterator();
+            while (!first.isDone() && it.hasNext()) {
+                runIfUnclaimed(it.next());
+            }
+        }
+        return getUnwrapped(first);
     }
 
     /**
