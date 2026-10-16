@@ -1069,63 +1069,50 @@ public class EDIFNetlist extends EDIFName {
 
             if (dos != null) {
                 os.flush();
-                // The libraries' cells, one after the other: those of the i-th library are from offsets[i]
-                // (inclusive) to offsets[i + 1] (exclusive)
-                final List<EDIFCell> cells = new ArrayList<>();
-                final int[] offsets = new int[librariesToWrite.size() + 1];
-                for (int i = 0; i < librariesToWrite.size(); i++) {
-                    cells.addAll(librariesToWrite.get(i).getValidCellExportOrder(false));
-                    offsets[i + 1] = cells.size();
-                }
-                // Split the cells into chunks of consecutive cells, each the most estimated to make up at most
-                // PARALLEL_EXPORT_CHUNK_BYTES (ending a chunk before the cell that would take it beyond that), but at
-                // least one. There is at least one chunk, so that libraries are written even if none has any cells
-                final long[] estimates = ParallelismTools.stream(cells).mapToLong(EDIFNetlist::estimateExportBytes)
-                        .toArray();
                 final List<CompletableFuture<ParallelDCPInput>> pieces = new ArrayList<>();
                 // Each chunk's piece is written once that chunk is done and the previous chunk's piece has been
                 // written, by whichever thread completes the later of the two (so it may block on that I/O)
                 CompletableFuture<Void> written = CompletableFuture.completedFuture(null);
-                int from = 0;
-                do {
-                    final int start = from;
-                    long bytes = 0;
-                    while (from < cells.size()
-                            && (from == start || bytes + estimates[from] <= PARALLEL_EXPORT_CHUNK_BYTES)) {
-                        bytes += estimates[from++];
-                    }
-                    final int end = from;
-                    // Write this chunk's cells, and the header of each library that starts within it and the footer
-                    // of each that ends within it (a library without cells is written by the chunk that contains its
-                    // offset, or by the last chunk if it comes after all cells), directly into the compressing
-                    // stream of one piece
-                    final CompletableFuture<ParallelDCPInput> piece = ParallelismTools.supplyAsync(
-                            () -> ParallelDCPOutput.newStream(chunkOs -> {
-                        try {
-                            for (int i = 0; i < librariesToWrite.size(); i++) {
-                                final int libFrom = offsets[i];
-                                final int libTo = offsets[i + 1];
-                                if (start <= libFrom ? libFrom >= end && end < cells.size() : start >= libTo) {
-                                    continue;
-                                }
-                                librariesToWrite.get(i).exportEDIF(
-                                        cells.subList(Math.max(start, libFrom), Math.min(end, libTo)), chunkOs,
-                                        start <= libFrom, libTo <= end, cache, false);
+                for (EDIFLibrary lib : librariesToWrite) {
+                    // Split each library's cells into chunks of consecutive cells, each the most estimated to make up
+                    // at most PARALLEL_EXPORT_CHUNK_BYTES (ending a chunk before the cell that would take it beyond
+                    // that), but at least one; chunks do not span libraries. A library has at least one chunk, so
+                    // that it is written even if it has no cells
+                    final List<EDIFCell> cells = lib.getValidCellExportOrder(false);
+                    final long[] estimates = ParallelismTools.stream(cells)
+                            .mapToLong(EDIFNetlist::estimateExportBytes).toArray();
+                    int from = 0;
+                    do {
+                        final int start = from;
+                        long bytes = 0;
+                        while (from < cells.size()
+                                && (from == start || bytes + estimates[from] <= PARALLEL_EXPORT_CHUNK_BYTES)) {
+                            bytes += estimates[from++];
+                        }
+                        final List<EDIFCell> chunk = cells.subList(start, from);
+                        final boolean first = start == 0;
+                        final boolean last = from == cells.size();
+                        // Write this chunk's cells, and the library's header if it is the first chunk and its footer
+                        // if it is the last, directly into the compressing stream of one piece
+                        final CompletableFuture<ParallelDCPInput> piece = ParallelismTools.supplyAsync(
+                                () -> ParallelDCPOutput.newStream(chunkOs -> {
+                            try {
+                                lib.exportEDIF(chunk, chunkOs, first, last, cache, false);
+                            } catch (IOException e) {
+                                throw new UncheckedIOException(e);
                             }
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    }));
-                    pieces.add(piece);
-                    written = written.thenCombine(piece, (x, p) -> {
-                        try {
-                            dos.write(p);
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                        return null;
-                    });
-                } while (from < cells.size());
+                        }));
+                        pieces.add(piece);
+                        written = written.thenCombine(piece, (x, p) -> {
+                            try {
+                                dos.write(p);
+                            } catch (IOException e) {
+                                throw new UncheckedIOException(e);
+                            }
+                            return null;
+                        });
+                    } while (from < cells.size());
+                }
 
                 // Wait for the chunks in order, meanwhile running any not yet started (which rethrows any exception
                 // thrown by a chunk), dropping each from pieces once done (so that each piece is kept only until the
