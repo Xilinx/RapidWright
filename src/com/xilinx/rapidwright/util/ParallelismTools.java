@@ -43,6 +43,7 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -194,93 +195,72 @@ public class ParallelismTools {
     }
 
     /**
-     * A CompletableFuture completed by a FutureTask that runs its task: so that, once that FutureTask has been
-     * submitted to the pool, a thread waiting for the CompletableFuture with {@link #get(Future)}, {@link #join(List)}
-     * or {@link #joinAll(List)} can run it itself if no other thread has started it (see
-     * {@link #runIfUnclaimed(Future)}), as for a Future from {@link #submit(Callable)}. A CompletableFuture's own task
-     * (e.g. from CompletableFuture.supplyAsync()) cannot be run that way: the CompletableFuture has no reference to
-     * it, and (unlike a FutureTask) it could run twice if run by a second thread.
+     * A CompletableFuture that runs its own task, unless already done (e.g. cancelled), at most once, on whichever
+     * thread runs it first: a thread of the pool, if it was submitted to it, or a thread waiting for it, whether with
+     * its own get() or join(), or with {@link #get(Future)}, {@link #join(List)} or {@link #joinAll(List)} (see
+     * {@link #runIfUnclaimed(Future)}). So it need not be submitted at all (as when parallel processing is disabled),
+     * as waiting for it runs it. A CompletableFuture's own task (e.g. from CompletableFuture.supplyAsync()) cannot be
+     * run that way: the CompletableFuture has no reference to it, and it could run twice if run by a second thread.
      */
-    private static class CompletableFutureWithFutureTask<T> extends CompletableFuture<T> {
-        /** Runs the task and completes this, at most once */
-        protected final FutureTask<Void> task;
+    private static final class RunnableCompletableFuture<T> extends CompletableFuture<T> implements Runnable {
+        /** The task, until a thread claims it to run it */
+        private final AtomicReference<Callable<T>> task;
 
-        private CompletableFutureWithFutureTask(Callable<T> callable) {
-            task = new FutureTask<>(() -> {
+        private RunnableCompletableFuture(Callable<T> task) {
+            this.task = new AtomicReference<>(task);
+        }
+
+        @Override
+        public void run() {
+            final Callable<T> callable = isDone() ? null : task.getAndSet(null);
+            if (callable != null) {
                 try {
                     complete(callable.call());
                 } catch (Throwable e) {
                     completeExceptionally(e);
                 }
-                return null;
-            });
-        }
-
-        /**
-         * Also cancels the FutureTask, so that it is not run if no thread has started it (as a CompletableFuture's
-         * own cancel() only completes it, which would leave the FutureTask to run when a pool thread dequeues it).
-         */
-        @Override
-        public boolean cancel(boolean mayInterruptIfRunning) {
-            task.cancel(false);
-            return super.cancel(mayInterruptIfRunning);
-        }
-    }
-
-    /**
-     * A {@link CompletableFutureWithFutureTask} whose FutureTask is not submitted to the pool (as when parallel
-     * processing is disabled), but run by the first thread to wait for this with its own get() or join(), as for a
-     * {@link LazyFutureTask}, as well as by {@link #get(Future)}, {@link #join(List)} or {@link #joinAll(List)}.
-     */
-    private static final class CompletableFutureWithLazyFutureTask<T> extends CompletableFutureWithFutureTask<T> {
-        private CompletableFutureWithLazyFutureTask(Callable<T> callable) {
-            super(callable);
+            }
         }
 
         @Override
         public T get() throws InterruptedException, ExecutionException {
-            task.run();
+            run();
             return super.get();
         }
 
         @Override
         public T get(long timeout, @NotNull TimeUnit unit)
                 throws InterruptedException, ExecutionException, TimeoutException {
-            task.run();
+            run();
             return super.get(timeout, unit);
         }
 
         @Override
         public T join() {
-            task.run();
+            run();
             return super.join();
         }
     }
 
     /**
-     * Submit a task-with-return-value to the common ForkJoinPool, as {@link #submit(Callable)} does (so a thread
-     * waiting for it with {@link #get(Future)}, {@link #join(List)} or {@link #joinAll(List)} also runs it itself if
-     * no other thread has started it), but returning a CompletableFuture, so that further work can be chained on its
-     * completion (by default, run by the thread that completes it). Any exception the task throws completes the
-     * CompletableFuture exceptionally.
+     * Submit a task-with-return-value to the common ForkJoinPool, as {@link #submit(Callable)} does, but returning a
+     * CompletableFuture, so that further work can be chained on its completion (by default, run by the thread that
+     * completes it). Any exception the task throws completes the CompletableFuture exceptionally. A thread waiting
+     * for it, whether with {@link #get(Future)}, {@link #join(List)} or {@link #joinAll(List)}, or with the
+     * CompletableFuture's own get() or join(), runs the task itself if no other thread has started it (and a timed
+     * get() then runs it to the end, whatever the timeout).
      * When parallel processing is disabled, the task is deferred as for {@link #submit(Callable)}: until it is waited
-     * for with {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)} or the
-     * returned CompletableFuture's own get() or join(), which executes it (and then, on the same thread, any work
-     * chained on it) on the waiting thread. Waiting only for work chained on it (e.g. by thenApply()) does not run the
-     * task, so blocks forever.
-     * Otherwise, waiting with the CompletableFuture's own get() or join() does not run the task. (From Java 9, a thread
-     * of the pool that does so helps, within the JDK, which cannot be done from outside it, but only by running
-     * CompletableFutures' own tasks, e.g. from CompletableFuture.supplyAsync(), at the head of its own queue.)
+     * for, which executes it (and then, on the same thread, any work chained on it) on the waiting thread. Waiting
+     * only for work chained on it (e.g. by thenApply()) does not run the task, so blocks forever.
      * @param task Task to be performed.
      * @param <T> Type returned by task.
      * @return A CompletableFuture holding the value returned by task.
      */
     public static <T> CompletableFuture<T> submitCompletable(Callable<T> task) {
-        if (!getParallel()) {
-            return new CompletableFutureWithLazyFutureTask<>(task);
+        final RunnableCompletableFuture<T> future = new RunnableCompletableFuture<>(task);
+        if (getParallel()) {
+            ForkJoinPool.commonPool().execute(future);
         }
-        final CompletableFutureWithFutureTask<T> future = new CompletableFutureWithFutureTask<>(task);
-        ForkJoinPool.commonPool().execute(future.task);
         return future;
     }
 
@@ -533,8 +513,8 @@ public class ParallelismTools {
      * ForkJoinPool does not support for tasks given to execute()): FutureTask.run()
      * does nothing if another thread has already claimed the task, so the pool
      * worker that eventually dequeues it finds it already done, which costs it
-     * very little. Likewise for the FutureTask of a
-     * {@link CompletableFutureWithFutureTask}. Any other Future (e.g. a ForkJoinTask,
+     * very little. Likewise for a {@link RunnableCompletableFuture}, whose run()
+     * does nothing once its task has been claimed. Any other Future (e.g. a ForkJoinTask,
      * which, unlike a FutureTask, could run again if run while another thread is
      * running it) is left to the thread that runs it.
      * @param future Future representing a previously submitted task.
@@ -546,8 +526,8 @@ public class ParallelismTools {
         if (!future.isDone()) {
             if (future instanceof FutureTask) {
                 ((FutureTask<T>) future).run();
-            } else if (future instanceof CompletableFutureWithFutureTask) {
-                ((CompletableFutureWithFutureTask<T>) future).task.run();
+            } else if (future instanceof RunnableCompletableFuture) {
+                ((RunnableCompletableFuture<T>) future).run();
             }
         }
         return future.isDone();
