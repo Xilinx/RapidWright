@@ -1031,11 +1031,14 @@ public class EDIFNetlist extends EDIFName {
      *               parallel: then, this applies only to the date, the order of libraries and the netlist's and
      *               design's properties (cells are written in an unsorted valid order, with unsorted contents), and
      *               names that are made legal as the same EDIF identifier may be told apart differently each time
-     *               (see {@link EDIFWriteLegalNameCache}).
+     *               (see {@link EDIFWriteLegalNameCache}). So stable output into a DCP needs parallel processing to be
+     *               disabled (which is asserted).
      */
     public void exportEDIF(OutputStream out, boolean stable) throws IOException {
         try (BufferedOutputStream os = new BufferedOutputStream(out)) {
             final ParallelDCPOutput dos = ParallelismTools.getParallel() ? ParallelDCPOutput.cast(out) : null;
+            // Stable output is not guaranteed when written in parallel (see above)
+            assert(!stable || dos == null);
             EDIFWriteLegalNameCache<?> cache = dos != null ?
                     EDIFWriteLegalNameCache.multiThreaded() : EDIFWriteLegalNameCache.singleThreaded();
 
