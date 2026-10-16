@@ -1287,6 +1287,96 @@ public class TestDesignTools {
                 + " instance.", e.getMessage());
     }
 
+    /**
+     * A static shell can hold site instances in a reconfigurable partition's region that do nothing
+     * but lock the site's BELs, with placeholder cells. A circuit filling the black box has its own
+     * site instances on those sites, which must take their place. A site instance holding anything
+     * else, such as another cell or site routing without a net, or nothing at all, is still an overlap.
+     * The circuit's site instance is usually named after the site, as the locked one is, but need not
+     * be ("onlyLockedRenamed"): what the site changes from goes with the site, not the name.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"onlyLocked", "onlyLockedRenamed", "otherCell", "nullNetSitePIP", "empty"})
+    public void testPopulateBlackBoxReplacesLockedSites(String shellSite) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", createBlackBox(top, "bb", EDIFDirection.INPUT));
+        Net inNet = design.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+
+        Site site = design.getDevice().getSite("SLICE_X1Y0");
+        SiteInst locked = design.createSiteInst(site);
+        Assertions.assertEquals(site.getName(), locked.getName());
+        if (!shellSite.equals("empty")) {
+            for (String belName : new String[] {"A6LUT", "B6LUT", "AFF"}) {
+                locked.addCell(new Cell(Cell.LOCKED, locked.getBEL(belName)));
+            }
+        }
+        if (shellSite.equals("otherCell")) {
+            design.createAndPlaceCell(top, "other", Unisim.LUT1, site.getName() + "/C6LUT");
+        } else if (shellSite.equals("nullNetSitePIP")) {
+            locked.addSitePIP("FFMUXA1", "D6");
+            Assertions.assertTrue(locked.getSiteWireToNetMap().isEmpty());
+        }
+        // The shell is as it was read: from here on, changes to it are tracked
+        design.setTrackingChanges(true);
+        design.setCopyingOriginalSiteInsts(true);
+
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet circuitIn = circuitTop.createNet("I");
+        circuitIn.createPortInst(circuitTop.getPort("I"));
+        boolean renamed = shellSite.equals("onlyLockedRenamed");
+        if (renamed) {
+            circuit.createSiteInst("incoming", site.getSiteTypeEnum(), site);
+        }
+        SitePinInst lutIn = addSinkLUT(circuit, circuitTop, "lut", site.getName(), circuitIn,
+                circuit.createNet("I"));
+        SiteInst incoming = lutIn.getSiteInst();
+        Assertions.assertEquals(renamed ? "incoming" : site.getName(), incoming.getName());
+        for (String belName : new String[] {"B6LUT", "AFF"}) {
+            incoming.addCell(new Cell(Cell.LOCKED, incoming.getBEL(belName)));
+        }
+
+        if (!shellSite.startsWith("onlyLocked")) {
+            RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                    () -> DesignTools.populateBlackBox(design, "bb", circuit));
+            Assertions.assertTrue(e.getMessage().startsWith("ERROR: Site overlap at SLICE_X1Y0"),
+                    e.getMessage());
+            return;
+        }
+
+        // Also asserts that every modified site instance is the one the design holds on its site,
+        // so that the locked one is not left in the modified set: as SiteInsts compare by name, it
+        // would otherwise stand in for the incoming one when the two share a name
+        populateBlackBox(design, "bb", circuit, false);
+
+        Assertions.assertSame(incoming, design.getSiteInstFromSite(site));
+        Assertions.assertSame(incoming, design.getSiteInst(incoming.getName()));
+        if (renamed) {
+            Assertions.assertNull(design.getSiteInst(locked.getName()));
+        }
+        Assertions.assertNull(locked.getDesign());
+        Assertions.assertTrue(design.getModifiedSiteInsts().contains(incoming));
+        Assertions.assertNotNull(design.getCell("bb/lut"));
+        Assertions.assertSame(inNet, lutIn.getNet());
+
+        // What the site changes from is the locked site instance it held, recorded under the site
+        // whatever the incoming site instance is called
+        SiteInst original = design.getOriginalSiteInsts().get(site.getName());
+        Assertions.assertNotNull(original);
+        Assertions.assertNotSame(Design.EMPTY_ORIGINAL_SITE_INST, original);
+        Assertions.assertSame(site, original.getSite());
+        Assertions.assertEquals(3, original.getCells().size());
+        for (Cell c : original.getCells()) {
+            Assertions.assertEquals(Cell.LOCKED, c.getName());
+        }
+        if (renamed) {
+            Assertions.assertNull(design.getOriginalSiteInsts().get(incoming.getName()));
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"DX", "D_I"})
     public void testGetTrimmablePIPsFromPins(String pinName) {
