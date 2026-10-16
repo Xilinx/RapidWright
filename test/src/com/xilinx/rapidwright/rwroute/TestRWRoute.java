@@ -64,6 +64,7 @@ import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.interchange.Interchange;
+import com.xilinx.rapidwright.support.ChangeTrackingAssertions;
 import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.CodeGenerator;
@@ -93,6 +94,40 @@ public class TestRWRoute {
                 Assertions.assertTrue(spi.isRouted());
             }
         }
+    }
+
+    /**
+     * Whether RWRoute leaves the given net unrouted for having no source or no sinks -- such as a
+     * net driven from, or driving, a top-level port of an out-of-context design. Such a net can
+     * still be modified, by gaining the pins that
+     * {@link DesignTools#createMissingSitePinInsts(Design)} creates ahead of routing.
+     * <p>
+     * Static nets are exempt: RWRoute routes them, but strips their output pins first and only
+     * creates new ones for sinks it sources from a LUT, not those it sources from a tie-off. So a
+     * routed static net can be left with no source pin, which RouterHelper#isDriverLessNet() would
+     * mistake for a net that RWRoute leaves unrouted.
+     */
+    private static boolean isDriverLessOrLoadLessAndNotStaticNet(Net net) {
+        return !net.isStaticNet() && RouterHelper.isDriverLessOrLoadLessNet(net);
+    }
+
+    /**
+     * Asserts that every modified net is one the design still holds, and has all its pins routed
+     * unless RWRoute leaves it unrouted (see {@link #isDriverLessOrLoadLessAndNotStaticNet(Net)}).
+     *
+     * @return The number of modified nets whose pins were checked.
+     */
+    private static int assertModifiedNetsRouted(Design design) {
+        ChangeTrackingAssertions.assertModifiedNetsAreInDesign(design);
+        int checked = 0;
+        for (Net net : design.getModifiedNets()) {
+            if (isDriverLessOrLoadLessAndNotStaticNet(net)) {
+                continue;
+            }
+            assertAllPinsRouted(net);
+            checked++;
+        }
+        return checked;
     }
 
     public static void assertAllPinsRouted(Design design) {
@@ -225,9 +260,7 @@ public class TestRWRoute {
         }, null, softPreserve);
 
         Assertions.assertFalse(design.getModifiedNets().isEmpty());
-        for (Net net : design.getModifiedNets()) {
-            assertAllPinsRouted(net);
-        }
+        assertModifiedNetsRouted(design);
         VivadoToolsHelper.assertFullyRouted(design);
     }
 
@@ -296,9 +329,7 @@ public class TestRWRoute {
         Design routed = PartialRouter.routeDesignPartialNonTimingDriven(design, null, softPreserve);
 
         Assertions.assertFalse(routed.getModifiedNets().isEmpty());
-        for (Net net : routed.getModifiedNets()) {
-            assertAllPinsRouted(net);
-        }
+        assertModifiedNetsRouted(routed);
         VivadoToolsHelper.assertFullyRouted(design);
     }
 
@@ -346,10 +377,7 @@ public class TestRWRoute {
             RWRoute.routeDesignFullNonTimingDriven(design);
         }
 
-        Assertions.assertEquals(expectedNetsModified, design.getModifiedNets().size());
-        for (Net net : design.getModifiedNets()) {
-            assertAllPinsRouted(net);
-        }
+        Assertions.assertEquals(expectedNetsModified, assertModifiedNetsRouted(design));
 
         if (FileTools.isVivadoOnPath()) {
             ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
@@ -376,9 +404,7 @@ public class TestRWRoute {
         Design routed = PartialRouter.routeDesignPartialTimingDriven(design, null, softPreserve);
 
         Assertions.assertFalse(routed.getModifiedNets().isEmpty());
-        for (Net net : routed.getModifiedNets()) {
-            assertAllPinsRouted(net);
-        }
+        assertModifiedNetsRouted(routed);
         VivadoToolsHelper.assertFullyRouted(design);
     }
 
