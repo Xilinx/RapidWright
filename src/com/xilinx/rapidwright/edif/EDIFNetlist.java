@@ -833,16 +833,18 @@ public class EDIFNetlist extends EDIFName {
      * Get Libraries in export order so that any cell instance appearing in a library will only
      * refer to cells in its own library or previous libraries in the list.  This is a pre-requisite
      * for export to a file.
+     * @param stable If true, sorts the libraries before determining the order so that they are
+     * ordered consistently.
      * @return List of all libraries in the netlist sorted for valid export, HDIPrimitives library
      * is always first.
      */
-    public List<EDIFLibrary> getLibrariesInExportOrder() {
+    public List<EDIFLibrary> getLibrariesInExportOrder(boolean stable) {
         Set<EDIFLibrary> toExport = new LinkedHashSet<EDIFLibrary>();
         // Assume HDI Primitives are always first as they should not refer to any previous libraries
         toExport.add(getHDIPrimitivesLibrary());
 
         Map<String, HashSet<EDIFLibrary>> deps = new HashMap<String, HashSet<EDIFLibrary>>();
-        for (EDIFLibrary lib : getLibraries()) {
+        for (EDIFLibrary lib : EDIFTools.sortIfStable(getLibraries(), stable)) {
             if (lib.isHDIPrimitivesLibrary()) continue;
             HashSet<EDIFLibrary> externalRefs =
                     new HashSet<EDIFLibrary>(lib.getExternallyReferencedLibraries());
@@ -881,6 +883,17 @@ public class EDIFNetlist extends EDIFName {
         }
 
         return new ArrayList<>(toExport);
+    }
+
+    /**
+     * Get Libraries in export order so that any cell instance appearing in a library will only
+     * refer to cells in its own library or previous libraries in the list.  This is a pre-requisite
+     * for export to a file.
+     * @return List of all libraries in the netlist sorted for valid export, HDIPrimitives library
+     * is always first.
+     */
+    public List<EDIFLibrary> getLibrariesInExportOrder() {
+        return getLibrariesInExportOrder(false);
     }
 
     public static final byte[] EXPORT_CONST_EDIF_VERSION = "\n  (edifversion 2 0 0)\n  (edifLevel 0)\n  (keywordmap (keywordlevel 0))\n(status\n (written\n  (timeStamp ".getBytes(StandardCharsets.UTF_8);
@@ -931,7 +944,7 @@ public class EDIFNetlist extends EDIFName {
             }
             os.write(EXPORT_CONST_DOUBLE_CLOSE);
 
-            List<EDIFLibrary> librariesToWrite = getLibrariesInExportOrder();
+            List<EDIFLibrary> librariesToWrite = getLibrariesInExportOrder(stable);
 
             if (dos != null) {
                 Deque<Future<ParallelDCPInput>> streamFutures = new ArrayDeque<>();
