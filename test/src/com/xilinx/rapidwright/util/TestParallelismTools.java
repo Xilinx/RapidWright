@@ -29,6 +29,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CountedCompleter;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
@@ -36,6 +37,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -169,6 +171,61 @@ public class TestParallelismTools {
         });
         Assertions.assertSame(thrown,
                 Assertions.assertThrows(IllegalStateException.class, () -> ParallelismTools.get(future)));
+    }
+
+    @Test
+    public void testOriginalExceptionRethrownByAll() {
+        boolean wasParallel = ParallelismTools.getParallel();
+        try {
+            for (boolean parallel : new boolean[] {false, true}) {
+                ParallelismTools.setParallel(parallel);
+                List<Integer> items = new ArrayList<>();
+                for (int i = 0; i < NUM_TASKS; i++) {
+                    items.add(i);
+                }
+                // Every item throws the same exception, after spinning (so that other threads start on items too),
+                // so whichever is rethrown, from whichever thread, must be that one, rather than a copy of it
+                Callable<Integer>[] tasks = countingTasks(new AtomicIntegerArray(NUM_TASKS));
+                IllegalStateException thrown = new IllegalStateException("every item");
+                Consumer<Integer> throwing = (i) -> {
+                    try {
+                        tasks[i].call();
+                    } catch (Exception e) {
+                        throw new AssertionError(e);
+                    }
+                    throw thrown;
+                };
+
+                Assertions.assertSame(thrown, Assertions.assertThrows(IllegalStateException.class,
+                        () -> ParallelismTools.forEach(items, throwing)));
+                Assertions.assertSame(thrown, Assertions.assertThrows(IllegalStateException.class,
+                        () -> ParallelismTools.invokeAll(items, (i) -> {
+                            throwing.accept(i);
+                            return i;
+                        })));
+                @SuppressWarnings("unchecked")
+                Callable<Integer>[] callables = items.stream().map((i) -> (Callable<Integer>) () -> {
+                    throwing.accept(i);
+                    return i;
+                }).toArray(Callable[]::new);
+                Assertions.assertSame(thrown, Assertions.assertThrows(IllegalStateException.class,
+                        () -> ParallelismTools.invokeAll(callables)));
+                CountedCompleter<Void> parent = new CountedCompleter<Void>() {
+                    @Override
+                    public void compute() {
+                    }
+                };
+                Assertions.assertSame(thrown, Assertions.assertThrows(IllegalStateException.class, () -> {
+                    ParallelismTools.submit(parent, items, throwing);
+                    parent.tryComplete();
+                    ParallelismTools.join(parent);
+                }));
+                // Each rethrow recorded the stack of the rethrowing thread
+                Assertions.assertTrue(thrown.getSuppressed().length >= 4);
+            }
+        } finally {
+            ParallelismTools.setParallel(wasParallel);
+        }
     }
 
     @Test
