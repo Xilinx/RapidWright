@@ -1035,10 +1035,9 @@ public class EDIFNetlist extends EDIFName {
      */
     public void exportEDIF(OutputStream out, boolean stable) throws IOException {
         try (BufferedOutputStream os = new BufferedOutputStream(out)) {
-            final ParallelDCPOutput dos = ParallelismTools.getParallel() ?
-                    ParallelDCPOutput.cast(out) : null;
-
-            EDIFWriteLegalNameCache<?> cache = dos!=null ? EDIFWriteLegalNameCache.multiThreaded() : EDIFWriteLegalNameCache.singleThreaded();
+            final ParallelDCPOutput dos = ParallelismTools.getParallel() ? ParallelDCPOutput.cast(out) : null;
+            EDIFWriteLegalNameCache<?> cache = dos != null ?
+                    EDIFWriteLegalNameCache.multiThreaded() : EDIFWriteLegalNameCache.singleThreaded();
 
             os.write(EXPORT_CONST_EDIF_HEAD);
             exportEDIFName(os, cache);
@@ -1084,6 +1083,9 @@ public class EDIFNetlist extends EDIFName {
                 final long[] estimates = ParallelismTools.stream(cells).mapToLong(EDIFNetlist::estimateExportBytes)
                         .toArray();
                 final List<CompletableFuture<ParallelDCPInput>> pieces = new ArrayList<>();
+                // Each chunk's piece is written once that chunk is done and the previous chunk's piece has been
+                // written, by whichever thread completes the later of the two (so it may block on that I/O)
+                CompletableFuture<Void> written = CompletableFuture.completedFuture(null);
                 int from = 0;
                 do {
                     final int start = from;
@@ -1097,7 +1099,8 @@ public class EDIFNetlist extends EDIFName {
                     // of each that ends within it (a library without cells is written by the chunk that contains its
                     // offset, or by the last chunk if it comes after all cells), directly into the compressing
                     // stream of one piece
-                    pieces.add(ParallelismTools.submitCompletable(() -> ParallelDCPOutput.newStream(chunkOs -> {
+                    final CompletableFuture<ParallelDCPInput> piece = ParallelismTools.supplyAsync(
+                            () -> ParallelDCPOutput.newStream(chunkOs -> {
                         try {
                             for (int i = 0; i < librariesToWrite.size(); i++) {
                                 final int libFrom = offsets[i];
@@ -1112,13 +1115,8 @@ public class EDIFNetlist extends EDIFName {
                         } catch (IOException e) {
                             throw new UncheckedIOException(e);
                         }
-                    })));
-                } while (from < cells.size());
-
-                // Each chunk's piece is written once that chunk is done and the previous chunk's piece has been
-                // written, by whichever thread completes the later of the two (so it may block on that I/O)
-                CompletableFuture<Void> written = CompletableFuture.completedFuture(null);
-                for (CompletableFuture<ParallelDCPInput> piece : pieces) {
+                    }));
+                    pieces.add(piece);
                     written = written.thenCombine(piece, (x, p) -> {
                         try {
                             dos.write(p);
@@ -1127,7 +1125,8 @@ public class EDIFNetlist extends EDIFName {
                         }
                         return null;
                     });
-                }
+                } while (from < cells.size());
+
                 // Wait for the chunks in order, meanwhile running any not yet started (which rethrows any exception
                 // thrown by a chunk), dropping each from pieces once done (so that each piece is kept only until the
                 // relay has written it), then for the last piece to have been written. Even if a chunk threw, do not
