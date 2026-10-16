@@ -760,10 +760,10 @@ public class ParallelismTools {
      * Every index is in exactly one chunk.
      * @param start The first index.
      * @param end One past the last index.
-     * @return The chunks, in encounter order, each as {@code {from, to}}: the indices from from (inclusive) to to
-     *         (exclusive). When parallel processing is enabled, a parallel stream of them (so use an operation that
-     *         respects encounter order, such as forEachOrdered(), if their order matters), none if end is not after
-     *         start; else a sequential stream of the single chunk (which is empty if end is not after start).
+     * @return A sequential stream of the chunks, in order, each as {@code {from, to}}: the indices from from
+     *         (inclusive) to to (exclusive). When parallel processing is enabled, none if end is not after start (call
+     *         parallel() on it to run a task on each chunk in parallel); else the single chunk (which is empty if end
+     *         is not after start).
      */
     public static Stream<int[]> chunkRanges(int start, int end) {
         if (!getParallel()) {
@@ -771,7 +771,7 @@ public class ParallelismTools {
         }
         final int size = end - start;
         final int chunkSize = chunkSize(size);
-        return IntStream.range(0, (size + chunkSize - 1) / chunkSize).parallel()
+        return IntStream.range(0, (size + chunkSize - 1) / chunkSize)
                 .mapToObj(i -> new int[]{start + i * chunkSize, Math.min(start + (i + 1) * chunkSize, end)});
     }
 
@@ -792,7 +792,7 @@ public class ParallelismTools {
         if (!getParallel()) {
             return Stream.of(items);
         }
-        return chunkRanges(0, items.size()).map(r -> items.subList(r[0], r[1]));
+        return chunkRanges(0, items.size()).parallel().map(r -> items.subList(r[0], r[1]));
     }
 
     /**
