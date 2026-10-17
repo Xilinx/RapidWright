@@ -1829,9 +1829,16 @@ public class EDIFTools {
             } else {
                 EDIFNet net = topPort.getInternalNet();
                 if (net == null) continue;
-                EDIFNet flatNet = flatTop.getNet(net.getName());
+                EDIFHierNet parentNet = netlist.getParentNet(new EDIFHierNet(netlist.getTopHierCellInst(), net));
+                String netName = parentNet == null ? net.getName() : parentNet.getHierarchicalNetName();
+                if (parentNet != null && parentNet.getNet().isGND()) {
+                    netName = LOGICAL_GND_NET_NAME;
+                } else if (parentNet != null && parentNet.getNet().isVCC()) {
+                    netName = LOGICAL_VCC_NET_NAME;
+                }
+                EDIFNet flatNet = flatTop.getNet(netName);
                 if (flatNet == null) {
-                    flatNet = flatTop.createNet(net.getName());
+                    flatNet = flatTop.createNet(netName);
                 }
                 flatNet.createPortInst(flatPort);
             }
