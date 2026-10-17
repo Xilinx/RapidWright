@@ -1147,9 +1147,8 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
-     * Submit the given libraries' cells to be written as EDIF in parallel, in chunks of consecutive cells, each
-     * written and compressed into a piece of a DCP's EDIF (see {@link ParallelDCPOutput#newStream}), without waiting
-     * for any.
+     * Submit the given libraries' cells to be written as EDIF in parallel, in chunks of consecutive cells, each written
+     * and compressed into a piece of a DCP's EDIF (see {@link ParallelDCPOutput#newStream}), without waiting for any.
      * @param librariesToWrite The libraries, in the order to be written.
      * @param cache The cache of legal EDIF names, which must be safe to use from multiple threads.
      * @return The pieces, in order: one per chunk, and at least one per library.
@@ -1159,9 +1158,9 @@ public class EDIFNetlist extends EDIFName {
         final List<Future<ParallelDCPInput>> pieces = new ArrayList<>();
         for (EDIFLibrary lib : librariesToWrite) {
             // Split each library's cells into chunks of consecutive cells, each the most estimated to make up at most
-            // PARALLEL_EXPORT_CHUNK_BYTES (ending a chunk before the cell that would take it beyond that), but at
-            // least one; chunks do not span libraries. A library has at least one chunk, so that it is written even
-            // if it has no cells
+            // PARALLEL_EXPORT_CHUNK_BYTES (ending a chunk before the cell that would take it beyond that), but at least
+            // one; chunks do not span libraries. A library has at least one chunk, so that it is written even if it has
+            // no cells
             final List<EDIFCell> cells = lib.getValidCellExportOrder(false);
             final long[] estimates = ParallelismTools.stream(cells).mapToLong(EDIFNetlist::estimateExportBytes)
                     .toArray();
