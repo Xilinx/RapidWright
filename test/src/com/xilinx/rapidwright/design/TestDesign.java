@@ -61,6 +61,7 @@ import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.router.Router;
+import com.xilinx.rapidwright.support.ChangeTrackingAssertions;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
@@ -790,6 +791,7 @@ public class TestDesign {
         Set<Net> nets = new HashSet<>(Collections.singletonList(net));
         nets.removeAll(design.getModifiedNets());
         Assertions.assertEquals(Collections.emptySet(), nets);
+        ChangeTrackingAssertions.assertModifiedNetsAreInDesign(design);
     }
 
     /**
@@ -865,8 +867,15 @@ public class TestDesign {
         Assertions.assertTrue(orig.getUsedSitePIPs().isEmpty());
     }
 
-    @Test
-    public void testAddNetRecordsDisplacedRouting() {
+    /**
+     * Design.addNet() displacing a net of the same name: the routing the original bitstream holds
+     * under that name is the displaced net's, not the arriving one's, and the displaced net is
+     * detached. Nets are equal by name, so a displaced net that was already modified must make way
+     * for its replacement in the modified set, rather than stand in for it there.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testAddNetRecordsDisplacedRouting(boolean modifiedFirst) {
         Design design = new Design("testAddNetRecordsDisplacedRouting", "xcvu3p");
         SiteInst si = design.createSiteInst("SLICE_X0Y0");
         Net net = design.createNet("net0");
@@ -876,16 +885,114 @@ public class TestDesign {
         Assertions.assertTrue(design.getOriginalNetRouting().isEmpty());
         design.setTrackNetChanges(true);
         design.setCopyingOriginalNetsRouting(true);
+        if (modifiedFirst) {
+            net.unroute();
+            Assertions.assertTrue(design.getModifiedNets().contains(net));
+        }
 
-        // The routing the original bitstream holds under this name is the one being displaced,
-        // not the one arriving
         Net replacement = new Net(net.getName());
         routeToSitePin(replacement, si, "H6");
-        design.addNet(replacement);
+        Assertions.assertSame(net, design.addNet(replacement));
 
         Assertions.assertSame(replacement, design.getNet(net.getName()));
         Assertions.assertEquals(Collections.singletonList(origPIP),
                 design.getOriginalNetRouting().get(net.getName()));
+        Assertions.assertNull(net.getDesign());
+        Assertions.assertEquals(Collections.singleton(replacement), design.getModifiedNets());
+        Assertions.assertSame(replacement, design.getModifiedNets().iterator().next());
+        ChangeTrackingAssertions.assertModifiedNetsAreInDesign(design);
+    }
+
+    /**
+     * A name that was modified stays modified when Design.addNet() replaces its net, even with
+     * tracking since turned off, as it does for a renamed net. Otherwise the original routing under
+     * the name would still be turned off, but the replacement's routing never turned on.
+     */
+    @Test
+    public void testAddNetKeepsNameModifiedWithTrackingOff() {
+        Design design = new Design("testAddNetKeepsNameModifiedWithTrackingOff", "xcvu3p");
+        Net net = design.createNet("net0");
+        routeToSitePin(net, design.createSiteInst("SLICE_X0Y0"), "A1");
+        design.setTrackNetChanges(true);
+        net.unroute();
+        design.setTrackNetChanges(false);
+
+        Net replacement = new Net(net.getName());
+        design.addNet(replacement);
+
+        Assertions.assertNull(net.getDesign());
+        Assertions.assertEquals(1, design.getModifiedNets().size());
+        Assertions.assertSame(replacement, design.getModifiedNets().iterator().next());
+    }
+
+    /**
+     * None of the routing a net arrives in a design with is in the original bitstream, so it has
+     * no original routing of its own, even once it is changed or removed again.
+     */
+    @Test
+    public void testAddNetRecordsNoOriginalRouting() {
+        Design design = new Design("testAddNetRecordsNoOriginalRouting", "xcvu3p");
+        SiteInst si = design.createSiteInst("SLICE_X0Y0");
+        design.setTrackNetChanges(true);
+        design.setCopyingOriginalNetsRouting(true);
+
+        Net net = new Net("net0");
+        routeToSitePin(net, si, "A1");
+        design.addNet(net);
+        Assertions.assertTrue(design.getModifiedNets().contains(net));
+        Assertions.assertSame(Design.EMPTY_ORIGINAL_NET_ROUTING,
+                design.getOriginalNetRouting().get(net.getName()));
+
+        net.unroute();
+        Assertions.assertSame(Design.EMPTY_ORIGINAL_NET_ROUTING,
+                design.getOriginalNetRouting().get(net.getName()));
+        design.removeNet(net);
+        Assertions.assertSame(Design.EMPTY_ORIGINAL_NET_ROUTING,
+                design.getOriginalNetRouting().get(net.getName()));
+        ChangeTrackingAssertions.assertModifiedNetsAreInDesign(design);
+    }
+
+    /**
+     * A Net leaving a design by any route, not only removeNet(), is not left among that design's
+     * modified nets, and leaves the routing it had behind there as its original.
+     */
+    @Test
+    public void testSetDesignLeavesRoutingBehind() {
+        Design design = new Design("testSetDesignLeavesRoutingBehind", "xcvu3p");
+        Net net = design.createNet("net0");
+        PIP pip = routeToSitePin(net, design.createSiteInst("SLICE_X0Y0"), "A1");
+
+        design.setTrackNetChanges(true);
+        design.setCopyingOriginalNetsRouting(true);
+        net.unroute();
+        Assertions.assertTrue(design.getModifiedNets().contains(net));
+
+        net.setDesign(null);
+
+        Assertions.assertFalse(design.getModifiedNets().contains(net));
+        Assertions.assertEquals(Collections.singletonList(pip),
+                design.getOriginalNetRouting().get(net.getName()));
+    }
+
+    /**
+     * Unrouting a design is a change to every net that had routing, each of which keeps that
+     * routing as its original.
+     */
+    @Test
+    public void testUnrouteDesignRecordsRouting() {
+        Design design = new Design("testUnrouteDesignRecordsRouting", "xcvu3p");
+        Net net = design.createNet("net0");
+        PIP pip = routeToSitePin(net, design.createSiteInst("SLICE_X0Y0"), "A1");
+
+        design.setTrackNetChanges(true);
+        design.setCopyingOriginalNetsRouting(true);
+
+        design.unrouteDesign();
+        Assertions.assertFalse(net.hasPIPs());
+        Assertions.assertEquals(Collections.singleton(net), design.getModifiedNets());
+        Assertions.assertEquals(Collections.singletonList(pip),
+                design.getOriginalNetRouting().get(net.getName()));
+        ChangeTrackingAssertions.assertModifiedNetsAreInDesign(design);
     }
 
     @Test
@@ -900,14 +1007,16 @@ public class TestDesign {
         Assertions.assertSame(net, design.removeNet(net));
         Assertions.assertNull(design.getNet(net.getName()));
 
-        // Recorded while still tracked, so a consumer undoing the original routing hears about
-        // the removal; otherwise the net leaves no trace and its PIPs stay programmed
-        Assertions.assertTrue(design.getModifiedNets().contains(net));
+        // Its routing is recorded as original, which is how a consumer undoing the original
+        // routing hears about the removal; otherwise its PIPs stay programmed. It does not stay
+        // modified too: a consumer turns on the routing of every modified net, and getNets() no
+        // longer holds it
+        Assertions.assertFalse(design.getModifiedNets().contains(net));
         List<PIP> origPIPs = design.getOriginalNetRouting().get(net.getName());
         Assertions.assertEquals(Collections.singletonList(pip), origPIPs);
+        ChangeTrackingAssertions.assertModifiedNetsAreInDesign(design);
 
-        // Recorded rather than unrouted, so removeNet() leaves the caller's net intact. A
-        // detached net is how a consumer tells a removal from a modification
+        // Recorded rather than unrouted, so removeNet() leaves the caller's net intact
         Assertions.assertNull(net.getDesign());
         Assertions.assertEquals(Collections.singletonList(pip), net.getPIPs());
     }
@@ -925,13 +1034,89 @@ public class TestDesign {
         Assertions.assertTrue(design.removeSiteInst(si));
 
         // A net whose sole pin was on the removed site instance goes through removeNet() rather
-        // than straight out of the design's map, so it is detached and its removal recorded
+        // than straight out of the design's map, so it is detached, its routing recorded as
+        // original, and it is not left in the modified set
         Assertions.assertNull(design.getNet(net.getName()));
         Assertions.assertNull(net.getDesign());
         Assertions.assertNull(pin.getNet());
-        Assertions.assertTrue(design.getModifiedNets().contains(net));
+        Assertions.assertFalse(design.getModifiedNets().contains(net));
         Assertions.assertEquals(Collections.singletonList(pip),
                 design.getOriginalNetRouting().get(net.getName()));
+        ChangeTrackingAssertions.assertModifiedNetsAreInDesign(design);
+    }
+
+    /**
+     * A net that gains a pin and not one PIP has still changed: an incremental bitstream has to
+     * route that pin, and has no other way to learn of it.
+     */
+    @Test
+    public void testAddPinMarksNetModified() {
+        Design design = new Design("testAddPinMarksNetModified", "xcvu3p");
+        SiteInst si = design.createSiteInst("SLICE_X0Y0");
+        Net net = design.createNet("net0");
+        PIP pip = routeToSitePin(net, si, "A1");
+
+        design.setTrackNetChanges(true);
+        design.setCopyingOriginalNetsRouting(true);
+
+        Assertions.assertNotNull(net.createPin("B1", si));
+
+        Assertions.assertTrue(design.getModifiedNets().contains(net));
+        Assertions.assertEquals(Collections.singletonList(pip), net.getPIPs());
+        Assertions.assertEquals(Collections.singletonList(pip),
+                design.getOriginalNetRouting().get(net.getName()));
+        ChangeTrackingAssertions.assertModifiedNetsAreInDesign(design);
+    }
+
+    /**
+     * Re-adding the pin that is already a net's source changes nothing, so does not mark it.
+     */
+    @Test
+    public void testAddExistingSourcePinDoesNotMarkNet() {
+        Design design = new Design("testAddExistingSourcePinDoesNotMarkNet", "xcvu3p");
+        SiteInst si = design.createSiteInst("SLICE_X0Y0");
+        Net net = design.createNet("net0");
+        SitePinInst src = net.createPin("A_O", si);
+        Assertions.assertSame(src, net.getSource());
+
+        design.setTrackNetChanges(true);
+
+        Assertions.assertFalse(net.addPin(src));
+        Assertions.assertFalse(design.getModifiedNets().contains(net));
+    }
+
+    /**
+     * Merging one net onto another, as DesignTools.populateBlackBox() does to the nets either side
+     * of a black box port: the net merged onto gains pins but not one PIP, and must be marked
+     * modified; the net merged away is deleted, and must not be.
+     */
+    @Test
+    public void testMovePinsToNewNetDeleteOldNetTracking() {
+        Design design = new Design("testMovePinsToNewNetDeleteOldNetTracking", "xcvu3p");
+        SiteInst si0 = design.createSiteInst("SLICE_X0Y0");
+        SiteInst si1 = design.createSiteInst("SLICE_X2Y0");
+        Net in = design.createNet("in");
+        PIP inPIP = routeToSitePin(in, si0, "A1");
+        Net out = design.createNet("out");
+        PIP outPIP = routeToSitePin(out, si1, "A1");
+        SitePinInst outSink = out.getPins().get(0);
+
+        design.setTrackNetChanges(true);
+        design.setCopyingOriginalNetsRouting(true);
+
+        design.movePinsToNewNetDeleteOldNet(out, in, true);
+
+        Assertions.assertSame(in, outSink.getNet());
+        Assertions.assertEquals(Collections.singletonList(inPIP), in.getPIPs());
+        Assertions.assertTrue(design.getModifiedNets().contains(in),
+                "the net gained a pin and no PIP, and is not recorded as modified");
+
+        Assertions.assertNull(design.getNet(out.getName()));
+        Assertions.assertFalse(design.getModifiedNets().contains(out),
+                "a net the design no longer holds is still recorded as modified");
+        Assertions.assertEquals(Collections.singletonList(outPIP),
+                design.getOriginalNetRouting().get(out.getName()));
+        ChangeTrackingAssertions.assertModifiedNetsAreInDesign(design);
     }
 
     @Test
