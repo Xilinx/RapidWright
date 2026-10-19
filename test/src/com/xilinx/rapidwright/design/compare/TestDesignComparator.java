@@ -82,8 +82,9 @@ public class TestDesignComparator {
 
         compareDesign(1, 1, DesignDiffType.DESIGN_PARTNAME, dc, gold, test2);
         
-        // Track from here on: an object leaving a design must be recorded against the design it
-        // is leaving, or a consumer undoing the original state never hears about the removal
+        // Track from here on: an object leaving a design must have what it held recorded as
+        // original, or a consumer undoing the original state never hears about the removal. It is
+        // not left as modified, since the design no longer holds it
         test2.setTrackSiteInstChanges(true);
         test2.setCopyingOriginalSiteInsts(true);
         test2.setTrackNetChanges(true);
@@ -91,11 +92,13 @@ public class TestDesignComparator {
 
         test2.removeSiteInst(siteInst, true);
 
-        Assertions.assertTrue(test2.getModifiedSiteInsts().contains(siteInst));
-        Assertions.assertNotNull(test2.getOriginalSiteInsts().get(siteInst.getName()));
+        Assertions.assertFalse(test2.getModifiedSiteInsts().contains(siteInst));
+        SiteInst original = test2.getOriginalSiteInsts().get(siteInst.getSiteName());
+        Assertions.assertNotNull(original);
+        ChangeTrackingAssertions.assertModifiedAreInDesign(test2);
 
         compareDesign(2, 1, DesignDiffType.SITEINST_MISSING, dc, gold, test2);
-        
+
         Site s = device.getSite("SLICE_X56Y0");
         new SiteInst(s.getName(), test2, SiteTypeEnum.SLICEL, s);
 
@@ -105,8 +108,15 @@ public class TestDesignComparator {
         siteInst.setName("anotherNamedSiteInst");
         test2.addSiteInst(siteInst);
 
+        // Back on the site it was removed from, under another name: the original is keyed by site,
+        // so it is still the one recorded as it was removed
+        Assertions.assertTrue(test2.getModifiedSiteInsts().contains(siteInst));
+        Assertions.assertSame(original, test2.getOriginalSiteInsts().get(siteInst.getSiteName()));
+        ChangeTrackingAssertions.assertModifiedAreInDesign(test2);
+
         compareDesign(3, 1, DesignDiffType.SITEINST_NAME, dc, gold, test2);
 
+        // Renamed behind the design's back from here on, so only nets are checked below
         siteInst.setName(oldName);
         Cell removedCell = siteInst.removeCell(siteInst.getBEL("AFF"));
 
