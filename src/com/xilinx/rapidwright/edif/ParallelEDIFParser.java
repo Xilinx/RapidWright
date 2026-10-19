@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -152,15 +151,17 @@ public class ParallelEDIFParser implements AutoCloseable{
         numberOfThreads = workers.size();
 
         t.stop().start("Parse First Token");
-        final List<Future<ParallelEDIFParserWorker>> futures = ParallelismTools.invokeAll(workers, w -> !w.parseFirstToken() ? w : null);
-        final List<ParallelEDIFParserWorker> failedWorkers = futures.stream()
-                .map(ParallelismTools::get)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+        // For each worker: the worker itself if it failed, else null
+        final List<ParallelEDIFParserWorker> failedOrNull = ParallelismTools.invokeAll(workers,
+                w -> !w.parseFirstToken() ? w : null);
 
-        if (!failedWorkers.isEmpty() && !Device.QUIET_MESSAGE) {
-            for (ParallelEDIFParserWorker failedWorker : failedWorkers) {
-                if (failedWorker.parseException!=null) {
+        for (ParallelEDIFParserWorker failedWorker : failedOrNull) {
+            if (failedWorker == null) {
+                continue;
+            }
+
+            if (!Device.QUIET_MESSAGE) {
+                if (failedWorker.parseException != null) {
                     String message = failedWorker.parseException.getMessage();
                     if (failedWorker.parseException instanceof TokenTooLongException) {
                         //Message contains a hint to a constant that the user should adjust.
@@ -172,11 +173,10 @@ public class ParallelEDIFParser implements AutoCloseable{
                     System.err.println("Removing "+failedWorker+", it started past the last cell.");
                 }
             }
-        }
-        for (ParallelEDIFParserWorker failedWorker : failedWorkers) {
+
             failedWorker.close();
         }
-        workers.removeAll(failedWorkers);
+        workers.removeAll(failedOrNull);
 
         //Propagate parse limit to neighbours
         for (int i = 1; i < workers.size(); i++) {
@@ -191,7 +191,7 @@ public class ParallelEDIFParser implements AutoCloseable{
     }
 
     private void doParse() {
-        ParallelismTools.invokeAllRunnable(workers, w->w.doParse(false));
+        ParallelismTools.forEach(workers, w->w.doParse(false));
 
         //Check if we had misdetected start tokens
         for (int i=0; i<workers.size();i++) {
@@ -269,7 +269,7 @@ public class ParallelEDIFParser implements AutoCloseable{
         final Map<String, EDIFLibrary> librariesByLegalName = netlist.getLibraries().stream()
                 .collect(Collectors.toMap(cache::getLegalEDIFName, Function.identity()));
         Map<EDIFCell, Collection<ParallelEDIFParserWorker.LinkPortInstData>> byPortCell = new ConcurrentHashMap<>();
-        ParallelismTools.invokeAllRunnable(workers, w-> {
+        ParallelismTools.forEach(workers, w-> {
             for (ParallelEDIFParserWorker.CellReferenceData cellReferenceData : w.linkCellReference) {
                 cellReferenceData.apply(librariesByLegalName, cellsByLegalName);
             }
@@ -278,7 +278,7 @@ public class ParallelEDIFParser implements AutoCloseable{
 
         t.stop().start("Link Large Port Cells");
         //Now we can create a map of ports just for large cells and look up the ports
-        ParallelismTools.invokeAllRunnable(byPortCell.entrySet(), entry -> {
+        ParallelismTools.forEach(byPortCell.entrySet(), entry -> {
             EDIFCell cell = entry.getKey();
             final EDIFPortCache edifPortCache = new EDIFPortCache(cell, cache);
             for (ParallelEDIFParserWorker.LinkPortInstData linkPortInstData : entry.getValue()) {
@@ -290,7 +290,7 @@ public class ParallelEDIFParser implements AutoCloseable{
         //When adding the port insts, we have to make sure that we don't split a parent cell's port instances
         // between threads.
         //That could lead to ConcurrentModificationExceptions
-        ParallelismTools.invokeAllRunnable(workers,
+        ParallelismTools.forEach(workers,
                 w-> {
                     for (List<ParallelEDIFParserWorker.LinkPortInstData> list : w.linkPortInstData) {
                         for (ParallelEDIFParserWorker.LinkPortInstData linkPortInstData : list) {
@@ -306,7 +306,7 @@ public class ParallelEDIFParser implements AutoCloseable{
         for (EDIFLibrary lib : netlist.getLibraries()) {
             allCells.addAll(lib.getCells());
         }
-        ParallelismTools.invokeAllRunnable(allCells, EDIFCell::trimEDIFPortInstLists);
+        ParallelismTools.forEach(allCells, EDIFCell::trimEDIFPortInstLists);
         t.stop();
     }
 
