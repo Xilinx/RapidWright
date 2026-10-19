@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountedCompleter;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.BiConsumer;
@@ -56,7 +57,6 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
-import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -83,10 +83,10 @@ public class RouteNodeGraph {
     private final AtomicInteger preservedMapSize;
 
     /**
-     * A synchronization object tracking the number of outstanding calls to
-     * asyncPreserve()
+     * Parent of the tasks of all calls to preserveAsync() since the last call to awaitPreserve(),
+     * which completes once they all have and awaitPreserve() is called (and is then reinitialized for reuse)
      */
-    private final CountUpDownLatch asyncPreserveOutstanding;
+    private final CountedCompleter<Void> asyncPreserveOutstanding;
 
     private long createRnodeTime;
 
@@ -154,7 +154,12 @@ public class RouteNodeGraph {
         nodesMapSize = new AtomicInteger();
         preservedMap = new AtomicReferenceArray<>(getTileCount(design));
         preservedMapSize = new AtomicInteger();
-        asyncPreserveOutstanding = new CountUpDownLatch();
+        asyncPreserveOutstanding = new CountedCompleter<Void>() {
+            @Override
+            public void compute() {
+                // Never run: completed by its children and awaitPreserve()
+            }
+        };
         createRnodeTime = 0;
         highestBaseWireIndex = new ConcurrentHashMap<>();
 
@@ -670,14 +675,11 @@ public class RouteNodeGraph {
     }
 
     public void preserveAsync(Net net, List<SitePinInst> pins) {
-        asyncPreserveOutstanding.countUp();
-        ParallelismTools.submit(() -> {
+        ParallelismTools.submit(asyncPreserveOutstanding, () -> {
             try {
                 preserve(net, pins);
             } catch (Throwable t) {
                 t.printStackTrace();
-            } finally {
-                asyncPreserveOutstanding.countDown();
             }
         });
     }
@@ -691,8 +693,16 @@ public class RouteNodeGraph {
     }
 
     public void awaitPreserve() {
-        // TODO: Calling thread to do useful work when waiting
-        asyncPreserveOutstanding.await();
+        asyncPreserveOutstanding.tryComplete();
+        // Uninterruptibly (as before). First runs any of those calls' tasks not yet started on this thread, rather than
+        // only blocking, then blocks for those already started: it helps only that once, which is enough, as the
+        // calling thread submitted all of them before this and none of them submits any more (unlike
+        // ParallelismTools.join(CountedCompleter), which keeps helping). Never completes exceptionally, as each task
+        // catches what it throws
+        asyncPreserveOutstanding.quietlyJoin();
+        // Only once done (all of its children have completed, and this was its only join), so that it can be reused
+        // for any later calls to preserveAsync()
+        asyncPreserveOutstanding.reinitialize();
     }
 
     public boolean unpreserve(Node node) {
