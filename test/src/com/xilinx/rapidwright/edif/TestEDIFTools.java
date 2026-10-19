@@ -38,6 +38,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.Design;
@@ -373,6 +374,41 @@ public class TestEDIFTools {
         Assertions.assertEquals(321, flatNetlist.getAllLeafHierCellInstances().size());
         boolean includeBlackBoxes = true;
         Assertions.assertEquals(322, flatNetlist.getAllLeafHierCellInstances(includeBlackBoxes).size());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"source,false", "source,true", "VCC,false", "VCC,true", "GND,false", "GND,true"})
+    public void testCreateFlatNetlistScalarOutput(String sourceType, boolean hierarchical) {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top", false);
+        EDIFCell top = netlist.getTopCell();
+        EDIFPort output = top.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFCell source = new EDIFCell(sourceType.equals("source")
+                ? netlist.getWorkLibrary() : netlist.getHDIPrimitivesLibrary(), sourceType);
+        String sourcePort = sourceType.equals("VCC") ? "P" : sourceType.equals("GND") ? "G" : "O";
+        source.createPort(sourcePort, EDIFDirection.OUTPUT, 1);
+
+        EDIFCell parent = top;
+        EDIFNet net = top.createNet("outside");
+        net.createPortInst(output);
+        if (hierarchical) {
+            parent = new EDIFCell(netlist.getWorkLibrary(), "module");
+            parent.createPort("O", EDIFDirection.OUTPUT, 1);
+            EDIFCellInst mid = top.createChildCellInst("mid", parent);
+            net.createPortInst("O", mid);
+            net = parent.createNet("inside");
+            net.createPortInst(parent.getPort("O"));
+        }
+        EDIFCellInst driver = parent.createChildCellInst("g", source);
+        net.createPortInst(sourcePort, driver);
+
+        EDIFNetlist flatNetlist = EDIFTools.createFlatNetlist(netlist, "xc7a35tcpg236-1");
+        EDIFCell flatTop = flatNetlist.getTopCell();
+        EDIFNet flatOutput = flatTop.getPort("O").getInternalNet();
+        String driverName = sourceType.equals("source") ? (hierarchical ? "mid/g" : "g") : sourceType;
+        EDIFPortInst flatDriver = flatTop.getCellInst(driverName).getPortInst(sourcePort);
+        Assertions.assertNotNull(flatOutput);
+        Assertions.assertSame(flatDriver.getNet(), flatOutput);
+        Assertions.assertEquals(2, flatOutput.getPortInsts().size());
     }
 
     /**
