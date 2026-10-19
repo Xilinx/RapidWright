@@ -149,11 +149,12 @@ public class TestDesign {
 
         Design before = Design.readCheckpoint(filenameRead);
 
+        final boolean wasParallel = ParallelismTools.getParallel();
         try {
             ParallelismTools.setParallel(true);
             before.writeCheckpoint(filenameWrite);
         } finally {
-            ParallelismTools.setParallel(false);
+            ParallelismTools.setParallel(wasParallel);
         }
 
         Design after = Design.readCheckpoint(filenameWrite);
@@ -213,6 +214,7 @@ public class TestDesign {
         long maxMemoryNeeded = 1024L*1024L*1024L*14L;
         Assumptions.assumeTrue(Runtime.getRuntime().maxMemory() >= maxMemoryNeeded);
 
+        final boolean wasParallel = ParallelismTools.getParallel();
         try {
             ParallelismTools.setParallel(parallel);
 
@@ -231,7 +233,7 @@ public class TestDesign {
             Design design = new Design(netlist);
             design.writeCheckpoint(outputPath, t);
         } finally {
-            ParallelismTools.setParallel(false);
+            ParallelismTools.setParallel(wasParallel);
         }
     }
 
