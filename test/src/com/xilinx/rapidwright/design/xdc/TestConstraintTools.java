@@ -274,17 +274,27 @@ public class TestConstraintTools {
                 "set_false_path -from [get_ports pad] -to [get_cells x]",
                 // The circuit's clk port, not the device pin of the same name
                 "set_input_delay 1 [get_ports clk]",
-                "set_property IOSTANDARD LVCMOS18 [get_ports din]");
+                "set_property IOSTANDARD LVCMOS18 [get_ports din]",
+                // A device pin the circuit also has a port of, with a pin of the circuit
+                "set_max_delay 3 -from [get_ports din] -to [get_pins y/D]",
+                // A device pin and a port of the circuit
+                "set_false_path -from [get_ports din] -to [get_ports clk]");
 
         DesignTools.populateBlackBox(design, Collections.singletonMap("rp", circuit), false);
 
         Assertions.assertEquals(Arrays.asList(
                 "set_property IOSTANDARD LVCMOS18 [get_ports pad]",
                 "current_instance rp",
-                "set_false_path -from [get_ports -scoped_to_current_instance pad] -to [get_cells x]",
+                // In the box, but get_ports of device pins still finds them, and the box's pins
+                // would not be valid timing startpoints
+                "set_false_path -from [get_ports pad] -to [get_cells x]",
                 "set_input_delay 1 [get_ports -scoped_to_current_instance clk]",
                 "current_instance -quiet",
-                "set_property IOSTANDARD LVCMOS18 [get_ports din]"), design.getXDCConstraints(ConstraintGroup.EARLY));
+                "set_property IOSTANDARD LVCMOS18 [get_ports din]",
+                "current_instance rp",
+                "set_max_delay 3 -from [get_ports din] -to [get_pins y/D]",
+                "set_false_path -from [get_ports din] -to [get_ports -scoped_to_current_instance clk]",
+                "current_instance -quiet"), design.getXDCConstraints(ConstraintGroup.EARLY));
     }
 
     /**
