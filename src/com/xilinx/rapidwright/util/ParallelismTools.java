@@ -62,7 +62,7 @@ import org.jetbrains.annotations.NotNull;
  * Single-threaded mode means that all tasks are executed on the current
  * thread: those given to {@link #submit(Callable)} are deferred until they
  * are waited for ({@link #get(Future)}, {@link #join(List)},
- * {@link #joinAll(List)} or {@link #joinInOrder(List)}, or the returned
+ * {@link #joinAll(List)} or {@link #joinOrdered(List)}, or the returned
  * Future's own get()) or polled (its own isDone()), which executes them on
  * that thread, so a task submitted that
  * way is never executed if it is never waited for (or polled); all others are
@@ -150,7 +150,7 @@ public class ParallelismTools {
      * no threads), and any exception it throws is kept as-is.
      * When parallel processing is disabled, the task is not submitted, but deferred until
      * it is waited for, with {@link #get(Future)}, {@link #join(List)},
-     * {@link #joinAll(List)}, {@link #joinInOrder(List)} or the
+     * {@link #joinAll(List)}, {@link #joinOrdered(List)} or the
      * returned Future's own get(), or polled with its isDone(), which executes it on that
      * thread (see {@link LazyFutureTask}). So a task that is never waited for (or polled)
      * is never executed: for one whose result is not needed, use
@@ -198,7 +198,7 @@ public class ParallelismTools {
     /**
      * A FutureTask that is not submitted to the pool (as when parallel processing is disabled), but run by the first
      * thread to wait for it with its own get(), or to poll it with its own isDone(), as well as by
-     * {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)} or {@link #joinInOrder(List)}
+     * {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)} or {@link #joinOrdered(List)}
      * (see {@link #runIfUnclaimed(Future)}). FutureTask.run() does nothing if another thread
      * has already claimed the task (or it has been cancelled), so it is run at most once, and any other thread waiting
      * for it meanwhile waits for that one.
@@ -305,7 +305,7 @@ public class ParallelismTools {
      * CompletableFuture, so that further work can be chained on its completion (by default, run by the thread that
      * completes it), in any way. Any exception the task throws completes the CompletableFuture exceptionally. A thread
      * waiting for it, whether with {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)},
-     * {@link #joinInOrder(List)} or {@link #joinUnordered(List)}, or with the CompletableFuture's own get() or
+     * {@link #joinOrdered(List)} or {@link #joinUnordered(List)}, or with the CompletableFuture's own get() or
      * join(), runs the task itself if no other thread has started it (and a timed get() then runs it to the end,
      * whatever the timeout).
      * When parallel processing is disabled, the task is executed immediately on the current thread, so that the
@@ -421,13 +421,13 @@ public class ParallelismTools {
      * In single-threaded mode, all but the first task are not executed here but are
      * deferred, as by {@link #submit(Callable)}, until they are passed to
      * {@link #joinFirst(Deque)} (or waited for by {@link #get(Future)},
-     * {@link #join(List)}, {@link #joinAll(List)}, {@link #joinInOrder(List)} or the
+     * {@link #join(List)}, {@link #joinAll(List)}, {@link #joinOrdered(List)} or the
      * Future's own get(), or polled by its own isDone()).
      * @param tasks List of tasks to be executed (if none, an empty Deque is returned).
      * @param <T> Type returned by all tasks.
      * @return A Deque of Future objects corresponding to each task (in order).
      * @deprecated Submit each task with {@link #submit(Callable)} into a List, and wait for
-     *             them in order with {@link #joinInOrder(List)}, which also runs any not yet
+     *             them in order with {@link #joinOrdered(List)}, which also runs any not yet
      *             started.
      */
     @Deprecated
@@ -457,7 +457,7 @@ public class ParallelismTools {
      *                submitted tasks.
      * @param <T> Type returned by all tasks.
      * @return The value returned by the first task.
-     * @deprecated Wait for the Futures in order with {@link #joinInOrder(List)}, which
+     * @deprecated Wait for the Futures in order with {@link #joinOrdered(List)}, which
      *             likewise steals subsequent unclaimed tasks while waiting for each.
      */
     @Deprecated
@@ -527,7 +527,7 @@ public class ParallelismTools {
      *                ArrayList), and are each set to null once completed.
      */
     public static void joinAll(@NotNull List<? extends Future<?>> futures) {
-        final Iterator<?> it = joinInOrder(futures);
+        final Iterator<?> it = joinOrdered(futures);
         while (it.hasNext()) {
             it.next();
         }
@@ -558,7 +558,7 @@ public class ParallelismTools {
      * @param <T> Type returned by all tasks.
      * @return An Iterator over the values of the Futures, in order.
      */
-    public static <T> Iterator<T> joinInOrder(@NotNull List<? extends Future<? extends T>> futures) {
+    public static <T> Iterator<T> joinOrdered(@NotNull List<? extends Future<? extends T>> futures) {
         return new Iterator<T>() {
             // The index of the next Future to wait for
             private int i = 0;
@@ -616,7 +616,7 @@ public class ParallelismTools {
      * consumed by this thread as soon as it is ready, in whatever order the tasks complete. Its value, or the exception
      * its task threw, is not taken here: get it with {@link #get(Future)}, which rethrows such an exception as
      * described for this class.
-     * As with {@link #joinInOrder(List)}, the given List is modified: each next() sets the element of the item it
+     * As with {@link #joinOrdered(List)}, the given List is modified: each next() sets the element of the item it
      * returns to null, so that the List no longer keeps it once returned. So the List must be modifiable, and may be
      * read between calls to next() (e.g. to close the results of those not yet returned if consuming one fails), when
      * each item already returned is null. Items may also be added to its end between calls to next(): hasNext() and

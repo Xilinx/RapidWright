@@ -377,14 +377,14 @@ public class TestParallelismTools {
     }
 
     @Test
-    public void testJoinInOrder() {
+    public void testJoinOrdered() {
         final AtomicIntegerArray runs = new AtomicIntegerArray(NUM_TASKS);
         final List<Future<Integer>> futures = new ArrayList<>();
         for (Callable<Integer> task : countingTasks(runs)) {
             futures.add(ParallelismTools.submit(task));
         }
         // Each value in order, its element set to null once waited for
-        final Iterator<Integer> it = ParallelismTools.joinInOrder(futures);
+        final Iterator<Integer> it = ParallelismTools.joinOrdered(futures);
         for (int i = 0; i < NUM_TASKS; i++) {
             Assertions.assertTrue(it.hasNext());
             Assertions.assertEquals(i, it.next());
