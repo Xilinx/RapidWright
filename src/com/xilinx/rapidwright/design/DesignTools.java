@@ -942,12 +942,23 @@ public class DesignTools {
      * if it is not already. This is not checked: a physical net held under any other name is
      * missed, and its signal left split across two physical nets.
      * <p>
-     * Only the physical nets on a signal that crosses a black box port are touched. Those on each
-     * such signal, from whichever side, are merged onto the one named after the signal's source
-     * once the boxes are filled -- or, having nothing on them to move, simply removed. A signal
-     * that nothing drives has no source to name a net after, so its nets are left where they are,
-     * as is every net in the design not on such a signal. The design's parent net map is dropped,
-     * since the netlist has changed, and left for whichever caller next needs it to rebuild.
+     * A circuit's checkpoint written in the context of a shell can also hold physical nets that
+     * have nothing on them and no logical net in the circuit, named as in the full design. These
+     * are removed from the circuit's Design and not moved in, so there is no
+     * {@code <box>/<name>} net for them afterwards. A net inside a cell instance whose contents the
+     * circuit's netlist does not hold, such as an encrypted cell, has no logical net to look up
+     * and is moved in as usual. A circuit net that has pins or routing but no logical net is not
+     * named after its source, which is not checked, except where its name already carries the
+     * black box's prefix: such a net is rejected with the other entries' vetting, since it would
+     * take the name meant for one of the circuit's own nets.
+     * <p>
+     * Apart from those, only the physical nets on a signal that crosses a black box port are
+     * touched. Those on each such signal, from whichever side, are merged onto the one named after
+     * the signal's source once the boxes are filled -- or, having nothing on them to move, simply
+     * removed. A signal that nothing drives has no source to name a net after, so its nets are
+     * left where they are, as is every net in the design not on such a signal. The design's parent
+     * net map is dropped, since the netlist has changed, and left for whichever caller next needs
+     * it to rebuild.
      * <p>
      * Every entry is vetted before anything is modified, but there is no rollback once insertion has
      * begun: a failure part way through -- a site overlap, say -- leaves the boxes filled so far in
@@ -987,6 +998,13 @@ public class DesignTools {
         Map<String, EDIFHierCellInst> insts = new HashMap<>();
         Map<Design, String> firstUseOf = new IdentityHashMap<>();
         Map<EDIFCellInst, String> firstFillOf = new IdentityHashMap<>();
+        // A circuit's checkpoint can hold physical nets that have nothing on them and no logical
+        // net in the circuit: one written in the context of a shell carries nets named as in the
+        // full design, such as the shell's clocks, or the circuit's own nets prefixed with the
+        // black box's name. Moved in, they would be nets the netlist does not have, and one with
+        // the name that another of the circuit's nets is given once prefixed would block that
+        // net's rename. They are only collected here, and removed once every entry is vetted
+        List<Net> contextNets = new ArrayList<>();
         for (Entry<String, Design> e : blackBoxes.entrySet()) {
             String hierarchicalCellName = e.getKey();
             Design cell = e.getValue();
@@ -1020,6 +1038,26 @@ public class DesignTools {
                         + hierarchicalCellName + "' are the same cell instance.");
             }
             insts.put(hierarchicalCellName, hierInst);
+
+            // Only the empty nets and those already carrying the prefix are looked up logically,
+            // as a lookup for every net would cost more than the rest of the vetting
+            String cellPrefix = hierarchicalCellName + EDIFTools.EDIF_HIER_SEP;
+            EDIFNetlist cellNetlist = cell.getNetlist();
+            for (Net net : cell.getNets()) {
+                if (net.isStaticNet() || net.getName().equals(Net.USED_NET)) continue;
+                boolean empty = !hasPhysicalPresence(net);
+                if (!empty && !net.getName().startsWith(cellPrefix)) continue;
+                if (net.getLogicalHierNet() != null
+                        || isInsideOpaqueCell(cellNetlist, net.getName())) continue;
+                if (!empty) {
+                    throw new RuntimeException("ERROR: The net '" + net.getName() + "' in the"
+                            + " circuit for black box '" + hierarchicalCellName + "' already"
+                            + " carries the black box's prefix and has no logical net, but has"
+                            + " pins or routing, so cannot be dropped as a copy from the context"
+                            + " of the full design.");
+                }
+                contextNets.add(net);
+            }
         }
 
         // Both sides of every black box port are looked up now, in the parent net maps of the shell
@@ -1078,6 +1116,10 @@ public class DesignTools {
                             + " source.");
                 }
             }
+        }
+
+        for (Net net : contextNets) {
+            net.getDesign().removeNet(net);
         }
 
         // Populate Logical Netlist into cells. This loop and the physical ones below all walk
@@ -1283,6 +1325,24 @@ public class DesignTools {
     private static void unrouteSignalNet(Net net) {
         if (net == null || net.isStaticNet() || !hasPhysicalPresence(net)) return;
         net.unroute();
+    }
+
+    /**
+     * @param netlist A netlist.
+     * @param netName The hierarchical name of a net in it.
+     * @return True if the deepest cell instance that the name places the net in is a leaf cell or
+     *         black box -- an encrypted cell, say -- whose contents, and so the net's logical net,
+     *         the netlist does not hold.
+     */
+    private static boolean isInsideOpaqueCell(EDIFNetlist netlist, String netName) {
+        int sep = netName.length();
+        while ((sep = netName.lastIndexOf(EDIFTools.EDIF_HIER_SEP, sep - 1)) > 0) {
+            EDIFHierCellInst inst = netlist.getHierCellInstFromName(netName.substring(0, sep));
+            if (inst != null) {
+                return inst.getCellType().isLeafCellOrBlackBox();
+            }
+        }
+        return false;
     }
 
     /**
