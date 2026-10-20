@@ -119,7 +119,9 @@ public class ConstraintTools {
      * In the other commands at the circuit's top scope, {@code get_ports} names the circuit's own
      * ports, which are the pins of the black box in the design: it is given
      * {@code -scoped_to_current_instance}, as Vivado writes it, so that it finds them. A
-     * {@code get_ports} that already has the option, or names no ports
+     * {@code get_ports} that names only device pins is left as it is, since it finds them as
+     * top-level ports from inside the black box too, and the black box's pins are not valid timing
+     * startpoints or endpoints. A {@code get_ports} that already has the option, or names no ports
      * (such as one given only {@code -of_objects}), is taken to refer to the circuit's ports.
      * Options are told apart from port names as Vivado does: in any order, abbreviated, with values,
      * and over continued lines.
@@ -605,7 +607,10 @@ public class ConstraintTools {
 
         /**
          * @return The lines of a command at the circuit's top scope, with
-         *         -scoped_to_current_instance given to each get_ports that does not have it.
+         *         -scoped_to_current_instance given to each get_ports that refers to the circuit's
+         *         ports and does not have it. A get_ports of only device pins is left as it is: it
+         *         finds them as top-level ports from any current instance, and the black box's pins
+         *         of those names are not valid timing startpoints or endpoints.
          */
         private List<String> scopeGetPorts(List<String> lines) {
             String cmd = String.join("\n", lines);
@@ -613,7 +618,7 @@ public class ConstraintTools {
             StringBuilder sb = new StringBuilder(cmd);
             for (int i = found.size() - 1; i >= 0; i--) {
                 GetPorts getPorts = found.get(i);
-                if (!getPorts.scoped) {
+                if (!getPorts.scoped && !namesOnlyDevicePins(getPorts)) {
                     sb.insert(getPorts.argsStart, " " + SCOPED_TO_CURRENT_INSTANCE);
                 }
             }
