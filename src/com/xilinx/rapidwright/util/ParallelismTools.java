@@ -753,18 +753,15 @@ public class ParallelismTools {
      * The indices from start (inclusive) to end (exclusive) in chunks of consecutive indices, in order, for a task to
      * be run on each chunk in parallel: when parallel processing is enabled, roughly four chunks per
      * {@link #maxParallelism()} thread (or one per index, if there are fewer), else a single chunk of all the indices.
-     * Every index is in exactly one chunk.
+     * Every index is in exactly one chunk, and no chunk is empty.
      * @param start The first index.
      * @param end One past the last index.
      * @return A sequential stream of the chunks, in order, each as {@code {from, to}}: the indices from from
-     *         (inclusive) to to (exclusive). When parallel processing is enabled, none if end is not after start (call
-     *         parallel() on it to run a task on each chunk in parallel); else the single chunk (which is empty if end
-     *         is not after start).
+     *         (inclusive) to to (exclusive); none if end is not after start. Call parallel() on it to run a task on
+     *         each chunk in parallel.
      */
     public static Stream<int[]> chunkRanges(int start, int end) {
-        if (!getParallel()) {
-            return Stream.of(new int[]{start, end});
-        }
+        // When parallel processing is disabled, chunkSize() is size, so there is a single chunk, if any
         final int size = end - start;
         final int chunkSize = chunkSize(size);
         return IntStream.range(0, (size + chunkSize - 1) / chunkSize)
@@ -780,15 +777,13 @@ public class ParallelismTools {
      * @param items The items, which should be a random-access list (such as an ArrayList), as each chunk starts at
      *              an index.
      * @param <T> Item type.
-     * @return The chunks, in encounter order: when parallel processing is enabled, a parallel stream of them (so use
-     *         an operation that respects encounter order, such as forEachOrdered(), if their order matters), none if
-     *         there are no items; else a sequential stream of the single chunk.
+     * @return The chunks, in encounter order, none if there are no items: when parallel processing is enabled, a
+     *         parallel stream of them (so use an operation that respects encounter order, such as forEachOrdered(), if
+     *         their order matters), else a sequential one.
      */
     public static <T> Stream<List<T>> chunkedStream(@NotNull List<T> items) {
-        if (!getParallel()) {
-            return Stream.of(items);
-        }
-        return chunkRanges(0, items.size()).parallel().map(r -> items.subList(r[0], r[1]));
+        final Stream<List<T>> chunks = chunkRanges(0, items.size()).map(r -> items.subList(r[0], r[1]));
+        return getParallel() ? chunks.parallel() : chunks;
     }
 
     /**
@@ -834,7 +829,7 @@ public class ParallelismTools {
             forEach(items, task);
             return;
         }
-        chunkedStream(items).sequential().forEachOrdered(chunk -> submit(parent, () -> {
+        chunkedStream(items).forEachOrdered(chunk -> submit(parent, () -> {
             for (T item : chunk) {
                 task.accept(item);
             }
