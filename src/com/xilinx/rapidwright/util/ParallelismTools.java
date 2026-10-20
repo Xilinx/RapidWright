@@ -207,22 +207,10 @@ public class ParallelismTools {
             super(task);
         }
 
-        /**
-         * As FutureTask.get() does if it would wait, throws InterruptedException (clearing the interrupt status) if
-         * this thread has been interrupted and the task is not done; otherwise runs the task if no thread has claimed
-         * it.
-         */
-        private void runUnlessInterrupted() throws InterruptedException {
-            // Not isDone(), which runs the task
-            if (!super.isDone() && Thread.interrupted()) {
-                throw new InterruptedException();
-            }
-            run();
-        }
-
         @Override
         public T get() throws InterruptedException, ExecutionException {
-            runUnlessInterrupted();
+            // Not isDone(), which runs the task
+            runUnlessInterrupted(super.isDone(), this);
             return super.get();
         }
 
@@ -233,7 +221,7 @@ public class ParallelismTools {
         @Override
         public T get(long timeout, @NotNull TimeUnit unit)
                 throws InterruptedException, ExecutionException, TimeoutException {
-            runUnlessInterrupted();
+            runUnlessInterrupted(super.isDone(), this);
             return super.get(timeout, unit);
         }
 
@@ -246,6 +234,19 @@ public class ParallelismTools {
             run();
             return super.isDone();
         }
+    }
+
+    /**
+     * As a Future's get() does if it would wait, throws InterruptedException (clearing the interrupt status) if this
+     * thread has been interrupted and the task is not done; otherwise runs the task if no thread has claimed it.
+     * @param done Whether the task's Future is done.
+     * @param task Runs the task, unless another thread has claimed it.
+     */
+    private static void runUnlessInterrupted(boolean done, Runnable task) throws InterruptedException {
+        if (!done && Thread.interrupted()) {
+            throw new InterruptedException();
+        }
+        task.run();
     }
 
     /**
@@ -267,8 +268,9 @@ public class ParallelismTools {
 
         @Override
         public void run() {
-            final Callable<T> callable = isDone() ? null : task.getAndSet(null);
-            if (callable != null) {
+            // Taken even if already done (e.g. cancelled), so that the task is not kept
+            final Callable<T> callable = task.getAndSet(null);
+            if (callable != null && !isDone()) {
                 try {
                     complete(callable.call());
                 } catch (Throwable e) {
@@ -279,14 +281,14 @@ public class ParallelismTools {
 
         @Override
         public T get() throws InterruptedException, ExecutionException {
-            run();
+            runUnlessInterrupted(isDone(), this);
             return super.get();
         }
 
         @Override
         public T get(long timeout, @NotNull TimeUnit unit)
                 throws InterruptedException, ExecutionException, TimeoutException {
-            run();
+            runUnlessInterrupted(isDone(), this);
             return super.get(timeout, unit);
         }
 

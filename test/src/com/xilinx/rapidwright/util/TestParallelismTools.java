@@ -480,6 +480,52 @@ public class TestParallelismTools {
         assertEachRunOnce(runs);
     }
 
+    /**
+     * A task given to supplyAsync() that no thread of the pool has started yet is run by the thread waiting for its
+     * CompletableFuture with the CompletableFuture's own get(), timed get() or join(), rather than that thread only
+     * blocking; unless that thread has been interrupted, when get() throws without running it.
+     */
+    @Test
+    public void testSupplyAsyncOwnWaitRunsUnclaimedTask() throws Exception {
+        boolean wasParallel = ParallelismTools.getParallel();
+        // Parallel processing cannot be enabled if there is only one processor, or if it was disabled at startup
+        // (RW_PARALLEL=0): then, the blocked tasks below would run on this thread, and hang
+        Assumptions.assumeTrue(ParallelismTools.setParallel(true));
+        int threads = ForkJoinPool.getCommonPoolParallelism();
+        CountDownLatch started = new CountDownLatch(threads);
+        CountDownLatch release = new CountDownLatch(1);
+        try {
+            // Every thread of the pool busy until released, so that none starts the tasks supplied below
+            for (int i = 0; i < threads; i++) {
+                ParallelismTools.supplyAsync(() -> {
+                    started.countDown();
+                    release.await();
+                    return null;
+                });
+            }
+            started.await();
+            Thread self = Thread.currentThread();
+
+            Assertions.assertSame(self, ParallelismTools.supplyAsync(Thread::currentThread).get());
+            // Run to the end, whatever the timeout
+            Assertions.assertSame(self,
+                    ParallelismTools.supplyAsync(Thread::currentThread).get(1, TimeUnit.MILLISECONDS));
+            Assertions.assertSame(self, ParallelismTools.supplyAsync(Thread::currentThread).join());
+
+            // When interrupted, get() throws (clearing the interrupt status) without running it, as a Future's get()
+            // does if it would wait; join() is not interruptible, so then runs it
+            CompletableFuture<Thread> future = ParallelismTools.supplyAsync(Thread::currentThread);
+            self.interrupt();
+            Assertions.assertThrows(InterruptedException.class, future::get);
+            Assertions.assertFalse(Thread.interrupted());
+            Assertions.assertFalse(future.isDone());
+            Assertions.assertSame(self, future.join());
+        } finally {
+            release.countDown();
+            ParallelismTools.setParallel(wasParallel);
+        }
+    }
+
     @Test
     @SuppressWarnings("deprecation")
     public void testSingleThreaded() throws Exception {
