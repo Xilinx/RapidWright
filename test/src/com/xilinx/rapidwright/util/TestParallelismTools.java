@@ -396,49 +396,75 @@ public class TestParallelismTools {
     }
 
     @Test
-    public void testJoinAnyOrder() {
+    public void testJoinUnordered() {
         final AtomicIntegerArray runs = new AtomicIntegerArray(NUM_TASKS);
         final List<CompletableFuture<Integer>> futures = new ArrayList<>();
         for (Callable<Integer> task : countingTasks(runs)) {
             futures.add(ParallelismTools.supplyAsync(task));
         }
-        // Each value once, in whatever order the tasks complete, each removed with the Iterator returned
+        // Each value once, in whatever order the tasks complete, each set to null in the List once returned
         final boolean[] returned = new boolean[NUM_TASKS];
-        while (!futures.isEmpty()) {
-            final Iterator<CompletableFuture<Integer>> it = ParallelismTools.joinAnyOrder(futures);
+        final Iterator<CompletableFuture<Integer>> it = ParallelismTools.joinUnordered(futures);
+        while (it.hasNext()) {
             final CompletableFuture<Integer> future = it.next();
             Assertions.assertTrue(future.isDone());
-            it.remove();
             Assertions.assertFalse(futures.contains(future));
             final int value = ParallelismTools.get(future);
             Assertions.assertFalse(returned[value]);
             returned[value] = true;
         }
-        Assertions.assertThrows(NoSuchElementException.class, () -> ParallelismTools.joinAnyOrder(futures));
+        Assertions.assertThrows(NoSuchElementException.class, it::next);
+        for (CompletableFuture<Integer> future : futures) {
+            Assertions.assertNull(future);
+        }
         assertEachRunOnce(runs);
     }
 
     @Test
-    public void testJoinAnyOrderReturnsDoneBeforeRunning() throws InterruptedException {
+    public void testJoinUnorderedItems() {
+        final AtomicIntegerArray runs = new AtomicIntegerArray(NUM_TASKS);
+        final List<Pair<CompletableFuture<Integer>, Integer>> items = new ArrayList<>();
+        int i = 0;
+        for (Callable<Integer> task : countingTasks(runs)) {
+            items.add(new Pair<>(ParallelismTools.supplyAsync(task), i++));
+        }
+        // Each item once, with what its CompletableFuture is for, set to null in the List once returned
+        int count = 0;
+        final Iterator<Pair<CompletableFuture<Integer>, Integer>> it = ParallelismTools.joinUnordered(items,
+                Pair::getFirst);
+        while (it.hasNext()) {
+            final Pair<CompletableFuture<Integer>, Integer> item = it.next();
+            Assertions.assertTrue(item.getFirst().isDone());
+            Assertions.assertFalse(items.contains(item));
+            Assertions.assertEquals(item.getSecond(), ParallelismTools.get(item.getFirst()));
+            count++;
+        }
+        Assertions.assertEquals(NUM_TASKS, count);
+        assertEachRunOnce(runs);
+    }
+
+    @Test
+    public void testJoinUnorderedReturnsDoneBeforeRunning() throws InterruptedException {
         boolean wasParallel = ParallelismTools.getParallel();
+        // Which cannot be enabled if there is only one processor, or if it was disabled at startup (RW_PARALLEL=0):
+        // then, the blocked task below would run on this thread, and hang
+        Assumptions.assumeTrue(ParallelismTools.setParallel(true));
         CountDownLatch started = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
-        ParallelismTools.setParallel(true);
         try {
             CompletableFuture<Integer> blocked = ParallelismTools.supplyAsync(() -> {
                 started.countDown();
                 release.await();
                 return 0;
             });
-            // Claimed by a thread of the pool, so that joinAnyOrder() cannot run it
+            // Claimed by a thread of the pool, so that joinUnordered() cannot run it
             started.await();
             CompletableFuture<Integer> other = ParallelismTools.supplyAsync(() -> 1);
             List<CompletableFuture<Integer>> futures = new ArrayList<>(Arrays.asList(blocked, other));
 
             // The other one (run by this thread, if not yet by another), rather than waiting for the blocked one
-            Iterator<CompletableFuture<Integer>> it = ParallelismTools.joinAnyOrder(futures);
+            Iterator<CompletableFuture<Integer>> it = ParallelismTools.joinUnordered(futures);
             Assertions.assertSame(other, it.next());
-            it.remove();
             Assertions.assertFalse(blocked.isDone());
 
             // Then the blocked one, waited for until it is released by another thread
@@ -450,7 +476,8 @@ public class TestParallelismTools {
                 }
                 release.countDown();
             }).start();
-            Assertions.assertSame(blocked, ParallelismTools.joinAnyOrder(futures).next());
+            Assertions.assertSame(blocked, it.next());
+            Assertions.assertFalse(it.hasNext());
             Assertions.assertEquals(0, ParallelismTools.get(blocked));
         } finally {
             release.countDown();
@@ -459,25 +486,15 @@ public class TestParallelismTools {
     }
 
     @Test
-    public void testJoinAnyOrderFailed() {
+    public void testJoinUnorderedFailed() {
         IllegalStateException thrown = new IllegalStateException("task");
         CompletableFuture<Integer> failed = ParallelismTools.supplyAsync(() -> {
             throw thrown;
         });
         // Returned as any other, its exception left for get()
-        Assertions.assertSame(failed, ParallelismTools.joinAnyOrder(Arrays.asList(failed)).next());
+        Assertions.assertSame(failed, ParallelismTools.joinUnordered(new ArrayList<>(Arrays.asList(failed))).next());
         Assertions.assertSame(thrown,
                 Assertions.assertThrows(IllegalStateException.class, () -> ParallelismTools.get(failed)));
-    }
-
-    @Test
-    public void testInvokeAllRunsEachTaskOnce() {
-        final AtomicIntegerArray runs = new AtomicIntegerArray(NUM_TASKS);
-        final List<Future<Integer>> futures = ParallelismTools.invokeAll(countingTasks(runs));
-        for (int i = 0; i < NUM_TASKS; i++) {
-            Assertions.assertEquals(i, ParallelismTools.get(futures.get(i)));
-        }
-        assertEachRunOnce(runs);
     }
 
     /**
@@ -524,6 +541,16 @@ public class TestParallelismTools {
             release.countDown();
             ParallelismTools.setParallel(wasParallel);
         }
+    }
+
+    @Test
+    public void testInvokeAllRunsEachTaskOnce() {
+        final AtomicIntegerArray runs = new AtomicIntegerArray(NUM_TASKS);
+        final List<Future<Integer>> futures = ParallelismTools.invokeAll(countingTasks(runs));
+        for (int i = 0; i < NUM_TASKS; i++) {
+            Assertions.assertEquals(i, ParallelismTools.get(futures.get(i)));
+        }
+        assertEachRunOnce(runs);
     }
 
     @Test
