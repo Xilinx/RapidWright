@@ -877,30 +877,9 @@ public class DesignTools {
 
     private static String createInformativeCellInterfaceMismatchMessage(String hierCellInstName,
                                                     EDIFCell target, EDIFCell src) {
-        Map<String, EDIFPort> cellPorts = new HashMap<>(target.getPortMap());
         StringBuilder sb = new StringBuilder();
-        for (EDIFPort p : src.getPorts()) {
-            EDIFPort otherPort = cellPorts.remove(p.getBusName(true));
-            if (otherPort == null) {
-                otherPort = cellPorts.remove(p.getName());
-                if (otherPort == null) {
-                    sb.append("\n  port " + p.getName() + " doesn't exist on " + target);
-                    continue;
-                }
-            }
-
-            if (!Objects.equals(p.getName(), otherPort.getName()) ||
-                    !Objects.equals(p.getWidth(), otherPort.getWidth()) ||
-                    !EDIFCell.isCompatibleDirection(otherPort, p, true)) {
-                sb.append("\n  port " + p.getName() + " mismatch in name/direction/width: "
-                        + otherPort.getName() + " " + otherPort.getDirection() + " width "
-                        + otherPort.getWidth() + " on " + target + ", "
-                        + p.getName() + " " + p.getDirection() + " width " + p.getWidth()
-                        + " on " + src);
-            }
-        }
-        for (String portName : cellPorts.keySet()) {
-            sb.append("\n  port " + portName + " is missing on " + src);
+        for (String mismatch : target.getInterfaceMismatches(src, true)) {
+            sb.append("\n  " + mismatch);
         }
 
         return "\nERROR: The destination instance " + hierCellInstName +
@@ -949,7 +928,13 @@ public class DesignTools {
      * ensures this, as does an earlier call to this method for the design. That is what lets both
      * sides of every port be found by name, in each netlist's parent net map, which is built first
      * if it is not already. This is not checked: a physical net held under any other name is
-     * missed, and its signal left split across two physical nets.
+     * missed, and its signal left split across two physical nets. The one exception is a signal in
+     * the design that nothing drives but a black box inout that the circuit drives: it has no
+     * source to be named after, so its physical nets are looked for under each of its names.
+     * <p>
+     * A black box inout may be filled by a circuit port that is an input or an output, as Vivado
+     * allows. Each port's direction is taken from the circuit, and only a port that is an inout on
+     * both sides is taken to be driven by the circuit if anything inside the circuit drives it.
      * <p>
      * Only the physical nets on a signal that crosses a black box port are touched. Those on each
      * such signal, from whichever side, are merged onto the one named after the signal's source
@@ -1009,8 +994,9 @@ public class DesignTools {
                 throw new RuntimeException("ERROR: The cell instance " + hierarchicalCellName
                         + " is not a black box.");
             }
-            // A black box port to a device pin can be an inout that the circuit has resolved to an
-            // input or output, which Vivado accepts
+            // Any inout on the black box may be one that the circuit has resolved to an input or
+            // output, which Vivado accepts. A port to a device pin is the usual case, but nothing
+            // restricts it to one: the circuit's directions decide which side drives every port
             if (!inst.getCellType().hasCompatibleInterface(cell.getTopEDIFCell(), true)) {
                 throw new RuntimeException(createInformativeCellInterfaceMismatchMessage(
                         hierarchicalCellName, inst.getCellType(), cell.getTopEDIFCell()));
@@ -1084,14 +1070,23 @@ public class DesignTools {
                 boolean circuitDrives = circuitPort.isOutput() || (!circuitPort.isInput()
                         && innerOwner != null
                         && !innerOwner.getNet().getSourcePortInsts(false).isEmpty());
-                String from = circuitDrives ? shellName : innerName;
                 String to = circuitDrives ? innerName : shellName;
-                String previous = portParents.put(from, to);
-                if (NetType.getNetTypeFromNetName(from).isStaticNetType()
-                        || (previous != null && !previous.equals(to))) {
-                    throw new RuntimeException("ERROR: The signal on black box port '" + e.getKey()
-                            + EDIFTools.EDIF_HIER_SEP + portInst.getName() + "' has more than one"
-                            + " source.");
+                List<String> froms = Collections.singletonList(circuitDrives ? shellName : innerName);
+                if (circuitDrives && shellOwner == null) {
+                    // Only an inout on the black box can leave the shell's side without a source
+                    // when the circuit drives it, and then nothing names the shell's physical net,
+                    // which may be held under any of the signal's names
+                    froms = getAliasNamesHeld(design, outer);
+                    portNames.addAll(froms);
+                }
+                for (String from : froms) {
+                    String previous = portParents.put(from, to);
+                    if (NetType.getNetTypeFromNetName(from).isStaticNetType()
+                            || (previous != null && !previous.equals(to))) {
+                        throw new RuntimeException("ERROR: The signal on black box port '"
+                                + e.getKey() + EDIFTools.EDIF_HIER_SEP + portInst.getName()
+                                + "' has more than one source.");
+                    }
                 }
             }
         }
@@ -1311,6 +1306,32 @@ public class DesignTools {
         if (type == NetType.GND) return Net.GND_NET;
         if (type == NetType.VCC) return Net.VCC_NET;
         return prefix + net.getHierarchicalNetName();
+    }
+
+    /**
+     * Gets the names a signal with no source may have its physical nets held under: that of the
+     * given net, and of each of its aliases that the design holds a physical net under. The aliases
+     * are found by walking the netlist from the net, which builds no parent net map.
+     *
+     * @param design The design.
+     * @param net    A logical net on the signal.
+     * @return The given net's name first, then the others, sorted.
+     */
+    private static List<String> getAliasNamesHeld(Design design, EDIFHierNet net) {
+        // Only the nets visited are wanted, not the pins found on them
+        Set<EDIFHierNet> aliases = new HashSet<>();
+        net.getLeafHierPortInsts(false, true, aliases);
+        String name = net.getHierarchicalNetName();
+        List<String> held = new ArrayList<>();
+        for (EDIFHierNet alias : aliases) {
+            String aliasName = alias.getHierarchicalNetName();
+            if (!aliasName.equals(name) && design.getNet(aliasName) != null) {
+                held.add(aliasName);
+            }
+        }
+        Collections.sort(held);
+        held.add(0, name);
+        return held;
     }
 
     /**

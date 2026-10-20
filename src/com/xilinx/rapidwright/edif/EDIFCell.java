@@ -615,22 +615,44 @@ public class EDIFCell extends EDIFPropertyObject {
      * @return True if the ports on each cell match each other, false otherwise.
      */
     public boolean hasCompatibleInterface(EDIFCell cell, boolean allowResolvedInouts) {
-        Map<String,EDIFPort> portMap = new HashMap<>(ports);
-        if (portMap.size() != cell.getPortMap().size()) return false;
+        return getInterfaceMismatches(cell, allowResolvedInouts).isEmpty();
+    }
 
+    /**
+     * Lists every way in which the ports on the provided cell fail to match the ports on this cell,
+     * as {@link #hasCompatibleInterface(EDIFCell, boolean)} checks them: a port on the provided
+     * cell that this cell lacks, a port whose name, width or direction differs from its
+     * counterpart's, and a port on this cell that the provided cell lacks.
+     * @param cell The other cell to check against.
+     * @param allowResolvedInouts As for {@link #hasCompatibleInterface(EDIFCell, boolean)}.
+     * @return One description per mismatched port, empty if the interfaces match.
+     */
+    public List<String> getInterfaceMismatches(EDIFCell cell, boolean allowResolvedInouts) {
+        Map<String,EDIFPort> portMap = new HashMap<>(ports);
+        List<String> mismatches = new ArrayList<>();
         for (EDIFPort port : cell.getPorts()) {
             EDIFPort match = portMap.remove(port.getBusName(true));
             if (match == null) {
                 match = portMap.remove(port.getName());
                 if (match == null) {
-                    return false;
+                    mismatches.add("port " + port.getName() + " doesn't exist on " + getName());
+                    continue;
                 }
             }
-            if (!Objects.equals(port.getName(), match.getName())) return false;
-            if (!Objects.equals(port.getWidth(), match.getWidth())) return false;
-            if (!isCompatibleDirection(match, port, allowResolvedInouts)) return false;
+            if (!Objects.equals(port.getName(), match.getName())
+                    || !Objects.equals(port.getWidth(), match.getWidth())
+                    || !isCompatibleDirection(match, port, allowResolvedInouts)) {
+                mismatches.add("port " + port.getName() + " mismatch in name/direction/width: "
+                        + match.getName() + " " + match.getDirection() + " width "
+                        + match.getWidth() + " on " + getName() + ", "
+                        + port.getName() + " " + port.getDirection() + " width " + port.getWidth()
+                        + " on " + cell.getName());
+            }
         }
-        return portMap.isEmpty();
+        for (String portName : portMap.keySet()) {
+            mismatches.add("port " + portName + " is missing on " + cell.getName());
+        }
+        return mismatches;
     }
 
     /**
@@ -641,7 +663,7 @@ public class EDIFCell extends EDIFPropertyObject {
      *                            output, though not any other direction.
      * @return True if the directions match.
      */
-    public static boolean isCompatibleDirection(EDIFPort port, EDIFPort other, boolean allowResolvedInouts) {
+    private static boolean isCompatibleDirection(EDIFPort port, EDIFPort other, boolean allowResolvedInouts) {
         if (Objects.equals(port.getDirection(), other.getDirection())) return true;
         return allowResolvedInouts && port.getDirection() == EDIFDirection.INOUT
                 && (other.isInput() || other.isOutput());
