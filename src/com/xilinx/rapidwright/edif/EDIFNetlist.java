@@ -1074,13 +1074,26 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
-     * Write this netlist as EDIF to the given stream, on this thread, which is closed afterwards. To write it into a
-     * DCP in parallel, see {@link #exportEDIFParallel(boolean)} instead.
+     * Write this netlist as EDIF to the given stream, which is closed afterwards. If the stream is that of a DCP being
+     * written (a {@link ParallelDCPOutput}), the EDIF is written and compressed in pieces (see
+     * {@link #exportEDIFPieces(boolean)}), in parallel if parallel processing is enabled, that the stream adds to the
+     * DCP in order, each as soon as it is done; otherwise, it is written on this thread.
      * @param out The stream to write to.
      * @param stable If true, the output is the same each time for the same netlist: the date is fixed, and libraries,
-     *               cells, their contents and properties are written in sorted order.
+     *               cells, their contents and properties are written in sorted order. Except when written in pieces:
+     *               then, this applies only to the date, the order of libraries and the netlist's and design's
+     *               properties (cells are written in an unsorted valid order, with unsorted contents), and names that
+     *               are made legal as the same EDIF identifier may be told apart differently each time (see
+     *               {@link EDIFWriteLegalNameCache}).
      */
     public void exportEDIF(OutputStream out, boolean stable) throws IOException {
+        if (out instanceof ParallelDCPOutput) {
+            try (ParallelDCPOutput dcpOut = (ParallelDCPOutput) out) {
+                dcpOut.writePieces(exportEDIFPieces(stable));
+            }
+            return;
+        }
+
         try (BufferedOutputStream os = new BufferedOutputStream(out)) {
             EDIFWriteLegalNameCache<?> cache = EDIFWriteLegalNameCache.singleThreaded();
 
@@ -1193,35 +1206,25 @@ public class EDIFNetlist extends EDIFName {
 
     /**
      * Write this netlist as EDIF in parallel, into compressed pieces of a DCP's EDIF (see
-     * {@link ParallelDCPOutput#newStream}), returned in order without waiting for any: so that the caller can copy
-     * each elsewhere (e.g. into the DCP) as soon as it, and every piece before it, is done, while the rest
-     * are still being written. In order, they are: the EDIF's header; the libraries, in chunks of consecutive cells,
-     * each submitted to be written in parallel (with
-     * {@link ParallelismTools#submit(java.util.concurrent.Callable)}); and the
-     * design and the end of the EDIF, which ends the compressed stream. The header and the end are already written.
-     * Each piece's compressed data follows that of the piece before it, so that together they are this netlist's EDIF.
-     * They should be waited for in order with {@link ParallelismTools#joinInOrder(List)} (or its other ways of
-     * waiting for a Future), which runs any not yet started.
-     * @param stable If true, the date is fixed, and libraries and the netlist's and design's properties are written
-     *               in sorted order; but cells are written in an unsorted valid order, with unsorted contents, and
-     *               names that are made legal as the same EDIF identifier may be told apart differently each time (see
-     *               {@link EDIFWriteLegalNameCache}).
+     * {@link ParallelDCPOutput#newStream}), returned in order without waiting for any: the EDIF's header; the
+     * libraries, in chunks of consecutive cells, each submitted to be written in parallel (see
+     * {@link #submitExportChunks}); and the design and the end of the EDIF, which ends the compressed stream. Each
+     * piece's compressed data follows that of the piece before it, so that together they are this netlist's EDIF.
+     * @param stable As for {@link #exportEDIF(OutputStream, boolean)}, when written in pieces.
      * @return The pieces, in order.
      */
-    public List<Future<ParallelDCPInput>> exportEDIFParallel(boolean stable) {
+    private List<Future<ParallelDCPInput>> exportEDIFPieces(boolean stable) {
         final EDIFWriteLegalNameCache<?> cache = EDIFWriteLegalNameCache.multiThreaded();
-        final List<Future<ParallelDCPInput>> pieces = new ArrayList<>();
-        pieces.add(CompletableFuture.completedFuture(ParallelDCPOutput.newStream(os -> {
+        // The header and the end first, so that no chunk has been submitted if either fails. The names they make legal
+        // are those the chunks do, as they share the cache
+        final ParallelDCPInput header = ParallelDCPOutput.newStream(os -> {
             try {
                 exportEDIFHeader(os, cache, stable);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
-        })));
-        // Cells can only be instantiated after their library has been written.  A circular
-        // dependency cannot be ordered, but is still written (as it was before ordering)
-        pieces.addAll(submitExportChunks(getLibrariesInExportOrder(stable, false), cache));
-        pieces.add(CompletableFuture.completedFuture(ParallelDCPOutput.newStream(os -> {
+        });
+        final ParallelDCPInput footer = ParallelDCPOutput.newStream(os -> {
             try {
                 exportEDIFFooter(os, cache, stable);
                 // So that its last block is marked as being the final one
@@ -1229,7 +1232,13 @@ public class EDIFNetlist extends EDIFName {
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
-        })));
+        });
+        final List<Future<ParallelDCPInput>> pieces = new ArrayList<>();
+        pieces.add(CompletableFuture.completedFuture(header));
+        // Cells can only be instantiated after their library has been written.  A circular
+        // dependency cannot be ordered, but is still written (as it was before ordering)
+        pieces.addAll(submitExportChunks(getLibrariesInExportOrder(stable, false), cache));
+        pieces.add(CompletableFuture.completedFuture(footer));
         return pieces;
     }
 
