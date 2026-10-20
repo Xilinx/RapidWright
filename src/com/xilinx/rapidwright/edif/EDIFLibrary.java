@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -24,7 +24,6 @@
 
 package com.xilinx.rapidwright.edif;
 
-import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -35,13 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Future;
 import java.util.function.Predicate;
-
-import com.xilinx.rapidwright.util.NoCloseOutputStream;
-import com.xilinx.rapidwright.util.ParallelDCPInput;
-import com.xilinx.rapidwright.util.ParallelDCPOutput;
-import com.xilinx.rapidwright.util.ParallelismTools;
 
 /**
  * Keeps track of a set of {@link EDIFCell} objects
@@ -260,25 +253,30 @@ public class EDIFLibrary extends EDIFName {
      */
     public Collection<EDIFLibrary> getExternallyReferencedLibraries() {
         Set<EDIFLibrary> set = new HashSet<>();
-        addExternallyReferencedLibraries(getCells(), set);
+        for (EDIFCell c : getCells()) {
+            addExternallyReferencedLibraries(c, set);
+        }
         return set;
     }
 
     /**
-     * Adds the libraries, other than this one, of the cells instantiated within the provided cells.
-     * @param cells Cells of this library to visit.
-     * @param set Set to add the referenced libraries to.
+     * Adds the libraries, other than this one, of the cells instantiated within the given cell (cells not in any
+     * library are skipped).
+     * @param cell Cell of this library to visit.
+     * @param set Set to add the referenced libraries to. May be a concurrent set (which cannot hold null), shared by
+     *            threads visiting other cells: a library already in it is not added again, as adding to a concurrent
+     *            set may lock even then.
      */
-    void addExternallyReferencedLibraries(Collection<EDIFCell> cells, Set<EDIFLibrary> set) {
+    void addExternallyReferencedLibraries(EDIFCell cell, Set<EDIFLibrary> set) {
         // Most instances refer to the same few libraries, so skip repeats of the last one found
         EDIFLibrary last = this;
-        for (EDIFCell c : cells) {
-            for (EDIFCellInst i : c.getCellInsts()) {
-                EDIFLibrary lib = i.getCellType().getLibrary();
-                if (lib != this && lib != last) {
+        for (EDIFCellInst i : cell.getCellInsts()) {
+            EDIFLibrary lib = i.getCellType().getLibrary();
+            if (lib != null && lib != this && lib != last) {
+                if (!set.contains(lib)) {
                     set.add(lib);
-                    last = lib;
                 }
+                last = lib;
             }
         }
     }
@@ -351,33 +349,5 @@ public class EDIFLibrary extends EDIFName {
     }
     public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache) throws IOException {
         exportEDIF(os, cache, false);
-    }
-
-    public List<Future<ParallelDCPInput>> exportEDIF(EDIFWriteLegalNameCache<?> cache) throws IOException{
-        if (!ParallelismTools.getParallel()) {
-            throw new RuntimeException();
-        }
-
-        List<EDIFCell> validCellOrder = getValidCellExportOrder(false);
-        final int chunkSize = 256;
-
-        List<Future<ParallelDCPInput>> streamFutures = new ArrayList<>();
-        for (long i = 0; i < validCellOrder.size(); i += chunkSize) {
-            final boolean firstChunk = (i == 0);
-            final boolean lastChunk = (i + chunkSize >= validCellOrder.size());
-            List<EDIFCell> chunk = validCellOrder.subList((int) i, (int) (lastChunk ? validCellOrder.size() : i + chunkSize));
-
-            streamFutures.add(ParallelismTools.submit(
-                    () -> ParallelDCPOutput.newStream((os) -> {
-                        try (BufferedOutputStream bs = new BufferedOutputStream(new NoCloseOutputStream(os))) {
-                            exportEDIF(chunk, bs, firstChunk, lastChunk, cache, false);
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
-                    })
-            ));
-        }
-
-        return streamFutures;
     }
 }
