@@ -59,12 +59,11 @@ import org.jetbrains.annotations.NotNull;
  *
  * A class that abstracts away single-threaded and multi-threaded execution.
  * Single-threaded mode means that all tasks are executed on the current
- * thread: those given to {@link #submit(Callable)} (and all but the first
- * given to {@link #invokeFirstSubmitRest(Callable[])}) are deferred until they
+ * thread: those given to {@link #submit(Callable)} are deferred until they
  * are waited for ({@link #get(Future)}, {@link #join(List)},
- * {@link #joinAll(List)}, {@link #joinInOrder(List)} or
- * {@link #joinFirst(Deque)}, or the returned Future's own get()) or polled (its
- * own isDone()), which executes them on that thread, so a task submitted that
+ * {@link #joinAll(List)} or {@link #joinInOrder(List)}, or the returned
+ * Future's own get()) or polled (its own isDone()), which executes them on
+ * that thread, so a task submitted that
  * way is never executed if it is never waited for (or polled); all others are
  * executed immediately, including those given to
  * {@link #supplyAsync(Callable)}, so that the returned CompletableFuture is
@@ -150,7 +149,7 @@ public class ParallelismTools {
      * no threads), and any exception it throws is kept as-is.
      * When parallel processing is disabled, the task is not submitted, but deferred until
      * it is waited for, with {@link #get(Future)}, {@link #join(List)},
-     * {@link #joinAll(List)}, {@link #joinInOrder(List)}, {@link #joinFirst(Deque)} or the
+     * {@link #joinAll(List)}, {@link #joinInOrder(List)} or the
      * returned Future's own get(), or polled with its isDone(), which executes it on that
      * thread (see {@link LazyFutureTask}). So a task that is never waited for (or polled)
      * is never executed: for one whose result is not needed, use
@@ -198,8 +197,8 @@ public class ParallelismTools {
     /**
      * A FutureTask that is not submitted to the pool (as when parallel processing is disabled), but run by the first
      * thread to wait for it with its own get(), or to poll it with its own isDone(), as well as by
-     * {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)}, {@link #joinInOrder(List)} or
-     * {@link #joinFirst(Deque)} (see {@link #runIfUnclaimed(Future)}). FutureTask.run() does nothing if another thread
+     * {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)} or {@link #joinInOrder(List)}
+     * (see {@link #runIfUnclaimed(Future)}). FutureTask.run() does nothing if another thread
      * has already claimed the task (or it has been cancelled), so it is run at most once, and any other thread waiting
      * for it meanwhile waits for that one.
      */
@@ -545,7 +544,10 @@ public class ParallelismTools {
      * that threw) as they are, so that the List no longer keeps a Future (or
      * its value) once it has been waited for. So the List must be modifiable,
      * and may be read between calls to next() (e.g. to cancel the Futures not
-     * yet waited for), when each Future already waited for is null.
+     * yet waited for), when each Future already waited for is null. Futures may
+     * also be added to its end between calls to next() (e.g. as tasks are
+     * submitted while earlier ones are consumed): hasNext() and next() then
+     * include them, and next() may steal their tasks.
      * @param futures A modifiable List of Future objects corresponding to
      *                previously submitted tasks, whose elements are accessed by
      *                index (so should be a random-access list, such as an
