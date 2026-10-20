@@ -273,9 +273,8 @@ public class EDIFLibrary extends EDIFName {
         for (EDIFCellInst i : cell.getCellInsts()) {
             EDIFLibrary lib = i.getCellType().getLibrary();
             if (lib != null && lib != this && lib != last) {
-                // In a ConcurrentHashMap's key set, contains() never locks, whereas add() locks the bin of the
-                // library (unless that is empty) even if it is already there (from Java 9, unless it is the bin's
-                // first), so check first: most libraries found are already in the set
+                // In a ConcurrentHashMap's key set, contains() never locks, whereas add() locks the library's bin even
+                // if it is already there (from Java 9, unless it is the bin's first), so check first: most are
                 if (!set.contains(lib)) {
                     set.add(lib);
                 }
