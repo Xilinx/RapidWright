@@ -49,7 +49,7 @@ import java.util.TreeSet;
  */
 public class NOCDesign implements Serializable {
 
-    private static final long serialVersionUID = -1303425805455056695L;
+    private static final long serialVersionUID = 1981204940249783931L;
 
     private Design design;
 
