@@ -39,6 +39,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
@@ -366,6 +367,39 @@ public class TestParallelismTools {
             Assertions.assertTrue(chained.isDone());
         } finally {
             release.countDown();
+            ParallelismTools.setParallel(wasParallel);
+        }
+    }
+
+    @Test
+    public void testChunkRangesMinChunkSize() {
+        boolean wasParallel = ParallelismTools.getParallel();
+        try {
+            // Where parallel processing cannot be enabled, there is a single chunk whatever the minimum
+            Assumptions.assumeTrue(ParallelismTools.setParallel(true));
+            // Ten items per chunk without a minimum
+            int size = 4 * ParallelismTools.maxParallelism() * 10;
+            Assertions.assertEquals(10, ParallelismTools.chunkSize(size));
+            Assertions.assertEquals(25, ParallelismTools.chunkSize(size, 25));
+
+            // Every index once, in order, in chunks of the minimum but the last
+            List<int[]> chunks = ParallelismTools.chunkRanges(3, 3 + size, 25).collect(Collectors.toList());
+            int next = 3;
+            for (int i = 0; i < chunks.size(); i++) {
+                int[] chunk = chunks.get(i);
+                Assertions.assertEquals(next, chunk[0]);
+                int chunkSize = chunk[1] - chunk[0];
+                Assertions.assertTrue(i < chunks.size() - 1 ? chunkSize == 25 : chunkSize > 0 && chunkSize <= 25);
+                next = chunk[1];
+            }
+            Assertions.assertEquals(3 + size, next);
+
+            // Fewer indices than the minimum: a single chunk, even with a minimum too large to add to an index
+            List<int[]> single = ParallelismTools.chunkRanges(5, 15, Integer.MAX_VALUE).collect(Collectors.toList());
+            Assertions.assertEquals(1, single.size());
+            Assertions.assertArrayEquals(new int[]{5, 15}, single.get(0));
+            Assertions.assertEquals(0, ParallelismTools.chunkRanges(5, 5, 25).count());
+        } finally {
             ParallelismTools.setParallel(wasParallel);
         }
     }
