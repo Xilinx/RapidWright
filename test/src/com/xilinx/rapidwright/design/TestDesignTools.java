@@ -1079,6 +1079,55 @@ public class TestDesignTools {
     }
 
     /**
+     * A net on a port with nothing on it is removed, not merged, and its parent may have no
+     * physical net to take a BEL attribute on it. The attribute is then left with no net rather
+     * than the one removed -- unless another port's net has since become the parent's, in which
+     * case it goes onto that one, whichever port was reached first.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testPopulateBlackBoxBELAttrsOnRemovedNet(boolean fillOther) {
+        // The shell: 'in', held as no physical net, into two black boxes
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", createBlackBox(top, "bb0", EDIFDirection.INPUT));
+        in.createPortInst("I", createBlackBox(top, "bb1", EDIFDirection.INPUT));
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, null);
+
+        // The first circuit holds its input as a physical net with nothing on it, but for a BEL
+        // attribute
+        Design empty = createCircuit("empty", EDIFDirection.INPUT);
+        EDIFCell emptyTop = empty.getTopEDIFCell();
+        emptyTop.createNet("I").createPortInst(emptyTop.getPort("I"));
+        Net emptyNet = empty.createNet("I");
+        Site site = design.getDevice().getSite("SLICE_X1Y0");
+        BEL bel = site.getBEL("A6LUT");
+        empty.addBELAttr(emptyNet, site, site.getSiteTypeEnum(), bel, "ON_PORT", "1");
+
+        // The second reads its input with a LUT
+        Design reader = createCircuit("reader", EDIFDirection.INPUT);
+        EDIFCell readerTop = reader.getTopEDIFCell();
+        EDIFNet readerIn = readerTop.createNet("I");
+        readerIn.createPortInst(readerTop.getPort("I"));
+        addSinkLUT(reader, readerTop, "lut", "SLICE_X2Y0", readerIn, reader.createNet("I"));
+
+        Map<String, Design> blackBoxes = new HashMap<>();
+        blackBoxes.put("bb0", empty);
+        if (fillOther) {
+            blackBoxes.put("bb1", reader);
+        }
+        populateBlackBox(design, blackBoxes, false);
+
+        Assertions.assertNull(design.getNet("bb0/I"));
+        Net inNet = design.getNet("in");
+        Assertions.assertEquals(fillOther, inNet != null);
+        BELAttr attr = design.getBELAttrs().get(site).getBELAttribute(bel, "ON_PORT");
+        Assertions.assertSame(inNet, attr.getNet());
+        Assertions.assertEquals("1", attr.getValue());
+    }
+
+    /**
      * An output the circuit does not drive brings in no physical net to merge, but its shell
      * routing must still respect keepBoundaryRouting. A circuit that is nothing but ports is still
      * a leaf to the parent net map, so the net owns itself; one with contents leaves the net with
