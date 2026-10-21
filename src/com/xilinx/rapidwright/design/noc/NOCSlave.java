@@ -287,7 +287,7 @@ public class NOCSlave extends NOCClient implements Serializable {
                 obj.put(NOCJSONUtil.JSON_FIELD_INTERLEAVE_SIZE, interleaveSize);
             }
         }
-        return obj;
+        return addUnmodeledFields(obj);
     }
 
     /**
