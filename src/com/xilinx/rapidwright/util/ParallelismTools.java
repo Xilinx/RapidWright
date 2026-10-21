@@ -766,7 +766,19 @@ public class ParallelismTools {
      * @return The number of items in each chunk (the last may have fewer), at least 1.
      */
     public static int chunkSize(int size) {
-        return Math.max(1, getParallel() ? size / (4 * maxParallelism()) : size);
+        return chunkSize(size, 1);
+    }
+
+    /**
+     * As {@link #chunkSize(int)}, but with at least the given number of items in each chunk (but the last), so fewer
+     * chunks when there are few items (a single one, if there are no more items than that): e.g. when each chunk has a
+     * cost of its own (such as a buffer, or a task's overhead) that is only worth paying for enough items.
+     * @param size The number of items.
+     * @param minChunkSize The fewest items in each chunk (but the last).
+     * @return The number of items in each chunk (the last may have fewer), at least minChunkSize, and at least 1.
+     */
+    public static int chunkSize(int size, int minChunkSize) {
+        return Math.max(Math.max(1, minChunkSize), getParallel() ? size / (4 * maxParallelism()) : size);
     }
 
     /**
@@ -781,11 +793,26 @@ public class ParallelismTools {
      *         each chunk in parallel.
      */
     public static Stream<int[]> chunkRanges(int start, int end) {
-        // When parallel processing is disabled, chunkSize() is size, so there is a single chunk, if any
+        return chunkRanges(start, end, 1);
+    }
+
+    /**
+     * As {@link #chunkRanges(int, int)}, but with at least the given number of indices in each chunk (but the last),
+     * as for {@link #chunkSize(int, int)}.
+     * @param start The first index.
+     * @param end One past the last index.
+     * @param minChunkSize The fewest indices in each chunk (but the last).
+     * @return A sequential stream of the chunks, in order, each as {@code {from, to}}: the indices from from
+     *         (inclusive) to to (exclusive); none if end is not after start.
+     */
+    public static Stream<int[]> chunkRanges(int start, int end, int minChunkSize) {
+        // When parallel processing is disabled, chunkSize() is at least size, so there is a single chunk, if any
         final int size = end - start;
-        final int chunkSize = chunkSize(size);
-        return IntStream.range(0, (size + chunkSize - 1) / chunkSize)
-                .mapToObj(i -> new int[]{start + i * chunkSize, Math.min(start + (i + 1) * chunkSize, end)});
+        final int chunkSize = chunkSize(size, minChunkSize);
+        // Without adding chunkSize to an index, which could overflow if minChunkSize is large
+        final int chunks = size > 0 ? (size - 1) / chunkSize + 1 : 0;
+        return IntStream.range(0, chunks).mapToObj(i -> new int[]{start + i * chunkSize,
+                (int) Math.min(start + (long) (i + 1) * chunkSize, end)});
     }
 
     /**
