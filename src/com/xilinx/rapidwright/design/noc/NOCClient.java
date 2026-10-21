@@ -59,6 +59,25 @@ public class NOCClient implements Serializable {
     /** Fields from the traffic file that this class does not model (as JSON), written back unchanged */
     private String unmodeledFields;
 
+    /** Traffic file fields modeled by NOCClient, NOCMaster and NOCSlave */
+    private static final Set<String> modeledFields = new HashSet<>(Arrays.asList(
+            NOCJSONUtil.JSON_FIELD_NAME,
+            NOCJSONUtil.JSON_FIELD_IS_MASTER,
+            NOCJSONUtil.JSON_FIELD_HAS_PARITY_ADDR,
+            NOCJSONUtil.JSON_FIELD_HAS_PARITY_DATA,
+            NOCJSONUtil.JSON_FIELD_COMPONENT_TYPE,
+            NOCJSONUtil.JSON_FIELD_PROTOCOL,
+            NOCJSONUtil.JSON_FIELD_AXI_DATA_WIDTH,
+            NOCJSONUtil.JSON_FIELD_IS_VIRTUAL,
+            NOCJSONUtil.JSON_FIELD_EXTERNAL_CONNECTIONS,
+            NOCJSONUtil.JSON_FIELD_SIM_META_DATA,
+            NOCJSONUtil.JSON_FIELD_READ_TRAFFIC_CLASS,
+            NOCJSONUtil.JSON_FIELD_WRITE_TRAFFIC_CLASS,
+            NOCJSONUtil.JSON_FIELD_MEMORY_APERTURES,
+            NOCJSONUtil.JSON_FIELD_LOGICAL_PORTS,
+            NOCJSONUtil.JSON_FIELD_DDRC_PARAMS,
+            NOCJSONUtil.JSON_FIELD_INTERLEAVE_SIZE));
+
     private static final ArrayList<String> unsupportedFields = new ArrayList<String>();
     private static final Set<String> warnedUnsupportedFields = new HashSet<>();
 
@@ -136,7 +155,7 @@ public class NOCClient implements Serializable {
                 simMetaData.put(key, value);
             }
         }
-        unmodeledFields = json.toString();
+        unmodeledFields = NOCJSONUtil.getUnmodeledFields(json, modeledFields);
     }
 
     /**
@@ -188,7 +207,8 @@ public class NOCClient implements Serializable {
     /**
      * Adds the fields read from the traffic file that are not modeled by this
      * client (e.g. DesignName, InterleaveSel) to its JSON representation, so that
-     * they are preserved when the traffic file is written back out.
+     * they are preserved when the traffic file is written back out. Modeled fields
+     * are never added: they are written from the client's current state only.
      * @param obj The JSON representation of this client, after all modeled fields
      * have been added.
      * @return The same JSON object.

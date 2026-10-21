@@ -22,6 +22,7 @@ package com.xilinx.rapidwright.design.noc;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -62,6 +63,21 @@ public class NOCConnection implements Serializable {
 
     /** Fields from the traffic file that this class does not model (as JSON), written back unchanged */
     private String unmodeledFields;
+
+    /** Traffic file path fields modeled by NOCConnection */
+    private static final Set<String> modeledFields = new HashSet<>(Arrays.asList(
+            NOCJSONUtil.JSON_FIELD_PHASE,
+            NOCJSONUtil.JSON_FIELD_FROM_CELL,
+            NOCJSONUtil.JSON_FIELD_TO_CELL,
+            NOCJSONUtil.JSON_FIELD_PORT,
+            NOCJSONUtil.JSON_FIELD_COMMUNICATION_TYPE,
+            NOCJSONUtil.JSON_FIELD_READ_BANDWIDTH,
+            NOCJSONUtil.JSON_FIELD_READ_LATENCY,
+            NOCJSONUtil.JSON_FIELD_READ_AVERAGE_BURST,
+            NOCJSONUtil.JSON_FIELD_WRITE_BANDWIDTH,
+            NOCJSONUtil.JSON_FIELD_WRITE_LATENCY,
+            NOCJSONUtil.JSON_FIELD_WRITE_AVERAGE_BURST,
+            NOCJSONUtil.JSON_FIELD_EXCLUSIVE_GROUP));
 
     private static final ArrayList<String> unsupportedFields = new ArrayList<String>();
     private static final Set<String> warnedUnsupportedFields = new HashSet<>();
@@ -128,7 +144,7 @@ public class NOCConnection implements Serializable {
         if (json.has(NOCJSONUtil.JSON_FIELD_EXCLUSIVE_GROUP)) {
             exclusiveGroup = json.getString(NOCJSONUtil.JSON_FIELD_EXCLUSIVE_GROUP);
         }
-        unmodeledFields = json.toString();
+        unmodeledFields = NOCJSONUtil.getUnmodeledFields(json, modeledFields);
     }
 
     /**

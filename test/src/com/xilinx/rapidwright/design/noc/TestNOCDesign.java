@@ -256,6 +256,8 @@ public class TestNOCDesign {
         Design d = new Design("noc2", "xc2ve3858");
         NOCDesign noc = new NOCDesign(d);
         noc.loadTraffic(new ByteArrayInputStream(GEN2_TRAFFIC.getBytes(StandardCharsets.UTF_8)));
+        // Loading the same solution again replaces, rather than adds to, the loaded state
+        noc.loadSolution(new ByteArrayInputStream(GEN2_SOLUTION.getBytes(StandardCharsets.UTF_8)));
         noc.loadSolution(new ByteArrayInputStream(GEN2_SOLUTION.getBytes(StandardCharsets.UTF_8)));
 
         NOCMaster nmu = noc.getMasterClients().get("noc/S00_AXI_nmu/NOC2_NMU512_INST");
@@ -316,5 +318,85 @@ public class TestNOCDesign {
         Assertions.assertEquals(1, comps.get("NOC2_NMU512_X1Y5").size());
         Assertions.assertFalse(comps.get("NOC2_NMU512_X1Y5").get(0).has("TrafficLInst"));
         Assertions.assertEquals(0, comps.get("NOC2_NMU512_X1Y5").get(0).getInt("DestId"));
+
+        // Moving the memory controller to the unused one: the vacated site keeps one entry per port
+        mc.setLocation("DDRMC5E_X4Y0");
+        solution.reset();
+        noc.writeSolution(solution);
+        comps = componentsBySite(new JSONObject(solution.toString(StandardCharsets.UTF_8)));
+        Assertions.assertEquals(2, comps.get("DDRMC5E_X4Y0").size());
+        for (JSONObject c : comps.get("DDRMC5E_X4Y0")) {
+            Assertions.assertEquals(mc.getName(), c.getString("TrafficLInst"));
+        }
+        List<JSONObject> vacated = comps.get("DDRMC5E_X0Y0");
+        Assertions.assertEquals(2, vacated.size());
+        java.util.Set<Integer> ports = new java.util.TreeSet<>();
+        for (JSONObject c : vacated) {
+            Assertions.assertFalse(c.has("TrafficLInst"));
+            Assertions.assertEquals(0, c.getInt("DestId"));
+            ports.add(c.getInt("PortIndex"));
+        }
+        Assertions.assertEquals(new java.util.TreeSet<>(java.util.Arrays.asList(0, 1)), ports);
+    }
+
+    /**
+     * Modeled fields that are cleared after loading stay cleared when written, while fields
+     * RapidWright does not model are still written back unchanged.
+     */
+    @Test
+    public void testClearedModeledFieldsStayCleared() {
+        String traffic = "{\n"
+                + "  \"SystemProperties\": {\"Frequency\": 1000},\n"
+                + "  \"LogicalInstances\": [\n"
+                + "    {\"Name\": \"nmu\", \"DesignName\": \"/noc_0/S00_AXI\", \"IsMaster\": true,\n"
+                + "     \"CompType\": \"PL_NMU_2\", \"Protocol\": \"AXI_MM\", \"HasParityAddr\": true,\n"
+                + "     \"IsVirtual\": true, \"ExternalConn\": \"a b\", \"ReadTC\": \"BE\", \"WriteTC\": \"BE\",\n"
+                + "     \"AxiDataWidth\": 128, \"SysAddresses\": []},\n"
+                + "    {\"Name\": \"nsu\", \"IsMaster\": false, \"CompType\": \"PL_NSU_2\", \"Protocol\": \"AXI_MM\",\n"
+                + "     \"AxiDataWidth\": 128, \"SysAddresses\": []}\n"
+                + "  ],\n"
+                + "  \"Paths\": [\n"
+                + "    {\"Phase\": 0, \"From\": \"nmu\", \"To\": \"nsu\", \"Port\": \"PORT0\",\n"
+                + "     \"CommType\": \"MM_ReadWrite\", \"ReadBW\": 50, \"ReadLatency\": 300, \"ReadAvgBurst\": 4,\n"
+                + "     \"WriteBW\": 50, \"WriteLatency\": 300, \"WriteAvgBurst\": 4,\n"
+                + "     \"ExclusiveGroup\": \"group0\", \"WriteOrder\": \"relaxed\"}\n"
+                + "  ]\n"
+                + "}";
+        NOCDesign noc = new NOCDesign();
+        noc.loadTraffic(new ByteArrayInputStream(traffic.getBytes(StandardCharsets.UTF_8)));
+        NOCMaster nmu = noc.getMasterClients().get("nmu");
+        Assertions.assertTrue(nmu.hasParityAddr());
+        Assertions.assertTrue(nmu.isVirtual());
+        NOCConnection conn = noc.getAllConnections().get(0);
+        Assertions.assertEquals("group0", conn.getExclusiveGroup());
+
+        nmu.setParityAddr(false);
+        nmu.setVirtual(false);
+        nmu.getExternalConnections().clear();
+        conn.setExclusiveGroup(null);
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        noc.writeTraffic(out);
+        JSONObject written = new JSONObject(out.toString(StandardCharsets.UTF_8));
+        JSONObject client = null;
+        for (int i = 0; i < written.getJSONArray("LogicalInstances").length(); i++) {
+            JSONObject c = written.getJSONArray("LogicalInstances").getJSONObject(i);
+            if (c.getString("Name").equals("nmu")) client = c;
+        }
+        Assertions.assertNotNull(client);
+        Assertions.assertFalse(client.has("HasParityAddr"));
+        Assertions.assertFalse(client.has("IsVirtual"));
+        Assertions.assertFalse(client.has("ExternalConn"));
+        Assertions.assertEquals("/noc_0/S00_AXI", client.getString("DesignName"));
+        JSONObject path = written.getJSONArray("Paths").getJSONObject(0);
+        Assertions.assertFalse(path.has("ExclusiveGroup"));
+        Assertions.assertEquals("relaxed", path.getString("WriteOrder"));
+
+        NOCDesign reread = new NOCDesign();
+        reread.loadTraffic(new ByteArrayInputStream(out.toByteArray()));
+        Assertions.assertFalse(reread.getMasterClients().get("nmu").hasParityAddr());
+        Assertions.assertFalse(reread.getMasterClients().get("nmu").isVirtual());
+        Assertions.assertTrue(reread.getMasterClients().get("nmu").getExternalConnections().isEmpty());
+        Assertions.assertNull(reread.getAllConnections().get(0).getExclusiveGroup());
     }
 }
