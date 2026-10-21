@@ -60,6 +60,9 @@ public class NOCConnection implements Serializable {
     boolean isDestLocked;
 
 
+    /** Fields from the traffic file that this class does not model (as JSON), written back unchanged */
+    private String unmodeledFields;
+
     private static final ArrayList<String> unsupportedFields = new ArrayList<String>();
     private static final Set<String> warnedUnsupportedFields = new HashSet<>();
     static {
@@ -100,6 +103,7 @@ public class NOCConnection implements Serializable {
         this.writeLatency = templatePath.writeLatency;
         this.readAverageBurst = templatePath.readAverageBurst;
         this.writeAverageBurst = templatePath.writeAverageBurst;
+        this.unmodeledFields = templatePath.unmodeledFields;
     }
 
     /**
@@ -124,6 +128,7 @@ public class NOCConnection implements Serializable {
         if (json.has(NOCJSONUtil.JSON_FIELD_EXCLUSIVE_GROUP)) {
             exclusiveGroup = json.getString(NOCJSONUtil.JSON_FIELD_EXCLUSIVE_GROUP);
         }
+        unmodeledFields = json.toString();
     }
 
     /**
@@ -161,6 +166,14 @@ public class NOCConnection implements Serializable {
         obj.put(NOCJSONUtil.JSON_FIELD_WRITE_AVERAGE_BURST,writeAverageBurst);
         if (exclusiveGroup != null) {
             obj.put(NOCJSONUtil.JSON_FIELD_EXCLUSIVE_GROUP, exclusiveGroup);
+        }
+        if (unmodeledFields != null) {
+            JSONObject fields = new JSONObject(unmodeledFields);
+            for (String key : fields.keySet()) {
+                if (!obj.has(key)) {
+                    obj.put(key, fields.get(key));
+                }
+            }
         }
         return obj;
     }
@@ -556,6 +569,7 @@ public class NOCConnection implements Serializable {
             ChannelType netChannel = ChannelType.stringToValue(net.getString(NOCJSONUtil.JSON_FIELD_NET_CHANNEL));
             channels.put(netChannel,new NOCChannel(net));
         }
+        isRouted = !channels.isEmpty();
     }
 
     /**

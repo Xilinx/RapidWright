@@ -59,6 +59,10 @@ public class NOCDesign implements Serializable {
     private Map<String,NOCMaster> masterClients;
     private Map<String,NOCSlave> slaveClients;
     private Map<String,Integer> switchDestIDs;
+    /** Port-indexed solution components without a client (e.g. unused DDRMC ports), as JSON */
+    private List<String> unusedPortComponents;
+    /** Sites of client components in the loaded solution */
+    private Set<String> loadedClientSites;
     private List<NOCConnection> nocConnections;
     private List<String> dfxPaths; //List of RP cell names
 
@@ -85,6 +89,8 @@ public class NOCDesign implements Serializable {
         nocConnections = new ArrayList<NOCConnection>();
         dfxPaths = new ArrayList<String>();
         switchDestIDs = new HashMap<String,Integer>();
+        unusedPortComponents = new ArrayList<String>();
+        loadedClientSites = new HashSet<String>();
         isRouted = false;
         lockAllDestIDs = false;
         solutionType = SolutionType.NO_SOLUTION;
@@ -405,9 +411,14 @@ public class NOCDesign implements Serializable {
             }
             int destID = component.getInt(NOCJSONUtil.JSON_FIELD_DEST_ID);
             if (!component.has(NOCJSONUtil.JSON_FIELD_LOGICAL_INST)) {
-                switchDestIDs.put(component.getString(NOCJSONUtil.JSON_FIELD_NAME), destID);
+                if (component.has(NOCJSONUtil.JSON_FIELD_PORT_INDEX)) {
+                    unusedPortComponents.add(component.toString());
+                } else {
+                    switchDestIDs.put(component.getString(NOCJSONUtil.JSON_FIELD_NAME), destID);
+                }
                 continue;
             }
+            loadedClientSites.add(component.getString(NOCJSONUtil.JSON_FIELD_NAME));
             String cellName = component.getString(NOCJSONUtil.JSON_FIELD_LOGICAL_INST);
             if (cellName == null)
                 continue;
@@ -493,7 +504,8 @@ public class NOCDesign implements Serializable {
                 phyComponents.remove(loc);
                 int numPorts = 1;
                 if (clt.isDDRC()) {
-                    numPorts = 4;
+                    // DDRMC (Gen 1) has 4 NoC ports, DDRMC5E (Gen 2) has 2
+                    numPorts = clt.getComponentType() == ComponentType.DDR5E ? 2 : 4;
                 }
                 for (int i = 0; i < numPorts; i++) {
                     JSONObject component = NOCJSONUtil.createOrderedJSONObject();
@@ -514,7 +526,30 @@ public class NOCDesign implements Serializable {
                 }
             }
             Device dev = design.getDevice();
+            Set<String> clientSites = new HashSet<String>();
+            for (NOCClient clt : getClients().values()) {
+                clientSites.add(clt.getLocation());
+            }
+            for (String json : unusedPortComponents) {
+                JSONObject component = new JSONObject(json);
+                if (!clientSites.contains(component.getString(NOCJSONUtil.JSON_FIELD_NAME))) {
+                    nocSolution.append(NOCJSONUtil.JSON_FIELD_COMPONENTS, component);
+                }
+            }
+            // Sites vacated by clients that have moved since the solution was loaded
+            for (String site : loadedClientSites) {
+                if (!clientSites.contains(site) && !switchDestIDs.containsKey(site)) {
+                    JSONObject component = NOCJSONUtil.createOrderedJSONObject();
+                    component.put(NOCJSONUtil.JSON_FIELD_NAME, site);
+                    component.put(NOCJSONUtil.JSON_FIELD_DEST_ID, 0);
+                    nocSolution.append(NOCJSONUtil.JSON_FIELD_COMPONENTS, component);
+                }
+            }
             for (Entry<String, Integer> e : switchDestIDs.entrySet()) {
+                if (clientSites.contains(e.getKey())) {
+                    // Now occupied by a client that has moved there
+                    continue;
+                }
                 JSONObject component = NOCJSONUtil.createOrderedJSONObject();
                 component.put(NOCJSONUtil.JSON_FIELD_NAME, e.getKey());
                 component.put(NOCJSONUtil.JSON_FIELD_DEST_ID, e.getValue().intValue());
