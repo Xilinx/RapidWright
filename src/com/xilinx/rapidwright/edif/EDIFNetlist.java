@@ -1076,8 +1076,8 @@ public class EDIFNetlist extends EDIFName {
     /**
      * Write this netlist as EDIF to the given stream, which is closed afterwards. If the stream is that of a DCP being
      * written (a {@link ParallelDCPOutput}), the EDIF is written and compressed in pieces (see
-     * {@link #exportEDIFPieces(boolean)}), in parallel if parallel processing is enabled, that the stream adds to the
-     * DCP in order, each as soon as it is done; otherwise, it is written on this thread.
+     * {@link #exportEDIFPieces(ParallelDCPOutput, boolean)}), in parallel if parallel processing is enabled, that the
+     * stream adds to the DCP in order, each as soon as it is done; otherwise, it is written on this thread.
      * @param out The stream to write to.
      * @param stable If true, the output is the same each time for the same netlist: the date is fixed, and libraries,
      *               cells, their contents and properties are written in sorted order. Except when written in pieces:
@@ -1089,7 +1089,7 @@ public class EDIFNetlist extends EDIFName {
     public void exportEDIF(OutputStream out, boolean stable) throws IOException {
         if (out instanceof ParallelDCPOutput) {
             try (ParallelDCPOutput dcpOut = (ParallelDCPOutput) out) {
-                dcpOut.writePieces(exportEDIFPieces(stable));
+                dcpOut.writePieces(exportEDIFPieces(dcpOut, stable));
             }
             return;
         }
@@ -1162,11 +1162,13 @@ public class EDIFNetlist extends EDIFName {
     /**
      * Submit the given libraries' cells to be written as EDIF in parallel, in chunks of consecutive cells, each written
      * and compressed into a piece of a DCP's EDIF (see {@link ParallelDCPOutput#newStream}), without waiting for any.
+     * @param dcpOut The stream of the DCP's EDIF, which writes no more pieces once writing the DCP has failed.
      * @param librariesToWrite The libraries, in the order to be written.
      * @param cache The cache of legal EDIF names, which must be safe to use from multiple threads.
      * @return The pieces, in order: one per chunk, and at least one per library.
      */
-    private List<Future<ParallelDCPInput>> submitExportChunks(List<EDIFLibrary> librariesToWrite,
+    private List<Future<ParallelDCPInput>> submitExportChunks(ParallelDCPOutput dcpOut,
+                                                             List<EDIFLibrary> librariesToWrite,
                                                              EDIFWriteLegalNameCache<?> cache) {
         final List<Future<ParallelDCPInput>> pieces = new ArrayList<>();
         for (EDIFLibrary lib : librariesToWrite) {
@@ -1192,7 +1194,7 @@ public class EDIFNetlist extends EDIFName {
                 // the last, directly into the compressing stream of one piece. Submitted with submit(), so that, when
                 // parallel processing is disabled, each chunk is only written once waited for, as the pieces are
                 // read in order
-                pieces.add(ParallelismTools.submit(() -> ParallelDCPOutput.newStream(chunkOs -> {
+                pieces.add(ParallelismTools.submit(() -> dcpOut.newStream(chunkOs -> {
                     try {
                         lib.exportEDIF(chunk, chunkOs, first, last, cache, false);
                     } catch (IOException e) {
@@ -1210,21 +1212,22 @@ public class EDIFNetlist extends EDIFName {
      * libraries, in chunks of consecutive cells, each submitted to be written in parallel (see
      * {@link #submitExportChunks}); and the design and the end of the EDIF, which ends the compressed stream. Each
      * piece's compressed data follows that of the piece before it, so that together they are this netlist's EDIF.
+     * @param dcpOut The stream of the DCP's EDIF, from which the pieces are made.
      * @param stable As for {@link #exportEDIF(OutputStream, boolean)}, when written in pieces.
      * @return The pieces, in order.
      */
-    private List<Future<ParallelDCPInput>> exportEDIFPieces(boolean stable) {
+    private List<Future<ParallelDCPInput>> exportEDIFPieces(ParallelDCPOutput dcpOut, boolean stable) {
         final EDIFWriteLegalNameCache<?> cache = EDIFWriteLegalNameCache.multiThreaded();
         // The header and the end first, so that no chunk has been submitted if either fails. The names they make legal
         // are those the chunks do, as they share the cache
-        final ParallelDCPInput header = ParallelDCPOutput.newStream(os -> {
+        final ParallelDCPInput header = dcpOut.newStream(os -> {
             try {
                 exportEDIFHeader(os, cache, stable);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
         });
-        final ParallelDCPInput footer = ParallelDCPOutput.newStream(os -> {
+        final ParallelDCPInput footer = dcpOut.newStream(os -> {
             try {
                 exportEDIFFooter(os, cache, stable);
                 // So that its last block is marked as being the final one
@@ -1237,7 +1240,7 @@ public class EDIFNetlist extends EDIFName {
         pieces.add(CompletableFuture.completedFuture(header));
         // Cells can only be instantiated after their library has been written.  A circular
         // dependency cannot be ordered, but is still written (as it was before ordering)
-        pieces.addAll(submitExportChunks(getLibrariesInExportOrder(stable, false), cache));
+        pieces.addAll(submitExportChunks(dcpOut, getLibrariesInExportOrder(stable, false), cache));
         pieces.add(CompletableFuture.completedFuture(footer));
         return pieces;
     }
