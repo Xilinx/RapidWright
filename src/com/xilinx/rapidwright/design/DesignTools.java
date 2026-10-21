@@ -1232,8 +1232,8 @@ public class DesignTools {
         // no routing is left to carry across. The design's GND or VCC net is the exception: it is
         // unrouted, in its entirety, only when something is merged onto it, a port merely tied to
         // a constant not being reason enough
-        // What each net merged away or removed below became, for the BEL attributes on it
-        Map<Net, Net> replacedBy = new IdentityHashMap<>();
+        // The parent of each net merged away or removed below, for the BEL attributes on it
+        Map<Net, String> mergedInto = new IdentityHashMap<>();
         for (String name : portNames) {
             String parent = resolveParent(portParents, undriven, name);
             Net net = design.getNet(name);
@@ -1247,7 +1247,7 @@ public class DesignTools {
             if (!hasPhysicalPresence(net)) {
                 // Nothing to move, so the net is simply removed rather than left behind as an
                 // alias of its parent
-                replacedBy.put(net, target);
+                mergedInto.put(net, parent);
                 design.removeNet(net);
                 // TEMPORARY WORKAROUND: the design has stopped holding this net, but the change
                 // tracking still has it
@@ -1263,7 +1263,7 @@ public class DesignTools {
                 target.unroute();
             }
             mergeOntoNet(design, net, target);
-            replacedBy.put(net, target);
+            mergedInto.put(net, parent);
         }
 
         // The BEL attributes of each circuit (DDRMC and IMR settings, for example) are moved in as
@@ -1277,11 +1277,11 @@ public class DesignTools {
                         Net net = attr.getNet();
                         if (net != null && net.isStaticNet()) {
                             net = design.getStaticNet(net.getType());
-                        }
-                        while (replacedBy.containsKey(net)) {
-                            Net replacement = replacedBy.get(net);
-                            if (replacement == null) break;
-                            net = replacement;
+                        } else if (mergedInto.containsKey(net)) {
+                            // Looked up only now, as a parent with no physical net when the net
+                            // was removed may have been given one since, by a later port's net
+                            // being renamed to it. If not, the attribute keeps no net
+                            net = design.getNet(mergedInto.get(net));
                         }
                         design.addBELAttr(net, siteConfig.getSite(), siteConfig.getSiteTypeEnum(),
                                 e.getKey(), attr.getName(), attr.getValue());
