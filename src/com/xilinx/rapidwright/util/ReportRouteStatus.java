@@ -30,6 +30,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
+import com.xilinx.rapidwright.util.route_status.RouteStatusEngine;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -108,6 +109,32 @@ public class ReportRouteStatus {
         rrs.netsWithRoutingErrors = rrs.netsWithSomeUnroutedPins + rrs.netsWithResourceConflicts;
         rrs.fullyRoutedNets = rrs.routableNets - rrs.unroutedNets - rrs.netsWithRoutingErrors;
         return rrs;
+    }
+
+    /**
+     * Compute the route status of the given Design the way Vivado's `report_route_status` does,
+     * such that every count in the returned summary matches Vivado's. Unlike
+     * {@link #reportRouteStatus(Design)}, this method does not rely on (nor modify) the
+     * {@link SitePinInst#isRouted()} state, and examines the logical netlist and placement too.
+     * @param design Design to examine.
+     * @return ReportRouteStatusResult object.
+     */
+    public static ReportRouteStatusResult reportVivadoRouteStatus(Design design) {
+        return reportVivadoRouteStatus(design, false);
+    }
+
+    /**
+     * Compute the route status of the given Design the way Vivado's `report_route_status` does,
+     * such that every count in the returned summary matches Vivado's. Unlike
+     * {@link #reportRouteStatus(Design)}, this method does not rely on (nor modify) the
+     * {@link SitePinInst#isRouted()} state, and examines the logical netlist and placement too.
+     * @param design Design to examine.
+     * @param perNet If true, also populate {@link ReportRouteStatusResult#netsByStatus} with the
+     * names of the nets having each status, as listed by `report_route_status -list_all_nets`.
+     * @return ReportRouteStatusResult object.
+     */
+    public static ReportRouteStatusResult reportVivadoRouteStatus(Design design, boolean perNet) {
+        return RouteStatusEngine.run(design, perNet);
     }
 
     public static void main(String[] args) {
