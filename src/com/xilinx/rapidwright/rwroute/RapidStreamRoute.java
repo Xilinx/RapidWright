@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -32,13 +32,12 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
-import com.xilinx.rapidwright.util.CountUpDownLatch;
 import com.xilinx.rapidwright.util.ParallelismTools;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -101,41 +100,27 @@ public class RapidStreamRoute extends PartialRouter {
      * @return A Collection of conflicted nets.
      */
     private static Collection<Net> unrouteConflictedNets(Design design, String anchorNameKeyword) {
-        final Map<Node, Collection<Net>> nodeToNet = new ConcurrentHashMap<>();
-        final CountUpDownLatch netsOutstanding = new CountUpDownLatch();
-        for (Net net : design.getNets()) {
-            netsOutstanding.countUp();
-            ParallelismTools.submit(() -> {
-                try {
-                    for (Node node : RouterHelper.getNodesOfNet(net)) {
-                        final Collection<Net> nets = nodeToNet.computeIfAbsent(node, (n) -> new ArrayList<>(1));
-                        synchronized(nets) {
-                            if (!nets.contains(net)) {
-                                // Assume at most two nets (thus ArrayList.contains() will be negligible)
-                                assert(nets.size() < 2);
-                                nets.add(net);
-                            }
-                        }
-                    }
-                } finally {
-                    netsOutstanding.countDown();
+        // The first net found to use each node, and any others found to use it too (conflicts)
+        final Map<Node, Net> nodeToNet = new ConcurrentHashMap<>();
+        final Map<Node, Set<Net>> nodeToConflictNets = new ConcurrentHashMap<>();
+        ParallelismTools.forEach(design.getNets(), net -> {
+            // A net's nodes may include duplicates
+            for (Node node : RouterHelper.getNodesOfNet(net)) {
+                final Net firstNet = nodeToNet.putIfAbsent(node, net);
+                if (firstNet != null && firstNet != net) {
+                    nodeToConflictNets.computeIfAbsent(node, n -> ConcurrentHashMap.newKeySet()).add(net);
                 }
-            });
-        }
-        netsOutstanding.await();
+            }
+        });
 
         Set<Net> conflictNets = new HashSet<>();
-        for (Map.Entry<Node,Collection<Net>> e : nodeToNet.entrySet()) {
-            Collection<Net> nets = e.getValue();
-            if (nets.size() == 1)
-                continue;
-            // Assume at most 2 nets are conflicted
-            assert(nets.size() == 2);
-            Iterator<Net> it = nets.iterator();
+        for (Map.Entry<Node,Set<Net>> e : nodeToConflictNets.entrySet()) {
             Node node = e.getKey();
-            Net net0 = it.next();
-            Net net1 = it.next();
-            if (net0.getSource() != null && net1.getSource() != null) {
+            Net net0 = nodeToNet.get(node);
+            for (Net net1 : e.getValue()) {
+                if (net0.getSource() == null || net1.getSource() == null) {
+                    continue;
+                }
                 boolean generateWarning = conflictNets.size() < 5;
                 EDIFNet logicalNet0 = net0.getLogicalNet();
                 EDIFNet logicalNet1 = net1.getLogicalNet();
@@ -147,7 +132,9 @@ public class RapidStreamRoute extends PartialRouter {
                     if (generateWarning) generateConflictInfo(node, net0, net1);
                 }
 
-                for (Net net : nets) {
+                // Unroute every target net of the conflict, rather than the fewest nets needed to leave one net on each
+                // node. Once unrouted, net0 has no PIPs, so is not unrouted again for another conflict
+                for (Net net : Arrays.asList(net0, net1)) {
                     if (net.hasPIPs() && isTargetConflictNetToRoute(net, anchorNameKeyword)) {
                         conflictNets.add(net);
                         net.unroute();
