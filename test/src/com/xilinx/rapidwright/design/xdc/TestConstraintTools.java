@@ -308,9 +308,11 @@ public class TestConstraintTools {
         top.createPort("pad", EDIFDirection.OUTPUT, 1);
         top.createPort("clk", EDIFDirection.INPUT, 1);
         top.createPort("din", EDIFDirection.INPUT, 1);
+        top.createPort("bus[1:0]", EDIFDirection.INPUT, 2);
         EDIFCell rpType = new EDIFCell(top.getLibrary(), "rpType");
         rpType.createPort("clk", EDIFDirection.INPUT, 1);
         rpType.createPort("din", EDIFDirection.INPUT, 1);
+        rpType.createPort("clk0", EDIFDirection.INPUT, 1);
         EDIFCellInst rp = rpType.createCellInst("rp", top);
         rp.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
         // The box's din is on the device pin din; its clk is not on the device pin clk
@@ -321,6 +323,7 @@ public class TestConstraintTools {
         Design circuit = new Design("circuit", "xcvu3p");
         circuit.getTopEDIFCell().createPort("clk", EDIFDirection.INPUT, 1);
         circuit.getTopEDIFCell().createPort("din", EDIFDirection.INPUT, 1);
+        circuit.getTopEDIFCell().createPort("clk0", EDIFDirection.INPUT, 1);
         circuit.addXDCConstraint(ConstraintGroup.EARLY,
                 // Both kinds in one get_ports
                 "set_max_delay 2 -from [get_ports {pad clk}] -to [get_pins y/D]",
@@ -336,6 +339,17 @@ public class TestConstraintTools {
                 // A list continued onto the next line
                 "set_max_delay 5 -from [get_ports {pad \\",
                 "    din}] -to [get_pins y/D]",
+                // Tcl's own reading: a list with a braced element, a quoted option, and a command
+                // name inside a braced pattern, which is not a command
+                "set_max_delay 6 -from [get_ports {{pad} clk}] -to [get_pins y/D]",
+                "set_max_delay 7 -from [get_ports \"-regexp\" {pa.}] -to [get_pins y/D]",
+                "set_false_path -from [get_ports -regexp {[get_ports]}] -to [get_pins y/D]",
+                // A bus's declared name, bus[1:0], is not matched by patterns
+                "set_false_path -to [get_ports *0*]",
+                // Without . [ * + or ?, Vivado takes a -regexp pattern as a name, and with an
+                // alternation outside parentheses, it matches nothing
+                "set_false_path -to [get_ports -regexp {^pad$ clk}]",
+                "set_false_path -to [get_ports -regexp {pa.|c.k}]",
                 "set_property IOSTANDARD LVCMOS18 [get_ports pa?]");
 
         DesignTools.populateBlackBox(design, Collections.singletonMap("rp", circuit), false);
@@ -347,11 +361,17 @@ public class TestConstraintTools {
                 "set_max_delay 3 -from [get_ports pa*] -to [get_pins y/D]",
                 "set_max_delay 4 -from [get_ports -regexp {pa.}] -to [get_pins y/D]",
                 // Split, a pattern is replaced by the names it matches, and -regexp is dropped
-                "set_false_path -to [concat [get_ports {din pad}] [get_ports -scoped_to_current_instance clk]]",
-                "set_false_path -to [concat [get_ports pad] [get_ports -scoped_to_current_instance clk]]",
+                "set_false_path -to [concat [get_ports {bus[0] bus[1] din pad}] [get_ports -scoped_to_current_instance {clk clk0}]]",
+                "set_false_path -to [concat [get_ports pad] [get_ports -scoped_to_current_instance {clk clk0}]]",
                 "set_property KEEP true [get_ports -scoped_to_current_instance -regexp -nocase {C.K}]",
                 "set_max_delay 5 -from [get_ports {pad \\",
                 "    din}] -to [get_pins y/D]",
+                "set_max_delay 6 -from [concat [get_ports pad] [get_ports -scoped_to_current_instance clk]] -to [get_pins y/D]",
+                "set_max_delay 7 -from [get_ports \"-regexp\" {pa.}] -to [get_pins y/D]",
+                "set_false_path -from [get_ports -scoped_to_current_instance -regexp {[get_ports]}] -to [get_pins y/D]",
+                "set_false_path -to [concat [get_ports {bus[0]}] [get_ports -scoped_to_current_instance clk0]]",
+                "set_false_path -to [get_ports -scoped_to_current_instance -regexp {^pad$ clk}]",
+                "set_false_path -to [get_ports -scoped_to_current_instance -regexp {pa.|c.k}]",
                 "current_instance -quiet",
                 "set_property IOSTANDARD LVCMOS18 [get_ports pa?]"), design.getXDCConstraints(ConstraintGroup.EARLY));
     }
