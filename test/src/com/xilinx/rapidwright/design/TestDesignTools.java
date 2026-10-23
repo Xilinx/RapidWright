@@ -903,6 +903,294 @@ public class TestDesignTools {
     }
 
     /**
+     * A black box inout can be filled by a circuit port that has been resolved to an input or
+     * output, which Vivado accepts. The instance takes on the circuit's directions, and each signal
+     * must end up on the net of its source. Here a LUT inside the circuit drives the output, so
+     * guessing from the circuit's contents would give the same answer as reading its directions;
+     * the pass-through test below is one where only the directions give the right answer.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testPopulateBlackBoxResolvedInouts(boolean keepBoundaryRouting) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+
+        EDIFCell bbType = new EDIFCell(top.getLibrary(), "bbType");
+        bbType.createPort("I", EDIFDirection.INOUT, 1);
+        bbType.createPort("O", EDIFDirection.INOUT, 1);
+        EDIFCellInst bb = bbType.createCellInst("bb", top);
+        bb.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", bb);
+        Net inNet = design.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+        EDIFNet out = top.createNet("out");
+        out.createPortInst("O", bb);
+        Net outNet = design.createNet("out");
+        SitePinInst sinkPin = addSinkLUT(design, top, "sink", "SLICE_X2Y0", out, outNet);
+
+        // The circuit: a LUT from I to O
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet circuitIn = circuitTop.createNet("I");
+        circuitIn.createPortInst(circuitTop.getPort("I"));
+        Net circuitInNet = circuit.createNet("I");
+        SitePinInst lutIn = addSinkLUT(circuit, circuitTop, "lut", "SLICE_X1Y0", circuitIn, circuitInNet);
+        EDIFNet circuitOut = circuitTop.createNet("lut_O");
+        circuitOut.createPortInst(circuitTop.getPort("O"));
+        circuitOut.createPortInst("O", circuitTop.getCellInst("lut"));
+        Net circuitOutNet = circuit.createNet("lut_O");
+        SitePinInst lutOut = circuitOutNet.createPin("A_O", lutIn.getSiteInst());
+
+        populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
+
+        Assertions.assertEquals(EDIFDirection.INPUT, bb.getPortInst("I").getDirection());
+        Assertions.assertEquals(EDIFDirection.OUTPUT, bb.getPortInst("O").getDirection());
+        // The shell drives the input and the circuit the output
+        Assertions.assertSame(inNet, lutIn.getNet());
+        Assertions.assertSame(design.getNet("bb/lut_O"), lutOut.getNet());
+        Assertions.assertSame(lutOut.getNet(), sinkPin.getNet());
+        Assertions.assertNull(design.getNet("out"));
+        assertParentNet(netlist, "out", "bb/lut_O");
+    }
+
+    /**
+     * A signal straight through a circuit is driven by another of the circuit's inputs rather than
+     * by anything inside it, so only the circuit's resolved directions can tell which of the black
+     * box's inouts is the input.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testPopulateBlackBoxResolvedInoutPassThrough(boolean keepBoundaryRouting) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+
+        EDIFCell bbType = new EDIFCell(top.getLibrary(), "bbType");
+        bbType.createPort("I", EDIFDirection.INOUT, 1);
+        bbType.createPort("O", EDIFDirection.INOUT, 1);
+        EDIFCellInst bb = bbType.createCellInst("bb", top);
+        bb.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", bb);
+        Net inNet = design.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+        PIP inPIP = addTestRouting(inNet, 1);
+        EDIFNet out = top.createNet("out");
+        out.createPortInst("O", bb);
+        Net outNet = design.createNet("out");
+        SitePinInst sinkPin = addSinkLUT(design, top, "sink", "SLICE_X2Y0", out, outNet);
+        PIP outPIP = addTestRouting(outNet, 0, sinkPin);
+
+        // The circuit: nothing but a wire from I to O
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet wire = circuitTop.createNet("wire");
+        wire.createPortInst(circuitTop.getPort("I"));
+        wire.createPortInst(circuitTop.getPort("O"));
+        circuit.createNet("wire");
+
+        populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
+
+        Assertions.assertEquals(EDIFDirection.INPUT, bb.getPortInst("I").getDirection());
+        Assertions.assertEquals(EDIFDirection.OUTPUT, bb.getPortInst("O").getDirection());
+        // The output's sinks move onto the input's net, just as for a black box with an input and
+        // an output
+        assertParentNet(netlist, "out", "in");
+        Assertions.assertSame(inNet, sinkPin.getNet());
+        Assertions.assertNull(design.getNet("out"));
+        Assertions.assertNull(design.getNet("bb/wire"));
+        assertRouting(keepBoundaryRouting, inNet, Arrays.asList(inPIP, outPIP), sinkPin);
+        Assertions.assertTrue(design.getModifiedNets().contains(inNet));
+    }
+
+    /**
+     * The usual case: a black box inout wired to a device pin, a top-level inout port of the shell,
+     * which is the signal's source in the shell unless something else drives it. The circuit may
+     * resolve the port to an input, which reads the pin, or to an output, which drives it -- or
+     * leave that output unconnected inside, so nothing is merged.
+     */
+    @ParameterizedTest
+    @CsvSource({
+        "false, INPUT",
+        "true, INPUT",
+        "false, OUTPUT",
+        "true, OUTPUT",
+        "false, UNCONNECTED",
+        "true, UNCONNECTED"
+    })
+    public void testPopulateBlackBoxResolvedInoutPad(boolean keepBoundaryRouting, String resolved) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+
+        EDIFCell bbType = new EDIFCell(top.getLibrary(), "bbType");
+        bbType.createPort("IO", EDIFDirection.INOUT, 1);
+        EDIFCellInst bb = bbType.createCellInst("bb", top);
+        bb.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+        EDIFNet pad = top.createNet("pad");
+        pad.createPortInst(top.createPort("PAD", EDIFDirection.INOUT, 1));
+        pad.createPortInst("IO", bb);
+        Net padNet = design.createNet("pad");
+        PIP padPIP = addTestRouting(padNet, 0);
+        assertParentNet(netlist, "pad", "pad");
+
+        boolean output = !resolved.equals("INPUT");
+        Design circuit = new Design("circuit", "xcvu3p");
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        circuitTop.createPort("IO", output ? EDIFDirection.OUTPUT : EDIFDirection.INPUT, 1);
+        Net circuitNet = null;
+        SitePinInst lutPin = null;
+        if (resolved.equals("INPUT")) {
+            EDIFNet io = circuitTop.createNet("IO");
+            io.createPortInst(circuitTop.getPort("IO"));
+            circuitNet = circuit.createNet("IO");
+            lutPin = addSinkLUT(circuit, circuitTop, "lut", "SLICE_X1Y0", io, circuitNet);
+        } else if (resolved.equals("OUTPUT")) {
+            EDIFNet o = circuitTop.createNet("lut_O");
+            o.createPortInst(circuitTop.getPort("IO"));
+            circuitNet = circuit.createNet("lut_O");
+            addSourceLUT(circuit, circuitTop, "lut", "SLICE_X1Y0", o, circuitNet);
+            lutPin = circuitNet.getPins().get(0);
+        }
+
+        populateBlackBox(design, "bb", circuit, keepBoundaryRouting);
+
+        Assertions.assertEquals(output ? EDIFDirection.OUTPUT : EDIFDirection.INPUT,
+                bb.getPortInst("IO").getDirection());
+        switch (resolved) {
+            case "INPUT":
+                // The pin drives the circuit's net, which is merged onto the shell's
+                assertParentNet(netlist, "bb/IO", "pad");
+                Assertions.assertSame(padNet, lutPin.getNet());
+                Assertions.assertNull(design.getNet("bb/IO"));
+                assertRouting(keepBoundaryRouting, padNet, padPIP);
+                break;
+            case "OUTPUT":
+                // The circuit drives the pin, so the shell's net is merged onto the circuit's
+                assertParentNet(netlist, "pad", "bb/lut_O");
+                Assertions.assertSame(circuitNet, design.getNet("bb/lut_O"));
+                Assertions.assertSame(circuitNet, lutPin.getNet());
+                Assertions.assertNull(design.getNet("pad"));
+                assertRouting(keepBoundaryRouting, circuitNet, padPIP);
+                break;
+            default:
+                // An output the circuit leaves unconnected, as for a black box output
+                Assertions.assertSame(padNet, design.getNet("pad"));
+                assertRouting(keepBoundaryRouting, padNet, padPIP);
+                break;
+        }
+    }
+
+    /**
+     * A black box inout that nothing else in the shell drives -- here inside cell 'sub', on a
+     * signal leading up to the top-level net 'y' -- has no source in the shell to name the shell's
+     * physical net after, so the net may be held under any of the signal's names. Once the circuit
+     * resolves the port to an output, that net must still be merged onto the circuit's, whichever
+     * name it is held under, rather than left split from it.
+     */
+    @ParameterizedTest
+    @CsvSource({
+        "false, y",
+        "true, y",
+        "false, sub/x",
+        "true, sub/x"
+    })
+    public void testPopulateBlackBoxResolvedInoutNoShellSource(boolean keepBoundaryRouting,
+            String heldAs) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+
+        EDIFCell subType = new EDIFCell(top.getLibrary(), "subType");
+        subType.createPort("P", EDIFDirection.INOUT, 1);
+        EDIFCellInst sub = subType.createCellInst("sub", top);
+        EDIFCell bbType = new EDIFCell(top.getLibrary(), "bbType");
+        bbType.createPort("IO", EDIFDirection.INOUT, 1);
+        EDIFCellInst bb = bbType.createCellInst("bb", subType);
+        bb.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+        EDIFNet x = subType.createNet("x");
+        x.createPortInst(subType.getPort("P"));
+        x.createPortInst("IO", bb);
+        EDIFNet y = top.createNet("y");
+        y.createPortInst("P", sub);
+        Net shellNet = design.createNet(heldAs);
+        SitePinInst sinkPin = addSinkLUT(design, top, "sink", "SLICE_X2Y0", y, shellNet);
+        PIP shellPIP = addTestRouting(shellNet, 0, sinkPin);
+        Assertions.assertNull(netlist.getParentNet(netlist.getHierNetFromName("y")));
+
+        // The circuit: a LUT driving IO, resolved to an output
+        Design circuit = new Design("circuit", "xcvu3p");
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        circuitTop.createPort("IO", EDIFDirection.OUTPUT, 1);
+        EDIFNet o = circuitTop.createNet("lut_O");
+        o.createPortInst(circuitTop.getPort("IO"));
+        Net circuitNet = circuit.createNet("lut_O");
+        addSourceLUT(circuit, circuitTop, "lut", "SLICE_X1Y0", o, circuitNet);
+
+        populateBlackBox(design, "sub/bb", circuit, keepBoundaryRouting);
+
+        assertParentNet(netlist, "y", "sub/bb/lut_O");
+        Assertions.assertSame(circuitNet, design.getNet("sub/bb/lut_O"));
+        Assertions.assertSame(circuitNet, sinkPin.getNet());
+        Assertions.assertNull(design.getNet(heldAs));
+        assertRouting(keepBoundaryRouting, circuitNet, shellPIP, sinkPin);
+        Assertions.assertTrue(design.getModifiedNets().contains(circuitNet));
+    }
+
+    @Test
+    public void testPopulateBlackBoxInterfaceMismatch() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        createBlackBox(top, "bb", EDIFDirection.INPUT, EDIFDirection.OUTPUT);
+
+        // A circuit's output cannot fill a black box's input, while an inout is only accepted on
+        // the black box's side
+        Design circuit = createCircuit("circuit", EDIFDirection.OUTPUT);
+        circuit.getTopEDIFCell().createPort("I", EDIFDirection.INOUT, 1);
+        RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                () -> DesignTools.populateBlackBox(design, "bb", circuit));
+        Assertions.assertTrue(e.getMessage().contains("different port signature"), e.getMessage());
+        Assertions.assertTrue(e.getMessage().contains("port I mismatch"), e.getMessage());
+        Assertions.assertFalse(e.getMessage().contains("port O mismatch"), e.getMessage());
+
+        // Ports that are missing on either side are each listed
+        Design other = createCircuit("other", EDIFDirection.INPUT);
+        other.getTopEDIFCell().createPort("X", EDIFDirection.OUTPUT, 1);
+        e = Assertions.assertThrows(RuntimeException.class,
+                () -> DesignTools.populateBlackBox(design, "bb", other));
+        Assertions.assertTrue(e.getMessage().contains("port X doesn't exist on bbType"), e.getMessage());
+        Assertions.assertTrue(e.getMessage().contains("port O is missing on other"), e.getMessage());
+        Assertions.assertFalse(e.getMessage().contains("port I "), e.getMessage());
+
+        // A black box inout is only resolved by an input or output
+        Design inouts = new Design("inouts", "xcvu3p");
+        EDIFCell inoutsTop = inouts.getTopEDIFCell();
+        EDIFCell inoutType = new EDIFCell(inoutsTop.getLibrary(), "inoutType");
+        inoutType.createPort("IO", EDIFDirection.INOUT, 1);
+        inoutType.createCellInst("bb", inoutsTop).addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+        Design internal = new Design("internal", "xcvu3p");
+        internal.getTopEDIFCell().createPort("IO", EDIFDirection.INTERNAL, 1);
+        e = Assertions.assertThrows(RuntimeException.class,
+                () -> DesignTools.populateBlackBox(inouts, "bb", internal));
+        Assertions.assertTrue(e.getMessage().contains("port IO mismatch"), e.getMessage());
+
+        // A width mismatch on a bus whose name doesn't give its width away is shown
+        Design buses = new Design("buses", "xcvu3p");
+        EDIFCell busesTop = buses.getTopEDIFCell();
+        EDIFCell busType = new EDIFCell(busesTop.getLibrary(), "busType");
+        busType.createPort("D[7:0]", EDIFDirection.INPUT, 8);
+        busType.createCellInst("bb", busesTop).addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+        Design narrow = new Design("narrow", "xcvu3p");
+        narrow.getTopEDIFCell().createPort("D[7:0]", EDIFDirection.INPUT, 4);
+        e = Assertions.assertThrows(RuntimeException.class,
+                () -> DesignTools.populateBlackBox(buses, "bb", narrow));
+        Assertions.assertTrue(e.getMessage().contains("D[7:0] INPUT width 8 on busType, "
+                + "D[7:0] INPUT width 4 on narrow"), e.getMessage());
+    }
+
+    /**
      * A circuit that connects an input straight through to an output makes the shell's net on
      * that output an alias of the one on that input. Both sit outside the black box, so they are
      * not told apart by which side of the boundary they are on, but they must still be merged:
