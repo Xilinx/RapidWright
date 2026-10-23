@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -48,6 +49,15 @@ import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
+
+import tcl.lang.Parser;
+import tcl.lang.TCL;
+import tcl.lang.TclException;
+import tcl.lang.TclList;
+import tcl.lang.TclObject;
+import tcl.lang.TclParse;
+import tcl.lang.TclString;
+import tcl.lang.TclToken;
 
 /**
  * A collection of methods to access design constraints.
@@ -205,8 +215,6 @@ public class ConstraintTools {
     private static final Pattern ADD_TOP_TO_PBLOCK =
             Pattern.compile("^add_cells_to_pblock\\s+\\[get_pblocks\\s+\\{?([^\\]\\s}]+)\\}?\\]\\s+-top\\b");
 
-    private static final Pattern GET_PORTS = Pattern.compile("\\[\\s*get_ports(?=[\\s\\]\\\\])");
-
     private static final String SCOPED_TO_CURRENT_INSTANCE = "-scoped_to_current_instance";
 
     /** The options of get_ports, as Vivado lists them. */
@@ -214,7 +222,13 @@ public class ConstraintTools {
             "-of_objects", "-match_style", SCOPED_TO_CURRENT_INSTANCE, "-no_traverse", "-prop_thru_buffers",
             "-quiet", "-verbose");
 
-    private static final Pattern BACKSLASH_NEWLINE = Pattern.compile("\\\\\n\\s*");
+    /** Characters that make Vivado read a get_ports -regexp pattern as a regular expression */
+    private static final String REGEXP_CHARS = ".[*+?";
+
+    private static final Pattern MATCHES_NOTHING = Pattern.compile("(?!)");
+
+    /** A bus's declared name, such as bus[7:0] */
+    private static final Pattern BUS_DECLARATION = Pattern.compile(".*\\[\\d+:\\d+\\]");
 
     /** The options of get_ports that take a value. */
     private static final Set<String> GET_PORTS_VALUE_OPTIONS =
@@ -226,58 +240,6 @@ public class ConstraintTools {
 
     private static final Pattern PBLOCK_COMMAND = Pattern.compile("^(?:create_pblock|add_cells_to_pblock"
             + "|resize_pblock|remove_cells_from_pblock|delete_pblock)\\b|^set_property\\b.*\\[get_pblocks\\s[^\\]]*\\]$");
-
-    /**
-     * @return Where the Tcl word that starts at the given index ends: a braced or quoted word after
-     *         its closing brace or quote, any other word at the first space or unmatched ] outside
-     *         brackets.
-     */
-    private static int tclWordEnd(String s, int start) {
-        char first = s.charAt(start);
-        int depth = 0;
-        for (int i = start; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c == '\\') {
-                // A backslash and newline that continue the command separate words
-                if (first != '{' && depth == 0 && i + 1 < s.length() && s.charAt(i + 1) == '\n') return i;
-                i++;
-            } else if (first == '{') {
-                if (c == '{') {
-                    depth++;
-                } else if (c == '}' && --depth == 0) {
-                    return i + 1;
-                }
-            } else if (first == '"') {
-                if (c == '"' && i > start) return i + 1;
-            } else if (c == '[') {
-                depth++;
-            } else if (c == ']') {
-                if (depth == 0) return i;
-                depth--;
-            } else if (depth == 0 && Character.isWhitespace(c)) {
-                return i;
-            }
-        }
-        return s.length();
-    }
-
-    /**
-     * @return The index of the first character from the given one that is neither a space nor a
-     *         backslash and newline that continue the command.
-     */
-    private static int skipTclSpace(String s, int i) {
-        while (i < s.length()) {
-            char c = s.charAt(i);
-            if (Character.isWhitespace(c)) {
-                i++;
-            } else if (c == '\\' && i + 1 < s.length() && s.charAt(i + 1) == '\n') {
-                i += 2;
-            } else {
-                break;
-            }
-        }
-        return i;
-    }
 
     /**
      * @return The option of get_ports that a word names, which Vivado lets be abbreviated as long as
@@ -321,27 +283,83 @@ public class ConstraintTools {
         }
     }
 
+    /** Token types of Tcl's parser, as in tcl.h */
+    private static final int TCL_TOKEN_TEXT = 4;
+    private static final int TCL_TOKEN_BS = 8;
+    private static final int TCL_TOKEN_COMMAND = 16;
+
     /**
      * @param cmd A command, either joined into one line, or with the lines it continues onto
      *            separated by newlines.
-     * @return Each get_ports in the command, with its options and patterns told apart.
+     * @return Each get_ports in the command, including those in the arguments of others, with its
+     *         options and patterns told apart as Tcl and get_ports read them, in the order they
+     *         start in.
      */
     private static List<GetPorts> findGetPorts(String cmd) {
+        // Tcl's parser expects a null character after the script
+        char[] script = (cmd + '\0').toCharArray();
         List<GetPorts> found = new ArrayList<>();
-        Matcher m = GET_PORTS.matcher(cmd);
-        while (m.find()) {
-            GetPorts getPorts = new GetPorts(m.start(), m.end());
+        findGetPorts(script, 0, cmd.length(), false, found);
+        found.sort(Comparator.comparingInt(g -> g.start));
+        return found;
+    }
+
+    /**
+     * Finds each get_ports in the commands of a script, and in the commands substituted into
+     * their words.
+     *
+     * @param script     The script, followed by a null character.
+     * @param from       The index the commands start at.
+     * @param to         The index the commands end at.
+     * @param bracketed  True if the commands are substituted, inside brackets.
+     * @param found      Where to add each get_ports found.
+     */
+    private static void findGetPorts(char[] script, int from, int to, boolean bracketed, List<GetPorts> found) {
+        int open = from - 1;
+        while (from < to) {
+            TclParse parse = Parser.parseCommand(null, script, from, to - from, null, 0, false);
+            if (parse.result != TCL.OK || parse.commandSize <= 0) return;
+            GetPorts getPorts = null;
             boolean isValue = false;
-            int i = skipTclSpace(cmd, m.end());
-            while (i < cmd.length() && cmd.charAt(i) != ']') {
-                int end = tclWordEnd(cmd, i);
-                String word = cmd.substring(i, end);
-                i = skipTclSpace(cmd, end);
+            int word = 0;
+            for (int t = 0; t < parse.numTokens; t += 1 + parse.getToken(t).numComponents, word++) {
+                TclToken wordToken = parse.getToken(t);
+                // The word's value, or null if a command or variable is substituted into it
+                StringBuilder value = new StringBuilder();
+                for (int c = t + 1; c <= t + wordToken.numComponents; c++) {
+                    TclToken token = parse.getToken(c);
+                    if (token.type == TCL_TOKEN_COMMAND) {
+                        findGetPorts(script, token.script_index + 1, token.script_index + token.size - 1, true, found);
+                        value = null;
+                    } else if (value != null && token.type == TCL_TOKEN_TEXT) {
+                        value.append(script, token.script_index, token.size);
+                    } else if (value != null && token.type == TCL_TOKEN_BS) {
+                        // A backslash and newline, with the spaces after it, make a space
+                        char next = script[token.script_index + 1];
+                        value.append(next == '\n' ? ' ' : next);
+                    } else if (token.type != TCL_TOKEN_TEXT && token.type != TCL_TOKEN_BS) {
+                        value = null;
+                    }
+                }
+                if (word == 0) {
+                    if (bracketed && value != null && value.toString().equals("get_ports")) {
+                        getPorts = new GetPorts(open, wordToken.script_index + wordToken.size);
+                        // Only the bracket's sole command can be replaced with the bracket
+                        if (from == open + 1 && parse.commandStart + parse.commandSize >= to) {
+                            getPorts.end = to + 1;
+                        }
+                    }
+                    continue;
+                }
+                if (getPorts == null) continue;
+                String text = new String(script, wordToken.script_index, wordToken.size);
                 if (isValue) {
-                    getPorts.options.add(word);
+                    getPorts.options.add(text);
                     isValue = false;
-                } else if (word.startsWith("-")) {
-                    String option = getPortsOption(word);
+                } else if (value == null) {
+                    getPorts.indirect = true;
+                } else if (value.length() > 0 && value.charAt(0) == '-') {
+                    String option = getPortsOption(value.toString());
                     if (option.equals(SCOPED_TO_CURRENT_INSTANCE)) {
                         getPorts.scoped = true;
                     } else if (option.equals("-regexp")) {
@@ -349,28 +367,25 @@ public class ConstraintTools {
                     } else if (option.equals("-nocase")) {
                         getPorts.nocase = true;
                     } else {
-                        getPorts.options.add(word);
+                        getPorts.options.add(text);
                     }
                     getPorts.indirect |= option.equals("-of_objects");
                     isValue = GET_PORTS_VALUE_OPTIONS.contains(option);
-                } else if (word.startsWith("[")) {
-                    getPorts.indirect = true;
                 } else {
-                    // Tcl replaces a backslash and newline with a space, even inside braces
-                    word = BACKSLASH_NEWLINE.matcher(word).replaceAll(" ");
-                    for (String name : XDCTools.unquotedName(word).trim().split("\\s+")) {
-                        if (!name.isEmpty()) {
-                            getPorts.patterns.add(name);
+                    try {
+                        for (TclObject name : TclList.getElements(null, TclString.newInstance(value.toString()))) {
+                            getPorts.patterns.add(name.toString());
                         }
+                    } catch (TclException e) {
+                        getPorts.indirect = true;
                     }
                 }
             }
-            if (i < cmd.length()) {
-                getPorts.end = i + 1;
+            if (getPorts != null) {
+                found.add(getPorts);
             }
-            found.add(getPorts);
+            from = parse.commandStart + parse.commandSize;
         }
-        return found;
     }
 
     /**
@@ -665,11 +680,11 @@ public class ConstraintTools {
 
         /**
          * Sorts the ports a get_ports names into device pins and ports of the circuit. A name is
-         * sorted as a whole. A pattern (with * or ?, or any name under -regexp) is sorted by the
-         * bits it matches, of the design's top-level ports and of the black box's pins, as Vivado
-         * matches them: * and ? are its only wildcards, a regular expression must match a whole
-         * name, and a bus's name matches each of its bits. A pattern that matches no device pin
-         * names ports of the circuit.
+         * sorted as a whole. A pattern (with * or ?, or under -regexp with any of . [ * + ?) is
+         * sorted by the bits it matches, of the design's top-level ports and of the black box's
+         * pins, as Vivado matches them: * and ? are its only wildcards, a regular expression must
+         * match a whole name, and a bus's name (but not its declared range) matches each of its
+         * bits. A pattern that matches no device pin names ports of the circuit.
          */
         private SortedPorts sortPorts(GetPorts getPorts) {
             SortedPorts sorted = new SortedPorts();
@@ -682,6 +697,8 @@ public class ConstraintTools {
                 Set<String> bits = new TreeSet<>();
                 for (Map<String, List<String>> ports : Arrays.asList(topPorts, pins)) {
                     for (Map.Entry<String, List<String>> e : ports.entrySet()) {
+                        // A bus's declared name, with its range, is a name for literal lookups only
+                        if (BUS_DECLARATION.matcher(e.getKey()).matches()) continue;
                         if (regex.matcher(e.getKey()).matches()) {
                             bits.addAll(e.getValue());
                         }
@@ -710,6 +727,11 @@ public class ConstraintTools {
          */
         private static Pattern portPattern(String pattern, boolean regexp, boolean nocase) {
             if (regexp) {
+                // As Vivado reads -regexp: without any of these characters, a pattern is a
+                // plain name (case-sensitive even with -nocase), and with an alternation outside
+                // parentheses, it matches nothing
+                if (pattern.chars().noneMatch(c -> REGEXP_CHARS.indexOf(c) >= 0)) return null;
+                if (hasTopLevelAlternation(pattern)) return MATCHES_NOTHING;
                 try {
                     return Pattern.compile(pattern, nocase ? Pattern.CASE_INSENSITIVE : 0);
                 } catch (PatternSyntaxException e) {
@@ -732,6 +754,31 @@ public class ConstraintTools {
                 sb.append(Pattern.quote(pattern.substring(from)));
             }
             return Pattern.compile(sb.toString());
+        }
+
+        /**
+         * @return True if a regular expression has a | outside parentheses and brackets.
+         */
+        private static boolean hasTopLevelAlternation(String regex) {
+            int depth = 0;
+            boolean inClass = false;
+            for (int i = 0; i < regex.length(); i++) {
+                char c = regex.charAt(i);
+                if (c == '\\') {
+                    i++;
+                } else if (inClass) {
+                    inClass = c != ']';
+                } else if (c == '[') {
+                    inClass = true;
+                } else if (c == '(') {
+                    depth++;
+                } else if (c == ')') {
+                    depth--;
+                } else if (c == '|' && depth == 0) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /**
