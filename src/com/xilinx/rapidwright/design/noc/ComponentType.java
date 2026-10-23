@@ -48,7 +48,14 @@ public enum ComponentType {
     PCIE_NSU,
     HBM_NMU,
     HBM_NSU, 
-    HBMMC;
+    HBMMC,
+    // Versal Gen 2 (NoC2) client types
+    PL_NMU_2,
+    PL_NSU_2,
+    PS_CCI_NMU_2,
+    RPU_NMU_2,
+    PMC_NMU_2,
+    DDR5E;
 
     private static Map<String,ComponentType> map;
 

@@ -94,7 +94,7 @@ public class NOCMaster extends NOCClient implements Serializable {
         obj.put(NOCJSONUtil.JSON_FIELD_WRITE_TRAFFIC_CLASS, writeTC.toString());
         obj.put(NOCJSONUtil.JSON_FIELD_READ_TRAFFIC_CLASS, readTC.toString());
         obj.put(NOCJSONUtil.JSON_FIELD_MEMORY_APERTURES, new JSONArray());
-        return obj;
+        return addUnmodeledFields(obj);
     }
 
     /**
