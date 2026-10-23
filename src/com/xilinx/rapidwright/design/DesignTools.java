@@ -1328,14 +1328,24 @@ public class DesignTools {
         }
 
         // The BEL attributes of each circuit (DDRMC and IMR settings, for example) are moved in as
-        // well, each onto the net it is on in the design now
-        for (Design cell : blackBoxes.values()) {
-            Map<Site, SiteConfig> belAttrs = cell.getBELAttrs();
+        // well, each onto the net it is on in the design now. A circuit written against an abstract
+        // shell also holds the shell's, on sites such as the GCLK_DELAYs of the clock spines, where
+        // it can name a different net than the shell or another circuit does: there, as Vivado's
+        // link_design does, the attribute of the circuit that names a net of its own -- one under
+        // its black box -- is the one kept
+        for (Entry<String, Design> b : blackBoxes.entrySet()) {
+            final String cellPrefix = b.getKey() + EDIFTools.EDIF_HIER_SEP;
+            Map<Site, SiteConfig> belAttrs = b.getValue().getBELAttrs();
             if (belAttrs == null) continue;
             for (SiteConfig siteConfig : belAttrs.values()) {
                 for (Entry<BEL, Map<String, BELAttr>> e : siteConfig.getBELAttributes().entrySet()) {
                     for (BELAttr attr : e.getValue().values()) {
                         Net net = attr.getNet();
+                        boolean ownNet = net != null && net.getName().startsWith(cellPrefix);
+                        if (!ownNet && hasBELAttr(design, siteConfig.getSite(), e.getKey(),
+                                attr.getName())) {
+                            continue;
+                        }
                         if (net != null && net.isStaticNet()) {
                             net = design.getStaticNet(net.getType());
                         } else if (mergedInto.containsKey(net)) {
@@ -1369,6 +1379,15 @@ public class DesignTools {
         for (Net target : mergedOnto) {
             removeDuplicatePIPs(target);
         }
+    }
+
+    /**
+     * @return True if the design has a BEL attribute of the given name on the given BEL.
+     */
+    private static boolean hasBELAttr(Design design, Site site, BEL bel, String name) {
+        Map<Site, SiteConfig> attrs = design.getBELAttrs();
+        SiteConfig siteConfig = attrs == null ? null : attrs.get(site);
+        return siteConfig != null && siteConfig.getBELAttribute(bel, name) != null;
     }
 
     /**
