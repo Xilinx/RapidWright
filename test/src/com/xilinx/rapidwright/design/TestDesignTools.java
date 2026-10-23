@@ -1208,7 +1208,7 @@ public class TestDesignTools {
      * site shared with the shell -- a GCLK_DELAY on a clock spine, say -- each names the net it saw
      * there. As Vivado's link_design does, the attribute is taken from the circuit that names a net
      * of its own, whichever order the black boxes are filled in, and is otherwise left as the shell
-     * has it.
+     * has it. A net on a circuit's input port is not its own: it is merged onto the shell's.
      */
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
@@ -1222,8 +1222,10 @@ public class TestDesignTools {
         BEL bel = site.getBEL("A6LUT");
         design.addBELAttr(shellClock, site, site.getSiteTypeEnum(), bel, "SHARED", "1");
         design.addBELAttr(shellClock, site, site.getSiteTypeEnum(), bel, "SHELL_ONLY", "2");
+        design.addBELAttr(shellClock, site, site.getSiteTypeEnum(), bel, "VIA_PORT", "3");
 
-        // bb0 names the shell's clock, through its copy of it; bb1 the copy of its own net x
+        // For SHARED, bb0 names the shell's clock, through its copy of it; for VIA_PORT, its input
+        // port's net. bb1 names the copy of its own net x for both
         Map<String, Design> circuits = new LinkedHashMap<>();
         for (String box : ownerFirst ? new String[] {"bb1", "bb0"} : new String[] {"bb0", "bb1"}) {
             in.createPortInst("I", createBlackBox(top, box, EDIFDirection.INPUT));
@@ -1232,6 +1234,8 @@ public class TestDesignTools {
             circuit.addBELAttr(named, site, site.getSiteTypeEnum(), bel, "SHARED", "1");
             circuit.addBELAttr(circuit.getNet("shell_clk"), site, site.getSiteTypeEnum(), bel,
                     "SHELL_ONLY", "2");
+            Net viaPort = circuit.getNet(box.equals("bb0") ? "I" : box + "/x");
+            circuit.addBELAttr(viaPort, site, site.getSiteTypeEnum(), bel, "VIA_PORT", "3");
             circuits.put(box, circuit);
         }
         Net ownNet = circuits.get("bb1").getNet("x");
@@ -1242,6 +1246,7 @@ public class TestDesignTools {
         Assertions.assertSame(ownNet, design.getNet("bb1/x"));
         Assertions.assertSame(ownNet, siteConfig.getBELAttribute(bel, "SHARED").getNet());
         Assertions.assertSame(shellClock, siteConfig.getBELAttribute(bel, "SHELL_ONLY").getNet());
+        Assertions.assertSame(ownNet, siteConfig.getBELAttribute(bel, "VIA_PORT").getNet());
     }
 
     /**
