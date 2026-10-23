@@ -1167,6 +1167,43 @@ public class TestDesignTools {
     }
 
     /**
+     * A BEL attribute can be on a context net, one of the empty nets named as in the full design
+     * that are dropped rather than moved in, as the reader creates one for a net named so. The
+     * attribute goes onto the design's net of that name instead: a copy of the circuit's own net
+     * with the black box's prefix becomes that net, and a copy of a shell's net the shell's. A net
+     * of a name the design does not have is left as it was, still written out under that name.
+     */
+    @Test
+    public void testPopulateBlackBoxBELAttrsOnContextNets() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", createBlackBox(top, "bb", EDIFDirection.INPUT));
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, design.createNet("in"));
+        Net shellClock = design.createNet("shell_clk");
+
+        Design circuit = createContextNetCircuit("bb", 1);
+        Net xNet = circuit.getNet("x");
+        Net unknown = new Net("unknown");
+        circuit.addNet(unknown);
+        Site site = circuit.getSiteInstFromSiteName("SLICE_X1Y0").getSite();
+        BEL bel = site.getBEL("A6LUT");
+        circuit.addBELAttr(circuit.getNet("bb/x"), site, site.getSiteTypeEnum(), bel, "COPY", "1");
+        circuit.addBELAttr(circuit.getNet("shell_clk"), site, site.getSiteTypeEnum(), bel, "SHELL",
+                "2");
+        circuit.addBELAttr(unknown, site, site.getSiteTypeEnum(), bel, "UNKNOWN", "3");
+
+        populateBlackBox(design, "bb", circuit, false);
+
+        SiteConfig siteConfig = design.getBELAttrs().get(site);
+        Assertions.assertSame(xNet, design.getNet("bb/x"));
+        Assertions.assertSame(xNet, siteConfig.getBELAttribute(bel, "COPY").getNet());
+        Assertions.assertSame(shellClock, siteConfig.getBELAttribute(bel, "SHELL").getNet());
+        Assertions.assertNull(design.getNet("unknown"));
+        Assertions.assertSame(unknown, siteConfig.getBELAttribute(bel, "UNKNOWN").getNet());
+    }
+
+    /**
      * An output the circuit does not drive brings in no physical net to merge, but its shell
      * routing must still respect keepBoundaryRouting. A circuit that is nothing but ports is still
      * a leaf to the parent net map, so the net owns itself; one with contents leaves the net with
