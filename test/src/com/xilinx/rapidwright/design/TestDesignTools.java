@@ -1116,11 +1116,16 @@ public class TestDesignTools {
      * A net on a port with nothing on it is removed, not merged, and its parent may have no
      * physical net to take a BEL attribute on it. The attribute is then left with no net rather
      * than the one removed -- unless another port's net has since become the parent's, in which
-     * case it goes onto that one, whichever port was reached first.
+     * case it goes onto that one, whichever port was reached first. The ports are reached in the
+     * same order each time, so it is the boxes the circuits fill that are swapped.
      */
     @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    public void testPopulateBlackBoxBELAttrsOnRemovedNet(boolean fillOther) {
+    @CsvSource({
+        "bb0, ",
+        "bb0, bb1",
+        "bb1, bb0",
+    })
+    public void testPopulateBlackBoxBELAttrsOnRemovedNet(String emptyBox, String readerBox) {
         // The shell: 'in', held as no physical net, into two black boxes
         Design design = new Design("shell", "xcvu3p");
         EDIFCell top = design.getTopEDIFCell();
@@ -1147,15 +1152,15 @@ public class TestDesignTools {
         addSinkLUT(reader, readerTop, "lut", "SLICE_X2Y0", readerIn, reader.createNet("I"));
 
         Map<String, Design> blackBoxes = new HashMap<>();
-        blackBoxes.put("bb0", empty);
-        if (fillOther) {
-            blackBoxes.put("bb1", reader);
+        blackBoxes.put(emptyBox, empty);
+        if (readerBox != null) {
+            blackBoxes.put(readerBox, reader);
         }
         populateBlackBox(design, blackBoxes, false);
 
-        Assertions.assertNull(design.getNet("bb0/I"));
+        Assertions.assertNull(design.getNet(emptyBox + "/I"));
         Net inNet = design.getNet("in");
-        Assertions.assertEquals(fillOther, inNet != null);
+        Assertions.assertEquals(readerBox != null, inNet != null);
         BELAttr attr = design.getBELAttrs().get(site).getBELAttribute(bel, "ON_PORT");
         Assertions.assertSame(inNet, attr.getNet());
         Assertions.assertEquals("1", attr.getValue());
