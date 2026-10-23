@@ -22,6 +22,9 @@
 
 package com.xilinx.rapidwright.design.xdc.parser;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class XDCTools {
     public static boolean stringNeedsBraces(String s) {
         return s.contains(" ") || s.contains("*") || s.contains("$");
@@ -93,6 +96,54 @@ public class XDCTools {
             word = word.substring(1, len - 1);
         }
         return word.replaceAll("\\\\(.)", "$1");
+    }
+
+    /**
+     * Splits the arguments of a Tcl command into words, as Tcl does: a word in braces or double
+     * quotes, or with a backslash before a space, can hold whitespace, and a command substitution
+     * in square brackets is part of the word it is in. Each word is returned as written, quoting
+     * included, for {@link #unquotedName(String)} to read.
+     *
+     * @param args The arguments, without the command name.
+     * @return The words.
+     */
+    public static List<String> splitWords(String args) {
+        List<String> words = new ArrayList<>();
+        StringBuilder word = new StringBuilder();
+        int braces = 0;
+        int brackets = 0;
+        boolean quoted = false;
+        for (int i = 0; i < args.length(); i++) {
+            char c = args.charAt(i);
+            if (c == '\\' && i + 1 < args.length()) {
+                word.append(c).append(args.charAt(++i));
+                continue;
+            }
+            if (Character.isWhitespace(c) && braces == 0 && brackets == 0 && !quoted) {
+                if (word.length() > 0) {
+                    words.add(word.toString());
+                    word.setLength(0);
+                }
+                continue;
+            }
+            if (c == '{' && !quoted) {
+                braces++;
+            } else if (c == '}' && braces > 0 && !quoted) {
+                braces--;
+            } else if (c == '[' && braces == 0) {
+                brackets++;
+            } else if (c == ']' && braces == 0 && brackets > 0) {
+                brackets--;
+            } else if (c == '"' && braces == 0 && brackets == 0
+                    && (quoted || word.length() == 0)) {
+                quoted = !quoted;
+            }
+            word.append(c);
+        }
+        if (word.length() > 0) {
+            words.add(word.toString());
+        }
+        return words;
     }
 
     /** Characters, besides whitespace, that Tcl gives a meaning to within a word */

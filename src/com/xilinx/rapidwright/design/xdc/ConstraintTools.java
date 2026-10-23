@@ -104,7 +104,7 @@ public class ConstraintTools {
      * <li>commands under a {@code current_instance} that is not the circuit's cell or a cell inside
      * it;</li>
      * <li>{@code HD.RECONFIGURABLE} on the circuit's design;</li>
-     * <li>commands that modify the pblock the circuit adds its top cell to
+     * <li>commands that create or modify the pblock the circuit adds its top cell to
      * ({@code add_cells_to_pblock [get_pblocks <name>] -top}), which is the partition's pblock and is
      * defined by the design;</li>
      * <li>the {@code SRC_FILE_INFO} table.</li>
@@ -180,11 +180,20 @@ public class ConstraintTools {
         return added;
     }
 
-    private static final Pattern ADD_TOP_TO_PBLOCK =
-            Pattern.compile("^add_cells_to_pblock\\s+\\[get_pblocks\\s+\\{?([^\\]\\s}]+)\\}?\\]\\s+-top\\b");
+    /** A Tcl word naming one object: braced, quoted, or bare with any [<n>] bus bit suffixes */
+    private static final String NAME_WORD = "(\\{[^}]*\\}|\"[^\"]*\"|(?:[^\\s\\[\\]{}\"]|\\[\\d+\\])+)";
 
-    private static final Pattern GET_PORTS =
-            Pattern.compile("get_ports\\s+(?:-quiet\\s+)?(?:\\{([^}]*)\\}|([^\\]\\s]+))");
+    private static final Pattern ADD_TOP_TO_PBLOCK =
+            Pattern.compile("^add_cells_to_pblock\\s+\\[get_pblocks\\s+" + NAME_WORD + "\\s*\\]\\s+-top\\b");
+
+    private static final Pattern GET_PBLOCKS =
+            Pattern.compile("\\[get_pblocks\\s+(?:-quiet\\s+)?" + NAME_WORD + "\\s*\\]");
+
+    /** get_ports with a braced list of names, or one bare name, which may be a bus bit */
+    private static final Pattern GET_PORTS = Pattern.compile(
+            "\\bget_ports\\s+(?:-quiet\\s+)?(?:\\{([^}]*)\\}|((?:[^\\s\\[\\]{}\"]|\\[\\d+\\])+))");
+
+    private static final Pattern ANY_GET_PORTS = Pattern.compile("\\bget_ports\\b");
 
     /** Queries for objects named relative to the current instance */
     private static final Pattern GET_SCOPED_OBJECTS =
@@ -294,7 +303,7 @@ public class ConstraintTools {
                 for (XDCCommand c : cmds) {
                     Matcher m = ADD_TOP_TO_PBLOCK.matcher(c.text);
                     if (m.find()) {
-                        ownPblocks.add(m.group(1));
+                        ownPblocks.add(XDCTools.unquotedName(m.group(1)));
                     }
                 }
             }
@@ -370,8 +379,8 @@ public class ConstraintTools {
          */
         private String currentInstance(String current, String cmd) {
             String path = null;
-            for (String word : cmd.substring("current_instance".length()).trim().split("\\s+")) {
-                if (word.isEmpty() || word.equals("-quiet") || word.equals("-verbose")) continue;
+            for (String word : XDCTools.splitWords(cmd.substring("current_instance".length()))) {
+                if (word.equals("-quiet") || word.equals("-verbose")) continue;
                 path = XDCTools.unquotedName(word);
             }
             if (path == null) {
@@ -415,19 +424,25 @@ public class ConstraintTools {
         }
 
         /**
-         * @return True if a command modifies the pblock the circuit adds its top cell to, rather
-         *         than merely naming it.
+         * @return True if a command creates or modifies the pblock the circuit adds its top cell
+         *         to, rather than merely naming it.
          */
         private boolean modifiesPblock(String cmd) {
-            for (String pblock : ownPblocks) {
-                String ref = "[get_pblocks " + pblock + "]";
-                String bracedRef = "[get_pblocks {" + pblock + "}]";
-                if (!cmd.contains(ref) && !cmd.contains(bracedRef)) continue;
-                if (cmd.startsWith("add_cells_to_pblock") || cmd.startsWith("resize_pblock")
-                        || cmd.startsWith("remove_cells_from_pblock") || cmd.startsWith("delete_pblock")) {
-                    return true;
+            if (ownPblocks.isEmpty()) return false;
+            if (cmd.startsWith("create_pblock ")) {
+                // The design already has it
+                for (String word : XDCTools.splitWords(cmd.substring("create_pblock".length()))) {
+                    if (!word.startsWith("-") && ownPblocks.contains(XDCTools.unquotedName(word))) return true;
                 }
-                if (cmd.startsWith("set_property") && (cmd.endsWith(ref) || cmd.endsWith(bracedRef))) {
+                return false;
+            }
+            boolean pblockCommand = cmd.startsWith("add_cells_to_pblock") || cmd.startsWith("resize_pblock")
+                    || cmd.startsWith("remove_cells_from_pblock") || cmd.startsWith("delete_pblock");
+            Matcher m = GET_PBLOCKS.matcher(cmd);
+            while (m.find()) {
+                if (!ownPblocks.contains(XDCTools.unquotedName(m.group(1)))) continue;
+                // A set_property modifies the objects it ends with
+                if (pblockCommand || (cmd.startsWith("set_property") && m.end() == cmd.length())) {
                     return true;
                 }
             }
@@ -441,8 +456,10 @@ public class ConstraintTools {
         private boolean namesOnlyDevicePins(String cmd) {
             if (GET_SCOPED_OBJECTS.matcher(cmd).find()) return false;
             Matcher m = GET_PORTS.matcher(cmd);
+            int found = 0;
             boolean any = false;
             while (m.find()) {
+                found++;
                 String names = m.group(1) != null ? m.group(1) : m.group(2);
                 for (String name : names.trim().split("\\s+")) {
                     if (name.isEmpty()) continue;
@@ -450,7 +467,13 @@ public class ConstraintTools {
                     any = true;
                 }
             }
-            return any;
+            // A get_ports whose names are not given as above, such as by a command substitution,
+            // cannot be checked
+            Matcher all = ANY_GET_PORTS.matcher(cmd);
+            while (all.find()) {
+                found--;
+            }
+            return any && found == 0;
         }
 
         /**

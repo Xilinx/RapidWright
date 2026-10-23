@@ -240,6 +240,7 @@ public class TestConstraintTools {
         top.createPort("pad", EDIFDirection.OUTPUT, 1);
         top.createPort("clk", EDIFDirection.INPUT, 1);
         top.createPort("din", EDIFDirection.INPUT, 1);
+        top.createPort("bus[1:0]", EDIFDirection.OUTPUT, 2);
         EDIFCell rpType = new EDIFCell(top.getLibrary(), "rpType");
         rpType.createPort("clk", EDIFDirection.INPUT, 1);
         rpType.createPort("din", EDIFDirection.INPUT, 1);
@@ -259,7 +260,11 @@ public class TestConstraintTools {
                 "set_false_path -from [get_ports pad] -to [get_cells x]",
                 // The circuit's clk port, not the device pin of the same name
                 "set_input_delay 1 [get_ports clk]",
-                "set_property IOSTANDARD LVCMOS18 [get_ports din]");
+                "set_property IOSTANDARD LVCMOS18 [get_ports din]",
+                // A bus bit, unbraced as PackagePinConstraint writes it
+                "set_property IOSTANDARD LVCMOS18 [get_ports bus[1]]",
+                // Names that cannot be checked without evaluating the command
+                "set_property IOSTANDARD LVCMOS12 [get_ports [list pad]]");
 
         DesignTools.populateBlackBox(design, Collections.singletonMap("rp", circuit), false);
 
@@ -269,7 +274,83 @@ public class TestConstraintTools {
                 "set_false_path -from [get_ports pad] -to [get_cells x]",
                 "set_input_delay 1 [get_ports clk]",
                 "current_instance -quiet",
-                "set_property IOSTANDARD LVCMOS18 [get_ports din]"), design.getXDCConstraints(ConstraintGroup.EARLY));
+                "set_property IOSTANDARD LVCMOS18 [get_ports din]",
+                "set_property IOSTANDARD LVCMOS18 [get_ports bus[1]]",
+                "current_instance rp",
+                "set_property IOSTANDARD LVCMOS12 [get_ports [list pad]]",
+                "current_instance -quiet"), design.getXDCConstraints(ConstraintGroup.EARLY));
+    }
+
+    /**
+     * The partition's pblock is not created, resized or changed again, whatever its name.
+     */
+    @Test
+    public void testAddBlackBoxConstraintsPartitionPblock() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFCell rpType = new EDIFCell(top.getLibrary(), "rpType");
+        rpType.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCellInst rp = rpType.createCellInst("rp", top);
+        rp.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+
+        Design circuit = new Design("circuit", "xcvu3p");
+        circuit.getTopEDIFCell().createPort("I", EDIFDirection.INPUT, 1);
+        circuit.addXDCConstraint(ConstraintGroup.EARLY,
+                "create_pblock {pblock_rp[0]}",
+                "add_cells_to_pblock [get_pblocks {pblock_rp[0]}] -top",
+                "resize_pblock [get_pblocks {pblock_rp[0]}] -add CLOCKREGION_X0Y0",
+                "set_property IS_SOFT FALSE [get_pblocks {pblock_rp[0]}]",
+                // A pblock of the circuit's own, which only names the partition's
+                "create_pblock pblock_io",
+                "set_property PARENT {pblock_rp[0]} [get_pblocks pblock_io]",
+                "set_property MAX_FANOUT 10 [get_nets n]");
+
+        DesignTools.populateBlackBox(design, Collections.singletonMap("rp", circuit), false);
+
+        Assertions.assertEquals(Arrays.asList(
+                "current_instance rp",
+                "create_pblock pblock_io",
+                "set_property PARENT {pblock_rp[0]} [get_pblocks pblock_io]",
+                "set_property MAX_FANOUT 10 [get_nets n]",
+                "current_instance -quiet"), design.getXDCConstraints(ConstraintGroup.EARLY));
+    }
+
+    /**
+     * A scope is read as one Tcl word, however it is quoted.
+     */
+    @Test
+    public void testAddBlackBoxConstraintsScopeWords() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFCell rpType = new EDIFCell(top.getLibrary(), "rpType");
+        rpType.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCellInst rp = rpType.createCellInst("rp", top);
+        rp.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+
+        Design circuit = new Design("circuit", "xcvu3p");
+        circuit.getTopEDIFCell().createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCell subType = new EDIFCell(circuit.getNetlist().getWorkLibrary(), "subType");
+        subType.createChildCellInst("w", circuit.getNetlist().getHDIPrimitive(Unisim.FDRE));
+        subType.createCellInst("sub block", circuit.getTopEDIFCell());
+
+        circuit.addXDCConstraint(ConstraintGroup.EARLY,
+                "current_instance {sub block}",
+                "set_property KEEP true [get_cells w]",
+                "current_instance -quiet",
+                "current_instance -quiet \"sub block\"",
+                "set_property ASYNC_REG true [get_cells w]",
+                "current_instance -quiet",
+                "current_instance sub\\ block",
+                "set_property DONT_TOUCH true [get_cells w]");
+
+        DesignTools.populateBlackBox(design, Collections.singletonMap("rp", circuit), false);
+
+        Assertions.assertEquals(Arrays.asList(
+                "current_instance {rp/sub block}",
+                "set_property KEEP true [get_cells w]",
+                "set_property ASYNC_REG true [get_cells w]",
+                "set_property DONT_TOUCH true [get_cells w]",
+                "current_instance -quiet"), design.getXDCConstraints(ConstraintGroup.EARLY));
     }
 
     /**
@@ -318,6 +399,8 @@ public class TestConstraintTools {
         for (String name : Arrays.asList("a/b_0", "a/b[0].c", "a{b[0]", "a b")) {
             Assertions.assertEquals(name, XDCTools.unquotedName(XDCTools.quotedName(name)));
         }
+        Assertions.assertEquals(Arrays.asList("-quiet", "{a b}", "\"c d\"", "e\\ f", "g[0]", "[get_cells {x y}]"),
+                XDCTools.splitWords(" -quiet {a b} \"c d\" e\\ f g[0] [get_cells {x y}] "));
     }
 
     /**
