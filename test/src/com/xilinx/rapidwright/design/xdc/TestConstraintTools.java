@@ -298,6 +298,65 @@ public class TestConstraintTools {
     }
 
     /**
+     * A get_ports that names both device pins and ports of the circuit is split in two, and
+     * patterns count by the ports they match.
+     */
+    @Test
+    public void testAddBlackBoxConstraintsMixedGetPorts() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        top.createPort("pad", EDIFDirection.OUTPUT, 1);
+        top.createPort("clk", EDIFDirection.INPUT, 1);
+        top.createPort("din", EDIFDirection.INPUT, 1);
+        EDIFCell rpType = new EDIFCell(top.getLibrary(), "rpType");
+        rpType.createPort("clk", EDIFDirection.INPUT, 1);
+        rpType.createPort("din", EDIFDirection.INPUT, 1);
+        EDIFCellInst rp = rpType.createCellInst("rp", top);
+        rp.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+        // The box's din is on the device pin din; its clk is not on the device pin clk
+        EDIFNet din = top.createNet("din");
+        din.createPortInst(top.getPort("din"));
+        din.createPortInst("din", rp);
+
+        Design circuit = new Design("circuit", "xcvu3p");
+        circuit.getTopEDIFCell().createPort("clk", EDIFDirection.INPUT, 1);
+        circuit.getTopEDIFCell().createPort("din", EDIFDirection.INPUT, 1);
+        circuit.addXDCConstraint(ConstraintGroup.EARLY,
+                // Both kinds in one get_ports
+                "set_max_delay 2 -from [get_ports {pad clk}] -to [get_pins y/D]",
+                "set_false_path -from [get_ports -quiet {din clk}]",
+                // Patterns that only match device pins
+                "set_max_delay 3 -from [get_ports pa*] -to [get_pins y/D]",
+                "set_max_delay 4 -from [get_ports -regexp {pa.}] -to [get_pins y/D]",
+                // Patterns that match both
+                "set_false_path -to [get_ports *]",
+                "set_false_path -to [get_ports -regexp {[cp].*}]",
+                // A pattern that only matches the circuit's port
+                "set_property KEEP true [get_ports -regexp -nocase {C.K}]",
+                // A list continued onto the next line
+                "set_max_delay 5 -from [get_ports {pad \\",
+                "    din}] -to [get_pins y/D]",
+                "set_property IOSTANDARD LVCMOS18 [get_ports pa?]");
+
+        DesignTools.populateBlackBox(design, Collections.singletonMap("rp", circuit), false);
+
+        Assertions.assertEquals(Arrays.asList(
+                "current_instance rp",
+                "set_max_delay 2 -from [concat [get_ports pad] [get_ports -scoped_to_current_instance clk]] -to [get_pins y/D]",
+                "set_false_path -from [concat [get_ports -quiet din] [get_ports -scoped_to_current_instance -quiet clk]]",
+                "set_max_delay 3 -from [get_ports pa*] -to [get_pins y/D]",
+                "set_max_delay 4 -from [get_ports -regexp {pa.}] -to [get_pins y/D]",
+                // Split, a pattern is replaced by the names it matches, and -regexp is dropped
+                "set_false_path -to [concat [get_ports {din pad}] [get_ports -scoped_to_current_instance clk]]",
+                "set_false_path -to [concat [get_ports pad] [get_ports -scoped_to_current_instance clk]]",
+                "set_property KEEP true [get_ports -scoped_to_current_instance -regexp -nocase {C.K}]",
+                "set_max_delay 5 -from [get_ports {pad \\",
+                "    din}] -to [get_pins y/D]",
+                "current_instance -quiet",
+                "set_property IOSTANDARD LVCMOS18 [get_ports pa?]"), design.getXDCConstraints(ConstraintGroup.EARLY));
+    }
+
+    /**
      * NORMAL constraints are not added, with a warning if they hold more than pblocks and the
      * context's constraints.
      */
