@@ -1204,6 +1204,47 @@ public class TestDesignTools {
     }
 
     /**
+     * Circuits written against an abstract shell hold the shell's BEL attributes as well, and on a
+     * site shared with the shell -- a GCLK_DELAY on a clock spine, say -- each names the net it saw
+     * there. As Vivado's link_design does, the attribute is taken from the circuit that names a net
+     * of its own, whichever order the black boxes are filled in, and is otherwise left as the shell
+     * has it.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testPopulateBlackBoxBELAttrsSharedWithShell(boolean ownerFirst) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, design.createNet("in"));
+        Net shellClock = design.createNet("shell_clk");
+        Site site = design.getDevice().getSite("SLICE_X10Y0");
+        BEL bel = site.getBEL("A6LUT");
+        design.addBELAttr(shellClock, site, site.getSiteTypeEnum(), bel, "SHARED", "1");
+        design.addBELAttr(shellClock, site, site.getSiteTypeEnum(), bel, "SHELL_ONLY", "2");
+
+        // bb0 names the shell's clock, through its copy of it; bb1 the copy of its own net x
+        Map<String, Design> circuits = new LinkedHashMap<>();
+        for (String box : ownerFirst ? new String[] {"bb1", "bb0"} : new String[] {"bb0", "bb1"}) {
+            in.createPortInst("I", createBlackBox(top, box, EDIFDirection.INPUT));
+            Design circuit = createContextNetCircuit(box, box.equals("bb0") ? 1 : 3);
+            Net named = circuit.getNet(box.equals("bb0") ? "shell_clk" : box + "/x");
+            circuit.addBELAttr(named, site, site.getSiteTypeEnum(), bel, "SHARED", "1");
+            circuit.addBELAttr(circuit.getNet("shell_clk"), site, site.getSiteTypeEnum(), bel,
+                    "SHELL_ONLY", "2");
+            circuits.put(box, circuit);
+        }
+        Net ownNet = circuits.get("bb1").getNet("x");
+
+        populateBlackBox(design, circuits, false);
+
+        SiteConfig siteConfig = design.getBELAttrs().get(site);
+        Assertions.assertSame(ownNet, design.getNet("bb1/x"));
+        Assertions.assertSame(ownNet, siteConfig.getBELAttribute(bel, "SHARED").getNet());
+        Assertions.assertSame(shellClock, siteConfig.getBELAttribute(bel, "SHELL_ONLY").getNet());
+    }
+
+    /**
      * An output the circuit does not drive brings in no physical net to merge, but its shell
      * routing must still respect keepBoundaryRouting. A circuit that is nothing but ports is still
      * a leaf to the parent net map, so the net owns itself; one with contents leaves the net with
